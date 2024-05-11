@@ -6579,6 +6579,35 @@ public:
             "transferring result means all results are transferring");
 
     // We should only ever have a single sil_isolated parameter.
+    bool foundIsolatedParameter = false;
+    for (const auto &parameterInfo : FTy->getParameters()) {
+      if (parameterInfo.hasOption(SILParameterInfo::Isolated)) {
+        auto argType = parameterInfo.getArgumentType(F.getModule(),
+                                                     FTy,
+                                                     F.getTypeExpansionContext());
+        if (argType->isOptional())
+          argType = argType->lookThroughAllOptionalTypes()->getCanonicalType();
+
+        auto genericSig = FTy->getInvocationGenericSignature();
+        auto &ctx = F.getASTContext();
+        auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+        auto *anyActorProtocol = ctx.getProtocol(KnownProtocolKind::AnyActor);
+        bool genericTypeWithActorRequirement = llvm::any_of(
+            genericSig.getRequirements(), [&](const Requirement &other) {
+              if (other.getKind() != RequirementKind::Conformance)
+                return false;
+              if (other.getFirstType()->getCanonicalType() != argType)
+                return false;
+              auto *otherProtocol = other.getProtocolDecl();
+              return otherProtocol->inheritsFrom(actorProtocol) ||
+                     otherProtocol->inheritsFrom(anyActorProtocol);
+            });
+        require(argType->isAnyActorType() || genericTypeWithActorRequirement,
+                "Only any actor types can be isolated");
+        require(!foundIsolatedParameter, "Two isolated parameters");
+        foundIsolatedParameter = true;
+      }
+    }
     require(1 >= std::count_if(FTy->getParameters().begin(), FTy->getParameters().end(),
                                [](const SILParameterInfo &parameterInfo) {
                                  return parameterInfo.hasOption(SILParameterInfo::Isolated);
