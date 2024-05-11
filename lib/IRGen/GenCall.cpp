@@ -38,6 +38,7 @@
 #include <optional>
 
 #include "CallEmission.h"
+#include "ClassTypeInfo.h"
 #include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
 #include "GenCall.h"
@@ -2612,9 +2613,16 @@ public:
     if (fnConv.getNumDirectSILResults() == 1
         && (fnConv.getDirectSILResults().begin()->getConvention()
             == ResultConvention::Autoreleased)) {
-      if (IGF.IGM.Context.LangOpts.EnableObjCInterop)
-        result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
-      else
+      if (IGF.IGM.Context.LangOpts.EnableObjCInterop) {
+        auto ty = fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
+        auto *classTypeInfo = dyn_cast<ClassTypeInfo>(&IGF.IGM.getTypeInfo(ty));
+        if (classTypeInfo && classTypeInfo->getReferenceCounting() == ReferenceCounting::Custom) {
+          Explosion e(result);
+          classTypeInfo->strongCustomRetain(IGF, e, true);
+        } else {
+          result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+        }
+      } else
         IGF.emitNativeStrongRetain(result, IGF.getDefaultAtomicity());
     }
 
