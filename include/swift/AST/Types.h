@@ -128,10 +128,9 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains a context-dependent archetype, either a
-    /// \c PrimaryArchetypeType, \c OpenedArchetypeType,
-    /// \c ElementArchetypeType, or \c PackArchetype.
-    HasArchetype         = 0x02,
+    /// This type expression contains a PrimaryArchetypeType
+    /// or PackArchetypeType.
+    HasPrimaryArchetype  = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter     = 0x04,
@@ -171,7 +170,7 @@ public:
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
 
-    /// This type contains an ElementArchetype.
+    /// This type contains an ElementArchetypeType.
     HasElementArchetype = 0x4000,
 
     /// Whether the type is allocated in the constraint solver arena. This can
@@ -205,9 +204,9 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain a
-  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
-  bool hasArchetype() const { return Bits & HasArchetype; }
+  /// Does a type with these properties structurally contain a primary
+  /// archetype?
+  bool hasPrimaryArchetype() const { return Bits & HasPrimaryArchetype; }
 
   /// Does a type with these properties structurally contain an
   /// archetype from an opaque type declaration?
@@ -696,9 +695,21 @@ public:
     return getRecursiveProperties().hasPlaceholder();
   }
 
-  /// Determine whether the type involves a context-dependent archetype.
+  /// Determine whether the type involves a primary archetype.
+  bool hasPrimaryArchetype() const {
+    return getRecursiveProperties().hasPrimaryArchetype();
+  }
+
+  /// Whether the type contains a PackArchetypeType.
+  bool hasPackArchetype() const {
+    return getRecursiveProperties().hasPackArchetype();
+  }
+
+  /// Determine whether the type involves a primary, pack or local archetype.
+  ///
+  /// FIXME: Replace all remaining callers with a more precise check.
   bool hasArchetype() const {
-    return getRecursiveProperties().hasArchetype();
+    return hasPrimaryArchetype() || hasLocalArchetype();
   }
   
   /// Determine whether the type involves an opened existential archetype.
@@ -725,11 +736,6 @@ public:
   /// Whether the type contains a PackType.
   bool hasPack() const {
     return getRecursiveProperties().hasPack();
-  }
-
-  /// Whether the type contains a PackArchetypeType.
-  bool hasPackArchetype() const {
-    return getRecursiveProperties().hasPackArchetype();
   }
 
   /// Whether the type has any flavor of pack.

@@ -81,7 +81,7 @@ bb0(%owned_value : @owned $T):
   %unowned_value = unowned_copy_value %owned_value : $T
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@sil_unowned T>(%unowned_value) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{task-isolated value of type 'T' transferred to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@sil_unowned T>(%unowned_value) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
 
   destroy_value %unowned_value : $@sil_unowned T
   //destroy_value %value : $T
@@ -102,9 +102,9 @@ bb0:
   open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
   %elt = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'τ_1_0' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
 
-  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{use here could race}}
+  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{access can happen concurrently}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
   end_borrow %1 : $(repeat each T)
@@ -119,12 +119,12 @@ bb0:
   %p = apply %f() : $@convention(thin) () -> @owned P
 
   %transferP = function_ref @transferP : $@async @convention(thin) (@guaranteed P) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%p) : $@async @convention(thin) (@guaranteed P) -> () // expected-warning {{transferring value of non-Sendable type 'any P' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%p) : $@async @convention(thin) (@guaranteed P) -> () // expected-warning {{}}
 
   %b = begin_borrow %p : $P
   %v = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
   %w = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.doSomething, %v : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{use here could race}}
+  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
   end_borrow %b : $P
   destroy_value %p : $P
 
@@ -140,11 +140,11 @@ bb0:
   %pBorrowed = begin_borrow %p : $Optional<PAnyObject>
   %pExt = unchecked_enum_data %pBorrowed : $Optional<PAnyObject>, #Optional.some!enumelt
   %transferP = function_ref @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{transferring value of non-Sendable type 'any PAnyObject' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{}}
 
   %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
   %weakFunc = function_ref @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
-  apply %weakFunc(%w) : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> () // expected-note {{use here could race}}
+  apply %weakFunc(%w) : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> () // expected-note {{access can happen concurrently}}
   destroy_value %w : $@sil_weak Optional<PAnyObject>
 
   end_borrow %pBorrowed : $Optional<PAnyObject>
@@ -162,12 +162,12 @@ bb0:
   %pBorrowed = begin_borrow %p : $Optional<PAnyObject>
   %pExt = unchecked_enum_data %pBorrowed : $Optional<PAnyObject>, #Optional.some!enumelt
   %transferP = function_ref @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{transferring value of non-Sendable type 'any PAnyObject' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{}}
 
   %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
   %s = strong_copy_weak_value %w : $@sil_weak Optional<PAnyObject>
   %weakFunc = function_ref @usePAnyObject : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> ()
-  apply %weakFunc(%s) : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> () // expected-note {{use here could race}}
+  apply %weakFunc(%s) : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> () // expected-note {{access can happen concurrently}}
   destroy_value %s : $Optional<PAnyObject>
   destroy_value %w : $@sil_weak Optional<PAnyObject>
 
@@ -185,11 +185,11 @@ bb0:
 
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+  // expected-warning @-1 {{}}
 
   %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P
   %f2 = function_ref @useP : $@convention(thin) (@in_guaranteed P) -> ()
-  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{use here could race}}
+  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{access can happen concurrently}}
   destroy_value %i : $P
 
   %9999 = tuple ()

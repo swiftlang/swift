@@ -164,7 +164,8 @@ public func registerOptimizerTests() {
     lifetimeDependenceUseTest,
     linearLivenessTest,
     parseTestSpecificationTest,
-    variableIntroducerTest
+    variableIntroducerTest,
+    gatherCallSitesTest
   )
 
   // Finally register the thunk they all call through.
@@ -197,10 +198,6 @@ private func functionTestThunk(
   let invocation = castToInvocation(fromOpaquePointer: erasedInvocation)
   let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
   invocation(function.function, arguments.native, context)
-#if !os(Windows)
-  // TODO: https://github.com/apple/swift/issues/73252
-  fflush(stdout)
-#endif
 }
 
 /// Bitcast a thin test closure to void *.

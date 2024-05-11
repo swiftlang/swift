@@ -158,22 +158,9 @@ namespace {
 template <typename DeclType>
 bool checkResilience(DeclType *D, ModuleDecl *M,
                      ResilienceExpansion expansion) {
-  auto refDeclModule = D->getModuleContext();
   // Explicitly bypassed for debugging with `bypass-resilience-checks`
-  if (refDeclModule->getBypassResilience())
+  if (D->getModuleContext()->getBypassResilience())
     return false;
-
-  // If package serialization is enabled with `experimental-package-cmo`,
-  // decls can be serialized in a resiliently built module. In such case,
-  // a direct access should be allowed.
-  auto packageSerialized = expansion == ResilienceExpansion::Minimal &&
-                           refDeclModule->isResilient() &&
-                           refDeclModule->allowNonResilientAccess() &&
-                           refDeclModule->serializePackageEnabled() &&
-                           refDeclModule->inSamePackage(M);
-  if (packageSerialized)
-    return false;
-
   return D->isResilient(M, expansion);
 }
 
@@ -3002,6 +2989,9 @@ public:
   }
 
   void checkAssignOrInitInst(AssignOrInitInst *AI) {
+    if (F.getASTContext().hadError())
+      return;
+
     SILValue Src = AI->getSrc();
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign_or_init can only exist in raw SIL");
@@ -6620,6 +6610,9 @@ public:
   ///  the task, or exiting the function
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
+    if (F->getASTContext().hadError())
+      return;
+
     // Do a traversal of the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.

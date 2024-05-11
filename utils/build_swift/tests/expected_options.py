@@ -72,8 +72,9 @@ EXPECTED_DEFAULTS = {
     'build_llbuild': False,
     'build_lldb': False,
     'build_libcxx': False,
+    'build_linux_static': False,
     'build_ninja': False,
-    'build_lld': False,
+    'build_lld': True,
     'build_osx': True,
     'build_playgroundsupport': False,
     'build_runtime_with_host_compiler': False,
@@ -211,6 +212,7 @@ EXPECTED_DEFAULTS = {
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'libxml2_build_variant': 'Debug',
+    'linux_archs': None,
     'lit_jobs': multiprocessing.cpu_count(),
     'zlib_build_variant': 'Debug',
     'curl_build_variant': 'Debug',
@@ -235,6 +237,8 @@ EXPECTED_DEFAULTS = {
     'lto_type': None,
     'maccatalyst': False,
     'maccatalyst_ios_tests': False,
+    'musl_path': '/usr/local/musl',
+    'linux_static_archs': ['x86_64', 'aarch64'],
     'native_clang_tools_path': None,
     'native_llvm_tools_path': None,
     'native_swift_tools_path': None,
@@ -281,6 +285,7 @@ EXPECTED_DEFAULTS = {
     'test_ios_host': False,
     'test_ios_simulator': False,
     'test_linux': False,
+    'test_linux_static': False,
     'test_optimize_for_size': None,
     'test_optimize_none_with_implicit_dynamic': None,
     'test_optimized': None,
@@ -683,6 +688,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-ios-simulator',
                   dest='build_ios_simulator'),
     DisableOption('--skip-build-linux', dest='build_linux'),
+    EnableOption('--build-linux-static'),
     DisableOption('--skip-build-osx', dest='build_osx'),
     DisableOption('--skip-build-tvos', dest='build_tvos'),
     DisableOption('--skip-build-tvos-device', dest='build_tvos_device'),
@@ -714,6 +720,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-ios-host', dest='test_ios_host'),
     DisableOption('--skip-test-ios-simulator', dest='test_ios_simulator'),
     DisableOption('--skip-test-linux', dest='test_linux'),
+    DisableOption('--skip-test-linux-static', dest='test_linux_static'),
     DisableOption('--skip-test-osx', dest='test_osx'),
     DisableOption('--skip-test-tvos', dest='test_tvos'),
     DisableOption('--skip-test-tvos-host', dest='test_tvos_host'),
@@ -746,6 +753,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-zlib', dest='build_zlib'),
     DisableOption('--skip-build-curl', dest='build_curl'),
     DisableOption('--skip-build-compiler-rt', dest='build_compiler_rt'),
+    DisableOption('--skip-build-lld', dest='build_lld'),
 
     ChoicesOption('--compiler-vendor',
                   choices=['none', 'apple']),
@@ -774,6 +782,9 @@ EXPECTED_OPTIONS = [
     StrOption('--swift-darwin-supported-archs'),
     SetTrueOption('--swift-freestanding-is-darwin'),
 
+    StrOption('--linux-archs'),
+    StrOption('--linux-static-archs'),
+
     PathOption('--android-deploy-device-path'),
     PathOption('--android-ndk'),
     PathOption('--build-subdir'),
@@ -798,6 +809,7 @@ EXPECTED_OPTIONS = [
     PathOption('--cmake-cxx-launcher'),
     PathOption('--swift-profile-instr-use'),
     PathOption('--swift-runtime-fixed-backtracer-path'),
+    PathOption('--musl-path'),
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),
@@ -838,7 +850,7 @@ EXPECTED_OPTIONS = [
 
     SetOption('--bootstrapping', dest='bootstrapping_mode'),
     ChoicesOption('--bootstrapping', dest='bootstrapping_mode',
-                  choices=['off', 'hosttools', 'bootstrapping',
+                  choices=['hosttools', 'bootstrapping',
                            'bootstrapping-with-hostlibs']),
 
     # NOTE: We'll need to manually test the behavior of these since they

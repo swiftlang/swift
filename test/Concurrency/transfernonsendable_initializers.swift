@@ -33,7 +33,7 @@ actor ActorWithSynchronousNonIsolatedInit {
 
     // TODO: This should say actor isolated.
     let _ = { @MainActor in
-      print(newK) // expected-error {{transferring 'newK' may cause a data race}}
+      print(newK) // expected-error {{sending 'newK' risks causing data races}}
       // expected-note @-1 {{task-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -45,7 +45,7 @@ actor ActorWithSynchronousNonIsolatedInit {
 
     let _ = { @MainActor in
       // TODO: Second part should say later 'self'-isolated uses
-      print(newK) // expected-error {{transferring 'newK' may cause a data race}}
+      print(newK) // expected-error {{sending 'newK' risks causing data races}}
       // expected-note @-1 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -56,19 +56,19 @@ actor ActorWithSynchronousNonIsolatedInit {
 func initActorWithSyncNonIsolatedInit() {
   let k = NonSendableKlass()
   // TODO: This should say actor isolated.
-  _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{transferring 'k' may cause a data race}}
-  // expected-note @-1 {{transferring disconnected 'k' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{use here could race}}
+  _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  let _ = { @MainActor in // expected-note {{access can happen concurrently}}
     print(k)
   }
 }
 
 func initActorWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
   // TODO: This should say actor isolated.
-  _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{transferring 'k' may cause a data race}}
-  // expected-note @-1 {{transferring task-isolated 'k' to actor-isolated callee could cause races between actor-isolated and task-isolated uses}}
+  _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
   let _ = { @MainActor in
-    print(k) // expected-error {{transferring 'k' may cause a data race}}
+    print(k) // expected-error {{sending 'k' risks causing data races}}
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }
@@ -76,7 +76,7 @@ func initActorWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
 actor ActorWithAsyncIsolatedInit {
   init(_ newK: NonSendableKlass) async {
     let _ = { @MainActor in
-      print(newK) // expected-error {{transferring 'newK' may cause a data race}}
+      print(newK) // expected-error {{sending 'newK' risks causing data races}}
       // expected-note @-1 {{actor-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -85,19 +85,19 @@ actor ActorWithAsyncIsolatedInit {
 func initActorWithAsyncIsolatedInit() async {
   let k = NonSendableKlass()
   // TODO: This should say actor isolated.
-  _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{transferring 'k' may cause a data race}}
-  // expected-note @-1 {{transferring disconnected 'k' to actor-isolated callee could cause races in between callee actor-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{use here could race}}
+  _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and local nonisolated uses}}
+  let _ = { @MainActor in // expected-note {{access can happen concurrently}}
     print(k)
   }
 }
 
 func initActorWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
   // TODO: This should say actor isolated.
-  _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{transferring 'k' may cause a data race}}
-  // expected-note @-1 {{transferring task-isolated 'k' to actor-isolated callee could cause races between actor-isolated and task-isolated uses}}
+  _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
   let _ = { @MainActor in
-    print(k) // expected-error {{transferring 'k' may cause a data race}}
+    print(k) // expected-error {{sending 'k' risks causing data races}}
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }
@@ -114,7 +114,7 @@ class ClassWithSynchronousNonIsolatedInit {
     helper(newK)
 
     let _ = { @MainActor in
-      print(newK) // expected-error {{transferring 'newK' may cause a data race}}
+      print(newK) // expected-error {{sending 'newK' risks causing data races}}
       // expected-note @-1 {{task-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -133,7 +133,7 @@ func initClassWithSyncNonIsolatedInit() {
 func initClassWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
   _ = ClassWithSynchronousNonIsolatedInit(k)
   let _ = { @MainActor in
-    print(k) // expected-error {{transferring 'k' may cause a data race}}
+    print(k) // expected-error {{sending 'k' risks causing data races}}
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }
@@ -142,7 +142,7 @@ func initClassWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
 class ClassWithAsyncIsolatedInit {
   init(_ newK: NonSendableKlass) async {
     let _ = { @MainActor in
-      print(newK) // expected-error {{transferring 'newK' may cause a data race}}
+      print(newK) // expected-error {{sending 'newK' risks causing data races}}
       // expected-note @-1 {{global actor 'CustomActor'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -153,18 +153,18 @@ func initClassWithAsyncIsolatedInit() async {
   // TODO: Might make sense to emit a more specific error here since the closure
   // is MainActor isolated. The actual capture is initially not isolated to
   // MainActor.
-  _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{transferring 'k' may cause a data race}}
-  // expected-note @-1 {{transferring disconnected 'k' to global actor 'CustomActor'-isolated callee could cause races in between callee global actor 'CustomActor'-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{use here could race}}
+  _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated and local nonisolated uses}}
+  let _ = { @MainActor in // expected-note {{access can happen concurrently}}
     print(k)
   }
 }
 
 func initClassWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
-  _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{transferring 'k' may cause a data race}}
-  // expected-note @-1 {{transferring task-isolated 'k' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and task-isolated uses}}
+  _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated and task-isolated uses}}
   let _ = { @MainActor in
-    print(k) // expected-error {{transferring 'k' may cause a data race}}
+    print(k) // expected-error {{sending 'k' risks causing data races}}
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }

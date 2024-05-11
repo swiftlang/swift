@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/NoncopyableGenerics_Misc.swiftmodule \
@@ -9,7 +8,6 @@
 // RUN:     %S/Inputs/NoncopyableGenerics_Misc.swift
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -enable-experimental-feature BorrowingSwitch \
@@ -25,19 +23,16 @@
 // See if we can compile a module through just the interface and typecheck using it.
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/NoncopyableGenerics_Misc.swiftinterface -o %t/NoncopyableGenerics_Misc.swiftmodule
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/Swiftskell.swiftinterface -o %t/Swiftskell.swiftmodule
 
 // RUN: %target-swift-frontend -emit-silgen -I %t %s \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:    -enable-experimental-feature NonescapableTypes \
 // RUN:    -o %t/final.silgen
@@ -163,6 +158,39 @@ import NoncopyableGenerics_Misc
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public func suppressesNoncopyableGenerics<T>(_ t: borrowing T) where T : ~Copyable
+// CHECK-MISC-NEXT: #endif
+
+// CHECK-MISC:      #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct LoudlyNC<T> where T : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: public func _indexHumongousDonuts<TTT, T>(_ aggregate: Swift.UnsafePointer<TTT>, _ index: Swift.Int) -> T
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public func referToLoud(_ t: {{.*}}.LoudlyNC<Swift.String>)
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NEXT: public func referToLoud(_ t: {{.*}}.LoudlyNC<Swift.String>)
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public func referToLoudProperGuarding(_ t: {{.*}}.LoudlyNC<Swift.String>)
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: public struct NoCopyPls : ~Swift.Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: public func substCopyable(_ t: Swift.String?)
+// CHECK-MISC-NEXT: public func substGenericCopyable<T>(_ t: T?)
+
+// NOTE: we really shouldn't be emitting the else branch for the two funcs
+// below, since the suppressed version isn't valid. We don't have a good way of
+// fixing that right now, either.
+
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public func substNC(_ t: borrowing {{.*}}.NoCopyPls?)
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NEXT: public func substNC(_ t: borrowing {{.*}}.NoCopyPls?)
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public func substGenericNC<T>(_ t: borrowing T?) where T : ~Copyable
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NEXT: public func substGenericNC<T>(_ t: borrowing T?)
 // CHECK-MISC-NEXT: #endif
 
 

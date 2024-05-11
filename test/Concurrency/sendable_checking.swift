@@ -96,8 +96,8 @@ public actor MyActor: MyProto {
 
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{transferring 'ns1' may cause a data race}}
-    // expected-tns-note @-2 {{transferring actor-isolated 'ns1' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
+    // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
+    // expected-tns-note @-2 {{sending actor-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and actor-isolated uses}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
@@ -253,13 +253,13 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{transferring 'self' may cause a data race}}
-    // expected-tns-note @-3 {{transferring task-isolated 'self' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+    // expected-tns-warning @-2 {{sending 'self' risks causing data races}}
+    // expected-tns-note @-3 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{transferring 'self' may cause a data race}}
-    // expected-tns-note @-3 {{transferring task-isolated 'self' to main actor-isolated callee could cause races between main actor-isolated and task-isolated uses}}
+    // expected-tns-warning @-2 {{sending 'self' risks causing data races}}
+    // expected-tns-note @-3 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -277,12 +277,12 @@ func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 't' may cause a data race}}
-  // expected-tns-note @-3 {{transferring disconnected 't' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
+  // expected-tns-warning @-2 {{sending 't' risks causing data races}}
+  // expected-tns-note @-3 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-tns-note@-2 {{use here could race}}
+  // expected-tns-note@-2 {{access can happen concurrently}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -297,14 +297,14 @@ func callNonisolatedAsyncClosure(
 ) async {
   await g(ns)
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 'ns' may cause a data race}}
-  // expected-tns-note @-3 {{transferring main actor-isolated 'ns' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
+  // expected-tns-note @-3 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 'ns' may cause a data race}}
-  // expected-tns-note @-3 {{transferring main actor-isolated 'ns' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
+  // expected-tns-note @-3 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 @available(SwiftStdlib 5.1, *)

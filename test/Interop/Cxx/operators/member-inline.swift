@@ -394,6 +394,22 @@ OperatorsTestSuite.test("SubscriptSetterConst") {
   setterConst[0] = 10
 }
 
+OperatorsTestSuite.test("SubscriptUnnamedParameter") {
+  let unnamed = SubscriptUnnamedParameter()
+  expectEqual(123, unnamed[0])
+  expectEqual(123, unnamed[321])
+}
+
+OperatorsTestSuite.test("SubscriptUnnamedParameterReadWrite") {
+  var unnamed = SubscriptUnnamedParameterReadWrite()
+  expectEqual(0, unnamed[0])
+  expectEqual(0, unnamed[321])
+
+  unnamed[456] = 456
+  expectEqual(456, unnamed[0])
+  expectEqual(456, unnamed[321])
+}
+
 OperatorsTestSuite.test("DerivedFromConstIteratorPrivatelyWithUsingDecl.pointee") {
   let stars = DerivedFromConstIteratorPrivatelyWithUsingDecl()
   let res = stars.pointee

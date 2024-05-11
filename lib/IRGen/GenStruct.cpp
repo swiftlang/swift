@@ -1706,8 +1706,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
         IGM.getSwiftModule()->getASTContext().getProtocol(
             KnownProtocolKind::BitwiseCopyable);
     if (bitwiseCopyableProtocol &&
-        IGM.getSwiftModule()->lookupConformance(D->getDeclaredInterfaceType(),
-                                                bitwiseCopyableProtocol)) {
+        IGM.getSwiftModule()->checkConformance(type, bitwiseCopyableProtocol)) {
       return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, structAccessible);
     }
     return &getResilientStructTypeInfo(copyable, structAccessible);

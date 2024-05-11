@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -test-runner \
-// RUN:   -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   %s -o /dev/null 2>&1 | %FileCheck %s
 
 sil_stage raw

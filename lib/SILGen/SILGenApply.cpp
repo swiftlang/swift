@@ -3223,6 +3223,14 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
 
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
+  ForceValueExpr *forceUnwrap = nullptr;
+  // Check for a force unwrap. This might show up inside or outside of the
+  // load.
+  if (auto *fu = dyn_cast<ForceValueExpr>(argExpr)) {
+    forceUnwrap = fu;
+    argExpr = fu->getSubExpr();
+  }
+  
   // If there's a load around the outer part of this arg expr, look past it.
   bool sawLoad = false;
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
@@ -3230,34 +3238,39 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     sawLoad = true;
   }
 
+  // Check again for a force unwrap before the load.
+  if (auto *fu = dyn_cast<ForceValueExpr>(argExpr)) {
+    forceUnwrap = fu;
+    argExpr = fu->getSubExpr();
+  }
+
   // If we're consuming instead, then the load _must_ have been there.
   if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
     return nullptr;
 
-  // If we did not see a load and our argExpr is a
-  // declref_expr, return nullptr. We have an object not something that will be
-  // in memory. This can happen with classes or with values captured by a
-  // closure.
-  //
-  // NOTE: If we see a member_ref_expr from a decl_ref_expr, we still process it
-  // since the declref_expr could be from a class.
+  // TODO: This section should be removed eventually. Decl refs should not be
+  // handled different from other storage. Removing it breaks some things
+  // currently.
   if (!sawLoad) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-      
-      // Proceed if the storage references a global or static let.
-      // TODO: We should treat any storage reference as a borrow, it seems, but
-      // that currently disrupts what the move checker expects. It would also
-      // be valuable to borrow copyable global lets, but this is a targeted
-      // fix to allow noncopyable globals to work properly.
-      bool isGlobal = false;
-      if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
-        isGlobal = vd->isGlobalStorage();
-      }
-      
-      if (!isGlobal) {
-        return nullptr;
+             
+      // Proceed if the storage reference is a force unwrap.
+      if (!forceUnwrap) {
+        // Proceed if the storage references a global or static let.
+        // TODO: We should treat any storage reference as a borrow, it seems, but
+        // that currently disrupts what the move checker expects. It would also
+        // be valuable to borrow copyable global lets, but this is a targeted
+        // fix to allow noncopyable globals to work properly.
+        bool isGlobal = false;
+        if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
+          isGlobal = vd->isGlobalStorage();
+        }
+        
+        if (!isGlobal) {
+          return nullptr;
+        }
       }
     }
   }
@@ -3302,6 +3315,10 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   }
   if (!isMoveOnly)
     return nullptr;
+    
+  if (forceUnwrap) {
+    return forceUnwrap;
+  }
 
   return result.getTransitiveRoot();
 }

@@ -943,7 +943,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===----------------------------------------------------------------------===//
 
 NOTE(regionbasedisolation_maybe_race, none,
-     "use here could race", ())
+     "access can happen concurrently", ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
@@ -953,10 +953,10 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 //
 
 ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
-      "transferring value of non-Sendable type %0; later accesses could race",
+      "sending value of non-Sendable type %0 with later accesses risks causing data races",
       (Type))
 ERROR(regionbasedisolation_transfer_yields_race_with_isolation, none,
-      "transferring value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
+      "sending value of non-Sendable type %0 with later accesses from %1 context to %2 context risks causing data races",
       (Type, ActorIsolation, ActorIsolation))
 ERROR(regionbasedisolation_isolated_capture_yields_race, none,
       "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
@@ -965,7 +965,7 @@ ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, non
       "value of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
 ERROR(regionbasedisolation_arg_transferred, none,
-      "%0 value of type %1 transferred to %2 context; later accesses to value could race",
+      "sending %0 value of type %1 with later accesses to %2 context risks causing data races",
       (StringRef, Type, ActorIsolation))
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
       "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
@@ -979,31 +979,38 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 //
 
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "transferring %0 may cause a data race",
+      "sending %0 risks causing data races",
       (Identifier))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
-     "transferring %1 %0 to %2 callee could cause races in between callee %2 and local %3 uses",
+     "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
      (Identifier, StringRef, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_named_info_transfer_yields_race_callee, none,
+     "sending %1%0 to %2 %3 %4 risks causing data races between %2 and local %5 uses",
+     (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+
 NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
-      "transferring %1 %0 to %2 callee could cause races between %2 and %1 uses",
-      (Identifier, StringRef, ActorIsolation))
+      "sending %1%0 to %2 callee risks causing data races between %2 and %3 uses",
+      (Identifier, StringRef, ActorIsolation, StringRef))
+NOTE(regionbasedisolation_named_transfer_non_transferrable_callee, none,
+      "sending %1%0 to %2 %3 %4 risks causing data races between %2 and %5 uses",
+      (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, StringRef))
 NOTE(regionbasedisolation_named_transfer_into_transferring_param, none,
-     "%0 %1 is passed as a transferring parameter; Uses in callee may race with later %0 uses",
+     "%0%1 is passed as a transferring parameter; Uses in callee may race with later %0uses",
      (StringRef, Identifier))
 NOTE(regionbasedisolation_named_notransfer_transfer_into_result, none,
-     "%0 %1 cannot be a transferring result. %0 uses may race with caller uses",
-     (StringRef, Identifier))
+     "%0%1 cannot be a transferring result. %2 uses may race with caller uses",
+     (StringRef, Identifier, StringRef))
 NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
       "%0 used after being passed as a transferring parameter; Later uses could race",
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
-      "%0 %1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
+      "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
 
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,
-      "task or actor isolated value cannot be transferred", ())
+      "task or actor isolated value cannot be sent", ())
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,

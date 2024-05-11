@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion \
-// RUN: -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics -module-name Swift \
+// RUN: -enable-experimental-feature NonescapableTypes -module-name Swift \
 // RUN: | %FileCheck %s
 
 // Check to make sure that the process of promoting closure captures results in

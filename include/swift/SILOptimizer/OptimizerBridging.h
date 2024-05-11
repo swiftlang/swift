@@ -239,6 +239,9 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
                                                             SwiftInt numDeadArgs,
                                                             BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
+                                                               BridgedArrayRef closureArgIndices,
+                                                               BridgedFunction applySiteCallee) const;
 
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
                                                             bool isPrivate) const;
@@ -388,6 +391,9 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
 #ifndef PURE_BRIDGING_MODE
 // In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore inluded in the header file.
 #include "OptimizerBridgingImpl.h"
+#else
+// For fflush and stdout
+#include <stdio.h>
 #endif
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

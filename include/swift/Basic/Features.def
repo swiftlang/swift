@@ -140,7 +140,6 @@ LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in t
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup, 0, "Task create in discarding task group builtin, accounting for the Void return type")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference")
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
-BASELINE_LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()")
 BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
 LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
@@ -177,9 +176,10 @@ LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDis
 SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
 LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
 LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
-/// Enable bitwise-copyable feature.
 LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
+SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
+SUPPRESSIBLE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -195,6 +195,7 @@ UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
+UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -323,9 +324,6 @@ EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables importing the Volatile module
 EXPERIMENTAL_FEATURE(Volatile, true)
-
-/// Enables noncopyable generics
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 
 // Alias for NoncopyableGenerics
 EXPERIMENTAL_FEATURE(NoncopyableGenerics2, true)

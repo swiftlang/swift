@@ -506,6 +506,21 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl);
+
+static bool allSubstTypesAreCopyable(Type type, DeclContext *context) {
+  assert(type->getAnyNominal());
+  auto bgt = type->getAs<BoundGenericType>();
+  if (!bgt)
+    return false;  // nothing is bound.
+
+  for (auto argInterfaceTy : bgt->getGenericArgs())
+    if (context->mapTypeIntoContext(argInterfaceTy)->isNoncopyable())
+      return false;
+
+  return true;
+}
+
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
     return true;
@@ -523,15 +538,32 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
 
     if (isa<AbstractFunctionDecl>(valueDecl) ||
         isa<AbstractStorageDecl>(valueDecl)) {
-      if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
-            if (auto *nominalDecl = type->getAnyNominal()) {
-              if (isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
-                return usesFeatureNoncopyableGenerics(nominalDecl);
-            }
-            return false;
-          })) {
+      auto *context = decl->getInnermostDeclContext();
+      auto usesFeature = valueDecl->getInterfaceType().findIf(
+          [&](Type type) -> bool {
+        auto *nominalDecl = type->getAnyNominal();
+        if (!nominalDecl || !isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
+          return false;
+
+        if (!usesFeatureNoncopyableGenerics(nominalDecl))
+          return false;
+
+        // If we only _refer_ to a TypeDecl that uses NoncopyableGenerics,
+        // and a suppressed version of that decl is in the interface, and
+        // if we only substitute Copyable types for the generic parameters,
+        // then we can say this decl is not "using" the feature such that
+        // a feature guard is required. In other words, this reference to the
+        // type will always be valid, regardless of whether the feature is
+        // enabled or not. (rdar://127389991)
+        if (!disallowFeatureSuppression("NoncopyableGenerics", nominalDecl)
+            && allSubstTypesAreCopyable(type, context)) {
+          return false;
+        }
+
         return true;
-      }
+      });
+      if (usesFeature)
+        return true;
     }
   }
 
@@ -653,6 +685,8 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 
+UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
+
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -690,6 +724,19 @@ static bool usesFeatureConformanceSuppression(Decl *decl) {
     return true;
   }
 
+  return false;
+}
+
+static bool usesFeatureBitwiseCopyable2(Decl *decl) {
+  if (!decl->getModuleContext()->isStdlibModule()) {
+    return false;
+  }
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    return proto->getNameStr() == "BitwiseCopyable";
+  }
+  if (auto *typealias = dyn_cast<TypeAliasDecl>(decl)) {
+    return typealias->getNameStr() == "_BitwiseCopyable";
+  }
   return false;
 }
 

@@ -93,6 +93,12 @@ KNOWN_SETTINGS=(
     android-deploy-device-path                    ""                "Path on an Android device to which built Swift stdlib products will be deployed"
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
 
+    ## Linux Options
+    musl-path                                     "/usr/local/musl" "The path to the Musl headers and libraries"
+    linux-archs                                   ""                "The Linux target architecture(s)"
+    linux-static-archs                            ""                "The fully static Linux target architecture(s)"
+    build-linux-static                            ""                "set to build Swift stdlibs for statically linked Linux"
+
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
     darwin-deployment-version-ios                 "11.0"            "minimum deployment target version for iOS"
@@ -130,6 +136,7 @@ KNOWN_SETTINGS=(
     ## Skip Build ...
     skip-build                                    ""                "set to configure as usual while skipping the build step"
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
+    skip-build-linux                              ""                "set to skip building Swift stdlibs for Linux"
     skip-build-wasm                               ""                "set to skip building Swift stdlibs for WebAssembly"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
@@ -379,24 +386,6 @@ function true_false() {
     esac
 }
 
-function to_bootstrapping_mode() {
-    case "$1" in
-        false | FALSE | 0)
-            echo "OFF"
-            ;;
-        true | TRUE | 1 | "")
-            if [[ "$(uname -s)" == "Darwin" ]] ; then
-              echo "BOOTSTRAPPING-WITH-HOSTLIBS"
-            else
-              echo "BOOTSTRAPPING"
-            fi
-            ;;
-        *)
-            echo `toupper $1`
-            ;;
-    esac
-}
-
 function to_varname() {
     # Uses `tr` because it is orders of magnitude faster than ${1//-/_} on long
     # strings, which happens when translating KNOWN_SETTINGS.
@@ -485,6 +474,8 @@ function verify_host_is_supported() {
       | linux-powerpc64le       \
       | linux-riscv64           \
       | linux-s390x             \
+      | linux-static-aarch64    \
+      | linux-static-x86_64     \
       | macosx-x86_64           \
       | macosx-arm64            \
       | macosx-arm64e           \
@@ -1119,7 +1110,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* | linux-static-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1427,6 +1418,24 @@ function swift_c_flags() {
     if [[ $(is_cmake_release_build_type "${SWIFT_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
+
+    local host=$1
+
+    case $host in
+        linux-static-*)
+            echo -n " -D_GNU_SOURCE -DHAVE_DECL_PROGRAM_INVOCATION_SHORT_NAME"
+            ;;
+    esac
+}
+
+function maybe_lfts() {
+    local host=$1
+
+    case $host in
+        linux-static-*)
+            echo -n "-lfts"
+            ;;
+    esac
 }
 
 function common_swift_flags() {
@@ -1628,6 +1637,13 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
+    if [[ "${BOOTSTRAPPING}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DBOOTSTRAPPING_MODE:STRING=`toupper ${BOOTSTRAPPING}`
+        )
+    fi
+
     if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
         CLANG_BIN="${NATIVE_CLANG_TOOLS_PATH}"
         if [[ ! -f "${CLANG_BIN}/clang" ]] ; then
@@ -1709,6 +1725,21 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ ! "${SKIP_BUILD_LINUX}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_SDK_LINUX_ARCHITECTURES:STRING="${LINUX_ARCHS}"
+                    )
+                fi
+
+                if [[ "${BUILD_LINUX_STATIC}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_MUSL_PATH:STRING="${MUSL_PATH}"
+                        -DSWIFT_SDK_LINUX_STATIC_ARCHITECTURES:STRING="${LINUX_STATIC_ARCHS}"
+                    )
+                fi
+
                 if [[ "${DARWIN_OVERLAY_TARGET}" != "" ]]; then
                     # Split LOCAL_HOST into a pair ``arch-sdk``
                     # Example LOCAL_HOST: macosx-x86_64
@@ -1785,7 +1816,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
-                    -DBOOTSTRAPPING_MODE:STRING=$(to_bootstrapping_mode "${BOOTSTRAPPING}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
@@ -2492,6 +2522,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DENABLE_TESTING:BOOL=NO
 
                   -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
+                  -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) $(maybe_lfts ${host})"
                 )
 
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
@@ -2535,9 +2566,11 @@ for host in "${ALL_HOSTS[@]}"; do
                   cmake_options=(
                     -DENABLE_SWIFT=YES
                     ${cmake_options[@]}
+                    
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
+                    -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_Swift_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
@@ -3078,7 +3111,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|openbsd-*|cygwin-*|haiku-*|android-*) ;;
+                  linux-*|freebsd-*|openbsd-*|cygwin-*|haiku-*|android-*|linux-static-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1

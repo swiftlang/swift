@@ -1713,9 +1713,6 @@ struct CopiedLoadBorrowEliminationVisitor
             useWorklist.push_back(use);
         }
 
-        // If we have a switch_enum, we always need to convert it to a load
-        // [copy] since we need to destructure through it.
-        shouldConvertToLoadCopy |= isa<SwitchEnumInst>(nextUse->getUser());
         continue;
       }
       case OperandOwnership::Borrow:
@@ -4017,7 +4014,8 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
                          [](auto *user) { return isa<BranchInst>(user); })) {
           continue;
         }
-        if (completion.completeOSSALifetime(result) ==
+        if (completion.completeOSSALifetime(
+                result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
         }
@@ -4027,7 +4025,8 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
       if (arg->isReborrow()) {
         continue;
       }
-      if (completion.completeOSSALifetime(arg) ==
+      if (completion.completeOSSALifetime(
+              arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
       }

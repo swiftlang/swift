@@ -163,7 +163,8 @@ void MoveOnlyChecker::completeObjectLifetimes(
       for (auto result : inst.getResults()) {
         if (!transitiveValues.isVisited(result))
           continue;
-        if (completion.completeOSSALifetime(result) ==
+        if (completion.completeOSSALifetime(
+                result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           madeChange = true;
         }
@@ -173,7 +174,8 @@ void MoveOnlyChecker::completeObjectLifetimes(
       assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
       if (!transitiveValues.isVisited(arg))
         continue;
-      if (completion.completeOSSALifetime(arg) ==
+      if (completion.completeOSSALifetime(
+              arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         madeChange = true;
       }

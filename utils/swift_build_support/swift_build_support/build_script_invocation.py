@@ -463,16 +463,7 @@ class BuildScriptInvocation(object):
                 "--llvm-install-components=%s" % args.llvm_install_components
             ]
 
-        # On non-Darwin platforms, build lld so we can always have a
-        # linker that is compatible with the swift we are using to
-        # compile the stdlib.
-        #
-        # This makes it easier to build target stdlibs on systems that
-        # have old toolchains without more modern linker features.
-        #
-        # On Darwin, only build lld if explicitly requested using --build-lld.
-        should_build_lld = (platform.system() != 'Darwin' or args.build_lld)
-        if not should_build_lld:
+        if not args.build_lld:
             impl_args += [
                 "--skip-build-lld"
             ]
@@ -519,6 +510,24 @@ class BuildScriptInvocation(object):
                 "--extra-dsymutil-args=%s" % ' '.join(
                     shlex.quote(opt) for opt in args.extra_dsymutil_args)
             ]
+
+        if args.musl_path:
+            impl_args += [
+                "--musl-path=%s" % (args.musl_path, )
+            ]
+        if args.linux_static_archs:
+            impl_args += [
+                "--linux-static-archs=%s" % ';'.join(args.linux_static_archs)
+            ]
+        if args.linux_archs:
+            impl_args += [
+                "--linux-archs=%s" % ';'.join(args.linux_archs)
+            ]
+
+        if not args.build_linux:
+            impl_args += ["--skip-build-linux"]
+        if args.build_linux_static:
+            impl_args += ["--build-linux-static"]
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.

@@ -2044,6 +2044,8 @@ ERROR(expose_move_only_to_cxx,none,
       "noncopyable %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
+ERROR(expose_macro_to_cxx,none,
+      "Swift macro can not yet be represented in C++", (ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -3648,6 +3650,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances|"
+      "in an extension with public, package, or '@usableFromInline' members|"
       "in an extension with conditional conformances}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
@@ -7082,10 +7086,9 @@ WARNING(redundant_particular_literal_case,none,
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
-WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
-WARNING(non_exhaustive_switch_unknown_only,none,
-        "switch covers known cases, but %0 may have additional unknown values"
-        "%select{|, possibly added in future versions}1", (Type, bool))
+ERROR(non_exhaustive_switch_unknown_only,none,
+      "switch covers known cases, but %0 may have additional unknown values"
+      "%select{|, possibly added in future versions}1", (Type, bool))
 
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "

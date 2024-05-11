@@ -23,6 +23,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/RemoteInspection/BitMask.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRef.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
@@ -229,6 +230,11 @@ void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
   stream << "\n";
 }
 
+BitMask ReferenceTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+  return BitMask(getSize(), mpePointerSpareBits);
+}
+
 BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
                                  BuiltinTypeDescriptorBase &descriptor)
     : TypeInfo(TypeInfoKind::Builtin, descriptor.Size,
@@ -237,6 +243,21 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
                descriptor.IsBitwiseTakable),
       Name(descriptor.getMangledTypeName()) {}
 
+// Builtin.Int<N> is mangled as 'Bi' N '_'
+// Returns 0 if this isn't an Int
+static unsigned isIntType(std::string name) {
+  llvm::StringRef nameRef(name);
+  if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
+    llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
+    uint8_t natural;
+    if (naturalRef.getAsInteger(10, natural)) {
+      return 0;
+    }
+    return natural;
+  }
+  return 0;
+}
+
 bool BuiltinTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
     int *extraInhabitantIndex) const {
@@ -244,47 +265,28 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
     *extraInhabitantIndex = -1;
     return true;
   }
-  // If it has extra inhabitants, it could be an integer type with extra
-  // inhabitants (a bool) or a pointer.
-  // Check if it's an integer first. The mangling of an integer type is
-  // type ::= 'Bi' NATURAL '_'
-  llvm::StringRef nameRef(Name);
-  if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
-    // Drop the front "Bi" and "_" end, check that what we're left with is a
-    // bool.
-    llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
-    uint8_t natural;
-    if (naturalRef.getAsInteger(10, natural))
+  unsigned intSize = isIntType(Name);
+  if (intSize > 0 && intSize < 64 && getSize() <= 8 && intSize < getSize() * 8) {
+    uint64_t maxValidValue =  (((uint64_t)1) << intSize) - 1;
+    uint64_t maxAvailableValue = (((uint64_t)1) << (getSize() * 8)) - 1;
+    uint64_t computedExtraInhabitants = maxAvailableValue - maxValidValue;
+    if (computedExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
+      computedExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
+    }
+    assert(getNumExtraInhabitants() == computedExtraInhabitants &&
+           "Unexpected number of extra inhabitants in an odd-sized integer");
+
+    uint64_t rawValue;
+    if (!reader.readInteger(address, getSize(), &rawValue))
       return false;
 
-    assert(natural == 1 &&
-           "Reading extra inhabitants of integer with more than 1 byte!");
-    if (natural != 1)
-      return false;
-
-    assert(getSize() == 1 && "Reading extra inhabitants of integer but size of "
-                             "type info is different than 1!");
-    if (getSize() != 1)
-      return false;
-
-    assert(getNumExtraInhabitants() == 254 &&
-           "Boolean type info should have 254 extra inhabitants!");
-    if (getNumExtraInhabitants() != 254)
-      return false;
-
-    uint8_t rawValue;
-    if (!reader.readInteger(address, &rawValue))
-      return false;
-
-    // The max valid value, for a bool valid values are 0 or 1, so this would
-    // be 1.
-    auto maxValidValue = 1;
-    // If the raw value falls outside the range of valid values, this is an
-    // extra inhabitant.
-    if (maxValidValue < rawValue)
+    // Example:  maxValidValue is 1 for a 1-bit bool, so any larger value
+    // is an extra inhabitant.
+    if (maxValidValue < rawValue) {
       *extraInhabitantIndex = rawValue - maxValidValue - 1;
-    else
+    } else {
       *extraInhabitantIndex = -1;
+    }
     return true;
   } else if (Name == "yyXf") {
     // But there are two different conventions, one for function pointers:
@@ -294,6 +296,26 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
     // And one for pointers to heap-allocated blocks of memory
     return reader.readHeapObjectExtraInhabitantIndex(address,
                                                      extraInhabitantIndex);
+  }
+}
+
+BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  unsigned intSize = isIntType(Name);
+  if (intSize > 0) {
+    // Odd-sized integers export spare bits
+    // In particular: bool fields are Int1 and export 7 spare bits
+    auto mask = BitMask::oneMask(getSize());
+    mask.keepOnlyMostSignificantBits(getSize() * 8 - intSize);
+    return mask;
+  } else if (
+    Name == "yyXf" // 'yyXf' =  @thin () -> Void function
+  ) {
+    // Builtin types that expose pointer spare bits
+    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+    return BitMask(getSize(), mpePointerSpareBits);
+  } else {
+    // Everything else
+    return BitMask::zeroMask(getSize());
   }
 }
 
@@ -369,6 +391,45 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
   return false;
 }
 
+BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  auto mask = BitMask::oneMask(getSize());
+  switch (SubKind) {
+  case RecordKind::Invalid:
+    return mask;    // FIXME: Should invalid have all spare bits?  Or none?  Does it matter?
+  case RecordKind::Tuple:
+  case RecordKind::Struct:
+    break;
+  case RecordKind::ThickFunction:
+    break;
+  case RecordKind::OpaqueExistential: {
+    // Existential storage isn't recorded as a field,
+    // so we handle it specially here...
+    int pointerSize = TC.targetPointerSize();
+    BitMask submask = BitMask::zeroMask(pointerSize * 3);
+    mask.andMask(submask, 0);
+    hasAddrOnly = true;
+    break;
+  }
+  case RecordKind::ClassExistential:
+    break;
+  case RecordKind::ExistentialMetatype:
+    break; // Field 0 is metadata pointer, a Builtin of type 'yyXf'
+  case RecordKind::ErrorExistential:
+    break;
+  case RecordKind::ClassInstance:
+    break;
+  case RecordKind::ClosureContext:
+    break;
+  }
+  for (auto Field : Fields) {
+    if (Field.TR != 0) {
+      BitMask submask = Field.TI.getSpareBits(TC, hasAddrOnly);
+      mask.andMask(submask, Field.Offset);
+    }
+  }
+  return mask;
+}
+
 class UnsupportedEnumTypeInfo: public EnumTypeInfo {
 public:
   UnsupportedEnumTypeInfo(unsigned Size, unsigned Alignment,
@@ -382,6 +443,10 @@ public:
                        remote::RemoteAddress address,
                        int *index) const override {
     return false;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -408,6 +473,10 @@ public:
                        remote::RemoteAddress address,
                        int *index) const override {
     return false;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -440,6 +509,10 @@ public:
                        int *index) const override {
     *index = -1;
     return true;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -495,6 +568,10 @@ public:
       *index = tag - getNumCases();
     }
     return true;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -561,6 +638,10 @@ public:
       }
       return true;
     }
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   // Think of a single-payload enum as being encoded in "pages".
@@ -718,6 +799,16 @@ public:
     return true;
   }
 
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    // Walk the child cases to set `hasAddrOnly` correctly.
+    for (auto Case : getCases()) {
+      if (Case.TR != 0) {
+	auto submask = Case.TI.getSpareBits(TC, hasAddrOnly);
+      }
+    }
+    return BitMask::zeroMask(getSize());
+  }
+
   bool projectEnumValue(remote::MemoryReader &reader,
                         remote::RemoteAddress address,
                         int *CaseIndex) const override {
@@ -759,294 +850,6 @@ public:
       *CaseIndex = ComputedCase;
     }
     return true;
-  }
-};
-
-// A variable-length bitmap used to track "spare bits" for general multi-payload
-// enums.
-class BitMask {
-  static constexpr unsigned maxSize = 128 * 1024 * 1024; // 128MB
-
-  unsigned size; // Size of mask in bytes
-  uint8_t *mask;
-public:
-  ~BitMask() {
-    free(mask);
-  }
-  // Construct a bitmask of the appropriate number of bytes
-  // initialized to all bits set
-  BitMask(unsigned sizeInBytes): size(sizeInBytes) {
-    // Gracefully fail by constructing an empty mask if we exceed the size
-    // limit.
-    if (size > maxSize) {
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-
-    mask = (uint8_t *)malloc(size);
-
-    if (!mask) {
-      // Malloc might fail if size is large due to some bad data. Assert in
-      // asserts builds, and fail gracefully in non-asserts builds by
-      // constructing an empty BitMask.
-      assert(false && "Failed to allocate BitMask");
-      size = 0;
-      return;
-    }
-
-    memset(mask, 0xff, size);
-  }
-  // Construct a bitmask of the appropriate number of bytes
-  // initialized with bits from the specified buffer
-  BitMask(unsigned sizeInBytes, const uint8_t *initialValue,
-          unsigned initialValueBytes, unsigned offset)
-      : size(sizeInBytes) {
-    // Gracefully fail by constructing an empty mask if we exceed the size
-    // limit.
-    if (size > maxSize) {
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-
-    // Bad data could cause the initial value location to be off the end of our
-    // size. If initialValueBytes + offset is beyond sizeInBytes (or overflows),
-    // assert in asserts builds, and fail gracefully in non-asserts builds by
-    // constructing an empty BitMask.
-    bool overflowed = false;
-    unsigned initialValueEnd =
-        llvm::SaturatingAdd(initialValueBytes, offset, &overflowed);
-    if (overflowed) {
-      assert(false && "initialValueBytes + offset overflowed");
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-    assert(initialValueEnd <= sizeInBytes);
-    if (initialValueEnd > size) {
-      assert(false && "initialValueBytes + offset is greater than size");
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-
-    mask = (uint8_t *)calloc(1, size);
-
-    if (!mask) {
-      // Malloc might fail if size is large due to some bad data. Assert in
-      // asserts builds, and fail gracefully in non-asserts builds by
-      // constructing an empty BitMask.
-      assert(false && "Failed to allocate BitMask");
-      size = 0;
-      return;
-    }
-
-    memcpy(mask + offset, initialValue, initialValueBytes);
-  }
-  // Move constructor moves ownership and zeros the src
-  BitMask(BitMask&& src) noexcept: size(src.size), mask(std::move(src.mask)) {
-    src.size = 0;
-    src.mask = nullptr;
-  }
-  // Copy constructor makes a copy of the mask storage
-  BitMask(const BitMask& src) noexcept: size(src.size), mask(nullptr) {
-    mask = (uint8_t *)malloc(size);
-    memcpy(mask, src.mask, size);
-  }
-
-  std::string str() const {
-    std::ostringstream buff;
-    buff << size << ":0x";
-    for (unsigned i = 0; i < size; i++) {
-      buff << std::hex << ((mask[i] >> 4) & 0x0f) << (mask[i] & 0x0f);
-    }
-    return buff.str();
-  }
-
-  bool operator==(const BitMask& rhs) const {
-    // The two masks may be of different sizes.
-    // The common prefix must be identical.
-    size_t common = std::min(size, rhs.size);
-    if (memcmp(mask, rhs.mask, common) != 0)
-      return false;
-    // The remainder of the longer mask must be
-    // all zero bits.
-    unsigned mustBeZeroSize = std::max(size, rhs.size) - common;
-    uint8_t *mustBeZero;
-    if (size < rhs.size) {
-      mustBeZero = rhs.mask + size;
-    } else if (size > rhs.size) {
-      mustBeZero = mask + rhs.size;
-    }
-    for (unsigned i = 0; i < mustBeZeroSize; ++i) {
-      if (mustBeZero[i] != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool operator!=(const BitMask& rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool isNonZero() const { return !isZero(); }
-
-  bool isZero() const {
-    for (unsigned i = 0; i < size; ++i) {
-      if (mask[i] != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void makeZero() {
-    memset(mask, 0, size * sizeof(mask[0]));
-  }
-
-  void complement() {
-    for (unsigned i = 0; i < size; ++i) {
-      mask[i] = ~mask[i];
-    }
-  }
-
-  int countSetBits() const {
-    static const int counter[] =
-      {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
-    int bits = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      bits += counter[mask[i] >> 4] + counter[mask[i] & 15];
-    }
-    return bits;
-  }
-
-  int countZeroBits() const {
-    static const int counter[] =
-      {4, 3, 3, 2, 3, 2, 2, 1, 3, 2, 2, 1, 2, 1, 1, 0};
-    int bits = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      bits += counter[mask[i] >> 4] + counter[mask[i] & 15];
-    }
-    return bits;
-  }
-
-  // Treat the provided value as a mask, `and` it with
-  // the part of the mask at the provided byte offset.
-  // Bits outside the specified area are unchanged.
-  template<typename IntegerType>
-  void andMask(IntegerType value, unsigned byteOffset) {
-    andMask((void *)&value, sizeof(value), byteOffset);
-  }
-
-  // As above, but using the provided bitmask instead
-  // of an integer.
-  void andMask(BitMask mask, unsigned offset) {
-    andMask(mask.mask, mask.size, offset);
-  }
-
-  // As above, but using the complement of the
-  // provided mask.
-  void andNotMask(BitMask mask, unsigned offset) {
-    if (offset < size) {
-      andNotMask(mask.mask, mask.size, offset);
-    }
-  }
-
-  // Zero all bits except for the `n` most significant ones.
-  // XXX TODO: Big-endian support?
-  void keepOnlyMostSignificantBits(unsigned n) {
-    unsigned count = 0;
-    if (size < 1) {
-      return;
-    }
-    unsigned i = size;
-    while (i > 0) {
-      i -= 1;
-      if (count < n) {
-        for (int b = 128; b > 0; b >>= 1) {
-          if (count >= n) {
-            mask[i] &= ~b;
-          } else if ((mask[i] & b) != 0) {
-            ++count;
-          }
-        }
-      } else {
-        mask[i] = 0;
-      }
-    }
-  }
-
-  unsigned numBits() const {
-    return size * 8;
-  }
-
-  unsigned numSetBits() const {
-    unsigned count = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      if (mask[i] != 0) {
-        for (unsigned b = 1; b < 256; b <<= 1) {
-          if ((mask[i] & b) != 0) {
-            ++count;
-          }
-        }
-      }
-    }
-    return count;
-  }
-
-  // Read a mask-sized area from the target and collect
-  // the masked bits into a single integer.
-  template<typename IntegerType>
-  bool readMaskedInteger(remote::MemoryReader &reader,
-                         remote::RemoteAddress address,
-                         IntegerType *dest) const {
-    auto data = reader.readBytes(address, size);
-    if (!data) {
-      return false;
-    }
-#if defined(__BIG_ENDIAN__)
-    assert(false && "Big endian not supported for readMaskedInteger");
-#else
-    IntegerType result = 0;
-    IntegerType resultBit = 1; // Start from least-significant bit
-    auto bytes = static_cast<const uint8_t *>(data.get());
-    for (unsigned i = 0; i < size; ++i) {
-      for (unsigned b = 1; b < 256; b <<= 1) {
-        if ((mask[i] & b) != 0) {
-          if ((bytes[i] & b) != 0) {
-            result |= resultBit;
-          }
-          resultBit <<= 1;
-        }
-      }
-    }
-    *dest = result;
-    return true;
-#endif
-  }
-
-private:
-  void andMask(void *maskData, unsigned len, unsigned offset) {
-    if (offset < size) {
-      unsigned common = std::min(len, size - offset);
-      uint8_t *maskBytes = (uint8_t *)maskData;
-      for (unsigned i = 0; i < common; ++i) {
-        mask[i + offset] &= maskBytes[i];
-      }
-    }
-  }
-
-  void andNotMask(void *maskData, unsigned len, unsigned offset) {
-    assert(offset < size);
-    if (offset < size) {
-      unsigned common = std::min(len, size - offset);
-      uint8_t *maskBytes = (uint8_t *)maskData;
-      for (unsigned i = 0; i < common; ++i) {
-        mask[i + offset] &= ~maskBytes[i];
-      }
-    }
   }
 };
 
@@ -1102,8 +905,9 @@ public:
     tag = payloadTagLow;
     tagBits = payloadTagLowBitCount;
 
-    // Read the other spare bits
+    // Read the other spare bits from the payload area
     auto otherSpareBitsMask = spareBitsMask; // copy
+    otherSpareBitsMask.keepOnlyLeastSignificantBytes(getPayloadSize());
     otherSpareBitsMask.andNotMask(payloadTagLowBitsMask, 0);
     auto otherSpareBitsCount = otherSpareBitsMask.countSetBits();
     if (otherSpareBitsCount > 0) {
@@ -1152,6 +956,13 @@ public:
     uint32_t maxTag = (tagBits >= 32) ? ~0u : (1UL << tagBits) - 1;
     *extraInhabitantIndex = maxTag - tag;
     return true;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    auto mask = spareBitsMask;
+    // Bits we've used for our tag can't be re-used by a containing enum...
+    mask.andNotMask(getMultiPayloadTagBitsMask(), 0);
+    return mask;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -1221,7 +1032,7 @@ public:
 
   // The case value is stored in three pieces:
   // * A separate "discriminator" tag appended to the payload (if necessary)
-  // * A "payload tag" that uses (a subset of) the spare bits
+  // * A "payload tag" that uses (a subset of) the spare bits in the payload
   // * The remainder of the payload bits (for non-payload cases)
   // This computes the bits used for the payload tag.
   BitMask getMultiPayloadTagBitsMask() const {
@@ -1235,67 +1046,11 @@ public:
       payloadTagBits += 1;
     }
     BitMask payloadTagBitsMask = spareBitsMask;
+    payloadTagBitsMask.keepOnlyLeastSignificantBytes(getPayloadSize());
     payloadTagBitsMask.keepOnlyMostSignificantBits(payloadTagBits);
     return payloadTagBitsMask;
   }
 };
-
-// Recursively populate the spare bit mask for this single type
-static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits);
-
-// Recursively populate the spare bit mask for this collection of
-// record fields or enum cases.
-static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask &mask, uint64_t mpePointerSpareBits) {
-  for (auto Field : Fields) {
-    if (Field.TR != 0) {
-      BitMask submask(Field.TI.getSize());
-      if (!populateSpareBitsMask(&Field.TI, submask, mpePointerSpareBits)) {
-        return false;
-      }
-      mask.andMask(submask, Field.Offset);
-    }
-  }
-  return true;
-}
-
-// General recursive type walk to combine spare bit info from nested structures.
-static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits) {
-  switch (TI->getKind()) {
-  case TypeInfoKind::Reference: {
-    if (TI->getSize() == 8) {
-      mask.andMask(mpePointerSpareBits, 0);
-    } else /* TI->getSize() == 4 */ {
-      uint32_t pointerMask = (uint32_t)mpePointerSpareBits;
-      mask.andMask(pointerMask, 0);
-    }
-    break;
-  }
-  case TypeInfoKind::Enum: {
-    auto EnumTI = reinterpret_cast<const EnumTypeInfo *>(TI);
-    // Remove bits used by the payloads
-    if (!populateSpareBitsMask(EnumTI->getCases(), mask, mpePointerSpareBits)) {
-      return false;
-    }
-    // TODO: Remove bits needed to discriminate payloads.
-    // Until then, return false for any type with an enum in it so we
-    // won't claim to support something we don't.
-    return false;
-    break;
-  }
-  case TypeInfoKind::Record: {
-    auto RecordTI = dyn_cast<RecordTypeInfo>(TI);
-    if (!populateSpareBitsMask(RecordTI->getFields(), mask, mpePointerSpareBits)) {
-      return false;
-    }
-    break;
-  }
-  default: {
-    mask.makeZero();
-    break;
-  }
-  }
-  return true;
-}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
@@ -2128,6 +1883,7 @@ public:
       return nullptr;
     }
 
+    // Sort and classify the fields
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
         ++NonPayloadCases;
@@ -2306,21 +2062,32 @@ public:
       Stride = 1;
     auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
-    // If there's a multi-payload enum descriptor, then we
-    // have spare bits information from the compiler.
+    // Compute the spare bit mask and determine if we have any address-only fields
+    auto localSpareBitMask = BitMask::oneMask(Size);
+    bool hasAddrOnly = false;
+    for (auto Case : Cases) {
+      if (Case.TR != 0) {
+	auto submask = Case.TI.getSpareBits(TC, hasAddrOnly);
+	localSpareBitMask.andMask(submask, 0);
+      }
+    }
+
+    // See if we have MPE bit mask information from the compiler...
+    // TODO: drop this?
 
     // Uncomment the following line to dump the MPE section every time we come through here...
     //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
 
     auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumDescriptor(TR);
     if (MPEDescriptor && MPEDescriptor->usesPayloadSpareBits()) {
+      // We found compiler-provided spare bit data...
       auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
       auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
       auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
-      BitMask spareBitsMask(PayloadSize, SpareBitMask,
+      BitMask compilerSpareBitMask(PayloadSize, SpareBitMask,
                             PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
       
-      if (spareBitsMask.isZero()) {
+      if (compilerSpareBitMask.isZero() || hasAddrOnly) {
         // If there are no spare bits, use the "simple" tag-only implementation.
         return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
           Size, Alignment, Stride, NumExtraInhabitants,
@@ -2328,58 +2095,29 @@ public:
       }
 
 #if 0  // TODO: This should be !defined(NDEBUG)
-      // DEBUG verification that compiler mask and locally-computed
-      // mask are the same (whenever both are available).
-      BitMask locallyComputedSpareBitsMask(PayloadSize);
-      auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-      auto locallyComputedSpareBitsMaskIsValid
-        = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
-      // If the local computation were always correct, we could:
-      // assert(locallyComputedSpareBitsMaskIsValid);
-      if (locallyComputedSpareBitsMaskIsValid) {
-        // Whenever the compiler and local computation both produce
-        // data, they should agree.
-        // TODO: Make this true, then change `#if 0` above
-        assert(locallyComputedSpareBitsMask == spareBitsMask);
-      }
+      // Verify that compiler provided and local spare bit info agree...
+      // TODO: If we could make this actually work, then we wouldn't need the
+      // bulky compiler-provided info, would we?
+      assert(localSpareBitMask == compilerSpareBitMask);
 #endif
 
       // Use compiler-provided spare bit information
       return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, spareBitsMask,
+        BitwiseTakable, Cases, compilerSpareBitMask,
         EffectivePayloadCases);
     }
 
-    // Either there was no compiler data or it didn't make sense
-    // (existed but claimed to have no mask).
-    // Try computing the mask ourselves: This is less robust, but necessary to
-    // support images from older compilers.
-    BitMask spareBitsMask(PayloadSize);
-    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-    auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
-    // For DEBUGGING, disable fallback to local computation to
-    // make missing compiler data more obvious:
-    // validSpareBitsMask = false;
-    if (!validSpareBitsMask) {
-      // If we couldn't correctly determine the spare bits mask,
-      // return a TI that will always fail when asked for XIs or value.
-      return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, EnumKind::MultiPayloadEnum, Cases);
-    } else if (spareBitsMask.isZero()) {
+    if (localSpareBitMask.isZero() || hasAddrOnly) {
       // Simple case that does not use spare bits
-      // This is correct as long as our local spare bits calculation
-      // above only returns an empty mask when the mask is really empty,
       return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
         BitwiseTakable, Cases, EffectivePayloadCases);
     } else {
       // General case can mix spare bits and extra discriminator
-      // It obviously relies on having an accurate spare bit mask.
       return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, spareBitsMask,
+        BitwiseTakable, Cases, localSpareBitMask,
         EffectivePayloadCases);
     }
   }

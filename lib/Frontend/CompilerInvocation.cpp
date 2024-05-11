@@ -1084,10 +1084,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_nskeyedarchiver_diagnostics,
                    Opts.EnableNSKeyedArchiverDiagnostics);
 
-  Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
-    Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
-                 OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                 Opts.isSwiftVersionAtLeast(5));
+  if (Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
+                   OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
+                   Opts.isSwiftVersionAtLeast(5))) {
+    Opts.enableFeature(Feature::NonfrozenEnumExhaustivity);
+  }
 
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =
@@ -2612,6 +2613,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                    Opts.OSSAVerifyComplete);
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
+
+  Opts.EnableExperimentalSwiftBasedClosureSpecialization = 
+      Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
 
   return false;
 }

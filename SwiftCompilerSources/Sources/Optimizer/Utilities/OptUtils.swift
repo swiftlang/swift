@@ -398,6 +398,23 @@ extension LoadInst {
   }
 }
 
+extension PartialApplyInst {
+  var isPartialApplyOfReabstractionThunk: Bool {
+    // A partial_apply of a reabstraction thunk either has a single capture
+    // (a function) or two captures (function and dynamic Self type).
+    if self.numArguments == 1 || self.numArguments == 2, 
+       let fun = self.referencedFunction,
+       fun.isReabstractionThunk,
+       self.arguments[0].type.isFunction,
+       self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
+    {
+      return true
+    }
+    
+    return false
+  }
+}
+
 extension FunctionPassContext {
   /// Returns true if any blocks were removed.
   func removeDeadBlocks(in function: Function) -> Bool {
@@ -539,6 +556,10 @@ extension Function {
       }
     }
     return nil
+  }
+
+  var mayBindDynamicSelf: Bool {
+    self.bridged.mayBindDynamicSelf()
   }
 }
 
