@@ -416,13 +416,10 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
   if (auto *isolatedArg = fArg->getFunction()->maybeGetIsolatedArgument()) {
-    if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
-      assert(functionIsolation.isActorInstanceIsolated());
-      if (auto *nomDecl =
-              isolatedArg->getType().getNominalOrBoundGenericNominal()) {
-        return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg,
-                                                          nomDecl);
-      }
+    if (auto *nomDecl =
+        isolatedArg->getType().getNominalOrBoundGenericNominal()) {
+      return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg,
+                                                        nomDecl);
     }
   }
 
