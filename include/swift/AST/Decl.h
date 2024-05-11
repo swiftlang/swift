@@ -6010,10 +6010,6 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
   NamedPattern *NamingPattern = nullptr;
-  /// When the variable is declared in context of a for-in loop over the elements of 
-  /// a parameter pack, this is the opened element environment of the pack expansion
-  /// to use as the variable's context generic environment.
-  GenericEnvironment *OpenedElementEnvironment = nullptr;
 
 public:
   enum class Introducer : uint8_t {
@@ -6154,13 +6150,6 @@ public:
 
   NamedPattern *getNamingPattern() const;
   void setNamingPattern(NamedPattern *Pat);
-
-  GenericEnvironment *getOpenedElementEnvironment() const {
-    return OpenedElementEnvironment;
-  }
-  void setOpenedElementEnvironment(GenericEnvironment *Env) {
-    OpenedElementEnvironment = Env;
-  }
 
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
