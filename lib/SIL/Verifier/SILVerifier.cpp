@@ -6577,6 +6577,13 @@ public:
                                     SILResultInfo::IsTransferring);
                               })),
             "transferring result means all results are transferring");
+
+    // We should only ever have a single sil_isolated parameter.
+    require(1 >= std::count_if(FTy->getParameters().begin(), FTy->getParameters().end(),
+                               [](const SILParameterInfo &parameterInfo) {
+                                 return parameterInfo.hasOption(SILParameterInfo::Isolated);
+                               }),
+            "Should only ever be isolated to a single parameter");
   }
 
   struct VerifyFlowSensitiveRulesDetails {
