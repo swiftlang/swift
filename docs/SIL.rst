@@ -692,6 +692,18 @@ autorelease in the callee.
   type behaves like a non-generic type, as if the substitutions were
   actually applied to the underlying function type.
 
+- SIL functions may optionally mark a function parameter as
+  ``@sil_isolated``. An ``@sil_isolated`` parameter must be one of:
+
+  - An actor or any actor type.
+  - A generic type that conforms to Actor or AnyActor.
+
+  and must be the actor instance that a function is isolated to. Importantly
+  this means that global actor isolated nominal types are never
+  ``@sil_isolated``. Only one parameter can ever be marked as ``@sil_isolated``
+  since a function cannot be isolated to multiple actors at the same time.
+
+
 Async Functions
 ```````````````
 
