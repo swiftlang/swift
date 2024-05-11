@@ -124,7 +124,7 @@ extension _StringGuts {
     return isFastUTF8 && _object.isASCII
   }
 
-  @inline(__always)
+  @inlinable @inline(__always)
   internal var isNFC: Bool { return _object.isNFC }
 
   @inline(__always)
@@ -141,6 +141,21 @@ extension _StringGuts {
   internal var hasBreadcrumbs: Bool {
     return hasSharedStorage
       || (hasNativeStorage && _object.withNativeStorage { $0.hasBreadcrumbs })
+  }
+}
+
+// Setting flags
+extension _StringGuts {
+
+  /// Flags that the contents of this string
+  /// are known to be in Normalization Form C.
+  ///
+  /// Not all strings are able to store this information.
+  ///
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func markIsNFC() {
+    _object.markIsNFC()
   }
 }
 

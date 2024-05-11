@@ -906,6 +906,14 @@ extension _StringObject.CountAndFlags {
     (_storage & Self.isForeignUTF8Mask) != 0
   }
 
+  /// Sets the `isNFC` bit.
+  ///
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func markIsNFC() {
+    _storage |= _StringObject.CountAndFlags.isNFCMask
+  }
+
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
   #else
@@ -1140,7 +1148,7 @@ extension _StringObject {
     return _countAndFlags.isASCII
   }
 
-  @inline(__always)
+  @inlinable @inline(__always)
   internal var isNFC: Bool {
     if isSmall {
       // TODO(String performance): Worth implementing more sophisticated
@@ -1149,6 +1157,18 @@ extension _StringObject {
       return smallIsASCII
     }
     return _countAndFlags.isNFC
+  }
+
+  /// Sets the `isNFC` bit,
+  /// if the representation has a bit to store that information.
+  ///
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func markIsNFC() {
+    if isSmall { return }
+    var newFlags = _countAndFlags
+    newFlags.markIsNFC()
+    _setCountAndFlags(to: newFlags)
   }
 
   /// Returns whether this string has a UTF-8 storage representation.

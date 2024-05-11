@@ -12,58 +12,75 @@
 
 import SwiftShims
 
-extension Sequence where Element == Unicode.Scalar {
-  internal var _internalNFC: Unicode._InternalNFC<Self> {
-    Unicode._InternalNFC(self)
-  }
-}
-
-extension Unicode {
+extension Unicode.NormalizedScalars where Source: Sequence<Unicode.Scalar> {
 
   /// The contents of the source sequence, in Normalization Form C.
   ///
   /// Normalization to NFC preserves canonical equivalence.
   ///
-  internal struct _InternalNFC<Source> where Source: Sequence<Unicode.Scalar> {
+  @inlinable
+  public var nfc: NFC {
+    Unicode.NormalizedScalars.NFC(source)
+  }
 
+  // TODO: Should this be frozen? 
+  // If we want to let it conform to Collection, it wouldn't be able to store its 'startIndex'.
+  // But computing startIndex has costs that we don't want to impose on sequences...
+  // Maybe we just make the iterator frozen and give it a public init?
+
+  /// The contents of the source sequence, in Normalization Form C.
+  ///
+  /// Normalization to NFC preserves canonical equivalence.
+  ///
+  @frozen
+  public struct NFC {
+
+    @usableFromInline
     internal let source: Source
 
+    @inlinable
     internal init(_ source: Source) {
       self.source = source
     }
   }
 }
 
-extension Unicode._InternalNFC: Sequence {
+extension Unicode.NormalizedScalars.NFC: Sequence {
 
-  internal consuming func makeIterator() -> Iterator {
+  @inlinable
+  public consuming func makeIterator() -> Iterator {
     Iterator(source: source.makeIterator())
   }
 
-  internal struct Iterator: IteratorProtocol {
+  @frozen
+  public struct Iterator: IteratorProtocol {
 
-    internal var source: Source.Iterator
-    internal var normalizer: Unicode._NFCNormalizer
+    public var source: Source.Iterator
 
+    @usableFromInline
+    internal var normalizer: Unicode.NFCNormalizer
+
+    @inlinable
     internal init(source: Source.Iterator) {
       self.source = source
       if let strIter = source as? String.UnicodeScalarView.Iterator {
-        self.normalizer = Unicode._NFCNormalizer(sourceString: strIter._guts)
+        self.normalizer = Unicode.NFCNormalizer(sourceString: strIter._guts)
       } else if let substrIter = source as? Substring.UnicodeScalarView.Iterator {
-        self.normalizer = Unicode._NFCNormalizer(sourceString: substrIter._elements._wholeGuts)
+        self.normalizer = Unicode.NFCNormalizer(sourceString: substrIter._elements._wholeGuts)
       } else {
-        self.normalizer = Unicode._NFCNormalizer()
+        self.normalizer = Unicode.NFCNormalizer()
       }
     }
 
-    internal mutating func next() -> Unicode.Scalar? {
+    @inlinable
+    public mutating func next() -> Unicode.Scalar? {
       normalizer.resume { source.next() } ?? normalizer.flush()
     }
   }
 }
 
-extension Unicode._InternalNFC: Sendable where Source: Sendable {}
-extension Unicode._InternalNFC.Iterator: Sendable where Source.Iterator: Sendable {}
+extension Unicode.NormalizedScalars.NFC: Sendable where Source: Sendable {}
+extension Unicode.NormalizedScalars.NFC.Iterator: Sendable where Source.Iterator: Sendable {}
 
 extension Unicode {
 
@@ -102,7 +119,7 @@ extension Unicode {
   /// boundary. The normalizer state has value semantics, so it is possible
   /// to copy and store and is inherently thread-safe.
   ///
-  internal struct _NFCNormalizer: Sendable {
+  public struct NFCNormalizer: Sendable {
 
     internal enum State {
       case emittingSegment
@@ -113,8 +130,8 @@ extension Unicode {
     internal var isTerminated = false
     internal var sourceIsAlreadyNFC = false
 
-    internal var nfd = Unicode._NFDNormalizer()
-    internal var buffer = Unicode._NormDataBuffer()
+    internal var nfd = Unicode.NFDNormalizer()
+    internal var buffer = Unicode._CanonicalNormalizationBuffer()
     // This is our starter that is currently being composed with other scalars
     // into new scalars. For example, "e\u{301}", here our first scalar is 'e',
     // which is a starter, thus we assign composee to this 'e' and move to the
@@ -123,13 +140,24 @@ extension Unicode {
     // we continue to try and compose following scalars with this composee.
     internal var composee = Optional<Unicode.Scalar>.none
 
+    @usableFromInline
     internal init(sourceString: borrowing _StringGuts) {
       sourceIsAlreadyNFC = sourceString.isNFC
     }
 
     /// Creates a new normalizer.
     ///
-    internal init() { }
+    public init() { }
+
+    @usableFromInline
+    internal mutating func reset(maximumCapacity: Int = 64) {
+      state = .consuming
+      isTerminated = false
+      sourceIsAlreadyNFC = false
+      nfd.reset(maximumCapcity: maximumCapacity)
+      buffer.reset(maximumCapacity: maximumCapacity)
+      composee = .none
+    }
 
     /// Resume normalizing the text stream.
     ///
@@ -171,7 +199,8 @@ extension Unicode {
     /// Be careful to ensure each input source has been fully consumed
     /// before moving on to the next source (marked by `resume` returning `nil`).
     ///
-    internal mutating func resume(
+    @inlinable
+    public mutating func resume(
       consuming source: inout some IteratorProtocol<Unicode.Scalar>
     ) -> Unicode.Scalar? {
       resume(consuming: { source.next() })
@@ -179,6 +208,7 @@ extension Unicode {
 
     // Intended ABI barrier for resume(consuming: inout some IteratorProtocol<Unicode.Scalar>).
     // when it becomes public.
+    @usableFromInline
     internal mutating func resume(
       consuming nextFromSource: () -> Unicode.Scalar?
     ) -> Unicode.Scalar? {
@@ -221,7 +251,7 @@ extension Unicode {
     /// }
     /// ```
     ///
-    internal mutating func flush() -> Unicode.Scalar? {
+    public mutating func flush() -> Unicode.Scalar? {
 
       isTerminated = true
 
@@ -241,7 +271,7 @@ extension Unicode {
   }
 }
 
-extension Unicode._NFCNormalizer {
+extension Unicode.NFCNormalizer {
 
   @inline(never)
   internal mutating func _resume(

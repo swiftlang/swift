@@ -12,7 +12,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
-// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest15.txt
@@ -27,6 +27,69 @@ import StdlibUnicodeUnittest
 #if _runtime(_ObjC)
 import NSSlowString
 #endif
+
+private func UTF8ToScalars(_ utf8: some Collection<UInt8>) -> [Unicode.Scalar] {
+  var result: [Unicode.Scalar] = []
+  var iter = utf8.makeIterator()
+  var decoder = UTF8()
+  decode: while true {
+    switch decoder.decode(&iter) {
+    case .scalarValue(let s): result.append(s)
+    case .emptyInput: break decode
+    case .error: fatalError("Invalid UTF8")
+    }
+  } 
+  return result
+}
+
+private class SinglePassSequence<Element>: Sequence {
+  var iter: AnyIterator<Element>
+  var consumed: Bool
+
+  init(wrapping source: some Collection<Element>) {
+    self.iter = AnyIterator(source.makeIterator())
+    self.consumed = false
+  }
+
+  func makeIterator() -> AnyIterator<Element> {
+    expectFalse(consumed, "Sequence iterated for a second time")
+    consumed = true
+    return iter
+  }
+}
+
+extension Collection {
+  fileprivate var singlePassSequence: SinglePassSequence<Element> {
+    SinglePassSequence(wrapping: self)
+  }
+
+  fileprivate var async: AsyncStream<Element> {
+    var it = self.makeIterator()
+    return AsyncStream {
+      await Task.yield()
+      return it.next()
+    }
+  }
+}
+
+extension AsyncSequence where Element: Equatable {
+
+  func elementsEqual(_ other: some Sequence<Element>) async throws -> Bool {
+
+    var thisIter = self.makeAsyncIterator()
+    var otherIter = other.makeIterator()
+
+    while let thisNext = try await thisIter.next(),
+          let otherNext = otherIter.next() {
+      guard thisNext == otherNext else { return false }
+    }
+    guard try await thisIter.next() == nil, otherIter.next() == nil else {
+      return false
+    }
+
+    return true
+  }
+}
 
 private func expectEqualIterators(
   label: String,
@@ -126,6 +189,217 @@ if #available(SwiftStdlib 5.9, *) {
         ],
         stackTrace: SourceLocStack(test.loc)
       )
+    }
+  }
+}
+
+//if #available(SwiftStdlib 9999, *) {
+if true {
+
+  tests.test("StringNormalization15/NormalizedSequence")
+  .code {
+    for test in normalizationTests14 {
+      let sourceScalars = UTF8ToScalars(test.source)
+      let nfdScalars = UTF8ToScalars(test.NFD)
+      let nfcScalars = UTF8ToScalars(test.NFC)
+      let nfkdScalars = UTF8ToScalars(test.NFKD)
+      let nfkcScalars = UTF8ToScalars(test.NFKC)
+
+      expectEqualSequence(sourceScalars.normalized.nfd, nfdScalars)
+      expectEqualSequence(sourceScalars.normalized.nfc, nfcScalars)
+      expectEqualSequence(sourceScalars.normalized.nfkd, nfkdScalars)
+      expectEqualSequence(sourceScalars.normalized.nfkc, nfkcScalars)
+
+      // toNFKC(x) = toNFC(toNFKD(x))
+      expectEqualSequence(sourceScalars.normalized.nfkd.normalized.nfc, nfkcScalars)
+    }
+  }
+
+  tests.test("StringNormalization15/NormalizedSequence/Async")
+  .code {
+    for test in normalizationTests14 {
+      let sourceScalars = UTF8ToScalars(test.source)
+      let nfdScalars = UTF8ToScalars(test.NFD)
+      let nfcScalars = UTF8ToScalars(test.NFC)
+      let nfkdScalars = UTF8ToScalars(test.NFKD)
+      let nfkcScalars = UTF8ToScalars(test.NFKC)
+
+      expectTrue(try! await sourceScalars.async.normalized.nfd.elementsEqual(nfdScalars))
+      expectTrue(try! await sourceScalars.async.normalized.nfc.elementsEqual(nfcScalars))
+      expectTrue(try! await sourceScalars.async.normalized.nfkd.elementsEqual(nfkdScalars))
+      expectTrue(try! await sourceScalars.async.normalized.nfkc.elementsEqual(nfkcScalars))
+
+      // toNFKC(x) = toNFC(toNFKD(x))
+      expectTrue(try! await sourceScalars.async.normalized.nfkd.normalized.nfc.elementsEqual(nfkcScalars))
+    }
+  }
+
+  tests.test("StringNormalization15/NormalizedString")
+  .code {
+    for test in normalizationTests14 {
+      let source = String(validating: test.source, as: UTF8.self)!
+
+      expectEqualSequence(source.normalized(.nfd).utf8, test.NFD)
+      expectEqualSequence(source.normalized(.nfc).utf8, test.NFC)
+      expectEqualSequence(source.normalized(.nfkd).utf8, test.NFKD)
+      expectEqualSequence(source.normalized(.nfkc).utf8, test.NFKC)
+
+      // toNFKC(x) = toNFC(toNFKD(x))
+      expectEqualSequence(source.normalized(.nfkd).normalized(.nfc).utf8, test.NFKC)
+
+      // The isNFC bit should be set for large native strings when normalizing to NFC/NFKC.
+      let nfcStringInfo = source.normalized(.nfc)._classify()
+      switch nfcStringInfo._form {
+      case ._cocoa, ._immortal:
+        fatalError("We should not see a cocoa/immortal string here")
+      case ._small: 
+        expectTrue(nfcStringInfo._isASCII || !nfcStringInfo._isNFC, "Small strings do not have an isNFC bit")
+      default:
+        print("1️⃣")
+        expectTrue(nfcStringInfo._isNFC)
+      }
+
+      let nfkcStringInfo = source.normalized(.nfkc)._classify()
+      switch nfkcStringInfo._form {
+      case ._cocoa, ._immortal:
+        fatalError("We should not see a cocoa/immortal string here")
+      case ._small:
+        expectTrue(nfcStringInfo._isASCII || !nfcStringInfo._isNFC, "Small strings do not have an isNFC bit")
+      default:
+        print("2️⃣")
+        expectTrue(nfkcStringInfo._isNFC)
+      }
+    }
+  }
+
+  tests.test("StringNormalization15/NormalizedCharacter")
+  .code {
+    for test in normalizationTests14 {
+      let source = String(validating: test.source, as: UTF8.self)!
+      let nfdString = source.normalized(.nfd)
+      let nfcString = source.normalized(.nfc)
+
+      for (nfdChar, nfcChar) in zip(nfdString, nfcString) {
+        expectEqualSequence(nfdChar.unicodeScalars, nfcChar.normalized(.nfd).unicodeScalars)
+        expectEqualSequence(nfdChar.normalized(.nfc).unicodeScalars, nfcChar.unicodeScalars)
+      }
+    }
+  }
+
+  tests.test("StringNormalization15/NormalizedCharacter/isNFC")
+  .code {
+    let sourceScalars: [Unicode.Scalar] = [
+      "t", "e", "s", "t",
+      "t", "\u{0300}", "\u{0301}", "\u{0302}", "\u{0303}", "\u{0304}", "\u{0305}", "\u{0306}", "\u{0307}", "\u{0308}",
+      "\u{0309}", "\u{0322}", "\u{0323}", "\u{0324}", "\u{0325}", "\u{0326}", "\u{0327}", "\u{0328}", "\u{0329}",
+      "\u{035C}", "\u{035D}", "\u{035E}", "\u{035F}", "\u{0360}", "\u{0361}", "\u{0362}", "\u{0363}", "\u{0364}",
+      "\u{032A}", "\u{032B}", "\u{032C}", "\u{032D}", "\u{032E}", "\u{032F}", "\u{0330}", "\u{030A}", "\u{030B}",
+      "\u{030C}", "\u{030D}", "\u{030E}", "\u{030F}", "\u{0310}", "\u{0311}", "\u{0312}", "\u{0313}", "\u{0314}",
+      "\u{0315}", "\u{0316}", "\u{0317}", "\u{0318}", "\u{0319}", "\u{031A}", "\u{031B}", "\u{031C}", "\u{031D}",
+      "\u{031E}", "\u{031F}", "\u{0320}", "\u{0321}", "\u{0331}", "\u{0332}", "\u{0333}", "\u{0334}", "\u{0335}",
+      "\u{0336}", "\u{0337}", "\u{0338}", "\u{0339}", "\u{033A}", "\u{033B}", "\u{033C}", "\u{033D}", "\u{033E}",
+      "\u{033F}", "\u{0340}", "\u{0341}", "\u{0342}", "\u{0343}", "\u{0344}", "\u{0345}", "\u{0346}", "\u{0347}",
+      "\u{0348}", "\u{0349}", "\u{034A}", "\u{034B}", "\u{034C}", "\u{034D}", "\u{034E}", "\u{034F}", "\u{0350}",
+      "\u{0351}", "\u{0352}", "\u{0353}", "\u{0354}", "\u{0355}", "\u{0356}", "\u{0357}", "\u{0358}", "\u{0359}",
+      "\u{035A}", "\u{035B}", "\u{035C}", "\u{035D}", "\u{035E}", "\u{035F}", "\u{0360}", "\u{0361}", "\u{0362}",
+      "\u{0363}", "\u{0364}", "\u{0365}", "\u{0366}", "\u{0367}", "\u{0368}", "\u{0369}", "\u{036A}", "\u{036B}",
+      "\u{036C}", "\u{036D}", "\u{036E}", 
+      "t", "e", "s", "t",
+    ]
+
+    let sourceString = String(sourceScalars)
+    precondition(sourceString.count == 9)
+
+    let nfdString = sourceString.normalized(.nfd)
+    let nfcString = sourceString.normalized(.nfc)
+
+    // Extract the big Zalgo character.
+    let (nfdChar, nfcChar) = (nfdString.dropFirst(4).first!, nfcString.dropFirst(4).first!)
+    expectTrue(nfdChar.unicodeScalars.count > 50)
+    expectTrue(nfcChar.unicodeScalars.count > 50)
+
+    expectEqualSequence(nfdChar.unicodeScalars, nfcChar.normalized(.nfd).unicodeScalars)
+    expectEqualSequence(nfdChar.normalized(.nfc).unicodeScalars, nfcChar.unicodeScalars)
+
+    // Characters from an isNFC string should inherit the isNFC bit
+    // if their storage representation allows.
+    expectTrue(nfcString._classify()._isNFC)
+    expectTrue(nfcChar._classify()._isNFC)
+    expectFalse(nfdString._classify()._isNFC)
+    expectFalse(nfdChar._classify()._isNFC)
+
+    // Characters normalized to NFC should set the isNFC bit
+    // if their storage representation allows.
+    expectTrue(nfdChar.normalized(.nfc)._classify()._isNFC)
+  }
+
+  tests.test("StringNormalization15/IsNormalized/Sequence")
+  .code {
+    for test in normalizationTests14 {
+      let nfdScalars = UTF8ToScalars(test.NFD)
+      let nfcScalars = UTF8ToScalars(test.NFC)
+      let nfkdScalars = UTF8ToScalars(test.NFKD)
+      let nfkcScalars = UTF8ToScalars(test.NFKC)
+
+      // All samples should be confirmed as normalized in their respective forms.
+
+      expectTrue(nfdScalars.singlePassSequence.isNormalized(.nfd))
+      expectTrue(nfcScalars.singlePassSequence.isNormalized(.nfc))
+      expectTrue(nfkdScalars.singlePassSequence.isNormalized(.nfkd))
+      expectTrue(nfkcScalars.singlePassSequence.isNormalized(.nfkc))
+      
+      // If the source text is expected to be modified by the normalization process,
+      // it is an example of text that is NOT in the given normal form.
+
+      let sourceScalars = UTF8ToScalars(test.source)
+
+      if !sourceScalars.elementsEqual(nfdScalars) {
+        expectFalse(sourceScalars.singlePassSequence.isNormalized(.nfd))
+      }
+      if !sourceScalars.elementsEqual(nfcScalars) {
+        expectFalse(sourceScalars.singlePassSequence.isNormalized(.nfc))
+      }
+      if !sourceScalars.elementsEqual(nfkdScalars) {
+        expectFalse(sourceScalars.singlePassSequence.isNormalized(.nfkd))
+      }
+      if !sourceScalars.elementsEqual(nfkcScalars) {
+        expectFalse(sourceScalars.singlePassSequence.isNormalized(.nfkc))
+      }
+    }
+  }
+
+  tests.test("StringNormalization15/IsNormalized/Collection")
+  .code {
+    for test in normalizationTests14 {
+      let nfdScalars = UTF8ToScalars(test.NFD)
+      let nfcScalars = UTF8ToScalars(test.NFC)
+      let nfkdScalars = UTF8ToScalars(test.NFKD)
+      let nfkcScalars = UTF8ToScalars(test.NFKC)
+
+      // All samples should be confirmed as normalized in their respective forms.
+
+      expectTrue(nfdScalars.isNormalized(.nfd))
+      expectTrue(nfcScalars.isNormalized(.nfc))
+      expectTrue(nfkdScalars.isNormalized(.nfkd))
+      expectTrue(nfkcScalars.isNormalized(.nfkc))
+      
+      // If the source text is expected to be modified by the normalization process,
+      // it is an example of text that is NOT in the given normal form.
+
+      let sourceScalars = UTF8ToScalars(test.source)
+
+      if !sourceScalars.elementsEqual(nfdScalars) {
+        expectFalse(sourceScalars.isNormalized(.nfd))
+      }
+      if !sourceScalars.elementsEqual(nfcScalars) {
+        expectFalse(sourceScalars.isNormalized(.nfc))
+      }
+      if !sourceScalars.elementsEqual(nfkdScalars) {
+        expectFalse(sourceScalars.isNormalized(.nfkd))
+      }
+      if !sourceScalars.elementsEqual(nfkcScalars) {
+        expectFalse(sourceScalars.isNormalized(.nfkc))
+      }
     }
   }
 }
@@ -545,4 +819,4 @@ for (i, test) in codeUnitNormalizationTests.enumerated() {
 #endif
 }
 
-runAllTests()
+await runAllTestsAsync()
