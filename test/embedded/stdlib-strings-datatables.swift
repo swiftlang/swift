@@ -1,9 +1,8 @@
-// Test String operations that require unicode data tables. This is not an executable test yet, because the data tables
-// are not available for linking yet.
-
-// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -runtime-compatibility-version none -wmo %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswiftUnicodeDataTables.a) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Osize -Xlinker -dead_strip -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswiftUnicodeDataTables.a) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 
@@ -11,15 +10,19 @@ public func test1() {
   let string = "string"
   let other = "other"
   let appended = string + other
-  _ = appended
+  print(appended) // CHECK: stringother
 
   let _ = "aa" == "bb"
-  let dict: [String:Int] = [:]
-  _ = dict
+  var dict: [String:Int] = [:]
+  dict["aa"] = 42
+  print(dict["aa"]!) // CHECK: 42
 
-  let _ = "aaa".uppercased()
+  let u = "aaa".uppercased()
+  print(u) // CHECK: AAA
 
   let space: Character = " "
   let split = appended.split(separator: space)
-  _ = split
+  print(split[0]) // CHECK: stringother
 }
+
+test1()
