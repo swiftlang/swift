@@ -70,13 +70,13 @@ extension _HashTable: Sendable {}
 
 extension _HashTable {
   /// The inverse of the maximum hash table load factor.
-  private static var maxLoadFactor: (nominator: Int, denominator: Int) {
-    @inline(__always) get { return (nominator: 3, denominator: 4) } // 3/4
+  private static var maxLoadFactor: (numerator: Int, denominator: Int) {
+    @inline(__always) get { return (numerator: 3, denominator: 4) } // 3/4
   }
 
   internal static func capacity(forScale scale: Int8) -> Int {
     let bucketCount = (1 as Int) &<< scale
-    return bucketCount * maxLoadFactor.nominator / maxLoadFactor.denominator
+    return bucketCount * maxLoadFactor.numerator / maxLoadFactor.denominator
   }
 
   internal static func scale(forCapacity capacity: Int) -> Int8 {
@@ -86,7 +86,7 @@ extension _HashTable {
     // leave at least one hole.
     func divideRoundingUp(n: Int, by: Int) -> Int { (n + (by - 1)) / by }
     let minimumEntries = Swift.max(divideRoundingUp(
-      n: capacity * maxLoadFactor.denominator, by: maxLoadFactor.nominator),
+      n: capacity * maxLoadFactor.denominator, by: maxLoadFactor.numerator),
       capacity + 1)
     // The actual number of entries we need to allocate is the lowest power of
     // two greater than or equal to the minimum entry count. Calculate its
