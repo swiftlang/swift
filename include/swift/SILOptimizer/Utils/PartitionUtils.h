@@ -192,7 +192,10 @@ private:
         actorInstance(ActorInstance::getForValue(actorInstance)) {
     assert((!actorInstance ||
             (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
-             actorInstance->getType().isAnyActor())) &&
+             actorInstance->getType()
+                 .getASTType()
+                 ->lookThroughAllOptionalTypes()
+                 ->getAnyActor())) &&
            "actorInstance must be an actor if it is non-empty");
   }
 
