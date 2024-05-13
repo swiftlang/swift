@@ -47,6 +47,9 @@ LangOptions::LangOptions() {
 #endif
 
   // Note: Introduce default-on language options here.
+  Features.insert(Feature::NoncopyableGenerics);
+  Features.insert(Feature::BorrowingSwitch);
+  Features.insert(Feature::MoveOnlyPartialConsumption);
 
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
