@@ -5795,6 +5795,20 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   }
 
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto oldContext = var->getDeclContext();
+    auto oldTypeDecl = oldContext->getSelfNominalTypeDecl();
+    // If the base type is non-copyable, we cannot synthesize the accessor,
+    // because its implementation would use `UnsafePointer<BaseTy>`, and that
+    // triggers a bug when building SwiftCompilerSources. (rdar://128013193)
+    //
+    // We cannot use `ty->isNoncopyable()` here because that would create a
+    // cyclic dependency between ModuleQualifiedLookupRequest and
+    // LookupConformanceInModuleRequest, so we check for the presence of
+    // move-only attribute that is implicitly added to non-copyable C++ types by
+    // ClangImporter.
+    if (oldTypeDecl->getAttrs().hasAttribute<MoveOnlyAttr>())
+      return nullptr;
+
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
                                                     sizeof(VarDecl), false);
     auto out =

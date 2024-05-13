@@ -1,9 +1,11 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-5.9)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift)
+// -- FIXME: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -D HAS_RDAR_128013193)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-5.9 -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6 -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -O)
+// -- FIXME: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -O -D HAS_RDAR_128013193)
 //
 // REQUIRES: executable_test
 
@@ -90,6 +92,7 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderValueMutDeref pointee value") {
   expectEqual(k.x, k2.x)
 }
 
+#if HAS_RDAR_128013193
 MoveOnlyCxxOperators.test("NonCopyableHolderConstDerefDerivedDerived pointee borrow") {
   let holder = NonCopyableHolderConstDerefDerivedDerived(11)
   var k = borrowNC(holder.pointee)
@@ -157,5 +160,6 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderValueMutDerefDerivedDerived poin
   var k2 = holder.pointee
   expectEqual(k.x, k2.x)
 }
+#endif
 
 runAllTests()
