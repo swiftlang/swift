@@ -5,7 +5,7 @@
 // REQUIRES: asan_runtime
 
 // Try some options
-// RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=edge,indirect-calls,trace-bb,trace-cmp,8bit-counters,inlnie-8bit-counters,pc-table  -sanitize=address %s | %FileCheck -check-prefix=SANCOV_EDGE_WITH_OPTIONS %s
+// RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=edge,indirect-calls,trace-bb,trace-cmp,8bit-counters,inline-8bit-counters,pc-table  -sanitize=address %s | %FileCheck -check-prefix=SANCOV_EDGE_WITH_OPTIONS %s
 
 // Invalid command line arguments
 // RUN: not %swiftc_driver -driver-print-jobs -sanitize-coverage=func %s 2>&1 | %FileCheck -check-prefix=SANCOV_WITHOUT_XSAN %s
