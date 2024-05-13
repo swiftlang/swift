@@ -15,10 +15,14 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 45{{}}
+class NonSendableKlass { // expected-complete-note 48{{}}
   // expected-typechecker-only-note @-1 4{{}}
   // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
+
+  init() {}
+  init(_ x: NonSendableKlass) {
+  }
 
   func asyncCall() async {}
   func asyncCallWithIsolatedParameter(isolation: isolated (any Actor)? = #isolation) async {
@@ -36,6 +40,7 @@ actor MyActor {
 
   func useSendableFunction(_: @Sendable () -> Void) {}
   func useNonSendableFunction(_: () -> Void) {}
+  func doSomething() {}
 }
 
 final actor FinalActor {
@@ -625,7 +630,7 @@ func singleFieldVarMergeTest() async {
   await transferToMain(box) // expected-tns-warning {{sending 'box' risks causing data races}}
   // expected-tns-note @-1 {{sending 'box' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'SingleFieldKlassBox' into main actor-isolated context may introduce data races}}
-  
+
 
   // But if we use box.k here, we emit an error since we didn't reinitialize at
   // all.
@@ -640,7 +645,7 @@ func multipleFieldVarMergeTest1() async {
   await transferToMain(box.k1) // expected-tns-warning {{sending 'box.k1' risks causing data races}}
   // expected-tns-note @-1 {{sending 'box.k1' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-  
+
 
   // So even if we reassign over k1, since we did a merge, this should error.
   box.k1 = NonSendableKlass() // expected-tns-note {{access can happen concurrently}}
@@ -726,7 +731,7 @@ class ClassFieldTests { // expected-complete-note 6{{}}
   let letNonSendableNonTrivial = NonSendableKlass()
   var varSendableTrivial = 0
   var varSendableNonTrivial = SendableKlass()
-  var varNonSendableNonTrivial = NonSendableKlass()  
+  var varNonSendableNonTrivial = NonSendableKlass()
 }
 
 func letSendableTrivialClassFieldTest() async {
@@ -794,7 +799,7 @@ final class FinalClassFieldTests { // expected-complete-note 6 {{}}
   let letNonSendableNonTrivial = NonSendableKlass()
   var varSendableTrivial = 0
   var varSendableNonTrivial = SendableKlass()
-  var varNonSendableNonTrivial = NonSendableKlass()  
+  var varNonSendableNonTrivial = NonSendableKlass()
 }
 
 func letSendableTrivialFinalClassFieldTest() async {
@@ -861,7 +866,7 @@ struct StructFieldTests { // expected-complete-note 31 {{}}
   let letNonSendableNonTrivial = NonSendableKlass()
   var varSendableTrivial = 0
   var varSendableNonTrivial = SendableKlass()
-  var varNonSendableNonTrivial = NonSendableKlass()  
+  var varNonSendableNonTrivial = NonSendableKlass()
 }
 
 func letSendableTrivialLetStructFieldTest() async {
@@ -1342,7 +1347,7 @@ func varNonSendableNonTrivialLetTupleFieldTest() async {
 }
 
 func varSendableTrivialVarTupleFieldTest() async {
-  var test = (0, SendableKlass(), NonSendableKlass()) 
+  var test = (0, SendableKlass(), NonSendableKlass())
   test = (0, SendableKlass(), NonSendableKlass())
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -1352,7 +1357,7 @@ func varSendableTrivialVarTupleFieldTest() async {
 }
 
 func varSendableTrivialVarTupleFieldTest2() async {
-  var test = (0, SendableKlass(), NonSendableKlass()) 
+  var test = (0, SendableKlass(), NonSendableKlass())
   test = (0, SendableKlass(), NonSendableKlass())
   await transferToMain(test.2) // expected-tns-warning {{sending 'test.2' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test.2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -1362,7 +1367,7 @@ func varSendableTrivialVarTupleFieldTest2() async {
 }
 
 func varSendableNonTrivialVarTupleFieldTest() async {
-  var test = (0, SendableKlass(), NonSendableKlass()) 
+  var test = (0, SendableKlass(), NonSendableKlass())
   test = (0, SendableKlass(), NonSendableKlass())
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -1372,7 +1377,7 @@ func varSendableNonTrivialVarTupleFieldTest() async {
 }
 
 func varNonSendableNonTrivialVarTupleFieldTest() async {
-  var test = (0, SendableKlass(), NonSendableKlass()) 
+  var test = (0, SendableKlass(), NonSendableKlass())
   test = (0, SendableKlass(), NonSendableKlass())
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -1457,7 +1462,7 @@ actor ActorWithSetter {
     self.twoFieldBoxInTuple.1.k1 = x
     await transferToMain(x) // expected-tns-warning {{sending 'x' risks causing data races}}
     // expected-tns-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
-    // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
+    // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
   // This triggers a crash in SILGen with tns enabled.
@@ -1622,4 +1627,74 @@ actor DictionaryActorTest {
   func doSomething(_ key: Int) {
     assert(self.data[key] == 0)
   }
+}
+
+extension MyActor {
+  // Make sure that we properly infer information from isolated parameters that
+  // aren't self.
+  func isolationInferenceFromNonSelfIsolatedParameters() {
+    useValue {
+      self.doSomething()
+    }
+  }
+
+  func isolationInferenceFromNonSelfIsolatedParameters2() {
+    useValue {
+      self.doSomething()
+      let x = NonSendableKlass()
+      self.useKlass(x)
+      await transferToMain(x)
+      // expected-tns-warning @-1 {{sending 'x' risks causing data races}}
+      // expected-tns-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+      // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    }
+  }
+}
+
+func initAccessorTests() {
+  @available(SwiftStdlib 5.1, *)
+  actor NonisolatedAccessors {
+    nonisolated var a: Int = 0 {
+      init {
+      }
+
+      get { 0 }
+      set {}
+    }
+
+    init(value: Int) {
+      let escapingSelf: (NonisolatedAccessors) -> Void = { _ in }
+
+      // a is initialized here via default value
+
+      escapingSelf(self)
+
+      self.a = value // Ok (nonisolated)
+      print(a) // Ok (nonisolated)
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  actor NonSendableInit {
+    var first: NonSendableKlass
+    var second: NonSendableKlass? = nil {
+      @storageRestrictions(initializes: first)
+      init(initialValue)  {
+        first = initialValue!
+      }
+
+      get { fatalError() }
+      set { fatalError() }
+    }
+  }
+}
+
+func differentInstanceTest(_ a: MyActor, _ b: MyActor) async {
+  let x = NonSendableKlass()
+  await a.useKlass(x)
+  // expected-tns-warning @-1 {{sending 'x' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'x' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+  // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into actor-isolated context may introduce data races}}
+  await b.useKlass(x) // expected-tns-note {{access can happen concurrently}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into actor-isolated context may introduce data races}}
 }

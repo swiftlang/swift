@@ -1551,6 +1551,17 @@ public:
     return getArguments().back();
   }
 
+  /// If we have an isolated argument, return that. Returns nullptr otherwise.
+  const SILArgument *maybeGetIsolatedArgument() const {
+    for (auto *arg : getArgumentsWithoutIndirectResults()) {
+      if (cast<SILFunctionArgument>(arg)->getKnownParameterInfo().hasOption(
+              SILParameterInfo::Isolated))
+        return arg;
+    }
+
+    return nullptr;
+  }
+
   const SILArgument *getDynamicSelfMetadata() const {
     assert(hasDynamicSelfMetadata() && "This method can only be called if the "
            "SILFunction has a self-metadata parameter");
