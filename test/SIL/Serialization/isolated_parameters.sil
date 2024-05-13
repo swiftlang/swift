@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name _Concurrency
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name _Concurrency
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name _Concurrency -emit-sorted-sil | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -13,6 +13,7 @@ import Swift
 import SwiftShims
 
 // NOTE: In SIL we do not save/print out imports, so we cannot import _Concurrency here!
+
 public protocol AnyActor: AnyObject, Sendable {}
 public protocol Actor : AnyActor {}
 

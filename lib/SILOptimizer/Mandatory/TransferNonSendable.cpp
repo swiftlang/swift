@@ -1527,8 +1527,8 @@ struct DiagnosticEvaluator final
     if (auto *svi =
             dyn_cast<SingleValueInstruction>(partitionOp.getSourceInst())) {
       if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
-          !regionanalysisimpl::isNonSendableType(svi->getType(),
-                                                 svi->getFunction())) {
+          !SILIsolationInfo::isNonSendableType(svi->getType(),
+                                               svi->getFunction())) {
         bool isCapture = operandState.isClosureCaptured;
         if (!isCapture) {
           return;
