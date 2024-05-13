@@ -1446,7 +1446,7 @@ public:
     if (AVI->usesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
-    printDebugVar(AVI->getVarInfo(),
+    printDebugVar(AVI->getVarInfo(false),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
   void visitAllocVectorInst(AllocVectorInst *AVI) {
@@ -1503,7 +1503,7 @@ public:
     }
 
     *this << ABI->getType();
-    printDebugVar(ABI->getVarInfo(),
+    printDebugVar(ABI->getVarInfo(false),
                   &ABI->getModule().getASTContext().SourceMgr);
   }
 
@@ -1915,7 +1915,7 @@ public:
     if (DVI->hasTrace())
       *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
-    printDebugVar(DVI->getVarInfo(),
+    printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
   }
 

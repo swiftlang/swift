@@ -1875,9 +1875,9 @@ public:
   bool isLet() const { return Bits.Data.Constant; }
 
   std::optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType = {},
-      std::optional<SILLocation> DeclLoc = {},
-      const SILDebugScope *DeclScope = nullptr,
+  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType,
+      std::optional<SILLocation> DeclLoc,
+      const SILDebugScope *DeclScope,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return std::nullopt;
@@ -2087,11 +2087,18 @@ public:
   SILLocation getVarLoc() const {
     if (hasAuxDebugLocation())
       return *getTrailingObjects<SILLocation>();
-    return getLoc();
+    return getLoc().strippedForDebugVariable();
   }
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location, scope, and element type. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     // If we used to have debug info attached but our debug info is now
     // invalidated, just bail.
     if (sharedUInt8().AllocStackInst.hasInvalidatedVarInfo) {
@@ -2103,11 +2110,18 @@ public:
     const SILDebugScope *VarDeclScope = nullptr;
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    else if (complete)
+      AuxVarType = getElementType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -2509,8 +2523,13 @@ public:
   SILType getAddressType() const;
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+    if (complete)
+      return VarInfo.get(getDecl(), getTrailingObjects<char>(),
+                         getAddressType().getObjectType(),
+                         getLoc().strippedForDebugVariable(),
+                         getDebugScope());
+    return VarInfo.get(getDecl(), getTrailingObjects<char>(), {}, {}, nullptr);
   };
 
   void setUsesMoveableValueDebugInfo() {
@@ -5385,21 +5404,41 @@ public:
   SILLocation getVarLoc() const {
     if (hasAuxDebugLocation())
       return *getTrailingObjects<SILLocation>();
-    return getLoc();
+    return getLoc().strippedForDebugVariable();
   }
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  ///
+  /// \note The type is not included because it can change during a pass.
+  /// Passes must make sure to not lose the type information.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
+
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    // TODO: passes break if we set the type here, as the type of the operand
+    // can be changed during a pass.
+    // else if (complete)
+    //   AuxVarType = getOperand()->getType().getObjectType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);

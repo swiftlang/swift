@@ -347,8 +347,11 @@ struct DebugInfoPropagator {
     // var with a count already and return that value. If we did not, we insert
     // with the new count before expanding the set (initializing the map with
     // the correct value).
+    auto debugVariable = debugVar;
+    debugVariable.DIExpr = debugVariable.DIExpr.getFragmentPart();
+    debugVariable.Type = {};
     auto iter = dbgVarToDbgVarIndexMap.insert(
-        {debugVar, dbgVarToDbgVarIndexMap.size()});
+        {debugVariable, dbgVarToDbgVarIndexMap.size()});
     LLVM_DEBUG(if (iter.second) llvm::dbgs()
                    << "Mapping: [" << iter.first->second
                    << "] = " << iter.first->first.Name << '\n';);
