@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 48{{}}
+class NonSendableKlass { // expected-complete-note 49{{}}
   // expected-typechecker-only-note @-1 4{{}}
   // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
@@ -1697,4 +1697,17 @@ func differentInstanceTest(_ a: MyActor, _ b: MyActor) async {
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into actor-isolated context may introduce data races}}
   await b.useKlass(x) // expected-tns-note {{access can happen concurrently}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into actor-isolated context may introduce data races}}
+}
+
+protocol AssociatedTypeTestProtocol {
+  associatedtype A: Actor
+}
+
+func associatedTypeTestBasic<T: AssociatedTypeTestProtocol>(_: T, _: isolated T.A) {
+}
+
+func associatedTypeTestBasic2<T: AssociatedTypeTestProtocol>(_: T, iso: isolated T.A, x: NonSendableKlass) async {
+  await transferToMain(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{sending 'iso'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'iso'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 }
