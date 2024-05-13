@@ -478,7 +478,7 @@ internal func _int64ToStringImpl(
   _ radix: Int64,
   _ uppercase: Bool
 ) -> UInt64 {
-  return value._toStringImpl(buffer, bufferLength, radix, uppercase)
+  return UInt64(value._toStringImpl(buffer, bufferLength, Int(radix), uppercase))
 }
 #endif
 
@@ -527,7 +527,7 @@ internal func _uint64ToStringImpl(
   _ radix: Int64,
   _ uppercase: Bool
 ) -> UInt64 {
-  return value._toStringImpl(buffer, bufferLength, radix, uppercase)
+  return UInt64(value._toStringImpl(buffer, bufferLength, Int(radix), uppercase))
 }
 #endif
 

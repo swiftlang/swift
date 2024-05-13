@@ -77,9 +77,9 @@ extension BinaryInteger {
   internal func _toStringImpl(
     _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
     _ bufferLength: UInt,
-    _ radix: Int64,
+    _ radix: Int,
     _ uppercase: Bool
-  ) -> UInt64 {
+  ) -> Int {
     if self == (0 as Self) {
       buffer[0] = UInt8(("0" as Unicode.Scalar).value)
       return 1
@@ -114,7 +114,7 @@ extension BinaryInteger {
     let destination = UnsafeMutableRawBufferPointer(start: buffer, count: Int(bufferLength))
     destination.copyMemory(from: UnsafeRawBufferPointer(intermediate))
     
-    return UInt64(count)
+    return count
   }
 
   func writeToStdout() {
@@ -127,7 +127,7 @@ extension BinaryInteger {
 
     let count = _toStringImpl(buffer, 64, 10, false)
 
-    printCharacters(UnsafeBufferPointer(start: buffer, count: Int(count)))
+    printCharacters(UnsafeBufferPointer(start: buffer, count: count))
 
     Builtin.stackDealloc(stackBuffer)
   }
