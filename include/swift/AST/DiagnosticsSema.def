@@ -5731,6 +5731,18 @@ NOTE(nonisolated_mutable_storage_note,none,
      "convert %0 to a 'let' constant or consider declaring it "
      "'nonisolated(unsafe)' if manually managing concurrency safety",
      (const VarDecl *))
+WARNING(nonisolated_unsafe_sendable_constant,none,
+     "'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type "
+     "%0, consider removing it",
+     (Type))
+WARNING(unsafe_sendable_actor_constant,none,
+     "'(unsafe)' is unnecessary for a constant public actor property with "
+     "'Sendable' type %0, consider removing it",
+     (Type))
+WARNING(nonisolated_unsafe_sendable_actor_constant,none,
+     "'nonisolated(unsafe)' is unnecessary for a constant actor-isolated "
+     "property with 'Sendable' type %0, consider removing it",
+     (Type))
 ERROR(nonisolated_non_sendable,none,
       "'nonisolated' can not be applied to variable with non-'Sendable' "
       "type %0",
