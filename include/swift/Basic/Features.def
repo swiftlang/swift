@@ -196,6 +196,7 @@ UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
+UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 UPCOMING_FEATURE(BorrowingSwitch, 432, 6)
 
 // Swift 7
@@ -371,9 +372,6 @@ EXPERIMENTAL_FEATURE(CImplementation, true)
 
 // Enable the stdlib @DebugDescription macro.
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(DebugDescriptionMacro, true)
-
-// Enable usability improvements for global-actor-isolated types.
-EXPERIMENTAL_FEATURE(GlobalActorIsolatedTypesUsability, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
