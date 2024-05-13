@@ -273,6 +273,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       ARCHITECTURE "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
+      INSTALL_WITH_SHARED
       )
     swift_install_in_component(
       TARGETS embedded-concurrency-${mod}
