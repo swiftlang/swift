@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift)
+// -- FIXME: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -D HAS_RDAR_128013193)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-5.9 -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6 -O)
 
@@ -27,10 +28,12 @@ MoveOnlyCxxValueType.test("Test derived move only type member access") {
   var k = c.method(-3)
   expectEqual(k, -6)
   expectEqual(c.method(1), 2)
+#if HAS_RDAR_128013193
   k = c.x
   expectEqual(k, 2)
   c.x = 11
   expectEqual(c.x, 11)
+#endif
   k = c.mutMethod(-13)
   expectEqual(k, -13)
 }
@@ -56,6 +59,7 @@ MoveOnlyCxxValueType.test("Test move only field access in holder") {
   expectEqual(c.x.x, 5)
 }
 
+#if HAS_RDAR_128013193
 MoveOnlyCxxValueType.test("Test move only field access in derived holder") {
   var c = NonCopyableHolderDerivedDerived(-11)
   var k = borrowNC(c.x)
@@ -69,5 +73,6 @@ MoveOnlyCxxValueType.test("Test move only field access in derived holder") {
   c.x.mutMethod(5)
   expectEqual(c.x.x, 5)
 }
+#endif
 
 runAllTests()

@@ -509,6 +509,26 @@ namespace {
         return importFunctionPointerLikeType(*type, pointeeType);
       }
 
+      // We cannot specify UnsafePointer<T> with a non-copyable type T just yet,
+      // because it triggers a bug when building SwiftCompilerSources.
+      // (rdar://128013193)
+      //
+      // We cannot use `ty->isNoncopyable()` here because that would create a
+      // cyclic dependency between ModuleQualifiedLookupRequest and
+      // LookupConformanceInModuleRequest, so we check for the presence of
+      // move-only attribute that is implicitly added to non-copyable C++ types
+      // by ClangImporter.
+      if (pointeeType && pointeeType->getAnyNominal() &&
+          pointeeType->getAnyNominal()
+              ->getAttrs()
+              .hasAttribute<MoveOnlyAttr>()) {
+        auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+        if (!opaquePointerDecl)
+          return Type();
+        return {opaquePointerDecl->getDeclaredInterfaceType(),
+                ImportHint::OtherPointer};
+      }
+
       PointerTypeKind pointerKind;
       if (quals.hasConst()) {
         pointerKind = PTK_UnsafePointer;
