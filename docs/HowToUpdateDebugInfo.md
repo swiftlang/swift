@@ -108,6 +108,9 @@ debug_value %0 : $*T, let, name "address", type $UnsafeRawPointer
 The variable will usually have an associated expression yielding the correct
 type.
 
+> [!Note]
+> As there are no pointers in Swift, the type should never be an address type.
+
 ### Variable expressions
 
 A variable can have an associated expression if the value needs computation.

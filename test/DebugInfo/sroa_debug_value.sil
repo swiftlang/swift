@@ -31,11 +31,11 @@ bb0(%0 : $Int64, %1 : $Int64):
   // Make sure SROA propagate the debug info to the splitted alloc_stack/debug_value instructions
   // CHECK-SROA: %[[ALLOC_X:[0-9]+]] = alloc_stack $Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
-  // CHECK-SROA-SAME:        type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
   // CHECK-SROA: %[[ALLOC_Y:[0-9]+]] = alloc_stack $Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
-  // CHECK-SROA-SAME:        type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.y
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
   // CHECK-SROA: debug_value %[[ALLOC_X]] : $*Int64, let
   // CHECK-SROA-SAME:        name "my_copy",
@@ -54,11 +54,11 @@ bb0(%0 : $Int64, %1 : $Int64):
   dealloc_stack %4 : $*MyStruct, loc "sroa.swift":8:9, scope 2
   // Make sure function arguments' SSA values are properly connected to both source variables
   // CHECK-MEM2REG: debug_value %0 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9
-  // CHECK-MEM2REG-SAME: type $*MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.x
   // CHECK-MEM2REG: debug_value %0 : $Int64, let, (name "my_copy", loc "sroa.swift":7:10
   // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.x
   // CHECK-MEM2REG: debug_value %1 : $Int64, var, (name "my_struct", loc "sroa.swift":8:9
-  // CHECK-MEM2REG-SAME: type $*MyStruct, expr op_fragment:#MyStruct.y
+  // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.y
   // CHECK-MEM2REG: debug_value %1 : $Int64, let, (name "my_copy", loc "sroa.swift":7:10
   // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.y
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2

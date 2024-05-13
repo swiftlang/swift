@@ -342,8 +342,10 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
       // Special handling for SILDebugVariable.
+      // Fetch incomplete var info to avoid calling setDebugVarScope on
+      // alloc_box, crashing.
       if (auto DVI = DebugVarCarryingInst(&II))
-        if (auto VarInfo = DVI.getVarInfo())
+        if (auto VarInfo = DVI.getVarInfo(false))
           if (VarInfo->Scope)
             DVI.setDebugVarScope(
                 ScopeCloner.getOrCreateClonedScope(VarInfo->Scope));
