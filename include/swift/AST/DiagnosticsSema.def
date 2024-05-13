@@ -2033,6 +2033,8 @@ ERROR(expose_move_only_to_cxx,none,
       "noncopyable %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
+ERROR(expose_macro_to_cxx,none,
+      "Swift macro can not yet be represented in C++", (ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,

@@ -83,6 +83,7 @@ enum RepresentationError {
   UnrepresentableProtocol,
   UnrepresentableMoveOnly,
   UnrepresentableNested,
+  UnrepresentableMacro,
 };
 
 /// Constructs a diagnostic that describes the given C++ representation error.
