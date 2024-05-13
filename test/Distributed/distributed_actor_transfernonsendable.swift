@@ -54,7 +54,7 @@ distributed actor MyDistributedActor {
 
   distributed func transferActorIsolatedArg(_ x: NonSendableKlass) async {
     await transferToMain(x) // expected-error {{sending 'x' risks causing data races}}
-    // expected-note @-1 {{sending actor-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and actor-isolated uses}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 
   distributed func transferActorIsolatedArgIntoClosure(_ x: NonSendableKlass) async {
@@ -62,7 +62,7 @@ distributed actor MyDistributedActor {
       // TODO: In 2nd part of message should say actor-isolated instead of later
       // nonisolated uses in the case of a closure.
       print(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{actor-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 }

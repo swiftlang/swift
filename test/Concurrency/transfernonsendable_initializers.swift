@@ -75,9 +75,10 @@ func initActorWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
 
 actor ActorWithAsyncIsolatedInit {
   init(_ newK: NonSendableKlass) async {
+    // TODO: This should say actor isolated.
     let _ = { @MainActor in
       print(newK) // expected-error {{sending 'newK' risks causing data races}}
-      // expected-note @-1 {{actor-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 }

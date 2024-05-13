@@ -124,7 +124,8 @@ struct UseDefChainVisitor
     // If this is a type case, see if the result of the cast is sendable. In
     // such a case, we do not want to look through this cast.
     if (castType == AccessStorageCast::Type &&
-        !isNonSendableType(cast->getType(), cast->getFunction()))
+        !SILIsolationInfo::isNonSendableType(cast->getType(),
+                                             cast->getFunction()))
       return SILValue();
 
     // If we do not have an identity cast, mark this as a merge.
@@ -160,7 +161,8 @@ struct UseDefChainVisitor
 
         // See if our operand type is a sendable type. In such a case, we do not
         // want to look through our operand.
-        if (!isNonSendableType(op->getType(), op->getFunction()))
+        if (!SILIsolationInfo::isNonSendableType(op->getType(),
+                                                 op->getFunction()))
           return SILValue();
 
         break;
@@ -169,7 +171,8 @@ struct UseDefChainVisitor
         // These are merges if we have multiple fields.
         auto op = cast<TupleElementAddrInst>(inst)->getOperand();
 
-        if (!isNonSendableType(op->getType(), op->getFunction()))
+        if (!SILIsolationInfo::isNonSendableType(op->getType(),
+                                                 op->getFunction()))
           return SILValue();
 
         isMerge |= op->getType().getNumTupleElements() > 1;
@@ -183,7 +186,8 @@ struct UseDefChainVisitor
         // identify the sendable type with the non-sendable operand. These we
         // are always going to ignore anyways since a sendable let/var field of
         // a struct can always be used.
-        if (!isNonSendableType(op->getType(), op->getFunction()))
+        if (!SILIsolationInfo::isNonSendableType(op->getType(),
+                                                 op->getFunction()))
           return SILValue();
 
         // These are merges if we have multiple fields.
@@ -314,21 +318,23 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
       if (isLookThroughIfOperandAndResultNonSendable(svi)) {
-        if (isNonSendableType(svi->getType(), fn) &&
-            isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
+            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
           temp = svi->getOperand(0);
         }
       }
 
       if (isLookThroughIfResultNonSendable(svi)) {
-        if (isNonSendableType(svi->getType(), fn)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
           temp = svi->getOperand(0);
         }
       }
 
       if (isLookThroughIfOperandNonSendable(svi)) {
         // If our operand is a non-Sendable type, look through this instruction.
-        if (isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
           temp = svi->getOperand(0);
         }
       }
@@ -1464,7 +1470,7 @@ private:
   /// NOTE: We special case RawPointer and NativeObject to ensure they are
   /// treated as non-Sendable and strict checking is applied to it.
   bool isNonSendableType(SILType type) const {
-    return ::isNonSendableType(type, function);
+    return SILIsolationInfo::isNonSendableType(type, function);
   }
 
   TrackableValue
@@ -2221,7 +2227,8 @@ public:
     case TranslationSemantics::AssertingIfNonSendable:
       // Do not error if all of our operands are sendable.
       if (llvm::none_of(inst->getOperandValues(), [&](SILValue value) {
-            return ::isNonSendableType(value->getType(), inst->getFunction());
+            return ::SILIsolationInfo::isNonSendableType(value->getType(),
+                                                         inst->getFunction());
           }))
         return;
       llvm::errs() << "BadInst: " << *inst;
@@ -3242,11 +3249,18 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // If we were able to find this was actor isolated from finding our
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
-      SILValue actorInstance =
-          info.value->getType().isAnyActor() ? info.value : SILValue();
-      iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(value, actorInstance,
-                                             *info.actorIsolation));
+      SILIsolationInfo isolation;
+      if (info.value->getType().isAnyActor()) {
+        isolation = SILIsolationInfo::getActorInstanceIsolated(
+            value, info.value, info.actorIsolation->getActor());
+      } else if (info.actorIsolation->isGlobalActor()) {
+        isolation = SILIsolationInfo::getGlobalActorIsolated(
+            value, info.actorIsolation->getGlobalActor());
+      }
+
+      if (isolation) {
+        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+      }
     }
 
     auto storage = AccessStorageWithBase::compute(value);
@@ -3278,7 +3292,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   }
 
   // Otherwise refer to the oracle. If we have a Sendable value, just return.
-  if (!isNonSendableType(value->getType(), fn)) {
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -3296,8 +3310,9 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(svi, parentAddrInfo.value,
-                                             *parentAddrInfo.actorIsolation));
+          SILIsolationInfo::getActorInstanceIsolated(
+              svi, parentAddrInfo.value,
+              parentAddrInfo.actorIsolation->getActor()));
     }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
