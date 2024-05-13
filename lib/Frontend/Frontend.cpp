@@ -580,12 +580,19 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  const auto &CASOpts = getInvocation().getCASOptions();
+  if (CASOpts.EnableCaching && !CASOpts.HasImmutableFileSystem &&
+      FrontendOptions::supportCompilationCaching(
+          Invocation.getFrontendOptions().RequestedAction)) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
+    return true;
+  }
+
   if (Invocation.getCASOptions().requireCASFS()) {
-    const auto &Opts = getInvocation().getCASOptions();
-    if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty()) {
+    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTrees.empty()) {
       // Set up CASFS as BaseFS.
-      auto FS =
-          createCASFileSystem(*CAS, Opts.CASFSRootIDs, Opts.ClangIncludeTrees);
+      auto FS = createCASFileSystem(*CAS, CASOpts.CASFSRootIDs,
+                                    CASOpts.ClangIncludeTrees);
       if (!FS) {
         Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                              toString(FS.takeError()));
@@ -599,10 +606,10 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::InMemoryFileSystem();
     const auto &ClangOpts = getInvocation().getClangImporterOptions();
 
-    if (!Opts.BridgingHeaderPCHCacheKey.empty()) {
+    if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
       if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
               getObjectStore(), getActionCache(), Diagnostics,
-              Opts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
+              CASOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
               ClangOpts.BridgingHeader))
         MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
                        std::move(loadedBuffer));
@@ -611,7 +618,7 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
             SourceLoc(), diag::error_load_input_from_cas,
             Invocation.getClangImporterOptions().BridgingHeader);
     }
-    if (!Opts.InputFileKey.empty()) {
+    if (!CASOpts.InputFileKey.empty()) {
       if (Invocation.getFrontendOptions()
               .InputsAndOutputs.getAllInputs()
               .size() != 1)
@@ -624,7 +631,7 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
             llvm::sys::path::filename(InputPath));
         if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
                 getObjectStore(), getActionCache(), Diagnostics,
-                Opts.InputFileKey, Type, InputPath))
+                CASOpts.InputFileKey, Type, InputPath))
           MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
         else
           Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
