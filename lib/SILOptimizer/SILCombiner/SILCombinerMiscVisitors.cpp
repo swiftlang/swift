@@ -572,8 +572,15 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   }
 
   // Second step: replace the enum alloc_stack with a payload alloc_stack.
+  Builder.setCurrentDebugScope(AS->getDebugScope());
   auto *newAlloc = Builder.createAllocStack(
-      AS->getLoc(), payloadType, AS->getVarInfo(), AS->hasDynamicLifetime());
+      AS->getLoc(), payloadType, {}, AS->hasDynamicLifetime(), IsNotLexical,
+      IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo, true);
+  if (auto varInfo = AS->getVarInfo()) {
+    // TODO: Add support for op_enum_fragment
+    // For now, we can't represent this variable correctly, so we drop it.
+    Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
+  }
 
   while (!AS->use_empty()) {
     Operand *use = *AS->use_begin();
@@ -610,11 +617,9 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         break;
       }
       case SILInstructionKind::DebugValueInst:
-        if (DebugValueInst::hasAddrVal(user)) {
-          eraseInstFromFunction(*user);
-          break;
-        }
-        LLVM_FALLTHROUGH;
+        // TODO: Add support for op_enum_fragment
+        use->set(SILUndef::get(AS));
+        break;
       default:
         llvm_unreachable("unexpected alloc_stack user");
     }
@@ -653,8 +658,20 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI &&
       !IEI->getLoweredConcreteType().hasOpenedExistential()) {
     assert(!IEI->getLoweredConcreteType().isOpenedExistential());
+    Builder.setCurrentDebugScope(AS->getDebugScope());
+    auto varInfo = AS->getVarInfo();
+    if (varInfo) {
+      if (varInfo->Type == AS->getElementType()) {
+        varInfo->Type = {}; // Lower the variable's type too.
+      } else {
+        // Cannot salvage the variable, its type has changed and its expression
+        // cannot be rewritten.
+        Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
+        varInfo = {};
+      }
+    }
     auto *ConcAlloc = Builder.createAllocStack(
-        AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
+        AS->getLoc(), IEI->getLoweredConcreteType(), varInfo);
     IEI->replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
