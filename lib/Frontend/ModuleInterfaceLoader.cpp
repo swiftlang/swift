@@ -1765,6 +1765,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
     genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
+    genericSubInvocation.getCASOptions().HasImmutableFileSystem =
+        casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
         [&](StringRef Arg) { GenericArgs.push_back(ArgSaver.save(Arg)); });
     // ClangIncludeTree is default on when caching is enabled.
