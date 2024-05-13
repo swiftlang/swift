@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // This run validates that for specific test cases around closures, we properly
 // emit errors in the type checker before we run sns. This ensures that we know that
 // these cases can't happen when SNS is enabled.
 //
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -15,9 +15,9 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 49{{}}
-  // expected-typechecker-only-note @-1 4{{}}
-  // expected-tns-note @-2 2{{}}
+class NonSendableKlass { // expected-complete-note 51{{}}
+  // expected-typechecker-only-note @-1 3{{}}
+  // expected-tns-note @-2 {{}}
   var field: NonSendableKlass? = nil
 
   init() {}
@@ -1544,6 +1544,8 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
     let _ = x // expected-tns-warning {{sending 'x' risks causing data races}}
     // expected-tns-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 }
 
