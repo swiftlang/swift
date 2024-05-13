@@ -596,7 +596,7 @@ func testSendableClosureCapturesNonSendable(a: MyActor) {
 func testSendableClosureCapturesNonSendable2(a: FinalMainActorIsolatedKlass) {
   let klass = NonSendableKlass()
   let _ = { @Sendable @MainActor in
-    a.klass = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    a.klass = klass // expected-complete-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
   }
 }
 
@@ -1710,4 +1710,14 @@ func associatedTypeTestBasic2<T: AssociatedTypeTestProtocol>(_: T, iso: isolated
   await transferToMain(x) // expected-tns-warning {{sending 'x' risks causing data races}}
   // expected-tns-note @-1 {{sending 'iso'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'iso'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+}
+
+func sendableGlobalActorIsolated() {
+  let x = NonSendableKlass()
+  let _ = { @Sendable @MainActor in
+    print(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+    // expected-tns-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+  }
+  print(x) // expected-tns-note {{access can happen concurrently}}
 }
