@@ -113,8 +113,9 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       auto &self = fas.getSelfArgumentOperand();
       if (fas.getArgumentParameterInfo(self).hasOption(
               SILParameterInfo::Isolated)) {
+        CanType astType = self.get()->getType().getASTType();
         if (auto *nomDecl =
-                self.get()->getType().getNominalOrBoundGenericNominal()) {
+                astType->lookThroughAllOptionalTypes()->getAnyActor()) {
           // TODO: We really should be doing this based off of an Operand. Then
           // we would get the SILValue() for the first element. Today this can
           // only mess up isolation history.
@@ -416,8 +417,8 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
   if (auto *isolatedArg = fArg->getFunction()->maybeGetIsolatedArgument()) {
-    if (auto *nomDecl =
-        isolatedArg->getType().getNominalOrBoundGenericNominal()) {
+    auto astType = isolatedArg->getType().getASTType();
+    if (auto *nomDecl = astType->lookThroughAllOptionalTypes()->getAnyActor()) {
       return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg,
                                                         nomDecl);
     }

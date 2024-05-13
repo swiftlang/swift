@@ -66,3 +66,19 @@ distributed actor MyDistributedActor {
     }
   }
 }
+
+/////////////////////////////////
+// MARK: Associated Type Tests //
+/////////////////////////////////
+
+protocol AssociatedTypeTestProtocol {
+  associatedtype A: DistributedActor
+}
+
+func associatedTypeTestBasic<T: AssociatedTypeTestProtocol>(_: T, _: isolated T.A) {
+}
+
+func associatedTypeTestBasic2<T: AssociatedTypeTestProtocol>(_: T, iso: isolated T.A, x: NonSendableKlass) async {
+  await transferToMain(x) // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{sending 'iso'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'iso'-isolated uses}}
+}
