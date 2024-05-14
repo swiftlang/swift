@@ -652,8 +652,21 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
-UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_NONE_DEPENDING_ON_RESULT
+
+#define OWNED_OR_NONE_DEPENDING_ON_RESULT(ID)                                  \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    if (BI->getType().isTrivial(*BI->getFunction())) {                         \
+      return OwnershipKind::None;                                              \
+    }                                                                          \
+    return OwnershipKind::Owned;                                               \
+  }
+// A zeroInitializer may initialize an imported struct with __unsafe_unretained
+// fields. The initialized value is immediately consumed by an assignment, so it
+// must be owned.
+OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
+#undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)
 #define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY) \
