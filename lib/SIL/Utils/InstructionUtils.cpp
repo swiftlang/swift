@@ -781,9 +781,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     switch (cast<StoreInst>(inst)->getOwnershipQualifier()) {
       case StoreOwnershipQualifier::Unqualified:
       case StoreOwnershipQualifier::Trivial:
-        return RuntimeEffect::NoEffect;
       case StoreOwnershipQualifier::Init:
-        return RuntimeEffect::RefCounting;
+        return RuntimeEffect::NoEffect;
       case StoreOwnershipQualifier::Assign:
         return RuntimeEffect::Releasing;
     }
