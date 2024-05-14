@@ -735,7 +735,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addLoopUnroll();
 }
 
-  static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
+static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionAndGlobalElimination();
   P.addReadOnlyGlobalVariablesPass();
