@@ -3799,17 +3799,23 @@ protected:
 
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *bc) {
     auto builder = assignment.getBuilder(bc->getIterator());
+
     if (assignment.isLargeLoadableType(bc->getType()) &&
         !assignment.isLargeLoadableType(bc->getOperand()->getType())) {
       // Curious case of an imported C union.
       // The union is imported as a struct that has no fields.
       // When we access union members we instead bitcast to the union member
       // type.
-      auto addr = assignment.createAllocStack(bc->getType());
-      auto opdAddr = builder.createUncheckedAddrCast(
-          bc->getLoc(), addr, bc->getOperand()->getType().getAddressType());
+
+      // We expect the "in" type to be larger or equal in size to the "out"
+      // type. See IRGenSILFunction::visitUncheckedTrivialBitCastInst.
+      // We therefore must use the bigger type, i.e the operand type, to create
+      // a stack allocation.
+      auto opdAddr = assignment.createAllocStack(bc->getOperand()->getType());
       builder.createStore(bc->getLoc(), bc->getOperand(), opdAddr,
                           StoreOwnershipQualifier::Unqualified);
+      auto addr = builder.createUncheckedAddrCast(
+          bc->getLoc(), opdAddr, bc->getType().getAddressType());
       assignment.mapValueToAddress(origValue, addr);
       assignment.markForDeletion(bc);
       return;
