@@ -5964,6 +5964,10 @@ class UncheckedRefCastInst final
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, ValueOwnershipKind forwardingOwnershipKind);
+
+  static UncheckedRefCastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
