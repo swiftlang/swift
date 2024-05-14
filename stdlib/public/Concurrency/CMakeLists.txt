@@ -279,6 +279,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       DESTINATION "lib/swift/embedded/${mod}"
       COMPONENT "stdlib"
       )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_Concurrency.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "stdlib"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+      )
     set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
