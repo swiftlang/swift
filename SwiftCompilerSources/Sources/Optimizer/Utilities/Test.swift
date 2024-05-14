@@ -153,6 +153,7 @@ extension BridgedTestArguments {
 public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
+    getAccessBaseTest,
     argumentConventionsTest,
     borrowIntroducersTest,
     enclosingValuesTest,
