@@ -23,7 +23,7 @@ bb0(%0 : $@callee_owned () -> (), %1 : $@callee_owned () -> ()):
   return %3 : $()
 }
 
-sil @insert_release_in_liferange_exit_block : $@convention(thin) () -> () {
+sil @insert_release_in_liverange_exit_block : $@convention(thin) () -> () {
 bb0:
   %2 = function_ref @closure : $@convention(thin) () -> ()
   %3 = partial_apply %2() : $@convention(thin) () -> ()

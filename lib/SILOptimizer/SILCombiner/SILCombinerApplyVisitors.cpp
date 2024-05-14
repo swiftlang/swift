@@ -664,7 +664,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       return false;
     // As we are extending the lifetimes of owned parameters, we have to make
     // sure that no dealloc_ref or dealloc_stack_ref instructions are
-    // within this extended liferange.
+    // within this extended liverange.
     // It could be that the dealloc_ref is deallocating a parameter and then
     // we would have a release after the dealloc.
     if (VLA.containsDeallocRef(Frontier))

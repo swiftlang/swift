@@ -192,9 +192,9 @@ private func gatherCallSites(in caller: Function, _ context: FunctionPassContext
 
 private func updateCallSites(for rootClosure: SingleValueInstruction, in callSiteMap: inout CallSiteMap, 
                              convertedAndReabstractedClosures: inout InstructionSet, _ context: FunctionPassContext) {
-  var rootClosurePossibleLifeRange = InstructionRange(begin: rootClosure, context)
+  var rootClosurePossibleLiveRange = InstructionRange(begin: rootClosure, context)
   defer {
-    rootClosurePossibleLifeRange.deinitialize()
+    rootClosurePossibleLiveRange.deinitialize()
   }
 
   var rootClosureApplies = OperandWorklist(context)                            
@@ -218,7 +218,7 @@ private func updateCallSites(for rootClosure: SingleValueInstruction, in callSit
 
   let (foundUnexpectedUse, haveUsedReabstraction) = 
     handleNonApplies(for: rootClosure, rootClosureApplies: &rootClosureApplies,
-                     rootClosurePossibleLifeRange: &rootClosurePossibleLifeRange, context);
+                     rootClosurePossibleLiveRange: &rootClosurePossibleLiveRange, context);
 
 
   if foundUnexpectedUse {
@@ -227,12 +227,12 @@ private func updateCallSites(for rootClosure: SingleValueInstruction, in callSit
 
   let intermediateClosureArgDescriptorData = 
     handleApplies(for: rootClosure, callSiteMap: &callSiteMap, rootClosureApplies: &rootClosureApplies, 
-                  rootClosurePossibleLifeRange: &rootClosurePossibleLifeRange, 
+                  rootClosurePossibleLiveRange: &rootClosurePossibleLiveRange, 
                   convertedAndReabstractedClosures: &convertedAndReabstractedClosures,
                   haveUsedReabstraction: haveUsedReabstraction, context)
 
   finalizeCallSites(for: rootClosure, in: &callSiteMap, 
-                    rootClosurePossibleLifeRange: rootClosurePossibleLifeRange,
+                    rootClosurePossibleLiveRange: rootClosurePossibleLiveRange,
                     intermediateClosureArgDescriptorData: intermediateClosureArgDescriptorData, context)
 }
 
@@ -244,7 +244,7 @@ private func updateCallSites(for rootClosure: SingleValueInstruction, in callSit
 ///                      how to handle. If true, then `rootClosure` should not be specialized against.
 private func handleNonApplies(for rootClosure: SingleValueInstruction, 
                               rootClosureApplies: inout OperandWorklist,
-                              rootClosurePossibleLifeRange: inout InstructionRange, 
+                              rootClosurePossibleLiveRange: inout InstructionRange, 
                               _ context: FunctionPassContext) 
   -> (foundUnexpectedUse: Bool, haveUsedReabstraction: Bool)
 {
@@ -295,12 +295,12 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
     case let cfi as ConvertFunctionInst:
       rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: cfi.uses)
       possibleMarkDependenceBases.insert(cfi)
-      rootClosurePossibleLifeRange.insert(use.instruction)
+      rootClosurePossibleLiveRange.insert(use.instruction)
 
     case let cvt as ConvertEscapeToNoEscapeInst:
       rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: cvt.uses)
       possibleMarkDependenceBases.insert(cvt)
-      rootClosurePossibleLifeRange.insert(use.instruction)
+      rootClosurePossibleLiveRange.insert(use.instruction)
 
     case let pai as PartialApplyInst:
       if !pai.isPullbackInResultOfAutodiffVJP,
@@ -311,7 +311,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
       {
         rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: pai.uses)
         possibleMarkDependenceBases.insert(pai)
-        rootClosurePossibleLifeRange.insert(use.instruction)
+        rootClosurePossibleLiveRange.insert(use.instruction)
         haveUsedReabstraction = true
       } else {
         rootClosureApplies.pushIfNotVisited(use)
@@ -320,15 +320,15 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
     case let mv as MoveValueInst:
       rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: mv.uses)
       possibleMarkDependenceBases.insert(mv)
-      rootClosurePossibleLifeRange.insert(use.instruction)
+      rootClosurePossibleLiveRange.insert(use.instruction)
 
     // Uses of a copy of root-closure do not count as
     // uses of the root-closure
     case is CopyValueInst:
-      rootClosurePossibleLifeRange.insert(use.instruction)
+      rootClosurePossibleLiveRange.insert(use.instruction)
     
     case is DestroyValueInst:
-      rootClosurePossibleLifeRange.insert(use.instruction)
+      rootClosurePossibleLiveRange.insert(use.instruction)
 
     case let mdi as MarkDependenceInst:
       if possibleMarkDependenceBases.contains(mdi.base),  
@@ -337,7 +337,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
           mdi.value.type.isThickFunction
       {
         rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: mdi.uses)
-        rootClosurePossibleLifeRange.insert(use.instruction)
+        rootClosurePossibleLiveRange.insert(use.instruction)
       }
     
     default:
@@ -354,14 +354,14 @@ private typealias IntermediateClosureArgDescriptorDatum = (applySite: SingleValu
 
 private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap: inout CallSiteMap, 
                            rootClosureApplies: inout OperandWorklist, 
-                           rootClosurePossibleLifeRange: inout InstructionRange, 
+                           rootClosurePossibleLiveRange: inout InstructionRange, 
                            convertedAndReabstractedClosures: inout InstructionSet, haveUsedReabstraction: Bool, 
                            _ context: FunctionPassContext) -> [IntermediateClosureArgDescriptorDatum] 
 {
   var intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum] = []
   
   while let use = rootClosureApplies.pop() {
-    rootClosurePossibleLifeRange.insert(use.instruction)
+    rootClosurePossibleLiveRange.insert(use.instruction)
 
     // TODO [extend to general swift]: Handle full apply sites
     guard let pai = use.instruction as? PartialApplyInst else {
@@ -479,11 +479,11 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
 /// Finalizes the call sites for a given root closure by adding a corresponding `ClosureArgDescriptor`
 /// to all call sites where the closure is ultimately passed as an argument.
 private func finalizeCallSites(for rootClosure: SingleValueInstruction, in callSiteMap: inout CallSiteMap, 
-                               rootClosurePossibleLifeRange: InstructionRange, 
+                               rootClosurePossibleLiveRange: InstructionRange, 
                                intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum], 
                                _ context: FunctionPassContext) 
 {
-  let closureInfo = ClosureInfo(closure: rootClosure, lifetimeFrontier: Array(rootClosurePossibleLifeRange.ends))
+  let closureInfo = ClosureInfo(closure: rootClosure, lifetimeFrontier: Array(rootClosurePossibleLiveRange.ends))
 
   for (applySite, closureArgumentIndex, parameterInfo) in intermediateClosureArgDescriptorData {
     guard var callSite = callSiteMap[applySite] else {
