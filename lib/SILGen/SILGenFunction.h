@@ -820,6 +820,10 @@ public:
   /// the fields.
   void emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd);
 
+  /// Whether we are inside a constructor whose hops are injected by
+  /// definite initialization.
+  bool isCtorWithHopsInjectedByDefiniteInit();
+
   /// Generates code for a struct constructor.
   /// This allocates the new 'self' value, emits the
   /// body code, then returns the final initialized 'self'.

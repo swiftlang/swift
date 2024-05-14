@@ -647,7 +647,8 @@ bool SILGenFunction::unsafelyInheritsExecutor() {
 
 void ExecutorBreadcrumb::emit(SILGenFunction &SGF, SILLocation loc) {
   if (mustReturnToExecutor) {
-    assert(SGF.ExpectedExecutor || SGF.unsafelyInheritsExecutor());
+    assert(SGF.ExpectedExecutor || SGF.unsafelyInheritsExecutor() ||
+           SGF.isCtorWithHopsInjectedByDefiniteInit());
     if (auto executor = SGF.ExpectedExecutor)
       SGF.B.createHopToExecutor(
           RegularLocation::getDebugOnlyLocation(loc, SGF.getModule()), executor,

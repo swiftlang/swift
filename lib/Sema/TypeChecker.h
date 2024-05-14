@@ -944,10 +944,6 @@ Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
 /// of the first one and the expression will still type check.
 bool isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB);
 
-/// Build a type-checked reference to the given value.
-Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC, DeclNameLoc nameLoc,
-                          bool Implicit);
-
 /// Build a reference to a declaration, where name lookup returned
 /// the given set of declarations.
 Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
