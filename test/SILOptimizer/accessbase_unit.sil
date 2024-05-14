@@ -27,10 +27,10 @@ class C {}
 // CHECK:       Class [[BOX]] = argument of bb0
 // CHECK:         Field: var value: T Index: 0
 // CHECK-LABEL: end running test {{.*}} on test_phi_nested_access: compute_access_storage with
-// CHECK-LABEL: begin running test 3 of 3 on test_phi_nested_access: accesspath-base
-// CHECK:       Access path base: %6 = argument of bb1
+// CHECK-LABEL: begin running test 3 of 3 on test_phi_nested_access: accesspath
+// CHECK:       Access path for: %6 = argument of bb1
 // CHECK:       Exact Use:   end_access %2
-// CHECK-LABEL: end running test 3 of 3 on test_phi_nested_access: accesspath-base
+// CHECK-LABEL: end running test 3 of 3 on test_phi_nested_access: accesspath
 sil @test_phi_nested_access : $@convention(method) (@guaranteed Box<C>) -> () {
 bb1(%box : $Box<C>):         
   %value_addr = ref_element_addr %box : $Box<C>, #Box.value 
@@ -42,7 +42,7 @@ bb1(%box : $Box<C>):
 exit(%phi : $Builtin.RawPointer):                   
   specify_test "get_access_base @argument"
   specify_test "compute_access_storage @argument"
-  specify_test "accesspath-base @argument"
+  specify_test "accesspath @argument"
   %retval = tuple ()
   return %retval : $()
 } 
