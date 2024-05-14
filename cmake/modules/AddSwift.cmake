@@ -469,7 +469,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
     # Note we only check this for bootstrapping, since you ought to
     # be able to build using hosttools with the stdlib disabled.
-    if(ASRLF_BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+    if(ASRLF_BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*" AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
       # HostCompatibilityLibs is defined as an interface library that
       # does not generate any concrete build target
       # (https://cmake.org/cmake/help/latest/command/add_library.html#interface-libraries)
@@ -519,12 +519,14 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       # Add the SDK directory for the host platform.
       target_link_directories(${target} PRIVATE "${sdk_dir}")
 
-      # A backup in case the toolchain doesn't have one of the compatibility libraries.
-      # We are using on purpose `add_dependencies` instead of `target_link_libraries`,
-      # since we want to ensure the linker is pulling the matching archives
-      # only if needed
-      target_link_directories(${target} PRIVATE "${compatibility_libs_path}")
-      add_dependencies(${target} ${compatibility_libs})
+      if(compatibility_libs_path)
+        # A backup in case the toolchain doesn't have one of the compatibility libraries.
+        # We are using on purpose `add_dependencies` instead of `target_link_libraries`,
+        # since we want to ensure the linker is pulling the matching archives
+        # only if needed
+        target_link_directories(${target} PRIVATE "${compatibility_libs_path}")
+        add_dependencies(${target} ${compatibility_libs})
+      endif()
 
       # Include the abi stable system stdlib in our rpath.
       set(swift_runtime_rpath "/usr/lib/swift")
@@ -535,12 +537,14 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       get_bootstrapping_swift_lib_dir(bs_lib_dir "${bootstrapping}")
       target_link_directories(${target} PRIVATE ${bs_lib_dir})
 
-      # Required to pick up the built libswiftCompatibility<n>.a libraries
-      # We are using on purpose `add_dependencies` instead of `target_link_libraries`,
-      # since we want to ensure the linker is pulling the matching archives
-      # only if needed
-      target_link_directories(${target} PRIVATE "${compatibility_libs_path}")
-      add_dependencies(${target} ${compatibility_libs})
+      if(compatibility_libs_path)
+        # Required to pick up the built libswiftCompatibility<n>.a libraries
+        # We are using on purpose `add_dependencies` instead of `target_link_libraries`,
+        # since we want to ensure the linker is pulling the matching archives
+        # only if needed
+        target_link_directories(${target} PRIVATE "${compatibility_libs_path}")
+        add_dependencies(${target} ${compatibility_libs})
+      endif()
 
       # At runtime link against the built swift libraries from the current
       # bootstrapping stage.
