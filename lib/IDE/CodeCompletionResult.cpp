@@ -399,9 +399,6 @@ ContextFreeCodeCompletionResult::calculateContextualNotRecommendedReason(
   if (explicitReason != ContextualNotRecommendedReason::None) {
     return explicitReason;
   }
-  if (IsAsync && !canCurrDeclContextHandleAsync) {
-    return ContextualNotRecommendedReason::InvalidAsyncContext;
-  }
   if (HasAsyncAlternative && canCurrDeclContextHandleAsync) {
     return ContextualNotRecommendedReason::
         NonAsyncAlternativeUsedInAsyncContext;
