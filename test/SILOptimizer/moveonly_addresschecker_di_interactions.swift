@@ -1,6 +1,4 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature NoncopyableGenerics -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy %s
-
 
 // This testStruct specifically testStructs how DI and the move checkers interact with each other
 

@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/NoncopyableGenerics_Misc.swiftmodule \
@@ -9,7 +8,6 @@
 // RUN:     %S/Inputs/NoncopyableGenerics_Misc.swift
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -enable-experimental-feature BorrowingSwitch \
@@ -25,19 +23,16 @@
 // See if we can compile a module through just the interface and typecheck using it.
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/NoncopyableGenerics_Misc.swiftinterface -o %t/NoncopyableGenerics_Misc.swiftmodule
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/Swiftskell.swiftinterface -o %t/Swiftskell.swiftmodule
 
 // RUN: %target-swift-frontend -emit-silgen -I %t %s \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:    -enable-experimental-feature NonescapableTypes \
 // RUN:    -o %t/final.silgen

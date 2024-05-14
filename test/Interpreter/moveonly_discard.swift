@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend MoveOnlyEnumDeinits -Xfrontend -sil-verify-all) | %FileCheck %s --implicit-check-not closing
 // RUN: %target-run-simple-swift(-O -Xfrontend -enable-experimental-feature -Xfrontend MoveOnlyEnumDeinits -Xfrontend -sil-verify-all) | %FileCheck %s --implicit-check-not closing
 
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -Xfrontend -enable-experimental-feature -Xfrontend MoveOnlyEnumDeinits -Xfrontend -sil-verify-all) | %FileCheck %s --implicit-check-not closing
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -enable-experimental-feature -Xfrontend MoveOnlyEnumDeinits -Xfrontend -sil-verify-all) | %FileCheck %s --implicit-check-not closing
-
 // REQUIRES: executable_test
 
 // NOTE: it's important that this test has the `--implicit-check-not closing` flag to catch double deinits!!

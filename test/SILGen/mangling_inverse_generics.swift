@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   > %t/test.silgen
