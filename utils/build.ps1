@@ -250,7 +250,7 @@ $AndroidARMv7 = @{
   BinaryDir = "bina";
   CMakeName = "armv7-a";
   LLVMName = "armv7";
-  LLVMTarget = "armv7a-unknown-linux-androideabi";
+  LLVMTarget = "armv7-unknown-linux-androideabi$AndroidAPILevel";
   BuildID = 500;
   BinaryCache = "$BinaryCache\armv7";
   PlatformInstallRoot = "$BinaryCache\armv7\Android.platform";
@@ -263,7 +263,7 @@ $AndroidX86 = @{
   BinaryDir = "bin";
   CMakeName = "i686";
   LLVMName = "i686";
-  LLVMTarget = "i686-unknown-linux-android";
+  LLVMTarget = "i686-unknown-linux-android$AndroidAPILevel";
   BuildID = 600;
   BinaryCache = "$BinaryCache\i686";
   PlatformInstallRoot = "$BinaryCache\x86\Android.platform";
@@ -276,7 +276,7 @@ $AndroidX64 = @{
   BinaryDir = "bin64";
   CMakeName = "x86_64";
   LLVMName = "x86_64";
-  LLVMTarget = "x86_64-unknown-linux-android";
+  LLVMTarget = "x86_64-unknown-linux-android$AndroidAPILevel";
   BuildID = 700;
   BinaryCache = "$BinaryCache\x86_64";
   PlatformInstallRoot = "$BinaryCache\x64\Android.platform";
@@ -1630,7 +1630,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -UseBuiltCompilers ASM,C,Swift `
       -BuildTargets $Targets `
       -Defines (@{
-        BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+        FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
         CMAKE_SYSTEM_NAME = $Platform.ToString();
         # Turn off safeseh for lld as it has safeseh enabled by default
         # and fails with an ICU data object file icudt69l_dat.obj. This
