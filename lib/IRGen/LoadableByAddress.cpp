@@ -3461,7 +3461,7 @@ public:
     auto it = valueToAddressMap.find(v);
 
     // This can happen if we deem a container type small but a contained type
-    // big.
+    // big or if we lower an undef value.
     if (it == valueToAddressMap.end()) {
       if (auto *sv = dyn_cast<SingleValueInstruction>(v)) {
         auto addr = createAllocStack(v->getType());
@@ -3470,6 +3470,11 @@ public:
                             StoreOwnershipQualifier::Unqualified);
         mapValueToAddress(v, addr);
         return addr;
+      }
+      if (isa<SILUndef>(v)) {
+        auto undefAddr = createAllocStack(v->getType());
+        mapValueToAddress(v, undefAddr);
+        return undefAddr;
       }
     }
     assert(it != valueToAddressMap.end());
@@ -3765,6 +3770,7 @@ protected:
       builder.createStore(bc->getLoc(), bc->getOperand(), opdAddr,
                           StoreOwnershipQualifier::Unqualified);
       assignment.mapValueToAddress(origValue, addr);
+      assignment.markForDeletion(bc);
 
       return;
     }
