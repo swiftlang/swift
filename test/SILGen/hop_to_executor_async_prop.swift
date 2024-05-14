@@ -588,9 +588,7 @@ struct Container {
     // CHECK: [[SOME_BB]]:
     // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
     // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
-    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
-    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK: } // end sil function '$s4test9ContainerV10getOrCrashSfyYaFZ'
     static func getOrCrash() async -> Float {
@@ -628,7 +626,7 @@ struct Container {
 
 @propertyWrapper
 struct StateObject<ObjectType> {
-    @MainActor(unsafe)
+    @preconcurrency @MainActor
     var wrappedValue: ObjectType {
         fatalError()
     }

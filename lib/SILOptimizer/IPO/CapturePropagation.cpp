@@ -555,9 +555,9 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       // refers to the callee function.
       if (argConv != SILArgumentConvention::Direct_Guaranteed)
         return false;
-      
+
       // For escaping closures:
-      // To keep things simple, we don't do a liferange analysis to insert
+      // To keep things simple, we don't do a liverange analysis to insert
       // compensating destroys of the keypath.
       // Instead we require that the PAI is the only use of the keypath (= the
       // common case). This allows us to just delete the now unused keypath
