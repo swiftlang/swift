@@ -375,31 +375,6 @@ protected:
             getOpValue(dfei->getOperand()), remappedDerivativeFnType));
   }
 
-  /// One abstract function in the debug info can only have one set of variables
-  /// and types. This function determines whether applying the substitutions in
-  /// \p SubsMap on the generic signature \p Sig will change the generic type
-  /// parameters in the signature. This is used to decide whether it's necessary
-  /// to clone a unique copy of the function declaration with the substitutions
-  /// applied for the debug info.
-  static bool substitutionsChangeGenericTypeParameters(SubstitutionMap SubsMap,
-                                                       GenericSignature Sig) {
-
-    // If there are no substitutions, just reuse
-    // the original decl.
-    if (SubsMap.empty())
-      return false;
-
-    bool Result = false;
-    Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
-      if (!Canonical)
-        return;
-      if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
-        Result = true;
-    });
-
-    return Result;
-  }
-
   enum { ForInlining = true };
   /// Helper function to clone the parent function of a SILDebugScope if
   /// necessary when inlining said function into a new generic context.
@@ -420,7 +395,11 @@ protected:
     if (SubsMap.hasArchetypes())
       SubsMap = SubsMap.mapReplacementTypesOutOfContext();
 
-    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
+    // One abstract function in the debug info can only have one set of variables
+    // and types. We check if the function is called with non-identity substitutions
+    // to decide whether it's necessary to clone a unique copy of the function
+    // declaration with the substitutions applied for the debug info.
+    if (SubsMap.isIdentity())
       return ParentFunction;
 
     // Note that mapReplacementTypesOutOfContext() can't do anything for
