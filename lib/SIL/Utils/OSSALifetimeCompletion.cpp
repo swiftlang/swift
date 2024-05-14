@@ -105,7 +105,7 @@ static bool endLifetimeAtLivenessBoundary(SILValue value,
 }
 
 namespace {
-/// Implements OSSALifetimeCompletion::visitUnreachableLifetimeEnds.  Finds
+/// Implements OSSALifetimeCompletion::visitAvailabilityBoundary.  Finds
 /// positions as near as possible to unreachables at which `value`'s lifetime
 /// is available.
 ///
@@ -118,7 +118,7 @@ namespace {
 ///                               the value is available--these are the blocks
 ///                               without successors or with at least one
 ///                               unavailable successor.
-class VisitUnreachableLifetimeEnds {
+class AvailabilityBoundaryVisitor {
   /// The value whose dead-end block lifetime ends are to be visited.
   SILValue value;
 
@@ -134,8 +134,8 @@ class VisitUnreachableLifetimeEnds {
   BasicBlockSetVector region;
 
 public:
-  VisitUnreachableLifetimeEnds(SILValue value,
-                               OSSALifetimeCompletion::AllowLeaks_t allowLeaks)
+  AvailabilityBoundaryVisitor(SILValue value,
+                              OSSALifetimeCompletion::AllowLeaks_t allowLeaks)
       : value(value), allowLeaks(allowLeaks), starts(value->getFunction()),
         region(value->getFunction()) {}
 
@@ -198,7 +198,7 @@ public:
   };
 };
 
-void VisitUnreachableLifetimeEnds::computeRegion(
+void AvailabilityBoundaryVisitor::computeRegion(
     const SSAPrunedLiveness &liveness) {
   // (1) Compute the complete liveness boundary.
   PrunedLivenessBoundary boundary;
@@ -258,7 +258,7 @@ void VisitUnreachableLifetimeEnds::computeRegion(
   }
 }
 
-void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
+void AvailabilityBoundaryVisitor::propagateAvailablity(Result &result) {
   // Initialize per-block state.
   // - all blocks outside of the region are ::Unavailable (automatically
   //   initialized)
@@ -299,7 +299,7 @@ void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
   }
 }
 
-void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
+void AvailabilityBoundaryVisitor::visitAvailabilityBoundary(
     Result const &result, llvm::function_ref<void(SILInstruction *)> visit) {
   for (auto *block : region) {
     auto available = result.getState(block) == State::Available;
@@ -328,15 +328,15 @@ void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
 }
 } // end anonymous namespace
 
-void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
+void OSSALifetimeCompletion::visitAvailabilityBoundary(
     SILValue value, AllowLeaks_t allowLeaks, const SSAPrunedLiveness &liveness,
     llvm::function_ref<void(SILInstruction *)> visit) {
 
-  VisitUnreachableLifetimeEnds visitor(value, allowLeaks);
+  AvailabilityBoundaryVisitor visitor(value, allowLeaks);
 
   visitor.computeRegion(liveness);
 
-  VisitUnreachableLifetimeEnds::Result result(value->getFunction());
+  AvailabilityBoundaryVisitor::Result result(value->getFunction());
 
   visitor.propagateAvailablity(result);
 
@@ -347,7 +347,7 @@ static bool endLifetimeAtAvailabilityBoundary(
     SILValue value, OSSALifetimeCompletion::AllowLeaks_t allowLeaks,
     const SSAPrunedLiveness &liveness) {
   bool changed = false;
-  OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
+  OSSALifetimeCompletion::visitAvailabilityBoundary(
       value, allowLeaks, liveness, [&](auto *unreachable) {
         SILBuilderWithScope builder(unreachable);
         endOSSALifetime(value, builder);
