@@ -1729,6 +1729,13 @@ SwiftInt BridgedPassContext::getStaticStride(BridgedType type) const {
   return integerValueFromConstant(c);
 }
 
+bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
+  if (irgen::IRGenModule *IGM = invocation->getIRGenModule()) {
+    return IGM->canMakeStaticObjectReadOnly(type.unbridged());
+  }
+  return false;
+}
+
 swift::SILVTable * BridgedPassContext::specializeVTableForType(BridgedType type, BridgedFunction function) const {
   return ::specializeVTableForType(type.unbridged(),
                                    function.getFunction()->getModule(),

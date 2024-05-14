@@ -265,6 +265,7 @@ struct BridgedPassContext {
   SwiftInt getStaticSize(BridgedType type) const;
   SwiftInt getStaticAlignment(BridgedType type) const;
   SwiftInt getStaticStride(BridgedType type) const;
+  bool canMakeStaticObjectReadOnly(BridgedType type) const;
 
   // Sets
 
