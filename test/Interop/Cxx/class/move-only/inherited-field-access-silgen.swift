@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=swift-6 -enable-experimental-feature NoncopyableGenerics %s -validate-tbd-against-ir=none | %FileCheck %s
 // RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature NoncopyableGenerics %s -validate-tbd-against-ir=none | %FileCheck %s
 
+// REQUIRES: rdar128013193
+
 import MoveOnlyCxxValueType
 
 func testGetX() -> CInt {
