@@ -777,8 +777,8 @@ extension AddressUseDefWalker {
       } else {
         return walkUp(address: ia.base, path: path.push(.anyIndexedElement, index: 0))
       }
-    case let mdi as MarkDependenceInst:
-      return walkUp(address: mdi.operands[0].value, path: path)
+    case is MarkDependenceInst, is MarkUninitializedInst:
+      return walkUp(address: (def as! Instruction).operands[0].value, path: path)
     case is MoveOnlyWrapperToCopyableAddrInst,
          is CopyableToMoveOnlyWrapperAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)
