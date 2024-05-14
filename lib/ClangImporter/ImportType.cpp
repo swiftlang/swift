@@ -509,10 +509,8 @@ namespace {
         return importFunctionPointerLikeType(*type, pointeeType);
       }
 
-      // We cannot specify UnsafePointer<T> with a non-copyable type T just yet,
-      // because it triggers a bug when building SwiftCompilerSources.
-      // (rdar://128013193)
-      //
+      // If non-copyable generics are disabled, we cannot specify
+      // UnsafePointer<T> with a non-copyable type T.
       // We cannot use `ty->isNoncopyable()` here because that would create a
       // cyclic dependency between ModuleQualifiedLookupRequest and
       // LookupConformanceInModuleRequest, so we check for the presence of
@@ -521,7 +519,9 @@ namespace {
       if (pointeeType && pointeeType->getAnyNominal() &&
           pointeeType->getAnyNominal()
               ->getAttrs()
-              .hasAttribute<MoveOnlyAttr>()) {
+              .hasAttribute<MoveOnlyAttr>() &&
+          !Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::NoncopyableGenerics)) {
         auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
         if (!opaquePointerDecl)
           return Type();
