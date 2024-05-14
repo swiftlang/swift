@@ -98,6 +98,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       DESTINATION "lib/swift/embedded/${mod}"
       COMPONENT "stdlib"
       )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftUnicodeDataTables.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "stdlib"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+      )
     set_property(TARGET embedded-unicode-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
     add_dependencies(embedded-unicode embedded-unicode-${mod})
