@@ -83,7 +83,7 @@ bb0(%0 : $TrivialDestructor):
 }
 
 // Test the soundness check in dead object elimination which checks that all stores
-// to the array are within the array's liferange.
+// to the array are within the array's liverange.
 
 // CHECK-LABEL: sil @malformed_deadarray
 // CHECK: apply
