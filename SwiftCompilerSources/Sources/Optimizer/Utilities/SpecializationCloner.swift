@@ -30,9 +30,9 @@ struct SpecializationCloner {
 
   var entryBlock: BasicBlock {
     if cloned.blocks.isEmpty {
-      cloned.appendNewBlock(context)
+      return cloned.appendNewBlock(context)
     } else {
-      cloned.entryBlock
+      return cloned.entryBlock
     }
   }
 

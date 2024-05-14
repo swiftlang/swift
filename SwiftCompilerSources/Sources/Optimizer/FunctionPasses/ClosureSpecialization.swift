@@ -881,12 +881,9 @@ private extension FunctionConvention {
 
 private extension ParameterInfo {
   func withSpecializedConvention(isArgTypeTrivial: Bool) -> Self {
-    let specializedParamConvention =
-      if self.convention.isAllowedIndirectConvForClosureSpec {
-        self.convention
-      } else {
-        isArgTypeTrivial ? ArgumentConvention.directUnowned : ArgumentConvention.directOwned
-      }
+    let specializedParamConvention = self.convention.isAllowedIndirectConvForClosureSpec
+      ? self.convention
+      : isArgTypeTrivial ? ArgumentConvention.directUnowned : ArgumentConvention.directOwned
 
     return ParameterInfo(type: self.type, convention: specializedParamConvention, options: self.options, 
                          hasLoweredAddresses: self.hasLoweredAddresses)

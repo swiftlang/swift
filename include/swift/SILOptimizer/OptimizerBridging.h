@@ -184,9 +184,9 @@ struct BridgedCloner {
 struct BridgedSpecializationCloner {
   swift::ClosureSpecializationCloner * _Nonnull closureSpecCloner;
 
-  BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
-  BridgedFunction getCloned() const;
-  BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  SWIFT_IMPORT_UNSAFE BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
+  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
   void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const;
 };
 
@@ -334,7 +334,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE void beginTransformFunction(BridgedFunction function) const;
   BRIDGED_INLINE void endTransformFunction() const;
   BRIDGED_INLINE bool continueWithNextSubpassRun(OptionalBridgedInstruction inst) const;
-  BRIDGED_INLINE BridgedPassContext initializeNestedPassContext(BridgedFunction newFunction) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPassContext initializeNestedPassContext(BridgedFunction newFunction) const;
   BRIDGED_INLINE void deinitializedNestedPassContext() const;
 
   // SSAUpdater
