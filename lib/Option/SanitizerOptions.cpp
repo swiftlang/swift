@@ -92,6 +92,12 @@ llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
     } else if (StringRef(A->getValue(i)) == "trace-pc-guard") {
       opts.TracePCGuard = true;
       continue;
+    } else if (StringRef(A->getValue(i)) == "inline-8bit-counters") {
+      opts.Inline8bitCounters = true;
+      continue;
+    } else if (StringRef(A->getValue(i)) == "pc-table") {
+      opts.PCTable = true;
+      continue;
     }
 
     // Argument is not supported.
