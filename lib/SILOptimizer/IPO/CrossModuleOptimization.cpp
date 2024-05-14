@@ -143,6 +143,9 @@ public:
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    if (Subs.hasLocalArchetypes())
+      Subs = Subs.subst(Functor, Functor);
+
     CMS.makeSubstUsableFromInline(Subs);
     return Subs;
   }

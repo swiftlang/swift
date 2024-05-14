@@ -29,6 +29,35 @@
 
 namespace swift {
 
+struct SubstitutionMapWithLocalArchetypes {
+  std::optional<SubstitutionMap> SubsMap;
+  TypeSubstitutionMap LocalArchetypeSubs;
+
+  SubstitutionMapWithLocalArchetypes() {}
+  SubstitutionMapWithLocalArchetypes(SubstitutionMap subs) : SubsMap(subs) {}
+
+  Type operator()(SubstitutableType *type) {
+    if (isa<LocalArchetypeType>(type))
+      return QueryTypeSubstitutionMap{LocalArchetypeSubs}(type);
+
+    if (SubsMap)
+      return Type(type).subst(*SubsMap);
+
+    return Type(type);
+  }
+
+  ProtocolConformanceRef operator()(CanType origType,
+                                    Type substType,
+                                    ProtocolDecl *proto) {
+    if (isa<LocalArchetypeType>(origType))
+      return proto->getParentModule()->lookupConformance(substType, proto);
+    if (SubsMap)
+      return SubsMap->lookupConformance(origType, proto);
+
+    return ProtocolConformanceRef(proto);
+  }
+};
+
 /// SILCloner - Abstract SIL visitor which knows how to clone instructions and
 /// whose behavior can be customized by subclasses via the CRTP. This is meant
 /// to be subclassed to implement inlining, function specialization, and other
@@ -49,7 +78,8 @@ protected:
 
   SILBuilder Builder;
   DominanceInfo *DomTree = nullptr;
-  TypeSubstitutionMap LocalArchetypeSubs;
+  SubstitutionMapWithLocalArchetypes Functor;
+  TypeSubstitutionMap &LocalArchetypeSubs;
 
   // The old-to-new value map.
   llvm::DenseMap<SILValue, SILValue> ValueMap;
@@ -76,9 +106,10 @@ public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
   explicit SILCloner(SILFunction &F, DominanceInfo *DT = nullptr)
-      : Builder(F), DomTree(DT) {}
+      : Builder(F), DomTree(DT), LocalArchetypeSubs(Functor.LocalArchetypeSubs) {}
 
-  explicit SILCloner(SILGlobalVariable *GlobVar) : Builder(GlobVar) {}
+  explicit SILCloner(SILGlobalVariable *GlobVar)
+      : Builder(GlobVar), LocalArchetypeSubs(Functor.LocalArchetypeSubs) {}
 
   void clearClonerState() {
     ValueMap.clear();
@@ -189,12 +220,6 @@ public:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    // If we have local archetypes to substitute, do so now.
-    if (Subs.hasLocalArchetypes() && !LocalArchetypeSubs.empty()) {
-      Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-                        MakeAbstractConformanceForGenericType());
-    }
-
     return asImpl().remapSubstitutionMap(Subs)
                    .getCanonical(/*canonicalizeSignature*/false);
   }
@@ -441,7 +466,13 @@ protected:
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
 
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) { return Subs; }
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    // If we have local archetypes to substitute, do so now.
+    if (Subs.hasLocalArchetypes())
+      Subs = Subs.subst(Functor, Functor);
+
+    return Subs;
+  }
 
   /// This is called by either of the top-level visitors, cloneReachableBlocks
   /// or cloneSILFunction, after all other visitors are have been called.

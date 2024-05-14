@@ -148,6 +148,8 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
   using SILClonerWithScopes<ImplClass>::recordFoldedValue;
+  using SILClonerWithScopes<ImplClass>::LocalArchetypeSubs;
+  using SILClonerWithScopes<ImplClass>::Functor;
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
@@ -159,6 +161,7 @@ public:
       SubsMap(ApplySubs),
       Original(From),
       Inlining(Inlining) {
+    Functor.SubsMap = ApplySubs;
   }
 
 protected:
@@ -205,9 +208,10 @@ protected:
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    Subs = Subs.subst(Functor, Functor);
+
     auto context = getBuilder().getTypeExpansionContext();
 
-    Subs = Subs.subst(SubsMap);
     if (!Subs.hasOpaqueArchetypes() ||
         !context.shouldLookThroughOpaqueTypeArchetypes())
       return Subs;
