@@ -189,62 +189,38 @@ public:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    // If we have local archetypes to substitute, check whether that's
-    // relevant to this particular substitution.
-    if (!LocalArchetypeSubs.empty()) {
-      if (Subs.hasLocalArchetypes()) {
-        // If we found a type containing a local archetype, substitute
-        // open existentials throughout the substitution map.
-        Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
-      }
+    // If we have local archetypes to substitute, do so now.
+    if (Subs.hasLocalArchetypes() && !LocalArchetypeSubs.empty()) {
+      Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+                        MakeAbstractConformanceForGenericType());
     }
 
     return asImpl().remapSubstitutionMap(Subs)
                    .getCanonical(/*canonicalizeSignature*/false);
   }
 
-  SILType getTypeInClonedContext(SILType Ty) {
-    auto objectTy = Ty.getASTType();
-    // Do not substitute local archetypes, if we do not have any.
-    if (!objectTy->hasLocalArchetype())
-      return Ty;
-    // Do not substitute local archetypes, if it is not required.
-    // This is often the case when cloning basic blocks inside the same
-    // function.
-    if (LocalArchetypeSubs.empty())
-      return Ty;
-
-    // Substitute local archetypes, if we have any.
-    return Ty.subst(
-      Builder.getModule(),
-      QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType(),
-      CanGenericSignature());
-  }
   SILType getOpType(SILType Ty) {
-    Ty = getTypeInClonedContext(Ty);
+    // Substitute local archetypes, if we have any.
+    if (Ty.hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
+      Ty = Ty.subst(
+        Builder.getModule(),
+        QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+        MakeAbstractConformanceForGenericType(),
+        CanGenericSignature());
+    }
+
     return asImpl().remapType(Ty);
   }
 
-  CanType getASTTypeInClonedContext(Type ty) {
-    // Do not substitute local archetypes, if we do not have any.
-    if (!ty->hasLocalArchetype())
-      return ty->getCanonicalType();
-    // Do not substitute local archetypes, if it is not required.
-    // This is often the case when cloning basic blocks inside the same
-    // function.
-    if (LocalArchetypeSubs.empty())
-      return ty->getCanonicalType();
-
-    return ty.subst(
-      QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType()
-    )->getCanonicalType();
-  }
-
   CanType getOpASTType(CanType ty) {
-    ty = getASTTypeInClonedContext(ty);
+    // Substitute local archetypes, if we have any.
+    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
+      ty = ty.subst(
+            QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+            MakeAbstractConformanceForGenericType()
+          )->getCanonicalType();
+    }
+
     return asImpl().remapASTType(ty);
   }
 
@@ -356,13 +332,14 @@ public:
     if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
       conformance =
         conformance.subst(ty,
-                          QueryTypeSubstitutionMapOrIdentity{
-                                                        LocalArchetypeSubs},
+                          QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
                           MakeAbstractConformanceForGenericType());
+      ty = ty.subst(
+            QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+            MakeAbstractConformanceForGenericType());
     }
 
-    return asImpl().remapConformance(getASTTypeInClonedContext(ty),
-                                     conformance);
+    return asImpl().remapConformance(ty, conformance);
   }
 
   ArrayRef<ProtocolConformanceRef>

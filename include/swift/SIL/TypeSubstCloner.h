@@ -143,9 +143,7 @@ public:
   using SILClonerWithScopes<ImplClass>::getBuilder;
   using SILClonerWithScopes<ImplClass>::getOpLocation;
   using SILClonerWithScopes<ImplClass>::getOpValue;
-  using SILClonerWithScopes<ImplClass>::getASTTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpASTType;
-  using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
