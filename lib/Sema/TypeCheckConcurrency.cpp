@@ -512,16 +512,14 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
   if (!var->isLet()) {
     ASTContext &ctx = var->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
-      // A mutable storage of a value type accessed from within the module is
-      // okay.
-      if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
-          !var->isStatic() && 
-          var->hasStorage() &&
-          var->getTypeInContext()->isSendableType() &&
-          accessWithinModule) {
-        return true;
-      }
+    // A mutable storage of a value type accessed from within the module is
+    // okay.
+    if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
+        !var->isStatic() &&
+        var->hasStorage() &&
+        var->getTypeInContext()->isSendableType() &&
+        accessWithinModule) {
+      return true;
     }
     // Otherwise, must be immutable.
     return false;
@@ -4808,12 +4806,7 @@ static bool checkClassGlobalActorIsolation(
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    auto &ctx = classDecl->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability))
-      return false;
-
-    downgradeToWarning = true;
-    break;
+    return false;
   }
 
   case ActorIsolation::Erased:
@@ -6054,8 +6047,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
       // Classes that add global actor isolation to non-Sendable
       // superclasses cannot be 'Sendable'.
-      if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
-          nominal->getGlobalActorAttr()) {
+      auto superclassDecl = classDecl->getSuperclassDecl();
+      if (nominal->getGlobalActorAttr() && !superclassDecl->isNSObject()) {
         return nullptr;
       }
     }
