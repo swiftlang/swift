@@ -1618,15 +1618,20 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
   }
 
-  // If we are bridging a Swift method with Any return value(s), create a
-  // stack allocation to hold the result(s), since Any is address-only.
   SmallVector<SILValue, 4> args;
   if (substConv.hasIndirectSILResults()) {
     if (F.getRepresentation() ==
         SILFunctionType::Representation::CFunctionPointer) {
-      args.push_back(F.begin()->createFunctionArgument(
-          substConv.getSingleSILResultType(getTypeExpansionContext())));
+      // Pass the result address of the thunk to the native function.
+      auto resultTy =
+          F.getConventions().getSingleSILResultType(getTypeExpansionContext());
+      assert(resultTy ==
+                 substConv.getSingleSILResultType(getTypeExpansionContext()) &&
+             "result type mismatch");
+      args.push_back(F.begin()->createFunctionArgument(resultTy));
     } else {
+      // If we are bridging a Swift method with Any return value(s), create a
+      // stack allocation to hold the result(s), since Any is address-only.
       for (auto result : substConv.getResults()) {
         if (!substConv.isSILIndirect(result)) {
           continue;
