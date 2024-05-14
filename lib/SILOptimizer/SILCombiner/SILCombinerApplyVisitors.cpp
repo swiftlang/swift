@@ -1430,7 +1430,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
 ///  getContiguousArrayStorageType<Int>(for:)
 ///    => metatype @thick ContiguousArrayStorage<Int>.Type
 /// We know that `getContiguousArrayStorageType` will not return the AnyObject
-/// type optimization for any non class or objc existential type instantiation.
+/// type optimization for any non class or objc existential type instantiation
+/// or a C++ foreign reference type.
 static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
   if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
@@ -1451,7 +1452,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
-      isa<AnyFunctionType>(ty) ||
+      isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||
       (ty->isAnyExistentialType() && !ty->isObjCExistentialType()))
     return true;
 
