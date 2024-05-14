@@ -810,6 +810,9 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addDeadObjectElimination();
   P.addObjectOutliner();
   P.addDeadStoreElimination();
+  P.addDCE();
+  P.addSimplification();
+  P.addInitializeStaticGlobals();
 
   // dead-store-elimination can expose opportunities for dead object elimination.
   P.addDeadObjectElimination();
