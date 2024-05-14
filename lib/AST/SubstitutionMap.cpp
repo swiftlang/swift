@@ -140,6 +140,14 @@ bool SubstitutionMap::hasLocalArchetypes() const {
   return false;
 }
 
+bool SubstitutionMap::hasOpaqueArchetypes() const {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
+    if (replacementTy && replacementTy->hasOpaqueArchetype())
+      return true;
+  }
+  return false;
+}
+
 bool SubstitutionMap::hasDynamicSelf() const {
   for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasDynamicSelfType())
