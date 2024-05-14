@@ -565,3 +565,6 @@ Added: __swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstruments
 
 // Runtime bincompat functions for Concurrency runtime to detect legacy mode
 Added: _swift_bincompat_useLegacyNonCrashingExecutorChecks
+
+// Add add SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE
+Added: _concurrencyIsCurrentExecutorLegacyModeOverride
