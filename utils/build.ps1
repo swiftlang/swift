@@ -596,13 +596,13 @@ function Fetch-Dependencies {
         [string]$ExtractPath
     )
 
-    $zipFilePath = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
-    $extractedPath = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
+    $source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
+    $destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
 
     # Check if the extracted directory already exists and is up to date.
-    if (Test-Path $extractedPath) {
-        $zipLastWriteTime = (Get-Item $zipFilePath).LastWriteTime
-        $extractedLastWriteTime = (Get-Item $extractedPath).LastWriteTime
+    if (Test-Path $destination) {
+        $zipLastWriteTime = (Get-Item $source).LastWriteTime
+        $extractedLastWriteTime = (Get-Item $destination).LastWriteTime
         # Compare the last write times
         if ($zipLastWriteTime -le $extractedLastWriteTime) {
             Write-Output "'$ZipFileName' is already extracted and up to date."
@@ -612,7 +612,7 @@ function Fetch-Dependencies {
 
     Write-Output "Extracting '$ZipFileName' ..."
     New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
-    Expand-Archive -Path $zipFilePath -DestinationPath $BinaryCache -Force
+    Expand-Archive -Path $source -DestinationPath $BinaryCache -Force
   }
 
   $WiXVersion = "4.0.4"
@@ -814,12 +814,11 @@ function Build-CMakeProject {
     }
 
     if ($Platform -eq "Android") {
-      if (Test-Path "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
-        $env:Path = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
-        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
-      } elseif (Test-Path "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
-        $env:Path = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
-        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+      $vsWherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+      $vsInstallPath = & $vsWherePath -latest -property installationPath
+      if (Test-Path "${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
+        $env:Path = "${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
+        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
       } else {
         throw "Missing CMake and Ninja in the visual studio installation that are needed to build Android"
       }
@@ -846,8 +845,7 @@ function Build-CMakeProject {
         $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
       }
       Android {
-        $androidNDKPath = Get-AndroidNDKPath
-        $CFlags = @("--sysroot=$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
+        $CFlags = @("--sysroot=$(Get-AndroidNDKPath)\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
       }
     }
 
