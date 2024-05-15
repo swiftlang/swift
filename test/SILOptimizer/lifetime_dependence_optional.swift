@@ -2,8 +2,7 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -enable-experimental-feature BorrowingSwitch
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -58,7 +57,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
-    case .some(borrowing y):
+    case .some(let y):
       return .some(try transform(y))
     case .none:
       return .none
@@ -82,7 +81,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(borrowing y):
+    case .some(let y):
       return try transform(y)
     case .none:
       return .none

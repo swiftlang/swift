@@ -4575,18 +4575,6 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
       || !subjectType->isNoncopyable()) {
     return;
   }
-
-  // A bare reference to, or load from, a move-only binding must be consumed.
-  subjectExpr = subjectExpr->getSemanticsProvidingExpr();
-  if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
-    subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
-  }
-  if (!C.LangOpts.hasFeature(Feature::BorrowingSwitch)
-      && isa<DeclRefExpr>(subjectExpr)) {
-    C.Diags.diagnose(subjectExpr->getLoc(),
-                           diag::move_only_pattern_match_not_consumed)
-      .fixItInsert(subjectExpr->getStartLoc(), "consume ");
-  }
 }
 
 // Perform MiscDiagnostics on Switch Statements.

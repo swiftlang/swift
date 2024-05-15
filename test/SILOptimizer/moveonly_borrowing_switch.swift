@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 struct Payload: ~Copyable {
     var x: Int
