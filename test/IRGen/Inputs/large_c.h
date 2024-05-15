@@ -43,7 +43,7 @@ typedef struct _ContainerType {
 
 typedef unsigned char arr_t[32];
 
-typedef enum {
+typedef enum : unsigned int {
     entry_0       = 0,
     entry_1       = 1,
     entry_2       = 2,
