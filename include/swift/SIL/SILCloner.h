@@ -219,8 +219,24 @@ public:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    return asImpl().remapSubstitutionMap(Subs)
+    auto substSubs = asImpl().remapSubstitutionMap(Subs)
                    .getCanonical(/*canonicalizeSignature*/false);
+
+#ifndef NDEBUG
+    for (auto substConf : substSubs.getConformances()) {
+      if (substConf.isInvalid()) {
+        llvm::errs() << "Invalid conformance in SIL cloner:\n";
+        if (Functor.SubsMap)
+          Functor.SubsMap->dump(llvm::errs());
+        llvm::errs() << "\nsubstitution map:\n";
+        Subs.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+    }
+#endif
+
+    return substSubs;
   }
 
   SILType getOpType(SILType Ty) {
@@ -335,7 +351,22 @@ public:
 
   ProtocolConformanceRef getOpConformance(Type ty,
                                           ProtocolConformanceRef conformance) {
-    return asImpl().remapConformance(ty, conformance);
+    auto substConf = asImpl().remapConformance(ty, conformance);
+
+#ifndef NDEBUG
+    if (substConf.isInvalid()) {
+      llvm::errs() << "Invalid conformance in SIL cloner:\n";
+      if (Functor.SubsMap)
+        Functor.SubsMap->dump(llvm::errs());
+      llvm::errs() << "\nconformance:\n";
+      conformance.dump(llvm::errs());
+      llvm::errs() << "original type:\n";
+      ty.dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return substConf;
   }
 
   ArrayRef<ProtocolConformanceRef>

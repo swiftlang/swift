@@ -161,6 +161,17 @@ public:
       Original(From),
       Inlining(Inlining) {
     Functor.SubsMap = ApplySubs;
+
+#ifndef NDEBUG
+    for (auto substConf : ApplySubs.getConformances()) {
+      if (substConf.isInvalid()) {
+        llvm::errs() << "Invalid conformance in SIL cloner:\n";
+        ApplySubs.dump(llvm::errs());
+        abort();
+      }
+    }
+#endif
+
   }
 
 protected:
