@@ -16,11 +16,13 @@
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -164,6 +166,52 @@ public:
   }
 };
 
+static void emitRemark(StringRef remark, StringRef other, SILInstruction *i) {
+    if (!i->getModule().getASTContext().LangOpts.RemarkWhenFailedToSerialize)
+        return;
+
+    auto &ctx = i->getModule().getASTContext();
+    auto joined = remark.str() + other.str();
+    auto allocatedJoinedRemarks = ctx.getIdentifier(joined).str();
+
+    ctx.Diags.diagnose(i->getLoc().getSourceLoc(),
+                 diag::opt_remark_failed_serialization,
+                 allocatedJoinedRemarks);
+}
+
+static void emitRemark(StringRef remark, SILInstruction *i) {
+    emitRemark(remark, "", i);
+}
+
+static bool falseWithRemark(StringRef remark, StringRef other, SILInstruction *i) {
+    emitRemark(remark, other, i);
+    return false;
+}
+
+static bool falseWithRemark(StringRef remark, SILInstruction *i) {
+    return falseWithRemark(remark, "", i);
+}
+
+static bool falseWithRemark(StringRef remark, StringRef other, SILFunction *f) {
+    if (!f->getModule().getASTContext().LangOpts.RemarkWhenFailedToSerialize)
+        return false;
+    
+    auto &ctx = f->getModule().getASTContext();
+    auto joined = remark.str() + other.str();
+    auto allocatedJoinedRemarks = ctx.getIdentifier(joined).str();
+
+    ctx.Diags.diagnose(f->getLocation().getSourceLoc(),
+                 diag::opt_remark_failed_serialization,
+                 allocatedJoinedRemarks);
+    
+    return false;
+}
+
+static bool falseWithRemark(StringRef remark, SILFunction *f) {
+    return falseWithRemark(remark, "", f);
+}
+
+
 static bool isPackageOrPublic(SILLinkage linkage, SILOptions options) {
   if (options.EnableSerializePackage)
     return linkage == SILLinkage::Public || linkage == SILLinkage::Package;
@@ -289,16 +337,16 @@ bool CrossModuleOptimization::canSerializeFunction(
   }
 
   if (!function->isDefinition() || function->isAvailableExternally())
-    return false;
+    return falseWithRemark("no definition; failed to serialize function ", function->getName(), function);
 
   // Avoid a stack overflow in case of a very deeply nested call graph.
   if (maxDepth <= 0)
-    return false;
+    return falseWithRemark("call stack too deep; failed to serialize function ", function->getName(), function);
 
   // If someone adds specialization attributes to a function, it's probably the
   // developer's intention that the function is _not_ serialized.
   if (!function->getSpecializeAttrs().empty())
-    return false;
+    return falseWithRemark("found specialization attrs; failed to serialize function ", function->getName(), function);
 
   // Do the same check for the specializations of such functions.
   if (function->isSpecialization()) {
@@ -306,7 +354,8 @@ bool CrossModuleOptimization::canSerializeFunction(
     // Don't serialize exported (public) specializations.
     if (!parent->getSpecializeAttrs().empty() &&
         function->getLinkage() == SILLinkage::Public)
-      return false;
+      return falseWithRemark("failed to serialize public function ", function->getName(), function);
+
   }
 
   // Ask the heuristic.
@@ -333,17 +382,17 @@ bool CrossModuleOptimization::canSerializeInstruction(
   // First check if any result or operand types prevent serialization.
   for (SILValue result : inst->getResults()) {
     if (!canSerializeType(result->getType()))
-      return false;
+      return falseWithRemark("failed to serialize result type", inst);
   }
   for (Operand &op : inst->getAllOperands()) {
     if (!canSerializeType(op.get()->getType()))
-      return false;
+      return falseWithRemark("failed to serialize type in operand", inst);
   }
 
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
     SILFunction *callee = FRI->getReferencedFunctionOrNull();
     if (!callee)
-      return false;
+      return falseWithRemark("failed to serialize unresolvable callee", FRI);
 
     // In conservative mode we don't want to turn non-public functions into
     // public functions, because that can increase code size. E.g. if the
@@ -351,17 +400,19 @@ bool CrossModuleOptimization::canSerializeInstruction(
     // Also, when emitting TBD files, we cannot introduce a new public symbol.
     if (conservative || M.getOptions().emitTBD) {
       if (!isReferenceSerializeCandidate(callee, M.getOptions()))
-        return false;
+        return falseWithRemark("failed to serialize callee with internal visibility ", callee->getName(), FRI);
     }
 
     // In some project configurations imported C functions are not necessarily
     // public in their modules.
     if (conservative && callee->hasClangNode())
-      return false;
+      return falseWithRemark("failed to serialize callee with clang node ", callee->getName(), FRI);
 
     // Recursively walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
       return true;
+    else
+      emitRemark("failed to serialize callee ", callee->getName(), FRI);
 
     // In case a public/internal/private function cannot be serialized, it's
     // still possible to make them public and reference them from the serialized
@@ -377,13 +428,13 @@ bool CrossModuleOptimization::canSerializeInstruction(
     SILGlobalVariable *global = GAI->getReferencedGlobal();
     if ((conservative || M.getOptions().emitTBD) &&
         !isReferenceSerializeCandidate(global, M.getOptions())) {
-      return false;
+      return falseWithRemark("failed to serialize gloabl ", global->getName(), GAI);
     }
 
     // In some project configurations imported C variables are not necessarily
     // public in their modules.
     if (conservative && global->hasClangNode())
-      return false;
+      return falseWithRemark("failed to serialize foreign gloabl ", global->getName(), GAI);
 
     return true;
   }
@@ -398,17 +449,26 @@ bool CrossModuleOptimization::canSerializeInstruction(
           if (method.isForeign)
             canUse = false;
         });
+
+    if (!canUse)
+      emitRemark("failed to serialize keypath", KPI);
+
     return canUse;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
+    if (MI->getMember().isForeign)
+        emitRemark("failed to serialize foreign method", MI);
     return !MI->getMember().isForeign;
   }
   if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
     // In conservative mode, we don't support class field accesses of non-public
     // properties, because that would require to make the field decl public -
     // which keeps more metadata alive.
-    return !conservative ||
+    bool canUse = !conservative ||
            REAI->getField()->getEffectiveAccess() >= AccessLevel::Package;
+    if (!canUse)
+      emitRemark("failed to serialize class field access", REAI);
+    return canUse;
   }
   return true;
 }
@@ -508,19 +568,19 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
   if (DeclContext *funcCtxt = function->getDeclContext()) {
     if (!canUseFromInline(funcCtxt))
-      return false;
+        return falseWithRemark("failed to serialize; function context cannot be used from inline function in module ", funcCtxt->getParentModule()->getName().str(), function);
   }
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
   case SILLinkage::PackageNonABI:
   case SILLinkage::HiddenExternal:
-    return false;
+    return falseWithRemark("failed to serialize; function has public linkage ", function);
   case SILLinkage::Shared:
     // static inline C functions
     if (!function->isDefinition() && function->hasClangNode())
       return true;
-    return false;
+    return falseWithRemark("failed to serialize; function has public linkage ", function);
   case SILLinkage::Public:
   case SILLinkage::Package:
   case SILLinkage::Hidden:
@@ -563,7 +623,7 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
       for (SILInstruction &inst : block) {
         size += (int)instructionInlineCost(inst);
         if (size >= CMOFunctionSizeLimit)
-          return false;
+          return falseWithRemark("failed to serialize; function is too large", &inst);
       }
     }
   }

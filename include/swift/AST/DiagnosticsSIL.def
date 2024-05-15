@@ -657,6 +657,8 @@ REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
 NOTE(opt_remark_note, none, "%0", (StringRef))
 
+REMARK(opt_remark_failed_serialization, none, "%0", (StringRef))
+
 // Float-point to integer conversions
 ERROR(float_to_int_overflow, none,
   "invalid%select{| implicit}2 conversion: '%0' overflows %1", (StringRef, Type, bool))

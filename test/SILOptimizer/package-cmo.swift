@@ -6,6 +6,8 @@
 // RUN: %target-build-swift -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -emit-sil -o %t/Main.sil
 // RUN: %FileCheck %s < %t/Main.sil
 
+// RUN: %target-build-swift -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -Xfrontend -serialization-failed -Xfrontend -verify
+
 // REQUIRES: swift_in_compiler
 
 import Module
@@ -54,14 +56,14 @@ package func callStaticPkgFunctionPointer(_ x: Int) -> Int {
 // CHECK:         function_ref @$s6Module16callPrivateCFuncSiyF
 // CHECK:       } // end sil function '$s4Main24callPrivateCFuncInModuleSiyF'
 public func callPrivateCFuncInModule() -> Int {
-  return Module.callPrivateCFunc()
+  return Module.callPrivateCFunc() // expected-remark {{failed to serialize callee $s6Module16callPrivateCFuncSiyF}}
 }
 
 // CHECK-LABEL: sil @$s4Main22usePrivateCVarInModuleSiyF : $@convention(thin) () -> Int {
 // CHECK:         function_ref @$s6Module14usePrivateCVarSiyF
 // CHECK:       } // end sil function '$s4Main22usePrivateCVarInModuleSiyF'
 public func usePrivateCVarInModule() -> Int {
-  return Module.usePrivateCVar()
+  return Module.usePrivateCVar() // expected-remark {{failed to serialize callee $s6Module14usePrivateCVarSiyF}}
 }
 
 // CHECK-LABEL: sil @$s4Main11doIncrementyS2iF
@@ -117,7 +119,7 @@ package func callPkgFuncTBD(_ x: Int) -> Int {
 // CHECK:       } // end sil function '$s4Main22doIncrementTBDWithCallyS2iF'
 // CHECK-LABEL: sil @$s9ModuleTBD24incrementByThreeWithCallyS2iF : $@convention(thin) (Int) -> Int
 public func doIncrementTBDWithCall(_ x: Int) -> Int {
-  return ModuleTBD.incrementByThreeWithCall(x)
+  return ModuleTBD.incrementByThreeWithCall(x) // expected-remark {{failed to serialize callee $s9ModuleTBD24incrementByThreeWithCallyS2iF}}
 }
 
 // CHECK-LABEL: sil package @$s4Main19callPkgFuncNoCMOTBDyS2iF : $@convention(thin) (Int) -> Int {

@@ -274,6 +274,9 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
 
+def Rserialization_failed : Flag<["-"], "serialization-failed">,
+    HelpText<"Remark if we failed to inline a function">;
+
 def block_list_file
   : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
     HelpText<"The path to a blocklist configuration file">;
