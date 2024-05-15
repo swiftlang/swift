@@ -3060,7 +3060,7 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Maximal:
     if (M == getModuleContext())
       return false;
-    // Non-resilient if bypass optimization in package is enabled
+    // Access non-resiliently if package optimization is enabled
     if (bypassResilienceInPackage(M))
       return false;
     return isResilient();
@@ -4271,13 +4271,23 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
-  // Client needs to opt in to bypass resilience checks at the use site.
-  // Client and the loaded module both need to be in the same package.
-  // The loaded module needs to be built from source and opt in to allow
-  // non-resilient access.
-  return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
-         getModuleContext()->inSamePackage(accessingModule) &&
-         getModuleContext()->allowNonResilientAccess();
+  auto declModule = getModuleContext();
+  if (declModule->inSamePackage(accessingModule) &&
+      declModule->allowNonResilientAccess()) {
+    // If the defining module is built with package-cmo,
+    // allow direct access from the use site that belongs
+    // to accessingModule (client module).
+    if (declModule->isResilient() &&
+        declModule->serializePackageEnabled())
+      return true;
+
+    // If not, check if the client can still opt in to
+    // have a direct access to this decl from the use
+    // site with a flag.
+    // FIXME: serialize this flag to Module and get it via accessingModule.
+    return getASTContext().LangOpts.EnableBypassResilienceInPackage;
+  }
+  return false;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -5134,7 +5144,7 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
     // non-resiliently in a maximal context.
     if (M == getModuleContext())
       return false;
-    // Non-resilient if bypass optimization in package is enabled
+    // Access non-resiliently if package optimization is enabled
     if (bypassResilienceInPackage(M))
       return false;
 

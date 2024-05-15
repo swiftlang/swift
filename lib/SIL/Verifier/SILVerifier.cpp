@@ -160,29 +160,23 @@ bool checkResilience(DeclType *D, ModuleDecl *accessingModule,
                      ResilienceExpansion expansion,
                      bool isSerializedForPackage) {
   auto declModule = D->getModuleContext();
-  // Explicitly bypassed for debugging with `bypass-resilience-checks`
+
+  // For DEBUGGING: this check looks up
+  // `bypass-resilience-checks`, which is
+  // an old flag used for debugging, and
+  // has nothing to do with optimizations.
   if (declModule->getBypassResilience())
     return false;
 
-  // Check whether the function or a decl referenced
-  // by the function was serialized with package-cmo
-  // optimization.
-  // If enabled, resilience expansion for the function
-  // is maximal (see SILFunction::getResilienceExpansion()).
+  // If the SIL function containing the decl D is
+  // [serialized_for_package], package-cmo had been
+  // enabled in its defining module, so direct access
+  // from a client module should be allowed.
   if (accessingModule != declModule &&
-      expansion == ResilienceExpansion::Maximal) {
-    // If the function is [serialized_for_package],
-    // package-cmo had been enabled in its defining
-    // module, so direct access should be allowed.
-    if (isSerializedForPackage)
+      expansion == ResilienceExpansion::Maximal &&
+      isSerializedForPackage)
       return false;
-    // If not, check whether the referenced decl was
-    // serialized with package-cmo.
-    if (declModule->isResilient() &&
-        declModule->serializePackageEnabled() &&
-        declModule->inSamePackage(accessingModule))
-      return false;
-  }
+
   return D->isResilient(accessingModule, expansion);
 }
 
