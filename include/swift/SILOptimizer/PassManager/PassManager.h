@@ -74,6 +74,8 @@ class SwiftPassInvocation {
 
   SILSSAUpdater *ssaUpdater = nullptr;
 
+  SwiftPassInvocation *nestedSwiftPassInvocation = nullptr;
+
   static constexpr int BlockSetCapacity = SILBasicBlock::numCustomBits;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
@@ -180,6 +182,19 @@ public:
   SILSSAUpdater *getSSAUpdater() const {
     assert(ssaUpdater && "SSAUpdater not initialized");
     return ssaUpdater;
+  }
+
+  SwiftPassInvocation *initializeNestedSwiftPassInvocation(SILFunction *newFunction) {
+    assert(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
+    nestedSwiftPassInvocation = new SwiftPassInvocation(passManager, transform, newFunction);
+    return nestedSwiftPassInvocation;
+  }
+
+  void deinitializeNestedSwiftPassInvocation() {
+    assert(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
+    nestedSwiftPassInvocation->endTransformFunction();
+    delete nestedSwiftPassInvocation;
+    nestedSwiftPassInvocation = nullptr;
   }
 };
 

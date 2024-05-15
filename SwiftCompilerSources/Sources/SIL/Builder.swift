@@ -19,6 +19,7 @@ public struct Builder {
   public enum InsertionPoint {
     case before(Instruction)
     case atEndOf(BasicBlock)
+    case atStartOf(Function)
     case staticInitializer(GlobalVariable)
   }
 
@@ -34,6 +35,9 @@ public struct Builder {
                             loc: location.bridged)
     case .atEndOf(let block):
       return BridgedBuilder(insertAt: .endOfBlock, insertionObj: block.bridged.obj,
+                            loc: location.bridged)
+    case .atStartOf(let function):
+      return BridgedBuilder(insertAt: .startOfFunction, insertionObj: function.bridged.obj,
                             loc: location.bridged)
     case .staticInitializer(let global):
       return BridgedBuilder(insertAt: .intoGlobal, insertionObj: global.bridged.obj,
@@ -290,6 +294,20 @@ public struct Builder {
     return notifyNew(tttf.getAs(ThinToThickFunctionInst.self))
   }
 
+  public func createPartialApply(
+    function: Value,
+    substitutionMap: SubstitutionMap, 
+    capturedArguments: [Value], 
+    calleeConvention: ArgumentConvention, 
+    hasUnknownResultIsolation: Bool, 
+    isOnStack: Bool
+  ) -> PartialApplyInst {
+    return capturedArguments.withBridgedValues { capturedArgsRef in
+      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged, substitutionMap.bridged, hasUnknownResultIsolation, isOnStack)
+      return notifyNew(pai.getAs(PartialApplyInst.self))
+    }
+  }
+
   @discardableResult
   public func createSwitchEnum(enum enumVal: Value,
                                cases: [(Int, BasicBlock)],
@@ -433,5 +451,15 @@ public struct Builder {
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))
+  }
+
+  public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {
+    let convertFunction = bridged.createConvertFunction(originalFunction.bridged, resultType.bridged, withoutActuallyEscaping)
+    return notifyNew(convertFunction.getAs(ConvertFunctionInst.self))
+  }
+
+  public func createConvertEscapeToNoEscape(originalFunction: Value, resultType: Type, isLifetimeGuaranteed: Bool) -> ConvertEscapeToNoEscapeInst {
+    let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
+    return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
 }
