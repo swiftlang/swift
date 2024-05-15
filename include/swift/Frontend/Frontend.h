@@ -405,6 +405,9 @@ public:
   /// imported.
   bool shouldImportSwiftBacktracing() const;
 
+  /// Whether the CXX module should be implicitly imported.
+  bool shouldImportCxx() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.

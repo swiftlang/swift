@@ -1084,6 +1084,26 @@ bool CompilerInvocation::shouldImportSwiftBacktracing() const {
       FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
+bool CompilerInvocation::shouldImportCxx() const {
+  // C++ Interop is disabled
+  if (!getLangOptions().EnableCXXInterop)
+    return false;
+  // Avoid C++ stdlib when building Swift stdlib
+  if (getImplicitStdlibKind() == ImplicitStdlibKind::Builtin)
+    return false;
+  // Avoid importing Cxx when building Cxx itself
+  if (getFrontendOptions().ModuleName == CXX_MODULE_NAME)
+    return false;
+  // Cxx cannot be imported when Library evolution is enabled
+  if (getFrontendOptions().EnableLibraryEvolution)
+    return false;
+  // Implicit import of Cxx is disabled
+  if (getLangOptions().DisableImplicitCxxModuleImport)
+    return false;
+
+  return true;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -1276,9 +1296,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   if (Invocation.getLangOptions().EnableCXXInterop) {
-    if (imports.StdlibKind != ImplicitStdlibKind::Builtin &&
-        Invocation.getFrontendOptions().ModuleName != CXX_MODULE_NAME &&
-        canImportCxx())
+    if (Invocation.shouldImportCxx() && canImportCxx())
       pushImport(CXX_MODULE_NAME);
     if (canImportCxxShim())
       pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});

@@ -642,6 +642,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitStringProcessingModuleImport |=
     Args.hasArg(OPT_disable_implicit_string_processing_module_import);
 
+  Opts.DisableImplicitCxxModuleImport |=
+    Args.hasArg(OPT_disable_implicit_cxx_module_import);
+
   Opts.DisableImplicitBacktracingModuleImport =
     Args.hasFlag(OPT_disable_implicit_backtracing_module_import,
                  OPT_enable_implicit_backtracing_module_import,
