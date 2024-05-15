@@ -261,7 +261,6 @@ enum class NotRecommendedReason : uint8_t {
   RedundantImportIndirect,               // contextual
   Deprecated,                            // context-free
   SoftDeprecated,                        // context-free
-  CrossActorReference,                   // contextual
   VariableUsedInOwnDefinition,           // contextual
   NonAsyncAlternativeUsedInAsyncContext, // contextual
 
@@ -299,7 +298,6 @@ enum class ContextualNotRecommendedReason : uint8_t {
   None = 0,
   RedundantImport,
   RedundantImportIndirect,
-  CrossActorReference,
   VariableUsedInOwnDefinition,
   /// A method that is sync and has an async alternative is used in an async
   /// context.
@@ -710,8 +708,6 @@ public:
       return NotRecommendedReason::RedundantImportIndirect;
     case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
       return NotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext;
-    case ContextualNotRecommendedReason::CrossActorReference:
-      return NotRecommendedReason::CrossActorReference;
     case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
       return NotRecommendedReason::VariableUsedInOwnDefinition;
     }

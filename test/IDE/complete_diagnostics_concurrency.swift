@@ -24,7 +24,7 @@ func testAsyncContext() {
 func testActor(obj: MyActor) async {
     obj.#^ACTOR^#
 // ACTOR-DAG: Decl[InstanceMethod]/CurrNominal:   receiveSendable({#arg: MySendable#})[' async'][#Void#]; name=receiveSendable(arg:){{$}}
-// ACTOR-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: receiveNonSendable({#arg: MyNonSendable#})[' async'][#Void#]; name=receiveNonSendable(arg:); diagnostics=warning:actor-isolated 'receiveNonSendable(arg:)' should only be referenced from inside the actor{{$}}
+// ACTOR-DAG: Decl[InstanceMethod]/CurrNominal: receiveNonSendable({#arg: MyNonSendable#})[' async'][#Void#]; name=receiveNonSendable(arg:){{$}}
 }
 
 func testClosure(obj: (Int) async -> Void) {

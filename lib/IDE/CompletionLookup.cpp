@@ -807,32 +807,6 @@ void CompletionLookup::analyzeActorIsolation(
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
-
-  // If the reference is 'async', all types must be 'Sendable'.
-  if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete &&
-      implicitlyAsync && T) {
-    if (isa<VarDecl>(VD)) {
-      if (!T->isSendableType()) {
-        NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
-      }
-    } else {
-      assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
-      // Check if the result and the param types are all 'Sendable'.
-      auto *AFT = T->castTo<AnyFunctionType>();
-      if (!AFT->getResult()->isSendableType()) {
-        NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
-      } else {
-        for (auto &param : AFT->getParams()) {
-          Type paramType = param.getPlainType();
-          if (!paramType->isSendableType()) {
-            NotRecommended =
-                ContextualNotRecommendedReason::CrossActorReference;
-            break;
-          }
-        }
-      }
-    }
-  }
 }
 
 void CompletionLookup::addVarDeclRef(const VarDecl *VD,
