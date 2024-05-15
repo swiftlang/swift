@@ -489,17 +489,18 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   llvm_unreachable("instruction must be in its parent block");
 }
 
+static bool checkDeadEnd(SILInstruction *inst, DeadEndBlocks *deadEndBlocks) {
+  return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
+}
+
 template <typename LivenessWithDefs>
 bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
     ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   assert(asImpl().isInitialized());
 
-  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
-    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
-  };
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (!asImpl().isWithinBoundary(user) && !checkDeadEnd(user))
+    if (!asImpl().isWithinBoundary(user) && !checkDeadEnd(user, deadEndBlocks))
       return false;
   }
   return true;
@@ -510,12 +511,9 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(
     ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   assert(asImpl().isInitialized());
 
-  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
-    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
-  };
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (asImpl().isWithinBoundary(user) || checkDeadEnd(user))
+    if (asImpl().isWithinBoundary(user) || checkDeadEnd(user, deadEndBlocks))
       return false;
   }
   return true;
