@@ -453,7 +453,7 @@ extension UnsafePointer {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
@@ -1341,7 +1341,7 @@ extension UnsafeMutablePointer {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
@@ -1365,7 +1365,7 @@ extension UnsafeMutablePointer {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
