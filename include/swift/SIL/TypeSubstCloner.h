@@ -182,16 +182,17 @@ protected:
   }
 
   CanType remapASTType(CanType ty) {
-    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    auto substTy = ty.subst(Functor, Functor)->getCanonicalType();
+
+    auto context = getBuilder().getTypeExpansionContext();
+
     if (!substTy->hasOpaqueArchetype() ||
-        !getBuilder().getTypeExpansionContext()
-            .shouldLookThroughOpaqueTypeArchetypes())
+        !context.shouldLookThroughOpaqueTypeArchetypes())
       return substTy;
+
     // Remap types containing opaque result types in the current context.
-    return substOpaqueTypesWithUnderlyingTypes(
-        substTy,
-        TypeExpansionContext(getBuilder().getFunction()),
-        /*allowLoweredTypes=*/false);
+    return substOpaqueTypesWithUnderlyingTypes(substTy, context,
+                                               /*allowLoweredTypes=*/false);
   }
 
   ProtocolConformanceRef remapConformance(Type ty,

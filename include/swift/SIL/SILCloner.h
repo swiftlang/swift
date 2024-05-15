@@ -238,14 +238,6 @@ public:
   }
 
   CanType getOpASTType(CanType ty) {
-    // Substitute local archetypes, if we have any.
-    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
-      ty = ty.subst(
-            QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-            MakeAbstractConformanceForGenericType()
-          )->getCanonicalType();
-    }
-
     return asImpl().remapASTType(ty);
   }
 
@@ -450,8 +442,16 @@ protected:
       return Ty;
   }
 
-  CanType remapASTType(CanType Ty) {
-    return Ty;
+  CanType remapASTType(CanType ty) {
+    // Substitute local archetypes, if we have any.
+    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
+      ty = ty.subst(
+            QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
+            MakeAbstractConformanceForGenericType()
+          )->getCanonicalType();
+    }
+
+    return ty;
   }
 
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {

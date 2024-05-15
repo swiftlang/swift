@@ -52,6 +52,10 @@ public:
   }
 
   CanType remapASTType(CanType ty) {
+    // Substitute local archetypes, if we have any.
+    if (ty->hasLocalArchetype())
+      ty = ty.subst(Functor, Functor)->getCanonicalType();
+
     if (!ty->hasOpaqueArchetype() ||
         !getBuilder()
              .getTypeExpansionContext()

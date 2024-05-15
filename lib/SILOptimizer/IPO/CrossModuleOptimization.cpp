@@ -138,6 +138,9 @@ public:
   }
 
   CanType remapASTType(CanType Ty) {
+    if (Ty->hasLocalArchetype())
+      Ty = Ty.subst(Functor, Functor)->getCanonicalType();
+
     CMS.makeTypeUsableFromInline(Ty);
     return Ty;
   }
