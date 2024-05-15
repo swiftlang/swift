@@ -202,6 +202,7 @@ extension Unicode {
 
 extension Unicode._NFDNormalizer {
 
+  @inline(never)
   internal mutating func _resume(
     consuming nextFromSource: () -> Unicode.Scalar?
   ) -> ScalarAndNormData? {
@@ -281,6 +282,7 @@ extension Unicode._NFDNormalizer {
     return buffer.next() ?? pendingStarter._take()
   }
 
+  @inline(__always)
   private mutating func takePendingOrConsume(
     _ nextFromSource: () -> Unicode.Scalar?
   ) -> ScalarAndNormData? {

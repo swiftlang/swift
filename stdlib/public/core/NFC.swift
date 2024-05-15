@@ -243,6 +243,7 @@ extension Unicode {
 
 extension Unicode._NFCNormalizer {
 
+  @inline(never)
   internal mutating func _resume(
     consumingNFD nextNFD: (inout Self) -> ScalarAndNormData?
   ) -> Unicode.Scalar? {
