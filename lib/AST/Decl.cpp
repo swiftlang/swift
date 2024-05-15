@@ -11291,7 +11291,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   }
 
   if (auto value = dyn_cast<ValueDecl>(decl)) {
-    simple_display(out, value);
+    return simple_display(out, value);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     out << "extension of ";
     if (auto typeRepr = ext->getExtendedTypeRepr())
@@ -11301,12 +11301,12 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   } else if (auto med = dyn_cast<MacroExpansionDecl>(decl)) {
     out << '#' << med->getMacroName() << " in ";
     printContext(out, med->getDeclContext());
-    if (med->getLoc().isValid()) {
-      out << '@';
-      med->getLoc().print(out, med->getASTContext().SourceMgr);
-    }
   } else {
     out << "(unknown decl)";
+  }
+  if (decl->getLoc().isValid()) {
+    out << '@';
+    decl->getLoc().print(out, decl->getASTContext().SourceMgr);
   }
 }
 

@@ -6139,15 +6139,15 @@ evaluate(Evaluator &evaluator, Decl *decl) const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ObjCInterfaceAndImplementation &pair) {
-  if (!pair) {
+  if (pair.empty()) {
     out << "no clang interface or @_objcImplementation";
     return;
   }
 
-  out << "clang interface ";
-  simple_display(out, pair.interfaceDecls);
-  out << " with @_objcImplementation ";
+  out << "@implementation ";
   simple_display(out, pair.implementationDecl);
+  out << " matches clang interfaces ";
+  simple_display(out, pair.interfaceDecls);
 }
 
 SourceLoc
@@ -6163,7 +6163,8 @@ llvm::TinyPtrVector<Decl *> Decl::getAllImplementedObjCDecls() const {
     return {};
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {}).interfaceDecls;
+  auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return result.interfaceDecls;
 }
 
 DeclContext *DeclContext::getImplementedObjCContext() const {
@@ -6179,8 +6180,8 @@ Decl *Decl::getObjCImplementationDecl() const {
     return nullptr;
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {})
-             .implementationDecl;
+  auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return result.implementationDecl;
 }
 
 llvm::TinyPtrVector<Decl *>
