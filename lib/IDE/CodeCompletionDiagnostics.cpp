@@ -166,10 +166,6 @@ bool swift::ide::getContextualCompletionDiagnostics(
     const ASTContext &Ctx) {
   CodeCompletionDiagnostics Diag(Ctx);
   switch (Reason) {
-  case ContextualNotRecommendedReason::CrossActorReference:
-    return Diag.getDiagnostics(Severity, Out,
-                               diag::ide_cross_actor_reference_swift5,
-                               NameForDiagnostics);
   case ContextualNotRecommendedReason::RedundantImport:
     return Diag.getDiagnostics(Severity, Out, diag::ide_redundant_import,
                                NameForDiagnostics);
