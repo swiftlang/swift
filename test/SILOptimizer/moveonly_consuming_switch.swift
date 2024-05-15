@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BorrowingSwitch -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 // TODO: Remove this and just use the real `UnsafeMutablePointer` when
 // noncopyable type support has been upstreamed.
