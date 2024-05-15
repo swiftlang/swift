@@ -5934,6 +5934,33 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ext->getAttrs().add(attr);
 }
 
+/// Determine whether the given nominal is an enum that has a Sendable
+/// raw type.
+static bool isEnumWithSendableRawType(NominalTypeDecl *nominal) {
+  auto enumDecl = dyn_cast<EnumDecl>(nominal);
+  if (!enumDecl)
+    return false;
+
+  Type rawInterfaceType = enumDecl->getRawType();
+  if (!rawInterfaceType)
+    return false;
+
+  Type rawType = enumDecl->mapTypeIntoContext(rawInterfaceType);
+  SendableCheckContext context(
+     enumDecl,
+     SendableCheck::ImplicitForExternallyVisible
+  );
+  bool invalid = false;
+  diagnoseNonSendableTypes(
+      rawType, context, /*inDerivedConformance*/Type(),
+      enumDecl->getLoc(),
+      [&](Type type, DiagnosticBehavior behavior) {
+        invalid = true;
+        return true;
+      });
+  return !invalid;
+}
+
 ProtocolConformance *swift::deriveImplicitSendableConformance(
     Evaluator &evaluator, NominalTypeDecl *nominal) {
   // Protocols never get implicit Sendable conformances.
@@ -6089,7 +6116,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
     check = SendableCheck::Implicit;
   } else if (nominal->hasClangNode() ||
              nominal->getAttrs().hasAttribute<FixedLayoutAttr>() ||
-             nominal->getAttrs().hasAttribute<FrozenAttr>()) {
+             nominal->getAttrs().hasAttribute<FrozenAttr>() ||
+             isEnumWithSendableRawType(nominal)) {
     // @_frozen public types can also infer Sendable, but be more careful here.
     check = SendableCheck::ImplicitForExternallyVisible;
   } else {

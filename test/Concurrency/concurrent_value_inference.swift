@@ -83,6 +83,32 @@ public enum PublicEnum { // expected-note {{consider making enum 'PublicEnum' co
   case some
 }
 
+public struct NonSendableInt: RawRepresentable, Equatable {
+  public var rawValue: Int
+  public init(rawValue: Int) {
+    self.rawValue = rawValue
+  }
+}
+
+
+extension NonSendableInt: ExpressibleByIntegerLiteral {
+  public init(integerLiteral value: Int) {
+    self.init(rawValue: value)
+  }
+}
+
+// Enums with Sendable raw types are sendable
+public enum RawEnum: Int {
+  case first
+  case second
+}
+
+// expected-note@+1 {{consider making enum 'RawNSEnum' conform to the 'Sendable' protocol}}
+public enum RawNSEnum: NonSendableInt {
+  case first
+  case second
+}
+
 struct HasFunctions {
   var tfp: @convention(thin) () -> Void
   var cfp: @convention(c) () -> Void
@@ -115,6 +141,7 @@ func testCV(
   gs1: GS1<Int>, gs2: GS2<Int>,
   bc: Bitcode, ps: PublicStruct, pe: PublicEnum,
   fps: FrozenPublicStruct, fpe: FrozenPublicEnum,
+  re: RawEnum, rnse: RawNSEnum,
   hf: HasFunctions
 ) {
   acceptCV(c1) // expected-warning {{type 'C1' does not conform to the 'Sendable' protocol}}
@@ -137,6 +164,10 @@ func testCV(
   // Public is okay when also @frozen.
   acceptCV(fps)
   acceptCV(fpe)
+
+  // Public enum is okay when backed by a Sendable raw type
+  acceptCV(re)
+  acceptCV(rnse) // expected-warning  {{type 'RawNSEnum' does not conform to the 'Sendable' protocol}}
 
   // Thin and C function types are Sendable.
   acceptCV(hf)
