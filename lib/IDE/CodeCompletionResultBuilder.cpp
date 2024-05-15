@@ -128,7 +128,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Sink, CCS, AssociatedDecl, IsAsync, HasAsyncAlternative, ModuleName,
+        Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -145,7 +145,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            Sink, Kind, CCS, CodeCompletionOperatorKind::None, IsAsync,
+            Sink, Kind, CCS, CodeCompletionOperatorKind::None,
             NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
