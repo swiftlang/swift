@@ -1276,7 +1276,9 @@ public:
   /// the superclass's fields. For a version of this function that performs the
   /// same job but starting out with an instance pointer check
   /// MetadataReader::readInstanceStartFromClassMetadata.
-  std::optional<unsigned> computeUnalignedFieldStartOffset(const TypeRef *TR) {
+  std::optional<unsigned>
+  computeUnalignedFieldStartOffset(const TypeRef *TR,
+                                   remote::TypeInfoProvider *ExternalTypeInfo) {
     size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
 
     const TypeRef *superclass = getBuilder().lookupSuperclass(TR);
@@ -1286,12 +1288,12 @@ public:
       return isaAndRetainCountSize;
 
     auto superclassStart =
-        computeUnalignedFieldStartOffset(superclass);
+        computeUnalignedFieldStartOffset(superclass, ExternalTypeInfo);
     if (!superclassStart)
       return std::nullopt;
 
     auto *superTI = getBuilder().getTypeConverter().getClassInstanceTypeInfo(
-        superclass, *superclassStart, nullptr);
+        superclass, *superclassStart, ExternalTypeInfo);
     if (!superTI)
       return std::nullopt;
 
