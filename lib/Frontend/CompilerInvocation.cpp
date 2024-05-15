@@ -1269,6 +1269,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
   Opts.RequireCxxInteropToImportCxxInteropModule =
       !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
+  Opts.CxxInteropUseOpaquePointerForMoveOnly =
+      Args.hasArg(OPT_cxx_interop_use_opaque_pointer_for_moveonly);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
