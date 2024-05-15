@@ -32,11 +32,25 @@ struct LibPrespecializedData {
 
   TargetPointer<Runtime, const void> metadataMap;
   TargetPointer<Runtime, const void> disabledProcessesTable;
+  TargetPointer<Runtime, const void> pointerKeyedMetadataMap;
+
+  typename Runtime::StoredSize optionFlags;
+
+  // Existing fields are above, add new fields below this point.
 
   static constexpr uint32_t currentMajorVersion = 1;
-  static constexpr uint32_t currentMinorVersion = 2;
+  static constexpr uint32_t currentMinorVersion = 3;
 
   static constexpr uint32_t minorVersionWithDisabledProcessesTable = 2;
+  static constexpr uint32_t minorVersionWithPointerKeyedMetadataMap = 3;
+  static constexpr uint32_t minorVersionWithOptionFlags = 3;
+
+  // Option flags values.
+  enum : typename Runtime::StoredSize {
+    // When this flag is set, the runtime should default to using the
+    // pointer-keyed table. When not set, default to using the name-keyed table.
+    OptionFlagDefaultToPointerKeyedMap = 1ULL << 0,
+  };
 
   // Helpers for retrieving the metadata map in-process.
   static bool stringIsNull(const char *str) { return str == nullptr; }
@@ -51,6 +65,18 @@ struct LibPrespecializedData {
     if (minorVersion < minorVersionWithDisabledProcessesTable)
       return nullptr;
     return reinterpret_cast<const char *const *>(disabledProcessesTable);
+  }
+
+  const void *getPointerKeyedMetadataMap() const {
+    if (minorVersion < minorVersionWithPointerKeyedMetadataMap)
+      return nullptr;
+    return pointerKeyedMetadataMap;
+  }
+
+  typename Runtime::StoredSize getOptionFlags() const {
+    if (minorVersion < minorVersionWithOptionFlags)
+      return 0;
+    return optionFlags;
   }
 };
 
