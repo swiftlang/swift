@@ -225,15 +225,6 @@ public:
   }
 
   SILType getOpType(SILType Ty) {
-    // Substitute local archetypes, if we have any.
-    if (Ty.hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
-      Ty = Ty.subst(
-        Builder.getModule(),
-        QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-        MakeAbstractConformanceForGenericType(),
-        CanGenericSignature());
-    }
-
     return asImpl().remapType(Ty);
   }
 
@@ -439,17 +430,19 @@ protected:
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
   SILType remapType(SILType Ty) {
-      return Ty;
+    // Substitute local archetypes, if we have any.
+    if (Ty.hasLocalArchetype()) {
+      Ty = Ty.subst(Builder.getModule(), Functor, Functor,
+                    CanGenericSignature());
+    }
+
+    return Ty;
   }
 
   CanType remapASTType(CanType ty) {
     // Substitute local archetypes, if we have any.
-    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
-      ty = ty.subst(
-            QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-            MakeAbstractConformanceForGenericType()
-          )->getCanonicalType();
-    }
+    if (ty->hasLocalArchetype())
+      ty = ty.subst(Functor, Functor)->getCanonicalType();
 
     return ty;
   }

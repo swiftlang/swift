@@ -41,7 +41,13 @@ public:
   }
 
   SILType remapType(SILType Ty) {
-    if (!Ty.getASTType()->hasOpaqueArchetype() ||
+    // Substitute local archetypes, if we have any.
+    if (Ty.hasLocalArchetype()) {
+      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
+                    CanGenericSignature());
+    }
+
+    if (!Ty.hasOpaqueArchetype() ||
         !getBuilder()
              .getTypeExpansionContext()
              .shouldLookThroughOpaqueTypeArchetypes())

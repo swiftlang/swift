@@ -168,12 +168,16 @@ protected:
   SILType remapType(SILType Ty) {
     SILType &Sty = TypeCache[Ty];
     if (!Sty) {
-      Sty = Ty.subst(Original.getModule(), SubsMap);
-      if (!Sty.getASTType()->hasOpaqueArchetype() ||
-          !getBuilder()
-               .getTypeExpansionContext()
-               .shouldLookThroughOpaqueTypeArchetypes())
+      Sty = Ty;
+
+      Sty = Sty.subst(getBuilder().getModule(), Functor, Functor);
+
+      auto context = getBuilder().getTypeExpansionContext();
+
+      if (!Sty.hasOpaqueArchetype() ||
+          !context.shouldLookThroughOpaqueTypeArchetypes())
         return Sty;
+
       // Remap types containing opaque result types in the current context.
       Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
           Sty.getCategory());

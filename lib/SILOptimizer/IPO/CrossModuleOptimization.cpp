@@ -133,6 +133,11 @@ public:
   }
 
   SILType remapType(SILType Ty) {
+    if (Ty.hasLocalArchetype()) {
+      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
+                    CanGenericSignature());
+    }
+
     CMS.makeTypeUsableFromInline(Ty.getASTType());
     return Ty;
   }
