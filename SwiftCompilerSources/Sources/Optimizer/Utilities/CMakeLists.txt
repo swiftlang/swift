@@ -10,6 +10,7 @@ swift_compiler_sources(Optimizer
   AddressUtils.swift
   BorrowedFromUpdater.swift
   BorrowUtils.swift
+  SpecializationCloner.swift
   DiagnosticEngine.swift
   Devirtualization.swift
   EscapeUtils.swift

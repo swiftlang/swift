@@ -439,6 +439,14 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
       inst.unbridged(), invocation->getFunction(), invocation->getTransform());
 }
 
+BridgedPassContext BridgedPassContext::initializeNestedPassContext(BridgedFunction newFunction) const {
+  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) }; 
+}
+
+void BridgedPassContext::deinitializedNestedPassContext() const {
+  invocation->deinitializeNestedSwiftPassInvocation();
+}
+
 void BridgedPassContext::SSAUpdater_initialize(
     BridgedFunction function, BridgedType type,
     BridgedValue::Ownership ownership) const {

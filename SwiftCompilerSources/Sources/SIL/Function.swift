@@ -21,6 +21,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return StringRef(bridged: bridged.getName())
   }
 
+  public var location: Location {
+    return Location(bridged: bridged.getLocation())
+  }
+
   final public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
@@ -93,8 +97,6 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isAsync: Bool { bridged.isAsync() }
 
-  public var isReabstractionThunk: Bool { bridged.isReabstractionThunk() }
-
   /// True if this is a `[global_init]` function.
   ///
   /// Such a function is typically a global addressor which calls the global's
@@ -140,7 +142,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noThunk, thunk, reabstractionThunk, signatureOptimizedThunk
   }
 
-  var thunkKind: ThunkKind {
+  public var thunkKind: ThunkKind {
     switch bridged.isThunk() {
     case .IsNotThunk:                return .noThunk
     case .IsThunk:                   return .thunk

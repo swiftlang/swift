@@ -56,6 +56,7 @@ class SwiftPassInvocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 class SILVTable;
+class ClosureSpecializationCloner;
 }
 
 struct BridgedPassContext;
@@ -178,6 +179,15 @@ struct BridgedCloner {
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
   bool isValueCloned(BridgedValue v) const;
   void clone(BridgedInstruction inst);
+};
+
+struct BridgedSpecializationCloner {
+  swift::ClosureSpecializationCloner * _Nonnull closureSpecCloner;
+
+  SWIFT_IMPORT_UNSAFE BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
+  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const;
 };
 
 struct BridgedPassContext {
@@ -324,6 +334,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE void beginTransformFunction(BridgedFunction function) const;
   BRIDGED_INLINE void endTransformFunction() const;
   BRIDGED_INLINE bool continueWithNextSubpassRun(OptionalBridgedInstruction inst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPassContext initializeNestedPassContext(BridgedFunction newFunction) const;
+  BRIDGED_INLINE void deinitializedNestedPassContext() const;
 
   // SSAUpdater
 
@@ -347,6 +359,13 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
+
+  // Closure specializer
+  SWIFT_IMPORT_UNSAFE BridgedFunction ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
+                                                        const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                                        SwiftInt paramCount,
+                                                        BridgedFunction bridgedApplySiteCallee,
+                                                        bool isSerialized) const;
 };
 
 bool FullApplySite_canInline(BridgedInstruction apply);
