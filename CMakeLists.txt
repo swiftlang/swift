@@ -632,6 +632,9 @@ option(SWIFT_STDLIB_ENABLE_OBJC_INTEROP
        "Should stdlib be built with Obj-C interop."
        "${SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default}")
 
+set(SWIFT_DEBUGINFO_NON_LTO_ARGS "-g" CACHE STRING
+    "Compiler options to use when building the compiler in debug or debuginfo mode. These do not apply when linking with LTO")
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #

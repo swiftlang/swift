@@ -943,6 +943,11 @@ def cxx_interop_disable_requirement_at_import :
   HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_use_opaque_pointer_for_moveonly :
+  Flag<["-"], "cxx-interop-use-opaque-pointer-for-moveonly">,
+  HelpText<"Testing flag that will be eliminated soon. Do not use.">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
