@@ -133,15 +133,6 @@ extension DistributedResolvableMacro {
     var isGenericStub = false
     var specificActorSystemRequirement: TypeSyntax?
 
-    if proto.genericWhereClause == nil {
-      throw DiagnosticsError(
-        syntax: node,
-        message: """
-                 Distributed protocol must declare actor system with SerializationRequirement, for example:
-                    protocol Greeter<ActorSystem>: DistributedActor where ActorSystem: DistributedActorSystem<any Codable>
-                 """, id: .invalidApplication)
-    }
-
     let accessModifiers = proto.accessControlModifiers
 
     for req in proto.genericWhereClause?.requirements ?? [] {
