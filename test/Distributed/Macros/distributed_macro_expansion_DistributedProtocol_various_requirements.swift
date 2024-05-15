@@ -140,3 +140,12 @@ public protocol GreeterMore: DistributedActor where ActorSystem == FakeActorSyst
 // CHECK:     }
 // CHECK:   }
 // CHECK: }
+
+
+// Should not fail:
+public protocol MyActorWithSystemRequirement: DistributedActor where ActorSystem == FakeActorSystem {}
+
+@Resolvable
+public protocol MyActorWithSystemRequirementImpl: MyActorWithSystemRequirement {
+  distributed func example()
+}
