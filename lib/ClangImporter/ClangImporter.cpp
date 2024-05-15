@@ -5797,16 +5797,9 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     auto oldContext = var->getDeclContext();
     auto oldTypeDecl = oldContext->getSelfNominalTypeDecl();
-    // If the base type is non-copyable, and non-copyable generics are disabled,
-    // we cannot synthesize the accessor, because its implementation would use
-    // `UnsafePointer<BaseTy>`.
-    // We cannot use `ty->isNoncopyable()` here because that would create a
-    // cyclic dependency between ModuleQualifiedLookupRequest and
-    // LookupConformanceInModuleRequest, so we check for the presence of
-    // move-only attribute that is implicitly added to non-copyable C++ types by
-    // ClangImporter.
+    // FIXME: this is a workaround for rdar://128013193
     if (oldTypeDecl->getAttrs().hasAttribute<MoveOnlyAttr>() &&
-        !context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+        context.LangOpts.CxxInteropUseOpaquePointerForMoveOnly)
       return nullptr;
 
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
