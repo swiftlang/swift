@@ -108,7 +108,9 @@ private:
 
   void makeTypeUsableFromInline(CanType type);
 
-  void makeSubstUsableFromInline(const SubstitutionMap &substs);
+  void makeConformanceUsableFromInline(ProtocolConformanceRef conf);
+
+  void makeSubstitutionMapUsableFromInline(SubstitutionMap substs);
 };
 
 /// Visitor for making used types of an instruction inlinable.
@@ -150,11 +152,19 @@ public:
     return Ty;
   }
 
+  ProtocolConformanceRef remapConformance(Type ty, ProtocolConformanceRef conf) {
+    if (ty->hasLocalArchetype())
+      conf = conf.subst(ty, Functor, Functor);
+
+    CMS.makeConformanceUsableFromInline(conf);
+    return conf;
+  }
+
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     if (Subs.hasLocalArchetypes())
       Subs = Subs.subst(Functor, Functor);
 
-    CMS.makeSubstUsableFromInline(Subs);
+    CMS.makeSubstitutionMapUsableFromInline(Subs);
     return Subs;
   }
 
@@ -769,14 +779,9 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
 
 /// Ensure that the \p type is usable from serialized functions.
 void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
-  if (!typesHandled.insert(type.getPointer()).second)
+  if (typesHandled.count(type.getPointer()))
     return;
 
-  if (NominalTypeDecl *NT = type->getNominalOrBoundGenericNominal()) {
-    makeDeclUsableFromInline(NT);
-  }
-
-  // Also make all sub-types usable from inline.
   type.visit([this](Type rawSubType) {
     CanType subType = rawSubType->getCanonicalType();
     if (typesHandled.insert(subType.getPointer()).second) {
@@ -787,18 +792,18 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
   });
 }
 
-/// Ensure that all replacement types of \p substs are usable from serialized
-/// functions.
-void CrossModuleOptimization::makeSubstUsableFromInline(
-                                                const SubstitutionMap &substs) {
+void CrossModuleOptimization::makeConformanceUsableFromInline(
+                                                ProtocolConformanceRef conf) {
+  makeDeclUsableFromInline(conf.getRequirement());
+}
+
+void CrossModuleOptimization::makeSubstitutionMapUsableFromInline(
+                                                SubstitutionMap substs) {
   for (Type replType : substs.getReplacementTypes()) {
     makeTypeUsableFromInline(replType->getCanonicalType());
   }
-  for (ProtocolConformanceRef pref : substs.getConformances()) {
-    if (pref.isConcrete()) {
-      ProtocolConformance *concrete = pref.getConcrete();
-      makeDeclUsableFromInline(concrete->getProtocol());
-    }
+  for (ProtocolConformanceRef conf : substs.getConformances()) {
+    makeConformanceUsableFromInline(conf);
   }
 }
 
