@@ -79,7 +79,6 @@ protected:
   SILBuilder Builder;
   DominanceInfo *DomTree = nullptr;
   SubstitutionMapWithLocalArchetypes Functor;
-  TypeSubstitutionMap &LocalArchetypeSubs;
 
   // The old-to-new value map.
   llvm::DenseMap<SILValue, SILValue> ValueMap;
@@ -106,10 +105,10 @@ public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
   explicit SILCloner(SILFunction &F, DominanceInfo *DT = nullptr)
-      : Builder(F), DomTree(DT), LocalArchetypeSubs(Functor.LocalArchetypeSubs) {}
+      : Builder(F), DomTree(DT) {}
 
   explicit SILCloner(SILGlobalVariable *GlobVar)
-      : Builder(GlobVar), LocalArchetypeSubs(Functor.LocalArchetypeSubs) {}
+      : Builder(GlobVar) {}
 
   void clearClonerState() {
     ValueMap.clear();
@@ -198,7 +197,7 @@ public:
   /// Register a re-mapping for local archetypes such as opened existentials.
   void registerLocalArchetypeRemapping(ArchetypeType *From,
                                        ArchetypeType *To) {
-    auto result = LocalArchetypeSubs.insert(
+    auto result = Functor.LocalArchetypeSubs.insert(
         std::make_pair(CanArchetypeType(From), CanType(To)));
     assert(result.second);
     (void)result;
@@ -336,17 +335,6 @@ public:
 
   ProtocolConformanceRef getOpConformance(Type ty,
                                           ProtocolConformanceRef conformance) {
-    // If we have local archetypes to substitute, do so now.
-    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
-      conformance =
-        conformance.subst(ty,
-                          QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
-      ty = ty.subst(
-            QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-            MakeAbstractConformanceForGenericType());
-    }
-
     return asImpl().remapConformance(ty, conformance);
   }
 
@@ -448,8 +436,13 @@ protected:
   }
 
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
+    // If we have local archetypes to substitute, do so now.
+    if (Ty->hasLocalArchetype())
+      C = C.subst(Ty, Functor, Functor);
+
     return C;
   }
+
   /// Get the value that takes the place of the given `Value` within the cloned
   /// region. The given value must already have been mapped by this cloner.
   SILValue getMappedValue(SILValue Value);

@@ -148,7 +148,6 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
   using SILClonerWithScopes<ImplClass>::recordFoldedValue;
-  using SILClonerWithScopes<ImplClass>::LocalArchetypeSubs;
   using SILClonerWithScopes<ImplClass>::Functor;
 
   TypeSubstCloner(SILFunction &To,
@@ -201,15 +200,16 @@ protected:
 
   ProtocolConformanceRef remapConformance(Type ty,
                                           ProtocolConformanceRef conf) {
-    auto conformance = conf.subst(ty, SubsMap);
-    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    auto substTy = ty.subst(Functor, Functor)->getCanonicalType();
+    auto substConf = conf.subst(ty, Functor, Functor);
+
     auto context = getBuilder().getTypeExpansionContext();
-    if (substTy->hasOpaqueArchetype() &&
-        context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conformance =
-          substOpaqueTypesWithUnderlyingTypes(conformance, substTy, context);
-    }
-    return conformance;
+
+    if (!substTy->hasOpaqueArchetype() ||
+        !context.shouldLookThroughOpaqueTypeArchetypes())
+      return substConf;
+
+    return substOpaqueTypesWithUnderlyingTypes(substConf, substTy, context);
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
