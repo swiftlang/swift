@@ -444,9 +444,7 @@ extension UnsafePointer {
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
@@ -1332,9 +1330,7 @@ extension UnsafeMutablePointer {
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
@@ -1356,9 +1352,7 @@ extension UnsafeMutablePointer {
   /// - Returns: A mutable pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: WritableKeyPath<Pointee, Property>
   ) -> UnsafeMutablePointer<Property>? {
