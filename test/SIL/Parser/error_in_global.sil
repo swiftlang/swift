@@ -1,0 +1,15 @@
+// RUN: %target-sil-opt -inline -verify %s
+
+// Check that the parser doesn't end up in an infinite error loop in case there is an error in a sil_global
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_global @referencing_object : $Int = {
+  %initval = struct $Int_ ()
+  // expected-error @-1 {{cannot find type 'Int_' in scope}}
+}
+
