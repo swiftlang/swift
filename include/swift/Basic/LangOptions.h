@@ -402,6 +402,9 @@ namespace swift {
     bool DisableImplicitBacktracingModuleImport =
         !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
 
+    /// Disable the implicit import of the Cxx module.
+    bool DisableImplicitCxxModuleImport = false;
+
     // Whether to use checked continuations when making an async call from
     // Swift into ObjC. If false, will use unchecked continuations instead.
     bool UseCheckedAsyncObjCBridging = false;

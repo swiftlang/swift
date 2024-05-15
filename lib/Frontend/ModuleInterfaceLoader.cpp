@@ -1987,6 +1987,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
       compatVersion = "default";
     else if (langOpts.cxxInteropCompatVersion[0] == 5)
       compatVersion = "swift-5.9";
+    else if (langOpts.cxxInteropCompatVersion[0] == 6)
+      compatVersion = "swift-6";
     else if (langOpts.cxxInteropCompatVersion[0] ==
              version::getUpcomingCxxInteropCompatVersion())
       compatVersion = "upcoming-swift";

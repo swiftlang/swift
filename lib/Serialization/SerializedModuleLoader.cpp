@@ -1031,7 +1031,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasCxxInteroperability() &&
       M.getResilienceStrategy() != ResilienceStrategy::Resilient &&
       !Ctx.LangOpts.EnableCXXInterop &&
-      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule) {
+      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule &&
+      M.getName().str() != CXX_MODULE_NAME) {
     auto loc = diagLoc.value_or(SourceLoc());
     Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
                        M.getName());

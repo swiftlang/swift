@@ -502,6 +502,10 @@ def disable_implicit_backtracing_module_import : Flag<["-"],
   "disable-implicit-backtracing-module-import">,
   HelpText<"Disable the implicit import of the _Backtracing module.">;
 
+def disable_implicit_cxx_module_import : Flag<["-"],
+  "disable-implicit-cxx-module-import">,
+  HelpText<"Disable the implicit import of the C++ Standard Library module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,

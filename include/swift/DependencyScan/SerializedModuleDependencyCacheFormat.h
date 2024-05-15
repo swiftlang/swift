@@ -40,7 +40,7 @@ using llvm::BCVBR;
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR =
-    6; // mappedPCMPath
+    7; // isSystem
 /// Increment this on every change.
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 1;
 
