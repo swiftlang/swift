@@ -205,7 +205,18 @@ protected:
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    return Subs.subst(SubsMap);
+    auto context = getBuilder().getTypeExpansionContext();
+
+    Subs = Subs.subst(SubsMap);
+    if (!Subs.hasOpaqueArchetypes() ||
+        !context.shouldLookThroughOpaqueTypeArchetypes())
+      return Subs;
+
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+    return Subs.subst(replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes);
   }
 
   void visitApplyInst(ApplyInst *Inst) {
