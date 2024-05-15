@@ -15,10 +15,6 @@
 
 //===----------------------------------------------------------------------===//
 
-ERROR(ide_async_in_nonasync_context, none,
-      "async %0 used in a context that does not support concurrency",
-      (StringRef))
-
 // NOTE: This is WARNING because this is emitted for cross actor references with
 // non-'Sendable' types. That is optionally ('-warn-concurrency') warning in
 // Swift 5.5.
