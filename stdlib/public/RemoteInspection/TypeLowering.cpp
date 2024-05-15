@@ -247,7 +247,7 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
 // Returns 0 if this isn't an Int
 static unsigned isIntType(std::string name) {
   llvm::StringRef nameRef(name);
-  if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
+  if (nameRef.starts_with("Bi") && nameRef.endswith("_")) {
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
     uint8_t natural;
     if (naturalRef.getAsInteger(10, natural)) {
