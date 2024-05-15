@@ -857,6 +857,11 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
+  if (Caller->isSerialized() &&
+      !Caller->isSerializedForPackage() &&
+      Callee->isSerializedForPackage()) {
+    return nullptr;
+  }
   // Inlining self-recursive functions into other functions can result
   // in excessive code duplication since we run the inliner multiple
   // times in our pipeline

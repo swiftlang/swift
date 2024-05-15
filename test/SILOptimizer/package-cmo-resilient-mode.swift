@@ -132,13 +132,8 @@ package func mainPkg(_ arg: PkgKlass) -> PkgStruct {
 }
 
 @inlinable
-public func mainPubInlinableWithPub(_ arg: PubKlass) -> PubStruct {
+public func mainPubInlinable(_ arg: PubKlass) -> PubStruct {
   return PubStruct(arg.data)
-}
-
-@inlinable
-public func mainPubInlinableWithUFI(_ arg: PubKlass) -> UfiPkgStruct {
-  return UfiPkgStruct(arg.data)
 }
 
 
