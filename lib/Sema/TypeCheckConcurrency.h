@@ -436,20 +436,64 @@ bool diagnoseNonSendableTypes(
     Diag<Type, DiagArgs...> diag,
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
 
-    ASTContext &ctx = fromContext.fromDC->getASTContext();
-    return diagnoseNonSendableTypes(
-        type, fromContext, derivedConformance, typeLoc,
-        [&](Type specificType, DiagnosticBehavior behavior) {
-          auto preconcurrency =
-              fromContext.preconcurrencyBehavior(type->getAnyNominal());
+  ASTContext &ctx = fromContext.fromDC->getASTContext();
+  return diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc,
+      [&](Type specificType, DiagnosticBehavior behavior) {
+        auto preconcurrency =
+            fromContext.preconcurrencyBehavior(type->getAnyNominal());
 
+        ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
+            .limitBehaviorUntilSwiftVersion(behavior, 6)
+            .limitBehaviorIf(preconcurrency);
+
+        return (behavior == DiagnosticBehavior::Ignore ||
+                preconcurrency == DiagnosticBehavior::Ignore);
+      });
+}
+
+/// Emit a diagnostic if there are any non-Sendable types for which
+/// the Sendable diagnostic wasn't suppressed. This diagnostic will
+/// only be emitted once, but there might be additional notes for the
+/// various occurrences of Sendable types.
+///
+/// \param typeLoc is the source location of the type being diagnosed
+///
+/// \param diagnoseLoc is the source location at which the main diagnostic should
+/// be reported, which can differ from typeLoc
+///
+/// \returns \c true if any diagnostics.
+template<typename ...DiagArgs>
+bool diagnoseIfAnyNonSendableTypes(
+    Type type, SendableCheckContext fromContext,
+    Type derivedConformance,
+    SourceLoc typeLoc, SourceLoc diagnoseLoc,
+    Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type ...diagArgs) {
+
+  ASTContext &ctx = fromContext.fromDC->getASTContext();
+  bool diagnosed = false;
+  diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc,
+      [&](Type specificType, DiagnosticBehavior behavior) {
+        auto preconcurrency =
+            fromContext.preconcurrencyBehavior(type->getAnyNominal());
+
+        if (behavior == DiagnosticBehavior::Ignore ||
+            preconcurrency == DiagnosticBehavior::Ignore)
+          return true;
+
+        if (!diagnosed) {
           ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
               .limitBehaviorUntilSwiftVersion(behavior, 6)
               .limitBehaviorIf(preconcurrency);
+          diagnosed = true;
+        }
 
-          return (behavior == DiagnosticBehavior::Ignore ||
-                  preconcurrency == DiagnosticBehavior::Ignore);
-        });
+        return false;
+      });
+
+  return diagnosed;
 }
 
 /// Diagnose any non-Sendable types that occur within the given type, using
