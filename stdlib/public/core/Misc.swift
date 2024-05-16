@@ -199,24 +199,22 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// For example,
 /// all of the following pairs of declarations are equivalent:
 ///
-/// ```swift
-/// struct MyStructure { }
-/// struct MyStructere: Copyable { }
+///     struct MyStructure { }
+///     struct MyStructere: Copyable { }
 ///
-/// protocol MyProtocol { }
-/// protocol MyProtocol: Copyable { }
+///     protocol MyProtocol { }
+///     protocol MyProtocol: Copyable { }
 ///
-/// protocol AnotherProtocol {
-///     associatedtype MyType
-///     associatedtype MyType: Copyable
-/// }
+///     protocol AnotherProtocol {
+///         associatedtype MyType
+///         associatedtype MyType: Copyable
+///     }
 ///
-/// func genericFunction<T>(t: T) { }
-/// func genericFunction<T>(t: T) where T: Copyable { }
+///     func genericFunction<T>(t: T) { }
+///     func genericFunction<T>(t: T) where T: Copyable { }
 ///
-/// let x = any MyProtocol
-/// let x = any MyProtocol & Copyable
-/// ```
+///     let x = any MyProtocol
+///     let x = any MyProtocol & Copyable
 ///
 /// To suppress an implicit conformance to `Copyable` you write `~Copyable`.
 /// For example,
@@ -224,9 +222,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// but both copyable and noncopyable types
 /// can conform `NoRequirements` in the example below:
 ///
-/// ```swift
-/// protocol NoRequirements: ~Copyable { }
-/// ```
+///     protocol NoRequirements: ~Copyable { }
 ///
 /// Extensions to the `Copyable` protocol are not allowed.
 @_marker public protocol Copyable {}
