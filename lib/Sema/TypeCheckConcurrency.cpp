@@ -512,16 +512,14 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
   if (!var->isLet()) {
     ASTContext &ctx = var->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
-      // A mutable storage of a value type accessed from within the module is
-      // okay.
-      if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
-          !var->isStatic() && 
-          var->hasStorage() &&
-          var->getTypeInContext()->isSendableType() &&
-          accessWithinModule) {
-        return true;
-      }
+    // A mutable storage of a value type accessed from within the module is
+    // okay.
+    if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
+        !var->isStatic() &&
+        var->hasStorage() &&
+        var->getTypeInContext()->isSendableType() &&
+        accessWithinModule) {
+      return true;
     }
     // Otherwise, must be immutable.
     return false;
@@ -4805,9 +4803,9 @@ static bool checkClassGlobalActorIsolation(
   switch (superIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::NonisolatedUnsafe:
-    downgradeToWarning = true;
-    break;
+  case ActorIsolation::NonisolatedUnsafe: {
+    return false;
+  }
 
   case ActorIsolation::Erased:
     llvm_unreachable("class cannot have erased isolation");
@@ -6045,6 +6043,13 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
               nominal->getDeclaredInterfaceType(),
               inheritedConformance.getConcrete());
         }
+      }
+
+      // Classes that add global actor isolation to non-Sendable
+      // superclasses cannot be 'Sendable'.
+      auto superclassDecl = classDecl->getSuperclassDecl();
+      if (nominal->getGlobalActorAttr() && !superclassDecl->isNSObject()) {
+        return nullptr;
       }
     }
   }
