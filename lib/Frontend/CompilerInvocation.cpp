@@ -470,13 +470,6 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     interleave(RenderedArgs,
                [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
                [&] { OS << " "; });
-
-    // Backward-compatibility hack: disable availability checking in the
-    // _Concurrency module, so that older (Swift 5.5) compilers that did not
-    // support back deployment of concurrency do not complain about 'async'
-    // with older availability.
-    if (FOpts.ModuleName == "_Concurrency")
-      OS << " -disable-availability-checking";
   }
   {
     llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);

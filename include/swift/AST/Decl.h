@@ -5574,6 +5574,21 @@ public:
   }
 };
 
+/// Describes whether a particular storage declaration is mutable.
+enum class StorageMutability {
+  /// The storage is immutable, meaning that it can neither be assigned
+  /// to nor passed inout.
+  Immutable,
+
+  /// The storage is mutable, meaning that it can be assigned and pased
+  /// inout.
+  Mutable,
+
+  /// The storage is immutable, but can be asigned for the purposes of
+  /// initialization.
+  Initializable
+};
+
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
@@ -5745,8 +5760,31 @@ public:
   /// Determine whether references to this storage declaration may appear
   /// on the left-hand side of an assignment, as the operand of a
   /// `&` or 'inout' operator, or as a component in a writable key path.
-  bool isSettable(const DeclContext *UseDC,
-                  const DeclRefExpr *base = nullptr) const;
+  bool isSettable(const DeclContext *useDC,
+                  const DeclRefExpr *base = nullptr) const {
+    switch (mutability(useDC, base)) {
+      case StorageMutability::Immutable:
+        return false;
+      case StorageMutability::Mutable:
+      case StorageMutability::Initializable:
+        return true;
+    }
+  }
+
+  /// Determine the mutability of this storage declaration when
+  /// accessed from a given declaration context.
+  StorageMutability mutability(const DeclContext *useDC,
+                               const DeclRefExpr *base = nullptr) const;
+
+  /// Determine the mutability of this storage declaration when
+  /// accessed from a given declaration context in Swift.
+  ///
+  /// This method differs only from 'mutability()' in its handling of
+  /// 'optional' storage requirements, which lack support for direct
+  /// writes in Swift.
+  StorageMutability mutabilityInSwift(
+      const DeclContext *useDC,
+      const DeclRefExpr *base = nullptr) const;
 
   /// Determine whether references to this storage declaration in Swift may
   /// appear on the left-hand side of an assignment, as the operand of a
@@ -5755,8 +5793,16 @@ public:
   /// This method is equivalent to \c isSettable with the exception of
   /// 'optional' storage requirements, which lack support for direct writes
   /// in Swift.
-  bool isSettableInSwift(const DeclContext *UseDC,
-                         const DeclRefExpr *base = nullptr) const;
+  bool isSettableInSwift(const DeclContext *useDC,
+                         const DeclRefExpr *base = nullptr) const {
+    switch (mutabilityInSwift(useDC, base)) {
+      case StorageMutability::Immutable:
+        return false;
+      case StorageMutability::Mutable:
+      case StorageMutability::Initializable:
+        return true;
+    }
+  }
 
   /// Does this storage declaration have explicitly-defined accessors
   /// written in the source?
@@ -6069,13 +6115,10 @@ public:
   /// precisely point to the variable type because of type aliases.
   SourceRange getTypeSourceRangeForDiagnostics() const;
 
-  /// Returns whether the var is settable in the specified context: this
-  /// is either because it is a stored var, because it has a custom setter, or
-  /// is a let member in an initializer.
-  ///
-  /// Pass a null context and null base to check if it's always settable.
-  bool isSettable(const DeclContext *UseDC,
-                  const DeclRefExpr *base = nullptr) const;
+  /// Determine the mutability of this variable declaration when
+  /// accessed from a given declaration context.
+  StorageMutability mutability(const DeclContext *useDC,
+                               const DeclRefExpr *base = nullptr) const;
 
   /// Return the parent pattern binding that may provide an initializer for this
   /// VarDecl.  This returns null if there is none associated with the VarDecl.
@@ -9336,26 +9379,6 @@ findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
                                GenericTypeParamType *genericParam,
                                bool treatNonResultCovarianceAsInvariant,
                                std::optional<unsigned> skipParamIndex);
-
-inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
-                                            const DeclRefExpr *base) const {
-  if (auto vd = dyn_cast<VarDecl>(this))
-    return vd->isSettable(UseDC, base);
-
-  auto sd = cast<SubscriptDecl>(this);
-  return sd->supportsMutation();
-}
-
-inline bool
-AbstractStorageDecl::isSettableInSwift(const DeclContext *UseDC,
-                                       const DeclRefExpr *base) const {
-  // TODO: Writing to an optional storage requirement is not supported in Swift.
-  if (getAttrs().hasAttribute<OptionalAttr>()) {
-    return false;
-  }
-
-  return isSettable(UseDC, base);
-}
 
 inline void
 AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
