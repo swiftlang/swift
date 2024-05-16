@@ -909,13 +909,13 @@ private:
             case SILArgumentConvention::Pack_Owned:
             case SILArgumentConvention::Pack_Out:
               llvm_unreachable("Should have been handled elsewhere");
-            case SILArgumentConvention::Indirect_In_CXX:
             case SILArgumentConvention::Indirect_In:
               argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
                   loc, argrv,
                   MarkUnresolvedNonCopyableValueInst::CheckKind::
                       ConsumableAndAssignable);
               break;
+            case SILArgumentConvention::Indirect_In_CXX:
             case SILArgumentConvention::Indirect_In_Guaranteed:
               argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
                   loc, argrv,

@@ -306,13 +306,13 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   }
 
   switch (Convention) {
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In_Guaranteed:
     value = moduleConventions.isTypeIndirectForIndirectParamConvention(
                 Type.getASTType())
                 ? OwnershipKind::None
                 : OwnershipKind::Guaranteed;
     break;
-  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In:
     value = moduleConventions.isTypeIndirectForIndirectParamConvention(
                 Type.getASTType())

@@ -111,11 +111,11 @@ struct SILArgumentConvention {
   bool isOwnedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Pack_Owned:
       return true;
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_Out:
@@ -132,6 +132,7 @@ struct SILArgumentConvention {
   bool isGuaranteedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Pack_Guaranteed:
       return true;
@@ -139,7 +140,6 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
-    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Pack_Inout:
