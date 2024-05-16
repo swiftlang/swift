@@ -1313,7 +1313,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
                                            SILValue arg) {
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If address-only, make a +1 copy and operate on that.
-  if (lowering.isAddressOnly()) {
+  if (lowering.isAddressOnly() && SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
@@ -1422,11 +1422,7 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       arg = emitObjCUnconsumedArgument(SGF, loc, arg);
     }
 
-    // Don't emit a cleanup if the argument is @in_cxx.
-    auto managedArg =
-        inputs[i].isIndirectInCXX()
-            ? ManagedValue::forOwnedRValue(arg, CleanupHandle::invalid())
-            : SGF.emitManagedRValueWithCleanup(arg);
+    auto managedArg = SGF.emitManagedRValueWithCleanup(arg);
 
     bridgedArgs.push_back(managedArg);
   }
