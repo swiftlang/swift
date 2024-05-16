@@ -1802,6 +1802,10 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
   auto ty = genericArgs[0]->getCanonicalType();
   if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
     return std::nullopt;
+  // C++ foreign reference types have custom release/retain operations and are
+  // not AnyObjects.
+  if (ty->isForeignReferenceType())
+    return std::nullopt;
 
   auto anyObjectTy = ctxt.getAnyObjectType();
   auto arrayStorageTy =

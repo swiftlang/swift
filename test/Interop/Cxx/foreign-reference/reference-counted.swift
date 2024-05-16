@@ -67,4 +67,18 @@ ReferenceCountedTestSuite.test("Global") {
     expectEqual(globalCount, 0)
 }
 
+var globalArray: [GlobalCount] = []
+
+ReferenceCountedTestSuite.test("Global array") {
+    expectEqual(globalCount, 0)
+
+    globalArray = [GlobalCount.create()]
+#if NO_OPTIMIZATIONS
+    expectEqual(globalCount, 1)
+#endif
+
+    globalArray = []
+    expectEqual(globalCount, 0)
+}
+
 runAllTests()
