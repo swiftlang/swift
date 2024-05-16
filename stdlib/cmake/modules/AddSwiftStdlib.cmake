@@ -1,6 +1,7 @@
 
 include(AddSwift)
 include(SwiftSource)
+include(CompatibilityLibs)
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
@@ -2798,6 +2799,15 @@ function(_add_swift_target_executable_single name)
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
+  # Darwin may need the compatibility libraries
+  set(compatibility_libs)
+  if(SWIFTEXE_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    get_compatibility_libs(
+      "${SWIFTEXE_SINGLE_SDK}"
+      "${SWIFTEXE_SINGLE_ARCHITECTURE}"
+      compatibility_libs)
+  endif()
+
   # ELF and COFF need swiftrt
   if(("${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF")
@@ -2811,6 +2821,7 @@ function(_add_swift_target_executable_single name)
       TARGETS "${name}"
       DEPENDS
         ${dependency_target}
+        ${compatibility_libs}
         ${LLVM_COMMON_DEPENDS}
         ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
