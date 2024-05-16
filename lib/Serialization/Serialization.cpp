@@ -4507,7 +4507,7 @@ public:
         param->isAutoClosure(),
         param->isIsolated(),
         param->isCompileTimeConst(),
-        param->isTransferring(),
+        param->isSending(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
@@ -4566,7 +4566,7 @@ public:
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
                            fn->isUserAccessible(),
                            fn->isDistributedThunk(),
-                           fn->hasTransferringResult(),
+                           fn->hasSendingResult(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -5201,9 +5201,9 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     result |= SILParameterInfoFlags::Isolated;
   }
 
-  if (options.contains(SILParameterInfo::Transferring)) {
-    options -= SILParameterInfo::Transferring;
-    result |= SILParameterInfoFlags::Transferring;
+  if (options.contains(SILParameterInfo::Sending)) {
+    options -= SILParameterInfo::Sending;
+    result |= SILParameterInfoFlags::Sending;
   }
 
   // If we still have options left, this code is out of sync... return none.
@@ -5238,9 +5238,9 @@ getRawSILResultInfoOptions(swift::SILResultInfo::Options options) {
     result |= SILResultInfoFlags::NotDifferentiable;
   }
 
-  if (options.contains(SILResultInfo::IsTransferring)) {
-    options -= SILResultInfo::IsTransferring;
-    result |= SILResultInfoFlags::IsTransferring;
+  if (options.contains(SILResultInfo::IsSending)) {
+    options -= SILResultInfo::IsSending;
+    result |= SILResultInfoFlags::IsSending;
   }
 
   // If we still have any options set, then this code is out of sync. Signal an
@@ -5574,7 +5574,7 @@ public:
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
           paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn(),
-          paramFlags.isTransferring());
+          paramFlags.isSending());
     }
   }
 
@@ -5616,7 +5616,7 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
-        fnTy->hasTransferringResult());
+        fnTy->hasSendingResult());
 
     serializeFunctionTypeParams(fnTy);
 
@@ -5638,7 +5638,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasTransferringResult(),
+        isolation, fnTy->hasSendingResult(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);

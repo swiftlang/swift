@@ -2155,7 +2155,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
-    if (param.hasOption(SILParameterInfo::Transferring))
+    if (param.hasOption(SILParameterInfo::Sending))
       OpArgs.push_back('T');
     if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
@@ -2163,7 +2163,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   }
 
   // Mangle if we have a transferring result.
-  if (fn->hasTransferringResult())
+  if (fn->hasSendingResult())
     OpArgs.push_back('T');
 
   // Mangle the results.
@@ -3095,7 +3095,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     break;
   }
 
-  if (fn->hasTransferringResult()) {
+  if (fn->hasSendingResult()) {
     appendOperator("YT");
   }
 
@@ -3275,7 +3275,7 @@ void ASTMangler::appendParameterTypeListElement(
   }
   if (flags.isIsolated())
     appendOperator("Yi");
-  if (flags.isTransferring())
+  if (flags.isSending())
     appendOperator("Yu");
   if (flags.isCompileTimeConst())
     appendOperator("Yt");

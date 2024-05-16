@@ -403,7 +403,7 @@ enum class SILParameterDifferentiability : uint8_t {
 enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Isolated = 0x2,
-  Transferring = 0x4,
+  Sending = 0x4,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -424,7 +424,7 @@ using ResultConventionField = BCFixed<3>;
 /// module version.
 enum class SILResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
-  IsTransferring = 0x2,
+  IsSending = 0x2,
 };
 
 using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
@@ -1631,7 +1631,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
-    BCFixed<1>,              // isTransferring?
+    BCFixed<1>,              // isSending?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation

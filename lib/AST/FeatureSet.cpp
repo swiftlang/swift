@@ -651,18 +651,18 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
       if (!fnType)
         return false;
 
-      if (fnType->hasExtInfo() && fnType->hasTransferringResult())
+      if (fnType->hasExtInfo() && fnType->hasSendingResult())
         return true;
 
       return llvm::any_of(fnType->getParams(),
                           [](AnyFunctionType::Param param) {
-                            return param.getParameterFlags().isTransferring();
+                            return param.getParameterFlags().isSending();
                           });
     });
   };
 
   if (auto *pd = dyn_cast<ParamDecl>(decl)) {
-    if (pd->isTransferring()) {
+    if (pd->isSending()) {
       return true;
     }
 

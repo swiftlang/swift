@@ -877,7 +877,7 @@ BridgedParamDecl BridgedParamDecl_createParsed(
         else if (isa<CompileTimeConstTypeRepr>(STR))
           paramDecl->setCompileTimeConst(true);
         else if (isa<TransferringTypeRepr>(STR))
-          paramDecl->setTransferring(true);
+          paramDecl->setSending(true);
 
         unwrappedType = STR->getBase();
         continue;

@@ -1198,7 +1198,7 @@ class TargetExtendedFunctionTypeFlags {
     IsolatedAny            = 0x00000002U,
 
     // Values if we have a transferring result.
-    HasTransferringResult  = 0x00000010U,
+    HasSendingResult  = 0x00000010U,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1228,10 +1228,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withTransferringResult(bool newValue = true) const {
+  withSendingResult(bool newValue = true) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~HasTransferringResult) |
-        (newValue ? HasTransferringResult : 0));
+        (Data & ~HasSendingResult) |
+        (newValue ? HasSendingResult : 0));
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1247,8 +1247,8 @@ public:
     return (Data & IsolationMask) == IsolatedAny;
   }
 
-  bool hasTransferringResult() const {
-    return bool(Data & HasTransferringResult);
+  bool hasSendingResult() const {
+    return bool(Data & HasSendingResult);
   }
 
   int_type getIntValue() const {
@@ -1295,7 +1295,7 @@ class TargetParameterTypeFlags {
     AutoClosureMask       = 0x100,
     NoDerivativeMask      = 0x200,
     IsolatedMask          = 0x400,
-    TransferringMask      = 0x800,
+    SendingMask           = 0x800,
   };
   int_type Data;
 
@@ -1335,9 +1335,9 @@ public:
   }
 
   constexpr TargetParameterTypeFlags<int_type>
-  withTransferring(bool isTransferring) const {
+  withSending(bool isSending) const {
     return TargetParameterTypeFlags<int_type>(
-        (Data & ~TransferringMask) | (isTransferring ? TransferringMask : 0));
+        (Data & ~SendingMask) | (isSending ? SendingMask : 0));
   }
 
   bool isNone() const { return Data == 0; }
@@ -1345,7 +1345,7 @@ public:
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   bool isNoDerivative() const { return Data & NoDerivativeMask; }
   bool isIsolated() const { return Data & IsolatedMask; }
-  bool isTransferring() const { return Data & TransferringMask; }
+  bool isSending() const { return Data & SendingMask; }
 
   ParameterOwnership getOwnership() const {
     return (ParameterOwnership)(Data & OwnershipMask);

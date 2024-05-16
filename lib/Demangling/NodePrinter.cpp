@@ -425,10 +425,10 @@ private:
     case Node::Kind::ImplDifferentiabilityKind:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplErasedIsolation:
-    case Node::Kind::ImplTransferringResult:
+    case Node::Kind::ImplSendingResult:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplParameterResultDifferentiability:
-    case Node::Kind::ImplParameterTransferring:
+    case Node::Kind::ImplParameterSending:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
@@ -445,7 +445,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
-    case Node::Kind::Transferring:
+    case Node::Kind::Sending:
     case Node::Kind::CompileTimeConst:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
@@ -563,7 +563,7 @@ private:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
-    case Node::Kind::TransferringResultFunctionType:
+    case Node::Kind::SendingResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::TypedThrowsAnnotation:
@@ -884,7 +884,7 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false, hasTransferringResult = false;
+    bool isSendable = false, isAsync = false, hasSendingResult = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
@@ -930,9 +930,9 @@ private:
       isAsync = true;
     }
     if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::TransferringResultFunctionType) {
+        Node::Kind::SendingResultFunctionType) {
       ++startIndex;
-      hasTransferringResult = true;
+      hasSendingResult = true;
     }
 
     switch (diffKind) {
@@ -970,7 +970,7 @@ private:
 
     Printer << " -> ";
 
-    if (hasTransferringResult)
+    if (hasSendingResult)
       Printer << "transferring ";
 
     print(node->getChild(argIndex + 1), depth + 1);
@@ -979,7 +979,7 @@ private:
   void printImplFunctionType(NodePointer fn, unsigned depth) {
     NodePointer patternSubs = nullptr;
     NodePointer invocationSubs = nullptr;
-    NodePointer transferringResult = nullptr;
+    NodePointer sendingResult = nullptr;
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
       assert(newState >= curState);
@@ -995,8 +995,8 @@ private:
           continue;
         case Inputs:
           Printer << ") -> ";
-          if (transferringResult) {
-            print(transferringResult, depth + 1);
+          if (sendingResult) {
+            print(sendingResult, depth + 1);
             Printer << " ";
           }
           Printer << "(";
@@ -1022,8 +1022,8 @@ private:
         patternSubs = child;
       } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
         invocationSubs = child;
-      } else if (child->getKind() == Node::Kind::ImplTransferringResult) {
-        transferringResult = child;
+      } else if (child->getKind() == Node::Kind::ImplSendingResult) {
+        sendingResult = child;
       } else {
         assert(curState == Attrs);
         print(child, depth + 1);
@@ -1744,7 +1744,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "isolated ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::Transferring:
+  case Node::Kind::Sending:
     Printer << "transferring ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
@@ -2786,8 +2786,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Otherwise, print with leading @.
     Printer << '@' << Node->getText();
     return nullptr;
-  case Node::Kind::ImplTransferringResult:
-    Printer << "transferring";
+  case Node::Kind::ImplSendingResult:
+    Printer << "sending";
     return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
@@ -2799,7 +2799,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Otherwise, print with trailing space.
     Printer << Node->getText() << ' ';
     return nullptr;
-  case Node::Kind::ImplParameterTransferring:
+  case Node::Kind::ImplParameterSending:
     // Skip if text is empty.
     if (Node->getText().empty())
       return nullptr;
@@ -3043,8 +3043,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::IsolatedAnyFunctionType:
     Printer << "@isolated(any) ";
     return nullptr;
-  case Node::Kind::TransferringResultFunctionType:
-    Printer << "transferring ";
+  case Node::Kind::SendingResultFunctionType:
+    Printer << "sending ";
     return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer << " async";

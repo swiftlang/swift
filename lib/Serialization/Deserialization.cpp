@@ -3932,7 +3932,7 @@ public:
     bool isAutoClosure;
     bool isIsolated;
     bool isCompileTimeConst;
-    bool isTransferring;
+    bool isSending;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -3943,7 +3943,7 @@ public:
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
-                                         isTransferring,
+                                         isSending,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -3985,7 +3985,7 @@ public:
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
     param->setCompileTimeConst(isCompileTimeConst);
-    param->setTransferring(isTransferring);
+    param->setSending(isSending);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -4050,7 +4050,7 @@ public:
     DeclID opaqueReturnTypeID;
     bool isUserAccessible;
     bool isDistributedThunk;
-    bool hasTransferringResult = false;
+    bool hasSendingResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -4070,7 +4070,7 @@ public:
                                           opaqueReturnTypeID,
                                           isUserAccessible,
                                           isDistributedThunk,
-                                          hasTransferringResult,
+                                          hasSendingResult,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -4290,8 +4290,8 @@ public:
 
     fn->setDistributedThunk(isDistributedThunk);
 
-    if (hasTransferringResult)
-      fn->setTransferringResult();
+    if (hasSendingResult)
+      fn->setSendingResult();
 
     return fn;
   }
@@ -6612,9 +6612,9 @@ getActualSILParameterOptions(uint8_t raw) {
     result |= SILParameterInfo::Isolated;
   }
 
-  if (options.contains(serialization::SILParameterInfoFlags::Transferring)) {
-    options -= serialization::SILParameterInfoFlags::Transferring;
-    result |= SILParameterInfo::Transferring;
+  if (options.contains(serialization::SILParameterInfoFlags::Sending)) {
+    options -= serialization::SILParameterInfoFlags::Sending;
+    result |= SILParameterInfo::Sending;
   }
 
   // Check if we have any remaining options and return none if we do. We found
@@ -6660,9 +6660,9 @@ getActualSILResultOptions(uint8_t raw) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
-  if (options.contains(serialization::SILResultInfoFlags::IsTransferring)) {
-    options -= serialization::SILResultInfoFlags::IsTransferring;
-    result |= SILResultInfo::IsTransferring;
+  if (options.contains(serialization::SILResultInfoFlags::IsSending)) {
+    options -= serialization::SILResultInfoFlags::IsSending;
+    result |= SILResultInfo::IsSending;
   }
 
   // Check if we have any remaining options and return none if we do. We found
@@ -6895,7 +6895,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasTransferringResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -6905,12 +6905,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasTransferringResult);
+        hasSendingResult);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasTransferringResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -6961,7 +6961,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation, LifetimeDependenceInfo(),
-                  hasTransferringResult)
+                  hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -6991,12 +6991,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
         isCompileTimeConst, hasResultDependsOn;
-    bool isNoDerivative, isTransferring;
+    bool isNoDerivative, isSending;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, hasResultDependsOn, isTransferring);
+        isCompileTimeConst, hasResultDependsOn, isSending);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7012,7 +7012,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
                                            isCompileTimeConst,
-                                           hasResultDependsOn, isTransferring),
+                                           hasResultDependsOn, isSending),
                         MF.getIdentifier(internalLabelID));
   }
 

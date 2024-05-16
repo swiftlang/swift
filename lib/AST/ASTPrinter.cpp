@@ -3722,7 +3722,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
-  if (!options.SuppressTransferringArgsAndResults && flags.isTransferring())
+  if (!options.SuppressTransferringArgsAndResults && flags.isSending())
     printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
@@ -3750,7 +3750,7 @@ static void printParameterFlags(ASTPrinter &printer,
     break;
   case ParamSpecifier::ImplicitlyCopyableConsuming:
     // Nothing... we infer from transferring.
-    assert(flags.isTransferring() && "Only valid when transferring is enabled");
+    assert(flags.isSending() && "Only valid when transferring is enabled");
     break;
   }
   
@@ -4184,11 +4184,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       }
 
       if (!Options.SuppressTransferringArgsAndResults) {
-        if (decl->hasTransferringResult()) {
+        if (decl->hasSendingResult()) {
           Printer << "transferring ";
         } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
                        decl->getInterfaceType())) {
-          if (ft->hasExtInfo() && ft->hasTransferringResult()) {
+          if (ft->hasExtInfo() && ft->hasSendingResult()) {
             Printer << "transferring ";
           }
         }
@@ -6653,7 +6653,7 @@ public:
     Printer << " -> ";
 
     if (!Options.SuppressTransferringArgsAndResults && T->hasExtInfo() &&
-        T->hasTransferringResult()) {
+        T->hasSendingResult()) {
       Printer.printKeyword("transferring ", Options);
     }
 
@@ -7572,9 +7572,9 @@ void SILParameterInfo::print(ASTPrinter &Printer,
     Printer << "@noDerivative ";
   }
 
-  if (options.contains(SILParameterInfo::Transferring)) {
-    options -= SILParameterInfo::Transferring;
-    Printer << "@sil_transferring ";
+  if (options.contains(SILParameterInfo::Sending)) {
+    options -= SILParameterInfo::Sending;
+    Printer << "@sil_sending ";
   }
 
   if (options.contains(SILParameterInfo::Isolated)) {
@@ -7615,9 +7615,9 @@ void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
     Printer << "@noDerivative ";
   }
 
-  if (options.contains(SILResultInfo::IsTransferring)) {
-    options -= SILResultInfo::IsTransferring;
-    Printer << "@sil_transferring ";
+  if (options.contains(SILResultInfo::IsSending)) {
+    options -= SILResultInfo::IsSending;
+    Printer << "@sil_sending ";
   }
 
   assert(!bool(options) && "ResultInfo has option that was not handled?!");
