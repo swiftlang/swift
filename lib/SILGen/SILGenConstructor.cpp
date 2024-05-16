@@ -618,6 +618,19 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   }
 }
 
+bool SILGenFunction::isCtorWithHopsInjectedByDefiniteInit() {
+  auto declRef = F.getDeclRef();
+  if (!declRef || !declRef.isConstructor())
+    return false;
+
+  auto ctor = dyn_cast_or_null<ConstructorDecl>(declRef.getDecl());
+  if (!ctor)
+    return false;
+
+  auto isolation = getActorIsolation(ctor);
+  return ctorHopsInjectedByDefiniteInit(ctor, isolation);
+}
+
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
