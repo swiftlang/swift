@@ -2,7 +2,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -O -Xfrontend -sil-verify-none)
 //
 // REQUIRES: executable_test
-// REQUIRES: GH_ISSUE_70246
 
 
 

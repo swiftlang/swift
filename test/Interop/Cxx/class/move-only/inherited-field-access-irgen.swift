@@ -3,8 +3,6 @@
 
 // REQUIRES: rdar128013193
 
-// REQUIRES: rdar128013193
-
 import MoveOnlyCxxValueType
 
 func testGetX() -> CInt {
