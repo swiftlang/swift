@@ -3152,6 +3152,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::ResultDependsOn:
   case TypeReprKind::LifetimeDependentReturn:
   case TypeReprKind::Transferring:
+  case TypeReprKind::Sending:
     return result;
 
   case TypeReprKind::Fixed:

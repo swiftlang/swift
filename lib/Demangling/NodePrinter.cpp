@@ -971,7 +971,7 @@ private:
     Printer << " -> ";
 
     if (hasSendingResult)
-      Printer << "transferring ";
+      Printer << "sending ";
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -1745,7 +1745,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::Sending:
-    Printer << "transferring ";
+    Printer << "sending ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::CompileTimeConst:
@@ -2845,7 +2845,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Print differentiability, if it exists.
     if (Node->getNumChildren() == 3)
       print(Node->getChild(1), depth + 1);
-    // Print differentiability and transferring if it exists.
+    // Print differentiability and sending if it exists.
     if (Node->getNumChildren() == 4) {
       print(Node->getChild(1), depth + 1);
       print(Node->getChild(2), depth + 1);

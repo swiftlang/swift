@@ -15,9 +15,51 @@ import transferring_test
 
 func main() {
   let x = "123"
-  let y = test(x)
+  let y = testTransferring(x)
+  let _ = testSending(y)
+
+  do {
+    let f: (transferring String) -> () = {
+      (z: transferring String) in
+      print(z)
+    }
+    testTransferringFunc(f)
+  }
+
+  do {
+    let f: (sending String) -> () = {
+      (z: sending String) in
+      print(z)
+    }
+    testSendingFunc(f)
+  }
+
+  do {
+    let f: () -> transferring String = {
+      ""
+    }
+    testTransferringResultFunc(f)
+  }
+
+  do {
+    let f: () -> sending String = {
+      ""
+    }
+    testSendingResultFunc(f)
+  }
 }
 
-// CHECK-LABEL: sil @$s17transferring_test0B0yS2SnYuYTF : $@convention(thin) (@sil_transferring @owned String) -> @sil_transferring @owned String
 
-// AST-LABEL: func test(_ x: transferring String) -> transferring String
+// CHECK: sil @$s17transferring_test0B12TransferringyS2SnYuYTF : $@convention(thin) (@sil_sending @owned String) -> @sil_sending @owned String
+// CHECK: sil @$s17transferring_test0B7SendingyS2SnYuYTF : $@convention(thin) (@sil_sending @owned String) -> @sil_sending @owned String
+// CHECK: sil @$s17transferring_test0B16TransferringFuncyyySSnYuXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@sil_sending @owned String) -> ()) -> ()
+// CHECK: sil @$s17transferring_test0B11SendingFuncyyySSnYuXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@sil_sending @owned String) -> ()) -> ()
+// CHECK: sil @$s17transferring_test0B22TransferringResultFuncyySSyYTXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @sil_sending @owned String) -> ()
+// CHECK: sil @$s17transferring_test0B17SendingResultFuncyySSyYTXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @sil_sending @owned String) -> ()
+
+// AST-LABEL: func testTransferring(_ x: sending String) -> sending String
+// AST-LABEL: func testSending(_ x: sending String) -> sending String
+// AST-LABEL: func testTransferringFunc(_ x: (sending String) -> ())
+// AST-LABEL: func testSendingFunc(_ x: (sending String) -> ())
+// AST-LABEL: func testTransferringResultFunc(_ x: () -> sending String)
+// AST-LABEL: func testSendingResultFunc(_ x: () -> sending String)

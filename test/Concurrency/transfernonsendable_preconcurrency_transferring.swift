@@ -44,7 +44,7 @@ func useValueAsync<T>(_ t: T) async {}
 @MainActor func useValueMain<T>(_ t: T) {}
 @MainActor func mainActorFunction() {}
 
-func transferArg<T>(_ t: transferring T) {}
+func transferArg<T>(_ t: sending T) {}
 
 ////////////////////////////////////
 // MARK: Use After Transfer Tests //
@@ -102,7 +102,7 @@ func testOnlyErrorOnExactValue() async {
 func testNoErrorIfUseInSameRegionLater() async {
   let x = PreCUncheckedNonSendableKlass()
   let y = (x, x)
-  // We squelch since we are transferring x.
+  // We squelch since we are sending x.
   transferArg(x)
   useValue(y)
 }

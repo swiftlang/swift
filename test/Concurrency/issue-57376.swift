@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete-
 
 // NOTE: We test separately with region isolation and region isolation +
-// transferring args and results since the semantics when transferring args and
+// sending args and results since the semantics when sending args and
 // results are enabled is different since async let in such a case takes a
 // non-Sendable closure whose captures are transferred in while without it, we
 // leave the async let closure as sendable and use sema level checking.
