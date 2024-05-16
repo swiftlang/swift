@@ -312,7 +312,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
       /// Name Mangler for naming the protocol constrained generic method.
       auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
       Mangle::FunctionSignatureSpecializationMangler Mangler(
-          P, Callee->isSerialized(), Callee);
+          P, Callee->getSerializedKind(), Callee);
 
       /// Save the arguments in a descriptor.
       llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;

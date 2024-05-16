@@ -765,9 +765,9 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      loc, thunkName, thunkType, IsBare, IsTransparent,
+      caller->getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};

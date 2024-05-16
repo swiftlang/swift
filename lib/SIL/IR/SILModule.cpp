@@ -936,7 +936,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
 }
 
 SILProperty *
-SILProperty::create(SILModule &M, bool Serialized, AbstractStorageDecl *Decl,
+SILProperty::create(SILModule &M, unsigned Serialized, AbstractStorageDecl *Decl,
                     std::optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);

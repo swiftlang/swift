@@ -34,7 +34,7 @@ class PartialSpecializationMangler : public SpecializationMangler {
 public:
   PartialSpecializationMangler(SILFunction *F,
                                CanSILFunctionType SpecializedFnTy,
-                               IsSerialized_t Serialized, bool isReAbstracted)
+                               swift::SerializedKind_t Serialized, bool isReAbstracted)
       : SpecializationMangler(SpecializationPass::GenericSpecializer,
                               Serialized, F),
         SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
@@ -93,7 +93,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
 public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
-                                         IsSerialized_t Serialized,
+                                         swift::SerializedKind_t Serialized,
                                          SILFunction *F);
   // For arguments / return values
   void setArgumentConstantProp(unsigned OrigArgIdx, SILInstruction *constInst);

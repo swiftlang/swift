@@ -57,7 +57,7 @@ void SILWitnessTable::addWitnessTable() {
 }
 
 SILWitnessTable *SILWitnessTable::create(
-    SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized,
+    SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
     RootProtocolConformance *Conformance,
     ArrayRef<SILWitnessTable::Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances) {
@@ -72,7 +72,7 @@ SILWitnessTable *SILWitnessTable::create(
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf)
-      SILWitnessTable(M, Linkage, Serialized, Name.str(), Conformance, entries,
+      SILWitnessTable(M, Linkage, SerializedKind, Name.str(), Conformance, entries,
                       conditionalConformances);
 
   wt->addWitnessTable();
@@ -103,18 +103,20 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 }
 
 SILWitnessTable::SILWitnessTable(
-    SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized, StringRef N,
+    SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind, StringRef N,
     RootProtocolConformance *Conformance, ArrayRef<Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true), Serialized(false) {
-  convertToDefinition(entries, conditionalConformances, Serialized);
+      ConditionalConformances(), IsDeclaration(true),
+      SerializedKind(IsNotSerialized) {
+  convertToDefinition(entries, conditionalConformances, SerializedKind);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  RootProtocolConformance *Conformance)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true), Serialized(false) {}
+      ConditionalConformances(), IsDeclaration(true),
+      SerializedKind(IsNotSerialized) {}
 
 SILWitnessTable::~SILWitnessTable() {
   if (isDeclaration())
@@ -140,10 +142,10 @@ SILWitnessTable::~SILWitnessTable() {
 void SILWitnessTable::convertToDefinition(
     ArrayRef<Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances,
-    IsSerialized_t isSerialized) {
+    SerializedKind_t serializedKind) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;
-  Serialized = (isSerialized == IsSerialized);
+  SerializedKind = serializedKind;
 
   Entries = Mod.allocateCopy(entries);
   ConditionalConformances = Mod.allocateCopy(conditionalConformances);
@@ -165,25 +167,28 @@ void SILWitnessTable::convertToDefinition(
   }
 }
 
-bool SILWitnessTable::conformanceIsSerialized(
-    const RootProtocolConformance *conformance) {
+SerializedKind_t SILWitnessTable::conformanceSerializedKind(
+                                                            const RootProtocolConformance *conformance) {
   // Allow serializing conformance with package or public access level
   // if package serialization is enabled.
-  auto optInPackage = conformance->getDeclContext()
-                          ->getASTContext()
-                          .SILOpts.EnableSerializePackage;
+  auto optInPackage = conformance->getDeclContext()->getParentModule()->serializePackageEnabled();
   auto accessLevelToCheck =
-      optInPackage ? AccessLevel::Package : AccessLevel::Public;
+  optInPackage ? AccessLevel::Package : AccessLevel::Public;
 
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
   if (normalConformance && normalConformance->isResilient() && !optInPackage)
-    return false;
+    return IsNotSerialized;
 
   if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToCheck)
-    return false;
+    return IsNotSerialized;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  return nominal->getEffectiveAccess() >= accessLevelToCheck;
+  if (nominal->getEffectiveAccess() >= accessLevelToCheck)
+    return optInPackage &&
+           conformance->getDeclContext()->getParentModule()->isResilient() ?
+           IsSerializedForPackage : IsSerialized;
+
+  return IsNotSerialized;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(
