@@ -688,6 +688,23 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
 }
 
 bool SILModule::hasUnresolvedLocalArchetypeDefinitions() {
+  // Garbage collect dead placeholders first.
+  llvm::DenseMap<LocalArchetypeKey, SILValue> newLocalArchetypeDefs;
+
+  for (auto pair : RootLocalArchetypeDefs) {
+    if (auto *placeholder = dyn_cast<PlaceholderValue>(pair.second)) {
+      if (placeholder->use_empty()) {
+        --numUnresolvedLocalArchetypes;
+        ::delete placeholder;
+        continue;
+      }
+    }
+
+    newLocalArchetypeDefs.insert(pair);
+  }
+
+  std::swap(newLocalArchetypeDefs, RootLocalArchetypeDefs);
+
   return numUnresolvedLocalArchetypes != 0;
 }
 
@@ -753,6 +770,8 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
       auto *placeholder = cast<PlaceholderValue>(val);
       placeholder->replaceAllUsesWith(dependency);
       ::delete placeholder;
+
+      assert(numUnresolvedLocalArchetypes > 0);
       numUnresolvedLocalArchetypes--;
     }
     val = dependency;
