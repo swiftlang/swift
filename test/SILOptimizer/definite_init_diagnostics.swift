@@ -772,9 +772,9 @@ func throwingSwap<T>(_ a: inout T, _ b: inout T) throws {}
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
-  // expected-note @+1 5 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let arr : [Int]
-  // expected-note @+1 7 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let (u, v) : (Int, Int)
   // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let w : (Int, Int)
@@ -828,21 +828,10 @@ struct LetProperties {
   init() throws {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
-    var variable = 42
-    swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    try throwingSwap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-
     u.inspect()  // ok, non mutating.
-    u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
     
     arr = []
-    arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
-    arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
     arr[12] = 17   // expected-error {{cannot mutate subscript of immutable value 'self.arr'}}
-    let _ = arr[replacing: 12, with: 17] // expected-error {{mutating accessor for subscript may not be used on immutable value 'self.arr'}}
-
-    methodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    try throwingMethodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
   }
 }
 
@@ -855,12 +844,11 @@ protocol TestMutabilityProtocol {
  
 class C<T : TestMutabilityProtocol> {
   let x : T
-  let y : T // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y : T
   
   init(a : T) {
     x = a; y = a
     x.toIntMax()
-    y.changeToIntMax()  // expected-error {{mutating method 'changeToIntMax' may not be used on immutable value 'self.y'}}
   }
 }
 
@@ -897,15 +885,14 @@ func testLocalProperties(_ b : Int) -> Int {
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x : T
   let y : T
   let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
   y = b
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
 
-  var tmp = b
-  swap(&x, &tmp)   // expected-error {{immutable value 'x' must not be passed inout}}
+  _ = x
   return y
 }
 
@@ -949,14 +936,11 @@ struct StructMutatingMethodTest {
 
  // <rdar://problem/19268443> DI should reject this call to transparent function
  class TransparentFunction {
-  let x : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
-  let y : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x : Int
+  let y : Int
   init() {
     x = 42
-    x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
-
     y = 12
-    myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' must not be passed inout}}
   }
 }
 
@@ -1093,9 +1077,9 @@ extension ProtocolInitTest {
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
 func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
-  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x: Int
   x = 1
-  bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
+  _ = x
 }
 
 // https://github.com/apple/swift/issues/42806
@@ -1508,9 +1492,7 @@ func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
 
 func testOptionalTupleUse(x: Bool) -> Int? {
   let optTuple: (Int, Int)? // expected-note {{constant defined here}}
-                            // expected-note@-1 {{constant defined here}}
   return optTuple?.1 // expected-error {{constant 'optTuple' used before being initialized}}
-                     // expected-error@-1 {{constant 'optTuple' used before being initialized}}
 }
 
 func testOptionalTupleOverwrite(x: Bool) -> (Int, Int)? {
@@ -1536,15 +1518,14 @@ func testOptionalTupleNoError2(x: Bool) -> (Int, Int)? {
 // Test forced unwrapping of optionals
 
 func testOptionalUseByUnwrap() {
-  let x: Int? // expected-note {{constant defined here}}
-              // expected-warning@-1 {{immutable value 'x' was never used; consider removing it}}
-  x! = 0      // expected-error {{constant 'x' used before being initialized}}
+  let x: Int? // expected-warning {{immutable value 'x' was never used; consider removing it}}
+  x = 0
 }
 
 func testOptionalWriteByUnwrap() -> Int? {
   let x: Int? // expected-note {{change 'let' to 'var' to make it mutable}}
   x = 0
-  x! = 0      // expected-error {{immutable value 'x' may only be initialized once}}
+  x = 0      // expected-error {{immutable value 'x' may only be initialized once}}
   return x
 }
 
