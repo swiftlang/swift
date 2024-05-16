@@ -6015,6 +6015,11 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
+  /// True if the decl is non-resilient, or its defining module allows
+  /// non-resilient access so its consuming modules within the same
+  /// package can have visibility into this decl.
+  bool isFragile() const;
+
   /// True if the storage can be referenced by a keypath directly.
   /// Otherwise, its override must be referenced.
   bool isValidKeyPathComponent() const;

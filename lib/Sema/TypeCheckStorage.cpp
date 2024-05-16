@@ -2537,7 +2537,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 
   } else if (dc->isModuleScopeContext()) {
     // Fixed-layout global variables don't require opaque accessors.
-    if (!var->isResilient() && !var->shouldUseNativeDynamicDispatch())
+    if (var->isFragile() && !var->shouldUseNativeDynamicDispatch())
       return false;
 
   // Stored properties imported from Clang don't require opaque accessors.

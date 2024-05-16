@@ -3032,6 +3032,10 @@ bool Decl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
+bool AbstractStorageDecl::isFragile() const {
+  return !isResilient() || getModuleContext()->allowNonResilientAccess();
+}
+
 bool AbstractStorageDecl::isResilient() const {
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
