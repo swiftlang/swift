@@ -23,7 +23,7 @@ final class TestSendable: Sendable {
   init() {}
 }
 
-final class TestNonsendable {
+final class TestNonsendable { // expected-note 2{{class 'TestNonsendable' does not conform to the 'Sendable' protocol}}
   init() {}
 }
 
