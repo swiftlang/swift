@@ -44,10 +44,6 @@ import Lib
 // CHECK-MAIN-COMMON-NOT: s3Lib9PkgStructV6fooVarSivg
 // CHECK-MAIN-COMMON-NOT: s3Lib9PkgStructV6fooVarSivs
 // CHECK-MAIN-COMMON-NOT: s3Lib6runPkgySiAA0C6StructVF
-// CHECK-MAIN-COMMON-NOT: s3Lib8PubKlassC4dataSivg
-// CHECK-MAIN-COMMON-NOT: s3Lib8PubKlassC4dataSivs
-// CHECK-MAIN-COMMON-NOT: s3Lib8PkgKlassC4dataSivg
-// CHECK-MAIN-COMMON-NOT: s3Lib8PkgKlassC4dataSivs
 
 // CHECK-MAIN-COMMON: [[PUB_INIT:%.*]] = struct $PubStruct
 // CHECK-MAIN-COMMON: store [[PUB_INIT]] to {{.*}} : $*PubStruct
@@ -90,11 +86,52 @@ import Lib
 // CHECK-MAIN-COMMON: [[PKGK_SET:%.*]] = load {{.*}} : $*PkgKlass
 // CHECK-MAIN-COMMON: class_method [[PKGK_SET]] : $PkgKlass, #PkgKlass.data!setter : (PkgKlass) -> (Int) -> (), $@convention(method) (Int, @guaranteed PkgKlass) -> ()
 
-// CHECK-MAIN-RES: sil public_external [serialized_for_package] @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
-// CHECK-MAIN-NONRES: sil public_external @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
+// CHECK-MAIN-COMMON: [[FNL_PUB_ALLOC:%.*]] = alloc_ref $FinalPubKlass
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_INIT:%.*]] = end_init_let_ref [[FNL_PUB_ALLOC]] : $FinalPubKlass
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_REF_ELEM_ADDR:%.*]] = ref_element_addr [[FNL_PUB_INIT]] : $FinalPubKlass, #FinalPubKlass.data
+// CHECK-MAIN-COMMON-NEXT: store {{.*}} to [[FNL_PUB_REF_ELEM_ADDR]] : $*Int
+// CHECK-MAIN-COMMON: store [[FNL_PUB_INIT]] to {{.*}} : $*FinalPubKlass
+  
+// CHECK-MAIN-COMMON: [[FNL_PUB_GET:%.*]] = load {{.*}} : $*FinalPubKlass
+// CHECK-MAIN-COMMON: [[FNL_PUB_REF:%.*]] = ref_element_addr [[FNL_PUB_GET]] : $FinalPubKlass, #FinalPubKlass.data
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_ACCESS:%.*]] = begin_access {{.*}} [[FNL_PUB_REF]] : $*Int
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_LOAD:%.*]] = load [[FNL_PUB_ACCESS]] : $*Int
+// CHECK-MAIN-COMMON-NEXT: store [[FNL_PUB_LOAD]] to {{.*}} : $*Int
+  
+// CHECK-MAIN-COMMON: [[FNL_PKG_ALLOC:%.*]] = alloc_ref $FinalPkgKlass
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_INIT:%.*]] = end_init_let_ref [[FNL_PKG_ALLOC]] : $FinalPkgKlass
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_REF_ELEM_ADDR:%.*]] = ref_element_addr [[FNL_PKG_INIT]] : $FinalPkgKlass, #FinalPkgKlass.data
+// CHECK-MAIN-COMMON-NEXT: store {{.*}} to [[FNL_PKG_REF_ELEM_ADDR]] : $*Int
+// CHECK-MAIN-COMMON: store [[FNL_PKG_INIT]] to {{.*}} : $*FinalPkgKlass
+  
+// CHECK-MAIN-COMMON: [[FNL_PKG_GET:%.*]] = load {{.*}} : $*FinalPkgKlass
+// CHECK-MAIN-COMMON: [[FNL_PKG_REF:%.*]] = ref_element_addr [[FNL_PKG_GET]] : $FinalPkgKlass, #FinalPkgKlass.data
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_ACCESS:%.*]] = begin_access {{.*}} [[FNL_PKG_REF]] : $*Int
+// CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_LOAD:%.*]] = load [[FNL_PKG_ACCESS]] : $*Int
+// CHECK-MAIN-COMMON-NEXT: store [[FNL_PKG_LOAD]] to {{.*}} : $*Int
+  
+// CHECK-MAIN-RES-DAG: sil public_external [serialized_for_package] @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
+// CHECK-MAIN-NONRES-DAG: sil public_external @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
 
-// CHECK-MAIN-RES: sil package_external [serialized_for_package] @$s3Lib8PkgKlassCyACSicfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
-// CHECK-MAIN-NONRES: sil package_external @$s3Lib8PkgKlassCyACSicfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
+// CHECK-MAIN-RES-DAG: sil package_external [serialized_for_package] @$s3Lib8PkgKlassCyACSicfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
+// CHECK-MAIN-NONRES-DAG: sil package_external @$s3Lib8PkgKlassCyACSicfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
+
+// CHECK-MAIN-RES-DAG: sil public_external [serialized_for_package] @$s3Lib13FinalPubKlassCyACSicfC : $@convention(method) (Int, @thick FinalPubKlass.Type) -> @owned FinalPubKlass {
+// CHECK-MAIN-NONRES-DAG: sil public_external @$s3Lib13FinalPubKlassCyACSicfC : $@convention(method) (Int, @thick FinalPubKlass.Type) -> @owned FinalPubKlass {
+
+// CHECK-MAIN-RES-DAG: sil public_external [serialized_for_package] @$s3Lib8PubKlassC4dataSivs : $@convention(method) (Int, @guaranteed PubKlass) -> () {
+// CHECK-MAIN-NONRES-DAG: sil public_external [transparent] @$s3Lib8PubKlassC4dataSivs : $@convention(method) (Int, @guaranteed PubKlass) -> () {
+
+// CHECK-MAIN-RES-DAG: sil package_external [serialized_for_package] @$s3Lib13FinalPkgKlassCyACSicfC : $@convention(method) (Int, @thick FinalPkgKlass.Type) -> @owned FinalPkgKlass {
+// CHECK-MAIN-NONRES-DAG: sil package_external @$s3Lib13FinalPkgKlassCyACSicfC : $@convention(method) (Int, @thick FinalPkgKlass.Type) -> @owned FinalPkgKlass {
+
+// CHECK-MAIN-RES-DAG: sil package_external [serialized_for_package] @$s3Lib8PkgKlassC4dataSivs : $@convention(method) (Int, @guaranteed PkgKlass) -> () {
+// CHECK-MAIN-NONRES-DAG: sil package_external [transparent] @$s3Lib8PkgKlassC4dataSivs : $@convention(method) (Int, @guaranteed PkgKlass) -> () {
+
+// CHECK-MAIN-COMMON: sil_vtable PubKlass {
+// CHECK-MAIN-COMMON: sil_vtable PkgKlass {
+// CHECK-MAIN-COMMON: sil_vtable FinalPubKlass {
+// CHECK-MAIN-COMMON: sil_vtable FinalPkgKlass {
 
 var pub = PubStruct(1)
 let prevPub = pub.fooVar
@@ -111,17 +148,27 @@ let prevPkg = pkg.fooVar
 pkg.fooVar = 3
 let c = runPkg(pkg)
 
-var pubKlass = PubKlass(2)
+var pubKlass = PubKlass(5)
 let prevPubData = pubKlass.data
-pubKlass.data = 5
+pubKlass.data = 7
 let x = runPubKlass(pubKlass)
 
-var pkgKlass = PkgKlass(2)
+var pkgKlass = PkgKlass(7)
 let prevPkgData = pkgKlass.data
-pkgKlass.data = 5
+pkgKlass.data = 7
 let y = runPkgKlass(pkgKlass)
 
-print(a, b, c, x, y, prevPub, prevFrPub, prevPkg, prevPubData, prevPkgData)
+var fnlPubKlass = FinalPubKlass(9)
+let prevPubDataFnl = fnlPubKlass.data
+fnlPubKlass.data = 11
+
+var fnlPkgKlass = FinalPkgKlass(9)
+let prevPkgDataFnl = fnlPkgKlass.data
+fnlPkgKlass.data = 11
+
+print(a, b, c, x, y, 
+      prevPub, prevFrPub, prevPkg, prevPubData,
+      prevPkgData, prevPubDataFnl, prevPkgDataFnl)
 
 public func mainPub() {
   print(PubStruct(1))
@@ -140,8 +187,6 @@ public func mainPubArgRet(_ arg: PubKlass) -> PubStruct {
 public func mainPubArgRetInlinable(_ arg: PubKlass) -> PubStruct {
   return PubStruct(arg.data)
 }
-
-
 
 //--- Lib.swift
 
@@ -188,6 +233,18 @@ public func runPub(_ arg: PubStruct) -> Int {
   // CHECK-RES-DAG: sil [serialized] [serialized_for_package] [canonical] @$s3Lib6runPubySiAA0C6StructVF : $@convention(thin) (@in_guaranteed PubStruct) -> Int {
   // CHECK-NONRES-DAG: sil [serialized] [canonical] @$s3Lib6runPubySiAA0C6StructVF : $@convention(thin) (PubStruct) -> Int {
   return arg.f() > arg.fooVar ? arg.f() : arg.fooVar
+}
+
+@inlinable
+public func runPubInlinable(_ arg: Int) -> PubStruct {
+  // CHECK-RES-DAG: sil [serialized] [serialized_for_package] [canonical] @$s3Lib15runPubInlinableyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
+  // CHECK-NONRES-DAG: sil [serialized] [canonical] @$s3Lib15runPubInlinableyAA0C6StructVSiF : $@convention(thin) (Int) -> PubStruct {
+  // CHECK-RES-DAG: alloc_stack [var_decl] $PubStruct
+  // CHECK-RES-DAG: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct
+  // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> PubStruct
+  var x = PubStruct(1)
+  x.fooVar = arg > 11 ? arg + 13 : arg + 17
+  return x
 }
 
 @frozen
@@ -321,6 +378,16 @@ public func runPubKlass(_ arg: PubKlass) -> Int {
   return arg.pubfunc(31)
 }
 
+final public class FinalPubKlass {
+  public var data = 1
+  public init(_ arg: Int) {
+    data = arg
+  }
+  public func fnlPubFunc(_ arg: Int) -> Int {
+    data + arg
+  }
+}
+
 package protocol PkgProto {
   var data: Int { get set }
   func pkgfunc(_ arg: Int) -> Int
@@ -372,6 +439,17 @@ package func runPkgKlass(_ arg: PkgKlass) -> Int {
   return arg.pkgfunc(41)
 }
 
+
+final package class FinalPkgKlass {
+  package var data = 1
+  package init(_ arg: Int) {
+    data = arg
+  }
+  package func fnlPkgFunc(_ arg: Int) -> Int {
+    data + arg
+  }
+}
+
 // CHECK-COMMON-LABEL: sil_vtable [serialized] PubKlass {
 // CHECK-COMMON-NEXT:   #PubKlass.data!getter: (PubKlass) -> () -> Int : @$s3Lib8PubKlassC4dataSivg
 // CHECK-COMMON-NEXT:   #PubKlass.data!setter: (PubKlass) -> (Int) -> () : @$s3Lib8PubKlassC4dataSivs
@@ -380,6 +458,10 @@ package func runPkgKlass(_ arg: PkgKlass) -> Int {
 // CHECK-COMMON-NEXT:   #PubKlass.pubfunc: (PubKlass) -> (Int) -> Int : @$s3Lib8PubKlassC7pubfuncyS2iF
 // CHECK-COMMON-NEXT:   #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD
 
+// CHECK-COMMON-LABEL: sil_vtable [serialized] FinalPubKlass {
+// CHECK-COMMON-NEXT:  #FinalPubKlass.init!allocator: (FinalPubKlass.Type) -> (Int) -> FinalPubKlass : @$s3Lib13FinalPubKlassCyACSicfC
+// CHECK-COMMON-NEXT:  #FinalPubKlass.deinit!deallocator: @$s3Lib13FinalPubKlassCfD
+
 // CHECK-COMMON-LABEL: sil_vtable [serialized] PkgKlass {
 // CHECK-COMMON-NEXT:   #PkgKlass.data!getter: (PkgKlass) -> () -> Int : @$s3Lib8PkgKlassC4dataSivg
 // CHECK-COMMON-NEXT:   #PkgKlass.data!setter: (PkgKlass) -> (Int) -> () : @$s3Lib8PkgKlassC4dataSivs
@@ -387,6 +469,10 @@ package func runPkgKlass(_ arg: PkgKlass) -> Int {
 // CHECK-COMMON-NEXT:   #PkgKlass.init!allocator: (PkgKlass.Type) -> (Int) -> PkgKlass : @$s3Lib8PkgKlassCyACSicfC
 // CHECK-COMMON-NEXT:   #PkgKlass.pkgfunc: (PkgKlass) -> (Int) -> Int : @$s3Lib8PkgKlassC7pkgfuncyS2iF
 // CHECK-COMMON-NEXT:   #PkgKlass.deinit!deallocator: @$s3Lib8PkgKlassCfD
+
+// CHECK-COMMON-LABEL: sil_vtable [serialized] FinalPkgKlass {
+// CHECK-COMMON-NEXT:  #FinalPkgKlass.init!allocator: (FinalPkgKlass.Type) -> (Int) -> FinalPkgKlass : @$s3Lib13FinalPkgKlassCyACSicfC
+// CHECK-COMMON-NEXT:  #FinalPkgKlass.deinit!deallocator: @$s3Lib13FinalPkgKlassCfD
 
 // CHECK-COMMON-LABEL: sil_witness_table [serialized] PubKlass: PubProto module Lib {
 // CHECK-COMMON-NEXT:   method #PubProto.data!getter: <Self where Self : PubProto> (Self) -> () -> Int : @$s3Lib8PubKlassCAA0B5ProtoA2aDP4dataSivgTW

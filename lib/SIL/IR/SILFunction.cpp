@@ -251,6 +251,7 @@ void SILFunction::init(
   this->Bare = isBareSILFunction;
   this->Transparent = isTrans;
   this->Serialized = isSerialized;
+  this->SerializedForPackage = false;
   this->Thunk = isThunk;
   this->ClassSubclassScope = unsigned(classSubclassScope);
   this->GlobalInitFlag = false;
