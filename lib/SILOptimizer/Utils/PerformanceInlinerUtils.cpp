@@ -857,6 +857,17 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
+  // If the caller is [serialized] due to explicit `@inlinable` but
+  // the callee was [serialized_for_package] due to package-cmo, the
+  // callee is [serialized] and might contain loadable types, which
+  // is normally disallowed. This check prevents such loadable types
+  // from being inlined.
+  if (Caller->isSerialized() &&
+      !Caller->isSerializedForPackage() &&
+      Callee->isSerializedForPackage()) {
+    return nullptr;
+  }
+
   // Inlining self-recursive functions into other functions can result
   // in excessive code duplication since we run the inliner multiple
   // times in our pipeline
