@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fno-exceptions -Xcc -fno-objc-exceptions | %FileCheck %s
 
-// REQUIRES: OS=macosx
+// REQUIRES: objc_interop
 
 import ReferenceCountedObjCProperty
 
