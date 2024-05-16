@@ -99,7 +99,7 @@ extension NonSendableGlobalActorIsolatedStruct {
     self.k
   }
 
-  mutating func test3() -> transferring NonSendableKlass {
+  mutating func test3() -> sending NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
@@ -109,7 +109,7 @@ extension NonSendableGlobalActorIsolatedStruct {
   }
 
   // TODO: Should error here.
-  mutating func test5() -> transferring (any GlobalActorIsolatedProtocol)? {
+  mutating func test5() -> sending (any GlobalActorIsolatedProtocol)? {
     self.p
   }
 
@@ -118,7 +118,7 @@ extension NonSendableGlobalActorIsolatedStruct {
   }
 
   // TODO: Should error here.
-  mutating func test7() -> transferring (any OtherProtocol)? {
+  mutating func test7() -> sending (any OtherProtocol)? {
     self.p2
   }
 }
@@ -154,14 +154,14 @@ extension NonSendableGlobalActorIsolatedEnum {
   }
 
   // TODO: This should error.
-  mutating func test3() -> transferring (any GlobalActorIsolatedProtocol)? {
+  mutating func test3() -> sending (any GlobalActorIsolatedProtocol)? {
     guard case let .fourth(x) = self else {
       return nil
     }
     return x
   }
 
-  mutating func test3() -> transferring NonSendableKlass? {
+  mutating func test3() -> sending NonSendableKlass? {
     guard case let .second(x) = self else {
       return nil
     }
@@ -179,7 +179,7 @@ extension NonSendableGlobalActorIsolatedKlass {
     self.k
   }
 
-  func test3() -> transferring NonSendableKlass {
+  func test3() -> sending NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
@@ -189,7 +189,7 @@ extension NonSendableGlobalActorIsolatedKlass {
   }
 
   // TODO: Should error here.
-  func test5() -> transferring (any GlobalActorIsolatedProtocol)? {
+  func test5() -> sending (any GlobalActorIsolatedProtocol)? {
     self.p
   }
 
@@ -198,7 +198,7 @@ extension NonSendableGlobalActorIsolatedKlass {
   }
 
   // TODO: Should error here.
-  func test7() -> transferring (any OtherProtocol)? {
+  func test7() -> sending (any OtherProtocol)? {
     self.p2
   }
 }
@@ -212,7 +212,7 @@ extension FinalNonSendableGlobalActorIsolatedKlass {
     self.k
   }
 
-  func test3() -> transferring NonSendableKlass {
+  func test3() -> sending NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
@@ -222,7 +222,7 @@ extension FinalNonSendableGlobalActorIsolatedKlass {
   }
 
   // TODO: Should error here.
-  func test5() -> transferring (any GlobalActorIsolatedProtocol)? {
+  func test5() -> sending (any GlobalActorIsolatedProtocol)? {
     self.p
   }
 
@@ -231,7 +231,7 @@ extension FinalNonSendableGlobalActorIsolatedKlass {
   }
 
   // TODO: Should error here.
-  func test7() -> transferring (any OtherProtocol)? {
+  func test7() -> sending (any OtherProtocol)? {
     self.p2
   }
 }
@@ -245,7 +245,7 @@ extension GlobalActorIsolatedProtocol {
     self.k
   }
 
-  mutating func test3() -> transferring NonSendableKlass {
+  mutating func test3() -> sending NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
@@ -255,7 +255,7 @@ extension GlobalActorIsolatedProtocol {
   }
 
   // TODO: Should error here.
-  mutating func test5() -> transferring (any GlobalActorIsolatedProtocol)? {
+  mutating func test5() -> sending (any GlobalActorIsolatedProtocol)? {
     self.p
   }
 
@@ -264,7 +264,7 @@ extension GlobalActorIsolatedProtocol {
   }
 
   // TODO: Should error here.
-  mutating func test7() -> transferring (any OtherProtocol)? {
+  mutating func test7() -> sending (any OtherProtocol)? {
     self.p2
   }
 }

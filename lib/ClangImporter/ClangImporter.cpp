@@ -676,6 +676,8 @@ importer::getNormalInvocationArguments(
   // is supported.
   if (LangOpts.hasFeature(Feature::TransferringArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_TRANSFERRING=1");
+  if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
+    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
 
   if (searchPathOpts.getSDKPath().empty()) {
     invocationArgStrs.push_back("-Xclang");

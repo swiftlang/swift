@@ -350,7 +350,14 @@ EXPERIMENTAL_FEATURE(FixedArrays, true)
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
 // Allow for the 'transferring' keyword to be applied to arguments and results.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
+//
+// Enables SendingArgsAndResults as well. After parsing, we just represent this
+// as 'sendable' implying that since both are always enabled together, this
+// doesn't need to be suppressed.
+EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
+
+// Allow for the 'sending' keyword to be applied to arguments and results.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(SendingArgsAndResults, true)
 
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)

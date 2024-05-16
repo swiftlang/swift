@@ -2602,6 +2602,17 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
     }
   }
 
+  // If TransferringArgsAndResults are enabled and we have a transferring
+  // argument, set that the param was transferring.
+  if (paramInfo->getASTContext().LangOpts.hasFeature(
+          Feature::SendingArgsAndResults)) {
+    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+      if (attr->getAttribute() == "sending") {
+        paramInfo->setSending();
+      }
+    }
+  }
+
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()

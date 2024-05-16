@@ -2260,6 +2260,15 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = base;
   }
 
+  if (auto sending = dyn_cast<SendingTypeRepr>(nestedRepr)) {
+    // If we do not have an Ownership Repr, return implicit copyable consuming.
+    auto *base = sending->getBase();
+    if (!isa<OwnershipTypeRepr>(base)) {
+      return ParamSpecifier::ImplicitlyCopyableConsuming;
+    }
+    nestedRepr = base;
+  }
+
   if (auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(nestedRepr)) {
     if (ownershipRepr->getSpecifier() == ParamSpecifier::InOut
         && param->isDefaultArgument()) {

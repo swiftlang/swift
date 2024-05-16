@@ -1743,7 +1743,7 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
-  // The old mangler does not encode transferring result
+  // The old mangler does not encode sending result
   return ManglingError::Success;
 }
 

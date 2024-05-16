@@ -639,8 +639,9 @@ UNINTERESTING_FEATURE(BitwiseCopyable)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
-static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
-  auto functionTypeUsesTransferring = [](Decl *decl) {
+UNINTERESTING_FEATURE(TransferringArgsAndResults)
+static bool usesFeatureSendingArgsAndResults(Decl *decl) {
+  auto functionTypeUsesSending = [](Decl *decl) {
     return usesTypeMatching(decl, [](Type type) {
       auto fnType = type->getAs<AnyFunctionType>();
       if (!fnType)
@@ -661,17 +662,17 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
       return true;
     }
 
-    if (functionTypeUsesTransferring(pd))
+    if (functionTypeUsesSending(pd))
       return true;
   }
 
   if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
     // First check for param decl results.
     if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
-          return usesFeatureTransferringArgsAndResults(pd);
+          return usesFeatureSendingArgsAndResults(pd);
         }))
       return true;
-    if (functionTypeUsesTransferring(decl))
+    if (functionTypeUsesSending(decl))
       return true;
   }
 

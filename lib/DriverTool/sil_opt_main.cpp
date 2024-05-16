@@ -712,6 +712,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     }
   }
 
+  if (Invocation.getLangOptions().hasFeature(
+          Feature::TransferringArgsAndResults)) {
+    Invocation.getLangOptions().enableFeature(Feature::SendingArgsAndResults);
+  }
+
   Invocation.getDiagnosticOptions().VerifyMode =
     options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
 

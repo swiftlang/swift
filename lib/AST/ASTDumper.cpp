@@ -3445,6 +3445,12 @@ public:
     printFoot();
   }
 
+  void visitSendingTypeRepr(SendingTypeRepr *T, StringRef label) {
+    printCommon("sending", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T, StringRef label) {
     printCommon("_const", label);
     printRec(T->getBase());
