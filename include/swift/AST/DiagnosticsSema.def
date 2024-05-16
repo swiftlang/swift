@@ -5614,9 +5614,9 @@ NOTE(shared_mutable_state_decl_note,none,
      "isolate %0 to a global actor, or convert it to a 'let' constant and "
      "conform it to 'Sendable'", (const ValueDecl *))
 ERROR(shared_immutable_state_decl,none,
-      "%kind0 is not concurrency-safe because non-'Sendable' type %1 may have "
+      "%kind1 is not concurrency-safe because non-'Sendable' type %0 may have "
       "shared mutable state",
-      (const ValueDecl *, Type))
+      (Type, const ValueDecl *))
 NOTE(shared_immutable_state_decl_note,none,
      "isolate %0 to a global actor, or conform %1 to 'Sendable'",
      (const ValueDecl *, Type))
