@@ -505,3 +505,12 @@ func testLargeTuple() {
     _ = GenericStruct<SixInt8s>()
 }
 
+struct NonCopyableStruct: ~Copyable {
+  func foo() {}
+}
+
+@_noLocks
+func testNonCopyable() {
+  let t = NonCopyableStruct()
+  t.foo()
+}
