@@ -1110,7 +1110,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  Opts.RemarkWhenFailedToSerialize = Args.hasArg(OPT_Rcross_module_optimization_serialization_failed);
+  Opts.RemarkWhenFailedToSerialize =
+      Args.hasArg(OPT_Rcross_module_optimization_serialization_failed);
 
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,

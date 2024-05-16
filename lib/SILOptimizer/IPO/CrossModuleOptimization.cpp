@@ -15,14 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
-#include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Module.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -167,50 +167,50 @@ public:
 };
 
 static void emitRemark(StringRef remark, StringRef other, SILInstruction *i) {
-    if (!i->getModule().getASTContext().LangOpts.RemarkWhenFailedToSerialize)
-        return;
+  if (!i->getModule().getASTContext().LangOpts.RemarkWhenFailedToSerialize)
+    return;
 
-    auto &ctx = i->getModule().getASTContext();
-    auto joined = remark.str() + other.str();
-    auto allocatedJoinedRemarks = ctx.getIdentifier(joined).str();
+  auto &ctx = i->getModule().getASTContext();
+  auto joined = remark.str() + other.str();
+  auto allocatedJoinedRemarks = ctx.getIdentifier(joined).str();
 
-    ctx.Diags.diagnose(i->getLoc().getSourceLoc(),
-                 diag::opt_remark_failed_serialization,
-                 allocatedJoinedRemarks);
+  ctx.Diags.diagnose(i->getLoc().getSourceLoc(),
+                     diag::opt_remark_failed_serialization,
+                     allocatedJoinedRemarks);
 }
 
 static void emitRemark(StringRef remark, SILInstruction *i) {
-    emitRemark(remark, "", i);
+  emitRemark(remark, "", i);
 }
 
-static bool falseWithRemark(StringRef remark, StringRef other, SILInstruction *i) {
-    emitRemark(remark, other, i);
-    return false;
+static bool falseWithRemark(StringRef remark, StringRef other,
+                            SILInstruction *i) {
+  emitRemark(remark, other, i);
+  return false;
 }
 
 static bool falseWithRemark(StringRef remark, SILInstruction *i) {
-    return falseWithRemark(remark, "", i);
+  return falseWithRemark(remark, "", i);
 }
 
 static bool falseWithRemark(StringRef remark, StringRef other, SILFunction *f) {
-    if (!f->getModule().getASTContext().LangOpts.RemarkWhenFailedToSerialize)
-        return false;
-    
-    auto &ctx = f->getModule().getASTContext();
-    auto joined = remark.str() + other.str();
-    auto allocatedJoinedRemarks = ctx.getIdentifier(joined).str();
-
-    ctx.Diags.diagnose(f->getLocation().getSourceLoc(),
-                 diag::opt_remark_failed_serialization,
-                 allocatedJoinedRemarks);
-    
+  if (!f->getModule().getASTContext().LangOpts.RemarkWhenFailedToSerialize)
     return false;
+
+  auto &ctx = f->getModule().getASTContext();
+  auto joined = remark.str() + other.str();
+  auto allocatedJoinedRemarks = ctx.getIdentifier(joined).str();
+
+  ctx.Diags.diagnose(f->getLocation().getSourceLoc(),
+                     diag::opt_remark_failed_serialization,
+                     allocatedJoinedRemarks);
+
+  return false;
 }
 
 static bool falseWithRemark(StringRef remark, SILFunction *f) {
-    return falseWithRemark(remark, "", f);
+  return falseWithRemark(remark, "", f);
 }
-
 
 static bool isPackageOrPublic(SILLinkage linkage, SILOptions options) {
   if (options.EnableSerializePackage)
@@ -337,16 +337,20 @@ bool CrossModuleOptimization::canSerializeFunction(
   }
 
   if (!function->isDefinition() || function->isAvailableExternally())
-    return falseWithRemark("no definition; failed to serialize function ", function->getName(), function);
+    return falseWithRemark("no definition; failed to serialize function ",
+                           function->getName(), function);
 
   // Avoid a stack overflow in case of a very deeply nested call graph.
   if (maxDepth <= 0)
-    return falseWithRemark("call stack too deep; failed to serialize function ", function->getName(), function);
+    return falseWithRemark("call stack too deep; failed to serialize function ",
+                           function->getName(), function);
 
   // If someone adds specialization attributes to a function, it's probably the
   // developer's intention that the function is _not_ serialized.
   if (!function->getSpecializeAttrs().empty())
-    return falseWithRemark("found specialization attrs; failed to serialize function ", function->getName(), function);
+    return falseWithRemark(
+        "found specialization attrs; failed to serialize function ",
+        function->getName(), function);
 
   // Do the same check for the specializations of such functions.
   if (function->isSpecialization()) {
@@ -354,8 +358,8 @@ bool CrossModuleOptimization::canSerializeFunction(
     // Don't serialize exported (public) specializations.
     if (!parent->getSpecializeAttrs().empty() &&
         function->getLinkage() == SILLinkage::Public)
-      return falseWithRemark("failed to serialize public function ", function->getName(), function);
-
+      return falseWithRemark("failed to serialize public function ",
+                             function->getName(), function);
   }
 
   // Ask the heuristic.
@@ -400,13 +404,16 @@ bool CrossModuleOptimization::canSerializeInstruction(
     // Also, when emitting TBD files, we cannot introduce a new public symbol.
     if (conservative || M.getOptions().emitTBD) {
       if (!isReferenceSerializeCandidate(callee, M.getOptions()))
-        return falseWithRemark("failed to serialize callee with internal visibility ", callee->getName(), FRI);
+        return falseWithRemark(
+            "failed to serialize callee with internal visibility ",
+            callee->getName(), FRI);
     }
 
     // In some project configurations imported C functions are not necessarily
     // public in their modules.
     if (conservative && callee->hasClangNode())
-      return falseWithRemark("failed to serialize callee with clang node ", callee->getName(), FRI);
+      return falseWithRemark("failed to serialize callee with clang node ",
+                             callee->getName(), FRI);
 
     // Recursively walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
@@ -428,13 +435,15 @@ bool CrossModuleOptimization::canSerializeInstruction(
     SILGlobalVariable *global = GAI->getReferencedGlobal();
     if ((conservative || M.getOptions().emitTBD) &&
         !isReferenceSerializeCandidate(global, M.getOptions())) {
-      return falseWithRemark("failed to serialize gloabl ", global->getName(), GAI);
+      return falseWithRemark("failed to serialize gloabl ", global->getName(),
+                             GAI);
     }
 
     // In some project configurations imported C variables are not necessarily
     // public in their modules.
     if (conservative && global->hasClangNode())
-      return falseWithRemark("failed to serialize foreign gloabl ", global->getName(), GAI);
+      return falseWithRemark("failed to serialize foreign gloabl ",
+                             global->getName(), GAI);
 
     return true;
   }
@@ -457,15 +466,15 @@ bool CrossModuleOptimization::canSerializeInstruction(
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
     if (MI->getMember().isForeign)
-        emitRemark("failed to serialize foreign method", MI);
+      emitRemark("failed to serialize foreign method", MI);
     return !MI->getMember().isForeign;
   }
   if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
     // In conservative mode, we don't support class field accesses of non-public
     // properties, because that would require to make the field decl public -
     // which keeps more metadata alive.
-    bool canUse = !conservative ||
-           REAI->getField()->getEffectiveAccess() >= AccessLevel::Package;
+    bool canUse = !conservative || REAI->getField()->getEffectiveAccess() >=
+                                       AccessLevel::Package;
     if (!canUse)
       emitRemark("failed to serialize class field access", REAI);
     return canUse;
@@ -568,19 +577,24 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
   if (DeclContext *funcCtxt = function->getDeclContext()) {
     if (!canUseFromInline(funcCtxt))
-        return falseWithRemark("failed to serialize; function context cannot be used from inline function in module ", funcCtxt->getParentModule()->getName().str(), function);
+      return falseWithRemark("failed to serialize; function context cannot be "
+                             "used from inline function in module ",
+                             funcCtxt->getParentModule()->getName().str(),
+                             function);
   }
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
   case SILLinkage::PackageNonABI:
   case SILLinkage::HiddenExternal:
-    return falseWithRemark("failed to serialize; function has public linkage ", function);
+    return falseWithRemark("failed to serialize; function has public linkage ",
+                           function);
   case SILLinkage::Shared:
     // static inline C functions
     if (!function->isDefinition() && function->hasClangNode())
       return true;
-    return falseWithRemark("failed to serialize; function has public linkage ", function);
+    return falseWithRemark("failed to serialize; function has public linkage ",
+                           function);
   case SILLinkage::Public:
   case SILLinkage::Package:
   case SILLinkage::Hidden:
@@ -623,7 +637,8 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
       for (SILInstruction &inst : block) {
         size += (int)instructionInlineCost(inst);
         if (size >= CMOFunctionSizeLimit)
-          return falseWithRemark("failed to serialize; function is too large", &inst);
+          return falseWithRemark("failed to serialize; function is too large",
+                                 &inst);
       }
     }
   }
