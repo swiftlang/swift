@@ -84,8 +84,8 @@ static SILInstruction *getConstant(SILValue V) {
   return nullptr;
 }
 
-static std::string getClonedName(PartialApplyInst *PAI, IsSerialized_t Serialized,
-                                 SILFunction *F) {
+static std::string getClonedName(PartialApplyInst *PAI,
+                                 SerializedKind_t Serialized, SILFunction *F) {
   auto P = Demangle::SpecializationPass::CapturePropagation;
   Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
 
@@ -267,16 +267,13 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
 /// function body.
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
-  IsSerialized_t Serialized = IsNotSerialized;
-  if (PAI->getFunction()->isSerialized())
-    Serialized = IsSerialized;
-
-  std::string Name = getClonedName(PAI, Serialized, OrigF);
+  SerializedKind_t serializedKind = PAI->getFunction()->getSerializedKind();
+  std::string Name = getClonedName(PAI, serializedKind, OrigF);
 
   // See if we already have a version of this function in the module. If so,
   // just return it.
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
-    assert(NewF->isSerialized() == Serialized);
+    assert(NewF->getSerializedKind() == serializedKind);
     LLVM_DEBUG(llvm::dbgs()
                  << "  Found an already specialized version of the callee: ";
                NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -295,7 +292,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILOptFunctionBuilder FuncBuilder(*this);
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
-      OrigF->isBare(), OrigF->isTransparent(), Serialized, IsNotDynamic,
+      OrigF->isBare(), OrigF->isTransparent(), serializedKind, IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible, OrigF->getEntryCount(),
       OrigF->isThunk(), OrigF->getClassSubclassScope(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
@@ -491,8 +488,8 @@ static SILFunction *getSpecializedWithDeadParams(
     ReabstractionInfo ReInfo(
         FuncBuilder.getModule().getSwiftModule(),
         FuncBuilder.getModule().isWholeModule(), ApplySite(), Specialized,
-        PAI->getSubstitutionMap(), Specialized->isSerialized(),
-        /* ConvertIndirectToDirect */ false, /*dropMetatypeArgs=*/ false);
+        PAI->getSubstitutionMap(), Specialized->getSerializedKind(),
+        /* ConvertIndirectToDirect */ false, /*dropMetatypeArgs=*/false);
     GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                            Specialized,
                                            ReInfo.getClonerParamSubstitutionMap(),

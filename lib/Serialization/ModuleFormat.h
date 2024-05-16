@@ -58,7 +58,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 869; // ~ for suppression
+const uint16_t SWIFTMODULE_VERSION_MINOR =
+    872; // Add package field to SerializedKind_t
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///

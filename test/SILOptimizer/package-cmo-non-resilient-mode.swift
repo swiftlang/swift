@@ -21,16 +21,11 @@ package func callStaticPkgClosurePointer(_ x: Int) -> Int {
   return Module.PkgModuleStruct.closurePointer(x)
 }
 
-// CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int = {
-  // function_ref incrementByThree(_:)
-// CHECK:       [[REF:%.*]] = function_ref @$s6Module16incrementByThreeyS2iF : $@convention(thin) (Int) -> Int
-// CHECK-NEXT:  [[INITVAL:%.*]] = thin_to_thick_function [[REF]] : $@convention(thin) (Int) -> Int to $@callee_guaranteed (Int) -> Int
-// CHECK-NEXT: }
+// static ModuleStruct.publicFunctionPointer
+// CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int
+// static PkgModuleStruct.funcPointer
+// CHECK-LABEL: sil_global package_external [serialized] @$s6Module03PkgA6StructV11funcPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int
 
-// CHECK-LABEL: sil_global package_external [serialized] @$s6Module03PkgA6StructV11funcPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int = {
-// CHECK:      [[REF:%.*]] = function_ref @$s6Module7pkgFuncyS2iF : $@convention(thin) (Int) -> Int
-// CHECK-NEXT: [[INITVAL:%.*]] = thin_to_thick_function [[REF]] : $@convention(thin) (Int) -> Int to $@callee_guaranteed (Int) -> Int
-// CHECK-NEXT: }
 
 // CHECK-LABEL: sil @$s4Main25callPublicFunctionPointeryS2iF : $@convention(thin) (Int) -> Int {
 // CHECK:         global_addr @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $*@callee_guaranteed (Int) -> Int
@@ -68,7 +63,6 @@ public func usePrivateCVarInModule() -> Int {
 // CHECK-NOT:     function_ref 
 // CHECK-NOT:     apply 
 // CHECK:       } // end sil function '$s4Main11doIncrementyS2iF'
-// CHECK-LABEL: sil public_external @$s6Module16incrementByThreeyS2iF : $@convention(thin) (Int) -> Int {
 public func doIncrement(_ x: Int) -> Int {
   return Module.incrementByThree(x)
 }
@@ -77,7 +71,6 @@ public func doIncrement(_ x: Int) -> Int {
 // CHECK-NOT:     function_ref
 // CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main11callPkgFuncyS2iF'
-// CHECK-LABEL: sil public_external @$s6Module7pkgFuncyS2iF : $@convention(thin) (Int) -> Int {
 package func callPkgFunc(_ x: Int) -> Int {
   return Module.pkgFunc(x)
 }
@@ -123,7 +116,6 @@ public func doIncrementTBDWithCall(_ x: Int) -> Int {
 // CHECK-LABEL: sil package @$s4Main19callPkgFuncNoCMOTBDyS2iF : $@convention(thin) (Int) -> Int {
 // CHECK:         function_ref @$s9ModuleTBD12pkgFuncNoCMOyS2iF
 // CHECK:       } // end sil function '$s4Main19callPkgFuncNoCMOTBDyS2iF'
-// FIXME: should package_external be package?
 // CHECK-LABEL: sil package_external @$s9ModuleTBD12pkgFuncNoCMOyS2iF : $@convention(thin) (Int) -> Int
 package func callPkgFuncNoCMOTBD(_ x: Int) -> Int {
   return ModuleTBD.pkgFuncNoCMO(x)

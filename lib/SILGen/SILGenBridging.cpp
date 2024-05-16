@@ -1528,17 +1528,11 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   closureName.push_back(thunkSuffix[0]);
 
   SILGenFunctionBuilder fb(SGM);
-  auto closure = fb.getOrCreateSharedFunction(loc, closureName,
-                                              closureTy,
-                                              IsBare,
-                                              IsNotTransparent,
-                                              F.isSerialized(),
-                                              ProfileCounter(),
-                                              IsThunk,
-                                              IsNotDynamic,
-                                              IsNotDistributed,
-                                              IsNotRuntimeAccessible);
-  
+  auto closure = fb.getOrCreateSharedFunction(
+      loc, closureName, closureTy, IsBare, IsNotTransparent,
+      F.getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
+
   auto closureRef = B.createFunctionRef(loc, closure);
   
   auto closureVal = B.createPartialApply(loc, closureRef, subs,
