@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "Tracing.h"
-#include "swift/Runtime/TracingCommon.h"
 
 #if SWIFT_STDLIB_TRACING
 
