@@ -28,6 +28,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenFunction.cpp
   SILGenGlobalVariable.cpp
   SILGenLazyConformance.cpp
+  SILGenLocalArchetype.cpp
   SILGenLValue.cpp
   SILGenPack.cpp
   SILGenPattern.cpp
