@@ -407,3 +407,23 @@ struct DowngradeForPreconcurrency {
     }
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+@MainActor protocol InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+struct ImplicitSendableViaMain: InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+extension ImplicitSendableViaMain {
+  nonisolated func capture() {
+    Task { @MainActor in
+      _ = self
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+struct TestImplicitSendable: Sendable {
+  var x: ImplicitSendableViaMain
+}
