@@ -1473,39 +1473,34 @@ public:
 
   void checkDebugVariable(SILInstruction *inst) {
     std::optional<SILDebugVariable> varInfo;
-    if (auto *di = dyn_cast<AllocStackInst>(inst))
-      varInfo = di->getVarInfo();
-    else if (auto *di = dyn_cast<AllocBoxInst>(inst))
-      varInfo = di->getVarInfo();
-    else if (auto *di = dyn_cast<DebugValueInst>(inst))
-      varInfo = di->getVarInfo();
+    if (auto di = DebugVarCarryingInst(inst))
+      varInfo = di.getVarInfo();
 
     if (!varInfo)
       return;
 
     // Retrieve debug variable type
-    SILType DebugVarTy;
-    if (varInfo->Type)
-      DebugVarTy = *varInfo->Type;
-    else {
-      // Fetch from related SSA value
-      switch (inst->getKind()) {
-      case SILInstructionKind::AllocStackInst:
-      case SILInstructionKind::AllocBoxInst:
-        DebugVarTy = inst->getResult(0)->getType();
-        break;
-      case SILInstructionKind::DebugValueInst:
-        DebugVarTy = inst->getOperand(0)->getType();
-        if (DebugVarTy.isAddress()) {
-          // FIXME: op_deref could be applied to address types only.
-          // FIXME: Add this check
-          if (varInfo->DIExpr.startsWithDeref())
-            DebugVarTy = DebugVarTy.getObjectType();
-        }
-        break;
-      default:
-        llvm_unreachable("impossible instruction kind");
-      }
+    SILType SSAType;
+    switch (inst->getKind()) {
+    case SILInstructionKind::AllocStackInst:
+    case SILInstructionKind::AllocBoxInst:
+      // TODO: unwrap box for AllocBox
+      SSAType = inst->getResult(0)->getType().getObjectType();
+      break;
+    case SILInstructionKind::DebugValueInst:
+      SSAType = inst->getOperand(0)->getType();
+      break;
+    default:
+      llvm_unreachable("impossible instruction kind");
+    }
+    
+    SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
+      SSAType.getObjectType();
+    if (!varInfo->DIExpr && !isa<AllocBoxInst>(inst)) {
+      // FIXME: Remove getObjectType() below when we fix create/createAddr
+      require(DebugVarTy.removingMoveOnlyWrapper()
+              == SSAType.getObjectType().removingMoveOnlyWrapper(),
+              "debug type mismatch without a DIExpr");
     }
 
     auto *debugScope = inst->getDebugScope();
@@ -6578,6 +6573,12 @@ public:
                                     SILResultInfo::IsTransferring);
                               })),
             "transferring result means all results are transferring");
+
+    require(1 >= std::count_if(FTy->getParameters().begin(), FTy->getParameters().end(),
+                               [](const SILParameterInfo &parameterInfo) {
+                                 return parameterInfo.hasOption(SILParameterInfo::Isolated);
+                               }),
+            "Should only ever be isolated to a single parameter");
   }
 
   struct VerifyFlowSensitiveRulesDetails {
@@ -6983,11 +6984,37 @@ public:
     }
   }
 
+  void verifyParentFunctionSILFunctionType(CanSILFunctionType FTy) {
+    bool foundIsolatedParameter = false;
+    for (const auto &parameterInfo : FTy->getParameters()) {
+      if (parameterInfo.hasOption(SILParameterInfo::Isolated)) {
+           auto argType = parameterInfo.getArgumentType(F.getModule(),
+                                                     FTy,
+                                                     F.getTypeExpansionContext());
+
+        if (argType->isOptional())
+          argType = argType->lookThroughAllOptionalTypes()->getCanonicalType();
+
+        auto genericSig = FTy->getInvocationGenericSignature();
+        auto &ctx = F.getASTContext();
+        auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+        auto *anyActorProtocol = ctx.getProtocol(KnownProtocolKind::AnyActor);
+        require(argType->isAnyActorType() ||
+                    genericSig->requiresProtocol(argType, actorProtocol) ||
+                    genericSig->requiresProtocol(argType, anyActorProtocol),
+                "Only any actor types can be isolated");
+        require(!foundIsolatedParameter, "Two isolated parameters");
+        foundIsolatedParameter = true;
+      }
+    }
+  }
+
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
+    verifyParentFunctionSILFunctionType(FTy);
 
     SILModule &mod = F->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);

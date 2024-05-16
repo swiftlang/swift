@@ -470,13 +470,6 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     interleave(RenderedArgs,
                [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
                [&] { OS << " "; });
-
-    // Backward-compatibility hack: disable availability checking in the
-    // _Concurrency module, so that older (Swift 5.5) compilers that did not
-    // support back deployment of concurrency do not complain about 'async'
-    // with older availability.
-    if (FOpts.ModuleName == "_Concurrency")
-      OS << " -disable-availability-checking";
   }
   {
     llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
@@ -571,13 +564,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
-      Opts.ClangIncludeTrees.empty() &&
-      FrontendOptions::supportCompilationCaching(
-          FrontendOpts.RequestedAction)) {
-    Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-    return true;
-  }
+  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty())
+    Opts.HasImmutableFileSystem = true;
 
   return false;
 }
@@ -1274,6 +1262,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
   Opts.RequireCxxInteropToImportCxxInteropModule =
       !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
+  Opts.CxxInteropUseOpaquePointerForMoveOnly =
+      Args.hasArg(OPT_cxx_interop_use_opaque_pointer_for_moveonly);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
@@ -2612,6 +2602,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                    Opts.OSSAVerifyComplete);
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
+
+  Opts.EnableExperimentalSwiftBasedClosureSpecialization = 
+      Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
 
   return false;
 }

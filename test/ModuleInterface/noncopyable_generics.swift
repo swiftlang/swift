@@ -10,7 +10,6 @@
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
-// RUN:     -enable-experimental-feature BorrowingSwitch \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
 // RUN:     %S/../Inputs/Swiftskell.swift

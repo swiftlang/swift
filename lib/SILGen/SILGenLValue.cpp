@@ -948,6 +948,9 @@ namespace {
                          ManagedValue base) && override {
       // Assert that the optional value is present and return the projected out
       // payload.
+      if (isConsumeAccess(getTypeData().getAccessKind())) {
+        base = base.ensurePlusOne(SGF, loc);
+      }
       return SGF.emitPreconditionOptionalHasValue(loc, base, isImplicitUnwrap);
     }
 
@@ -4355,6 +4358,16 @@ getOptionalObjectTypeData(SILGenFunction &SGF, SGFAccessKind accessKind,
 LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
                                          SGFAccessKind accessKind,
                                          LValueOptions options) {
+  // Since Sema doesn't reason about borrows, a borrowed force expr
+  // might end up type checked with the load inside of the force.
+  auto subExpr = e->getSubExpr();
+  if (auto load = dyn_cast<LoadExpr>(subExpr)) {
+    assert((isBorrowAccess(accessKind) || isConsumeAccess(accessKind))
+           && "should only see a (force_value (load)) lvalue as part of a "
+              "borrow or consume");
+    subExpr = load->getSubExpr();
+  }
+                                         
   // Like BindOptional, this is a read even if we only write to the result.
   // (But it's unnecessary to use a force this way!)
   LValue lv = visitRec(e->getSubExpr(),
@@ -4398,6 +4411,13 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
     
     if (optBase.getType().isMoveOnly()) {
       if (optBase.getType().isAddress()) {
+        // Strip the move-only wrapper if any.
+        if (optBase.getType().isMoveOnlyWrapped()) {
+          optBase = ManagedValue::forBorrowedAddressRValue(
+            SGF.B.createMoveOnlyWrapperToCopyableAddr(e,
+                                                      optBase.getValue()));
+        }
+      
         optBase = enterAccessScope(SGF, e, ManagedValue(),
                                    optBase, optTypeData,
                                    baseAccessKind,
@@ -4410,13 +4430,26 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
       } else {
         optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase, IsNotLexical,
                                                       BeginBorrowInst::IsFixed);
+        // Strip the move-only wrapper if any.
+        if (optBase.getType().isMoveOnlyWrapped()) {
+          optBase
+            = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(e, optBase);
+        }
       }
     }
   } else {
     optBase = SGF.emitAddressOfLValue(e, std::move(optLV));
+    bool isMoveOnly = optBase.getType().isMoveOnly();
+    
+    // Strip the move-only wrapper if any.
+    if (optBase.getType().isMoveOnlyWrapped()) {
+      optBase = ManagedValue::forLValue(
+        SGF.B.createMoveOnlyWrapperToCopyableAddr(e,
+                                                  optBase.getValue()));
+    }
     
     if (isConsumeAccess(baseAccessKind)) {
-      if (optBase.getType().isMoveOnly()) {
+      if (isMoveOnly) {
         optBase = enterAccessScope(SGF, e, ManagedValue(),
                                    optBase, optTypeData,
                                    baseAccessKind,

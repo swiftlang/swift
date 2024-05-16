@@ -121,6 +121,11 @@ function(add_swift_compiler_modules_library name)
         "-Xfrontend" "${SWIFT_MIN_RUNTIME_VERSION}")
     endif()
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
+
+    # We cannot use Unsafe*Pointer when importing C++ move-only types until the
+    # host libraries are updated to Swift 6.0, because that importing strategy
+    # requires _Pointer have its Pointee: ~Copyable. (rdar://128013193)
+    list(APPEND swift_compile_options "-Xfrontend" "-cxx-interop-use-opaque-pointer-for-moveonly")
   endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")

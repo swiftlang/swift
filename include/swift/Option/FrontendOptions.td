@@ -359,6 +359,10 @@ def enable_experimental_async_top_level :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
+def enable_experimental_swift_based_closure_specialization : 
+  Flag<["-"], "experimental-swift-based-closure-specialization">,
+  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">; 
+
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
            "async calls from Swift to ObjC: 'on', 'off' ">;
@@ -937,6 +941,11 @@ def cxx_interop_getters_setters_as_properties :
 def cxx_interop_disable_requirement_at_import :
   Flag<["-"], "disable-cxx-interop-requirement-at-import">,
   HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
+  Flags<[FrontendOption, HelpHidden]>;
+
+def cxx_interop_use_opaque_pointer_for_moveonly :
+  Flag<["-"], "cxx-interop-use-opaque-pointer-for-moveonly">,
+  HelpText<"Testing flag that will be eliminated soon. Do not use.">,
   Flags<[FrontendOption, HelpHidden]>;
 
 def use_malloc : Flag<["-"], "use-malloc">,

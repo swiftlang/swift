@@ -31,27 +31,6 @@ using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
 using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
-/// Check if the passed in type is NonSendable.
-///
-/// NOTE: We special case RawPointer and NativeObject to ensure they are
-/// treated as non-Sendable and strict checking is applied to it.
-inline bool isNonSendableType(SILType type, SILFunction *fn) {
-  // Treat Builtin.NativeObject and Builtin.RawPointer as non-Sendable.
-  if (type.getASTType()->is<BuiltinNativeObjectType>() ||
-      type.getASTType()->is<BuiltinRawPointerType>()) {
-    return true;
-  }
-
-  // Treat Builtin.SILToken as Sendable. It cannot escape from the current
-  // function. We should change isSendable to hardwire this.
-  if (type.getASTType()->is<SILTokenType>()) {
-    return false;
-  }
-
-  // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
-  return !type.isSendable(fn);
-}
-
 /// Return the ApplyIsolationCrossing for a specific \p inst if it
 /// exists. Returns std::nullopt otherwise.
 std::optional<ApplyIsolationCrossing>
@@ -305,7 +284,10 @@ public:
     os << "\n    Rep Value: " << getRepresentative();
   }
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
 };
 
 class RegionAnalysis;

@@ -178,6 +178,11 @@ extension Builder {
       insertFunc(builder)
     }
   }
+
+  func destroyCapturedArgs(for paiOnStack: PartialApplyInst) {
+    precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
+    self.bridged.destroyCapturedArgs(paiOnStack.bridged)
+  }
 }
 
 extension Value {
@@ -240,7 +245,7 @@ extension Value {
 
     useToDefRange.insert(destBlock)
 
-    // The value needs to be destroyed at every exit of the liferange.
+    // The value needs to be destroyed at every exit of the liverange.
     for exitBlock in useToDefRange.exits {
       let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)
@@ -539,6 +544,10 @@ extension Function {
       }
     }
     return nil
+  }
+
+  var mayBindDynamicSelf: Bool {
+    self.bridged.mayBindDynamicSelf()
   }
 }
 

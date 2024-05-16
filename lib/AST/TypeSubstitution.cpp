@@ -50,27 +50,6 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   return Type();
 }
 
-Type
-QueryTypeSubstitutionMapOrIdentity::operator()(SubstitutableType *type) const {
-  // FIXME: Type::subst should not be pass in non-root archetypes.
-  // Consider only root archetypes.
-  if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!archetype->isRoot())
-      return Type();
-  }
-
-  auto key = type->getCanonicalType()->castTo<SubstitutableType>();
-  auto known = substitutions.find(key);
-  if (known != substitutions.end() && known->second)
-    return known->second;
-
-  if (isa<PackArchetypeType>(type) || type->isRootParameterPack()) {
-    return PackType::getSingletonPackExpansion(type);
-  }
-
-  return type;
-}
-
 Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
   auto key = cast<SubstitutableType>(type->getCanonicalType());
   return subMap.lookupSubstitution(key);

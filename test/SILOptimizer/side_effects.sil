@@ -87,10 +87,11 @@ sil @$s4test1ZCfD : $@convention(method) (@owned Z) -> () {
 // CHECK-LABEL: sil @load_store_to_args
 // CHECK-NEXT:  [%0: read v**]
 // CHECK-NEXT:  [%1: write v**]
-// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [%2: noescape **, write c0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+[%2: noescape **]
 bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
   %l1 = load %0 : $*Int32
   store %l1 to %1  : $*Int32
@@ -971,11 +972,13 @@ bb0(%0 : @guaranteed $S):
 }
 
 // CHECK-LABEL: sil [ossa] @storeToArgs
-// CHECK-NEXT:  [%0: write c0.v**]
-// CHECK-NEXT:  [%1: write c0.v**]
+// CHECK-NEXT:  [%0: noescape **, write c0.v**]
+// CHECK-NEXT:  [%1: noescape **, write c0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
+[%0: noescape **]
+[%1: noescape **]
 bb0(%1 : @guaranteed $List, %2 : @guaranteed $List):
   cond_br undef, bb1, bb2
 
@@ -1193,5 +1196,41 @@ bb0(%0 : $*T):
   destroy_addr %1 : $*T
   dealloc_stack %1 : $*T
   %r = tuple()
+  return %r : $()
+}
+
+sil @store_owned_to_out : $@convention(thin) (@owned SP) -> @out SP {
+[%0: noescape **, write v**]
+[%1: escape v** -> %0.v**]
+[global: ]
+}  
+
+// CHECK-LABEL: sil @test_escaping_arg1
+// CHECK-NEXT:  [%0: write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_escaping_arg1 : $@convention(thin) (@owned SP) -> () {
+bb0(%0 : $SP):
+  %1 = alloc_stack $SP
+  %2 = function_ref @store_owned_to_out : $@convention(thin) (@owned SP) -> @out SP
+  %3 = apply %2(%1, %0) : $@convention(thin) (@owned SP) -> @out SP
+  %4 = struct_element_addr %1 : $*SP, #SP.value
+  %5 = load %4 : $*X
+  strong_release %5 : $X
+  dealloc_stack %1 : $*SP
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_escaping_arg2
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_escaping_arg2 : $@convention(thin) (@owned SP) -> () {
+bb0(%0 : $SP):
+  %1 = function_ref @forward_to_return : $@convention(thin) (@owned SP) -> @owned SP
+  %2 = apply %1(%0) : $@convention(thin) (@owned SP) -> @owned SP
+  release_value %2 : $SP
+  %r = tuple ()
   return %r : $()
 }

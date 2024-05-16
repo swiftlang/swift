@@ -512,16 +512,14 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
   if (!var->isLet()) {
     ASTContext &ctx = var->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
-      // A mutable storage of a value type accessed from within the module is
-      // okay.
-      if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
-          !var->isStatic() && 
-          var->hasStorage() &&
-          var->getTypeInContext()->isSendableType() &&
-          accessWithinModule) {
-        return true;
-      }
+    // A mutable storage of a value type accessed from within the module is
+    // okay.
+    if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
+        !var->isStatic() &&
+        var->hasStorage() &&
+        var->getTypeInContext()->isSendableType() &&
+        accessWithinModule) {
+      return true;
     }
     // Otherwise, must be immutable.
     return false;
@@ -4545,6 +4543,37 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
   return foundIsolation;
 }
 
+/// Compute the isolation of a protocol
+static std::optional<ActorIsolation>
+getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
+  std::optional<ActorIsolation> foundIsolation;
+  for (auto inherited : protocol->getInheritedProtocols()) {
+    switch (auto protoIsolation = getActorIsolation(inherited)) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("protocol cannot have erased isolation");
+
+    case ActorIsolation::GlobalActor:
+      if (!foundIsolation) {
+        foundIsolation = protoIsolation;
+        continue;
+      }
+
+      if (*foundIsolation != protoIsolation)
+        return std::nullopt;
+
+      break;
+    }
+  }
+
+  return foundIsolation;
+}
+
 /// Compute the isolation of a nominal type from the property wrappers on
 /// any stored properties.
 static std::optional<ActorIsolation>
@@ -4777,12 +4806,7 @@ static bool checkClassGlobalActorIsolation(
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    auto &ctx = classDecl->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability))
-      return false;
-
-    downgradeToWarning = true;
-    break;
+    return false;
   }
 
   case ActorIsolation::Erased:
@@ -5235,6 +5259,17 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (auto conformanceIsolation = getIsolationFromConformances(nominal))
         if (auto inferred = inferredIsolation(*conformanceIsolation))
           return inferred;
+
+      // For a protocol, inherit isolation from the directly-inherited
+      // protocols.
+      if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+        if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+          if (auto protoIsolation = getIsolationFromInheritedProtocols(proto)) {
+            if (auto inferred = inferredIsolation(*protoIsolation))
+              return inferred;
+          }
+        }
+      }
 
       // Before Swift 6: If the declaration is a nominal type and any property
       // wrappers on its stored properties require isolation, use that.
@@ -6012,8 +6047,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
       // Classes that add global actor isolation to non-Sendable
       // superclasses cannot be 'Sendable'.
-      if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
-          nominal->getGlobalActorAttr()) {
+      auto superclassDecl = classDecl->getSuperclassDecl();
+      if (nominal->getGlobalActorAttr() && !superclassDecl->isNSObject()) {
         return nullptr;
       }
     }

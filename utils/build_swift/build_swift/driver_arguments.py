@@ -439,6 +439,14 @@ def create_argument_parser():
                 'list "module_regexp;flag". Can be called multiple times to '
                 'add multiple such module_regexp flag pairs. All semicolons '
                 'in flags must be escaped with a "\\"')
+    option('--swift-debuginfo-non-lto-args', append,
+           # We cannot set the default value directly here,
+           # since it will be prepended to any option the user provides.
+           default=None,
+           help='Compilation flags to use when building the swift compiler '
+                ' in debug or debug info mode. Does not apply when building with '
+                ' LTO. Defaults to the default value of the CMake cache variable '
+                ' SWIFT_DEBUGINFO_NON_LTO_ARGS for Swift.')
 
     option('--host-cc', store_path(executable=True),
            help='the absolute path to CC, the "clang" compiler for the host '
@@ -830,8 +838,10 @@ def create_argument_parser():
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
 
-    option(['--build-lld'], toggle_true('build_lld'),
+    option(['--build-lld'], toggle_true('build_lld'), default=True,
            help='build lld as part of llvm')
+    option(['--skip-build-lld'], toggle_false('build_lld'),
+           help='skip building lld as part of llvm')
 
     option('--skip-build-clang-tools-extra',
            toggle_false('build_clang_tools_extra'),

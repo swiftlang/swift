@@ -49,6 +49,9 @@ public:
   /// Cache key for imported bridging header.
   std::string BridgingHeaderPCHCacheKey;
 
+  /// Has immutable file system input.
+  bool HasImmutableFileSystem = false;
+
   /// Get the CAS configuration flags.
   void enumerateCASConfigurationFlags(
       llvm::function_ref<void(llvm::StringRef)> Callback) const;

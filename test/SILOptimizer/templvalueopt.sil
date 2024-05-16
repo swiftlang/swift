@@ -134,15 +134,15 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @write_to_dest_ok_if_before_liferange :
+// CHECK-LABEL: sil @write_to_dest_ok_if_before_liverange :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr
 // CHECK-NEXT:   init_enum_data_addr
 // CHECK-NEXT:   copy_addr
 // CHECK-NEXT:   inject_enum_addr
 // CHECK-NOT:    copy_addr
-// CHECK: } // end sil function 'write_to_dest_ok_if_before_liferange'
-sil @write_to_dest_ok_if_before_liferange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
+// CHECK: } // end sil function 'write_to_dest_ok_if_before_liverange'
+sil @write_to_dest_ok_if_before_liverange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   destroy_addr %0 : $*Optional<Any>

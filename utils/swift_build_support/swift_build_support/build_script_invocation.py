@@ -463,16 +463,7 @@ class BuildScriptInvocation(object):
                 "--llvm-install-components=%s" % args.llvm_install_components
             ]
 
-        # On non-Darwin platforms, build lld so we can always have a
-        # linker that is compatible with the swift we are using to
-        # compile the stdlib.
-        #
-        # This makes it easier to build target stdlibs on systems that
-        # have old toolchains without more modern linker features.
-        #
-        # On Darwin, only build lld if explicitly requested using --build-lld.
-        should_build_lld = (platform.system() != 'Darwin' or args.build_lld)
-        if not should_build_lld:
+        if not args.build_lld:
             impl_args += [
                 "--skip-build-lld"
             ]

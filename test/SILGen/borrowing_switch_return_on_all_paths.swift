@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature BorrowingSwitch -verify %s
+// RUN: %target-swift-emit-silgen -verify %s
 
 struct Box<Wrapped: ~Copyable>: ~Copyable {
     var wrapped: Wrapped {

@@ -509,6 +509,19 @@ namespace {
         return importFunctionPointerLikeType(*type, pointeeType);
       }
 
+      // FIXME: this is a workaround for rdar://128013193
+      if (pointeeType && pointeeType->getAnyNominal() &&
+          pointeeType->getAnyNominal()
+              ->getAttrs()
+              .hasAttribute<MoveOnlyAttr>() &&
+          Impl.SwiftContext.LangOpts.CxxInteropUseOpaquePointerForMoveOnly) {
+        auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+        if (!opaquePointerDecl)
+          return Type();
+        return {opaquePointerDecl->getDeclaredInterfaceType(),
+                ImportHint::OtherPointer};
+      }
+
       PointerTypeKind pointerKind;
       if (quals.hasConst()) {
         pointerKind = PTK_UnsafePointer;

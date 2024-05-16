@@ -353,11 +353,48 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: _bridged.mangleOutlinedVariable(function.bridged))
   }
 
+  func mangle(withClosureArgs closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
+    closureArgs.withBridgedValues { bridgedClosureArgsRef in
+      closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in 
+        String(taking: _bridged.mangleWithClosureArgs(
+          bridgedClosureArgsRef, 
+          bridgedClosureArgIndicesRef, 
+          applySiteCallee.bridged
+        ))
+      }
+    }
+  }
+
   func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
       _bridged.createGlobalVariable($0, type.bridged, isPrivate)
     }
     return gv.globalVar
+  }
+
+  func createFunctionForClosureSpecialization(from applySiteCallee: Function, withName specializedFunctionName: String, 
+                                              withParams specializedParameters: [ParameterInfo], 
+                                              withSerialization isSerialized: Bool) -> Function 
+  {
+    return specializedFunctionName._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = specializedParameters.map { $0._bridged }
+
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+        _bridged.ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(nameRef, paramBuf.baseAddress, 
+                                                                                paramBuf.count, 
+                                                                                applySiteCallee.bridged, 
+                                                                                isSerialized).function
+      }
+    }
+  }
+
+  func buildSpecializedFunction(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> ()) {
+    let nestedFunctionPassContext = 
+        FunctionPassContext(_bridged: _bridged.initializeNestedPassContext(specializedFunction.bridged))
+
+      defer { _bridged.deinitializedNestedPassContext() }
+
+      buildFn(specializedFunction, nestedFunctionPassContext)
   }
 }
 
@@ -442,6 +479,13 @@ extension Builder {
     context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst), location: firstInst.location,
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+  }
+
+  /// Creates a builder which inserts instructions into an empty function, using the location of the function itself.
+  init(atStartOf function: Function, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: function)
+    self.init(insertAt: .atStartOf(function), location: function.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
@@ -628,7 +672,6 @@ extension Function {
     context.notifyEffectsChanged()
     bridged.setIsPerformanceConstraint(isPerformanceConstraint)
   }
-
 
   func fixStackNesting(_ context: FunctionPassContext) {
     context._bridged.fixStackNesting(bridged)

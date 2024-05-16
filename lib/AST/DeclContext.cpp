@@ -1418,6 +1418,8 @@ bool DeclContext::isAsyncContext() const {
 }
 
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
+  assert(dc && "Expected non-null DeclContext!");
+
   switch (dc->getContextKind()) {
   case DeclContextKind::Package:
   case DeclContextKind::Module:

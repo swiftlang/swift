@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowingSwitch -parse-as-library -O -emit-sil -verify %s
+// RUN: %target-swift-frontend -parse-as-library -O -emit-sil -verify %s
 
 extension List {
     var peek: Element {

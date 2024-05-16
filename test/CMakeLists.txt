@@ -47,10 +47,6 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps sdk-overlay)
   endif()
 
-  if(SWIFT_BUILD_REMOTE_MIRROR)
-    list(APPEND deps swiftRemoteInspection)
-  endif()
-
   set(deps_binaries)
 
   if (SWIFT_INCLUDE_TOOLS)

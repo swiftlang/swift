@@ -508,7 +508,7 @@ UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl);
 
-static bool allBoundTypesAreCopyable(Type type, DeclContext *context) {
+static bool allSubstTypesAreCopyable(Type type, DeclContext *context) {
   assert(type->getAnyNominal());
   auto bgt = type->getAs<BoundGenericType>();
   if (!bgt)
@@ -549,11 +549,14 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
           return false;
 
         // If we only _refer_ to a TypeDecl that uses NoncopyableGenerics,
-        // and a suppressed version of that decl is in the interface, then we're
-        // only referring to the un-suppressed version if any of the bound types
-        // are noncopyable. (rdar://127389991)
+        // and a suppressed version of that decl is in the interface, and
+        // if we only substitute Copyable types for the generic parameters,
+        // then we can say this decl is not "using" the feature such that
+        // a feature guard is required. In other words, this reference to the
+        // type will always be valid, regardless of whether the feature is
+        // enabled or not. (rdar://127389991)
         if (!disallowFeatureSuppression("NoncopyableGenerics", nominalDecl)
-            && allBoundTypesAreCopyable(type, context)) {
+            && allSubstTypesAreCopyable(type, context)) {
           return false;
         }
 
@@ -721,6 +724,19 @@ static bool usesFeatureConformanceSuppression(Decl *decl) {
     return true;
   }
 
+  return false;
+}
+
+static bool usesFeatureBitwiseCopyable2(Decl *decl) {
+  if (!decl->getModuleContext()->isStdlibModule()) {
+    return false;
+  }
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    return proto->getNameStr() == "BitwiseCopyable";
+  }
+  if (auto *typealias = dyn_cast<TypeAliasDecl>(decl)) {
+    return typealias->getNameStr() == "_BitwiseCopyable";
+  }
   return false;
 }
 

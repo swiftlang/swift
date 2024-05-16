@@ -520,8 +520,13 @@ public:
 };
 
 inline llvm::hash_code hash_value(const SILLocation &R) {
-  return llvm::hash_combine(R.kindAndFlags.packedKindAndFlags,
-                            *R.storage.filePositionLoc);
+  if (R.isFilenameAndLocation()) {
+    return llvm::hash_combine(R.kindAndFlags.packedKindAndFlags,
+                              *R.storage.filePositionLoc);
+  } else {
+    return llvm::hash_combine(R.kindAndFlags.packedKindAndFlags,
+                              R.storage.filePositionLoc);
+  }
 }
 
 inline llvm::hash_code hash_value(const SILLocation::FilenameAndLocation &R) {

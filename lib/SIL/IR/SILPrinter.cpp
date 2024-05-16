@@ -1446,7 +1446,7 @@ public:
     if (AVI->usesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
-    printDebugVar(AVI->getVarInfo(),
+    printDebugVar(AVI->getVarInfo(false),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
   void visitAllocVectorInst(AllocVectorInst *AVI) {
@@ -1503,7 +1503,7 @@ public:
     }
 
     *this << ABI->getType();
-    printDebugVar(ABI->getVarInfo(),
+    printDebugVar(ABI->getVarInfo(false),
                   &ABI->getModule().getASTContext().SourceMgr);
   }
 
@@ -1550,11 +1550,17 @@ public:
       *this << "[noasync] ";
     if (auto isolationCrossing = AI->getIsolationCrossing()) {
       auto callerIsolation = isolationCrossing->getCallerIsolation();
-      if (callerIsolation != ActorIsolation::Unspecified)
-        *this << "[callee_isolation=" << callerIsolation << "] ";
+      if (callerIsolation != ActorIsolation::Unspecified) {
+        *this << "[callee_isolation=";
+        callerIsolation.printForSIL(PrintState.OS);
+        *this << "] ";
+      }
       auto calleeIsolation = isolationCrossing->getCalleeIsolation();
-      if (calleeIsolation != ActorIsolation::Unspecified)
-        *this << "[caller_isolation=" << calleeIsolation << "] ";
+      if (calleeIsolation != ActorIsolation::Unspecified) {
+        *this << "[caller_isolation=";
+        calleeIsolation.printForSIL(PrintState.OS);
+        *this << "] ";
+      }
     }
     visitApplyInstBase(AI);
   }
@@ -1915,7 +1921,7 @@ public:
     if (DVI->hasTrace())
       *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
-    printDebugVar(DVI->getVarInfo(),
+    printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
   }
 
@@ -3328,6 +3334,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     P.printDebugScopeRef(getDebugScope(), SM);
   }
   OS << '\n';
+
+  if (auto functionIsolation = getActorIsolation()) {
+    OS << "// Isolation: ";
+    functionIsolation.print(OS);
+    OS << '\n';
+  }
   printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
 
   OS << "sil ";
