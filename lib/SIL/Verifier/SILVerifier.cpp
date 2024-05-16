@@ -1496,7 +1496,7 @@ public:
     
     SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
       SSAType.getObjectType();
-    if (!varInfo->DIExpr && !isa<AllocBoxInst>(inst)) {
+    if (!varInfo->DIExpr && !isa<SILBoxType>(SSAType.getASTType())) {
       // FIXME: Remove getObjectType() below when we fix create/createAddr
       require(DebugVarTy.removingMoveOnlyWrapper()
               == SSAType.getObjectType().removingMoveOnlyWrapper(),
