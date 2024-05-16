@@ -4411,6 +4411,13 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
     
     if (optBase.getType().isMoveOnly()) {
       if (optBase.getType().isAddress()) {
+        // Strip the move-only wrapper if any.
+        if (optBase.getType().isMoveOnlyWrapped()) {
+          optBase = ManagedValue::forBorrowedAddressRValue(
+            SGF.B.createMoveOnlyWrapperToCopyableAddr(e,
+                                                      optBase.getValue()));
+        }
+      
         optBase = enterAccessScope(SGF, e, ManagedValue(),
                                    optBase, optTypeData,
                                    baseAccessKind,
@@ -4423,13 +4430,26 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
       } else {
         optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase, IsNotLexical,
                                                       BeginBorrowInst::IsFixed);
+        // Strip the move-only wrapper if any.
+        if (optBase.getType().isMoveOnlyWrapped()) {
+          optBase
+            = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(e, optBase);
+        }
       }
     }
   } else {
     optBase = SGF.emitAddressOfLValue(e, std::move(optLV));
+    bool isMoveOnly = optBase.getType().isMoveOnly();
+    
+    // Strip the move-only wrapper if any.
+    if (optBase.getType().isMoveOnlyWrapped()) {
+      optBase = ManagedValue::forLValue(
+        SGF.B.createMoveOnlyWrapperToCopyableAddr(e,
+                                                  optBase.getValue()));
+    }
     
     if (isConsumeAccess(baseAccessKind)) {
-      if (optBase.getType().isMoveOnly()) {
+      if (isMoveOnly) {
         optBase = enterAccessScope(SGF, e, ManagedValue(),
                                    optBase, optTypeData,
                                    baseAccessKind,
