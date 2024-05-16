@@ -21,6 +21,7 @@
 #define SWIFT_SIL_FIELDSENSITIVEPRUNTEDLIVENESS_H
 
 #include "swift/AST/TypeExpansionContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
