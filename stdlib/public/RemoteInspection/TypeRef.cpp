@@ -175,8 +175,8 @@ public:
     if (F->getExtFlags().isIsolatedAny()) {
       printField("isolated", "any");
     }
-    if (F->getExtFlags().hasTransferringResult()) {
-      printField("", "transferring-result");
+    if (F->getExtFlags().hasSendingResult()) {
+      printField("", "sending-result");
     }
 
     stream << "\n";
@@ -213,7 +213,7 @@ public:
       if (flags.isVariadic())
         printHeader("variadic");
 
-      if (flags.isTransferring())
+      if (flags.isSending())
         printHeader("transferring");
 
       printRec(param.getType());
@@ -698,8 +698,8 @@ public:
       if (flags.isIsolated()) {
         wrapInput(Node::Kind::Isolated);
       }
-      if (flags.isTransferring()) {
-        wrapInput(Node::Kind::Transferring);
+      if (flags.isSending()) {
+        wrapInput(Node::Kind::Sending);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -774,8 +774,8 @@ public:
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
       funcNode->addChild(node, Dem);
-    } else if (F->getExtFlags().hasTransferringResult()) {
-      auto node = Dem.createNode(Node::Kind::TransferringResultFunctionType);
+    } else if (F->getExtFlags().hasSendingResult()) {
+      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
       funcNode->addChild(node, Dem);
     }
 

@@ -4026,7 +4026,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  bool hasTransferringResult =
+  bool hasSendingResult =
       isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
 
   // TODO: maybe make this the place that claims @escaping.
@@ -4035,7 +4035,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      LifetimeDependenceInfo(), hasTransferringResult);
+      LifetimeDependenceInfo(), hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4494,8 +4494,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
         parameterOptions |= SILParameterInfo::Isolated;
         return true;
 
-      case TypeAttrKind::SILTransferring:
-        parameterOptions |= SILParameterInfo::Transferring;
+      case TypeAttrKind::SILSending:
+        parameterOptions |= SILParameterInfo::Sending;
         return true;
 
       default:
@@ -4597,8 +4597,8 @@ bool TypeResolver::resolveSingleSILResult(
       resultInfoOptions |= SILResultInfo::NotDifferentiable;
     }
 
-    if (claim<SILTransferringTypeAttr>(attrs)) {
-      resultInfoOptions |= SILResultInfo::IsTransferring;
+    if (claim<SILSendingTypeAttr>(attrs)) {
+      resultInfoOptions |= SILResultInfo::IsSending;
     }
 
     type = resolveAttributedType(repr, options, attrs);

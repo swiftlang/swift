@@ -9014,8 +9014,8 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 }
 
 /// Pattern match if an initializer has as its value a callee that returns
-/// transferring.
-static bool isTransferringInitializer(Expr *initializer) {
+/// a sent value.
+static bool isSendingInitializer(Expr *initializer) {
   auto *await = dyn_cast<AwaitExpr>(initializer);
   if (!await)
     return false;
@@ -9028,7 +9028,7 @@ static bool isTransferringInitializer(Expr *initializer) {
   if (!fType)
     return false;
 
-  return fType->hasTransferringResult();
+  return fType->hasSendingResult();
 }
 
 /// For the initializer of an `async let`, wrap it in an autoclosure and then
@@ -9042,14 +9042,14 @@ static Expr *wrapAsyncLetInitializer(
   Type initializerType = initializer->getType();
   bool throws = TypeChecker::canThrow(cs.getASTContext(), initializer)
                   .has_value();
-  bool hasTransferringResult = isTransferringInitializer(initializer);
+  bool hasSendingeResult = isSendingInitializer(initializer);
   bool isSendable = !cs.getASTContext().LangOpts.hasFeature(
       Feature::TransferringArgsAndResults);
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
                      .withThrows(throws, /*FIXME:*/ Type())
                      .withSendable(isSendable)
-                     .withTransferringResult(hasTransferringResult)
+                     .withSendingResult(hasSendingeResult)
                      .build();
 
   // Form the autoclosure expression. The actual closure here encapsulates the

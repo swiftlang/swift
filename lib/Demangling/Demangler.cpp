@@ -971,10 +971,10 @@ NodePointer Demangler::demangleTypeAnnotation() {
     return createType(
         createWithChild(Node::Kind::CompileTimeConst, popTypeAndGetChild()));
   case 'T':
-    return createNode(Node::Kind::TransferringResultFunctionType);
+    return createNode(Node::Kind::SendingResultFunctionType);
   case 'u':
     return createType(
-        createWithChild(Node::Kind::Transferring, popTypeAndGetChild()));
+        createWithChild(Node::Kind::Sending, popTypeAndGetChild()));
   case 'l':
     return demangleLifetimeDependenceKind(/*isSelfDependence*/ false);
   case 'L':
@@ -1582,7 +1582,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   addChild(FuncType, popNode(Node::Kind::SelfLifetimeDependence));
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
-  addChild(FuncType, popNode(Node::Kind::TransferringResultFunctionType));
+  addChild(FuncType, popNode(Node::Kind::SendingResultFunctionType));
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
   addChild(FuncType, popNode([](Node::Kind kind) {
     return kind == Node::Kind::ThrowsAnnotation ||
@@ -1632,7 +1632,7 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
         == Node::Kind::IsolatedAnyFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::TransferringResultFunctionType)
+      Node::Kind::SendingResultFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::DifferentiableFunctionType)
@@ -2192,12 +2192,12 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
                          createNode(Node::Kind::ImplConvention, attr));
 }
 
-NodePointer Demangler::demangleImplParameterTransferring() {
+NodePointer Demangler::demangleImplParameterSending() {
   // Empty string represents default differentiability.
   if (!nextIf('T'))
     return nullptr;
-  const char *attr = "transferring";
-  return createNode(Node::Kind::ImplParameterTransferring, attr);
+  const char *attr = "sending";
+  return createNode(Node::Kind::ImplParameterSending, attr);
 }
 
 NodePointer Demangler::demangleImplParameterResultDifferentiability() {
@@ -2343,13 +2343,13 @@ NodePointer Demangler::demangleImplFunctionType() {
     type = addChild(type, Param);
     if (NodePointer Diff = demangleImplParameterResultDifferentiability())
       Param = addChild(Param, Diff);
-    if (auto Transferring = demangleImplParameterTransferring())
-      Param = addChild(Param, Transferring);
+    if (auto Sending = demangleImplParameterSending())
+      Param = addChild(Param, Sending);
     ++NumTypesToAdd;
   }
 
   if (nextIf('T')) {
-    type->addChild(createNode(Node::Kind::ImplTransferringResult), *this);
+    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
   }
 
   while (NodePointer Result = demangleImplResultConvention(

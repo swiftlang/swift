@@ -2597,7 +2597,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
           Feature::TransferringArgsAndResults)) {
     if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "transferring") {
-        paramInfo->setTransferring();
+        paramInfo->setSending();
       }
     }
   }

@@ -601,7 +601,7 @@ struct [[nodiscard]] ManglingError {
     InvalidImplDifferentiability,
     InvalidImplFunctionAttribute,
     InvalidImplParameterConvention,
-    InvalidImplParameterTransferring,
+    InvalidImplParameterSending,
     InvalidMetatypeRepresentation,
     MultiByteRelatedEntity,
     BadValueWitnessKind,

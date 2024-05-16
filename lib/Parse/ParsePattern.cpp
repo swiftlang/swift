@@ -600,7 +600,7 @@ mapParsedParameters(Parser &parser,
       if (paramInfo.TransferringLoc.isValid()) {
         type = new (parser.Context)
             TransferringTypeRepr(type, paramInfo.TransferringLoc);
-        param->setTransferring();
+        param->setSending();
       }
 
       param->setTypeRepr(type);
@@ -631,7 +631,7 @@ mapParsedParameters(Parser &parser,
             else if (isa<ResultDependsOnTypeRepr>(STR))
               param->setResultDependsOn(true);
             else if (isa<TransferringTypeRepr>(STR))
-              param->setTransferring(true);
+              param->setSending(true);
             unwrappedType = STR->getBase();
             continue;
           }

@@ -639,8 +639,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       if (flags.isIsolated()) {
         wrapInput(Node::Kind::Isolated);
       }
-      if (flags.isTransferring()) {
-        wrapInput(Node::Kind::Transferring);
+      if (flags.isSending()) {
+        wrapInput(Node::Kind::Sending);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -765,9 +765,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     if (func->isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
 
-    if (func->getExtendedFlags().hasTransferringResult())
-      funcNode->addChild(
-          Dem.createNode(Node::Kind::TransferringResultFunctionType), Dem);
+    if (func->getExtendedFlags().hasSendingResult())
+      funcNode->addChild(Dem.createNode(Node::Kind::SendingResultFunctionType),
+                         Dem);
 
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);

@@ -8050,7 +8050,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
         if (!funcDecl)
           continue;
-        funcDecl->setTransferringResult();
+        funcDecl->setSendingResult();
         continue;
       }
 

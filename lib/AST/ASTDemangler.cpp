@@ -415,7 +415,7 @@ Type ASTBuilder::createFunctionType(
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative())
                               .withIsolated(flags.isIsolated())
-                              .withTransferring(flags.isTransferring());
+                              .withSending(flags.isSending());
 
     hasIsolatedParameter |= flags.isIsolated();
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
@@ -473,7 +473,7 @@ Type ASTBuilder::createFunctionType(
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
-                   LifetimeDependenceInfo(), extFlags.hasTransferringResult())
+                   LifetimeDependenceInfo(), extFlags.hasSendingResult())
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();
@@ -518,9 +518,9 @@ getParameterOptions(ImplParameterInfoOptions implOptions) {
     result |= SILParameterInfo::NotDifferentiable;
   }
 
-  if (implOptions.contains(ImplParameterInfoFlags::Transferring)) {
-    implOptions -= ImplParameterInfoFlags::Transferring;
-    result |= SILParameterInfo::Transferring;
+  if (implOptions.contains(ImplParameterInfoFlags::Sending)) {
+    implOptions -= ImplParameterInfoFlags::Sending;
+    result |= SILParameterInfo::Sending;
   }
 
   // If we did not handle all flags in implOptions, this code was not updated
@@ -558,9 +558,9 @@ getResultOptions(ImplResultInfoOptions implOptions) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
-  if (implOptions.contains(ImplResultInfoFlags::IsTransferring)) {
-    implOptions -= ImplResultInfoFlags::IsTransferring;
-    result |= SILResultInfo::IsTransferring;
+  if (implOptions.contains(ImplResultInfoFlags::IsSending)) {
+    implOptions -= ImplResultInfoFlags::IsSending;
+    result |= SILResultInfo::IsSending;
   }
 
   // If we did not remove all of the options from implOptions, someone forgot to
