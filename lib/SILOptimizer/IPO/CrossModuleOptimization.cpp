@@ -133,16 +133,27 @@ public:
   }
 
   SILType remapType(SILType Ty) {
+    if (Ty.hasLocalArchetype()) {
+      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
+                    CanGenericSignature());
+    }
+
     CMS.makeTypeUsableFromInline(Ty.getASTType());
     return Ty;
   }
 
   CanType remapASTType(CanType Ty) {
+    if (Ty->hasLocalArchetype())
+      Ty = Ty.subst(Functor, Functor)->getCanonicalType();
+
     CMS.makeTypeUsableFromInline(Ty);
     return Ty;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    if (Subs.hasLocalArchetypes())
+      Subs = Subs.subst(Functor, Functor);
+
     CMS.makeSubstUsableFromInline(Subs);
     return Subs;
   }
