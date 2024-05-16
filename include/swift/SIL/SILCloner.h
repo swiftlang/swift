@@ -29,6 +29,35 @@
 
 namespace swift {
 
+struct SubstitutionMapWithLocalArchetypes {
+  std::optional<SubstitutionMap> SubsMap;
+  TypeSubstitutionMap LocalArchetypeSubs;
+
+  SubstitutionMapWithLocalArchetypes() {}
+  SubstitutionMapWithLocalArchetypes(SubstitutionMap subs) : SubsMap(subs) {}
+
+  Type operator()(SubstitutableType *type) {
+    if (isa<LocalArchetypeType>(type))
+      return QueryTypeSubstitutionMap{LocalArchetypeSubs}(type);
+
+    if (SubsMap)
+      return Type(type).subst(*SubsMap);
+
+    return Type(type);
+  }
+
+  ProtocolConformanceRef operator()(CanType origType,
+                                    Type substType,
+                                    ProtocolDecl *proto) {
+    if (isa<LocalArchetypeType>(origType))
+      return proto->getParentModule()->lookupConformance(substType, proto);
+    if (SubsMap)
+      return SubsMap->lookupConformance(origType, proto);
+
+    return ProtocolConformanceRef(proto);
+  }
+};
+
 /// SILCloner - Abstract SIL visitor which knows how to clone instructions and
 /// whose behavior can be customized by subclasses via the CRTP. This is meant
 /// to be subclassed to implement inlining, function specialization, and other
@@ -49,7 +78,7 @@ protected:
 
   SILBuilder Builder;
   DominanceInfo *DomTree = nullptr;
-  TypeSubstitutionMap LocalArchetypeSubs;
+  SubstitutionMapWithLocalArchetypes Functor;
 
   // The old-to-new value map.
   llvm::DenseMap<SILValue, SILValue> ValueMap;
@@ -78,7 +107,8 @@ public:
   explicit SILCloner(SILFunction &F, DominanceInfo *DT = nullptr)
       : Builder(F), DomTree(DT) {}
 
-  explicit SILCloner(SILGlobalVariable *GlobVar) : Builder(GlobVar) {}
+  explicit SILCloner(SILGlobalVariable *GlobVar)
+      : Builder(GlobVar) {}
 
   void clearClonerState() {
     ValueMap.clear();
@@ -167,7 +197,7 @@ public:
   /// Register a re-mapping for local archetypes such as opened existentials.
   void registerLocalArchetypeRemapping(ArchetypeType *From,
                                        ArchetypeType *To) {
-    auto result = LocalArchetypeSubs.insert(
+    auto result = Functor.LocalArchetypeSubs.insert(
         std::make_pair(CanArchetypeType(From), CanType(To)));
     assert(result.second);
     (void)result;
@@ -189,62 +219,31 @@ public:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    // If we have local archetypes to substitute, check whether that's
-    // relevant to this particular substitution.
-    if (!LocalArchetypeSubs.empty()) {
-      if (Subs.hasLocalArchetypes()) {
-        // If we found a type containing a local archetype, substitute
-        // open existentials throughout the substitution map.
-        Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
+    auto substSubs = asImpl().remapSubstitutionMap(Subs)
+                   .getCanonical(/*canonicalizeSignature*/false);
+
+#ifndef NDEBUG
+    for (auto substConf : substSubs.getConformances()) {
+      if (substConf.isInvalid()) {
+        llvm::errs() << "Invalid conformance in SIL cloner:\n";
+        if (Functor.SubsMap)
+          Functor.SubsMap->dump(llvm::errs());
+        llvm::errs() << "\nsubstitution map:\n";
+        Subs.dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
       }
     }
+#endif
 
-    return asImpl().remapSubstitutionMap(Subs)
-                   .getCanonical(/*canonicalizeSignature*/false);
+    return substSubs;
   }
 
-  SILType getTypeInClonedContext(SILType Ty) {
-    auto objectTy = Ty.getASTType();
-    // Do not substitute local archetypes, if we do not have any.
-    if (!objectTy->hasLocalArchetype())
-      return Ty;
-    // Do not substitute local archetypes, if it is not required.
-    // This is often the case when cloning basic blocks inside the same
-    // function.
-    if (LocalArchetypeSubs.empty())
-      return Ty;
-
-    // Substitute local archetypes, if we have any.
-    return Ty.subst(
-      Builder.getModule(),
-      QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType(),
-      CanGenericSignature());
-  }
   SILType getOpType(SILType Ty) {
-    Ty = getTypeInClonedContext(Ty);
     return asImpl().remapType(Ty);
   }
 
-  CanType getASTTypeInClonedContext(Type ty) {
-    // Do not substitute local archetypes, if we do not have any.
-    if (!ty->hasLocalArchetype())
-      return ty->getCanonicalType();
-    // Do not substitute local archetypes, if it is not required.
-    // This is often the case when cloning basic blocks inside the same
-    // function.
-    if (LocalArchetypeSubs.empty())
-      return ty->getCanonicalType();
-
-    return ty.subst(
-      QueryTypeSubstitutionMapOrIdentity{LocalArchetypeSubs},
-      MakeAbstractConformanceForGenericType()
-    )->getCanonicalType();
-  }
-
   CanType getOpASTType(CanType ty) {
-    ty = getASTTypeInClonedContext(ty);
     return asImpl().remapASTType(ty);
   }
 
@@ -352,17 +351,22 @@ public:
 
   ProtocolConformanceRef getOpConformance(Type ty,
                                           ProtocolConformanceRef conformance) {
-    // If we have local archetypes to substitute, do so now.
-    if (ty->hasLocalArchetype() && !LocalArchetypeSubs.empty()) {
-      conformance =
-        conformance.subst(ty,
-                          QueryTypeSubstitutionMapOrIdentity{
-                                                        LocalArchetypeSubs},
-                          MakeAbstractConformanceForGenericType());
-    }
+    auto substConf = asImpl().remapConformance(ty, conformance);
 
-    return asImpl().remapConformance(getASTTypeInClonedContext(ty),
-                                     conformance);
+#ifndef NDEBUG
+    if (substConf.isInvalid()) {
+      llvm::errs() << "Invalid conformance in SIL cloner:\n";
+      if (Functor.SubsMap)
+        Functor.SubsMap->dump(llvm::errs());
+      llvm::errs() << "\nconformance:\n";
+      conformance.dump(llvm::errs());
+      llvm::errs() << "original type:\n";
+      ty.dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return substConf;
   }
 
   ArrayRef<ProtocolConformanceRef>
@@ -445,16 +449,31 @@ protected:
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
   SILType remapType(SILType Ty) {
-      return Ty;
-  }
+    // Substitute local archetypes, if we have any.
+    if (Ty.hasLocalArchetype()) {
+      Ty = Ty.subst(Builder.getModule(), Functor, Functor,
+                    CanGenericSignature());
+    }
 
-  CanType remapASTType(CanType Ty) {
     return Ty;
   }
 
+  CanType remapASTType(CanType ty) {
+    // Substitute local archetypes, if we have any.
+    if (ty->hasLocalArchetype())
+      ty = ty.subst(Functor, Functor)->getCanonicalType();
+
+    return ty;
+  }
+
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
+    // If we have local archetypes to substitute, do so now.
+    if (Ty->hasLocalArchetype())
+      C = C.subst(Ty, Functor, Functor);
+
     return C;
   }
+
   /// Get the value that takes the place of the given `Value` within the cloned
   /// region. The given value must already have been mapped by this cloner.
   SILValue getMappedValue(SILValue Value);
@@ -464,7 +483,13 @@ protected:
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
 
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) { return Subs; }
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    // If we have local archetypes to substitute, do so now.
+    if (Subs.hasLocalArchetypes())
+      Subs = Subs.subst(Functor, Functor);
+
+    return Subs;
+  }
 
   /// This is called by either of the top-level visitors, cloneReachableBlocks
   /// or cloneSILFunction, after all other visitors are have been called.
