@@ -1260,6 +1260,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
   emitLazyConformancesForFunction(F);
 
+  auto sig = Types.getGenericSignatureWithCapturedEnvironments(constant);
+  recontextualizeCapturedLocalArchetypes(F, sig);
+
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
