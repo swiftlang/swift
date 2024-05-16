@@ -1073,6 +1073,12 @@ public:
   GenericSignatureWithCapturedEnvironments
   getGenericSignatureWithCapturedEnvironments(SILDeclRef constant);
 
+  /// Get the substitution map for calling a constant.
+  SubstitutionMap
+  getSubstitutionMapWithCapturedEnvironments(SILDeclRef constant,
+                                             const CaptureInfo &captureInfo,
+                                             SubstitutionMap subs);
+
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
 
