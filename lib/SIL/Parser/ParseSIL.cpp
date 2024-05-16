@@ -7432,7 +7432,8 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   if (State.P.consumeIf(tok::equal) && State.P.consumeIf(tok::l_brace)) {
     SILBuilder B(GV);
     do {
-      State.parseSILInstruction(B);
+      if (State.parseSILInstruction(B))
+        return true;
     } while (! State.P.consumeIf(tok::r_brace));
   }
   return false;
