@@ -582,17 +582,37 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   return true;
 }
 
+/// Adds [serialized_for_package] attribute to an already [serialized] function.
+/// It's used to indicate that a function was [serialized] because of package-cmo.
+/// Package-cmo allows serializing a function containing a loadable type in
+/// a resiliently built module, which is normally illegal. During SIL deserialization,
+/// this attribute can be used to check whether a loaded function that was serialized
+/// can be allowed to have loadable types. This attribute is also used to determine
+/// if a callee can be inlined into a caller that's serialized without package-cmo, for
+/// example, by explicitly annotating the caller decl with `@inlinable`, where
+/// the callee was serialized due to package-cmo.
+static void addSerializedForPackageAttrIfEnabled(SILFunction *f,
+                                                 const SILModule &mod) {
+  assert(f->isSerialized());
+  auto shouldSet = mod.getSwiftModule()->serializePackageEnabled() &&
+                   mod.getSwiftModule()->isResilient();
+  f->setSerializedForPackage(shouldSet ? IsSerializedForPackage
+                                       : IsNotSerializedForPackage);
+}
+
 /// Serialize \p function and recursively all referenced functions which are
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                        const FunctionFlags &canSerializeFlags) {
-  if (function->isSerialized())
+  if (function->isSerialized()) {
+    addSerializedForPackageAttrIfEnabled(function, M);
     return;
-
+  }
   if (!canSerializeFlags.lookup(function))
     return;
 
   function->setSerialized(IsSerialized);
+  addSerializedForPackageAttrIfEnabled(function, M);
 
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {

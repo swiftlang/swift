@@ -3353,6 +3353,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   case IsSerialized: OS << "[serialized] "; break;
   }
 
+  switch (isSerializedForPackage()) {
+  case IsNotSerializedForPackage:
+    break;
+  case IsSerializedForPackage:
+    OS << "[serialized_for_package] ";
+    break;
+  }
+
   switch (isThunk()) {
   case IsNotThunk: break;
   case IsThunk: OS << "[thunk] "; break;
@@ -3540,7 +3548,7 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
   if (isSerialized())
     OS << "[serialized] ";
-  
+
   if (isLet())
     OS << "[let] ";
 
@@ -3852,7 +3860,7 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   OS << "sil_property ";
   if (isSerialized())
     OS << "[serialized] ";
-  
+
   OS << '#';
   printValueDecl(getDecl(), OS);
   if (auto sig = getDecl()->getInnermostDeclContext()
@@ -4031,6 +4039,7 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
   if (isSerialized())
     OS << "[serialized] ";
+
   if (SILType classTy = getClassType()) {
     OS << classTy;
   } else {

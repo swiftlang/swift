@@ -162,6 +162,11 @@ enum IsSerialized_t : unsigned char {
   IsSerialized
 };
 
+enum IsSerializedForPackage_t : unsigned char {
+  IsNotSerializedForPackage,
+  IsSerializedForPackage
+};
+
 /// The scope in which a subclassable class can be subclassed.
 enum class SubclassScope : uint8_t {
   /// This class can be subclassed in other modules.
