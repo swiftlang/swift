@@ -3,6 +3,7 @@
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake/modules)
 include(StdlibOptions)
 include(AddSwiftStdlib)
+include(CompatibilityLibs)
 
 set(CXX_COMPILE_FLAGS)
 set(CXX_LINK_FLAGS)
@@ -58,13 +59,13 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   # of all the compatibility libraries needed to build
   # host tools in a single place
   add_library(HostCompatibilityLibs INTERFACE)
-  set(vsuffix "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
+  get_compatibility_libs(
+    "${SWIFT_HOST_VARIANT_SDK}"
+    "${SWIFT_HOST_VARIANT_ARCH}"
+    compatibility_libs
+    )
   target_link_libraries(HostCompatibilityLibs INTERFACE
-    swiftCompatibilityConcurrency${vsuffix}
-    swiftCompatibilityDynamicReplacements${vsuffix}
-    swiftCompatibilityPacks${vsuffix}
-    swiftCompatibility50${vsuffix}
-    swiftCompatibility51${vsuffix}
-    swiftCompatibility56${vsuffix})
+    ${compatibility_libs}
+    )
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS HostCompatibilityLibs)
 endif()
