@@ -35,6 +35,6 @@ func funcTestTransferringResult() async {
 func funcTestTransferringArg() async {
   let x = NonSendableCStruct()
   transferUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{'x' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }

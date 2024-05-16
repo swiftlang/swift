@@ -26,7 +26,7 @@ func methodTestTransferringArg() async {
   let x = MyType()
   let s = NSObject()
   let _ = x.getResultWithTransferringArgument(s)  // expected-error {{sending 's' risks causing data races}}
-  // expected-note @-1 {{'s' used after being passed as a transferring parameter; Later uses could race}}
+  // expected-note @-1 {{'s' used after being passed as a 'sending' parameter; Later uses could race}}
   useValue(s) // expected-note {{access can happen concurrently}}
 }
 
@@ -53,6 +53,6 @@ func funcTestTransferringResult() async {
 func funcTestTransferringArg() async {
   let x = NSObject()
   transferNSObjectToGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{'x' used after being passed as a transferring parameter; Later uses could race}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }

@@ -70,7 +70,7 @@ func twoTransferArg(_ x: transferring Klass, _ y: transferring Klass) {}
 func testSimpleTransferLet() {
   let k = Klass()
   transferArg(k) // expected-warning {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{'k' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'k' used after being passed as a 'sending' parameter}}
   useValue(k) // expected-note {{access can happen concurrently}}
 }
 
@@ -78,7 +78,7 @@ func testSimpleTransferVar() {
   var k = Klass()
   k = Klass()
   transferArg(k) // expected-warning {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{'k' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'k' used after being passed as a 'sending' parameter}}
   useValue(k) // expected-note {{access can happen concurrently}}
 }
 
@@ -218,7 +218,7 @@ func canTransferAssigningIntoLocal3(_ x: transferring Klass) async {
 // MARK: Transferring is "var" like //
 //////////////////////////////////////
 
-// Assigning into a transferring parameter is a merge.
+// Assigning into a 'sending' parameter is a merge.
 func assigningIsAMerge(_ x: transferring Klass) async {
   let y = Klass()
 
@@ -336,7 +336,7 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
 func doubleArgument() async {
   let x = Klass()
   twoTransferArg(x, x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{'x' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   // expected-note @-2 {{access can happen concurrently}}
 }
 
@@ -359,7 +359,7 @@ func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: transferring @escaping () async -> ()) {}
 
   fakeInit(operation: x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
 }
 
 @MainActor func actorIsolatedError(_ x: @escaping @MainActor () async -> ()) {
@@ -367,7 +367,7 @@ func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
 
   // TODO: This needs to say actor-isolated.
   fakeInit(operation: x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later main actor-isolated uses}}
+  // expected-note @-1 {{main actor-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
 }
 
 // Make sure we error here on only the second since x by being assigned a part
@@ -393,7 +393,7 @@ actor NonSendableInit {
     @storageRestrictions(initializes: first)
     init(initialValue)  {
       transferArg(initialValue!) // expected-warning {{sending 'initialValue' risks causing data races}}
-      // expected-note @-1 {{'self'-isolated 'initialValue' is passed as a transferring parameter}}
+      // expected-note @-1 {{'self'-isolated 'initialValue' is passed as a 'sending' parameter}}
       first = initialValue!
     }
 

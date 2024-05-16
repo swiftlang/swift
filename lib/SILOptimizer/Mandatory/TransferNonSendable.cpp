@@ -608,7 +608,8 @@ public:
 
     // Then emit the note with greater context.
     diagnoseNote(
-        loc, diag::regionbasedisolation_named_stronglytransferred_binding, name)
+        loc, diag::regionbasedisolation_named_value_used_after_explicit_sending,
+        name)
         .highlight(loc.getSourceRange());
 
     // Finally the require points.
@@ -1231,8 +1232,7 @@ public:
         os << ' ';
       }
     }
-    auto diag =
-        diag::regionbasedisolation_named_transfer_into_transferring_param;
+    auto diag = diag::regionbasedisolation_named_transfer_into_sending_param;
     diagnoseNote(loc, diag, descriptiveKindStr, varName);
   }
 
