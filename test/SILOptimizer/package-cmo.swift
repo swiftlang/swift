@@ -6,7 +6,7 @@
 // RUN: %target-build-swift -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -emit-sil -o %t/Main.sil
 // RUN: %FileCheck %s < %t/Main.sil
 
-// RUN: %target-build-swift -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -Xfrontend -serialization-failed -Xfrontend -verify
+// RUN: %target-build-swift -O -wmo -module-name=Main -package-name Pkg -I%t -I%S/Inputs/cross-module %s -Xfrontend -Rcross-module-optimization-serialization-failed -verify
 
 // REQUIRES: swift_in_compiler
 

@@ -274,8 +274,8 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
 
-def Rserialization_failed : Flag<["-"], "serialization-failed">,
-    HelpText<"Remark if we failed to inline a function">;
+def Rcross_module_optimization_serialization_failed : Flag<["-"], "Rcross-module-optimization-serialization-failed">,
+    HelpText<"Remark if we failed to serialize a function for the purpose of cross module optimization">;
 
 def block_list_file
   : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
