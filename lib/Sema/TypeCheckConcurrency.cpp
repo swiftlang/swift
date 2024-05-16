@@ -6055,7 +6055,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   }
 
   // A non-protocol type with a global actor is implicitly Sendable.
-  if (nominal->getGlobalActorAttr()) {
+  if (getActorIsolation(nominal).isGlobalActor()) {
     // Form the implicit conformance to Sendable.
     return formConformance(nullptr);
   }
