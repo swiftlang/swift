@@ -185,6 +185,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// * Protocol declarations
 /// * Associated type declarations
 /// * The `Self` type in a protocol extension
+/// * In an extension, the generic parameters of the type being extended
 ///
 /// A class or actor can contain noncopyable stored properties,
 /// while still being copyable itself ---
