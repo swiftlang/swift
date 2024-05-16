@@ -2324,31 +2324,34 @@ namespace {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
+        // The same should happen if the type was resilient and serialized in
+        // another module in the same package with package-cmo enabled, which
+        // treats those modules to be in the same resilience domain.
         auto declModule = D->getModuleContext();
         bool sameModule = (declModule == &TC.M);
-        if (sameModule)
-          properties.addSubobject(RecursiveProperties::forResilient());
-
-        // If the type is in a different module, or if we're using a minimal
-        // expansion, the type is address only and completely opaque to us.
-        // However, this is not true if the different module is in the same
-        // package and package serialization is enabled (resilience expansion
-        // is maximal), e.g. in case of package-cmo.
-        //
-        // Note: if the type is in a different module, the lowering does
-        // not depend on the resilience expansion, so we do not need to set
-        // the isResilient() flag above.
-        bool serializedPackage = declModule->inSamePackage(&TC.M) &&
+        bool serializedPackage = declModule != &TC.M &&
+                                 declModule->inSamePackage(&TC.M) &&
                                  declModule->isResilient() &&
                                  declModule->serializePackageEnabled();
-        if ((!sameModule && !serializedPackage) ||
+        auto inSameResilienceDomain = sameModule || serializedPackage;
+        if (inSameResilienceDomain)
+          properties.addSubobject(RecursiveProperties::forResilient());
+
+        // If the type is in a different module and not in the same package
+        // resilience domain (with package-cmo), or if we're using a minimal
+        // expansion, the type is address only and completely opaque to us.
+        //
+        // Note: if the type is in a different module and not in the same
+        // package resilience domain, the lowering does not depend on the
+        // resilience expansion, so we do not need to set the isResilient()
+        // flag above.
+        if (!inSameResilienceDomain ||
             Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
           return true;
         }
       }
-
       return false;
     }
 

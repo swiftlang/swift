@@ -460,8 +460,12 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::EnumElement:
     return Limit::OnDemand;
 
-  case Kind::GlobalAccessor:
-    return cast<VarDecl>(d)->isResilient() ? Limit::NeverPublic : Limit::None;
+  case Kind::GlobalAccessor: {
+    auto varDecl = cast<VarDecl>(d);
+    return varDecl->isResilient() &&
+           !varDecl->getModuleContext()->allowNonResilientAccess() ?
+           Limit::NeverPublic : Limit::None;
+  }
 
   case Kind::DefaultArgGenerator:
     // If the default argument is to be serialized, only use non-ABI public
