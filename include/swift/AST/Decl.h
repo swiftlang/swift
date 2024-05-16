@@ -5964,10 +5964,15 @@ public:
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
   bool isResilient() const;
-
+ 
   /// Do we need to use resilient access patterns when accessing this
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
+
+  /// True if the decl is non-resilient, or its defining module allows non-resilient
+  /// access so its consuming modules within the same package can have
+  /// visibility into this decl.
+  bool isFragile() const;
 
   /// True if the storage can be referenced by a keypath directly.
   /// Otherwise, its override must be referenced.
