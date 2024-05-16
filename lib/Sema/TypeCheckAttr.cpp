@@ -141,6 +141,8 @@ public:
   IGNORED_ATTR(NoRuntime)
   IGNORED_ATTR(NoExistentials)
   IGNORED_ATTR(NoObjCBridging)
+  IGNORED_ATTR(NeedsStringsInEmbedded)
+  IGNORED_ATTR(NeedsUnicodeDataTablesInEmbedded)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(SILGenName)

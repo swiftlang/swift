@@ -6829,6 +6829,11 @@ ERROR(conformance_availability_only_version_newer, none,
       "conformance of %0 to %1 is only available in %2 %3 or newer",
       (Type, Type, StringRef, llvm::VersionTuple))
 
+ERROR(embedded_string_without_opt_in, none,
+      "String has large associated codesize cost; only available in embedded Swift by explicitly passing -enable-strings", ())
+ERROR(embedded_string_needs_data_tables, none,
+      "This operation on String needs Unicode data tables; pass -enable-string=full-unicode-data-tables to acknowledge the associated codesize cost", ())
+
 //------------------------------------------------------------------------------
 // MARK: @discardableResult
 //------------------------------------------------------------------------------

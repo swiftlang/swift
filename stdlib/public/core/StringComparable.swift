@@ -19,6 +19,7 @@ extension StringProtocol {
   @_specialize(where Self == Substring, RHS == String)
   @_specialize(where Self == Substring, RHS == Substring)
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func == <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return _stringCompare(
       lhs._wholeGuts, lhs._offsetRange,
@@ -28,6 +29,7 @@ extension StringProtocol {
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func != <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(lhs == rhs)
   }
@@ -38,6 +40,7 @@ extension StringProtocol {
   @_specialize(where Self == Substring, RHS == String)
   @_specialize(where Self == Substring, RHS == Substring)
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func < <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return _stringCompare(
       lhs._wholeGuts, lhs._offsetRange,
@@ -47,40 +50,48 @@ extension StringProtocol {
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func > <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return rhs < lhs
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func <= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(rhs < lhs)
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func >= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(lhs < rhs)
   }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension String: Equatable {
   @inlinable @inline(__always) // For the bitwise comparison
   @_effects(readonly)
   @_semantics("string.equals")
+  @_needsUnicodeDataTablesInEmbedded
   public static func == (lhs: String, rhs: String) -> Bool {
     return _stringCompare(lhs._guts, rhs._guts, expecting: .equal)
   }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension String: Comparable {
   @inlinable @inline(__always) // For the bitwise comparison
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func < (lhs: String, rhs: String) -> Bool {
     return _stringCompare(lhs._guts, rhs._guts, expecting: .less)
   }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension Substring: Equatable {}
 
 // TODO: Generalize `~=` over `StringProtocol` (https://github.com/apple/swift/issues/54896)
@@ -90,6 +101,7 @@ extension String {
   @_alwaysEmitIntoClient
   @inline(__always)
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func ~= (lhs: String, rhs: Substring) -> Bool {
     return lhs == rhs
   }
@@ -98,6 +110,7 @@ extension Substring {
   @_alwaysEmitIntoClient
   @inline(__always)
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func ~= (lhs: Substring, rhs: String) -> Bool {
     return lhs == rhs
   }

@@ -12,12 +12,14 @@
 
 import SwiftShims
 
+@_needsUnicodeDataTablesInEmbedded
 extension String: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
+  @_needsUnicodeDataTablesInEmbedded
   public func hash(into hasher: inout Hasher) {
     if _fastPath(self._guts.isNFCFastUTF8) {
       self._guts.withFastUTF8 {
@@ -28,8 +30,14 @@ extension String: Hashable {
       _gutsSlice._normalizedHash(into: &hasher)
     }
   }
+
+  // Avoid using the compiler-synthesized hashValue implementation, because
+  // we need the attribute to apply.
+  @_needsUnicodeDataTablesInEmbedded
+  public var hashValue: Int { _hashValue(for: self) }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension StringProtocol {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
@@ -38,13 +46,21 @@ extension StringProtocol {
   ///   of this instance.
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
+  @_needsUnicodeDataTablesInEmbedded
   public func hash(into hasher: inout Hasher) {
     _gutsSlice._normalizedHash(into: &hasher)
   }
+
+  // Avoid using the compiler-synthesized hashValue implementation, because
+  // we need the attribute to apply.
+  @_needsUnicodeDataTablesInEmbedded
+  public var hashValue: Int { _hashValue(for: self) }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension _StringGutsSlice {
   @_effects(releasenone) @inline(never) // slow-path
+  @_needsUnicodeDataTablesInEmbedded
   internal func _normalizedHash(into hasher: inout Hasher) {
     if self.isNFCFastUTF8 {
       self.withFastUTF8 {

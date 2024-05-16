@@ -350,6 +350,7 @@ internal func unimplemented_utf8_32bit(
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @frozen
 @_eagerMove
+@_needsStringsInEmbedded
 public struct String {
   public // @SPI(Foundation)
   var _guts: _StringGuts

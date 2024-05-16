@@ -1511,6 +1511,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (Args.hasArg(OPT_enable_strings)) {
+    Opts.EnableStringsInEmbeddedSwift = EmbeddedSwiftStringsLevel::Core;
+  }
+  if (Args.hasArg(OPT_enable_strings_full_unicode_data_tables)) {
+    Opts.EnableStringsInEmbeddedSwift = EmbeddedSwiftStringsLevel::FullWithUnicodeDataTables;
+  }
+
   if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
     auto value = llvm::StringSwitch<std::optional<bool>>(A->getValue())
                      .Case("off", false)
@@ -3455,6 +3462,10 @@ bool CompilerInvocation::parseArgs(
   } else {
     if (SILOpts.NoAllocations) {
       Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
+      return true;
+    }
+    if (LangOpts.EnableStringsInEmbeddedSwift != EmbeddedSwiftStringsLevel::None) {
+      Diags.diagnose(SourceLoc(), diag::enable_strings_without_embedded);
       return true;
     }
   }

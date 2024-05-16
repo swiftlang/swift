@@ -440,6 +440,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SWIFT_COMPILE_FLAGS
         ${swift_stdlib_compile_flags} -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
         -Xfrontend -enable-ossa-modules
+        -Xfrontend -enable-strings-full-unicode-data-tables
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"

@@ -662,6 +662,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-track-system-dependencies");
   }
 
+  if (context.Args.hasArg(options::OPT_enable_strings)) {
+    Arguments.push_back("-enable-strings");
+  }
+  if (context.Args.hasArg(options::OPT_enable_strings_full_unicode_data_tables)) {
+    Arguments.push_back("-enable-strings-full-unicode-data-tables");
+  }
+
   if (context.Args.hasFlag(options::OPT_static_executable,
                            options::OPT_no_static_executable, false) ||
       context.Args.hasFlag(options::OPT_static_stdlib,

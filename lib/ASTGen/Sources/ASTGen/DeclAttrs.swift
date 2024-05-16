@@ -140,6 +140,10 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .noObjCBridging:
         fatalError("unimplemented")
+      case .needsStringsInEmbedded:
+        fatalError("unimplemented")
+      case .needsUnicodeDataTablesInEmbedded:
+        fatalError("unimplemented")
       case .noRuntime:
         fatalError("unimplemented")
       case .nonSendable:

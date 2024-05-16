@@ -94,6 +94,12 @@ namespace swift {
     TaskToThread,
   };
 
+  enum class EmbeddedSwiftStringsLevel : uint8_t {
+    None,
+    Core,
+    FullWithUnicodeDataTables,
+  };
+
   /// Describes the code size optimization behavior for code associated with
   /// declarations that are marked unavailable.
   enum class UnavailableDeclOptimization : uint8_t {
@@ -594,6 +600,9 @@ namespace swift {
 
     /// Disables `DynamicActorIsolation` feature.
     bool DisableDynamicActorIsolation = false;
+
+    /// Whether the user has opted in to using Swift.String via -enable-strings
+    EmbeddedSwiftStringsLevel EnableStringsInEmbeddedSwift = EmbeddedSwiftStringsLevel::None;
 
     /// Whether or not to allow experimental features that are only available
     /// in "production".

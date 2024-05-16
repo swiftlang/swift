@@ -211,22 +211,27 @@ extension String {
   }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension Character: Equatable {
   @inlinable @inline(__always)
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func == (lhs: Character, rhs: Character) -> Bool {
     return lhs._str == rhs._str
   }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension Character: Comparable {
   @inlinable @inline(__always)
   @_effects(readonly)
+  @_needsUnicodeDataTablesInEmbedded
   public static func < (lhs: Character, rhs: Character) -> Bool {
     return lhs._str < rhs._str
   }
 }
 
+@_needsUnicodeDataTablesInEmbedded
 extension Character: Hashable {
   // not @inlinable (performance)
   /// Hashes the essential components of this value by feeding them into the
