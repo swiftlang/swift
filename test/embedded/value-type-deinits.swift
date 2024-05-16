@@ -27,7 +27,7 @@ public struct Foo<Element> : ~Copyable {
 
 import MyModule
 
-func test() {
+public func test() {
   createFoo(x: 1)
 }
 
