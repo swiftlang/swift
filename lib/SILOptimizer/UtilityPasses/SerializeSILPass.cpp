@@ -41,7 +41,13 @@ public:
   }
 
   SILType remapType(SILType Ty) {
-    if (!Ty.getASTType()->hasOpaqueArchetype() ||
+    // Substitute local archetypes, if we have any.
+    if (Ty.hasLocalArchetype()) {
+      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
+                    CanGenericSignature());
+    }
+
+    if (!Ty.hasOpaqueArchetype() ||
         !getBuilder()
              .getTypeExpansionContext()
              .shouldLookThroughOpaqueTypeArchetypes())
@@ -52,6 +58,10 @@ public:
   }
 
   CanType remapASTType(CanType ty) {
+    // Substitute local archetypes, if we have any.
+    if (ty->hasLocalArchetype())
+      ty = ty.subst(Functor, Functor)->getCanonicalType();
+
     if (!ty->hasOpaqueArchetype() ||
         !getBuilder()
              .getTypeExpansionContext()
@@ -66,14 +76,19 @@ public:
 
   ProtocolConformanceRef remapConformance(Type ty,
                                           ProtocolConformanceRef conf) {
+    // If we have local archetypes to substitute, do so now.
+    if (ty->hasLocalArchetype()) {
+      conf = conf.subst(ty, Functor, Functor);
+      ty = ty.subst(Functor, Functor);
+    }
+
     auto context = getBuilder().getTypeExpansionContext();
-    auto conformance = conf;
     if (ty->hasOpaqueArchetype() &&
         context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conformance =
-          substOpaqueTypesWithUnderlyingTypes(conformance, ty, context);
+      conf =
+          substOpaqueTypesWithUnderlyingTypes(conf, ty, context);
     }
-    return conformance;
+    return conf;
   }
 
   void replace();

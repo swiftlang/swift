@@ -2983,6 +2983,7 @@ namespace {
     }
 
     SILType remapType(SILType ty) {
+      ty = ty.subst(getBuilder().getModule(), Functor, Functor);
       if (auto fnType = ty.getAs<SILFunctionType>()) {
         GenericEnvironment *genEnv = getSubstGenericEnvironment(fnType);
         return SILType::getPrimitiveObjectType(
