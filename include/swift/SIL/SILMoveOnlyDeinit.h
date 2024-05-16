@@ -29,7 +29,7 @@
 
 namespace swift {
 
-enum IsSerialized_t : unsigned char;
+enum SerializedKind_t : unsigned char;
 class SILFunction;
 class SILModule;
 
@@ -45,7 +45,7 @@ class SILMoveOnlyDeinit final : public SILAllocated<SILMoveOnlyDeinit> {
   /// Whether or not this deinit table is serialized. If a deinit is not
   /// serialized, then other modules can not consume directly a move only type
   /// since the deinit can not be called directly.
-  bool serialized : 1;
+  unsigned serialized : 2;
 
   SILMoveOnlyDeinit()
       : nominalDecl(nullptr), funcImpl(nullptr), serialized(false) {}
@@ -56,7 +56,7 @@ class SILMoveOnlyDeinit final : public SILAllocated<SILMoveOnlyDeinit> {
 
 public:
   static SILMoveOnlyDeinit *create(SILModule &mod, NominalTypeDecl *nominalDecl,
-                                   IsSerialized_t serialized,
+                                   SerializedKind_t serialized,
                                    SILFunction *funcImpl);
 
   NominalTypeDecl *getNominalDecl() const { return nominalDecl; }
@@ -66,11 +66,14 @@ public:
     return funcImpl;
   }
 
-  IsSerialized_t isSerialized() const {
-    return serialized ? IsSerialized : IsNotSerialized;
+  bool isSerialized() const {
+    return SerializedKind_t(serialized) == IsSerialized;
   }
-  void setSerialized(IsSerialized_t inputSerialized) {
-    serialized = inputSerialized ? 1 : 0;
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(serialized);
+  }
+  void setSerializedKind(SerializedKind_t inputSerialized) {
+    serialized = unsigned(inputSerialized);
   }
 
   void print(llvm::raw_ostream &os, bool verbose) const;

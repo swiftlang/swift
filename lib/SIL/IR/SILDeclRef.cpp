@@ -790,8 +790,12 @@ bool SILDeclRef::isTransparent() const {
   return false;
 }
 
+bool SILDeclRef::isSerialized() const {
+  return getSerializedKind() == IsSerialized;
+}
+
 /// True if the function should have its body serialized.
-IsSerialized_t SILDeclRef::isSerialized() const {
+SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (auto closure = getAbstractClosureExpr()) {
     // Ask the AST if we're inside an @inlinable context.
     if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {
@@ -864,6 +868,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Anything else that is not public is not serializable.
+  // pcmo TODO: should check if package-cmo is enabled?
   if (d->getEffectiveAccess() < AccessLevel::Public)
     return IsNotSerialized;
 

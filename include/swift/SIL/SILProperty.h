@@ -36,7 +36,7 @@ class SILProperty : public llvm::ilist_node<SILProperty>,
 {
 private:
   /// True if serialized.
-  bool Serialized;
+  unsigned Serialized : 2;
   
   /// The declaration the descriptor represents.
   AbstractStorageDecl *Decl;
@@ -44,12 +44,12 @@ private:
   /// The key path component that represents its implementation.
   std::optional<KeyPathPatternComponent> Component;
 
-  SILProperty(bool Serialized, AbstractStorageDecl *Decl,
+  SILProperty(unsigned Serialized, AbstractStorageDecl *Decl,
               std::optional<KeyPathPatternComponent> Component)
       : Serialized(Serialized), Decl(Decl), Component(Component) {}
 
 public:
-  static SILProperty *create(SILModule &M, bool Serialized,
+  static SILProperty *create(SILModule &M, unsigned Serialized,
                              AbstractStorageDecl *Decl,
                              std::optional<KeyPathPatternComponent> Component);
 

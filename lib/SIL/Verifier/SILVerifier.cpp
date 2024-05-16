@@ -2456,7 +2456,7 @@ public:
     // from a fragile function is an error.
     if (F.isSerialized()) {
       require((SingleFunction && RefF->isExternalDeclaration()) ||
-              RefF->hasValidLinkageForFragileRef(),
+              RefF->hasValidLinkageForFragileRef(F.getSerializedKind()),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -7024,7 +7024,7 @@ public:
     case SILLinkage::PackageNonABI:
       require(F->isDefinition(),
               "alwaysEmitIntoClient function must have a body");
-      require(F->isSerialized() || mod.isSerialized(),
+      require(!F->isNotSerialized() || mod.isSerialized(),
               "alwaysEmitIntoClient function must be serialized");
       break;
     case SILLinkage::Hidden:
@@ -7035,12 +7035,14 @@ public:
               "internal/private function cannot be serialized or serializable");
       break;
     case SILLinkage::PublicExternal:
-      require(F->isExternalDeclaration() || F->isSerialized() ||
+      require(F->isExternalDeclaration() ||
+              !F->isNotSerialized() ||
               mod.isSerialized(),
             "public-external function definition must be serialized");
       break;
     case SILLinkage::PackageExternal:
-      require(F->isExternalDeclaration() || F->isSerialized() ||
+      require(F->isExternalDeclaration() ||
+              !F->isNotSerialized() ||
               mod.isSerialized(),
               "package-external function definition must be serialized");
       break;
@@ -7377,8 +7379,8 @@ void SILWitnessTable::verify(const SILModule &M) const {
       if (F) {
         // If a SILWitnessTable is going to be serialized, it must only
         // reference public or serializable functions.
-        if (isSerialized()) {
-          assert(F->hasValidLinkageForFragileRef() &&
+        if (isSerialized()) { // pcmo TODO: change to !isNotSerialized()
+          assert(F->hasValidLinkageForFragileRef(getSerializedKind()) &&
                  "Fragile witness tables should not reference "
                  "less visible functions.");
         }

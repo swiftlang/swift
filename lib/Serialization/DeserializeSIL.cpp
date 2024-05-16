@@ -563,16 +563,16 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
-  unsigned rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
-      isThunk, isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
+  unsigned rawLinkage, isTransparent, serializedKind, isThunk,
+      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
-      scratch, rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
-      isThunk, isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
+      scratch, rawLinkage, isTransparent, serializedKind, isThunk,
+      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
@@ -640,7 +640,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // as serialized, since we no longer need to enforce resilience
   // boundaries.
   if (SILMod.isSerialized())
-    isSerialized = IsNotSerialized;
+    serializedKind = IsNotSerialized;
 
   SILSerializationFunctionBuilder builder(SILMod);
 
@@ -654,20 +654,21 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       return MF->diagnoseFatal(std::move(error));
     }
 
-    fn->setSerialized(IsSerialized_t(isSerialized));
+    fn->setSerializedKind(SerializedKind_t(serializedKind));
 
+    // pcmo TODO: delete this
     // If fn was serialized in a module with package serialization
     // enabled, a new attribute [serialized_for_package] was added
     // to its definition. Preserve the attribute here if the current
     // module is in the same package, and use it to determine the
     // resilience expansion for this function.
     auto loadedModule = getFile()->getParentModule();
-    if (isSerializedForPackage == IsSerializedForPackage &&
+    if (SerializedKind_t(serializedKind) == IsSerializedForPackage &&
         loadedModule->isResilient() &&
         loadedModule != SILMod.getSwiftModule() &&
         loadedModule->serializePackageEnabled() &&
         loadedModule->inSamePackage(SILMod.getSwiftModule()))
-      fn->setSerializedForPackage(IsSerializedForPackage);
+      fn->setSerializedKind(IsSerializedForPackage);
 
     // If the serialized function comes from the same module, we're merging
     // modules, and can update the linkage directly. This is needed to
@@ -715,8 +716,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn = builder.createDeclaration(name, ty, loc);
     fn->setLinkage(linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
-    fn->setSerialized(IsSerialized_t(isSerialized));
-    fn->setSerializedForPackage(IsSerializedForPackage_t(isSerializedForPackage));
+    fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutActuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
@@ -980,8 +980,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
   if (!MF->isSIB() && !SILMod.isSerialized()) {
-    assert((fn->isSerialized() || fn->empty()) &&
-           "deserialized function must have the IsSerialized flag set");
+    assert((!fn->isNotSerialized() || fn->empty()) &&
+           "deserialized function must have the IsSerialized or IsSerializedForPackage flag set");
   }
   return fn;
 }
@@ -3534,16 +3534,16 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
-  unsigned rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
-      isThunk, isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+  unsigned rawLinkage, isTransparent, serializedKind, isThunk,
+      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
-      scratch, rawLinkage, isTransparent, isSerialized, isSerializedForPackage,
-      isThunk, isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+      scratch, rawLinkage, isTransparent, serializedKind, isThunk,
+      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
@@ -3847,11 +3847,11 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   // as serialized, since we no longer need to enforce resilience
   // boundaries.
   if (SILMod.isSerialized())
-    Serialized = 0;
+    Serialized = unsigned(SerializedKind_t::IsNotSerialized);
 
   SILVTable *vT = SILVTable::create(
       SILMod, theClass,
-      Serialized ? IsSerialized : IsNotSerialized,
+      SerializedKind_t(Serialized),
       vtableEntries);
   vTableOrOffset.set(vT, true /*isFullyDeserialized*/);
 
@@ -4153,7 +4153,6 @@ llvm::Expected<SILWitnessTable *>
   ProtocolConformanceID conformance;
   WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
                                  Serialized, conformance);
-
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
@@ -4228,10 +4227,10 @@ llvm::Expected<SILWitnessTable *>
   // as serialized, since we no longer need to enforce resilience
   // boundaries.
   if (SILMod.isSerialized())
-    Serialized = 0;
+    Serialized = unsigned(SerializedKind_t::IsNotSerialized);
 
   wT->convertToDefinition(witnessEntries, conditionalConformances,
-                          Serialized ? IsSerialized : IsNotSerialized);
+                          SerializedKind_t(Serialized));
   wTableOrOffset.set(wT, /*fully deserialized*/ true);
   if (Callback)
     Callback->didDeserializeWitnessTableEntries(MF->getAssociatedModule(), wT);

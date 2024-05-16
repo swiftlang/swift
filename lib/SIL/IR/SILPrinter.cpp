@@ -3336,16 +3336,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isTransparent())
     OS << "[transparent] ";
 
-  switch (isSerialized()) {
-  case IsNotSerialized: break;
-  case IsSerialized: OS << "[serialized] "; break;
-  }
-
-  switch (isSerializedForPackage()) {
-  case IsNotSerializedForPackage:
+  switch (getSerializedKind()) {
+  case IsNotSerialized:
     break;
   case IsSerializedForPackage:
     OS << "[serialized_for_package] ";
+    break;
+  case IsSerialized:
+    OS << "[serialized] ";
     break;
   }
 
@@ -4025,8 +4023,17 @@ void SILVTableEntry::print(llvm::raw_ostream &OS) const {
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
-  if (isSerialized())
+
+  switch (getSerializedKind()) {
+  case IsNotSerialized:
+    break;
+  case IsSerializedForPackage:
+    OS << "[serialized_for_package] ";
+    break;
+  case IsSerialized:
     OS << "[serialized] ";
+    break;
+  }
 
   if (SILType classTy = getClassType()) {
     OS << classTy;
@@ -4138,8 +4145,17 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
-  if (isSerialized())
+
+  switch (getSerializedKind()) {
+  case IsNotSerialized:
+    break;
+  case IsSerializedForPackage:
+    OS << "[serialized_for_package] ";
+    break;
+  case IsSerialized:
     OS << "[serialized] ";
+    break;
+  }
 
   getConformance()->printName(OS, Options);
   Options.GenericSig =

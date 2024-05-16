@@ -847,24 +847,13 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 
   // A non-fragile function may not be inlined into a fragile function.
   if (Caller->isSerialized() &&
-      !Callee->hasValidLinkageForFragileInline()) {
-    if (!Callee->hasValidLinkageForFragileRef()) {
+      !Callee->canBeSerializedIntoCaller(Caller->getSerializedKind())) {
+    if (!Callee->hasValidLinkageForFragileRef(Caller->getSerializedKind())) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
       llvm::errs() << "callee: " << Callee->getName() << "\n";
       llvm_unreachable("Should never be inlining a resilient function into "
                        "a fragile function");
     }
-    return nullptr;
-  }
-
-  // If the caller is [serialized] due to explicit `@inlinable` but
-  // the callee was [serialized_for_package] due to package-cmo, the
-  // callee is [serialized] and might contain loadable types, which
-  // is normally disallowed. This check prevents such loadable types
-  // from being inlined.
-  if (Caller->isSerialized() &&
-      !Caller->isSerializedForPackage() &&
-      Callee->isSerializedForPackage()) {
     return nullptr;
   }
 

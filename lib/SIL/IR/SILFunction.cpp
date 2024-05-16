@@ -152,7 +152,7 @@ SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
     std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsSerialized_t isSerialized,
+    IsTransparent_t isTrans, SerializedKind_t serializedKind,
     ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
     IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk,
@@ -174,14 +174,14 @@ SILFunction *SILFunction::create(
     // This happens for example if a specialized function gets dead and gets
     // deleted. And afterwards the same specialization is created again.
     fn->init(linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
-             isSerialized, entryCount, isThunk, classSubclassScope,
+             serializedKind, entryCount, isThunk, classSubclassScope,
              inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
              isDistributed, isRuntimeAccessible);
     assert(fn->empty());
   } else {
     fn = new (M) SILFunction(
         M, linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
-        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
+        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy,
         E, debugScope, isDynamic, isExactSelfClass, isDistributed,
         isRuntimeAccessible);
   }
@@ -209,7 +209,7 @@ SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
     CanSILFunctionType LoweredType, GenericEnvironment *genericEnv,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
+    SerializedKind_t serializedKind, ProfileCounter entryCount, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
     IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
@@ -218,7 +218,7 @@ SILFunction::SILFunction(
       index(Module.getNewFunctionIndex()),
       Availability(AvailabilityContext::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
-       isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
+       serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
        DebugScope, isDynamic, isExactSelfClass, isDistributed,
        isRuntimeAccessible);
 
@@ -232,7 +232,7 @@ SILFunction::SILFunction(
 void SILFunction::init(
     SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
     GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsSerialized_t isSerialized,
+    IsTransparent_t isTrans, SerializedKind_t serializedKind,
     ProfileCounter entryCount, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
@@ -250,8 +250,7 @@ void SILFunction::init(
   this->Availability = AvailabilityContext::alwaysAvailable();
   this->Bare = isBareSILFunction;
   this->Transparent = isTrans;
-  this->Serialized = isSerialized;
-  this->SerializedForPackage = false;
+  this->SerializedKind = serializedKind;
   this->Thunk = isThunk;
   this->ClassSubclassScope = unsigned(classSubclassScope);
   this->GlobalInitFlag = false;
@@ -322,7 +321,7 @@ void SILFunction::createSnapshot(int id) {
 
   SILFunction *newSnapshot = new (Module) SILFunction(
       Module, getLinkage(), getName(), getLoweredFunctionType(),
-      getGenericEnvironment(), isBare(), isTransparent(), isSerialized(),
+      getGenericEnvironment(), isBare(), isTransparent(), getSerializedKind(),
       getEntryCount(), isThunk(), getClassSubclassScope(), getInlineStrategy(),
       getEffectsKind(), getDebugScope(), isDynamicallyReplaceable(),
       isExactSelfClass(), isDistributed(), isRuntimeAccessible());
@@ -526,9 +525,6 @@ ResilienceExpansion SILFunction::getResilienceExpansion() const {
   // attribute is preserved if the current module is in
   // the same package, thus should be in the same resilience
   // domain.
-  if (isSerializedForPackage() == IsSerializedForPackage)
-    return ResilienceExpansion::Maximal;
-
   return (isSerialized()
           ? ResilienceExpansion::Minimal
           : ResilienceExpansion::Maximal);
@@ -892,16 +888,51 @@ bool SILFunction::hasName(const char *Name) const {
   return getName() == Name;
 }
 
+bool SILFunction::canBeSerializedIntoCaller(
+    std::optional<SerializedKind_t> callerSerializedKind) const {
+  // If Package-CMO is enabled, we serialize package, public,
+  // and @usableFromInline decls as [serialized_for_package].
+  // They must not, however, leak into @inlinable functions
+  // outside of their defining module. The following contains
+  // the rule of inlinability of a callee (e.g. serialized
+  // in a library module with Package-CMO) into a caller (e.g.
+  // an @inlinable function in a client module).
+
+  switch (getSerializedKind()) {
+    // If this callee is not serialized, caller must also
+    // be _not_ serialized for this callee to be inlined
+    // into the caller.
+    case IsNotSerialized:
+      return false;
+// pcmo TODO: should we return the following instead? 
+//      return callerSerializedKind.has_value() &&
+//             callerSerializedKind.value() == IsNotSerialized &&
+//             getModule().getSwiftModule()->serializePackageEnabled() &&
+//             getModule().getSwiftModule()->isResilient() &&
+//             hasPublicOrPackageVisibility(getLinkage(), true);
+    // If this callee is serialized_for_package, the caller
+    // must be either not serialized or serialized_for_package
+    // for this callee to be inlined into the caller.
+    case IsSerializedForPackage:
+      return callerSerializedKind.has_value() &&
+             callerSerializedKind.value() != IsSerialized;
+    case IsSerialized:
+      return true;
+  }
+  llvm_unreachable("Invalid serialized kind");
+}
+
 /// Returns true if this function can be referenced from a fragile function
 /// body.
-bool SILFunction::hasValidLinkageForFragileRef() const {
+bool SILFunction::hasValidLinkageForFragileRef(
+    std::optional<SerializedKind_t> callerSerializedKind) const {
   // Fragile functions can reference 'static inline' functions imported
   // from C.
   if (hasForeignBody())
     return true;
 
   // If we can inline it, we can reference it.
-  if (hasValidLinkageForFragileInline())
+  if (canBeSerializedIntoCaller(callerSerializedKind))
     return true;
 
   // If the containing module has been serialized already, we no longer

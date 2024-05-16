@@ -277,7 +277,8 @@ namespace {
     void writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit);
     void writeSILGlobalVar(const SILGlobalVariable &g);
     void writeSILWitnessTable(const SILWitnessTable &wt);
-    void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry);
+    void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry,
+                                   SerializedKind_t serializedKind);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
     void
     writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw);
@@ -375,7 +376,8 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
   }
 
   if (F->getLinkage() == SILLinkage::Shared) {
-    assert(F->isSerialized() || F->hasForeignBody());
+    assert(!F->isNotSerialized() ||
+           F->hasForeignBody());
 
     FuncsToEmit[F] = false;
     functionWorklist.push_back(F);
@@ -490,7 +492,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
-
+  // pcmo TODO: check if package-cmo is enabled
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
   bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
                                  !F.hasSemanticsAttr("optimize.no.crossmodule");
@@ -511,9 +513,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
-      (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
-      (unsigned)F.isSerializedForPackage(), (unsigned)F.isThunk(),
-      (unsigned)F.isWithoutActuallyEscapingThunk(),
+      (unsigned)F.isTransparent(), (unsigned)F.getSerializedKind(),
+      (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
@@ -2915,13 +2916,13 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
                            S.addDeclRef(vt.getClass()),
-                           vt.isSerialized() == IsSerialized ? 1 : 0);
+                           vt.getSerializedKind());
 
   for (auto &entry : vt.getEntries()) {
     SmallVector<uint64_t, 4> ListOfValues;
     SILFunction *impl = entry.getImplementation();
 
-    if (ShouldSerializeAll || impl->hasValidLinkageForFragileRef()) {
+    if (ShouldSerializeAll || impl->hasValidLinkageForFragileRef(vt.getSerializedKind())) {
       handleSILDeclRef(S, entry.getMethod(), ListOfValues);
       addReferencedSILFunction(impl, true);
       // Each entry is a pair of SILDeclRef and SILFunction.
@@ -2997,7 +2998,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
-    wt.isSerialized() == IsSerialized ? 1 : 0,
+    wt.getSerializedKind(),
     conformanceID);
 
   // If we have a declaration, do not attempt to serialize entries.
@@ -3005,7 +3006,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     return;
 
   for (auto &entry : wt.getEntries()) {
-    writeSILWitnessTableEntry(entry);
+    writeSILWitnessTableEntry(entry, wt.getSerializedKind());
   }
 
   for (auto conditional : wt.getConditionalConformances()) {
@@ -3019,7 +3020,8 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
 }
 
 void SILSerializer::writeSILWitnessTableEntry(
-                                        const SILWitnessTable::Entry &entry) {
+                                        const SILWitnessTable::Entry &entry,
+                                              SerializedKind_t serializedKind) {
   if (entry.getKind() == SILWitnessTable::BaseProtocol) {
     auto &baseWitness = entry.getBaseProtocolWitness();
 
@@ -3060,7 +3062,7 @@ void SILSerializer::writeSILWitnessTableEntry(
   handleSILDeclRef(S, methodWitness.Requirement, ListOfValues);
   IdentifierID witnessID = 0;
   SILFunction *witness = methodWitness.Witness;
-  if (witness && witness->hasValidLinkageForFragileRef()) {
+  if (witness && witness->hasValidLinkageForFragileRef(serializedKind)) {
     addReferencedSILFunction(witness, true);
     witnessID = S.addUniquedStringRef(witness->getName());
   }
@@ -3093,8 +3095,7 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
           SILAbbrCodes[DefaultWitnessTableNoEntryLayout::Code]);
       continue;
     }
-
-    writeSILWitnessTableEntry(entry);
+    writeSILWitnessTableEntry(entry, IsNotSerialized);
   }
 }
 
@@ -3166,7 +3167,8 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   // If F is serialized, we should always emit its body.
   // Shared functions are only serialized if they are referenced from another
   // serialized function. This is handled in `addReferencedSILFunction`.
-  if (F->isSerialized() && !hasSharedVisibility(F->getLinkage()))
+  if (!F->isNotSerialized() &&
+      !hasSharedVisibility(F->getLinkage()))
     return true;
 
   return false;
@@ -3228,7 +3230,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
   for (const auto &vt : SILMod->getVTables()) {
-    if ((ShouldSerializeAll || vt->isSerialized()) &&
+    if ((ShouldSerializeAll || !vt->isNotSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt->getClass()))
       writeSILVTable(*vt);
   }
@@ -3250,7 +3252,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if ((ShouldSerializeAll || wt.isSerialized()) &&
+    if ((ShouldSerializeAll || !wt.isNotSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                          wt.getConformance()->getDeclContext()))
       writeSILWitnessTable(wt);
@@ -3313,6 +3315,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.
+  // pcmo TODO: check if package-cmo is enabled
   auto resilience = SILMod->getSwiftModule()->getResilienceStrategy();
   for (const SILFunction &F : *SILMod) {
     auto iter = FuncsToEmit.find(&F);

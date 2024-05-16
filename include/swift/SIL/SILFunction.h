@@ -361,11 +361,7 @@ private:
   unsigned Transparent : 1;
 
   /// The function's serialized attribute.
-  bool Serialized : 1;
-
-  /// [serialized_for_package] attribute if package serialization
-  /// is enabled.
-  bool SerializedForPackage : 1;
+  unsigned SerializedKind : 2;
 
   /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
@@ -505,7 +501,7 @@ private:
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-              IsSerialized_t isSerialized, ProfileCounter entryCount,
+              SerializedKind_t serializedKind, ProfileCounter entryCount,
               IsThunk_t isThunk, SubclassScope classSubclassScope,
               Inline_t inlineStrategy, EffectsKind E,
               const SILDebugScope *debugScope,
@@ -518,7 +514,7 @@ private:
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, IsSerialized_t isSerialized,
+         IsTransparent_t isTrans, SerializedKind_t serializedKind,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
          IsDistributed_t isDistributed,
          IsRuntimeAccessible_t isRuntimeAccessible,
@@ -531,7 +527,7 @@ private:
 
   void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
             GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-            IsTransparent_t isTrans, IsSerialized_t isSerialized,
+            IsTransparent_t isTrans, SerializedKind_t serializedKind,
             ProfileCounter entryCount, IsThunk_t isThunk,
             SubclassScope classSubclassScope, Inline_t inlineStrategy,
             EffectsKind E, const SILDebugScope *DebugScope,
@@ -876,11 +872,19 @@ public:
 
   /// Returns true if this function can be inlined into a fragile function
   /// body.
-  bool hasValidLinkageForFragileInline() const { return isSerialized(); }
+  /// If the caller is [serialized] due to explicit `@inlinable` but
+  /// the callee was [serialized_for_package] due to package-cmo, the
+  /// callee is [serialized] and might contain loadable types, which
+  /// is normally disallowed. This check prevents such loadable types
+  /// from being inlined.
+  bool canBeSerializedIntoCaller(
+      std::optional<SerializedKind_t> callerSerializedKind) const;
 
   /// Returns true if this function can be referenced from a fragile function
   /// body.
-  bool hasValidLinkageForFragileRef() const;
+  bool hasValidLinkageForFragileRef(
+      std::optional<SerializedKind_t> callerSerializedKind =
+          std::nullopt) const;
 
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
@@ -1134,28 +1138,24 @@ public:
     assert(!Transparent || !IsDynamicReplaceable);
   }
 
-  /// Get this function's serialized attribute.
-  IsSerialized_t isSerialized() const { return IsSerialized_t(Serialized); }
-  void setSerialized(IsSerialized_t isSerialized) {
-    Serialized = isSerialized;
-    assert(this->isSerialized() == isSerialized &&
-           "too few bits for Serialized storage");
+  bool isSerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized;
+  }
+  bool isSerializedForPackage() const {
+    return SerializedKind_t(SerializedKind) == IsSerializedForPackage;
+  }
+  bool isNotSerialized() const {
+    return SerializedKind_t(SerializedKind) == IsNotSerialized;
   }
 
-  /// A [serialized_for_package] attribute is used to indicate that a function
-  /// is [serialized] because of package-cmo optimization.
-  /// Package-cmo allows serializing a function containing a loadable type in
-  /// a resiliently built module, which is normally illegal. During SIL deserialization,
-  /// this attribute can be used to check whether a loaded function that was serialized
-  /// can be allowed to have loadable types. This attribute is also used to determine
-  /// if a callee can be inlined into a caller that's serialized without package-cmo, for
-  /// example, by explicitly annotating the caller decl with `@inlinable`.
-  IsSerializedForPackage_t isSerializedForPackage() const {
-    return IsSerializedForPackage_t(SerializedForPackage);
+  /// Get this function's serialized attribute.
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(SerializedKind);
   }
-  void
-  setSerializedForPackage(IsSerializedForPackage_t isSerializedForPackage) {
-    SerializedForPackage = isSerializedForPackage;
+  void setSerializedKind(SerializedKind_t serializedKind) {
+    SerializedKind = serializedKind;
+    assert(this->getSerializedKind() == serializedKind &&
+           "too few bits for Serialized storage");
   }
 
   /// Get this function's thunk attribute.

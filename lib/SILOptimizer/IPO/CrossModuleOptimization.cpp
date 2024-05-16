@@ -234,7 +234,12 @@ void CrossModuleOptimization::serializeTablesInModule() {
   for (const auto &vt : M.getVTables()) {
     if (!vt->isSerialized() &&
         vt->getClass()->getEffectiveAccess() >= AccessLevel::Package) {
-      vt->setSerialized(IsSerialized);
+      vt->setSerializedKind(IsSerializedForPackage);
+    }
+    if (vt->isSerialized()) {
+      // This block shouldn't be reached, but in case it
+      // does, set it to IsSerializedForPackage.
+      vt->setSerializedKind(IsSerializedForPackage);
     }
   }
 
@@ -247,11 +252,16 @@ void CrossModuleOptimization::serializeTablesInModule() {
             !entry.getMethodWitness().Witness->isSerialized() &&
             isSerializeCandidate(entry.getMethodWitness().Witness,
                                  M.getOptions())) {
-          entry.getMethodWitness().Witness->setSerialized(IsSerialized);
+          entry.getMethodWitness().Witness->setSerializedKind(IsSerialized);
         }
       }
       // Then serialize the witness table itself.
-      wt.setSerialized(IsSerialized);
+      wt.setSerializedKind(IsSerializedForPackage);
+    }
+    if (wt.isSerialized()) {
+      // This block shouldn't be reached, but in case it
+      // does, set it to IsSerializedForPackage.
+      wt.setSerializedKind(IsSerializedForPackage);
     }
   }
 }
@@ -583,10 +593,12 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 static void addSerializedForPackageAttrIfEnabled(SILFunction *f,
                                                  const SILModule &mod) {
   assert(f->isSerialized());
+  if (f->isSerializedForPackage())
+    return;
   auto shouldSet = mod.getSwiftModule()->serializePackageEnabled() &&
                    mod.getSwiftModule()->isResilient();
-  f->setSerializedForPackage(shouldSet ? IsSerializedForPackage
-                                       : IsNotSerializedForPackage);
+  if (shouldSet)
+    f->setSerializedKind(IsSerializedForPackage);
 }
 
 /// Serialize \p function and recursively all referenced functions which are
@@ -600,7 +612,7 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
   if (!canSerializeFlags.lookup(function))
     return;
 
-  function->setSerialized(IsSerialized);
+  function->setSerializedKind(IsSerialized);
   addSerializedForPackageAttrIfEnabled(function, M);
 
   for (SILBasicBlock &block : *function) {
@@ -684,7 +696,7 @@ void CrossModuleOptimization::serializeGlobal(SILGlobalVariable *global) {
         makeFunctionUsableFromInline(callee);
     }
   }
-  global->setSerialized(IsSerialized);
+  global->setSerializedKind(IsSerialized);
 }
 
 void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
@@ -726,7 +738,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
       // usable from inline.
       if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
         auto *vTable = M.lookUpVTable(classDecl);
-        vTable->setSerialized(IsSerialized);
+        vTable->setSerializedKind(IsSerialized);
         for (auto &entry : vTable->getEntries()) {
           makeFunctionUsableFromInline(entry.getImplementation());
         }
@@ -736,7 +748,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
           if (!vTable) {
             return TypeWalker::Action::Stop;
           }
-          vTable->setSerialized(IsSerialized);
+          vTable->setSerializedKind(IsSerialized);
           for (auto &entry : vTable->getEntries()) {
             makeFunctionUsableFromInline(entry.getImplementation());
           }

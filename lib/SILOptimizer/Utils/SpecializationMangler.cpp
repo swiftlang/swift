@@ -37,10 +37,9 @@ std::string PartialSpecializationMangler::mangle() {
 //                      Function Signature Optimizations
 //===----------------------------------------------------------------------===//
 
-FunctionSignatureSpecializationMangler::
-FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
-                                       IsSerialized_t Serialized, SILFunction *F)
-  : SpecializationMangler(P, Serialized, F) {
+FunctionSignatureSpecializationMangler::FunctionSignatureSpecializationMangler(
+    Demangle::SpecializationPass P, SerializedKind_t Serialized, SILFunction *F)
+    : SpecializationMangler(P, Serialized, F) {
   for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
        ++i) {
     (void)i;

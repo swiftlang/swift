@@ -616,11 +616,11 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
     NewF = FunctionBuilder.createFunction(
-      linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+        linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
+        F->isTransparent(), F->getSerializedKind(), IsNotDynamic,
+        IsNotDistributed, IsNotRuntimeAccessible, F->getEntryCount(),
+        F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
+        F->getEffectsKind(), nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())

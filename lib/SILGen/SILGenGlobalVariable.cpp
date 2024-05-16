@@ -42,7 +42,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
   // Get the linkage for SILGlobalVariable.
   FormalLinkage formalLinkage;
-  if (gDecl->isResilient())
+  if (gDecl->isResilient()) // pcmo TODO: !isFragile? 
     formalLinkage = FormalLinkage::Private;
   else
     formalLinkage = getDeclLinkage(gDecl);

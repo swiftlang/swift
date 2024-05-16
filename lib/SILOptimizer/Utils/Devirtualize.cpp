@@ -722,7 +722,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   if (applySite.getFunction()->isSerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
-    if (!f->hasValidLinkageForFragileRef())
+    if (!f->hasValidLinkageForFragileRef(applySite.getFunction()->getSerializedKind()))
       return false;
   }
 
@@ -1170,7 +1170,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   if (applySite.getFunction()->isSerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
-    if (!f->hasValidLinkageForFragileRef())
+    if (!f->hasValidLinkageForFragileRef(applySite.getFunction()->getSerializedKind()))
       return false;
   }
 

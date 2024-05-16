@@ -18,7 +18,7 @@ using namespace swift;
 
 SILMoveOnlyDeinit *SILMoveOnlyDeinit::create(SILModule &mod,
                                              NominalTypeDecl *nominalDecl,
-                                             IsSerialized_t serialized,
+                                             SerializedKind_t serialized,
                                              SILFunction *funcImpl) {
   auto buf =
       mod.allocate(sizeof(SILMoveOnlyDeinit), alignof(SILMoveOnlyDeinit));
