@@ -61,8 +61,18 @@ SILGlobalVariable::~SILGlobalVariable() {
 }
 
 bool SILGlobalVariable::isPossiblyUsedExternally() const {
+  if (shouldBePreservedForDebugger())
+    return true;
+
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
+bool SILGlobalVariable::shouldBePreservedForDebugger() const {
+  if (getModule().getOptions().OptMode != OptimizationMode::NoOptimization)
+    return false;
+  // Keep any language-level global variables for the debugger.
+  return VDecl != nullptr;
 }
 
 /// Get this global variable's fragile attribute.
