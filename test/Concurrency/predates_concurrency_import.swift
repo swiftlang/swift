@@ -3,10 +3,10 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify  -parse-as-library -enable-upcoming-feature GlobalConcurrency
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -disable-region-based-isolation-with-strict-concurrency  -parse-as-library -enable-upcoming-feature GlobalConcurrency
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency  -parse-as-library -enable-upcoming-feature GlobalConcurrency
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -28,3 +28,8 @@ func test(
   acceptSendable(oma) // okay
   acceptSendable(ssc) // okay
 }
+
+let nonStrictGlobal = NonStrictClass() // no warning
+
+let strictGlobal = StrictStruct() // expected-warning{{let 'strictGlobal' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
+// expected-note@-1{{isolate 'strictGlobal' to a global actor, or conform 'StrictStruct' to 'Sendable'}}
