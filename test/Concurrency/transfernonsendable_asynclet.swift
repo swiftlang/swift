@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

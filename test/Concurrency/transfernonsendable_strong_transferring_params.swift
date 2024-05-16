@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -134,7 +134,7 @@ actor MyActor {
   func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
     await transferToMain(x)
     await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
-    // expected-note @-1 {{sending actor-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and actor-isolated uses}}
+    // expected-note @-1 {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
@@ -383,4 +383,21 @@ func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
   x = y
   await transferToCustom(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending main actor-isolated 'x' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+}
+
+
+@available(SwiftStdlib 5.1, *)
+actor NonSendableInit {
+  var first: Klass
+  var second: Klass? = nil {
+    @storageRestrictions(initializes: first)
+    init(initialValue)  {
+      transferArg(initialValue!) // expected-warning {{sending 'initialValue' risks causing data races}}
+      // expected-note @-1 {{'self'-isolated 'initialValue' is passed as a transferring parameter}}
+      first = initialValue!
+    }
+
+    get { fatalError() }
+    set { fatalError() }
+  }
 }

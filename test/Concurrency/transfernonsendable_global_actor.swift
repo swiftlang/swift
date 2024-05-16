@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null -parse-as-library -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null -parse-as-library -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -29,6 +29,31 @@ func useValueAsync<T>(_ t: T) async {}
 var booleanFlag: Bool { false }
 @MainActor var mainActorIsolatedGlobal = NonSendableKlass()
 @CustomActor var customActorIsolatedGlobal = NonSendableKlass()
+
+@MainActor
+class NonSendableGlobalActorIsolatedKlass {}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedKlass: Sendable {}
+
+@MainActor
+struct NonSendableGlobalActorIsolatedStruct {
+  var k = NonSendableKlass()
+}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedStruct: Sendable {}
+
+@MainActor
+enum NonSendableGlobalActorIsolatedEnum {
+  case first
+  case second(NonSendableKlass)
+  case third(SendableKlass)
+}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedEnum: Sendable {}
+
 
 /////////////////
 // MARK: Tests //
@@ -186,7 +211,7 @@ struct Clock {
     // nonisolated instead of custom actor isolated.
     print(ns) // expected-tns-warning {{sending 'ns' risks causing data races}}
     // expected-tns-note @-1 {{global actor 'CustomActor'-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in an isolated closure}}
+    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
   }
 
   useValue(ns)

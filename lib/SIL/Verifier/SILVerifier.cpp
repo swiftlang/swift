@@ -6577,6 +6577,12 @@ public:
                                     SILResultInfo::IsTransferring);
                               })),
             "transferring result means all results are transferring");
+
+    require(1 >= std::count_if(FTy->getParameters().begin(), FTy->getParameters().end(),
+                               [](const SILParameterInfo &parameterInfo) {
+                                 return parameterInfo.hasOption(SILParameterInfo::Isolated);
+                               }),
+            "Should only ever be isolated to a single parameter");
   }
 
   struct VerifyFlowSensitiveRulesDetails {
@@ -6979,11 +6985,37 @@ public:
     }
   }
 
+  void verifyParentFunctionSILFunctionType(CanSILFunctionType FTy) {
+    bool foundIsolatedParameter = false;
+    for (const auto &parameterInfo : FTy->getParameters()) {
+      if (parameterInfo.hasOption(SILParameterInfo::Isolated)) {
+           auto argType = parameterInfo.getArgumentType(F.getModule(),
+                                                     FTy,
+                                                     F.getTypeExpansionContext());
+
+        if (argType->isOptional())
+          argType = argType->lookThroughAllOptionalTypes()->getCanonicalType();
+
+        auto genericSig = FTy->getInvocationGenericSignature();
+        auto &ctx = F.getASTContext();
+        auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+        auto *anyActorProtocol = ctx.getProtocol(KnownProtocolKind::AnyActor);
+        require(argType->isAnyActorType() ||
+                    genericSig->requiresProtocol(argType, actorProtocol) ||
+                    genericSig->requiresProtocol(argType, anyActorProtocol),
+                "Only any actor types can be isolated");
+        require(!foundIsolatedParameter, "Two isolated parameters");
+        foundIsolatedParameter = true;
+      }
+    }
+  }
+
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
+    verifyParentFunctionSILFunctionType(FTy);
 
     SILModule &mod = F->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);

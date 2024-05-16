@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -disable-availability-checking -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -27,6 +27,8 @@ func useValue<T>(_ t: T) {}
 @MainActor func transferToMain<T>(_ t: T) {}
 @CustomActor func transferToCustom<T>(_ t: T) {}
 
+var boolValue: Bool { false }
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -37,12 +39,19 @@ actor ProtectsNonSendable {
   var ns: NonSendableKlass = .init()
 
   nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
-    // TODO: This is wrong, we should get an error saying that nsArg is task
-    // isolated since this is nonisolated.
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
       // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
+  }
+
+  nonisolated func testParameterOutOfLine2(_ nsArg: NonSendableKlass) async {
+    let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+      isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+    self.assumeIsolated(closure)
+    self.assumeIsolated(closure)
   }
 
   nonisolated func testParameterMergedIntoLocal(_ nsArg: NonSendableKlass) async {
@@ -103,4 +112,58 @@ func transferBeforeCaptureErrors() async {
   let _ = { @MainActor in // expected-note {{access can happen concurrently}}
     useValue(x)
   }
+}
+
+// TODO: This should have an error. We aren't disambiguating the actors.
+func testDifferentIsolationFromSameClassKindPartialApply() async {
+  let p1 = ProtectsNonSendable()
+  let p2 = ProtectsNonSendable()
+
+  let x = NonSendableKlass()
+
+  let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+    print(x)
+  }
+
+  await closure(p1)
+  await closure(p2)
+}
+
+// TODO: This should have an error. We aren't disambiguating the actors.
+func testDifferentIsolationFromSameClassKindPartialApplyFlowSensitive() async {
+  let p1 = ProtectsNonSendable()
+  let p2 = ProtectsNonSendable()
+
+  let x = NonSendableKlass()
+
+  let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+    print(x)
+  }
+
+  if await boolValue {
+    await closure(p1)
+    await closure(p1)
+  } else {
+    await closure(p2)
+    await closure(p2)
+  }
+}
+
+// TODO: This should have an error. We aren't disambiguating the actors.
+func testDifferentIsolationFromSameClassKindPartialApplyFlowSensitive2() async {
+  let p1 = ProtectsNonSendable()
+  let p2 = ProtectsNonSendable()
+
+  let x = NonSendableKlass()
+
+  let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+    print(x)
+  }
+
+  if await boolValue {
+    await closure(p1)
+  } else {
+    await closure(p2)
+  }
+  await closure(p2)
 }

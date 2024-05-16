@@ -124,7 +124,8 @@ struct UseDefChainVisitor
     // If this is a type case, see if the result of the cast is sendable. In
     // such a case, we do not want to look through this cast.
     if (castType == AccessStorageCast::Type &&
-        !isNonSendableType(cast->getType(), cast->getFunction()))
+        !SILIsolationInfo::isNonSendableType(cast->getType(),
+                                             cast->getFunction()))
       return SILValue();
 
     // If we do not have an identity cast, mark this as a merge.
@@ -156,59 +157,41 @@ struct UseDefChainVisitor
         isMerge = true;
         break;
       case ProjectionKind::Enum: {
-        // Enum is never a merge since it always has a single tuple field... but
-        // it can be actor isolated.
-        if (!bool(actorIsolation)) {
-          auto *uedi = cast<UncheckedTakeEnumDataAddrInst>(inst);
-          auto i = getActorIsolation(uedi->getEnumDecl());
-          // If our operand decl is actor isolated, then we want to stop looking
-          // through since it is Sendable.
-          if (i.isActorIsolated()) {
-            actorIsolation = i;
-            return SILValue();
-          }
-        }
+        auto op = cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand();
+
+        // See if our operand type is a sendable type. In such a case, we do not
+        // want to look through our operand.
+        if (!SILIsolationInfo::isNonSendableType(op->getType(),
+                                                 op->getFunction()))
+          return SILValue();
+
         break;
       }
       case ProjectionKind::Tuple: {
         // These are merges if we have multiple fields.
-        auto *tti = cast<TupleElementAddrInst>(inst);
+        auto op = cast<TupleElementAddrInst>(inst)->getOperand();
 
-        // See if our result type is a sendable type. In such a case, we do not
-        // want to look through the tuple_element_addr since we do not want to
-        // identify the sendable type with the non-sendable operand. These we
-        // are always going to ignore anyways since a sendable let/var field of
-        // a struct can always be used.
-        if (!isNonSendableType(tti->getType(), tti->getFunction()))
+        if (!SILIsolationInfo::isNonSendableType(op->getType(),
+                                                 op->getFunction()))
           return SILValue();
 
-        isMerge |= tti->getOperand()->getType().getNumTupleElements() > 1;
+        isMerge |= op->getType().getNumTupleElements() > 1;
         break;
       }
       case ProjectionKind::Struct:
-        auto *sea = cast<StructElementAddrInst>(inst);
-
-        // See if our type is actor isolated.
-        if (!bool(actorIsolation)) {
-          auto i = getActorIsolation(sea->getStructDecl());
-          // If our parent type is actor isolated then we do not want to keep on
-          // walking up from use->def since the value is considered Sendable.
-          if (i.isActorIsolated()) {
-            actorIsolation = i;
-            return SILValue();
-          }
-        }
+        auto op = cast<StructElementAddrInst>(inst)->getOperand();
 
         // See if our result type is a sendable type. In such a case, we do not
         // want to look through the struct_element_addr since we do not want to
         // identify the sendable type with the non-sendable operand. These we
         // are always going to ignore anyways since a sendable let/var field of
         // a struct can always be used.
-        if (!isNonSendableType(sea->getType(), sea->getFunction()))
+        if (!SILIsolationInfo::isNonSendableType(op->getType(),
+                                                 op->getFunction()))
           return SILValue();
 
         // These are merges if we have multiple fields.
-        isMerge |= sea->getOperand()->getType().getNumNominalFields() > 1;
+        isMerge |= op->getType().getNumNominalFields() > 1;
         break;
       }
     }
@@ -335,21 +318,23 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
       if (isLookThroughIfOperandAndResultNonSendable(svi)) {
-        if (isNonSendableType(svi->getType(), fn) &&
-            isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
+            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
           temp = svi->getOperand(0);
         }
       }
 
       if (isLookThroughIfResultNonSendable(svi)) {
-        if (isNonSendableType(svi->getType(), fn)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
           temp = svi->getOperand(0);
         }
       }
 
       if (isLookThroughIfOperandNonSendable(svi)) {
         // If our operand is a non-Sendable type, look through this instruction.
-        if (isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
           temp = svi->getOperand(0);
         }
       }
@@ -1457,6 +1442,8 @@ public:
         LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ";
                    state->print(llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(state->getID());
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "    Sendable: " << *arg);
       }
     }
 
@@ -1483,7 +1470,7 @@ private:
   /// NOTE: We special case RawPointer and NativeObject to ensure they are
   /// treated as non-Sendable and strict checking is applied to it.
   bool isNonSendableType(SILType type) const {
-    return ::isNonSendableType(type, function);
+    return SILIsolationInfo::isNonSendableType(type, function);
   }
 
   TrackableValue
@@ -1731,8 +1718,12 @@ public:
     }
 
     // Now that we have transferred everything into the partial_apply, perform
-    // an assign fresh for the partial_apply. If we use any of the transferred
-    // values later, we will error, so it is safe to just create a new value.
+    // an assign fresh for the partial_apply if it is non-Sendable. If we use
+    // any of the transferred values later, we will error, so it is safe to just
+    // create a new value.
+    if (pai->getFunctionType()->isSendable())
+      return;
+
     auto paiValue = tryToTrackValue(pai).value();
     SILValue rep = paiValue.getRepresentative().getValue();
     mergeIsolationRegionInfo(rep, actorIsolation);
@@ -1740,21 +1731,19 @@ public:
   }
 
   void translateSILPartialApply(PartialApplyInst *pai) {
-    // First check if our partial apply is Sendable. In such a case, we will
-    // have emitted an earlier warning in Sema.
-    //
-    // DISCUSSION: The reason why we can treat values passed into an async let
-    // as transferring safely but it is unsafe to do this for arbitrary Sendable
-    // closures is that we do not know how many times the Sendable closure will
-    // be executed. It is possible to have different invocations of the Sendable
-    // closure to cause races with the captured non-Sendable value. In contrast
-    // since we know an async let runs exactly once, we do not need to worry
-    // about such a possibility. If we had the ability in the language to
-    // specify that a closure is run at most once or that it is always run
-    // serially, we could lift this restriction... so for now we leave in the
-    // Sema warning and just bail here.
-    if (pai->getFunctionType()->isSendableType())
-      return;
+    // First check if our partial apply is Sendable and not global actor
+    // isolated. In such a case, we will have emitted an earlier warning in Sema
+    // and can return early. If we have a global actor isolated partial_apply,
+    // we can be looser and can use region isolation since we know that the
+    // Sendable closure will be executed serially due to the closure having to
+    // run on the global actor queue meaning that we do not have to worry about
+    // the Sendable closure being run concurrency.
+    if (pai->getFunctionType()->isSendableType()) {
+      auto isolationInfo = SILIsolationInfo::get(pai);
+      if (!isolationInfo || !isolationInfo.hasActorIsolation() ||
+          !isolationInfo.getActorIsolation().isGlobalActor())
+        return;
+    }
 
     // Then check if our partial_apply is fed into an async let begin. If so,
     // handle it especially.
@@ -2240,7 +2229,8 @@ public:
     case TranslationSemantics::AssertingIfNonSendable:
       // Do not error if all of our operands are sendable.
       if (llvm::none_of(inst->getOperandValues(), [&](SILValue value) {
-            return ::isNonSendableType(value->getType(), inst->getFunction());
+            return ::SILIsolationInfo::isNonSendableType(value->getType(),
+                                                         inst->getFunction());
           }))
         return;
       llvm::errs() << "BadInst: " << *inst;
@@ -3260,11 +3250,18 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // If we were able to find this was actor isolated from finding our
     // underlying object, use that. It is never wrong.
     if (info.actorIsolation) {
-      SILValue actorInstance =
-          info.value->getType().isAnyActor() ? info.value : SILValue();
-      iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(value, actorInstance,
-                                             *info.actorIsolation));
+      SILIsolationInfo isolation;
+      if (info.value->getType().isAnyActor()) {
+        isolation = SILIsolationInfo::getActorInstanceIsolated(
+            value, info.value, info.actorIsolation->getActor());
+      } else if (info.actorIsolation->isGlobalActor()) {
+        isolation = SILIsolationInfo::getGlobalActorIsolated(
+            value, info.actorIsolation->getGlobalActor());
+      }
+
+      if (isolation) {
+        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+      }
     }
 
     auto storage = AccessStorageWithBase::compute(value);
@@ -3296,7 +3293,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   }
 
   // Otherwise refer to the oracle. If we have a Sendable value, just return.
-  if (!isNonSendableType(value->getType(), fn)) {
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -3314,8 +3311,9 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
       iter.first->getSecond().mergeIsolationRegionInfo(
-          SILIsolationInfo::getActorIsolated(svi, parentAddrInfo.value,
-                                             *parentAddrInfo.actorIsolation));
+          SILIsolationInfo::getActorInstanceIsolated(
+              svi, parentAddrInfo.value,
+              parentAddrInfo.actorIsolation->getActor()));
     }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));

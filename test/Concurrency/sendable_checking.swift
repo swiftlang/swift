@@ -97,7 +97,7 @@ public actor MyActor: MyProto {
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
     // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
-    // expected-tns-note @-2 {{sending actor-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and actor-isolated uses}}
+    // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
