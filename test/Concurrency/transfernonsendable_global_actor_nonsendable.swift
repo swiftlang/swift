@@ -102,7 +102,7 @@ extension NonSendableGlobalActorIsolatedStruct {
   mutating func test3() -> transferring NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   mutating func test4() -> (any GlobalActorIsolatedProtocol)? {
     self.p
@@ -167,7 +167,7 @@ extension NonSendableGlobalActorIsolatedEnum {
     }
     return x
   } // expected-error {{sending 'x.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'x.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
 extension NonSendableGlobalActorIsolatedKlass {
@@ -182,7 +182,7 @@ extension NonSendableGlobalActorIsolatedKlass {
   func test3() -> transferring NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func test4() -> (any GlobalActorIsolatedProtocol)? {
     self.p
@@ -215,7 +215,7 @@ extension FinalNonSendableGlobalActorIsolatedKlass {
   func test3() -> transferring NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func test4() -> (any GlobalActorIsolatedProtocol)? {
     self.p
@@ -248,7 +248,7 @@ extension GlobalActorIsolatedProtocol {
   mutating func test3() -> transferring NonSendableKlass {
     self.k
   } // expected-error {{sending 'self.k' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'self.k' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   mutating func test4() -> (any GlobalActorIsolatedProtocol)? {
     self.p

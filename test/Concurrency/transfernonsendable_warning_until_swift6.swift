@@ -32,7 +32,7 @@ func testTransferArgumentError(_ x: NonSendableType) async {
 
 func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
   transferValue(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
 }
 
 func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) async {
