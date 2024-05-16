@@ -213,8 +213,8 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 ///     func genericFunction<T>(t: T) { }
 ///     func genericFunction<T>(t: T) where T: Copyable { }
 ///
-///     let x = any MyProtocol
-///     let x = any MyProtocol & Copyable
+///     let x: any MyProtocol
+///     let x: any MyProtocol & Copyable
 ///
 /// To suppress an implicit conformance to `Copyable` you write `~Copyable`.
 /// For example,
