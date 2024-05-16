@@ -2092,6 +2092,14 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
+/// Determine whether the given expression is part of the left-hand side
+/// of an assignment expression.
+struct IsInLeftHandSideOfAssignment {
+  ConstraintSystem &cs;
+
+  bool operator()(Expr *expr) const;
+};
+
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -4421,7 +4429,7 @@ public:
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
-                                  ConstraintLocator *memberLocator = nullptr,
+                                  ConstraintLocator *locator,
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
@@ -4443,7 +4451,7 @@ public:
   getUnopenedTypeOfReference(
       VarDecl *value, Type baseType, DeclContext *UseDC,
       llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *memberLocator = nullptr,
+      ConstraintLocator *locator,
       bool wantInterfaceType = false,
       bool adjustForPreconcurrency = true,
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
@@ -4453,7 +4461,10 @@ public:
       llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
         [](const ClosureExpr *closure) {
           return closure->isIsolatedByPreconcurrency();
-        });
+        },
+      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
+        return false;
+      });
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
