@@ -888,7 +888,7 @@ func expandAttachedMacroIPC(
 
   let declSyntax = PluginMessage.Syntax(
     syntax: Syntax(declarationNode),
-    in: customAttrSourceFilePtr
+    in: declarationSourceFilePtr
   )!
 
   let parentDeclSyntax: PluginMessage.Syntax?
