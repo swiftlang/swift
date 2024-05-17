@@ -621,7 +621,11 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     case Limit::None:
       return SILLinkage::Package;
     case Limit::AlwaysEmitIntoClient:
-      return SILLinkage::PackageNonABI;
+      // Drop the AEIC if the enclosing decl is not effectively public.
+      // This matches what we do in the `internal` case.
+      if (isSerialized())
+        return SILLinkage::PackageNonABI;
+      else return SILLinkage::Package;
     case Limit::OnDemand:
       return SILLinkage::Shared;
     case Limit::NeverPublic:
