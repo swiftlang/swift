@@ -1279,6 +1279,11 @@ public:
   UncheckedRefCastInst *
   createUncheckedRefCast(SILLocation Loc, SILValue Op, SILType Ty,
                          ValueOwnershipKind forwardingOwnershipKind) {
+    if (isInsertingIntoGlobal()) {
+      return insert(UncheckedRefCastInst::create(
+          getSILDebugLocation(Loc), Op, Ty, getModule(),
+          forwardingOwnershipKind));
+    }
     return insert(UncheckedRefCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(),
         forwardingOwnershipKind));
