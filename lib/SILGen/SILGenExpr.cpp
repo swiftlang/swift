@@ -3028,14 +3028,11 @@ RValueEmitter::emitClosureReference(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e, contextInfo);
 
-  SubstitutionMap subs;
-  if (e->getCaptureInfo().hasGenericParamCaptures())
-    subs = SGF.getForwardingSubstitutionMap();
-
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   SILLocation loc = e;
-  return SGF.emitClosureValue(loc, SILDeclRef(e), contextInfo, subs);
+  return SGF.emitClosureValue(loc, SILDeclRef(e), contextInfo,
+                              SubstitutionMap());
 }
 
 RValue RValueEmitter::
