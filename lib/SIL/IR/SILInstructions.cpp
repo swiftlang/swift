@@ -2590,6 +2590,17 @@ BeginCOWMutationInst::create(SILDebugLocation loc, SILValue operand,
 
 UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                             SILType Ty, SILModule &Mod,
+                             ValueOwnershipKind forwardingOwnershipKind) {
+  assert(Operand->getType().getCategory() == SILValueCategory::Object);
+  unsigned size = totalSizeToAlloc<swift::Operand>(1);
+  void *Buffer = Mod.allocateInst(size, alignof(UncheckedRefCastInst));
+  return ::new (Buffer) UncheckedRefCastInst(
+      DebugLoc, Operand, {}, Ty, forwardingOwnershipKind);
+}
+
+UncheckedRefCastInst *
+UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                              SILType Ty, SILFunction &F,
                              ValueOwnershipKind forwardingOwnershipKind) {
   assert(Operand->getType().getCategory() == SILValueCategory::Object);

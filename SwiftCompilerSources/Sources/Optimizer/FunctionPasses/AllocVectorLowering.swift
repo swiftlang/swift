@@ -283,7 +283,7 @@ private func getInitStores(to allocVectorBuiltin: BuiltinInst, count: Int,
 
   for use in allocVectorBuiltin.uses {
     if let ptrToAddr = use.instruction as? PointerToAddressInst {
-      if !findInitStores(of: ptrToAddr, atIndex: 0, &stores) {
+      if !findInitStores(of: ptrToAddr, atIndex: 0, &stores, context) {
         return nil
       }
     } else {
@@ -307,18 +307,20 @@ private func getInitStores(to allocVectorBuiltin: BuiltinInst, count: Int,
   return stores.map { $0! }
 }
 
-private func findInitStores(of address: Value, atIndex: Int, _ initStores: inout [StoreInst?]) -> Bool {
+private func findInitStores(of address: Value, atIndex: Int, _ initStores: inout [StoreInst?],
+                            _ context: FunctionPassContext) -> Bool
+{
   for use in address.uses {
     switch use.instruction {
     case let indexAddr as IndexAddrInst:
       guard let indexLiteral = indexAddr.index as? IntegerLiteralInst,
             let index = indexLiteral.value,
-            findInitStores(of: indexAddr, atIndex: atIndex + index, &initStores) else
+            findInitStores(of: indexAddr, atIndex: atIndex + index, &initStores, context) else
       {
         return false
       }
     case let store as StoreInst where store.destinationOperand == use:
-      if !store.source.isValidGlobalInitValue {
+      if !store.source.isValidGlobalInitValue(context) {
         return false
       }
       if atIndex >= initStores.count ||

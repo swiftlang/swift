@@ -59,7 +59,10 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
 
   // The initializer must not contain a `global_value` because `global_value` needs to
   // initialize the class metadata at runtime.
-  guard let (allocInst, storeToGlobal) = getGlobalInitialization(of: function, allowGlobalValue: false) else {
+  guard let (allocInst, storeToGlobal) = getGlobalInitialization(of: function,
+                                                                 forStaticInitializer: true,
+                                                                 context) else
+  {
     return
   }
 
