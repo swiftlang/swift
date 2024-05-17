@@ -422,6 +422,11 @@ tests.test("testThunks") {
   testBridgeableValue(Thunks())
 }
 
+tests.test("testHKTFilter") {
+  let base = ["hello", "world"]
+  let result = testHKTFilter(base) as! NSArray as! [String]
+  expectEqual(result, ["hello"])
+}
 
 tests.test("testRoundTrip") {
   class Test : NSObject {
