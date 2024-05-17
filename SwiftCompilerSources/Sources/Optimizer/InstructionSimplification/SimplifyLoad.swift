@@ -250,7 +250,7 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   }
   let initFn = initFnRef.referencedFunction
   context.notifyDependency(onBodyOf: initFn)
-  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, allowGlobalValue: true)  else {
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, forStaticInitializer: false, context) else {
     return nil
   }
   return storeToGlobal.source

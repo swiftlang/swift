@@ -45,6 +45,10 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
+    _bridged.canMakeStaticObjectReadOnly(objectType.bridged)
+  }
+
   func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
   }
