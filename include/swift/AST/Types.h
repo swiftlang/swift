@@ -182,7 +182,7 @@ public:
     /// Contains a PackType.
     HasPack = 0x10000,
 
-    /// Contains a PackArchetypeType.
+    /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
     HasPackArchetype = 0x20000,
 
     Last_Property = HasPackArchetype
@@ -205,7 +205,8 @@ public:
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
   /// Does a type with these properties structurally contain a primary
-  /// archetype?
+  /// or pack archetype? These are the archetypes instantiated from a
+  /// primary generic environment.
   bool hasPrimaryArchetype() const { return Bits & HasPrimaryArchetype; }
 
   /// Does a type with these properties structurally contain an
@@ -695,7 +696,9 @@ public:
     return getRecursiveProperties().hasPlaceholder();
   }
 
-  /// Determine whether the type involves a primary archetype.
+  /// Determine whether the type involves a PrimaryArchetypeType *or* a
+  /// PackArchetypeType. These are the archetypes instantiated from a
+  /// primary generic environment.
   bool hasPrimaryArchetype() const {
     return getRecursiveProperties().hasPrimaryArchetype();
   }
