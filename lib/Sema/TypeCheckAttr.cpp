@@ -6968,13 +6968,16 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
       // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable variables.
       auto type = var->getTypeInContext();
-      if (!attr->isUnsafe() && !type->hasError() &&
-          !type->isSendableType()) {
-        Ctx.Diags.diagnose(attr->getLocation(),
-                           diag::nonisolated_non_sendable,
-                           type)
-          .warnUntilSwiftVersion(6);
-        return;
+      if (!attr->isUnsafe() && !type->hasError()) {
+        bool diagnosed = diagnoseIfAnyNonSendableTypes(
+            type,
+            SendableCheckContext(dc),
+            Type(),
+            SourceLoc(),
+            attr->getLocation(),
+            diag::nonisolated_non_sendable);
+        if (diagnosed)
+          return;
       }
 
       if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
