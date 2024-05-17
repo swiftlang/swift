@@ -1080,7 +1080,7 @@ public:
   /// sends the generic parameters of the function's interface type into
   /// archetypes, which will either be primary archetypes from this
   /// environment, or local archetypes captured by this function.
-  std::pair<GenericEnvironment *, SubstitutionMap>
+  std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
   getForwardingSubstitutionsForLowering(SILDeclRef constant);
 
   /// Returns the SIL type of a constant reference.

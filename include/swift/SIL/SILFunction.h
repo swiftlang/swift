@@ -237,6 +237,9 @@ private:
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
 
+  /// Captured local generic environments.
+  ArrayRef<GenericEnvironment *> CapturedEnvs;
+
   /// The information about specialization.
   /// Only set if this function is a specialization of another function.
   const GenericSpecializationInformation *SpecializationInfo = nullptr;
@@ -1292,9 +1295,21 @@ public:
   GenericEnvironment *getGenericEnvironment() const {
     return GenericEnv;
   }
+
+  /// Return any captured local generic environments, currently used for pack
+  /// element environments only. After SILGen, these are rewritten into
+  /// primary archetypes.
+  ArrayRef<GenericEnvironment *> getCapturedEnvironments() const {
+    return CapturedEnvs;
+  }
+
+  void setGenericEnvironment(GenericEnvironment *env);
+
   void setGenericEnvironment(GenericEnvironment *env,
-                             SubstitutionMap forwardingSubs=SubstitutionMap()) {
+                             ArrayRef<GenericEnvironment *> capturedEnvs,
+                             SubstitutionMap forwardingSubs) {
     GenericEnv = env;
+    CapturedEnvs = capturedEnvs;
     ForwardingSubMap = forwardingSubs;
   }
 
@@ -1324,9 +1339,30 @@ public:
   /// responsibility of the caller.
   void eraseAllBlocks();
 
-  /// Return the identity substitutions necessary to forward this call if it is
-  /// generic.
-  SubstitutionMap getForwardingSubstitutionMap();
+  /// A substitution map that sends the generic parameters of the invocation
+  /// generic signature to some combination of primar and local archetypes.
+  ///
+  /// CAUTION: If this is a SILFunction that captures pack element environments,
+  /// then at SILGen time, this is not actually the forwarding substitution map
+  /// of the SILFunction's generic environment. This is because:
+  ///
+  /// 1) The SILFunction's generic signature includes extra generic parameters,
+  ///    to model captured pack elements;
+  /// 2) The SILFunction's generic environment is the AST generic environment,
+  ///    so it's based on the original generic signature;
+  /// 3) SILGen uses this AST generic environment together with local archetypes
+  ///    for lowering SIL instructions.
+  ///
+  /// Therefore, the SILFunction's forwarding substitution map takes the extended
+  /// generic signature (1). It maps the original generic parameters to the
+  /// archetypes of (2), and the extended generic parameters to the local archetypes
+  /// of (3).
+  ///
+  /// After SILGen, all archetypes are re-instantiated inside the SIL function,
+  /// and the forwarding substitution map and generic environment then align.
+  SubstitutionMap getForwardingSubstitutionMap() const {
+    return ForwardingSubMap;
+  }
 
   /// Returns true if this SILFunction must be a defer statement.
   ///

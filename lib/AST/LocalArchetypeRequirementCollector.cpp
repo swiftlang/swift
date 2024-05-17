@@ -194,6 +194,28 @@ Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
   llvm_unreachable("Fell off the end");
 }
 
+static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,
+                                ArrayRef<GenericEnvironment *> capturedEnvs) {
+  assert(!param->isParameterPack());
+  unsigned envIndex = param->getDepth() - baseDepth;
+  assert(envIndex < capturedEnvs.size());
+  auto *capturedEnv = capturedEnvs[envIndex];
+  auto localInterfaceType = capturedEnv->getGenericSignature()
+      .getInnermostGenericParams()[param->getIndex()];
+  assert(localInterfaceType->getIndex() == param->getIndex());
+  return capturedEnvs[envIndex]->mapTypeIntoContext(localInterfaceType);
+}
+
+Type MapIntoLocalArchetypeContext::operator()(SubstitutableType *type) const {
+  unsigned baseDepth = baseGenericEnv->getGenericSignature().getNextDepth();
+
+  auto param = cast<GenericTypeParamType>(type);
+  if (param->getDepth() >= baseDepth)
+    return mapIntoLocalContext(param, baseDepth, capturedEnvs);
+
+  return baseGenericEnv->mapTypeIntoContext(param);
+}
+
 /// Given a substitution map for a call to a local function or closure, extend
 /// it to include all captured element archetypes; they become primary archetypes
 /// inside the body of the function.
@@ -215,15 +237,8 @@ swift::buildSubstitutionMapWithCapturedEnvironments(
     genericSigWithCaptures,
     [&](SubstitutableType *type) -> Type {
       auto param = cast<GenericTypeParamType>(type);
-      if (param->getDepth() >= baseDepth) {
-        assert(!param->isParameterPack());
-        unsigned envIndex = param->getDepth() - baseDepth;
-        assert(envIndex < capturedEnvs.size());
-        auto *capturedEnv = capturedEnvs[envIndex];
-        auto localInterfaceType = capturedEnv->getGenericSignature()
-            .getInnermostGenericParams()[param->getIndex()];
-        return capturedEnvs[envIndex]->mapTypeIntoContext(localInterfaceType);
-      }
+      if (param->getDepth() >= baseDepth)
+        return mapIntoLocalContext(param, baseDepth, capturedEnvs);
       return Type(type).subst(baseSubMap);
     },
     [&](CanType origType, Type substType,

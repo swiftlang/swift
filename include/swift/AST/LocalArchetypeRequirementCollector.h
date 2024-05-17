@@ -53,6 +53,17 @@ struct MapLocalArchetypesOutOfContext {
   Type operator()(SubstitutableType *type) const;
 };
 
+struct MapIntoLocalArchetypeContext {
+  GenericEnvironment *baseGenericEnv;
+  ArrayRef<GenericEnvironment *> capturedEnvs;
+
+  MapIntoLocalArchetypeContext(GenericEnvironment *baseGenericEnv,
+                               ArrayRef<GenericEnvironment *> capturedEnvs)
+      : baseGenericEnv(baseGenericEnv), capturedEnvs(capturedEnvs) {}
+
+  Type operator()(SubstitutableType *type) const;
+};
+
 GenericSignature buildGenericSignatureWithCapturedEnvironments(
     ASTContext &ctx,
     GenericSignature sig,

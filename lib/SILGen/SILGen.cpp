@@ -1224,8 +1224,9 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   assert(F->empty() && "already emitted function?!");
 
   if (F->getLoweredFunctionType()->isPolymorphic()) {
-    auto pair = Types.getForwardingSubstitutionsForLowering(constant);
-    F->setGenericEnvironment(pair.first, pair.second);
+    auto [genericEnv, capturedEnvs, forwardingSubs]
+        = Types.getForwardingSubstitutionsForLowering(constant);
+    F->setGenericEnvironment(genericEnv, capturedEnvs, forwardingSubs);
   }
 
   // If we have global actor isolation for our constant, put the isolation onto
