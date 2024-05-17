@@ -110,29 +110,9 @@ public:
     // Insert the new entry block at the beginning.
     F.moveBlockBefore(clonedEntryBlock, F.begin());
 
-    // FIXME: This should be a common utility.
-
     // Erase the old basic blocks.
     for (auto *bb : bbs) {
-      for (SILArgument *arg : bb->getArguments()) {
-        arg->replaceAllUsesWithUndef();
-        // To appease the ownership verifier, just set to None.
-        arg->setOwnershipKind(OwnershipKind::None);
-      }
-
-      // Instructions in the dead block may be used by other dead blocks. Replace
-      // any uses of them with undef values.
-      while (!bb->empty()) {
-        // Grab the last instruction in the bb.
-        auto *inst = &bb->back();
-
-        // Replace any still-remaining uses with undef values and erase.
-        inst->replaceAllUsesOfAllResultsWithUndef();
-        inst->eraseFromParent();
-      }
-
-      // Finally, erase the basic block itself.
-      bb->eraseFromParent();
+      bb->removeDeadBlock();
     }
   }
 };
