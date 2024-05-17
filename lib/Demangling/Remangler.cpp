@@ -2106,7 +2106,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@inout", 'l')
                 .Case("@inout_aliasable", 'b')
                 .Case("@in_guaranteed", 'n')
-                .Case("@in_cxx", 'C')
+                .Case("@in_cxx", 'X')
                 .Case("@in_constant", 'c')
                 .Case("@owned", 'x')
                 .Case("@guaranteed", 'g')
