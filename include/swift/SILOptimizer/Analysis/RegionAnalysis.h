@@ -123,7 +123,8 @@ using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 class regionanalysisimpl::TrackableValueState {
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
-  SILIsolationInfo regionInfo = SILIsolationInfo::getDisconnected();
+  SILIsolationInfo regionInfo =
+      SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
