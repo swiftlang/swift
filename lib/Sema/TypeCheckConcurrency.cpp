@@ -840,16 +840,25 @@ SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
     return std::nullopt;
 
   if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    // Determine whether this nominal type is visible via a @preconcurrency
-    // import.
-    auto import = nominal->findImport(fromDC);
-    auto sourceFile = fromDC->getParentSourceFile();
+    ModuleDecl *importedModule = nullptr;
+    if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+      // If the declaration itself has the @preconcurrency attribute,
+      // respect it.
+      importedModule = nominal->getParentModule();
+    } else {
+      // Determine whether this nominal type is visible via a @preconcurrency
+      // import.
+      auto import = nominal->findImport(fromDC);
+      auto sourceFile = fromDC->getParentSourceFile();
 
-    if (!import || !import->options.contains(ImportFlags::Preconcurrency))
-      return std::nullopt;
+      if (!import || !import->options.contains(ImportFlags::Preconcurrency))
+        return std::nullopt;
 
-    if (sourceFile)
-      sourceFile->setImportUsedPreconcurrency(*import);
+      if (sourceFile)
+        sourceFile->setImportUsedPreconcurrency(*import);
+
+      importedModule = import->module.importedModule;
+    }
 
     // When the type is explicitly non-Sendable, @preconcurrency imports
     // downgrade the diagnostic to a warning in Swift 6.
@@ -858,7 +867,7 @@ SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
 
     // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
     // diagnostics until the imported module enables Swift 6.
-    return import->module.importedModule->isConcurrencyChecked()
+    return importedModule->isConcurrencyChecked()
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
   }
@@ -5708,7 +5717,7 @@ static bool checkSendableInstanceStorage(
           /*inDerivedConformance*/Type(), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             auto preconcurrency =
-                context.preconcurrencyBehavior(elementType->getAnyNominal());
+                context.preconcurrencyBehavior(type->getAnyNominal());
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -5719,7 +5728,7 @@ static bool checkSendableInstanceStorage(
               // If we are to ignore this diagnostic, just continue.
               if (behavior == DiagnosticBehavior::Ignore ||
                   preconcurrency == DiagnosticBehavior::Ignore)
-                return false;
+                return true;
 
               invalid = true;
               return true;
