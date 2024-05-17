@@ -4104,7 +4104,7 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
         vd->getDeclContext()->getGenericSignatureOfContext());
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-    llvm_unreachable("Doesn't have generic signature");
+    return GenericSignatureWithCapturedEnvironments();
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
