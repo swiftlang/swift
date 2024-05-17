@@ -694,9 +694,6 @@ ERROR(isolated_after_nonisolated, none,
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
      "only non-isolated properties of 'self' can be accessed from "
      "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
-ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
-        (Type, DescriptiveDeclKind, DeclName))
 ERROR(isolated_property_mutation_in_nonisolated_context,none,
       "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
       "from a non-isolated context",
