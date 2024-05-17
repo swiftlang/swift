@@ -656,7 +656,8 @@ protected:
   void appendClosureEntity(const AbstractClosureExpr *closure);
 
   void appendClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,
-                               const DeclContext *parentContext);
+                               const DeclContext *parentContext,
+                               ArrayRef<GenericEnvironment *> capturedEnvs);
 
   void appendDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
 

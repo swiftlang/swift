@@ -225,7 +225,11 @@ private:
         getPullback().getLoweredFunctionType()->getSubstGenericSignature());
     auto remappedSILType =
         SILType::getPrimitiveType(remappedType, ty.getCategory());
-    return getPullback().mapTypeIntoContext(remappedSILType);
+    // FIXME: Sometimes getPullback() doesn't have a generic environment, in which
+    // case callers are apparently happy to receive an interface type.
+    if (getPullback().getGenericEnvironment())
+      return getPullback().mapTypeIntoContext(remappedSILType);
+    return remappedSILType;
   }
 
   std::optional<TangentSpace> getTangentSpace(CanType type) {

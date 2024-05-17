@@ -460,6 +460,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     Linkage = addExternalToLinkage(Linkage);
   }
 
+  assert(F.getCapturedEnvironments().empty() &&
+         "Captured local environments should not survive past SILGen");
+
   // If we have a body, we might have a generic environment.
   GenericSignatureID genericSigID = 0;
   if (!NoBody)
