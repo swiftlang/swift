@@ -23,6 +23,7 @@
 #include "llvm/Support/Casting.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Remote/TypeInfoProvider.h"
+#include "swift/RemoteInspection/BitMask.h"
 #include "swift/RemoteInspection/DescriptorFinder.h"
 
 #include <memory>
@@ -34,6 +35,7 @@ using llvm::cast;
 using llvm::dyn_cast;
 using remote::RemoteRef;
 
+class TypeConverter;
 class TypeRef;
 class TypeRefBuilder;
 class BuiltinTypeDescriptor;
@@ -158,6 +160,11 @@ public:
     return false;
   }
 
+  // Calculate and return the spare bit mask for this type
+  virtual BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+    return BitMask::zeroMask(getSize());
+  }
+
   virtual ~TypeInfo() { }
 };
 
@@ -195,6 +202,8 @@ public:
                                 remote::RemoteAddress address,
                                 int *extraInhabitantIndex) const override;
 
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
   }
@@ -221,6 +230,8 @@ public:
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *index) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
@@ -329,6 +340,8 @@ public:
     }
     return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Reference;
