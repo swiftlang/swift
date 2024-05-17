@@ -3020,6 +3020,18 @@ void SILCloner<ImplClass>::visitEndLifetimeInst(EndLifetimeInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitExtendLifetimeInst(ExtendLifetimeInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  if (!getBuilder().hasOwnership())
+    return;
+
+  recordClonedInstruction(
+      Inst, getBuilder().createExtendLifetime(getOpLocation(Inst->getLoc()),
+                                              getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
     UncheckedOwnershipConversionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
