@@ -5481,8 +5481,8 @@ ERROR(sendable_isolated_sync_function,none,
       "%0 synchronous %kind1 cannot be marked as '@Sendable'",
       (ActorIsolation, const ValueDecl *))
 ERROR(nonsendable_instance_method,none,
-      "instance methods of non-Sendable types cannot be marked as '@Sendable'",
-      ())
+      "instance method of non-Sendable type %0 cannot be marked as '@Sendable'",
+      (Type))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %kind1 in "
       "concurrently-executing code",

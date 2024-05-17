@@ -6918,10 +6918,13 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   // Prevent Sendable Attr from being added to methods of non-sendable types
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
     if (auto selfDecl = funcDecl->getImplicitSelfDecl()) {
-      if (!selfDecl->getTypeInContext()->isSendableType()) {
-        diagnose(attr->getLocation(), diag::nonsendable_instance_method)
-        .warnUntilSwiftVersion(6);
-      }
+      diagnoseIfAnyNonSendableTypes(
+          selfDecl->getTypeInContext(),
+          SendableCheckContext(funcDecl),
+          Type(),
+          SourceLoc(),
+          attr->getLocation(),
+          diag::nonsendable_instance_method);
     }
   }
 }

@@ -19,3 +19,11 @@ func test(ss: StrictStruct, ns: NonStrictClass) {
 let nonStrictGlobal = NonStrictClass()
 let strictGlobal = StrictStruct() // expected-warning{{let 'strictGlobal' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
 // expected-note@-1{{isolate 'strictGlobal' to a global actor, or conform 'StrictStruct' to 'Sendable'}}
+
+extension NonStrictClass {
+  @Sendable func f() { }
+}
+
+extension StrictStruct {
+  @Sendable func f() { } // expected-warning{{instance method of non-Sendable type 'StrictStruct' cannot be marked as '@Sendable'}}
+}
