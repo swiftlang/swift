@@ -30,13 +30,26 @@
 
 namespace swift {
 
+/// Represents a generalized actor instance reference.
+///
+/// Used to generalize over cases where we actually have an actor instance
+/// associated with a SILValue and other cases where we know that the actor
+/// instance is but we don't have a value.
 class ActorInstance {
 public:
   enum class Kind : uint8_t {
+    /// An actor instance where we have an actual SILValue for the actor
+    /// instance.
     Value,
+
+    /// An actor instance in an actor accessor init where we do not have direct
+    /// access to the self value and instead have access indirectly to the
+    /// storage associated with the accessor.
     ActorAccessorInit = 0x1,
   };
 
+  /// Set to (SILValue(), ActorAccessorInit) if we have an ActorAccessorInit. Is
+  /// null if we have (SILValue(), Kind::Value).
   llvm::PointerIntPair<SILValue, 1> value;
 
   ActorInstance(SILValue value, Kind kind)
@@ -116,8 +129,6 @@ private:
 
   /// If set this is the SILValue that represents the actor instance that we
   /// derived isolatedValue from.
-  ///
-  /// If set to (SILValue(), 1), then we are in an
   ActorInstance actorInstance;
 
   SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
