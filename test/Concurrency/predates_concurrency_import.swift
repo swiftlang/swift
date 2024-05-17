@@ -41,3 +41,13 @@ extension NonStrictClass {
 extension StrictStruct {
   @Sendable func f() { } // expected-warning{{instance method of non-Sendable type 'StrictStruct' cannot be marked as '@Sendable'}}
 }
+
+
+struct HasStatics {
+  nonisolated static let ns: NonStrictClass = NonStrictClass()
+
+  nonisolated static let ss: StrictStruct = StrictStruct()
+  // expected-warning@-1{{'nonisolated' can not be applied to variable with non-'Sendable' type 'StrictStruct'}}
+  // expected-warning@-2{{static property 'ss' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
+  // expected-note@-3{{isolate 'ss' to a global actor, or conform 'StrictStruct' to 'Sendable'}}
+}
