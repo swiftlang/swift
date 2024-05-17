@@ -2834,7 +2834,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(
 }
 
 namespace {
-struct LocalArchetypeRequirementCollector {
+struct OldLocalArchetypeRequirementCollector {
   const ASTContext &Context;
   unsigned Depth;
 
@@ -2853,7 +2853,7 @@ struct LocalArchetypeRequirementCollector {
   /// The set of element environments we've processed.
   llvm::SmallPtrSet<GenericEnvironment*, 4> ElementEnvs;
 
-  LocalArchetypeRequirementCollector(const ASTContext &ctx, unsigned depth)
+  OldLocalArchetypeRequirementCollector(const ASTContext &ctx, unsigned depth)
     : Context(ctx), Depth(depth) {}
 
   void collect(CanLocalArchetypeType archetype) {
@@ -3023,7 +3023,7 @@ buildThunkSignature(SILFunction *fn,
   }
 
   // Add new generic parameters to replace the local archetypes.
-  LocalArchetypeRequirementCollector collector(ctx, depth);
+  OldLocalArchetypeRequirementCollector collector(ctx, depth);
 
   for (auto archetype : localArchetypes) {
     collector.collect(archetype);
