@@ -2313,6 +2313,11 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         (void)outermostExpr;
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
+      } else if (auto AE = dyn_cast<ApplyExpr>(expr)) {
+        // .foo() or .foo(with args: [T])
+        components.push_back(KeyPathExpr::Component::forUnresolvedMethod(AE, 
+            getASTContext(), AE->getArgs()));
+        expr = AE->getFn();
       } else {
         if (emitErrors) {
           // \(<expr>) may be an attempt to write a string interpolation outside
