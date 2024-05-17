@@ -25,6 +25,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Frontend/CachingUtils.h"
@@ -202,6 +203,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
+  serializationOpts.SDKVersion = swift::getSDKBuildVersion(
+                                          getSearchPathOptions().getSDKPath());
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
   serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
 

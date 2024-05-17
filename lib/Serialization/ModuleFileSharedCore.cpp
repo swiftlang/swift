@@ -354,6 +354,9 @@ static ValidationInfo validateControlBlock(
     case control_block::ALLOWABLE_CLIENT_NAME:
       result.allowableClients.push_back(blobData);
       break;
+    case control_block::SDK_VERSION:
+      result.sdkVersion = blobData;
+      break;
     case control_block::SDK_NAME: {
       result.sdkName = blobData;
 
@@ -690,6 +693,7 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << "', builder version '" << MiscVersion
      << "', built from "
      << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
+     << " against SDK " << SDKVersion
      << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.AllowNonResilientAccess)
     os << ", built with -experimental-allow-non-resilient-access";
@@ -1453,6 +1457,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       MiscVersion = info.miscVersion;
+      SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
