@@ -464,7 +464,7 @@ public enum ArgumentConvention : CustomStringConvertible {
 
   public var isConsumed: Bool {
     switch self {
-    case .indirectIn, .directOwned, .packOwned:
+    case .indirectIn, .indirectInCXX, .directOwned, .packOwned:
       return true
     case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed,
           .indirectInout, .indirectInoutAliasable, .indirectOut,
