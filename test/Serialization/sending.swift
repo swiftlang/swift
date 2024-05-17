@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -module-name transferring_test -emit-module -o %t/transferring_test.swiftmodule %S/Inputs/sending.swift
-// RUN: %target-swift-frontend -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -module-name transferring -emit-sil -I %t %s | %FileCheck %s
-// RUN: %target-sil-opt -strict-concurrency=complete -module-name transferring_test -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults %t/transferring_test.swiftmodule | %FileCheck -check-prefix=AST %s
+// RUN: %target-swift-frontend -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature TransferringArgsAndResults -module-name transferring_test -emit-module -o %t/transferring_test.swiftmodule %S/Inputs/sending.swift
+// RUN: %target-swift-frontend -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature TransferringArgsAndResults -module-name transferring -emit-sil -I %t %s | %FileCheck %s
+// RUN: %target-sil-opt -strict-concurrency=complete -module-name transferring_test -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature TransferringArgsAndResults %t/transferring_test.swiftmodule | %FileCheck -check-prefix=AST %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

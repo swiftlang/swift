@@ -1064,6 +1064,23 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
+  // Enable TransferringArgsAndResults/SendingArgsAndResults whenever
+  // RegionIsolation is enabled.
+  if (Opts.hasFeature(Feature::RegionBasedIsolation)) {
+    bool enableTransferringArgsAndResults = true;
+    bool enableSendingArgsAndResults = true;
+#ifndef NDEBUG
+    enableTransferringArgsAndResults = !Args.hasArg(
+        OPT_disable_transferring_args_and_results_with_region_isolation);
+    enableSendingArgsAndResults = !Args.hasArg(
+        OPT_disable_sending_args_and_results_with_region_isolation);
+#endif
+    if (enableTransferringArgsAndResults)
+      Opts.enableFeature(Feature::TransferringArgsAndResults);
+    if (enableSendingArgsAndResults)
+      Opts.enableFeature(Feature::SendingArgsAndResults);
+  }
+
   // Enable SendingArgsAndResults whenever TransferringArgsAndResults is
   // enabled.
   //
