@@ -354,7 +354,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         return info;
 
       if (crossing->getCalleeIsolation().isNonisolated()) {
-        return SILIsolationInfo::getDisconnected();
+        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
   }
@@ -386,7 +386,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
       ((fArg->isClosureCapture() &&
         fArg->getFunction()->getLoweredFunctionType()->isSendable()) ||
        fArg->isSending()))
-    return SILIsolationInfo::getDisconnected();
+    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
 
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
@@ -408,7 +408,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (auto declRef = fArg->getFunction()->getDeclRef()) {
     if (declRef.kind == SILDeclRef::Kind::Allocator) {
       if (fArg->getFunction()->getActorIsolation().isActorInstanceIsolated()) {
-        return SILIsolationInfo::getDisconnected();
+        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
 
@@ -447,6 +447,9 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
     return;
   case Disconnected:
     os << "disconnected";
+    if (unsafeNonIsolated) {
+      os << ": nonisolated(unsafe)";
+    }
     return;
   case Actor:
     if (ActorInstance instance = getActorInstance()) {
@@ -454,14 +457,23 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
       case ActorInstance::Kind::Value: {
         SILValue value = instance.getValue();
         if (auto name = VariableNameInferrer::inferName(value)) {
-          os << "'" << *name << "'-isolated\n";
+          os << "'" << *name << "'-isolated";
+          if (unsafeNonIsolated) {
+            os << ": nonisolated(unsafe)";
+          }
+          os << "\n";
           os << "instance: " << *value;
+
           return;
         }
         break;
       }
       case ActorInstance::Kind::ActorAccessorInit:
-        os << "'self'-isolated\n";
+        os << "'self'-isolated";
+        if (unsafeNonIsolated) {
+          os << ": nonisolated(unsafe)";
+        }
+        os << '\n';
         os << "instance: actor accessor init\n";
         return;
       }
@@ -470,14 +482,24 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
     if (getActorIsolation().getKind() == ActorIsolation::ActorInstance) {
       if (auto *vd = getActorIsolation().getActorInstance()) {
         os << "'" << vd->getBaseIdentifier() << "'-isolated";
+        if (unsafeNonIsolated) {
+          os << ": nonisolated(unsafe)";
+        }
         return;
       }
     }
 
     getActorIsolation().printForDiagnostics(os);
+    if (unsafeNonIsolated) {
+      os << ": nonisolated(unsafe)";
+    }
     return;
   case Task:
-    os << "task-isolated\n";
+    os << "task-isolated";
+    if (unsafeNonIsolated) {
+      os << ": nonisolated(unsafe)";
+    }
+    os << '\n';
     os << "instance: " << *getIsolatedValue();
     return;
   }
