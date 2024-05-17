@@ -230,7 +230,7 @@ extension Optional where Wrapped: ~Copyable {
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
-    #if $NoncopyableGenerics
+    #if compiler(>=6.0) && $NoncopyableGenerics
     switch self {
     case .some(_borrowing y):
       return .some(try transform(y))
@@ -289,7 +289,6 @@ extension Optional {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -309,12 +308,16 @@ extension Optional where Wrapped: ~Copyable {
   public func _borrowingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
+    #if compiler(>=6.0) && $NoncopyableGenerics
     switch self {
     case .some(_borrowing y):
       return try transform(y)
     case .none:
       return .none
     }
+    #else
+    fatalError("Unsupported compiler")
+    #endif
   }
 }
 
