@@ -425,7 +425,7 @@ public:
 #endif
     // Don't apply location overrides on variables.
     if (Var && !Var->Loc)
-      Var->Loc = Loc;
+      Var->Loc = Loc.strippedForDebugVariable();
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical,

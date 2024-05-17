@@ -336,8 +336,7 @@ static bool isLetAllocation(MarkUnresolvedNonCopyableValueInst *mmci) {
   }
 
   if (auto *asi = dyn_cast<AllocStackInst>(mmci->getOperand()))
-    if (auto varInfo = asi->getVarInfo())
-      return varInfo->isLet();
+    return asi->isLet();
 
   return false;
 }
