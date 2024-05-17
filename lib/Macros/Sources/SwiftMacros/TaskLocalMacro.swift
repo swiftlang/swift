@@ -50,10 +50,16 @@ extension TaskLocalMacro: PeerMacro {
         message: "'@TaskLocal' property must have name", id: .incompatibleDecl)
     }
 
-    let type = firstBinding.typeAnnotation?.type
+    let originalType = firstBinding.typeAnnotation?.type
     let explicitTypeAnnotation: TypeAnnotationSyntax?
-    if let type {
-      explicitTypeAnnotation = TypeAnnotationSyntax(type: TypeSyntax("TaskLocal<\(type.trimmed)>"))
+    let taskLocalWrappedType: TypeSyntax?
+    if let forceUnwrappedOptionalType = firstBinding.typeAnnotation?.type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+      taskLocalWrappedType = TypeSyntax("\(forceUnwrappedOptionalType.wrappedType.trimmed)?")
+    } else {
+      taskLocalWrappedType = originalType?.trimmed
+    }
+    if let taskLocalWrappedType {
+      explicitTypeAnnotation = TypeAnnotationSyntax(type: TypeSyntax("TaskLocal<\(taskLocalWrappedType)>"))
     } else {
       explicitTypeAnnotation = nil
     }
@@ -61,7 +67,7 @@ extension TaskLocalMacro: PeerMacro {
     let initialValue: ExprSyntax
     if let initializerValue = firstBinding.initializer?.value {
       initialValue = ExprSyntax(initializerValue)
-    } else if let type, type.isOptional {
+    } else if let originalType, originalType.isOptional {
       initialValue = ExprSyntax(NilLiteralExprSyntax())
     } else {
       throw DiagnosticsError(
@@ -162,7 +168,7 @@ extension TypeSyntax {
   // and T? we can detect the optional.
   fileprivate var isOptional: Bool {
     switch self.as(TypeSyntaxEnum.self) {
-    case .optionalType:
+    case .optionalType, .implicitlyUnwrappedOptionalType:
       return true
     case .identifierType(let identifierType):
       return identifierType.name.text == "Optional"
@@ -172,7 +178,8 @@ extension TypeSyntax {
         return false
       }
       return memberType.name.text == "Optional"
-    default: return false
+    default:
+      return false
     }
   }
 }
