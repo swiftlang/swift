@@ -834,6 +834,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, MODULE_NAME);
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
+  BLOCK_RECORD(control_block, SDK_VERSION);
   BLOCK_RECORD(control_block, REVISION);
   BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, IS_OSSA);
@@ -984,6 +985,7 @@ void Serializer::writeHeader() {
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
     control_block::SDKNameLayout SDKName(Out);
+    control_block::SDKVersionLayout SDKVersion(Out);
     control_block::RevisionLayout Revision(Out);
     control_block::ChannelLayout Channel(Out);
     control_block::IsOSSALayout IsOSSA(Out);
@@ -1025,6 +1027,9 @@ void Serializer::writeHeader() {
 
     if (!Options.SDKName.empty())
       SDKName.emit(ScratchRecord, Options.SDKName);
+
+    if (!Options.SDKVersion.empty())
+      SDKVersion.emit(ScratchRecord, Options.SDKVersion);
 
     for (auto &name : Options.AllowableClients) {
       Allowable.emit(ScratchRecord, name);
