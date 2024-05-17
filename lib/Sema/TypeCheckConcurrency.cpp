@@ -511,7 +511,6 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
     return true;
 
   if (!var->isLet()) {
-    ASTContext &ctx = var->getASTContext();
     // A mutable storage of a value type accessed from within the module is
     // okay.
     if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
