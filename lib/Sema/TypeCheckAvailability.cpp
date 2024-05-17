@@ -2896,7 +2896,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   diags.diagnose(loc, diag::conformance_availability_unavailable,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
-      .limitBehavior(behavior)
+      .limitBehaviorUntilSwiftVersion(behavior, 6)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
@@ -3452,6 +3452,11 @@ public:
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
                                         /*useConformanceAvailabilityErrorsOpt=*/true);
       }
+    }
+
+    if (auto UTO = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
+      diagnoseSubstitutionMapAvailability(
+          UTO->getLoc(), UTO->substitutions, Where);
     }
 
     if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
