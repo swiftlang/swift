@@ -1262,3 +1262,10 @@ BO
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+
+BD
+// CHECK-64:      (builtin Builtin.DefaultActorStorage)
+// CHECK-64-NEXT:    (builtin size=96 alignment=16 stride=96 num_extra_inhabitants=0 bitwise_takable=1)
+
+// CHECK-32:      (builtin Builtin.DefaultActorStorage)
+// CHECK-32-NEXT:    (builtin size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1)
