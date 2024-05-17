@@ -22,8 +22,10 @@
 
 namespace swift {
 
+class DeclContext;
 class SourceFile;
 class NominalTypeDecl;
+class VarDecl;
 
 /// If any of the imports in this source file was @preconcurrency but there were
 /// no diagnostics downgraded or suppressed due to that @preconcurrency, suggest
@@ -34,6 +36,13 @@ void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 /// conformance (regardless of its availability).
 bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
                                     bool applyModuleDefault = true);
+
+/// Diagnose the use of an instance property of non-sendable type from an
+/// nonisolated deinitializer within an actor-isolated type.
+///
+/// \returns true iff a diagnostic was emitted for this reference.
+bool diagnoseNonSendableFromDeinit(
+    SourceLoc refLoc, VarDecl *var, DeclContext *dc);
 
 } // namespace swift
 

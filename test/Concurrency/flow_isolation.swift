@@ -15,7 +15,7 @@ func takeNonSendable(_ ns: NonSendableType) {}
 @available(SwiftStdlib 5.1, *)
 func takeSendable(_ s: SendableType) {}
 
-class NonSendableType {
+class NonSendableType { // expected-note *{{class 'NonSendableType' does not conform to the 'Sendable' protocol}}
   var x: Int = 0
   func f() {}
 }
