@@ -33,7 +33,7 @@ extension VariableDeclSyntax {
 }
 
 extension ImplicitlyUnwrappedOptionalTypeSyntax {
-  internal var asOptionalTypeSyntax: some TypeSyntaxProtocol {
+  internal var asOptionalTypeSyntax: any TypeSyntaxProtocol {
     OptionalTypeSyntax(
       leadingTrivia: leadingTrivia,
       unexpectedBeforeWrappedType,
