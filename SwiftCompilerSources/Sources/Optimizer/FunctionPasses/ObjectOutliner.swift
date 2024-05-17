@@ -59,16 +59,25 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
     return
   }
 
-  for inst in function.instructions {
-    if let ari = inst as? AllocRefInstBase {
-      if !context.continueWithNextSubpassRun(for: inst) {
+  var allocRefs = Stack<AllocRefInstBase>(context)
+  defer { allocRefs.deinitialize() }
+
+  allocRefs.append(contentsOf: function.instructions.lazy.compactMap { $0 as? AllocRefInstBase })
+
+  // Try multiple iterations to handle multi-dimensional arrays.
+  var changed: Bool
+  repeat {
+    changed = false
+    for ari in allocRefs where !ari.isDeleted {
+      if !context.continueWithNextSubpassRun(for: ari) {
         return
       }
       if let globalValue = optimizeObjectAllocation(allocRef: ari, context) {
         optimizeFindStringCall(stringArray: globalValue, context)
+        changed = true
       }
     }
-  }
+  } while changed
 }
 
 private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: FunctionPassContext) -> GlobalValueInst? {
