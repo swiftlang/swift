@@ -128,6 +128,16 @@ struct UseDefChainVisitor
                                              cast->getFunction()))
       return SILValue();
 
+    // Do not look through begin_borrow [var_decl]. They are start new semantic
+    // values.
+    //
+    // This only comes up if a codegen pattern occurs where the debug
+    // information is place on a debug_value instead of the alloc_box.
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(cast)) {
+      if (bbi->isFromVarDecl())
+        return SILValue();
+    }
+
     // If we do not have an identity cast, mark this as a merge.
     isMerge |= castType != AccessStorageCast::Identity;
 
@@ -305,11 +315,6 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
   while (true) {
     SILValue temp = result;
 
-    temp = stripSinglePredecessorArgs(temp);
-    temp = stripAddressProjections(temp);
-    temp = stripIndexingInsts(temp);
-    temp = lookThroughOwnershipInsts(temp);
-
     if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
       if (isStaticallyLookThroughInst(svi)) {
         temp = svi->getOperand(0);
@@ -356,6 +361,11 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 }
 
 static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
+  // Look through a project_box, so that we process it like its operand object.
+  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
+    value = pbi->getOperand();
+  }
+
   if (!value->getType().isAddress()) {
     SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
 
