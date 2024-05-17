@@ -16,6 +16,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Sema/Concurrency.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -528,31 +529,17 @@ static bool onlyDeinitAccess(RefElementAddrInst *inst) {
 /// is happening in a deinit that uses flow-isolation.
 /// \returns true iff a diagnostic was emitted for this reference.
 static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
-  VarDecl *var = inst->getField();
-  Type ty = var->getTypeInContext();
-  DeclContext *dc = inst->getFunction()->getDeclContext();
+  auto dc = inst->getFunction()->getDeclContext();
 
-// FIXME: we should emit diagnostics in other modes using:
-//
-//  if (!shouldDiagnoseExistingDataRaces(dc))
-//    return false;
-//
-// but until we decide how we want to handle isolated state from deinits,
-// we're going to limit the noise to complete mode for now.
+  // For historical reasons, only diagnose this issue in strict mode.
   if (dc->getASTContext().LangOpts.StrictConcurrencyLevel
-      != StrictConcurrency::Complete)
-      return false;
-
-  if (ty->isSendableType())
+        != StrictConcurrency::Complete)
     return false;
 
-  auto &diag = var->getASTContext().Diags;
-
-  diag.diagnose(inst->getLoc().getSourceLoc(), diag::non_sendable_from_deinit,
-                ty, var->getDescriptiveKind(), var->getName())
-      .warnUntilSwiftVersion(6);
-
-  return true;
+  return swift::diagnoseNonSendableFromDeinit(
+      inst->getLoc().getSourceLoc(),
+      inst->getField(),
+      dc);
 }
 
 class OperandWorklist {
