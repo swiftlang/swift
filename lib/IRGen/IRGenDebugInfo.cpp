@@ -3165,6 +3165,11 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (DbgTy.getType()->hasLocalArchetype())
     return;
 
+  // We don't support dbg.declare in optimized code, as variables can be moved
+  // by SIL optimization passes.
+  if (DS->getInlinedFunction()->shouldOptimize())
+    AddrDInstrKind = AddrDbgInstrKind::DbgValueDeref;
+
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
   auto DInstLoc = getStartLocation(DbgInstLoc);
