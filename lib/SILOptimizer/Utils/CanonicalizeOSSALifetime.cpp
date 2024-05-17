@@ -674,7 +674,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
       predecessor->getTerminator()->visitPriorInstructions([&](auto *inst) {
-        visitor(inst, PrunedLiveness::LifetimeEnding::NonUse());
+        visitor(inst, PrunedLiveness::LifetimeEnding::Value::NonUse);
         return true;
       });
     }
@@ -688,7 +688,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
     // hoisting it would avoid a copy.
     if (consumedAtExitBlocks.contains(block))
       continue;
-    visitor(destroy, PrunedLiveness::LifetimeEnding::Ending());
+    visitor(destroy, PrunedLiveness::LifetimeEnding::Value::Ending);
   }
 }
 

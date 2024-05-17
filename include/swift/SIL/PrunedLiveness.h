@@ -391,22 +391,20 @@ public:
       Ending,
       // The instruction doesn't use the value.
       NonUse,
-    };
-    Value value;
+    } value;
 
     LifetimeEnding(Value value) : value(value) {}
-    explicit LifetimeEnding(bool lifetimeEnding)
-        : value(lifetimeEnding ? Value::Ending : Value::NonEnding) {}
     operator Value() const { return value; }
+
+    static LifetimeEnding forUse(bool lifetimeEnding) {
+      return lifetimeEnding ? Value::Ending : Value::NonEnding;
+    }
+    bool isEnding() const { return value == Value::Ending; }
+
     LifetimeEnding meet(LifetimeEnding const other) const {
       return value < other.value ? *this : other;
     }
     void meetInPlace(LifetimeEnding const other) { *this = meet(other); }
-    bool isEnding() const { return value == Value::Ending; }
-
-    static LifetimeEnding NonUse() { return {Value::NonUse}; };
-    static LifetimeEnding Ending() { return {Value::Ending}; };
-    static LifetimeEnding NonEnding() { return {Value::NonEnding}; };
   };
 
 protected:
@@ -467,8 +465,8 @@ public:
     auto useIter = users.find(user);
     if (useIter == users.end())
       return NonUser;
-    return useIter->second == LifetimeEnding::Ending() ? LifetimeEndingUse
-                                                       : NonLifetimeEndingUse;
+    return useIter->second.isEnding() ? LifetimeEndingUse
+                                      : NonLifetimeEndingUse;
   }
 
   using ConstUserRange =
