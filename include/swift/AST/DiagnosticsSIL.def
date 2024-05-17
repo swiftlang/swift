@@ -390,6 +390,8 @@ ERROR(embedded_swift_metatype,none,
       "cannot use metatype in embedded Swift", ())
 ERROR(embedded_swift_keypath,none,
       "cannot use key path in embedded Swift", ())
+ERROR(embedded_swift_dynamic_cast,none,
+      "cannot do dynamic casting in embedded Swift", ())
 ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating,none,
