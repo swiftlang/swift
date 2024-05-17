@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Runtime/TracingCommon.h"
 
 #if SWIFT_STDLIB_TRACING
 #include <os/signpost.h>
@@ -49,6 +50,8 @@ void setupLogs(void *unused);
 // optimized out.
 #define ENSURE_LOG(log)                                                        \
   do {                                                                         \
+    if (!tracingReady())                                                       \
+      return {};                                                               \
     swift::once(LogsToken, setupLogs, nullptr);                                \
     if (!TracingEnabled)                                                       \
       return {};                                                               \
