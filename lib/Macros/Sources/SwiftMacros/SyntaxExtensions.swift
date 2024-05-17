@@ -31,3 +31,16 @@ extension VariableDeclSyntax {
     }
   }
 }
+
+extension ImplicitlyUnwrappedOptionalTypeSyntax {
+  internal var asOptionalTypeSyntax: some TypeSyntaxProtocol {
+    OptionalTypeSyntax(
+      leadingTrivia: leadingTrivia,
+      unexpectedBeforeWrappedType,
+      wrappedType: wrappedType,
+      self.unexpectedBetweenWrappedTypeAndExclamationMark,
+      self.unexpectedAfterExclamationMark,
+      trailingTrivia: self.trailingTrivia
+    )
+  }
+}

@@ -31,6 +31,9 @@ enum TL {
 
   @TaskLocal
   static var clazz: ClassTaskLocal?
+
+  @TaskLocal
+  static var force: ForceUnwrapMe!
 }
 
 @TaskLocal
@@ -39,6 +42,8 @@ var globalTaskLocal: StringLike = StringLike("<not-set>")
 
 @available(SwiftStdlib 5.10, *)
 struct LessAvailable {}
+
+struct ForceUnwrapMe {}
 
 @TaskLocal
 @available(SwiftStdlib 5.10, *)
