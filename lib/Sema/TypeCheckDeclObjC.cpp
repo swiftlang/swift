@@ -2128,7 +2128,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 }
 
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
-                                   const ValueDecl *decl,
+                                   const Decl *decl,
                                    std::optional<ObjCSelector> nameOpt,
                                    std::optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {

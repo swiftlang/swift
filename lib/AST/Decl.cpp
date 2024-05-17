@@ -4021,25 +4021,86 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
-SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
+SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
+  // Some decls have a parent/child split where the introducer keyword is on the
+  // parent, but the attributes are on the children. If this is a child in such
+  // a pair, `introDecl` will be changed to point to the parent. (The parent
+  // decl should delegate to one of its children.)
+  const Decl *introDecl = this;
+
+  switch (getKind()) {
+  case DeclKind::Module:
+  case DeclKind::TopLevelCode:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+  case DeclKind::Missing:
+  case DeclKind::MissingMember:
+  case DeclKind::MacroExpansion:
+  case DeclKind::BuiltinTuple:
+    // These don't take attributes.
+    return SourceLoc();
+
+  case DeclKind::EnumCase:
+    // An ECD's attributes are attached to its elements.
+    if (auto elem = cast<EnumCaseDecl>(this)->getFirstElement())
+      return elem->getAttributeInsertionLoc(forModifier);
+    break;
+
+  case DeclKind::EnumElement:
+    // An EED's introducer keyword is on its parent case.
+    if (auto parent = cast<EnumElementDecl>(this)->getParentCase())
+      introDecl = parent;
+    break;
+
+  case DeclKind::PatternBinding: {
+    // A PBD's attributes are attached to the vars in its patterns.
+    auto pbd = cast<PatternBindingDecl>(this);
+
+    for (unsigned i = 0; i < pbd->getNumPatternEntries(); i++) {
+      if (auto var = pbd->getAnchoringVarDecl(i)) {
+        return var->getAttributeInsertionLoc(forModifier);
+      }
+    }
+
+    break;
+  }
+
+  case DeclKind::Var:
+  case DeclKind::Param:
+    // A VarDecl's introducer keyword, if it has one, is on its pattern binding.
+    if (auto pbd = cast<VarDecl>(this)->getParentPatternBinding())
+      introDecl = pbd;
+    break;
+
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::OpaqueType:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::Macro:
+  case DeclKind::Extension:
+  case DeclKind::Import:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    // Both the introducer keyword and the attributes are on `this`.
+    break;
+  }
+
   if (isImplicit())
     return SourceLoc();
 
-  if (auto var = dyn_cast<VarDecl>(this)) {
-    // [attrs] var ...
-    // The attributes are part of the VarDecl, but the 'var' is part of the PBD.
-    SourceLoc resultLoc = var->getAttrs().getStartLoc(forModifier);
-    if (resultLoc.isValid()) {
-      return resultLoc;
-    } else if (auto pbd = var->getParentPatternBinding()) {
-      return pbd->getStartLoc();
-    } else {
-      return var->getStartLoc();
-    }
-  }
-
   SourceLoc resultLoc = getAttrs().getStartLoc(forModifier);
-  return resultLoc.isValid() ? resultLoc : getStartLoc();
+  return resultLoc.isValid() ? resultLoc : introDecl->getStartLoc();
 }
 
 /// Returns true if \p VD needs to be treated as publicly-accessible

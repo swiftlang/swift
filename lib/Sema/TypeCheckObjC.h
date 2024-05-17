@@ -212,7 +212,7 @@ bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 ///
 /// For properties, the selector should be a zero-parameter selector of the
 /// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, const Decl *decl,
                             std::optional<ObjCSelector> nameOpt,
                             std::optional<ObjCSelector> targetNameOpt,
                             bool ignoreImpliedName = false);
