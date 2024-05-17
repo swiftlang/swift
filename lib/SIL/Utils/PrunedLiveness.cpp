@@ -489,17 +489,62 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   llvm_unreachable("instruction must be in its parent block");
 }
 
+/// Whether \p parent is a dead (reported to be dead by `liveBlocks`), dead-end
+/// (such as an infinite loop) block within the availability boundary (where
+/// the value has not been consumed).
+static bool checkDeadEnd(SILBasicBlock *parent, DeadEndBlocks *deadEndBlocks,
+                         PrunedLiveBlocks const &liveBlocks) {
+  if (!deadEndBlocks) {
+    return false;
+  }
+  if (!deadEndBlocks->isDeadEnd(parent)) {
+    return false;
+  }
+  if (liveBlocks.getBlockLiveness(parent) != PrunedLiveBlocks::Dead) {
+    return false;
+  }
+  // Check whether the value is available in `parent` (i.e. not consumed on any
+  // path to it):
+  //
+  // Search backward until LiveOut or LiveWithin blocks are reached.
+  // (1) If ALL the reached blocks are LiveOut, then `parent` IS within the
+  //     availability boundary.
+  // (2) If ANY reached block is LiveWithin, the value was consumed in that
+  //     reached block, preventing the value from being available at `parent`,
+  //     so `parent` is NOT within the availability boundary.
+  BasicBlockWorklist worklist(parent->getFunction());
+  worklist.push(parent);
+  while (auto *block = worklist.pop()) {
+    auto isLive = liveBlocks.getBlockLiveness(block);
+    switch (isLive) {
+    case PrunedLiveBlocks::Dead: {
+      // Availability is unchanged; continue the backwards walk.
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predecessor);
+      }
+      break;
+    }
+    case PrunedLiveBlocks::LiveWithin:
+      // Availability ended in this block.  Some path to `parent` consumed the
+      // value.  Case (2) above.
+      return false;
+    case PrunedLiveBlocks::LiveOut:
+      // Availability continued out of this block.  Case (1) above.
+      continue;
+    }
+  }
+  return true;
+}
+
 template <typename LivenessWithDefs>
 bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
     ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   assert(asImpl().isInitialized());
 
-  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
-    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
-  };
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (!asImpl().isWithinBoundary(user) && !checkDeadEnd(user))
+    if (!asImpl().isWithinBoundary(user) &&
+        !checkDeadEnd(user->getParent(), deadEndBlocks, liveBlocks))
       return false;
   }
   return true;
@@ -510,12 +555,10 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(
     ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   assert(asImpl().isInitialized());
 
-  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
-    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
-  };
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (asImpl().isWithinBoundary(user) || checkDeadEnd(user))
+    if (asImpl().isWithinBoundary(user) ||
+        checkDeadEnd(user->getParent(), deadEndBlocks, liveBlocks))
       return false;
   }
   return true;
