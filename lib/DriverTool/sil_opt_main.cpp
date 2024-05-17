@@ -539,6 +539,17 @@ struct SILOptOptions {
       llvm::cl::opt<bool>(
           "disable-region-based-isolation-with-strict-concurrency",
           llvm::cl::init(false));
+
+  llvm::cl::opt<bool>
+      DisableTransferringArgsAndResultsWithRegionBasedIsolation = llvm::cl::opt<
+          bool>(
+          "disable-transferring-args-and-results-with-region-based-isolation",
+          llvm::cl::init(false));
+
+  llvm::cl::opt<bool> DisableSendingArgsAndResultsWithRegionBasedIsolation =
+      llvm::cl::opt<bool>(
+          "disable-sending-args-and-results-with-region-based-isolation",
+          llvm::cl::init(false));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -710,6 +721,14 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
         !options.DisableRegionBasedIsolationWithStrictConcurrency) {
       Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
     }
+  }
+
+  if (Invocation.getLangOptions().hasFeature(Feature::RegionBasedIsolation)) {
+    if (!options.DisableTransferringArgsAndResultsWithRegionBasedIsolation)
+      Invocation.getLangOptions().enableFeature(
+          Feature::TransferringArgsAndResults);
+    if (!options.DisableSendingArgsAndResultsWithRegionBasedIsolation)
+      Invocation.getLangOptions().enableFeature(Feature::SendingArgsAndResults);
   }
 
   if (Invocation.getLangOptions().hasFeature(
