@@ -764,6 +764,18 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     return nullptr;
   }
 
+
+  // If the caller is [serialized] due to explicit `@inlinable` but
+  // the callee was [serialized_for_package] due to package-cmo, the
+  // callee is [serialized] and might contain loadable types, which
+  // is normally disallowed. This check prevents such loadable types
+  // from being inlined.
+  if (F->isSerialized() &&
+      !F->isSerializedForPackage() &&
+      CalleeFunction->isSerializedForPackage()) {
+    return nullptr;
+  }
+
   return CalleeFunction;
 }
 
