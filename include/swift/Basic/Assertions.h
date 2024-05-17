@@ -19,6 +19,13 @@
 
 #include <stdint.h>
 
+// Only for use in this header
+#if __has_builtin(__builtin_expect)
+#define ASSERT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
+#else
+#define ASSERT_UNLIKELY(expression) ((expression))
+#endif
+
 // ================================ Mandatory Asserts ================================
 
 // `ASSERT(expr)`:
@@ -38,7 +45,7 @@
 
 #define ASSERT(expr) \
   do { \
-    if (!(expr)) { \
+    if (ASSERT_UNLIKELY(!expr)) {			   \
       ASSERT_failure(#expr, __FILE__, __LINE__, __func__); \
     } \
   } while (0)
@@ -69,7 +76,7 @@ void ASSERT_failure(const char *expr, const char *file, int line, const char *fu
 
 #define CONDITIONAL_ASSERT(expr) \
   do { \
-    if (CONDITIONAL_ASSERT_enabled()) { \
+    if (ASSERT_UNLIKELY(CONDITIONAL_ASSERT_enabled())) {	\
       ASSERT(expr); \
     } \
   } while (0)
