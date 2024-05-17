@@ -441,7 +441,7 @@ bool diagnoseNonSendableTypes(
       type, fromContext, derivedConformance, typeLoc,
       [&](Type specificType, DiagnosticBehavior behavior) {
         auto preconcurrency =
-            fromContext.preconcurrencyBehavior(type->getAnyNominal());
+          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
 
         ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
             .limitBehaviorUntilSwiftVersion(behavior, 6)
@@ -477,7 +477,7 @@ bool diagnoseIfAnyNonSendableTypes(
       type, fromContext, derivedConformance, typeLoc,
       [&](Type specificType, DiagnosticBehavior behavior) {
         auto preconcurrency =
-            fromContext.preconcurrencyBehavior(type->getAnyNominal());
+          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
 
         if (behavior == DiagnosticBehavior::Ignore ||
             preconcurrency == DiagnosticBehavior::Ignore)

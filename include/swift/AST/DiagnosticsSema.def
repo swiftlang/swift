@@ -5520,8 +5520,8 @@ ERROR(sendable_isolated_sync_function,none,
       "%0 synchronous %kind1 cannot be marked as '@Sendable'",
       (ActorIsolation, const ValueDecl *))
 ERROR(nonsendable_instance_method,none,
-      "instance methods of non-Sendable types cannot be marked as '@Sendable'",
-      ())
+      "instance method of non-Sendable type %0 cannot be marked as '@Sendable'",
+      (Type))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %kind1 in "
       "concurrently-executing code",
@@ -5795,6 +5795,10 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+
+ERROR(non_sendable_from_deinit,none,
+        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
+        (Type, DescriptiveDeclKind, DeclName))
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
