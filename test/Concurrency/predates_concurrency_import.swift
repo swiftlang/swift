@@ -28,13 +28,13 @@ func acceptSendable<T: Sendable>(_: T) { }
 @available(SwiftStdlib 5.1, *)
 func test(
   ss: StrictStruct, ns: NonStrictClass, oma: OtherModuleActor,
-  ssOpt: StrictStruct?, nsOpt: NonStrictClass?
+  ssOpt: StrictStruct?, nsOpt: NonStrictClass?,
   ssc: SomeSendableClass,
   mpcc: MyPredatesConcurrencyClass
 ) async {
   acceptSendable(ss) // expected-warning{{type 'StrictStruct' does not conform to the 'Sendable' protocol}}
   acceptSendable(ns) // silence issue entirely
-  acceptSendable(ssOpt) // expected-warning{{type 'StrictStruct?' does not conform to the 'Sendable' protocol}}
+  acceptSendable(ssOpt) // expected-warning{{type 'StrictStruct' does not conform to the 'Sendable' protocol}}
   acceptSendable(nsOpt) // silence issue entirely
   acceptSendable(oma) // okay
   acceptSendable(ssc) // okay
