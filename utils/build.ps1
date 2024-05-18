@@ -867,7 +867,7 @@ function Build-CMakeProject {
 
     if ($UseBuiltCompilers.Contains("Swift")) {
       $env:Path = "$($HostArch.SDKInstallRoot)\usr\bin;$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
-    } else if ($UsePinnedCompilers.Contains("Swift")) {
+    } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
     Invoke-Program cmake.exe @cmakeGenerateArgs
