@@ -4104,10 +4104,25 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
         vd->getDeclContext()->getGenericSignatureOfContext());
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-    llvm_unreachable("Doesn't have generic signature");
+    return GenericSignatureWithCapturedEnvironments();
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+SubstitutionMap
+TypeConverter::getSubstitutionMapWithCapturedEnvironments(
+    SILDeclRef constant, const CaptureInfo &captureInfo,
+    SubstitutionMap subs) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+  if (!sig.genericSig) {
+    assert(!sig.baseGenericSig);
+    assert(sig.capturedEnvs.empty());
+    return SubstitutionMap();
+  }
+
+  return buildSubstitutionMapWithCapturedEnvironments(
+      subs, sig.genericSig, sig.capturedEnvs);
 }
 
 GenericEnvironment *

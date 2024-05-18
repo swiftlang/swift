@@ -448,9 +448,9 @@ protected:
 
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
+
   SILType remapType(SILType Ty) {
-    // Substitute local archetypes, if we have any.
-    if (Ty.hasLocalArchetype()) {
+    if (Functor.SubsMap || Ty.hasLocalArchetype()) {
       Ty = Ty.subst(Builder.getModule(), Functor, Functor,
                     CanGenericSignature());
     }
@@ -459,16 +459,14 @@ protected:
   }
 
   CanType remapASTType(CanType ty) {
-    // Substitute local archetypes, if we have any.
-    if (ty->hasLocalArchetype())
+    if (Functor.SubsMap || ty->hasLocalArchetype())
       ty = ty.subst(Functor, Functor)->getCanonicalType();
 
     return ty;
   }
 
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
-    // If we have local archetypes to substitute, do so now.
-    if (Ty->hasLocalArchetype())
+    if (Functor.SubsMap || Ty->hasLocalArchetype())
       C = C.subst(Ty, Functor, Functor);
 
     return C;
@@ -485,7 +483,7 @@ protected:
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     // If we have local archetypes to substitute, do so now.
-    if (Subs.hasLocalArchetypes())
+    if (Subs.hasLocalArchetypes() || Functor.SubsMap)
       Subs = Subs.subst(Functor, Functor);
 
     return Subs;

@@ -39,6 +39,10 @@ class FindCapturedVars : public ASTWalker {
   SmallVector<CapturedValue, 4> Captures;
   llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
 
+  /// We track the pack expansion expressions in ForEachStmts, because
+  /// their local generics remain in scope until the end of the statement.
+  llvm::DenseSet<PackExpansionExpr *> ForEachPatternSequences;
+
   /// A stack of pack element environments we're currently walking into.
   /// A reference to an element archetype defined by one of these is not
   /// a capture.
@@ -652,12 +656,51 @@ public:
     if (auto expansion = dyn_cast<PackExpansionExpr>(E)) {
       if (auto *env = expansion->getGenericEnvironment()) {
         assert(env == VisitingEnvironments.back());
-        VisitingEnvironments.pop_back();
         (void) env;
+
+        // If this is the pack expansion of a for .. in loop, the generic
+        // environment remains in scope until the end of the loop.
+        if (ForEachPatternSequences.count(expansion) == 0)
+          VisitingEnvironments.pop_back();
       }
     }
 
     return Action::Continue(E);
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+        if (auto *env = expansion->getGenericEnvironment()) {
+          // Remember this generic environment, so that it remains on the
+          // visited stack until the end of the for .. in loop.
+          assert(ForEachPatternSequences.count(expansion) == 0);
+          ForEachPatternSequences.insert(expansion);
+        }
+      }
+    }
+
+    return Action::Continue(S);
+  }
+
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+    if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+        if (auto *env = expansion->getGenericEnvironment()) {
+          assert(ForEachPatternSequences.count(expansion) != 0);
+          ForEachPatternSequences.erase(expansion);
+
+          // Clean up the generic environment bound by the for loop.
+          assert(env == VisitingEnvironments.back());
+          VisitingEnvironments.pop_back();
+          (void) env;
+        }
+      }
+    }
+
+    return Action::Continue(S);
   }
 };
 
