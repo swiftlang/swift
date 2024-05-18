@@ -98,7 +98,7 @@ func testOnlyErrorOnExactValue() async {
 func testNoErrorIfUseInSameRegionLater() async {
   let x = PreCUncheckedNonSendableKlass()
   let y = (x, x)
-  // We squelch since we are transferring x.
+  // We squelch since we are sending x.
   await transferToMain(x)
   useValue(y)
 }

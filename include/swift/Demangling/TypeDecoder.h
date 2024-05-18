@@ -84,7 +84,7 @@ public:
   }
   void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
   void setIsolated() { Flags = Flags.withIsolated(true); }
-  void setTransferring() { Flags = Flags.withTransferring(true); }
+  void setSending() { Flags = Flags.withSending(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -116,14 +116,14 @@ enum class ImplParameterConvention {
 
 enum class ImplParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
-  Transferring = 0x2,
+  Sending = 0x2,
 };
 
 using ImplParameterInfoOptions = OptionSet<ImplParameterInfoFlags>;
 
 enum class ImplResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
-  IsTransferring = 0x2,
+  IsSending = 0x2,
 };
 
 using ImplResultInfoOptions = OptionSet<ImplResultInfoFlags>;
@@ -294,30 +294,29 @@ class ImplFunctionTypeFlags {
   unsigned Async : 1;
   unsigned ErasedIsolation : 1;
   unsigned DifferentiabilityKind : 3;
-  unsigned HasTransferringResult : 1;
+  unsigned HasSendingResult : 1;
 
 public:
   ImplFunctionTypeFlags()
       : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
-        ErasedIsolation(0), DifferentiabilityKind(0), HasTransferringResult(0) {
-  }
+        ErasedIsolation(0), DifferentiabilityKind(0), HasSendingResult(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
                         bool erasedIsolation,
                         ImplFunctionDifferentiabilityKind diffKind,
-                        bool hasTransferringResult)
+                        bool hasSendingResult)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
         Concurrent(concurrent), Async(async), ErasedIsolation(erasedIsolation),
         DifferentiabilityKind(unsigned(diffKind)),
-        HasTransferringResult(hasTransferringResult) {}
+        HasSendingResult(hasSendingResult) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
     return ImplFunctionTypeFlags(
         rep, Pseudogeneric, Escaping, Concurrent, Async, ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -326,7 +325,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true, Async,
         ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -335,7 +334,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         true, ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -344,7 +343,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
         ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -352,7 +351,7 @@ public:
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, true, ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
   
   ImplFunctionTypeFlags
@@ -361,17 +360,17 @@ public:
         ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
         ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
     return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
                                  Escaping, Concurrent, Async, ErasedIsolation,
-                                 diffKind, HasTransferringResult);
+                                 diffKind, HasSendingResult);
   }
 
-  ImplFunctionTypeFlags withTransferringResult() const {
+  ImplFunctionTypeFlags withSendingResult() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ErasedIsolation,
@@ -392,7 +391,7 @@ public:
 
   bool hasErasedIsolation() const { return ErasedIsolation; }
 
-  bool hasTransferringResult() const { return HasTransferringResult; }
+  bool hasSendingResult() const { return HasSendingResult; }
 
   bool isDifferentiable() const {
     return getDifferentiabilityKind() !=
@@ -919,10 +918,10 @@ protected:
         extFlags = extFlags.withIsolatedAny();
         ++firstChildIdx;
       }
-      
+
       if (Node->getChild(firstChildIdx)->getKind() ==
-                 NodeKind::TransferringResultFunctionType) {
-        extFlags = extFlags.withTransferringResult();
+          NodeKind::SendingResultFunctionType) {
+        extFlags = extFlags.withSendingResult();
         ++firstChildIdx;
       }
 
@@ -1780,8 +1779,8 @@ private:
           hasParamFlags = true;
           break;
 
-        case NodeKind::Transferring:
-          param.setTransferring();
+        case NodeKind::Sending:
+          param.setSending();
           node = node->getFirstChild();
           hasParamFlags = true;
           break;

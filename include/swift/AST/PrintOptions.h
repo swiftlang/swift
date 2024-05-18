@@ -382,8 +382,8 @@ struct PrintOptions {
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
-  /// Suppress 'transferring' on arguments and results.
-  bool SuppressTransferringArgsAndResults = false;
+  /// Suppress 'sending' on arguments and results.
+  bool SuppressSendingArgsAndResults = false;
 
   /// Suppress Noncopyable generics.
   bool SuppressNoncopyableGenerics = false;

@@ -532,8 +532,8 @@ protected:
     /// analysis.
     HasTopLevelLocalContextCaptures : 1,
 
-    /// Set to true if this FuncDecl has a transferring result.
-    HasTransferringResult : 1
+    /// Set to true if this FuncDecl has a 'sending' result.
+    HasSendingResult : 1
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
@@ -6639,8 +6639,8 @@ class ParamDecl : public VarDecl {
     /// Whether or not this paramater is '_resultDependsOn'
     IsResultDependsOn = 1 << 3,
 
-    /// Whether or not this parameter is 'transferring'.
-    IsTransferring = 1 << 4,
+    /// Whether or not this parameter is 'sending'.
+    IsSending = 1 << 4,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -6918,16 +6918,14 @@ public:
       removeFlag(Flag::IsIsolated);
   }
 
-  /// Whether or not this parameter is marked with 'transferring'.
-  bool isTransferring() const {
-    return getOptions().contains(Flag::IsTransferring);
-  }
+  /// Whether or not this parameter is marked with 'sending'.
+  bool isSending() const { return getOptions().contains(Flag::IsSending); }
 
-  void setTransferring(bool value = true) {
+  void setSending(bool value = true) {
     if (value)
-      addFlag(Flag::IsTransferring);
+      addFlag(Flag::IsSending);
     else
-      removeFlag(Flag::IsTransferring);
+      removeFlag(Flag::IsSending);
   }
 
   /// Whether or not this parameter is marked with '_const'.
@@ -7966,7 +7964,7 @@ protected:
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
-    Bits.FuncDecl.HasTransferringResult = false;
+    Bits.FuncDecl.HasSendingResult = false;
   }
 
   void setResultInterfaceType(Type type);
@@ -8119,14 +8117,12 @@ public:
     Bits.FuncDecl.ForcedStaticDispatch = flag;
   }
 
-  /// Returns true if this FuncDecl has a transferring result... returns false
+  /// Returns true if this FuncDecl has a sending result... returns false
   /// otherwise.
-  bool hasTransferringResult() const {
-    return Bits.FuncDecl.HasTransferringResult;
-  }
+  bool hasSendingResult() const { return Bits.FuncDecl.HasSendingResult; }
 
-  void setTransferringResult(bool newValue = true) {
-    Bits.FuncDecl.HasTransferringResult = newValue;
+  void setSendingResult(bool newValue = true) {
+    Bits.FuncDecl.HasSendingResult = newValue;
   }
 
   static bool classof(const Decl *D) {

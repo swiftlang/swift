@@ -126,6 +126,8 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("borrowing") &&
         (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
          !Tok.isContextualKeyword("transferring")) &&
+        (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
+         !Tok.isContextualKeyword("sending")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
         (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
          !Tok.isContextualKeyword("_resultDependsOn")))
@@ -272,7 +274,40 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             continue;
           }
 
+          diagnose(Tok, diag::transferring_is_now_sendable)
+              .fixItReplace(Tok.getLoc(), "sending");
+
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::sending_and_transferring_used_together)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
           param.TransferringLoc = consumeToken();
+          continue;
+        }
+
+        if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
+            Tok.isContextualKeyword("sending")) {
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
+                   Tok.getText())
+              .warnUntilSwiftVersion(6);
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::parameter_specifier_repeated)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
+          if (param.TransferringLoc.isValid()) {
+            diagnose(Tok, diag::sending_and_transferring_used_together)
+                .fixItRemove(param.TransferringLoc);
+            consumeToken();
+            continue;
+          }
+
+          param.SendingLoc = consumeToken();
           continue;
         }
 
@@ -294,6 +329,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
+          }
+
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::sending_before_parameter_specifier,
+                     getNameForParamSpecifier(param.SpecifierKind));
           }
 
           hasSpecifier = true;
@@ -581,7 +621,12 @@ mapParsedParameters(Parser &parser,
       if (paramInfo.TransferringLoc.isValid()) {
         type = new (parser.Context)
             TransferringTypeRepr(type, paramInfo.TransferringLoc);
-        param->setTransferring();
+        param->setSending();
+      }
+
+      if (paramInfo.SendingLoc.isValid()) {
+        type = new (parser.Context) SendingTypeRepr(type, paramInfo.SendingLoc);
+        param->setSending();
       }
 
       param->setTypeRepr(type);
@@ -612,7 +657,9 @@ mapParsedParameters(Parser &parser,
             else if (isa<ResultDependsOnTypeRepr>(STR))
               param->setResultDependsOn(true);
             else if (isa<TransferringTypeRepr>(STR))
-              param->setTransferring(true);
+              param->setSending(true);
+            else if (isa<SendingTypeRepr>(STR))
+              param->setSending(true);
             unwrappedType = STR->getBase();
             continue;
           }

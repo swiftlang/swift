@@ -3450,6 +3450,12 @@ public:
     printFoot();
   }
 
+  void visitSendingTypeRepr(SendingTypeRepr *T, StringRef label) {
+    printCommon("sending", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T, StringRef label) {
     printCommon("_const", label);
     printRec(T->getBase());
@@ -4324,7 +4330,7 @@ namespace {
         printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
-        printFlag(T->hasTransferringResult(), "transferring_result");
+        printFlag(T->hasSendingResult(), "sending_result");
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");
