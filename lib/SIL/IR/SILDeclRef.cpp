@@ -507,7 +507,8 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::AlwaysEmitIntoClient;
 
     // FIXME: This should always be true.
-    if (d->getModuleContext()->isResilient())
+    if (d->getModuleContext()->isResilient() &&
+        !d->getModuleContext()->allowNonResilientAccess())
       return Limit::NeverPublic;
 
     break;
@@ -1528,7 +1529,8 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   // FIXME: This is too narrow. Any class with resilient metadata should
   // probably have this, at least for method overrides that don't add new
   // vtable entries.
-  bool isResilientClass = classType->isResilient();
+  bool isResilientClass = classType->isResilient() &&
+                          !classType->getModuleContext()->allowNonResilientAccess();
 
   if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
     if (isResilientClass)
