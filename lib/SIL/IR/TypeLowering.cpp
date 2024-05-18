@@ -3898,7 +3898,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
-          .withTransferringResult(funcType->hasTransferringResult())
+          .withSendingResult(funcType->hasSendingResult())
           .build();
 
   return CanAnyFunctionType::get(

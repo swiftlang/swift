@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -strict-concurrency=complete %s -o /dev/null -verify
+// RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature TransferringArgsAndResults -strict-concurrency=complete %s -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -221,52 +221,52 @@ bb1:
   return %9999 : $()
 }
 
-sil [ossa] @synchronous_returns_transferring : $@convention(method) (@guaranteed NonSendableStruct) -> @sil_transferring @owned NonSendableKlass {
+sil [ossa] @synchronous_returns_transferring : $@convention(method) (@guaranteed NonSendableStruct) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : @guaranteed $NonSendableStruct):
   debug_value %0 : $NonSendableStruct, var, name "myname"
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'myname.ns' cannot be a transferring result. task-isolated uses may race with caller uses}}
+  // expected-note @-1 {{task-isolated 'myname.ns' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
 }
 
-sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
+sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : @guaranteed $MainActorIsolatedStruct):
   debug_value %0 : $MainActorIsolatedStruct, var, name "myname"
   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
-sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_transferring @owned NonSendableKlass {
+sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : $*MainActorIsolatedStruct):
   debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = load [copy] %2 : $*NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'myname.ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
-sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedenumdata : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedenumdata : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : @guaranteed $MainActorIsolatedEnum):
   debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_enum_data %0 : $MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = copy_value %2 : $NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.second' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
-sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_transferring @owned NonSendableKlass {
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : $*MainActorIsolatedEnum):
   debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
   %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = load [take] %2 : $*NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.second' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'myname.second' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
-sil [ossa] @synchronous_returns_transferring_globalactor_enum_switchenum : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_transferring @owned FakeOptional<NonSendableKlass> {
+sil [ossa] @synchronous_returns_transferring_globalactor_enum_switchenum : $@convention(method) (@guaranteed MainActorIsolatedEnum) -> @sil_sending @owned FakeOptional<NonSendableKlass> {
 bb0(%0 : @guaranteed $MainActorIsolatedEnum):
   debug_value %0 : $MainActorIsolatedEnum, var, name "myname"
   switch_enum %0 : $MainActorIsolatedEnum, case #MainActorIsolatedEnum.first!enumelt: bb1, case #MainActorIsolatedEnum.second!enumelt: bb2
@@ -282,7 +282,7 @@ bb2(%1 : @guaranteed $NonSendableKlass):
 
 bb3(%4 : @owned $FakeOptional<NonSendableKlass>):
   return %4 : $FakeOptional<NonSendableKlass> // expected-warning {{sending 'myname.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'myname.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'myname.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
 sil [ossa] @warningIfCallingGetter : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> () {

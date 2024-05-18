@@ -1638,14 +1638,14 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   // TaskOptionRecord*
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
-  // If transferring results are enabled, make async let return a transferring
+  // If sending results are enabled, make async let return a set
   // value.
   //
   // NOTE: If our actual returned function does not return something that is
-  // transferring, we will emit an error in Sema. In the case of SILGen, we just
-  // in such a case want to thunk and not emit an error. So in such a case, we
-  // always make this builtin take a transferring result.
-  bool hasTransferringResult =
+  // sent, we will emit an error in Sema. In the case of SILGen, we just in such
+  // a case want to thunk and not emit an error. So in such a case, we always
+  // make this builtin take a sending result.
+  bool hasSendingResult =
       ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults);
 
   // operation async function pointer: () async throws -> transferring T
@@ -1653,7 +1653,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
                      .withAsync()
                      .withThrows()
                      .withNoEscape()
-                     .withTransferringResult(hasTransferringResult)
+                     .withSendingResult(hasSendingResult)
                      .build();
   builder.addParameter(
       makeConcrete(FunctionType::get({ }, genericParam, extInfo)));

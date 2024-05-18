@@ -1552,6 +1552,7 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : size_t {
   BridgedAttributedTypeSpecifierIsolated,
   BridgedAttributedTypeSpecifierResultDependsOn,
   BridgedAttributedTypeSpecifierTransferring,
+  BridgedAttributedTypeSpecifierSending,
 };
 
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:loc:name:)")

@@ -459,15 +459,15 @@ $s28implicit_lifetime_dependence10BufferViewVyA2CYlicfC ---> {T:$s28implicit_lif
 $s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyYLsF ---> implicit_lifetime_dependence.Wrapper.getView1(self lifetime dependence: scope) () -> implicit_lifetime_dependence.BufferView
 $s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYLiF ---> implicit_lifetime_dependence.Wrapper.getView2(self lifetime dependence: inherit) () -> implicit_lifetime_dependence.BufferView
 $s3red3use2fnySiyYAXE_tF ---> red.use(fn: @isolated(any) () -> Swift.Int) -> ()
-$s4testAAyAA5KlassC_ACtACnYTF ---> test.test(__owned test.Klass) -> transferring (test.Klass, test.Klass)
-$s5test24testyyAA5KlassCnYuF ---> test2.test(transferring __owned test2.Klass) -> ()
+$s4testAAyAA5KlassC_ACtACnYTF ---> test.test(__owned test.Klass) -> sending (test.Klass, test.Klass)
+$s5test24testyyAA5KlassCnYuF ---> test2.test(sending __owned test2.Klass) -> ()
 $s7ElementSTQzqd__s5Error_pIgnrzo_ABqd__sAC_pIegnrzr_SlRzr__lTR ---> {T:} reabstraction thunk helper <A><A1 where A: Swift.Collection> from @callee_guaranteed (@in_guaranteed A.Swift.Sequence.Element) -> (@out A1, @error @owned Swift.Error) to @escaping @callee_guaranteed (@in_guaranteed A.Swift.Sequence.Element) -> (@out A1, @error @out Swift.Error)
-$sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative transferring Swift.Float) -> (@unowned Swift.Float)
-$sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned transferring Swift.Float) -> (@unowned Swift.Float)
-$s4testA2A5KlassCyYTF ---> test.test() -> transferring test.Klass
-$s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> transferring main.Klass
-$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> transferring null.NonSendableKlass
-$s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> transferring (@out null.NonSendableKlass, @error @owned Swift.Error)
+$sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative sending Swift.Float) -> (@unowned Swift.Float)
+$sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned sending Swift.Float) -> (@unowned Swift.Float)
+$s4testA2A5KlassCyYTF ---> test.test() -> sending test.Klass
+$s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> sending main.Klass
+$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> sending null.NonSendableKlass
+$s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> sending (@out null.NonSendableKlass, @error @owned Swift.Error)
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi1_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.<bit 2>> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization

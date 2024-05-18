@@ -646,7 +646,7 @@ bb0:
   fix_lifetime %value : $SendableKlass
 
   // This is not considered a bad use of the raw pointer since this is
-  // transferring to the same isolation domain.
+  // sending to the same isolation domain.
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
 

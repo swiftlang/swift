@@ -6583,12 +6583,12 @@ public:
 
     // If our function hasTransferringResult, then /all/ results must be
     // transferring.
-    require(FTy->hasTransferringResult() ==
+    require(FTy->hasSendingResult() ==
                 (FTy->getResults().size() &&
                  llvm::all_of(FTy->getResults(),
                               [](SILResultInfo result) {
                                 return result.hasOption(
-                                    SILResultInfo::IsTransferring);
+                                    SILResultInfo::IsSending);
                               })),
             "transferring result means all results are transferring");
 

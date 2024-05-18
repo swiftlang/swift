@@ -50,16 +50,16 @@ struct CustomActor {
 @MainActor func transferToMain<T>(_ t: T) {}
 @CustomActor func transferToCustom<T>(_ t: T) {}
 
-func transferArg(_ x: transferring Klass) {
+func transferArg(_ x: sending Klass) {
 }
 
-func transferArgWithOtherParam(_ x: transferring Klass, _ y: Klass) {
+func transferArgWithOtherParam(_ x: sending Klass, _ y: Klass) {
 }
 
-func transferArgWithOtherParam2(_ x: Klass, _ y: transferring Klass) {
+func transferArgWithOtherParam2(_ x: Klass, _ y: sending Klass) {
 }
 
-func twoTransferArg(_ x: transferring Klass, _ y: transferring Klass) {}
+func twoTransferArg(_ x: sending Klass, _ y: sending Klass) {}
 
 @MainActor var globalKlass = Klass()
 
@@ -70,7 +70,7 @@ func twoTransferArg(_ x: transferring Klass, _ y: transferring Klass) {}
 func testSimpleTransferLet() {
   let k = Klass()
   transferArg(k) // expected-warning {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{'k' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'k' used after being passed as a 'sending' parameter}}
   useValue(k) // expected-note {{access can happen concurrently}}
 }
 
@@ -78,7 +78,7 @@ func testSimpleTransferVar() {
   var k = Klass()
   k = Klass()
   transferArg(k) // expected-warning {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{'k' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'k' used after being passed as a 'sending' parameter}}
   useValue(k) // expected-note {{access can happen concurrently}}
 }
 
@@ -96,7 +96,7 @@ func testSimpleTransferUseOfOtherParamNoError2() {
   useValue(k)
 }
 
-@MainActor func transferToMain2(_ x: transferring Klass, _ y: Klass, _ z: Klass) async {
+@MainActor func transferToMain2(_ x: sending Klass, _ y: Klass, _ z: Klass) async {
 
 }
 
@@ -108,21 +108,21 @@ func testNonStrongTransferDoesntMerge() async {
 // MARK: Transferring Parameter //
 //////////////////////////////////
 
-func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) async {
+func testTransferringParameter_canTransfer(_ x: sending Klass, _ y: Klass) async {
   await transferToMain(x)
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending task-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
-func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
+func testTransferringParameter_cannotTransferTwice(_ x: sending Klass, _ y: Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
 
-  // TODO: We should not error on this since we are transferring to the same place.
+  // TODO: We should not error on this since we are sending to the same place.
   await transferToMain(x) // expected-note {{access can happen concurrently}}
 }
 
-func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _ y: Klass) async {
+func testTransferringParameter_cannotUseAfterTransfer(_ x: sending Klass, _ y: Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x) // expected-note {{access can happen concurrently}}
@@ -131,19 +131,19 @@ func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _
 actor MyActor {
   var field = Klass()
 
-  func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
+  func canTransferWithTransferringMethodArg(_ x: sending Klass, _ y: Klass) async {
     await transferToMain(x)
     await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
     // expected-note @-1 {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 
-  func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
+  func getNormalErrorIfTransferTwice(_ x: sending Klass) async {
     await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
     // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local actor-isolated uses}}
     await transferToMain(x) // expected-note {{access can happen concurrently}}
   }
 
-  func getNormalErrorIfUseAfterTransfer(_ x: transferring Klass) async {
+  func getNormalErrorIfUseAfterTransfer(_ x: sending Klass) async {
     await transferToMain(x)  // expected-warning {{sending 'x' risks causing data races}}
     // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local actor-isolated uses}}
     useValue(x) // expected-note {{access can happen concurrently}}
@@ -151,40 +151,40 @@ actor MyActor {
 
   // After assigning into the actor, we can still use x in the actor as long as
   // we don't transfer it.
-  func assignTransferringIntoActor(_ x: transferring Klass) async {
+  func assignTransferringIntoActor(_ x: sending Klass) async {
     field = x
     useValue(x)
   }
 
   // Once we assign into the actor, we cannot transfer further.
-  func assignTransferringIntoActor2(_ x: transferring Klass) async {
+  func assignTransferringIntoActor2(_ x: sending Klass) async {
     field = x
     await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
     // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 }
 
-@MainActor func canAssignTransferringIntoGlobalActor(_ x: transferring Klass) async {
+@MainActor func canAssignTransferringIntoGlobalActor(_ x: sending Klass) async {
   globalKlass = x
 }
 
-@MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
+@MainActor func canAssignTransferringIntoGlobalActor2(_ x: sending Klass) async {
   globalKlass = x
-  // TODO: This is incorrect! transferring should be independent of @MainActor.
+  // TODO: This is incorrect! sending should be independent of @MainActor.
   await transferToCustom(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending main actor-isolated 'x' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
-@MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
+@MainActor func canAssignTransferringIntoGlobalActor3(_ x: sending Klass) async {
   await transferToCustom(globalKlass) // expected-warning {{sending main actor-isolated value of type 'Klass' with later accesses to global actor 'CustomActor'-isolated context risks causing data races}}
 }
 
-func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
+func canTransferAssigningIntoLocal(_ x: sending Klass) async {
   let _ = x
   await transferToMain(x)
 }
 
-func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
+func canTransferAssigningIntoLocal2(_ x: sending Klass) async {
   let _ = x
   await transferToMain(x)
   // We do not error here since we just load the value and do not do anything
@@ -195,7 +195,7 @@ func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
   let _ = x
 }
 
-func canTransferAssigningIntoLocal2a(_ x: transferring Klass) async {
+func canTransferAssigningIntoLocal2a(_ x: sending Klass) async {
   let _ = x
   await transferToMain(x)
   // We do not error here since we just load the value and do not do anything
@@ -206,7 +206,7 @@ func canTransferAssigningIntoLocal2a(_ x: transferring Klass) async {
   _ = x
 }
 
-func canTransferAssigningIntoLocal3(_ x: transferring Klass) async {
+func canTransferAssigningIntoLocal3(_ x: sending Klass) async {
   let _ = x
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -218,8 +218,8 @@ func canTransferAssigningIntoLocal3(_ x: transferring Klass) async {
 // MARK: Transferring is "var" like //
 //////////////////////////////////////
 
-// Assigning into a transferring parameter is a merge.
-func assigningIsAMerge(_ x: transferring Klass) async {
+// Assigning into a 'sending' parameter is a merge.
+func assigningIsAMerge(_ x: sending Klass) async {
   let y = Klass()
 
   x = y
@@ -228,7 +228,7 @@ func assigningIsAMerge(_ x: transferring Klass) async {
   await transferToMain(y)
 }
 
-func assigningIsAMergeError(_ x: transferring Klass) async {
+func assigningIsAMergeError(_ x: sending Klass) async {
   let y = Klass()
 
   x = y
@@ -240,7 +240,7 @@ func assigningIsAMergeError(_ x: transferring Klass) async {
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
-func assigningIsAMergeAny(_ x: transferring Any) async {
+func assigningIsAMergeAny(_ x: sending Any) async {
   // Ok, this is disconnected.
   let y = getAny()
 
@@ -249,7 +249,7 @@ func assigningIsAMergeAny(_ x: transferring Any) async {
   await transferToMain(y)
 }
 
-func assigningIsAMergeAnyError(_ x: transferring Any) async {
+func assigningIsAMergeAnyError(_ x: sending Any) async {
   // Ok, this is disconnected.
   let y = getAny()
 
@@ -261,7 +261,7 @@ func assigningIsAMergeAnyError(_ x: transferring Any) async {
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
-func canTransferAfterAssign(_ x: transferring Any) async {
+func canTransferAfterAssign(_ x: sending Any) async {
   // Ok, this is disconnected.
   let y = getAny()
 
@@ -273,21 +273,21 @@ func canTransferAfterAssign(_ x: transferring Any) async {
   useValue(x)
 }
 
-func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
+func canTransferAfterAssignButUseIsError(_ x: sending Any) async {
   // Ok, this is disconnected.
   let y = getAny()
 
   // y is transferred into x.
   x = y
 
-  // TODO: This should refer to the transferring parameter.
+  // TODO: This should refer to the sending parameter.
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
-func assignToEntireValueEliminatesEarlierTransfer(_ x: transferring Any) async {
+func assignToEntireValueEliminatesEarlierTransfer(_ x: sending Any) async {
   // Ok, this is disconnected.
   let y = getAny()
 
@@ -302,7 +302,7 @@ func assignToEntireValueEliminatesEarlierTransfer(_ x: transferring Any) async {
   useValue(x)
 }
 
-func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) async {
+func mergeDoesNotEliminateEarlierTransfer(_ x: sending NonSendableStruct) async {
 
 
   // Ok, this is disconnected.
@@ -320,7 +320,7 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
   useValue(x)
 }
 
-func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) async {
+func mergeDoesNotEliminateEarlierTransfer2(_ x: sending NonSendableStruct) async {
   // Ok, this is disconnected.
   let y = Klass()
 
@@ -336,50 +336,50 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
 func doubleArgument() async {
   let x = Klass()
   twoTransferArg(x, x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{'x' used after being passed as a transferring parameter}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   // expected-note @-2 {{access can happen concurrently}}
 }
 
-func testTransferSrc(_ x: transferring Klass) async {
+func testTransferSrc(_ x: sending Klass) async {
   let y = Klass()
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   x = y // expected-note {{access can happen concurrently}}
 }
 
-func testTransferOtherParam(_ x: transferring Klass, y: Klass) async {
+func testTransferOtherParam(_ x: sending Klass, y: Klass) async {
   x = y
 }
 
-func testTransferOtherParamTuple(_ x: transferring Klass, y: (Klass, Klass)) async {
+func testTransferOtherParamTuple(_ x: sending Klass, y: (Klass, Klass)) async {
   x = y.0
 }
 
 func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
-  func fakeInit(operation: transferring @escaping () async -> ()) {}
+  func fakeInit(operation: sending @escaping () async -> ()) {}
 
   fakeInit(operation: x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
 }
 
 @MainActor func actorIsolatedError(_ x: @escaping @MainActor () async -> ()) {
-  func fakeInit(operation: transferring @escaping () async -> ()) {}
+  func fakeInit(operation: sending @escaping () async -> ()) {}
 
   // TODO: This needs to say actor-isolated.
   fakeInit(operation: x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later main actor-isolated uses}}
+  // expected-note @-1 {{main actor-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
 }
 
 // Make sure we error here on only the second since x by being assigned a part
 // of y becomes task-isolated
-func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
+func testMergeWithTaskIsolated(_ x: sending Klass, y: Klass) async {
   await transferToMain(x)
   x = y
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
-@MainActor func testMergeWithActorIsolated(_ x: transferring Klass, y: Klass) async {
+@MainActor func testMergeWithActorIsolated(_ x: sending Klass, y: Klass) async {
   x = y
   await transferToCustom(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending main actor-isolated 'x' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
@@ -393,7 +393,7 @@ actor NonSendableInit {
     @storageRestrictions(initializes: first)
     init(initialValue)  {
       transferArg(initialValue!) // expected-warning {{sending 'initialValue' risks causing data races}}
-      // expected-note @-1 {{'self'-isolated 'initialValue' is passed as a transferring parameter}}
+      // expected-note @-1 {{'self'-isolated 'initialValue' is passed as a 'sending' parameter}}
       first = initialValue!
     }
 
