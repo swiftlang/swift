@@ -858,8 +858,8 @@ ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleTransferringResultFunctionType(Node *node,
-                                                              unsigned depth) {
+ManglingError Remangler::mangleSendingResultFunctionType(Node *node,
+                                                         unsigned depth) {
   Buffer << "YT";
   return ManglingError::Success;
 }
@@ -1751,9 +1751,8 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleImplTransferringResult(Node *node,
-                                                      unsigned depth) {
-  // The old mangler does not encode transferring result
+ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
+  // The old mangler does not encode sending result
   return ManglingError::Success;
 }
 
@@ -1812,14 +1811,14 @@ Remangler::mangleImplParameterResultDifferentiability(Node *node,
   return MANGLING_ERROR(ManglingError::InvalidImplDifferentiability, node);
 }
 
-ManglingError Remangler::mangleImplParameterTransferring(Node *node,
-                                                         unsigned depth) {
+ManglingError Remangler::mangleImplParameterSending(Node *node,
+                                                    unsigned depth) {
   StringRef text = node->getText();
-  if (text == "transferring") {
+  if (text == "sending") {
     Buffer << 'T';
     return ManglingError::Success;
   }
-  return MANGLING_ERROR(ManglingError::InvalidImplParameterTransferring, node);
+  return MANGLING_ERROR(ManglingError::InvalidImplParameterSending, node);
 }
 
 ManglingError Remangler::mangleDynamicSelf(Node *node, unsigned depth) {
@@ -1924,7 +1923,7 @@ ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleTransferring(Node *node, unsigned depth) {
+ManglingError Remangler::mangleSending(Node *node, unsigned depth) {
   Buffer << "Yu";
   return mangleSingleChildNode(node, depth + 1); // type
 }

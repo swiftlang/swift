@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature TransferringArgsAndResults -verify -import-objc-header %S/Inputs/transferring.h
+// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature SendingArgsAndResults -verify -import-objc-header %S/Inputs/sending.h
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -18,13 +18,13 @@ func useValue<T>(_ t: T) {}
 // MARK: Tests //
 /////////////////
 
-func funcTestTransferringResult() async {
+func funcTestSendingResult() async {
   let x = NonSendableCStruct()
   let y = transferUserDefinedFromGlobalFunction(x)
   await transferToMain(x)
   useValue(y)
 
-  // Just to show that without the transferring param, we generate diagnostics.
+  // Just to show that without the sending param, we generate diagnostics.
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
   await transferToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
@@ -32,7 +32,7 @@ func funcTestTransferringResult() async {
   useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
-func funcTestTransferringArg() async {
+func funcTestSendingArg() async {
   let x = NonSendableCStruct()
   transferUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}

@@ -1,8 +1,17 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation  -verify-additional-prefix complete-tns-
+// Typecheck.
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -verify-additional-prefix without-transferring-
+
+// Emit SIL with minimal strict concurrency.
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix without-transferring-
+
+// Emit SIL with targeted concurrency.
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
+
+// Emit SIL with strict concurrency + region based isolation but without transferring.
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -verify-additional-prefix without-transferring- -disable-transferring-args-and-results-with-region-based-isolation -disable-sending-args-and-results-with-region-based-isolation
+
+// Emit SIL with strict concurrency + region based isolation + transferring
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -323,7 +332,7 @@ func stripActor(_ expr: @Sendable @autoclosure () -> (() -> ())) async {
 
 // NOTE: this warning is correct, but is only being caught by TypeCheckConcurrency's extra check.
 @MainActor func exampleWhereConstraintSolverHasWrongDeclContext_v2() async -> Int {
-  async let a: () = noActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+  async let a: () = noActor(mainActorFn) // expected-without-transferring-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   await a
 }
 

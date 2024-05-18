@@ -262,9 +262,9 @@ public:
 
   TrackableValueState getValueState() const { return valueState; }
 
-  /// Returns true if this TrackableValue is an alloc_stack from a transferring
+  /// Returns true if this TrackableValue is an alloc_stack from a sending
   /// parameter.
-  bool isTransferringParameter() const;
+  bool isSendingParameter() const;
 
   void printIsolationInfo(SmallString<64> &outString) const {
     llvm::raw_svector_ostream os(outString);

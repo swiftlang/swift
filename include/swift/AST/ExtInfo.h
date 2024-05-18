@@ -438,8 +438,8 @@ class ASTExtInfoBuilder {
   // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| TransferringResult |
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14         |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -451,7 +451,7 @@ class ASTExtInfoBuilder {
     IsolationMask = 0x7 << IsolationMaskOffset,
     DifferentiabilityMaskOffset = 11,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
-    TransferringResultMask = 1 << 14,
+    SendingResultMask = 1 << 14,
     NumMaskBits = 15
   };
 
@@ -501,14 +501,14 @@ public:
                     Type thrownError, DifferentiabilityKind diffKind,
                     const clang::Type *type, FunctionTypeIsolation isolation,
                     LifetimeDependenceInfo lifetimeDependenceInfo,
-                    bool transferringResult)
+                    bool sendingResult)
       : ASTExtInfoBuilder(
             ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
                 (throws ? ThrowsMask : 0) |
                 (((unsigned)diffKind << DifferentiabilityMaskOffset) &
                  DifferentiabilityMask) |
                 (unsigned(isolation.getKind()) << IsolationMaskOffset) |
-                (transferringResult ? TransferringResultMask : 0),
+                (sendingResult ? SendingResultMask : 0),
             ClangTypeInfo(type), isolation.getOpaqueType(), thrownError,
             lifetimeDependenceInfo) {}
 
@@ -530,9 +530,7 @@ public:
 
   constexpr bool isThrowing() const { return bits & ThrowsMask; }
 
-  constexpr bool hasTransferringResult() const {
-    return bits & TransferringResultMask;
-  }
+  constexpr bool hasSendingResult() const { return bits & SendingResultMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -644,12 +642,10 @@ public:
     return withThrows(true, Type());
   }
 
-  [[nodiscard]] ASTExtInfoBuilder
-  withTransferringResult(bool transferring = true) const {
-    return ASTExtInfoBuilder(transferring ? (bits | TransferringResultMask)
-                                          : (bits & ~TransferringResultMask),
-                             clangTypeInfo, globalActor, thrownError,
-                             lifetimeDependenceInfo);
+  [[nodiscard]] ASTExtInfoBuilder withSendingResult(bool sending = true) const {
+    return ASTExtInfoBuilder(
+        sending ? (bits | SendingResultMask) : (bits & ~SendingResultMask),
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
 
   [[nodiscard]]
@@ -765,9 +761,7 @@ public:
 
   constexpr bool isThrowing() const { return builder.isThrowing(); }
 
-  constexpr bool hasTransferringResult() const {
-    return builder.hasTransferringResult();
-  }
+  constexpr bool hasSendingResult() const { return builder.hasSendingResult(); }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();
@@ -838,9 +832,8 @@ public:
     return builder.withAsync(async).build();
   }
 
-  [[nodiscard]] ASTExtInfo
-  withTransferringResult(bool transferring = true) const {
-    return builder.withTransferringResult(transferring).build();
+  [[nodiscard]] ASTExtInfo withSendingResult(bool sending = true) const {
+    return builder.withSendingResult(sending).build();
   }
 
   [[nodiscard]]

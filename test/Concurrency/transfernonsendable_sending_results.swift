@@ -16,7 +16,7 @@ struct NonSendableStruct {
 
 func getValue<T>() -> T { fatalError() }
 func getValueAsync<T>() async -> T { fatalError() }
-func getValueAsyncTransferring<T>() async -> transferring T { fatalError() }
+func getValueAsyncTransferring<T>() async -> sending T { fatalError() }
 
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
@@ -38,22 +38,22 @@ struct CustomActor {
 func useValueIndirect<T>(_ t: T) {}
 func useValueDirect(_ t: NonSendableKlass) {}
 
-func transferValueDirect(_ x: transferring NonSendableKlass) {}
-func transferValueIndirect<T>(_ x: transferring T) {}
+func transferValueDirect(_ x: sending NonSendableKlass) {}
+func transferValueIndirect<T>(_ x: sending T) {}
 
-func transferResult() -> transferring NonSendableKlass { NonSendableKlass() }
-func transferResultWithArg(_ x: NonSendableKlass) -> transferring NonSendableKlass { NonSendableKlass() }
-func transferResultWithTransferringArg(_ x: transferring NonSendableKlass) -> transferring NonSendableKlass { NonSendableKlass() }
-func transferResultWithTransferringArg2(_ x: transferring NonSendableKlass, _ y: NonSendableKlass) -> transferring NonSendableKlass { NonSendableKlass() }
-func transferResultWithTransferringArg2Throwing(_ x: transferring NonSendableKlass, _ y: NonSendableKlass) throws -> transferring NonSendableKlass { NonSendableKlass() }
+func transferResult() -> sending NonSendableKlass { NonSendableKlass() }
+func transferResultWithArg(_ x: NonSendableKlass) -> sending NonSendableKlass { NonSendableKlass() }
+func transferResultWithTransferringArg(_ x: sending NonSendableKlass) -> sending NonSendableKlass { NonSendableKlass() }
+func transferResultWithTransferringArg2(_ x: sending NonSendableKlass, _ y: NonSendableKlass) -> sending NonSendableKlass { NonSendableKlass() }
+func transferResultWithTransferringArg2Throwing(_ x: sending NonSendableKlass, _ y: NonSendableKlass) throws -> sending NonSendableKlass { NonSendableKlass() }
 
-func transferAsyncResult() async -> transferring NonSendableKlass { NonSendableKlass() }
-func transferAsyncResultWithArg(_ x: NonSendableKlass) async -> transferring NonSendableKlass { NonSendableKlass() }
-func transferAsyncResultWithTransferringArg(_ x: transferring NonSendableKlass) async -> transferring NonSendableKlass { NonSendableKlass() }
-func transferAsyncResultWithTransferringArg2(_ x: transferring NonSendableKlass, _ y: NonSendableKlass) async -> transferring NonSendableKlass { NonSendableKlass() }
-func transferAsyncResultWithTransferringArg2Throwing(_ x: transferring NonSendableKlass, _ y: NonSendableKlass) async throws -> transferring NonSendableKlass { NonSendableKlass() }
+func transferAsyncResult() async -> sending NonSendableKlass { NonSendableKlass() }
+func transferAsyncResultWithArg(_ x: NonSendableKlass) async -> sending NonSendableKlass { NonSendableKlass() }
+func transferAsyncResultWithTransferringArg(_ x: sending NonSendableKlass) async -> sending NonSendableKlass { NonSendableKlass() }
+func transferAsyncResultWithTransferringArg2(_ x: sending NonSendableKlass, _ y: NonSendableKlass) async -> sending NonSendableKlass { NonSendableKlass() }
+func transferAsyncResultWithTransferringArg2Throwing(_ x: sending NonSendableKlass, _ y: NonSendableKlass) async throws -> sending NonSendableKlass { NonSendableKlass() }
 
-@MainActor func transferAsyncResultMainActor() async -> transferring NonSendableKlass { NonSendableKlass() }
+@MainActor func transferAsyncResultMainActor() async -> sending NonSendableKlass { NonSendableKlass() }
 
 @MainActor var globalNonSendableKlass = NonSendableKlass()
 
@@ -101,33 +101,33 @@ func simpleTest3() async {
   useValue(y) // expected-note {{access can happen concurrently}}
 }
 
-func transferResult() async -> transferring NonSendableKlass {
+func transferResult() async -> sending NonSendableKlass {
   let x = NonSendableKlass()
   await transferToMainDirect(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local nonisolated uses}}
   return x // expected-note {{access can happen concurrently}}
 }
 
-func transferInAndOut(_ x: transferring NonSendableKlass) -> transferring NonSendableKlass {
+func transferInAndOut(_ x: sending NonSendableKlass) -> sending NonSendableKlass {
   x
 }
 
 
-func transferReturnArg(_ x: NonSendableKlass) -> transferring NonSendableKlass {
+func transferReturnArg(_ x: NonSendableKlass) -> sending NonSendableKlass {
   return x // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' cannot be a transferring result. task-isolated uses may race with caller uses}}
+  // expected-note @-1 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
 }
 
 // TODO: This will be fixed once I represent @MainActor on func types.
-@MainActor func transferReturnArgMainActor(_ x: NonSendableKlass) -> transferring NonSendableKlass {
+@MainActor func transferReturnArgMainActor(_ x: NonSendableKlass) -> sending NonSendableKlass {
   return x // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'x' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
 
 // This is safe since we are returning the whole tuple fresh. In contrast,
-// (transferring NonSendableKlass, transferring NonSendableKlass) would not be
+// (transferring NonSendableKlass, sending NonSendableKlass) would not be
 // safe if we ever support that.
-func transferReturnArgTuple(_ x: transferring NonSendableKlass) -> transferring (NonSendableKlass, NonSendableKlass) {
+func transferReturnArgTuple(_ x: sending NonSendableKlass) -> sending (NonSendableKlass, NonSendableKlass) {
   return (x, x)
 }
 
@@ -140,9 +140,9 @@ func useTransferredResult() async {
 }
 
 extension MainActorIsolatedStruct {
-  func testNonSendableErrorReturnWithTransfer() -> transferring NonSendableKlass {
+  func testNonSendableErrorReturnWithTransfer() -> sending NonSendableKlass {
     return ns // expected-warning {{sending 'self.ns' risks causing data races}}
-    // expected-note @-1 {{main actor-isolated 'self.ns' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+    // expected-note @-1 {{main actor-isolated 'self.ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
   }
   func testNonSendableErrorReturnNoTransfer() -> NonSendableKlass {
     return ns
@@ -150,7 +150,7 @@ extension MainActorIsolatedStruct {
 }
 
 extension MainActorIsolatedEnum {
-  func testSwitchReturn() -> transferring NonSendableKlass? {
+  func testSwitchReturn() -> sending NonSendableKlass? {
     switch self {
     case .first:
       return nil
@@ -158,7 +158,7 @@ extension MainActorIsolatedEnum {
       return ns
     }
   } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}}
+  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testSwitchReturnNoTransfer() -> NonSendableKlass? {
     switch self {
@@ -169,13 +169,13 @@ extension MainActorIsolatedEnum {
     }
   }
 
-  func testIfLetReturn() -> transferring NonSendableKlass? {
+  func testIfLetReturn() -> sending NonSendableKlass? {
     if case .second(let ns) = self {
       return ns // TODO: The error below should be here.
     }
     return nil
   } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a transferring result. main actor-isolated uses may race with caller uses}} 
+  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}} 
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {
     if case .second(let ns) = self {
@@ -194,7 +194,7 @@ extension MainActorIsolatedEnum {
 // transfer non sendable.
 
 // Make sure that we can properly construct a reabstraction thunk since
-// constructNonSendableKlassAsync doesn't return the value transferring but
+// constructNonSendableKlassAsync doesn't return the value sending but
 // async let wants it to be transferring.
 //
 // Importantly, we should only emit the sema error here saying that one cannot

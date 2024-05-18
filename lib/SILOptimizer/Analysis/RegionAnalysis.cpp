@@ -585,14 +585,14 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
 
   // Otherwise, we only allow for the argument to be transferred if it is
   // explicitly marked as a strong transferring parameter.
-  return arg->isTransferring();
+  return arg->isSending();
 }
 
 //===----------------------------------------------------------------------===//
 //                            MARK: TrackableValue
 //===----------------------------------------------------------------------===//
 
-bool TrackableValue::isTransferringParameter() const {
+bool TrackableValue::isSendingParameter() const {
   // First get our alloc_stack.
   //
   // TODO: We should just put a flag on the alloc_stack, so we /know/ 100% that
@@ -624,7 +624,7 @@ bool TrackableValue::isTransferringParameter() const {
       // transferring and for which the store is the only use of the function
       // argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(si->getSrc());
-      if (!fArg || !fArg->isTransferring())
+      if (!fArg || !fArg->isSending())
         return false;
       return fArg->getSingleUse();
     }
@@ -633,7 +633,7 @@ bool TrackableValue::isTransferringParameter() const {
       // Check if our copy_addr is from a function argument that is transferring
       // and for which the copy_addr is the only use of the function argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(copyAddr->getSrc());
-      if (!fArg || !fArg->isTransferring())
+      if (!fArg || !fArg->isSending())
         return false;
       return fArg->getSingleUse();
     }
@@ -1794,7 +1794,7 @@ public:
       for (auto &op : fas.getOperandsWithoutSelf()) {
         if (!fas.getArgumentConvention(op).isIndirectOutParameter() &&
             fas.getArgumentParameterInfo(op).hasOption(
-                SILParameterInfo::Transferring)) {
+                SILParameterInfo::Sending)) {
           if (auto value = tryToTrackValue(op.get())) {
             builder.addRequire(value->getRepresentative().getValue());
             builder.addTransfer(value->getRepresentative().getValue(), &op);
@@ -1811,7 +1811,7 @@ public:
     if (fas.hasSelfArgument()) {
       auto &selfOperand = fas.getSelfArgumentOperand();
       if (fas.getArgumentParameterInfo(selfOperand)
-              .hasOption(SILParameterInfo::Transferring)) {
+              .hasOption(SILParameterInfo::Sending)) {
         if (auto value = tryToTrackValue(selfOperand.get())) {
           builder.addRequire(value->getRepresentative().getValue());
           builder.addTransfer(value->getRepresentative().getValue(),
@@ -1835,7 +1835,7 @@ public:
     auto isolationInfo = SILIsolationInfo::get(*fas);
 
     // If our result is not transferring, just do the normal multi-assign.
-    if (!type->hasTransferringResult()) {
+    if (!type->hasSendingResult()) {
       return translateSILMultiAssign(applyResults, nonTransferringParameters,
                                      isolationInfo);
     }
@@ -2731,7 +2731,7 @@ PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
-  if (ri->getFunction()->getLoweredFunctionType()->hasTransferringResult()) {
+  if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
     return TranslationSemantics::TransferringNoResult;
   }
   return TranslationSemantics::Require;

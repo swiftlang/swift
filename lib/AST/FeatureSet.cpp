@@ -644,39 +644,40 @@ UNINTERESTING_FEATURE(BitwiseCopyable)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
-static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
-  auto functionTypeUsesTransferring = [](Decl *decl) {
+UNINTERESTING_FEATURE(TransferringArgsAndResults)
+static bool usesFeatureSendingArgsAndResults(Decl *decl) {
+  auto functionTypeUsesSending = [](Decl *decl) {
     return usesTypeMatching(decl, [](Type type) {
       auto fnType = type->getAs<AnyFunctionType>();
       if (!fnType)
         return false;
 
-      if (fnType->hasExtInfo() && fnType->hasTransferringResult())
+      if (fnType->hasExtInfo() && fnType->hasSendingResult())
         return true;
 
       return llvm::any_of(fnType->getParams(),
                           [](AnyFunctionType::Param param) {
-                            return param.getParameterFlags().isTransferring();
+                            return param.getParameterFlags().isSending();
                           });
     });
   };
 
   if (auto *pd = dyn_cast<ParamDecl>(decl)) {
-    if (pd->isTransferring()) {
+    if (pd->isSending()) {
       return true;
     }
 
-    if (functionTypeUsesTransferring(pd))
+    if (functionTypeUsesSending(pd))
       return true;
   }
 
   if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
     // First check for param decl results.
     if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
-          return usesFeatureTransferringArgsAndResults(pd);
+          return usesFeatureSendingArgsAndResults(pd);
         }))
       return true;
-    if (functionTypeUsesTransferring(decl))
+    if (functionTypeUsesSending(decl))
       return true;
   }
 
