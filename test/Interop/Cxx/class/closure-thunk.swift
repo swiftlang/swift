@@ -10,7 +10,7 @@ import Closure
 // CHECK: %[[V2:.*]] = alloc_stack $@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: %[[V3:.*]] = project_block_storage %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: store %[[V1]] to %[[V3]] : $*@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
-// CHECK: %[[V7:.*]] = function_ref @$sSo10NonTrivialVIegn_ABIeyBC_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_cxx NonTrivial) -> ()
+// CHECK: %[[V7:.*]] = function_ref @$sSo10NonTrivialVIegn_ABIeyBX_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_cxx NonTrivial) -> ()
 // CHECK: %[[V6:.*]] = init_block_storage_header %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), invoke %[[V7]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_cxx NonTrivial) -> (), type $@convention(block) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V8:.*]] = copy_block %[[V6]] : $@convention(block) (@in_cxx NonTrivial) -> ()
 // CHECK: dealloc_stack %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> ()
@@ -20,7 +20,7 @@ import Closure
 // CHECK: %[[V12:.*]] = tuple ()
 // CHECK: return %[[V12]] : $()
 
-// CHECK: sil shared [transparent] [reabstraction_thunk] @$sSo10NonTrivialVIegn_ABIeyBC_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_cxx NonTrivial) -> () {
+// CHECK: sil shared [transparent] [reabstraction_thunk] @$sSo10NonTrivialVIegn_ABIeyBX_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_cxx NonTrivial) -> () {
 // CHECK: bb0(%[[V0:.*]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), %[[V1:.*]] : $*NonTrivial):
 // CHECK: %[[V2:.*]] = project_block_storage %[[V0]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: %[[V3:.*]] = load %[[V2]] : $*@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
@@ -59,11 +59,11 @@ public func testClosureToFuncPtr() {
 // CHECK: sil @$s4main13returnFuncPtrySo10NonTrivialVcyF : $@convention(thin) () -> @owned @callee_guaranteed (@in_guaranteed NonTrivial) -> () {
 // CHECK: %[[V0:.*]] = function_ref @_Z8getFnPtrv : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
-// CHECK: %[[V2:.*]] = function_ref @$sSo10NonTrivialVIetCC_ABIegn_TR : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()
+// CHECK: %[[V2:.*]] = function_ref @$sSo10NonTrivialVIetCX_ABIegn_TR : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: %[[V3:.*]] = partial_apply [callee_guaranteed] %[[V2]](%[[V1]]) : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: return %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 
-// CHECK: sil shared [transparent] [reabstraction_thunk] @$sSo10NonTrivialVIetCC_ABIegn_TR : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> () {
+// CHECK: sil shared [transparent] [reabstraction_thunk] @$sSo10NonTrivialVIetCX_ABIegn_TR : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> () {
 // CHECK: bb0(%[[V0:.*]] : $*NonTrivial, %[[V1:.*]] : $@convention(c) (@in_cxx NonTrivial) -> ()):
 // CHECK: %[[V2:.*]] = alloc_stack $NonTrivial
 // CHECK: copy_addr %[[V0]] to [init] %[[V2]] : $*NonTrivial
