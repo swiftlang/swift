@@ -3094,6 +3094,14 @@ namespace {
         return false;
       }
 
+      // If global variable checking is enabled and the global variable is
+      // from the same module as the reference, we'll already have diagnosed
+      // the global variable itself.
+      if (ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+          var->getDeclContext()->getParentModule() ==
+              getDeclContext()->getParentModule())
+        return false;
+
       const auto import = var->findImport(getDeclContext());
       const bool isPreconcurrencyImport =
           import && import->options.contains(ImportFlags::Preconcurrency);
