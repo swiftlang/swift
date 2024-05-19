@@ -13,6 +13,7 @@
 // This file implements type checking support for Swift's concurrency model.
 //
 //===----------------------------------------------------------------------===//
+#include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
@@ -5019,23 +5020,41 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (auto *originalVar = var->getOriginalWrappedProperty()) {
           diagVar = originalVar;
         }
+
+        bool diagnosed = false;
         if (var->isLet()) {
           auto type = var->getInterfaceType();
-          bool diagnosed = diagnoseIfAnyNonSendableTypes(
+          diagnosed = diagnoseIfAnyNonSendableTypes(
               type, SendableCheckContext(var->getDeclContext()),
               /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
               /*diagnoseLoc=*/var->getLoc(),
               diag::shared_immutable_state_decl, diagVar);
-
-          // If we diagnosed this 'let' as non-Sendable, tack on a note
-          // to suggest a course of action.
-          if (diagnosed)
-            diagVar->diagnose(diag::shared_immutable_state_decl_note,
-                              diagVar, type);
         } else {
           diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
               .warnUntilSwiftVersion(6);
-          diagVar->diagnose(diag::shared_mutable_state_decl_note, diagVar);
+          diagnosed = true;
+        }
+
+        // If we diagnosed this global, tack on notes to suggest potential
+        // courses of action.
+        if (diagnosed) {
+          if (!var->isLet()) {
+            auto diag = diagVar->diagnose(diag::shared_state_make_immutable,
+                                          diagVar);
+            SourceLoc fixItLoc = getFixItLocForVarToLet(diagVar);
+            if (fixItLoc.isValid()) {
+              diag.fixItReplace(fixItLoc, "let");
+            }
+          }
+
+          diagVar->diagnose(diag::shared_state_main_actor_node,
+                            diagVar)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(false),
+                           "@MainActor ");
+          diagVar->diagnose(diag::shared_state_nonisolated_unsafe,
+                            diagVar)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(true),
+                           "nonisolated(unsafe) ");
         }
       }
     }
