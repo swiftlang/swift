@@ -239,7 +239,7 @@ public func runPub(_ arg: PubStruct) -> Int {
 public func runPubInlinable(_ arg: Int) -> PubStruct {
   // CHECK-RES-DAG: sil [serialized] [serialized_for_package] [canonical] @$s3Lib15runPubInlinableyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
   // CHECK-NONRES-DAG: sil [serialized] [canonical] @$s3Lib15runPubInlinableyAA0C6StructVSiF : $@convention(thin) (Int) -> PubStruct {
-  // CHECK-RES-DAG: alloc_stack [var_decl] $PubStruct
+  // CHECK-RES-DAG: alloc_stack {{.*}} [var_decl] $PubStruct
   // CHECK-RES-DAG: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct
   // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> PubStruct
   var x = PubStruct(1)
