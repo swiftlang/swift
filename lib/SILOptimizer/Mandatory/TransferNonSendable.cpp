@@ -69,20 +69,7 @@ getDiagnosticBehaviorLimitForValue(SILValue value) {
     return {};
 
   auto *fromDC = declRef.getInnermostDeclContext();
-  auto attributedImport = nom->findImport(fromDC);
-  if (!attributedImport ||
-      !attributedImport->options.contains(ImportFlags::Preconcurrency))
-    return {};
-
-  if (auto *sourceFile = fromDC->getParentSourceFile())
-    sourceFile->setImportUsedPreconcurrency(*attributedImport);
-
-  if (hasExplicitSendableConformance(nom))
-    return DiagnosticBehavior::Warning;
-
-  return attributedImport->module.importedModule->isConcurrencyChecked()
-             ? DiagnosticBehavior::Warning
-             : DiagnosticBehavior::Ignore;
+  return getConcurrencyDiagnosticBehaviorLimit(nom, fromDC);
 }
 
 static std::optional<SILDeclRef> getDeclRefForCallee(SILInstruction *inst) {

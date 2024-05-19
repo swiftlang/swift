@@ -20,12 +20,16 @@
 #ifndef SWIFT_SEMA_CONCURRENCY_H
 #define SWIFT_SEMA_CONCURRENCY_H
 
+#include <optional>
+
 namespace swift {
 
 class DeclContext;
 class SourceFile;
 class NominalTypeDecl;
 class VarDecl;
+
+enum class DiagnosticBehavior: uint8_t;
 
 /// If any of the imports in this source file was @preconcurrency but there were
 /// no diagnostics downgraded or suppressed due to that @preconcurrency, suggest
@@ -43,6 +47,12 @@ bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
 /// \returns true iff a diagnostic was emitted for this reference.
 bool diagnoseNonSendableFromDeinit(
     SourceLoc refLoc, VarDecl *var, DeclContext *dc);
+
+/// Determinate the appropriate diagnostic behavior when referencing
+/// the given nominal type from the given declaration context.
+std::optional<DiagnosticBehavior>
+getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
+                                      const DeclContext *fromDC);
 
 } // namespace swift
 
