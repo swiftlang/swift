@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
-class GlobalCounter {
+class GlobalCounter { // expected-note{{class 'GlobalCounter' does not conform to the 'Sendable' protocol}}
   var counter: Int = 0
 }
 

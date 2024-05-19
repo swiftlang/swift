@@ -5481,8 +5481,8 @@ ERROR(sendable_isolated_sync_function,none,
       "%0 synchronous %kind1 cannot be marked as '@Sendable'",
       (ActorIsolation, const ValueDecl *))
 ERROR(nonsendable_instance_method,none,
-      "instance methods of non-Sendable types cannot be marked as '@Sendable'",
-      ())
+      "instance method of non-Sendable type %0 cannot be marked as '@Sendable'",
+      (Type))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %kind1 in "
       "concurrently-executing code",
@@ -5575,9 +5575,9 @@ NOTE(shared_mutable_state_decl_note,none,
      "isolate %0 to a global actor, or convert it to a 'let' constant and "
      "conform it to 'Sendable'", (const ValueDecl *))
 ERROR(shared_immutable_state_decl,none,
-      "%kind0 is not concurrency-safe because non-'Sendable' type %1 may have "
+      "%kind1 is not concurrency-safe because non-'Sendable' type %0 may have "
       "shared mutable state",
-      (const ValueDecl *, Type))
+      (Type, const ValueDecl *))
 NOTE(shared_immutable_state_decl_note,none,
      "isolate %0 to a global actor, or conform %1 to 'Sendable'",
      (const ValueDecl *, Type))
@@ -5756,6 +5756,10 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+
+ERROR(non_sendable_from_deinit,none,
+        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
+        (Type, DescriptiveDeclKind, DeclName))
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "

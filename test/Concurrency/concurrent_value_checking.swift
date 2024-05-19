@@ -215,7 +215,7 @@ func testUnsafeSendableInAsync() async {
 // ----------------------------------------------------------------------
 // Sendable restriction on key paths.
 // ----------------------------------------------------------------------
-class NC: Hashable { // expected-note 2{{class 'NC' does not conform to the 'Sendable' protocol}}
+class NC: Hashable { // expected-note 3{{class 'NC' does not conform to the 'Sendable' protocol}}
   func hash(into: inout Hasher) { }
   static func==(_: NC, _: NC) -> Bool { true }
 }
