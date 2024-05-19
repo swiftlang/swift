@@ -391,7 +391,9 @@ struct SendableCheckContext {
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
 
-  std::optional<DiagnosticBehavior> preconcurrencyBehavior(Decl *decl) const;
+  std::optional<DiagnosticBehavior> preconcurrencyBehavior(
+      Decl *decl,
+      bool ignoreExplicitConformance = false) const;
 
   /// Whether we are in an explicit conformance to Sendable.
   bool isExplicitSendableConformance() const;

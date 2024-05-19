@@ -63,3 +63,8 @@ struct HasStatics {
   // expected-warning@-2{{static property 'ss' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
   // expected-note@-3{{isolate 'ss' to a global actor, or conform 'StrictStruct' to 'Sendable'}}
 }
+
+extension NonStrictClass2: @retroactive MySendableProto { }
+
+extension NonStrictClass3: @retroactive Sendable { }
+// expected-warning@-1{{conformance to 'Sendable' must occur in the same source file as class 'NonStrictClass3'; use '@unchecked Sendable' for retroactive conformance}}
