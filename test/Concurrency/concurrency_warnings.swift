@@ -1,5 +1,9 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
+
+// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -12,12 +16,7 @@ let rs = GlobalCounter() // expected-warning {{let 'rs' is not concurrency-safe 
 // expected-note@-1 {{restrict 'rs' to the main actor if it will only be accessed from the main thread}}
 // expected-note@-2 {{unsafely mark 'rs' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
 
-
-var globalInt = 17 // expected-warning {{var 'globalInt' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{restrict 'globalInt' to the main actor if it will only be accessed from the main thread}}
-// expected-note@-2 2{{var declared here}}
-// expected-note@-3 {{unsafely mark 'globalInt' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
-// expected-note@-4 {{convert 'globalInt' to a 'let' constant to make the shared state immutable}}
+import GlobalVariables
 
 class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
   var storage = 0 // expected-warning{{stored property 'storage' of 'Sendable'-conforming class 'MyError' is mutable}}

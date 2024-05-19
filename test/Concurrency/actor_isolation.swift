@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
 
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
@@ -8,15 +9,10 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
+import GlobalVariables
 import OtherActors // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
 
 let immutableGlobal: String = "hello"
-
-// expected-warning@+4 {{var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@+3 {{convert 'mutableGlobal' to a 'let' constant to make the shared state immutable}}
-// expected-note@+2 {{restrict 'mutableGlobal' to the main actor if it will only be accessed from the main thread}}
-// expected-note@+1 {{unsafely mark 'mutableGlobal' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
-var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
 @available(SwiftStdlib 5.1, *)
 func globalFunc() { }
