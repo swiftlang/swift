@@ -106,6 +106,8 @@ protocol StrictlyLocal {
 }
 
 distributed actor Nope1_StrictlyLocal: StrictlyLocal {
+  // expected-note@-1{{add '@preconcurrency' to the 'StrictlyLocal' conformance to suppress isolation-related diagnostics}}
+
   func local() {}
   // expected-error@-1{{distributed actor-isolated instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
@@ -157,6 +159,8 @@ actor LocalOK_ImplicitlyThrowsAsync_AsyncThrowsAll: AsyncThrowsAll {
 }
 
 distributed actor Nope1_AsyncThrowsAll: AsyncThrowsAll {
+  // expected-note@-1{{add '@preconcurrency' to the 'AsyncThrowsAll' conformance to suppress isolation-related diagnostics}}
+
   func maybe(param: String, int: Int) async throws -> Int { 111 }
   // expected-error@-1{{distributed actor-isolated instance method 'maybe(param:int:)' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'maybe(param:int:)' to make this instance method not isolated to the actor}}
@@ -202,6 +206,8 @@ func test_watching_A(a: A_TerminationWatchingA) async throws {
 }
 
 distributed actor DA_TerminationWatchingA: TerminationWatchingA {
+  // expected-note@-1{{add '@preconcurrency' to the 'TerminationWatchingA' conformance to suppress isolation-related diagnostics}}
+
   func terminated(a: String) { }
   // expected-error@-1{{distributed actor-isolated instance method 'terminated(a:)' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'terminated(a:)' to make this instance method not isolated to the actor}}

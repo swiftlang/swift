@@ -144,10 +144,10 @@ struct CountSteps1<T> : Collection {
   subscript(i: Int) -> Int { return i }
 }
 
-extension CountSteps1 // expected-error {{type 'CountSteps1<T>' does not conform to protocol 'RandomAccessCollection'}}
+extension CountSteps1 // expected-error {{type 'CountSteps1<T>' does not conform to protocol 'BidirectionalCollection'}}
   // expected-error@-1 {{conditional conformance of type 'CountSteps1<T>' to protocol 'RandomAccessCollection' does not imply conformance to inherited protocol 'BidirectionalCollection'}}
   // expected-note@-2 {{did you mean to explicitly state the conformance like 'extension CountSteps1: BidirectionalCollection where ...'?}}
-  // expected-error@-3 {{type 'CountSteps1<T>' does not conform to protocol 'BidirectionalCollection'}}
+  // expected-error@+1 {{type 'CountSteps1<T>' does not conform to protocol 'RandomAccessCollection'}}
   : RandomAccessCollection
      where T : Equatable
 {
