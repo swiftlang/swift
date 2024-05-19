@@ -969,10 +969,11 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     assert(!isa<ProtocolDecl>(conformingDC->getSelfNominalTypeDecl()));
     Type conformingType = conformingDC->getSelfInterfaceType();
 
-    SourceLoc conformanceLoc
-      = conformingNominal == conformingDC
-          ? conformingNominal->getLoc()
-          : cast<ExtensionDecl>(conformingDC)->getLoc();
+    SourceLoc conformanceLoc =
+      entry->getLoc().isValid() ? entry->getLoc()
+        : (conformingNominal == conformingDC
+             ? conformingNominal->getLoc()
+             : cast<ExtensionDecl>(conformingDC)->getLoc());
 
     NormalProtocolConformance *implyingConf = nullptr;
     if (entry->Source.getKind() == ConformanceEntryKind::Implied) {

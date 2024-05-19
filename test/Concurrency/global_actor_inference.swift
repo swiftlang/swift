@@ -117,6 +117,8 @@ protocol Interface {
 
 @MainActor
 class Object: Interface {
+  // expected-note@-1{{add '@preconcurrency' to the 'Interface' conformance to suppress isolation-related diagnostics}}{{15-15=@preconcurrency }}
+
   var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated protocol requirement}}
 }
 

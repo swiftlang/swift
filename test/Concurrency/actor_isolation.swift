@@ -1560,6 +1560,8 @@ protocol NonisolatedProtocol {
 }
 
 actor ActorWithNonSendableLet: NonisolatedProtocol {
+  // expected-note@-1{{add '@preconcurrency' to the 'NonisolatedProtocol' conformance to suppress isolation-related diagnostics}}{{32-32=@preconcurrency }}
+
   // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in the Swift 6 language mode}}
   let ns = NonSendable()
 }
