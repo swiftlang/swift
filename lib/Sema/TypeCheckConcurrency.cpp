@@ -836,7 +836,8 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
 std::optional<DiagnosticBehavior>
 swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
-                                             const DeclContext *fromDC) {
+                                             const DeclContext *fromDC,
+                                             bool ignoreExplicitConformance) {
   ModuleDecl *importedModule = nullptr;
   if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     // If the declaration itself has the @preconcurrency attribute,
@@ -859,7 +860,8 @@ swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
 
   // When the type is explicitly non-Sendable, @preconcurrency imports
   // downgrade the diagnostic to a warning in Swift 6.
-  if (hasExplicitSendableConformance(nominal))
+  if (!ignoreExplicitConformance &&
+      hasExplicitSendableConformance(nominal))
     return DiagnosticBehavior::Warning;
 
   // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
@@ -870,12 +872,15 @@ swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
 }
 
 std::optional<DiagnosticBehavior>
-SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
+SendableCheckContext::preconcurrencyBehavior(
+    Decl *decl,
+    bool ignoreExplicitConformance) const {
   if (!decl)
     return std::nullopt;
 
   if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    return getConcurrencyDiagnosticBehaviorLimit(nominal, fromDC);
+    return getConcurrencyDiagnosticBehaviorLimit(nominal, fromDC,
+                                                 ignoreExplicitConformance);
   }
 
   return std::nullopt;
@@ -5847,8 +5852,16 @@ bool swift::checkSendableConformance(
 
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  auto behavior = SendableCheckContext(conformanceDC, check)
-      .defaultDiagnosticBehavior();
+  SendableCheckContext checkContext(conformanceDC, check);
+  DiagnosticBehavior behavior = checkContext.defaultDiagnosticBehavior();
+  if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+      conformance->getProtocol()->isSpecificProtocol(
+          KnownProtocolKind::Sendable)) {
+    if (auto optBehavior = checkContext.preconcurrencyBehavior(
+            nominal, /*ignoreExplicitConformance=*/true))
+      behavior = *optBehavior;
+  }
+
   if (conformanceDC->getOutermostParentSourceFile() &&
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {

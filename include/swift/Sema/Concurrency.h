@@ -52,7 +52,8 @@ bool diagnoseNonSendableFromDeinit(
 /// the given nominal type from the given declaration context.
 std::optional<DiagnosticBehavior>
 getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
-                                      const DeclContext *fromDC);
+                                      const DeclContext *fromDC,
+                                      bool ignoreExplicitConformance = false);
 
 } // namespace swift
 
