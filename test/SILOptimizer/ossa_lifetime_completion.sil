@@ -27,6 +27,10 @@ case none
 case some(Wrapped)
 }
 
+typealias AnyObject = Builtin.AnyObject
+
+protocol P : AnyObject {}
+
 // CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
 // CHECK-LABEL: OSSA lifetime completion on liveness boundary: %0 = argument of bb0 : $C
 // CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
@@ -536,4 +540,29 @@ left:
 
 right:
   unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on loopy: liveness_partial_boundary_outside_users with: %o
+// CHECK:       end_borrow
+// CHECK-LABEL: end running test {{.*}} on loopy: liveness_partial_boundary_outside_users with: %o
+sil [ossa] @loopy : $@convention(thin) () -> () {
+  %o = apply undef() : $@convention(thin) () -> (@owned C)
+  specify_test "liveness_partial_boundary_outside_users %o"
+  %b = begin_borrow %o : $C
+  end_borrow %b : $C
+  br loop
+
+loop:
+  br loop
+}
+
+// CHECK-LABEL: begin running test {{.*}} on type_dependent_operand: liveness_partial_boundary_outside_users
+// There should be no out-of-boundary users.
+// CHECK-NEXT:  end running test {{.*}} on type_dependent_operand: liveness_partial_boundary_outside_users
+sil [ossa] @type_dependent_operand : $@convention(thin) (@owned any P) -> @owned AnyObject {
+bb0(%existential : @owned $any P):
+  %opened = open_existential_ref %existential : $any P to $@opened("00000000-0000-0000-0000-000000000000", any P) Self
+  specify_test "liveness_partial_boundary_outside_users %opened"
+  %ref_existential = init_existential_ref %opened : $@opened("00000000-0000-0000-0000-000000000000", any P) Self : $@opened("00000000-0000-0000-0000-000000000000", any P) Self, $AnyObject
+  return %ref_existential : $AnyObject
 }

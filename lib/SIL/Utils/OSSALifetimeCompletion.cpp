@@ -109,6 +109,43 @@ static bool endLifetimeAtLivenessBoundary(SILValue value,
   return changed;
 }
 
+static void visitUsersOutsideLinearLivenessBoundary(
+    SILValue value, const SSAPrunedLiveness &liveness,
+    llvm::function_ref<void(SILInstruction *)> visitor) {
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    return;
+  }
+  LinearLiveness linearLiveness(value);
+  linearLiveness.compute();
+  for (auto pair : liveness.getAllUsers()) {
+    if (pair.second.isEnding() || isa<ExtendLifetimeInst>(pair.first)) {
+      continue;
+    }
+    auto *user = pair.first;
+    if (linearLiveness.getLiveness().isWithinBoundary(user)) {
+      continue;
+    }
+    visitor(user);
+  }
+}
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - the instructions outside the liveness boundary
+static FunctionTest LivenessPartialBoundaryOutsideUsersTest(
+    "liveness_partial_boundary_outside_users",
+    [](auto &function, auto &arguments, auto &test) {
+      SILValue value = arguments.takeValue();
+      InteriorLiveness liveness(value);
+      liveness.compute(test.getDominanceInfo());
+      visitUsersOutsideLinearLivenessBoundary(
+          value, liveness.getLiveness(),
+          [](auto *inst) { inst->print(llvm::outs()); });
+    });
+} // end namespace swift::test
+
 namespace {
 /// Implements OSSALifetimeCompletion::visitAvailabilityBoundary.  Finds
 /// positions as near as possible to unreachables at which `value`'s lifetime
