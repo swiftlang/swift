@@ -62,6 +62,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_NATIVE_LLVM_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
         self.cmake_options.define(
+            'BOOTSTRAPPING_MODE:STRING', 'CROSSCOMPILE')
+        self.cmake_options.define(
             'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
                                   self._wasi_sysroot_path(target_triple))
