@@ -9,3 +9,6 @@ public struct Globals {
 
   public init() {}
 }
+
+public var mutableGlobal: String = "can't touch this"
+public var globalInt = 17
