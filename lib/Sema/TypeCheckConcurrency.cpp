@@ -13,6 +13,7 @@
 // This file implements type checking support for Swift's concurrency model.
 //
 //===----------------------------------------------------------------------===//
+#include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
@@ -835,41 +836,52 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 }
 
 std::optional<DiagnosticBehavior>
-SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
+swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
+                                             const DeclContext *fromDC,
+                                             bool ignoreExplicitConformance) {
+  ModuleDecl *importedModule = nullptr;
+  if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+    // If the declaration itself has the @preconcurrency attribute,
+    // respect it.
+    importedModule = nominal->getParentModule();
+  } else {
+    // Determine whether this nominal type is visible via a @preconcurrency
+    // import.
+    auto import = nominal->findImport(fromDC);
+    auto sourceFile = fromDC->getParentSourceFile();
+
+    if (!import || !import->options.contains(ImportFlags::Preconcurrency))
+      return std::nullopt;
+
+    if (sourceFile)
+      sourceFile->setImportUsedPreconcurrency(*import);
+
+    importedModule = import->module.importedModule;
+  }
+
+  // When the type is explicitly non-Sendable, @preconcurrency imports
+  // downgrade the diagnostic to a warning in Swift 6.
+  if (!ignoreExplicitConformance &&
+      hasExplicitSendableConformance(nominal))
+    return DiagnosticBehavior::Warning;
+
+  // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
+  // diagnostics until the imported module enables Swift 6.
+  return importedModule->isConcurrencyChecked()
+      ? DiagnosticBehavior::Warning
+      : DiagnosticBehavior::Ignore;
+}
+
+std::optional<DiagnosticBehavior>
+SendableCheckContext::preconcurrencyBehavior(
+    Decl *decl,
+    bool ignoreExplicitConformance) const {
   if (!decl)
     return std::nullopt;
 
   if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    ModuleDecl *importedModule = nullptr;
-    if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-      // If the declaration itself has the @preconcurrency attribute,
-      // respect it.
-      importedModule = nominal->getParentModule();
-    } else {
-      // Determine whether this nominal type is visible via a @preconcurrency
-      // import.
-      auto import = nominal->findImport(fromDC);
-      auto sourceFile = fromDC->getParentSourceFile();
-
-      if (!import || !import->options.contains(ImportFlags::Preconcurrency))
-        return std::nullopt;
-
-      if (sourceFile)
-        sourceFile->setImportUsedPreconcurrency(*import);
-
-      importedModule = import->module.importedModule;
-    }
-
-    // When the type is explicitly non-Sendable, @preconcurrency imports
-    // downgrade the diagnostic to a warning in Swift 6.
-    if (hasExplicitSendableConformance(nominal))
-      return DiagnosticBehavior::Warning;
-
-    // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
-    // diagnostics until the imported module enables Swift 6.
-    return importedModule->isConcurrencyChecked()
-        ? DiagnosticBehavior::Warning
-        : DiagnosticBehavior::Ignore;
+    return getConcurrencyDiagnosticBehaviorLimit(nominal, fromDC,
+                                                 ignoreExplicitConformance);
   }
 
   return std::nullopt;
@@ -3082,6 +3094,14 @@ namespace {
         return false;
       }
 
+      // If global variable checking is enabled and the global variable is
+      // from the same module as the reference, we'll already have diagnosed
+      // the global variable itself.
+      if (ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+          var->getDeclContext()->getParentModule() ==
+              getDeclContext()->getParentModule())
+        return false;
+
       const auto import = var->findImport(getDeclContext());
       const bool isPreconcurrencyImport =
           import && import->options.contains(ImportFlags::Preconcurrency);
@@ -5019,23 +5039,41 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (auto *originalVar = var->getOriginalWrappedProperty()) {
           diagVar = originalVar;
         }
+
+        bool diagnosed = false;
         if (var->isLet()) {
           auto type = var->getInterfaceType();
-          bool diagnosed = diagnoseIfAnyNonSendableTypes(
+          diagnosed = diagnoseIfAnyNonSendableTypes(
               type, SendableCheckContext(var->getDeclContext()),
               /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
               /*diagnoseLoc=*/var->getLoc(),
               diag::shared_immutable_state_decl, diagVar);
-
-          // If we diagnosed this 'let' as non-Sendable, tack on a note
-          // to suggest a course of action.
-          if (diagnosed)
-            diagVar->diagnose(diag::shared_immutable_state_decl_note,
-                              diagVar, type);
         } else {
           diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
               .warnUntilSwiftVersion(6);
-          diagVar->diagnose(diag::shared_mutable_state_decl_note, diagVar);
+          diagnosed = true;
+        }
+
+        // If we diagnosed this global, tack on notes to suggest potential
+        // courses of action.
+        if (diagnosed) {
+          if (!var->isLet()) {
+            auto diag = diagVar->diagnose(diag::shared_state_make_immutable,
+                                          diagVar);
+            SourceLoc fixItLoc = getFixItLocForVarToLet(diagVar);
+            if (fixItLoc.isValid()) {
+              diag.fixItReplace(fixItLoc, "let");
+            }
+          }
+
+          diagVar->diagnose(diag::shared_state_main_actor_node,
+                            diagVar)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(false),
+                           "@MainActor ");
+          diagVar->diagnose(diag::shared_state_nonisolated_unsafe,
+                            diagVar)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(true),
+                           "nonisolated(unsafe) ");
         }
       }
     }
@@ -5841,8 +5879,16 @@ bool swift::checkSendableConformance(
 
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  auto behavior = SendableCheckContext(conformanceDC, check)
-      .defaultDiagnosticBehavior();
+  SendableCheckContext checkContext(conformanceDC, check);
+  DiagnosticBehavior behavior = checkContext.defaultDiagnosticBehavior();
+  if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+      conformance->getProtocol()->isSpecificProtocol(
+          KnownProtocolKind::Sendable)) {
+    if (auto optBehavior = checkContext.preconcurrencyBehavior(
+            nominal, /*ignoreExplicitConformance=*/true))
+      behavior = *optBehavior;
+  }
+
   if (conformanceDC->getOutermostParentSourceFile() &&
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {

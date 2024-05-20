@@ -1,5 +1,9 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
+
+// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -9,12 +13,10 @@ class GlobalCounter { // expected-note{{class 'GlobalCounter' does not conform t
 }
 
 let rs = GlobalCounter() // expected-warning {{let 'rs' is not concurrency-safe because non-'Sendable' type 'GlobalCounter' may have shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{isolate 'rs' to a global actor, or conform 'GlobalCounter' to 'Sendable'}}
+// expected-note@-1 {{restrict 'rs' to the main actor if it will only be accessed from the main thread}}
+// expected-note@-2 {{unsafely mark 'rs' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
 
-var globalInt = 17 // expected-warning {{var 'globalInt' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{isolate 'globalInt' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
-// expected-note@-2 2{{var declared here}}
-
+import GlobalVariables
 
 class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
   var storage = 0 // expected-warning{{stored property 'storage' of 'Sendable'-conforming class 'MyError' is mutable}}

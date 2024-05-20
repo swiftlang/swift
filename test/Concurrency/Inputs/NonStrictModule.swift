@@ -10,3 +10,8 @@ public protocol NonStrictProtocol {
   func send(_ body: @Sendable () -> Void)
   func dontSend(_ body: () -> Void)
 }
+
+open class NonStrictClass2 { }
+open class NonStrictClass3 { }
+
+public protocol MySendableProto: Sendable {}
