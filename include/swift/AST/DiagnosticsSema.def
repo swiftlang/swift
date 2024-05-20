@@ -5618,9 +5618,9 @@ NOTE(shared_state_make_immutable,none,
      "convert %0 to a 'let' constant to make the shared state immutable",
      (const ValueDecl *))
 NOTE(shared_state_main_actor_node,none,
-     "restrict %0 to the main actor if it will only be accessed from the main thread", (const ValueDecl *))
+     "annotate %0 with @MainActor if property should only be accessed from main actor isolated context", (const ValueDecl *))
 NOTE(shared_state_nonisolated_unsafe,none,
-     "unsafely mark %0 as concurrency-safe if all accesses are protected by an external synchronization mechanism", (const ValueDecl *))
+     "disable concurrency-safety checks, if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
      "requirement",
