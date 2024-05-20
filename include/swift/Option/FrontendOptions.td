@@ -220,6 +220,13 @@ def swift_module_file: Joined<["-"], "swift-module-file=">,
   MetaVarName<"<name>=<path>">,
   HelpText<"Specify Swift module input explicitly built from textual interface">;
 
+def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
+  MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
+  HelpText<"Specify the cross import module">;
+
+def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
+  HelpText<"Disable searching for cross import overlay file">;
+
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
