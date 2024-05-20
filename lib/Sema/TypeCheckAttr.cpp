@@ -3940,11 +3940,6 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    if (!ED->getModuleContext()->isResilient()) {
-      attr->setInvalid();
-      return;
-    }
-
     if (ED->getFormalAccess() < AccessLevel::Package &&
         !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
       diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
