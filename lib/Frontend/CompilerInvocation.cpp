@@ -1622,7 +1622,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_tbd_is_installapi)) {
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
-                     "-experimental-tbd-is-installapi",
+                     "-tbd-is-installapi",
                      "-experimental-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
