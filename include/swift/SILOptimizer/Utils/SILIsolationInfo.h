@@ -187,6 +187,12 @@ public:
 
   void print(llvm::raw_ostream &os) const;
 
+  /// Print a textual representation of the text info that is meant to be
+  /// included in other logging output for types that compose with
+  /// SILIsolationInfo. As a result, we only print state that can fit on
+  /// one line.
+  void printForOneLineLogging(llvm::raw_ostream &os) const;
+
   SWIFT_DEBUG_DUMP {
     print(llvm::dbgs());
     llvm::dbgs() << '\n';
