@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
 
 #include "llvm/ADT/MapVector.h"
@@ -963,6 +964,14 @@ public:
     return Impl::getIsolationInfo(partitionOp);
   }
 
+  std::optional<Element> getElement(SILValue value) const {
+    return asImpl().getElement(value);
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return asImpl().getRepresentative(value);
+  }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
     if (shouldEmitVerboseLogging()) {
@@ -1018,10 +1027,16 @@ public:
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
+      // Before we do any further work, see if we have a nonisolated(unsafe)
+      // element. In such a case, this is also not a real transfer point.
+      Element transferredElement = op.getOpArgs()[0];
+      if (getIsolationRegionInfo(transferredElement).isUnsafeNonIsolated()) {
+        return;
+      }
+
       // Otherwise, we need to merge our isolation region info with the
       // isolation region info of everything else in our region. This is the
       // dynamic isolation region info found by the dataflow.
-      Element transferredElement = op.getOpArgs()[0];
       Region transferredRegion = p.getRegion(transferredElement);
       bool isClosureCapturedElt = false;
       SILIsolationInfo transferredRegionIsolation;
@@ -1045,8 +1060,8 @@ public:
       // region.
       if (bool(transferredRegionIsolation) &&
           !transferredRegionIsolation.isDisconnected()) {
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0],
-                                              transferredRegionIsolation);
+        return handleTransferNonTransferrableHelper(op, op.getOpArgs()[0],
+                                                    transferredRegionIsolation);
       }
 
       // Mark op.getOpArgs()[0] as transferred.
@@ -1136,6 +1151,24 @@ private:
           return;
       }
 
+      // If we have a temporary that is initialized with an unsafe nonisolated
+      // value... squelch the error like if we were that value.
+      //
+      // TODO: This goes away with opaque values.
+      if (SILValue equivalenceClassRep =
+              getRepresentative(transferringOp->get())) {
+        if (auto *asi = dyn_cast<AllocStackInst>(equivalenceClassRep)) {
+          if (SILValue value = getInitOfTemporaryAllocStack(asi)) {
+            if (auto elt = getElement(value)) {
+              SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
+              if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                return;
+              }
+            }
+          }
+        }
+      }
+
       // If our instruction does not have any isolation info associated with it,
       // it must be nonisolated. See if our function has a matching isolation to
       // our transferring operand. If so, we can squelch this.
@@ -1150,6 +1183,35 @@ private:
 
     // Ok, we actually need to emit a call to the callback.
     return handleLocalUseAfterTransfer(op, elt, transferringOp);
+  }
+
+  // Private helper that squelches the error if our transfer instruction and our
+  // use have the same isolation.
+  void handleTransferNonTransferrableHelper(
+      const PartitionOp &op, Element elt,
+      SILIsolationInfo dynamicMergedIsolationInfo) const {
+    if (shouldTryToSquelchErrors()) {
+      // If we have a temporary that is initialized with an unsafe nonisolated
+      // value... squelch the error like if we were that value.
+      //
+      // TODO: This goes away with opaque values.
+      if (SILValue equivalenceClassRep =
+              getRepresentative(op.getSourceOp()->get())) {
+        if (auto *asi = dyn_cast<AllocStackInst>(equivalenceClassRep)) {
+          if (SILValue value = getInitOfTemporaryAllocStack(asi)) {
+            if (auto elt = getElement(value)) {
+              SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
+              if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Ok, we actually need to emit a call to the callback.
+    return handleTransferNonTransferrable(op, elt, dynamicMergedIsolationInfo);
   }
 };
 
@@ -1212,6 +1274,15 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
     return SILIsolationInfo();
   }
+
+  /// If we are able to, return the element associated with \p value. If
+  /// unsupported, returns none.
+  std::optional<Element> getElement(SILValue value) const { return {}; }
+
+  /// If supported, returns the representative in \p value's equivalence
+  /// class. Returns an empty SILValue if this is unsupported or if it does not
+  /// have one.
+  SILValue getRepresentative(SILValue value) const { return SILValue(); }
 
   /// Check if the representative value of \p elt is closure captured at \p
   /// op.
