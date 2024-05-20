@@ -3401,11 +3401,6 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   auto DL =
       llvm::DILocation::get(IGM.getLLVMContext(), Line, Col, Scope, InlinedAt);
 
-  // An alloca may only be described by exactly one dbg.declare.
-  if (isa<llvm::AllocaInst>(Storage) &&
-      !llvm::FindDbgDeclareUses(Storage).empty())
-    return;
-
   // Fragment DIExpression cannot cover the whole variable
   // or going out-of-bound.
   if (auto Fragment = Expr->getFragmentInfo()) {

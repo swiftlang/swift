@@ -52,6 +52,7 @@ public class C<R> {
     // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
     // IR: dbg.value(metadata ptr %[[ARG_S]], metadata ![[MD_1_0:[0-9]+]]
     // IR: %[[RS_PAIR:.*]] = alloca i8, i{{.*}} %
+    // IR: dbg.declare(metadata ptr %[[RS_PAIR]], metadata ![[GRS_U:[0-9]+]],
     // IR: dbg.declare(metadata ptr %[[RS_PAIR]], metadata ![[GRS_T:[0-9]+]],
     // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[S:[0-9]+]]
     // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[GS_T:[0-9]+]]
@@ -100,6 +101,8 @@ public class C<R> {
 // IR-DAG: ![[MD_1_0]] = !DILocalVariable(name: "$\CF\84_1_0"
 // IR-DAG: ![[GRS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GRS_T:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
 // IR-DAG: ![[SP_GRS_T]] = {{.*}}linkageName: "$s1A1gyyxlFx_qd__t_Ti5"
+// IR-DAG: ![[GRS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GRS_U:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
+// IR-DAG: ![[SP_GRS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_qd__t_Ti5"
 // IR-DAG: ![[LET_TUPLE]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TUPLE:[0-9]+]])
 // IR-DAG: ![[TUPLE]] = {{.*}}DW_TAG_structure_type, name: "$sx_qd__tD"
 // IR-DAG: ![[S]] = !DILocalVariable(name: "s", {{.*}} type: ![[LET_TAU_1_0:[0-9]+]]
