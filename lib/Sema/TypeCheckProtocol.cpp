@@ -2063,7 +2063,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
   auto proto = conformance->getProtocol();
   Type protoType = proto->getDeclaredInterfaceType();
   auto implyingProto = implyingConf->getProtocol()->getDeclaredInterfaceType();
-  auto loc = implyingConf->getLoc();
+  auto loc = extractNearestSourceLoc(implyingConf->getDeclContext());
   Diags.diagnose(loc, diag::conditional_conformances_cannot_imply_conformances,
                  conformance->getType(), implyingProto, protoType);
 
