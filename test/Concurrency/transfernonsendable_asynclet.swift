@@ -788,6 +788,6 @@ func asyncLet_Let_ActorIsolated_Method() async {
   // expected-tns-note @-1 {{sending 'x' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into actor-isolated context may introduce data races}}
-  useValue(x) // expected-tns-note {{risks concurrent access}}
+  useValue(x) // expected-tns-note {{access can happen concurrently}}
   let _ = await y
 }
