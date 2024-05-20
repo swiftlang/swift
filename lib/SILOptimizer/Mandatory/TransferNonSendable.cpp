@@ -1616,6 +1616,17 @@ struct DiagnosticEvaluator final
     return info->getValueMap().getIsolationRegion(element);
   }
 
+  std::optional<Element> getElement(SILValue value) const {
+    return info->getValueMap().getTrackableValue(value).getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .getRepresentative()
+        .maybeGetValue();
+  }
+
   bool isClosureCaptured(Element element, Operand *op) const {
     auto value = info->getValueMap().maybeGetRepresentative(element);
     if (!value)

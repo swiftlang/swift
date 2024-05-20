@@ -163,6 +163,12 @@ public:
     regionInfo = getIsolationRegionInfo().merge(newRegionInfo);
   }
 
+  void setDisconnectedNonisolatedUnsafe() {
+    auto oldRegionInfo = getIsolationRegionInfo();
+    assert(oldRegionInfo.isDisconnected());
+    regionInfo = oldRegionInfo.withUnsafeNonIsolated();
+  }
+
   Element getID() const { return Element(id); }
 
   void addFlag(TrackableValueFlag flag) { flagSet |= flag; }

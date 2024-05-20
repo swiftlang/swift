@@ -35,6 +35,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -384,6 +385,7 @@ static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   assert(base);
   if (base->getType().isObject())
     return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
+
   return {base, visitor.actorIsolation};
 }
 
@@ -2979,6 +2981,17 @@ bool BlockPartitionState::recomputeExitFromEntry(
 
     SILIsolationInfo getIsolationRegionInfo(Element elt) const {
       return translator.getValueMap().getIsolationRegion(elt);
+    }
+
+    std::optional<Element> getElement(SILValue value) const {
+      return translator.getValueMap().getTrackableValue(value).getID();
+    }
+
+    SILValue getRepresentative(SILValue value) const {
+      return translator.getValueMap()
+          .getTrackableValue(value)
+          .getRepresentative()
+          .maybeGetValue();
     }
 
     bool isClosureCaptured(Element elt, Operand *op) const {

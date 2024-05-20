@@ -45,27 +45,92 @@ getGlobalActorInitIsolation(SILFunction *fn) {
   return getActorIsolation(globalDecl);
 }
 
-static DeclRefExpr *getDeclRefExprFromExpr(Expr *expr) {
+class DeclRefExprAnalysis {
+  DeclRefExpr *result = nullptr;
+
+  // Be greedy with the small size so we very rarely allocate.
+  SmallVector<Expr *, 8> lookThroughExprs;
+
+public:
+  bool compute(Expr *expr);
+
+  DeclRefExpr *getResult() const {
+    assert(result && "Not computed?!");
+    return result;
+  }
+
+  ArrayRef<Expr *> getLookThroughExprs() const {
+    assert(result && "Not computed?!");
+    return lookThroughExprs;
+  }
+
+  void print(llvm::raw_ostream &os) const {
+    if (!result) {
+      os << "DeclRefExprAnalysis: None.";
+      return;
+    }
+
+    os << "DeclRefExprAnalysis:\n";
+    result->dump(os);
+    os << "\n";
+    if (lookThroughExprs.size()) {
+      os << "LookThroughExprs:\n";
+      for (auto *expr : lookThroughExprs) {
+        expr->dump(os, 4);
+      }
+    }
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  bool hasNonisolatedUnsafe() const {
+    // See if our initial member_ref_expr is actor instance isolated.
+    for (auto *expr : lookThroughExprs) {
+      // We can skip load expr.
+      if (isa<LoadExpr>(expr))
+        continue;
+
+      if (auto *mri = dyn_cast<MemberRefExpr>(expr)) {
+        if (mri->hasDecl()) {
+          auto isolation = swift::getActorIsolation(mri->getDecl().getDecl());
+          if (isolation.isNonisolatedUnsafe())
+            return true;
+        }
+      }
+
+      break;
+    }
+
+    return false;
+  }
+};
+
+bool DeclRefExprAnalysis::compute(Expr *expr) {
   struct LocalWalker final : ASTWalker {
-    DeclRefExpr *result = nullptr;
+    DeclRefExprAnalysis &parentAnalysis;
+
+    LocalWalker(DeclRefExprAnalysis &parentAnalysis)
+        : parentAnalysis(parentAnalysis) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-      assert(!result && "Shouldn't have a result yet");
+      assert(!parentAnalysis.result && "Shouldn't have a result yet");
 
       if (auto *dre = dyn_cast<DeclRefExpr>(expr)) {
-        result = dre;
+        parentAnalysis.result = dre;
         return Action::Stop();
       }
 
       if (isa<CoerceExpr, MemberRefExpr, ImplicitConversionExpr, IdentityExpr>(
-              expr))
+              expr)) {
+        parentAnalysis.lookThroughExprs.push_back(expr);
         return Action::Continue(expr);
+      }
 
       return Action::Stop();
     }
   };
 
-  LocalWalker walker;
+  LocalWalker walker(*this);
 
   if (auto *ae = dyn_cast<AssignExpr>(expr)) {
     ae->getSrc()->walk(walker);
@@ -73,7 +138,7 @@ static DeclRefExpr *getDeclRefExprFromExpr(Expr *expr) {
     expr->walk(walker);
   }
 
-  return walker.result;
+  return result;
 }
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
@@ -149,18 +214,25 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   //
   // This is important so we properly handle setters.
   if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
+    auto varIsolation = swift::getActorIsolation(rei->getField());
+
     auto *nomDecl =
         rei->getOperand()->getType().getNominalOrBoundGenericNominal();
 
     if (nomDecl->isAnyActor())
       return SILIsolationInfo::getActorInstanceIsolated(rei, rei->getOperand(),
-                                                        nomDecl);
+                                                        nomDecl)
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
 
     if (auto isolation = swift::getActorIsolation(nomDecl)) {
       assert(isolation.isGlobalActor());
       return SILIsolationInfo::getGlobalActorIsolated(
-          rei, isolation.getGlobalActor());
+                 rei, isolation.getGlobalActor())
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
     }
+
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
   }
 
   // Check if we have a global_addr inst.
@@ -171,6 +243,11 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         if (isolation.isGlobalActor()) {
           return SILIsolationInfo::getGlobalActorIsolated(
               ga, isolation.getGlobalActor());
+        }
+
+        if (isolation.isNonisolatedUnsafe()) {
+          return SILIsolationInfo::getDisconnected(
+              true /*is nonisolated(unsafe)*/);
         }
       }
     }
@@ -227,8 +304,18 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     // check if we are self. If we are not self, we want this to be
     // disconnected.
     if (auto *expr = cmi->getLoc().getAsASTNode<Expr>()) {
-      if (auto *dre = getDeclRefExprFromExpr(expr)) {
-        if (auto isolation = swift::getActorIsolation(dre->getDecl())) {
+      DeclRefExprAnalysis exprAnalysis;
+      if (exprAnalysis.compute(expr)) {
+        auto *dre = exprAnalysis.getResult();
+
+        // First see if we can get any information from the actual var decl of
+        // the class_method. We could find isolation or if our value is marked
+        // as nonisolated(unsafe), we could find that as well. If we have
+        // nonisolated(unsafe), we just propagate the value. Otherwise, we
+        // return the isolation.
+        bool isNonIsolatedUnsafe = exprAnalysis.hasNonisolatedUnsafe();
+        {
+          auto isolation = swift::getActorIsolation(dre->getDecl());
           if (isolation.isActorIsolated() &&
               (isolation.getKind() != ActorIsolation::ActorInstance ||
                isolation.getActorInstanceParameter() == 0)) {
@@ -242,6 +329,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             return SILIsolationInfo::getGlobalActorIsolated(
                 cmi, isolation.getGlobalActor());
           }
+
+          isNonIsolatedUnsafe |= isolation.isNonisolatedUnsafe();
         }
 
         if (auto type = dre->getType()->getNominalOrBoundGenericNominal()) {
@@ -251,28 +340,46 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
                  isolation.getActorInstanceParameter() == 0)) {
               if (cmi->getOperand()->getType().isAnyActor()) {
                 return SILIsolationInfo::getActorInstanceIsolated(
-                    cmi, cmi->getOperand(),
-                    cmi->getOperand()
-                        ->getType()
-                        .getNominalOrBoundGenericNominal());
+                           cmi, cmi->getOperand(),
+                           cmi->getOperand()
+                               ->getType()
+                               .getNominalOrBoundGenericNominal())
+                    .withUnsafeNonIsolated(isNonIsolatedUnsafe);
               }
-              return SILIsolationInfo::getGlobalActorIsolated(
-                  cmi, isolation.getGlobalActor());
+
+              if (auto globalIso = SILIsolationInfo::getGlobalActorIsolated(
+                      cmi, isolation.getGlobalActor())) {
+                return globalIso.withUnsafeNonIsolated(isNonIsolatedUnsafe);
+              }
             }
           }
         }
+
+        if (isNonIsolatedUnsafe)
+          return SILIsolationInfo::getDisconnected(isNonIsolatedUnsafe);
       }
     }
   }
 
   // See if we have a struct_extract from a global actor isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
-    return SILIsolationInfo::getGlobalActorIsolated(sei, sei->getStructDecl());
+    auto varIsolation = swift::getActorIsolation(sei->getField());
+    if (auto isolation =
+            SILIsolationInfo::getGlobalActorIsolated(sei, sei->getStructDecl()))
+      return isolation.withUnsafeNonIsolated(
+          varIsolation.isNonisolatedUnsafe());
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
   }
 
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
-    return SILIsolationInfo::getGlobalActorIsolated(seai,
-                                                    seai->getStructDecl());
+    auto varIsolation = swift::getActorIsolation(seai->getField());
+    if (auto isolation = SILIsolationInfo::getGlobalActorIsolated(
+            seai, seai->getStructDecl()))
+      return isolation.withUnsafeNonIsolated(
+          varIsolation.isNonisolatedUnsafe());
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
   }
 
   // See if we have an unchecked_enum_data from a global actor isolated type.
@@ -355,6 +462,34 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
       if (crossing->getCalleeIsolation().isNonisolated()) {
         return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+      }
+    }
+  }
+
+  if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
+    if (asi->isFromVarDecl()) {
+      if (auto *varDecl = asi->getLoc().getAsASTNode<VarDecl>()) {
+        auto isolation = swift::getActorIsolation(varDecl);
+        if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
+          return SILIsolationInfo::getDisconnected(
+              true /*is nonisolated(unsafe)*/);
+        }
+      }
+    }
+  }
+
+  if (auto *mvi = dyn_cast<MoveValueInst>(inst)) {
+    if (mvi->isFromVarDecl()) {
+      if (auto *debugInfo = getSingleDebugUse(mvi)) {
+        if (auto *dbg = dyn_cast<DebugValueInst>(debugInfo->getUser())) {
+          if (auto *varDecl = dbg->getLoc().getAsASTNode<VarDecl>()) {
+            auto isolation = swift::getActorIsolation(varDecl);
+            if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
+              return SILIsolationInfo::getDisconnected(
+                  true /*is nonisolated(unsafe)*/);
+            }
+          }
+        }
       }
     }
   }
@@ -517,7 +652,20 @@ SILIsolationInfo SILIsolationInfo::merge(SILIsolationInfo other) const {
           hasSameIsolation(other)) &&
          "Actor can only be merged with the same actor");
 
-  // Otherwise, take the other value.
+  // If we are both disconnected and other has the unsafeNonIsolated bit set,
+  // drop that bit and return that.
+  //
+  // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
+  // merging. These bits should not propagate through merging and should instead
+  // always be associated with non-merged infos.
+  //
+  // TODO: We should really bake the above into the type system by having merged
+  // and non-merged SILIsolationInfo.
+  if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
+    return other.withUnsafeNonIsolated(false);
+  }
+
+  // Otherwise, just return other.
   return other;
 }
 

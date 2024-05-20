@@ -2100,3 +2100,269 @@ bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
   }
   return false;
 }
+
+//===----------------------------------------------------------------------===//
+//          MARK: Find Initialization Value Of Temporary Alloc Stack
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct AddressWalkerState {
+  bool foundError = false;
+  InstructionSet writes;
+  AddressWalkerState(SILFunction *fn) : writes(fn) {}
+};
+} // namespace
+
+static SILValue
+findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
+                                       AddressWalkerState &state) {
+  // These are instructions which we are ok with looking through when
+  // identifying our allocation. It must always refer to the entire allocation.
+  auto isAlloc = [&](SILValue value) -> bool {
+    if (auto *ieai = dyn_cast<InitExistentialAddrInst>(value))
+      value = ieai->getOperand();
+    return value == SILValue(allocInst);
+  };
+
+  // Walk from our allocation to one of our writes. Then make sure that the
+  // write writes to our entire value.
+  for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
+    // See if we have a full tuple value.
+
+    if (!state.writes.contains(&inst))
+      continue;
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+      if (isAlloc(copyAddr->getDest()) && copyAddr->isInitializationOfDest()) {
+        return copyAddr->getSrc();
+      }
+    }
+
+    if (auto *si = dyn_cast<StoreInst>(&inst)) {
+      if (isAlloc(si->getDest()) &&
+          si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        return si->getSrc();
+      }
+    }
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
+      if (isAlloc(sbi->getDest()))
+        return sbi->getSrc();
+    }
+
+    // If we do not identify the write... return SILValue(). We weren't able
+    // to understand the write.
+    break;
+  }
+
+  return SILValue();
+}
+
+static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
+                                                    AddressWalkerState &state) {
+  SmallVector<SILValue, 8> tupleValues;
+
+  for (unsigned i : range(allocInst->getType().getNumTupleElements())) {
+    (void)i;
+    tupleValues.push_back(nullptr);
+  }
+
+  unsigned numEltsLeft = tupleValues.size();
+
+  // If we have an empty tuple, just return SILValue() for now.
+  //
+  // TODO: What does this pattern look like out of SILGen?
+  if (!numEltsLeft)
+    return SILValue();
+
+  // Walk from our allocation to one of our writes. Then make sure that the
+  // write writes to our entire value.
+  DestructureTupleInst *foundDestructure = nullptr;
+  SILValue foundRootAddress;
+  for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
+    if (!state.writes.contains(&inst))
+      continue;
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+      if (copyAddr->isInitializationOfDest()) {
+        if (auto *tei = dyn_cast<TupleElementAddrInst>(copyAddr->getDest())) {
+          if (tei->getOperand() == allocInst) {
+            unsigned i = tei->getFieldIndex();
+            if (auto *otherTei = dyn_cast_or_null<TupleElementAddrInst>(
+                    copyAddr->getSrc()->getDefiningInstruction())) {
+              // If we already were processing destructures, then we have a mix
+              // of struct/destructures... we do not support that, so bail.
+              if (foundDestructure)
+                return SILValue();
+
+              // Otherwise, update our root address. If we already had a root
+              // address and it doesn't match our tuple_element_addr's operand,
+              // bail. There is some sort of mix/match of tuple addresses that
+              // we do not support. We are looking for a specific SILGen
+              // pattern.
+              if (!foundRootAddress) {
+                foundRootAddress = otherTei->getOperand();
+              } else if (foundRootAddress != otherTei->getOperand()) {
+                return SILValue();
+              }
+
+              if (i != otherTei->getFieldIndex())
+                return SILValue();
+              if (tupleValues[i])
+                return SILValue();
+              tupleValues[i] = otherTei;
+
+              // If we have completely covered the tuple, break.
+              --numEltsLeft;
+              if (!numEltsLeft)
+                break;
+
+              // Otherwise, continue so we keep processing.
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    if (auto *si = dyn_cast<StoreInst>(&inst)) {
+      if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        // Check if we are updating the entire tuple value.
+        if (si->getDest() == allocInst) {
+          // If we already found a root address (meaning we were processing
+          // tuple_elt_addr), bail. We have some sort of unhandled mix of
+          // copy_addr and store.
+          if (foundRootAddress)
+            return SILValue();
+
+          // If we already found a destructure, return SILValue(). We are
+          // initializing twice.
+          if (foundDestructure)
+            return SILValue();
+
+          // We are looking for a pattern where we construct a tuple from
+          // destructured parts.
+          if (auto *ti = dyn_cast<TupleInst>(si->getSrc())) {
+            for (auto p : llvm::enumerate(ti->getOperandValues())) {
+              SILValue value = lookThroughOwnershipInsts(p.value());
+              if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                      value->getDefiningInstruction())) {
+                // We should always go through the same dti.
+                if (foundDestructure && foundDestructure != dti)
+                  return SILValue();
+                if (!foundDestructure)
+                  foundDestructure = dti;
+
+                // If we have a mixmatch of indices, we cannot look through.
+                if (p.index() != dti->getIndexOfResult(value))
+                  return SILValue();
+                if (tupleValues[p.index()])
+                  return SILValue();
+                tupleValues[p.index()] = value;
+
+                // If we have completely covered the tuple, break.
+                --numEltsLeft;
+                if (!numEltsLeft)
+                  break;
+              }
+            }
+
+            // If we haven't completely covered the tuple, return SILValue(). We
+            // should completely cover the tuple.
+            if (numEltsLeft)
+              return SILValue();
+
+            // Otherwise, break since we are done.
+            break;
+          }
+        }
+
+        // If we store to a tuple_element_addr, update for a single value.
+        if (auto *tei = dyn_cast<TupleElementAddrInst>(si->getDest())) {
+          if (tei->getOperand() == allocInst) {
+            unsigned i = tei->getFieldIndex();
+            if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                    si->getSrc()->getDefiningInstruction())) {
+              // If we already found a root address (meaning we were processing
+              // tuple_elt_addr), bail. We have some sort of unhandled mix of
+              // copy_addr and store [init].
+              if (foundRootAddress)
+                return SILValue();
+              if (!foundDestructure) {
+                foundDestructure = dti;
+              } else if (foundDestructure != dti) {
+                return SILValue();
+              }
+
+              if (i != dti->getIndexOfResult(si->getSrc()))
+                return SILValue();
+              if (tupleValues[i])
+                return SILValue();
+              tupleValues[i] = si->getSrc();
+
+              // If we have completely covered the tuple, break.
+              --numEltsLeft;
+              if (!numEltsLeft)
+                break;
+
+              // Otherwise, continue so we keep processing.
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    // Found a write that we did not understand... bail.
+    break;
+  }
+
+  // Now check if we have a complete tuple with all elements coming from the
+  // same destructure_tuple. In such a case, we can look through the
+  // destructure_tuple.
+  if (numEltsLeft)
+    return SILValue();
+
+  if (foundDestructure)
+    return foundDestructure->getOperand();
+  if (foundRootAddress)
+    return foundRootAddress;
+
+  return SILValue();
+}
+
+SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
+  // If we are from a VarDecl, bail.
+  if (asi->isFromVarDecl())
+    return SILValue();
+
+  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
+    AddressWalkerState &state;
+
+    AddressWalker(AddressWalkerState &state) : state(state) {}
+
+    bool visitUse(Operand *use) {
+      if (use->getUser()->mayWriteToMemory())
+        state.writes.insert(use->getUser());
+      return true;
+    }
+
+    TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+        return TransitiveUseVisitation::OnlyUser;
+      return TransitiveUseVisitation::OnlyUses;
+    }
+
+    void onError(Operand *use) { state.foundError = true; }
+  };
+
+  AddressWalkerState state(asi->getFunction());
+  AddressWalker walker(state);
+  if (std::move(walker).walk(asi) == AddressUseKind::Unknown ||
+      state.foundError)
+    return SILValue();
+
+  if (asi->getType().is<TupleType>())
+    return findRootValueForTupleTempAllocation(asi, state);
+  return findRootValueForNonTupleTempAllocation(asi, state);
+}
