@@ -4,7 +4,7 @@
 // RUN: %target-build-swift %t/Core.swift \
 // RUN: -module-name=Core -package-name Pkg \
 // RUN: -Xfrontend -experimental-allow-non-resilient-access \
-// RUN: -Xfrontend -experimental-package-cmo \
+ // RUN: -Xfrontend -experimental-package-cmo \
 // RUN: -enable-library-evolution -O -wmo \
 // RUN: -emit-ir -o %t/Core.ir \
 // RUN: -emit-tbd -emit-tbd-path %t/libCore.tbd \
