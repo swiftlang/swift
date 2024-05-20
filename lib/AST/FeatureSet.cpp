@@ -415,6 +415,7 @@ static bool usesFeatureCodeItemMacros(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BodyMacros)
+UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
 
 static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
