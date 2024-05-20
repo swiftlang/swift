@@ -101,7 +101,7 @@ final class K : @preconcurrency Initializable {
 
 @MainActor
 final class MainActorK: Initializable {
-  // expected-note@-1{{add '@preconcurrency' to the 'Initializable' conformance to suppress isolation-related diagnostics}}{{25-25=@preconcurrency }}
+  // expected-note@-1{{add '@preconcurrency' to the 'Initializable' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
   init() { } // expected-warning{{main actor-isolated initializer 'init()' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-1{{add 'nonisolated' to 'init()' to make this initializer not isolated to the actor}}
 }
