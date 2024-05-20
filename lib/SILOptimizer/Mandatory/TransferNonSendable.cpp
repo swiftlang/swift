@@ -608,7 +608,8 @@ public:
 
     // Then emit the note with greater context.
     diagnoseNote(
-        loc, diag::regionbasedisolation_named_stronglytransferred_binding, name)
+        loc, diag::regionbasedisolation_named_value_used_after_explicit_sending,
+        name)
         .highlight(loc.getSourceRange());
 
     // Finally the require points.
@@ -953,7 +954,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
     assert(!fas.getArgumentConvention(*transferOp).isIndirectOutParameter() &&
            "We should never transfer an indirect out parameter");
     if (fas.getArgumentParameterInfo(*transferOp)
-            .hasOption(SILParameterInfo::Transferring)) {
+            .hasOption(SILParameterInfo::Sending)) {
 
       // First try to do the named diagnostic if we can find a name.
       if (auto rootValueAndName =
@@ -1231,8 +1232,7 @@ public:
         os << ' ';
       }
     }
-    auto diag =
-        diag::regionbasedisolation_named_transfer_into_transferring_param;
+    auto diag = diag::regionbasedisolation_named_transfer_into_sending_param;
     diagnoseNote(loc, diag, descriptiveKindStr, varName);
   }
 
@@ -1362,7 +1362,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     // First see if we have a transferring argument.
     if (auto fas = FullApplySite::isa(op->getUser())) {
       if (fas.getArgumentParameterInfo(*op).hasOption(
-              SILParameterInfo::Transferring)) {
+              SILParameterInfo::Sending)) {
 
         // See if we can infer a name from the value.
         SmallString<64> resultingName;
@@ -1445,11 +1445,11 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   if (auto *ri = dyn_cast<ReturnInst>(op->getUser())) {
     auto fType = ri->getFunction()->getLoweredFunctionType();
     if (fType->getNumResults() &&
-        fType->getResults()[0].hasOption(SILResultInfo::IsTransferring)) {
+        fType->getResults()[0].hasOption(SILResultInfo::IsSending)) {
       assert(llvm::all_of(fType->getResults(),
                           [](SILResultInfo resultInfo) {
                             return resultInfo.hasOption(
-                                SILResultInfo::IsTransferring);
+                                SILResultInfo::IsSending);
                           }) &&
              "All result info must be the same... if that changes... update "
              "this code!");
@@ -1462,7 +1462,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       assert(llvm::none_of(fType->getResults(),
                            [](SILResultInfo resultInfo) {
                              return resultInfo.hasOption(
-                                 SILResultInfo::IsTransferring);
+                                 SILResultInfo::IsSending);
                            }) &&
              "All result info must be the same... if that changes... update "
              "this code!");

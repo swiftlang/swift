@@ -3123,10 +3123,10 @@ static void suppressingFeatureOptionalIsolatedParameters(
   action();
 }
 
-static void suppressingFeatureTransferringArgsAndResults(
-    PrintOptions &options, llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressTransferringArgsAndResults,
-                                   true);
+static void
+suppressingFeatureSendingArgsAndResults(PrintOptions &options,
+                                        llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressSendingArgsAndResults, true);
   action();
 }
 
@@ -3728,8 +3728,6 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
-  if (!options.SuppressTransferringArgsAndResults && flags.isTransferring())
-    printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -3755,11 +3753,14 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("__owned", options, " ");
     break;
   case ParamSpecifier::ImplicitlyCopyableConsuming:
-    // Nothing... we infer from transferring.
-    assert(flags.isTransferring() && "Only valid when transferring is enabled");
+    // Nothing... we infer from sending.
+    assert(flags.isSending() && "Only valid when sending is enabled");
     break;
   }
-  
+
+  if (!options.SuppressSendingArgsAndResults && flags.isSending())
+    printer.printAttrName("sending ");
+
   if (flags.isIsolated()) {
     if (!(param && param->getInterfaceType()->isOptional() &&
           options.SuppressOptionalIsolatedParams))
@@ -4189,13 +4190,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
       }
 
-      if (!Options.SuppressTransferringArgsAndResults) {
-        if (decl->hasTransferringResult()) {
-          Printer << "transferring ";
+      if (!Options.SuppressSendingArgsAndResults) {
+        if (decl->hasSendingResult()) {
+          Printer << "sending ";
         } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
                        decl->getInterfaceType())) {
-          if (ft->hasExtInfo() && ft->hasTransferringResult()) {
-            Printer << "transferring ";
+          if (ft->hasExtInfo() && ft->hasSendingResult()) {
+            Printer << "sending ";
           }
         }
       }
@@ -6658,9 +6659,9 @@ public:
 
     Printer << " -> ";
 
-    if (!Options.SuppressTransferringArgsAndResults && T->hasExtInfo() &&
-        T->hasTransferringResult()) {
-      Printer.printKeyword("transferring ", Options);
+    if (!Options.SuppressSendingArgsAndResults && T->hasExtInfo() &&
+        T->hasSendingResult()) {
+      Printer.printKeyword("sending ", Options);
     }
 
     if (T->hasLifetimeDependenceInfo()) {
@@ -7578,9 +7579,9 @@ void SILParameterInfo::print(ASTPrinter &Printer,
     Printer << "@noDerivative ";
   }
 
-  if (options.contains(SILParameterInfo::Transferring)) {
-    options -= SILParameterInfo::Transferring;
-    Printer << "@sil_transferring ";
+  if (options.contains(SILParameterInfo::Sending)) {
+    options -= SILParameterInfo::Sending;
+    Printer << "@sil_sending ";
   }
 
   if (options.contains(SILParameterInfo::Isolated)) {
@@ -7621,9 +7622,9 @@ void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
     Printer << "@noDerivative ";
   }
 
-  if (options.contains(SILResultInfo::IsTransferring)) {
-    options -= SILResultInfo::IsTransferring;
-    Printer << "@sil_transferring ";
+  if (options.contains(SILResultInfo::IsSending)) {
+    options -= SILResultInfo::IsSending;
+    Printer << "@sil_sending ";
   }
 
   assert(!bool(options) && "ResultInfo has option that was not handled?!");

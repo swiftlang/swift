@@ -8516,7 +8516,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      hasResultDependsOn(), isTransferring());
+      hasResultDependsOn(), isSending());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -10156,8 +10156,9 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
-  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR))
-    FD->setTransferringResult();
+  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR) ||
+      llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
+    FD->setSendingResult();
   return FD;
 }
 

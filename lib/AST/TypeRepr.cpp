@@ -850,6 +850,9 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::Transferring:
     Printer.printKeyword("transferring", Opts, " ");
     break;
+  case TypeReprKind::Sending:
+    Printer.printKeyword("sending", Opts, " ");
+    break;
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");
     break;

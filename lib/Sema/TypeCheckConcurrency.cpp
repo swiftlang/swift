@@ -3581,7 +3581,7 @@ namespace {
       // Check for sendability of the result type if we do not have a
       // transferring result.
       if ((!ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
-           !fnType->hasTransferringResult())) {
+           !fnType->hasSendingResult())) {
         // See if we are a autoclosure that has a direct callee that has the
         // same non-transferred type value returned. If so, do not emit an
         // error... we are going to emit an error on the call expr and do not

@@ -1,13 +1,18 @@
 // RUN: %target-swift-frontend -disable-availability-checking -strict-concurrency=targeted %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-and-complete-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete-
 
 // NOTE: We test separately with region isolation and region isolation +
-// transferring args and results since the semantics when transferring args and
+// sending args and results since the semantics when sending args and
 // results are enabled is different since async let in such a case takes a
 // non-Sendable closure whose captures are transferred in while without it, we
 // leave the async let closure as sendable and use sema level checking.
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix tns- -verify-additional-prefix no-transferring-tns-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -verify-additional-prefix tns- -verify-additional-prefix transferring-tns-
+
+// No transferring.
+//
+// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix tns- -verify-additional-prefix no-transferring-tns- -disable-transferring-args-and-results-with-region-based-isolation -disable-sending-args-and-results-with-region-based-isolation
+
+// With transferring.
+//
+// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix transferring-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

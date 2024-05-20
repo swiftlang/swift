@@ -411,7 +411,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
       ((fArg->isClosureCapture() &&
         fArg->getFunction()->getLoweredFunctionType()->isSendable()) ||
-       fArg->isTransferring()))
+       fArg->isSending()))
     return SILIsolationInfo::getDisconnected();
 
   // Before we do anything further, see if we have an isolated parameter. This
