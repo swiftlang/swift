@@ -909,7 +909,6 @@ static void transformAndForwardResults(
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
-            /*IsAsync=*/false,
             /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,

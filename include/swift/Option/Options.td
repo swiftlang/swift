@@ -542,7 +542,7 @@ def module_name : Separate<["-"], "module-name">,
          SwiftSymbolGraphExtractOption]>,
   HelpText<"Name of the module to build">;
 def project_name : Separate<["-"], "project-name">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption]>,
   HelpText<"Name of the project this module to build belongs to">;
 
