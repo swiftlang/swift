@@ -24,9 +24,7 @@
 
 extern "C" const char *__progname;
 
-// This function may not be present when building at desk, and isn't really
-// needed there, so just skip it in that case.
-#if SWIFT_BNI_OS_BUILD
+#if SWIFT_USE_OS_TRACE_LAZY_INIT
 extern "C" bool _os_trace_lazy_init_completed_4swift(void);
 #endif
 
@@ -47,7 +45,7 @@ static inline bool shouldEnableTracing() {
 }
 
 static inline bool tracingReady() {
-#if SWIFT_BNI_OS_BUILD
+#if SWIFT_USE_OS_TRACE_LAZY_INIT
   if (!_os_trace_lazy_init_completed_4swift())
     return false;
 #endif
