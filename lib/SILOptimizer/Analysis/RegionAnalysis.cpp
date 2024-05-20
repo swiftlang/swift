@@ -3255,7 +3255,27 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
   // Otherwise, we need to compute our flags.
 
-  // First for addresses.
+  // Treat function ref and class method as either actor isolated or
+  // sendable. Formally they are non-Sendable, so we do the check before we
+  // check the oracle.
+  if (isa<FunctionRefInst, ClassMethodInst>(value)) {
+    if (auto isolation = SILIsolationInfo::get(value)) {
+      iter.first->getSecond().setIsolationRegionInfo(isolation);
+      return {iter.first->first, iter.first->second};
+    }
+
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Then check our oracle to see if the value is actually sendable. If we have
+  // a Sendable value, just return early.
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Ok, at this point we have a non-Sendable value. First process addresses.
   if (value->getType().isAddress()) {
     // If we were able to find this was actor isolated from finding our
     // underlying object, use that. It is never wrong.
@@ -3270,7 +3290,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       }
 
       if (isolation) {
-        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+        iter.first->getSecond().setIsolationRegionInfo(isolation);
       }
     }
 
@@ -3284,32 +3304,14 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       }
 
       if (auto isolation = SILIsolationInfo::get(storage.base)) {
-        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+        iter.first->getSecond().setIsolationRegionInfo(isolation);
       }
     }
   }
 
-  // Treat function ref and class method as either actor isolated or
-  // sendable. Formally they are non-Sendable, so we do the check before we
-  // check the oracle.
-  if (isa<FunctionRefInst, ClassMethodInst>(value)) {
-    if (auto isolation = SILIsolationInfo::get(value)) {
-      iter.first->getSecond().mergeIsolationRegionInfo(isolation);
-      return {iter.first->first, iter.first->second};
-    }
-
-    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-    return {iter.first->first, iter.first->second};
-  }
-
-  // Otherwise refer to the oracle. If we have a Sendable value, just return.
-  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
-    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-    return {iter.first->first, iter.first->second};
-  }
-
-  // Check if our base is a ref_element_addr from an actor. In such a case,
-  // mark this value as actor derived.
+  // Check if we have a load or load_borrow from an address. In that case, we
+  // want to look through the load and find a better root from the address we
+  // loaded from.
   if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
     auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
 
@@ -3320,7 +3322,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     // everywhere. Just haven't done it due to possible perturbations.
     auto parentAddrInfo = getUnderlyingTrackedValue(svi);
     if (parentAddrInfo.actorIsolation) {
-      iter.first->getSecond().mergeIsolationRegionInfo(
+      iter.first->getSecond().setIsolationRegionInfo(
           SILIsolationInfo::getActorInstanceIsolated(
               svi, parentAddrInfo.value,
               parentAddrInfo.actorIsolation->getActor()));
@@ -3329,16 +3331,20 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
     if (storage.storage) {
       if (auto isolation = SILIsolationInfo::get(storage.base)) {
-        iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+        iter.first->getSecond().setIsolationRegionInfo(isolation);
       }
     }
 
     return {iter.first->first, iter.first->second};
   }
 
-  // Ok, we have a non-Sendable type, attempt to infer its isolation.
-  if (auto isolation = SILIsolationInfo::get(iter.first->first.getValue())) {
-    iter.first->getSecond().mergeIsolationRegionInfo(isolation);
+  // Ok, we have a non-Sendable type, see if we do not have any isolation
+  // yet. If we don't, attempt to infer its isolation.
+  if (!iter.first->getSecond().hasIsolationRegionInfo()) {
+    if (auto isolation = SILIsolationInfo::get(iter.first->first.getValue())) {
+      iter.first->getSecond().setIsolationRegionInfo(isolation);
+      return {iter.first->first, iter.first->second};
+    }
   }
 
   return {iter.first->first, iter.first->second};

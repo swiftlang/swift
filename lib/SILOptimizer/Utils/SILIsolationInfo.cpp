@@ -629,6 +629,49 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
   }
 }
 
+void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
+  switch (Kind(*this)) {
+  case Unknown:
+    os << "unknown";
+    return;
+  case Disconnected:
+    os << "disconnected";
+    if (unsafeNonIsolated) {
+      os << ": nonisolated(unsafe)";
+    }
+    return;
+  case Actor:
+    if (auto instance = getActorInstance()) {
+      switch (instance.getKind()) {
+      case ActorInstance::Kind::Value: {
+        SILValue value = instance.getValue();
+        if (auto name = VariableNameInferrer::inferName(value)) {
+          os << "'" << *name << "'-isolated";
+          return;
+        }
+        break;
+      }
+      case ActorInstance::Kind::ActorAccessorInit:
+        os << "'self'-isolated";
+        return;
+      }
+    }
+
+    if (getActorIsolation().getKind() == ActorIsolation::ActorInstance) {
+      if (auto *vd = getActorIsolation().getActorInstance()) {
+        os << "'" << vd->getBaseIdentifier() << "'-isolated";
+        return;
+      }
+    }
+
+    getActorIsolation().printForDiagnostics(os);
+    return;
+  case Task:
+    os << "task-isolated";
+    return;
+  }
+}
+
 // Check if the passed in type is NonSendable.
 //
 // NOTE: We special case RawPointer and NativeObject to ensure they are
