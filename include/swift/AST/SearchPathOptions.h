@@ -504,6 +504,14 @@ public:
   /// version inheritance.
   std::optional<std::string> PlatformAvailabilityInheritanceMapPath;
 
+  /// Cross import module information. Map from module name to the list of cross
+  /// import overlay files that associate with that module.
+  using CrossImportMap = llvm::StringMap<std::vector<std::string>>;
+  CrossImportMap CrossImportInfo;
+
+  /// Whether to search for cross import overlay on file system.
+  bool DisableCrossImportOverlaySearch = false;
+
   /// Debug path mappings to apply to serialized search paths. These are
   /// specified in LLDB from the target.source-map entries.
   PathRemapper SearchPathRemapper;
