@@ -1590,6 +1590,18 @@ BridgedInstruction BridgedBuilder::createEndInitLetRef(BridgedValue op) const {
   return {unbridged().createEndInitLetRef(regularLoc(), op.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createRetainValue(BridgedValue op) const {
+  auto b = unbridged();
+  return {b.createRetainValue(regularLoc(), op.getSILValue(),
+                              b.getDefaultAtomicity())};
+}
+
+BridgedInstruction BridgedBuilder::createReleaseValue(BridgedValue op) const {
+  auto b = unbridged();
+  return {b.createReleaseValue(regularLoc(), op.getSILValue(),
+                               b.getDefaultAtomicity())};
+}
+
 BridgedInstruction BridgedBuilder::createStrongRetain(BridgedValue op) const {
   auto b = unbridged();
   return {b.createStrongRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};

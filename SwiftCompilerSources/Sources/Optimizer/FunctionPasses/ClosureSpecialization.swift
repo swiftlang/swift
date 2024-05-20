@@ -255,21 +255,23 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
       let closureArgDesc = callSite.closureArgDesc(at: parentClosureArgIndex)!
       var builder = Builder(before: closureArgDesc.closure, context)
 
+      // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization 
+      // passes.
       if callSite.applySite.parentBlock != closureArgDesc.closure.parentBlock {
         // Emit the retain and release that keeps the argument live across the callee using the closure.
-        builder.createCopyValue(operand: capturedArg)
+        builder.createRetainValue(operand: capturedArg)
 
         for instr in closureArgDesc.lifetimeFrontier {
           builder = Builder(before: instr, context)
-          builder.createDestroyValue(operand: capturedArg)
+          builder.createReleaseValue(operand: capturedArg)
         }
 
         // Emit the retain that matches the captured argument by the partial_apply in the callee that is consumed by
         // the partial_apply.
         builder = Builder(before: callSite.applySite, context)
-        builder.createCopyValue(operand: capturedArg)
+        builder.createRetainValue(operand: capturedArg)
       } else {
-        builder.createCopyValue(operand: capturedArg)
+        builder.createRetainValue(operand: capturedArg)
       }
     }
   }
@@ -286,12 +288,14 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
                                             isOnStack: oldApply.isOnStack)
 
   builder = Builder(before: callSite.applySite.next!, context)
+  // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization 
+  // passes.
   for closureArgDesc in callSite.closureArgDescriptors {
     if closureArgDesc.isClosureConsumed,
        !closureArgDesc.isPartialApplyOnStack,
        !closureArgDesc.parameterInfo.isTrivialNoescapeClosure
     {
-      builder.createDestroyValue(operand: closureArgDesc.closure)
+      builder.createReleaseValue(operand: closureArgDesc.closure)
     }
   }
 
@@ -825,7 +829,7 @@ private extension SpecializationCloner {
             {
               builder.destroyPartialApplyOnStack(paiOnStack: pai, self.context)  
             } else {
-              builder.createDestroyValue(operand: closure)
+              builder.createReleaseValue(operand: closure)
             }
           }
         }
@@ -992,11 +996,25 @@ private extension Builder {
   func destroyPartialApplyOnStack(paiOnStack: PartialApplyInst, _ context: FunctionPassContext){
     precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
 
-    for arg in paiOnStack.arguments {
-      self.createDestroyValue(operand: arg)
-    }
+    // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization 
+    // passes.
+    //
+    // for arg in paiOnStack.arguments {
+    //   self.createDestroyValue(operand: arg)
+    // }
 
-    self.createDestroyValue(operand: paiOnStack)
+    // self.createDestroyValue(operand: paiOnStack)
+
+    if paiOnStack.parentFunction.hasOwnership {
+      // Under OSSA, the closure acts as an owned value whose lifetime is a borrow scope for the captures, so we need to
+      // end the borrow scope before ending the lifetimes of the captures themselves.
+      self.createDestroyValue(operand: paiOnStack)
+      self.destroyCapturedArgs(for: paiOnStack)
+    } else {
+      self.destroyCapturedArgs(for: paiOnStack)
+      self.createDeallocStack(paiOnStack)
+      context.notifyInvalidatedStackNesting()
+    }
   }
 }
 
