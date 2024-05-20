@@ -890,28 +890,24 @@ bool SILFunction::hasName(const char *Name) const {
 
 bool SILFunction::canBeSerializedIntoCaller(
     std::optional<SerializedKind_t> callerSerializedKind) const {
-  // If Package-CMO is enabled, we serialize package, public,
-  // and @usableFromInline decls as [serialized_for_package].
-  // They must not, however, leak into @inlinable functions
-  // outside of their defining module. The following contains
-  // the rule of inlinability of a callee (e.g. serialized
-  // in a library module with Package-CMO) into a caller (e.g.
-  // an @inlinable function in a client module).
-
   switch (getSerializedKind()) {
-    // If this callee is not serialized, caller must also
-    // be _not_ serialized for this callee to be inlined
-    // into the caller.
+    // If this callee is not serialized, it can't be inlined
+    // into the caller unless Package-CMO is enabled; if so,
+    // the callee should have package or more visibility and
+    // the caller must also be _not_ serialized for this callee
+    // to be inlined.
     case IsNotSerialized:
-      return false;
-// pcmo TODO: should we return the following instead? 
-//      return callerSerializedKind.has_value() &&
-//             callerSerializedKind.value() == IsNotSerialized &&
-//             getModule().getSwiftModule()->serializePackageEnabled() &&
-//             getModule().getSwiftModule()->isResilient() &&
-//             hasPublicOrPackageVisibility(getLinkage(), true);
-    // If this callee is serialized_for_package, the caller
-    // must be either not serialized or serialized_for_package
+      return callerSerializedKind.has_value() &&
+             callerSerializedKind.value() == IsNotSerialized &&
+             getModule().getSwiftModule()->serializePackageEnabled() &&
+             getModule().getSwiftModule()->isResilient() &&
+             hasPublicOrPackageVisibility(getLinkage(), true);
+    // If Package-CMO is enabled, we serialize package, public,
+    // and @usableFromInline decls as [serialized_for_package].
+    // They must not, however, leak into @inlinable functions
+    // outside of their defining module that are [serialized].
+    // If this callee is [serialized_for_package], the caller
+    // must be either non-serialized or [serialized_for_package]
     // for this callee to be inlined into the caller.
     case IsSerializedForPackage:
       return callerSerializedKind.has_value() &&
