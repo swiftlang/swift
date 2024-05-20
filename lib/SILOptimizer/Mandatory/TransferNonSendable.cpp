@@ -558,6 +558,35 @@ public:
     emitRequireInstDiagnostics();
   }
 
+  void
+  emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
+                                  SILIsolationInfo namedValuesIsolationInfo,
+                                  ApplyIsolationCrossing isolationCrossing,
+                                  DeclName calleeDeclName,
+                                  DescriptiveDeclKind calleeDeclKind) {
+    // Emit the short error.
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+
+    // Then emit the note with greater context.
+    SmallString<64> descriptiveKindStr;
+    {
+      if (!namedValuesIsolationInfo.isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        namedValuesIsolationInfo.printForDiagnostics(os);
+        os << ' ';
+      }
+    }
+
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_info_transfer_yields_race_callee,
+        name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+        calleeDeclKind, calleeDeclName, isolationCrossing.getCallerIsolation());
+    emitRequireInstDiagnostics();
+  }
+
   void emitTypedIsolationCrossing(SILLocation loc, Type inferredType,
                                   ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(
@@ -872,6 +901,38 @@ struct UseAfterTransferDiagnosticInferrer::AutoClosureWalker : ASTWalker {
             if (declRef->getDecl() == targetDecl) {
               // Found our target!
               visitedCallExprDeclRefExprs.insert(declRef);
+
+              // See if we can find a valueDecl/name for our callee so we can
+              // emit a nicer error.
+              ConcreteDeclRef concreteDecl =
+                  callExpr->getDirectCallee()->getReferencedDecl();
+
+              // If we do not find a direct one, see if we are calling a method
+              // on a nominal type.
+              if (!concreteDecl) {
+                if (auto *dot = dyn_cast<DotSyntaxCallExpr>(
+                        callExpr->getDirectCallee())) {
+                  concreteDecl = dot->getSemanticFn()->getReferencedDecl();
+                }
+              }
+
+              if (concreteDecl) {
+                auto *valueDecl = concreteDecl.getDecl();
+                assert(valueDecl &&
+                       "Should be non-null if concreteDecl is valid");
+                if (valueDecl->hasName()) {
+                  foundTypeInfo.diagnosticEmitter
+                      .emitNamedIsolationCrossingError(
+                          foundTypeInfo.baseLoc,
+                          targetDecl->getBaseIdentifier(),
+                          targetDeclIsolationInfo, *isolationCrossing,
+                          valueDecl->getName(),
+                          valueDecl->getDescriptiveKind());
+                  return Action::Continue(expr);
+                }
+              }
+
+              // Otherwise default back to the "callee" error.
               foundTypeInfo.diagnosticEmitter.emitNamedIsolationCrossingError(
                   foundTypeInfo.baseLoc, targetDecl->getBaseIdentifier(),
                   targetDeclIsolationInfo, *isolationCrossing);
