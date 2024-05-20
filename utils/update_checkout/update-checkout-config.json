@@ -125,7 +125,7 @@
                 "swiftpm": "main",
                 "swift-argument-parser": "1.2.3",
                 "swift-atomics": "1.2.0",
-                "swift-collections": "1.0.5",
+                "swift-collections": "1.1.0",
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
