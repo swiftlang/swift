@@ -2645,7 +2645,7 @@ WARNING(add_predates_concurrency_import,none,
 WARNING(remove_predates_concurrency_import,none,
      "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
 NOTE(add_preconcurrency_to_conformance,none,
-     "add '@preconcurrency' to the %0 conformance to suppress isolation-related diagnostics", (DeclName))
+     "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (const ModuleDecl *))
@@ -5578,12 +5578,12 @@ ERROR(shared_immutable_state_decl,none,
       "shared mutable state",
       (Type, const ValueDecl *))
 NOTE(shared_state_make_immutable,none,
-     "convert %0 to a 'let' constant to make the shared state immutable",
+     "convert %0 to a 'let' constant to make 'Sendable' shared state immutable",
      (const ValueDecl *))
 NOTE(shared_state_main_actor_node,none,
-     "restrict %0 to the main actor if it will only be accessed from the main thread", (const ValueDecl *))
+     "annotate %0 with '@MainActor' if property should only be accessed from the main actor", (const ValueDecl *))
 NOTE(shared_state_nonisolated_unsafe,none,
-     "unsafely mark %0 as concurrency-safe if all accesses are protected by an external synchronization mechanism", (const ValueDecl *))
+     "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
      "requirement",

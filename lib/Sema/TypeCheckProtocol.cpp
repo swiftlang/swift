@@ -5141,9 +5141,8 @@ void ConformanceChecker::resolveValueWitnesses() {
 
     SourceLoc preconcurrencyLoc = Conformance->getPreconcurrencyLoc();
     if (preconcurrencyLoc.isValid()) {
-      SourceLoc endLoc =
-          preconcurrencyLoc.getAdvancedLoc(strlen("@preconcurrency "));
-      diag.fixItRemoveChars(preconcurrencyLoc, endLoc);
+      SourceLoc endLoc = preconcurrencyLoc.getAdvancedLoc(1);
+      diag.fixItRemove(SourceRange(preconcurrencyLoc, endLoc));
     }
   }
 

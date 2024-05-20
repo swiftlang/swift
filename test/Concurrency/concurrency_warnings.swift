@@ -13,8 +13,8 @@ class GlobalCounter { // expected-note{{class 'GlobalCounter' does not conform t
 }
 
 let rs = GlobalCounter() // expected-warning {{let 'rs' is not concurrency-safe because non-'Sendable' type 'GlobalCounter' may have shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{restrict 'rs' to the main actor if it will only be accessed from the main thread}}
-// expected-note@-2 {{unsafely mark 'rs' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
+// expected-note@-1 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+// expected-note@-2 {{annotate 'rs' with '@MainActor' if property should only be accessed from the main actor}}
 
 import GlobalVariables
 

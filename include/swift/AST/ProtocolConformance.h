@@ -573,6 +573,8 @@ public:
         Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
+    assert((preconcurrencyLoc.isInvalid() || isPreconcurrency) &&
+           "Cannot have a @preconcurrency location without isPreconcurrency");
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
     Bits.NormalProtocolConformance.IsUnchecked = isUnchecked;
