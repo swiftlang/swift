@@ -362,7 +362,9 @@ bool DiagnosticVerifier::checkForFixIt(
       if (ActualFixIt.getText() != Expected.Text)
         continue;
 
-      auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+      auto bufferID =
+        SM.findBufferContainingLoc(ActualFixIt.getSourceRange().getStart());
+      auto &ActualRange = ActualFixIt.getLineColumnRange(SM, bufferID);
 
       if (Expected.Range.StartCol != ActualRange.StartCol ||
           Expected.Range.EndCol != ActualRange.EndCol ||
@@ -393,7 +395,9 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
   interleave(
       ActualFixIts,
       [&](const CapturedFixItInfo &ActualFixIt) {
-        auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+        auto bufferID =
+            SM.findBufferContainingLoc(ActualFixIt.getSourceRange().getStart());
+        auto &ActualRange = ActualFixIt.getLineColumnRange(SM, bufferID);
         OS << "{{";
 
         if (ActualRange.StartLine != DiagnosticLineNo)
