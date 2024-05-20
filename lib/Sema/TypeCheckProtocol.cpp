@@ -5120,9 +5120,16 @@ void ConformanceChecker::resolveValueWitnesses() {
   }
 
   if (Conformance->isPreconcurrency() && !usesPreconcurrencyConformance) {
-    DC->getASTContext().Diags.diagnose(
+    auto diag = DC->getASTContext().Diags.diagnose(
         Conformance->getLoc(), diag::preconcurrency_conformance_not_used,
         Proto->getDeclaredInterfaceType());
+
+    SourceLoc preconcurrencyLoc = Conformance->getPreconcurrencyLoc();
+    if (preconcurrencyLoc.isValid()) {
+      SourceLoc endLoc =
+          preconcurrencyLoc.getAdvancedLoc(strlen("@preconcurrency "));
+      diag.fixItRemoveChars(preconcurrencyLoc, endLoc);
+    }
   }
 
   // Finally, check some ad-hoc protocol requirements.
