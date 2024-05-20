@@ -67,6 +67,22 @@ void testBridgeableValue(id thunks) {
   [thunks acceptBridgeableValueArray: toSwiftArr];
 }
 
+static id filter(id<NSFastEnumeration, NSObject> container, BOOL (^predicate)(id)) {
+  id result = [[[container class] new] mutableCopy];
+  for (id object in container) {
+    if (predicate(object)) {
+      [result addObject:object];
+    }
+  }
+  return result;
+}
+
+id testHKTFilter(id array) {
+  return filter(array, ^(id obj) {
+    return [obj isEqual:@"hello"];
+  });
+}
+
 @implementation RDar27905230
 
 + (NSDictionary<NSString *, NSArray<id> *> *)mutableDictionaryOfMutableLists  {
