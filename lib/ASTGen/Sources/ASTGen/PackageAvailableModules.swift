@@ -67,13 +67,13 @@ fileprivate struct AddTargetDependencyMessage: DiagnosticMessage, FixItMessage {
   var message: String {
     switch dependency {
     case .target(name: let name):
-      "add dependency on target '\(name)' to the package manifest"
+      return "add dependency on target '\(name)' to the package manifest"
 
     case .product(name: let name, package: nil):
-      "add dependency on product '\(name)' from the current package package manifest"
+      return "add dependency on product '\(name)' from the current package package manifest"
 
     case .product(name: let name, package: let package?):
-      "add dependency on product '\(name)' from the package '\(package)' to the package manifest"
+      return "add dependency on product '\(name)' from the package '\(package)' to the package manifest"
     }
   }
 
