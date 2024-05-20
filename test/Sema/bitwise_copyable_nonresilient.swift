@@ -38,9 +38,7 @@ func passOopsional<T>(_ t: Oopsional<T>) { take(t) } // expected-error{{type_doe
 
 
 struct S_Explicit_With_Woopsional<T> : BitwiseCopyable {
-  var o: Woopsional<T> // expected-error{{non_bitwise_copyable_type_member}}
+  var o: Woopsional<T>
 }
 
-func passWoopsional<T>(_ t: Woopsional<T>) { take(t) } // expected-error{{type_does_not_conform_decl_owner}}
-                                                       // expected-note@-15{{where_requirement_failure_one_subst}}
-
+func passWoopsional<T>(_ t: Woopsional<T>) { take(t) }
