@@ -114,12 +114,6 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
         !Mod.isSerialized() &&
         hasSharedVisibility(linkage) &&
         !F->isSerialized()) {
-      llvm::dbgs() << "\nSIL FUNC: " << F->getName();
-      llvm::dbgs() << "\n";
-      if (F->getName() == "$s3Lib8PubKlassCAA0B5ProtoA2aDP4dataSivgTW")
-        F->dump();
-      llvm::dbgs() << "\n";
-
       F->setSerializedKind(IsSerialized);
 
       // Push the function to the worklist so that all referenced shared functions

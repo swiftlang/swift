@@ -29,7 +29,7 @@
 
 namespace swift {
 
-enum SerializedKind_t : unsigned char;
+enum SerializedKind_t : uint8_t;
 class SILFunction;
 class SILModule;
 
