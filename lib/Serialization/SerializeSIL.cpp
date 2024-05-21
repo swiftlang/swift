@@ -2870,7 +2870,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
-                                 g.getSerializedKind(),
+                                 (unsigned)g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  TyID, dID);
@@ -2916,13 +2916,14 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
                            S.addDeclRef(vt.getClass()),
-                           vt.getSerializedKind());
+                           (unsigned)vt.getSerializedKind());
 
   for (auto &entry : vt.getEntries()) {
     SmallVector<uint64_t, 4> ListOfValues;
     SILFunction *impl = entry.getImplementation();
 
-    if (ShouldSerializeAll || impl->hasValidLinkageForFragileRef(vt.getSerializedKind())) {
+    if (ShouldSerializeAll ||
+        impl->hasValidLinkageForFragileRef(vt.getSerializedKind())) {
       handleSILDeclRef(S, entry.getMethod(), ListOfValues);
       addReferencedSILFunction(impl, true);
       // Each entry is a pair of SILDeclRef and SILFunction.
@@ -2998,7 +2999,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
-    wt.getSerializedKind(),
+    unsigned(wt.getSerializedKind()),
     conformanceID);
 
   // If we have a declaration, do not attempt to serialize entries.

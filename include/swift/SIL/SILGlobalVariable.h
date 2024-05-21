@@ -150,6 +150,8 @@ public:
   /// Check if this global variable is [serialized]. This does not check
   /// if it's [serialized_for_package].
   bool isSerialized() const;
+  /// Check if this global variable is [serialized_for_package].
+  bool isSerializedForPackage() const;
   /// Checks whether this global var is neither [serialized] nor
   /// [serialized_for_package].
   bool isNotSerialized() const;

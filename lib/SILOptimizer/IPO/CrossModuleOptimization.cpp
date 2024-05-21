@@ -191,7 +191,11 @@ static bool isSerializedWithRightKind(const SILModule &mod,
   return mod.getSwiftModule()->serializePackageEnabled() ?
          f->isSerializedForPackage() : f->isSerialized();
 }
-
+static bool isSerializedWithRightKind(const SILModule &mod,
+                                      SILGlobalVariable *g) {
+  return mod.getSwiftModule()->serializePackageEnabled() ?
+         g->isSerializedForPackage() : g->isSerialized();
+}
 static SerializedKind_t getRightSerializedKind(const SILModule &mod) {
   return mod.getSwiftModule()->serializePackageEnabled() ?
          IsSerializedForPackage : IsSerialized;
@@ -224,7 +228,7 @@ static bool isReferenceSerializeCandidate(SILFunction *F, SILOptions options) {
 static bool isReferenceSerializeCandidate(SILGlobalVariable *G,
                                           SILOptions options) {
   if (options.EnableSerializePackage) {
-    if (G->isSerialized())
+    if (isSerializedWithRightKind(G->getModule(), G))
       return true;
     return hasPublicOrPackageVisibility(G->getLinkage(),
                                         /*includePackage*/ true);
@@ -295,8 +299,8 @@ bool CrossModuleOptimization::canSerializeFunction(
   canSerializeFlags[function] = false;
 
   if (everything) {
-   canSerializeFlags[function] = true;
-   return true;
+    canSerializeFlags[function] = true;
+    return true;
   }
 
   if (DeclContext *funcCtxt = function->getDeclContext()) {
@@ -678,6 +682,8 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
 }
 
 void CrossModuleOptimization::serializeGlobal(SILGlobalVariable *global) {
+  if (isSerializedWithRightKind(M, global))
+    return;
   for (const SILInstruction &initInst : *global) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(&initInst)) {
       SILFunction *callee = FRI->getReferencedFunction();

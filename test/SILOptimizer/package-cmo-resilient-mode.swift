@@ -176,8 +176,9 @@ public func mainPub() {
 
 //--- Lib.swift
 
+// FIXME: serialize closure pointers?
 // static PkgStruct.pkgStaticSimpleFuncPtr
-// CHECK-COMMON-DAG: sil_global package @$s3Lib9PkgStructV22pkgStaticSimpleFuncPtryS2icvpZ
+// CHECK-COMMON-DAG: sil_global package [serialized_for_package] @$s3Lib9PkgStructV22pkgStaticSimpleFuncPtryS2icvpZ
 
 // static FrPubStruct.pubStaticClosurePtr
 // CHECK-COMMON-DAG: sil_global @$s3Lib11FrPubStructV19pubStaticClosurePtrySiAA0cD0VcvpZ
@@ -189,25 +190,25 @@ public func mainPub() {
 // CHECK-COMMON-DAG: sil_global package @$s3Lib9PkgStructV25pkgStaticSimpleClosurePtryS2icvpZ
 
 // static PkgStruct.pkgStaticFuncPtr
-// CHECK-COMMON-DAG: sil_global package @$s3Lib9PkgStructV16pkgStaticFuncPtrySiACcvpZ
+// CHECK-COMMON-DAG: sil_global package [serialized_for_package] @$s3Lib9PkgStructV16pkgStaticFuncPtrySiACcvpZ
 
 // static PubStruct.pubStaticClosurePtr
 // CHECK-COMMON-DAG: sil_global @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvpZ
 
 // static FrPubStruct.pubStaticSimpleFuncPtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib11FrPubStructV22pubStaticSimpleFuncPtryS2icvpZ
+// CHECK-COMMON-DAG: sil_global [serialized_for_package] @$s3Lib11FrPubStructV22pubStaticSimpleFuncPtryS2icvpZ
 
 // static FrPubStruct.pubStaticFuncPtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib11FrPubStructV16pubStaticFuncPtrySiAA0cD0VcvpZ
+// CHECK-COMMON-DAG: sil_global [serialized_for_package] @$s3Lib11FrPubStructV16pubStaticFuncPtrySiAA0cD0VcvpZ
 
 // static PubStruct.pubStaticSimpleClosurePtr
 // CHECK-COMMON-DAG: sil_global @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvpZ
 
 // static PubStruct.pubStaticSimpleFuncPtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib9PubStructV22pubStaticSimpleFuncPtryS2icvpZ
+// CHECK-COMMON-DAG: sil_global [serialized_for_package] @$s3Lib9PubStructV22pubStaticSimpleFuncPtryS2icvpZ
 
 // static PubStruct.pubStaticFuncPtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ
+// CHECK-COMMON-DAG: sil_global [serialized_for_package] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ
 
 // static FrPubStruct.pubStaticSimpleClosurePtr
 // CHECK-COMMON-DAG: sil_global @$s3Lib11FrPubStructV25pubStaticSimpleClosurePtryS2icvpZ
@@ -517,7 +518,9 @@ final package class FinalPkgKlass {
   }
 }
 
-// CHECK-COMMON-LABEL: sil_vtable [serialized_for_package] PubKlass {
+// CHECK-RES-LABEL: sil_vtable [serialized_for_package] PubKlass {
+// FIXME: should be [serialized_for_package] in non-resilient mode as well?
+// CHECK-NONRES-LABEL: sil_vtable [serialized] PubKlass {
 // CHECK-COMMON-NEXT:   #PubKlass.data!getter: (PubKlass) -> () -> Int : @$s3Lib8PubKlassC4dataSivg
 // CHECK-COMMON-NEXT:   #PubKlass.data!setter: (PubKlass) -> (Int) -> () : @$s3Lib8PubKlassC4dataSivs
 // CHECK-COMMON-NEXT:   #PubKlass.data!modify: (PubKlass) -> () -> () : @$s3Lib8PubKlassC4dataSivM
@@ -525,7 +528,9 @@ final package class FinalPkgKlass {
 // CHECK-COMMON-NEXT:   #PubKlass.pubfunc: (PubKlass) -> (Int) -> Int : @$s3Lib8PubKlassC7pubfuncyS2iF
 // CHECK-COMMON-NEXT:   #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD
 
-// CHECK-COMMON-LABEL: sil_vtable [serialized_for_package] FinalPubKlass {
+// CHECK-RES-LABEL: sil_vtable [serialized_for_package] FinalPubKlass {
+// FIXME: should be [serialized_for_package] in non-resilient mode as well?
+// CHECK-NONRES-LABEL: sil_vtable [serialized] FinalPubKlass {
 // CHECK-COMMON-NEXT:  #FinalPubKlass.init!allocator: (FinalPubKlass.Type) -> (Int) -> FinalPubKlass : @$s3Lib13FinalPubKlassCyACSicfC
 // CHECK-COMMON-NEXT:  #FinalPubKlass.deinit!deallocator: @$s3Lib13FinalPubKlassCfD
 

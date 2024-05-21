@@ -256,8 +256,7 @@ public:
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass) {
-    isResilient = theClass->isResilient() &&
-                  !theClass->getModuleContext()->allowNonResilientAccess();
+    isResilient = theClass->isResilient();
   }
 
   void emitVTable() {

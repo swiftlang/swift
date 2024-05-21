@@ -3637,8 +3637,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   TypeID TyID;
   DeclID dID;
-  unsigned rawLinkage, isSerialized, IsDeclaration, IsLet;
-  SILGlobalVarLayout::readRecord(scratch, rawLinkage, isSerialized,
+  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet;
+  SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
                                  IsDeclaration, IsLet, TyID, dID);
   if (TyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
@@ -3654,7 +3654,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-      SILMod, linkage.value(), isSerialized ? IsSerialized : IsNotSerialized,
+      SILMod, linkage.value(), SerializedKind_t(serializedKind),
       Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
       std::nullopt, dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
   v->setLet(IsLet);
@@ -3931,7 +3931,7 @@ SILMoveOnlyDeinit *SILDeserializer::readMoveOnlyDeinit(DeclID tableID) {
     rawSerialized = 0;
 
   auto *deinit = SILMoveOnlyDeinit::create(
-      SILMod, theNomDecl, rawSerialized ? IsSerialized : IsNotSerialized,
+      SILMod, theNomDecl, SerializedKind_t(rawSerialized),
       theFunc);
   moveOnlyDeinitOrOffset.set(deinit, true /*isFullyDeserialized*/);
 

@@ -68,6 +68,9 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
 bool SILGlobalVariable::isSerialized() const {
   return SerializedKind_t(Serialized) == IsSerialized;
 }
+bool SILGlobalVariable::isSerializedForPackage() const {
+  return SerializedKind_t(Serialized) == IsSerializedForPackage;
+}
 bool SILGlobalVariable::isNotSerialized() const {
   return SerializedKind_t(Serialized) == IsNotSerialized;
 }
