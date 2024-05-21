@@ -339,7 +339,7 @@ static IsCurrentExecutorCheckMode isCurrentExecutorMode =
 // these symbols defined
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  swift::runtime::bincompat::
+  return swift::runtime::bincompat::
       swift_bincompat_useLegacyNonCrashingExecutorChecks();
 #endif
   return false;
