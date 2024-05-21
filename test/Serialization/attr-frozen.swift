@@ -6,7 +6,7 @@
 
 // These two should be checking for the same thing.
 // CHECK-RESILIENT: Frozen_DECL_ATTR
-// CHECK-NON-RESILIENT-NOT: Frozen_DECL_ATTR
+// CHECK-NON-RESILIENT: Frozen_DECL_ATTR
 
 @frozen // expected-no-warning
 public enum SomeEnum {
