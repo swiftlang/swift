@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 // BEGIN MyModule.swift
 

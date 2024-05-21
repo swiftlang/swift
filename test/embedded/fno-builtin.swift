@@ -3,7 +3,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 public func foo() -> [Int] {
 	var a = [1, 2, 3]

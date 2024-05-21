@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -o /dev/null
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || OS=windows-msvc
 
 // Check that this doesn't crash the compiler in embedded mode.
 

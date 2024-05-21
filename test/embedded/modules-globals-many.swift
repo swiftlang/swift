@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 // Dependencies look like this:
 //

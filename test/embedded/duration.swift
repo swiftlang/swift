@@ -3,7 +3,7 @@
 // RUN: %target-swift-emit-ir -Osize %s -enable-experimental-feature Embedded -wmo
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 @available(SwiftStdlib 5.7, *)
 extension Duration {

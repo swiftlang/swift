@@ -5,7 +5,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 @_extern(c, "putchar")
 @discardableResult

@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-ir %s -enable-experimental-feature Embedded -Xllvm -link-embedded-runtime=0
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || OS=windows-msvc
 
 public struct UInt23 {
 }

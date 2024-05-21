@@ -5,7 +5,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || OS=windows-msvc
 
 @_semantics("optimize.sil.specialize.generic.never")
 func foo<T>(_ t: T) -> Int {
