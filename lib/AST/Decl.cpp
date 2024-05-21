@@ -6355,7 +6355,14 @@ bool ClassDecl::walkSuperclasses(
 }
 
 bool ClassDecl::isForeignReferenceType() const {
-  return getClangDecl() && isa<clang::RecordDecl>(getClangDecl());
+  auto clangRecordDecl = dyn_cast_or_null<clang::RecordDecl>(getClangDecl());
+  if (!clangRecordDecl)
+    return false;
+
+  CxxRecordSemanticsKind kind = evaluateOrDefault(
+      getASTContext().evaluator,
+      CxxRecordSemantics({clangRecordDecl, getASTContext()}), {});
+  return kind == CxxRecordSemanticsKind::Reference;
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {
