@@ -1853,26 +1853,15 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // parsing.
   const Decl *ConcDecl = concreteSyntaxDeclForAvailableAttribute(D);
 
-  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
-  SourceLoc InsertLoc;
-
   // To avoid exposing the pattern binding declaration to the user, get the
-  // descriptive kind from one of the VarDecls. We get the Fix-It location
-  // from the PatternBindingDecl unless the VarDecl has attributes,
-  // in which case we get the start location of the VarDecl attributes.
-  DeclAttributes AttrsForLoc;
+  // descriptive kind from one of the VarDecls.
+  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
   if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
     KindForDiagnostic = D->getDescriptiveKind();
-    AttrsForLoc = D->getAttrs();
-  } else {
-    InsertLoc = ConcDecl->getAttrs().getStartLoc(/*forModifiers=*/false);
   }
 
-  InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
-  if (InsertLoc.isInvalid()) {
-    InsertLoc = ConcDecl->getStartLoc();
-  }
-
+  SourceLoc InsertLoc =
+      ConcDecl->getAttributeInsertionLoc(/*forModifier=*/false);
   if (InsertLoc.isInvalid())
     return;
 
@@ -4506,10 +4495,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
     auto suggestPlatform = ctx.LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
-      auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
-      if (InsertLoc.isInvalid())
-        InsertLoc = decl->getStartLoc();
-
+      auto InsertLoc = decl->getAttributeInsertionLoc(/*forModifiers=*/false);
       if (InsertLoc.isInvalid())
         return;
 

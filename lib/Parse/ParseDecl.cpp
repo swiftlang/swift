@@ -7165,6 +7165,20 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     status |= whereStatus;
   }
 
+  // @implementation requires an explicit @objc attribute, but
+  // @_objcImplementation didn't. Insert one if necessary.
+  auto implAttr = Attributes.getAttribute<ObjCImplementationAttr>();
+  if (implAttr && implAttr->isEarlyAdopter()
+        && !Attributes.hasAttribute<ObjCAttr>()) {
+    ObjCAttr *objcAttr;
+    if (implAttr->CategoryName.empty())
+      objcAttr = ObjCAttr::createUnnamedImplicit(Context);
+    else
+      objcAttr = ObjCAttr::createNullary(Context, implAttr->CategoryName,
+                                         /*isNameImplicit=*/false);
+    Attributes.add(objcAttr);
+  }
+
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
                                              extendedType.getPtrOrNull(),
                                              Context.AllocateCopy(Inherited),

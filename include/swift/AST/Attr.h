@@ -2422,6 +2422,9 @@ public:
 
 class ObjCImplementationAttr final : public DeclAttribute {
 public:
+  /// Name of the category being implemented. This should only be used with
+  /// the early adopter \@\_objcImplementation syntax, but we support it there
+  /// for backwards compatibility.
   Identifier CategoryName;
 
   ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,

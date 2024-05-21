@@ -1249,6 +1249,11 @@ static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
   return ext->getSelfClassDecl() && ext->getAttrs().hasAttribute<ObjCAttr>();
 }
 
+static bool isMemberOfObjCImplementationExtension(const ValueDecl *VD) {
+  return isMemberOfObjCClassExtension(VD) &&
+      cast<ExtensionDecl>(VD->getDeclContext())->isObjCImplementation();
+}
+
 /// Whether this declaration is a member of a class with the `@objcMembers`
 /// attribute.
 static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
@@ -1471,14 +1476,6 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
-  // A member implementation of an @objcImplementation extension is @objc.
-  if (VD->isObjCMemberImplementation()) {
-    auto ext = VD->getDeclContext()->getAsDecl();
-    auto attr = ext->getAttrs()
-                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-    return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
-  }
-
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1487,10 +1484,23 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
         .hasAttribute<NonObjCAttr>()))
     return std::nullopt;
 
-  if (isMemberOfObjCClassExtension(VD) && 
+  if (isMemberOfObjCImplementationExtension(VD)) {
+    // A `final` member of an @objc @implementation extension is not @objc.
+    if (VD->isFinal())
+      return std::nullopt;
+    // Other members get a special reason.
+    if (canInferImplicitObjC(/*allowAnyAccess*/true)) {
+      auto ext = VD->getDeclContext()->getAsDecl();
+      auto attr = ext->getAttrs()
+                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+      return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+    }
+  }
+  else if (isMemberOfObjCClassExtension(VD) &&
       canInferImplicitObjC(/*allowAnyAccess*/true))
     return ObjCReason(ObjCReason::MemberOfObjCExtension);
-  if (isMemberOfObjCMembersClass(VD) && 
+
+  if (isMemberOfObjCMembersClass(VD) &&
       canInferImplicitObjC(/*allowAnyAccess*/false))
     return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
 
@@ -2128,7 +2138,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 }
 
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
-                                   const ValueDecl *decl,
+                                   const Decl *decl,
                                    std::optional<ObjCSelector> nameOpt,
                                    std::optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {
@@ -2208,7 +2218,7 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
 namespace {
   /// Produce a deterministic ordering of the given declarations.
   struct OrderDeclarations {
-    bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
+    bool operator()(Decl *lhs, Decl *rhs) const {
       // If the declarations come from different modules, order based on the
       // module.
       ModuleDecl *lhsModule = lhs->getDeclContext()->getParentModule();
@@ -2233,9 +2243,77 @@ namespace {
       }
 
       // The declarations are in different source files (or unknown source
-      // files) of the same module. Order based on name.
+      // files) of the same module. Let's just try to find *something* to
+      // differentiate them.
+      auto leftName = getName(lhs);
+      auto rightName = getName(rhs);
+      if (leftName != rightName) {
+        // Order based on name, sorting named decls before unnamed decls.
+        // (std::optional's < sorts nullopt before other values, which is the
+        // opposite of what we want here.)
+        if (!leftName.has_value() || !rightName.has_value())
+          return leftName > rightName;
+        return leftName.value() < rightName.value();
+      }
+
+      auto leftTy = getExtendedType(lhs);
+      auto rightTy = getExtendedType(rhs);
+      if (leftTy || rightTy) {
+        // Order based on extended type, sorting extension decls before other
+        // decls.
+        if (!leftTy || !rightTy)
+          return leftTy;
+
+        auto normal = (*this)(leftTy, rightTy);
+        auto opposite = (*this)(rightTy, leftTy);
+        if (normal != opposite)
+          return normal;
+      }
+
+      // Try to differentiate by parents.
+      DeclContext *leftContext = lhs->getDeclContext();
+      DeclContext *rightContext = rhs->getDeclContext();
+      while (leftContext || rightContext) {
+        if (!rightContext)
+          return true;
+        if (!leftContext)
+          return false;
+
+        auto leftDecl = leftContext->getAsDecl();
+        auto rightDecl = rightContext->getAsDecl();
+        if (!rightDecl)
+          return true;
+        if (!leftDecl)
+          return false;
+
+        auto normal = (*this)(leftDecl, rightDecl);
+        auto opposite = (*this)(rightDecl, leftDecl);
+        if (normal != opposite)
+          return normal;
+      }
+
+      // Final tiebreaker: Kind
       // FIXME: This isn't a total ordering.
-      return lhs->getName() < rhs->getName();
+      return lhs->getKind() < rhs->getKind();
+    }
+
+  private:
+    std::optional<DeclName> getName(Decl *D) const {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        return VD->getName();
+      if (auto OD = dyn_cast<OperatorDecl>(D))
+        return OD->getName();
+      if (auto PD = dyn_cast<PrecedenceGroupDecl>(D))
+        return PD->getName();
+      if (auto MD = dyn_cast<MissingMemberDecl>(D))
+        return MD->getName();
+      return std::nullopt;
+    }
+
+    NominalTypeDecl *getExtendedType(Decl *D) const {
+      if (auto ED = dyn_cast<ExtensionDecl>(D))
+        return ED->getExtendedNominal();
+      return nullptr;
     }
   };
 } // end anonymous namespace
@@ -2382,8 +2460,8 @@ static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
   return nullptr;
 }
 
-static bool hasCustomObjCName(AbstractFunctionDecl *afd) {
-  if (auto objc = afd->getAttrs().getAttribute<ObjCAttr>())
+static bool hasCustomObjCName(Decl *D) {
+  if (auto objc = D->getAttrs().getAttribute<ObjCAttr>())
     return objc->hasName();
   return false;
 }
@@ -2574,6 +2652,153 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
       else
         Ctx.Diags.diagnose(originalDecl, diag::objc_declared_here,
                            origDiagInfo.first, origDiagInfo.second);
+    }
+  }
+
+  return anyConflicts;
+}
+
+/// Figure out how to resolve a specific Objective-C category name conflict.
+/// The list will be sorted so that the first extension is the "best" one
+/// and the others can be diagnosed as conflicts with that one.
+/// Extensions which aren't really conflicting will be removed.
+static void resolveObjCCategoryConflict(
+      llvm::SmallVectorImpl<ExtensionDecl *> &exts) {
+  assert(exts.size() > 1);
+
+  // Sort the conflicting categories from the "strongest" claim to the "weakest".
+  // This puts the "best" categories at exts.front() so that others will be
+  // diagnosed as conflicts with that one, and it helps ensure that individual
+  // categories in a conflict set are diagnosed in a deterministic order.
+  llvm::stable_sort(exts, [](ExtensionDecl *a, ExtensionDecl *b) {
+    #define RULE(aCriterion, bCriterion) do { \
+      bool _aCriterion = (aCriterion), _bCriterion = (bCriterion); \
+      if (!_aCriterion && _bCriterion) \
+        return false; \
+      if (_aCriterion && !_bCriterion) \
+        return true; \
+    } while (0)
+
+    // Is one of these from Objective-C and the other from Swift?
+    // NOTE: Inserting another rule above this will break the hasClangNode()
+    // filtering below.
+    RULE(a->hasClangNode(),
+         b->hasClangNode());
+
+    // Does one of these use plain @objc and the other @objc(selector)?
+    RULE(!hasCustomObjCName(a),
+         !hasCustomObjCName(b));
+
+    // Neither has a "stronger" claim, so just try to put them in some sort of
+    // consistent order.
+    OrderDeclarations ordering;
+    return ordering(a, b);
+
+    #undef RULE
+  });
+
+  // If the best extension is imported from clang, remove some false conflicts.
+  ExtensionDecl *best = exts.front();
+  if (!best->hasClangNode())
+    return;
+
+  llvm::erase_if(exts, [&](ExtensionDecl *ext) {
+    // If there are other extensions imported from ObjC, remove them; conflicts
+    // purely involving ObjC headers are clang's to complain about.
+    if (ext != best && ext->hasClangNode())
+      return true;
+
+    // If the best extension has an implementation that's also in the list,
+    // remove the implementation; it's not a conflict.
+    if (ext == best->getObjCImplementationDecl())
+      return true;
+
+    // If there's an @implementation attribute but something about the category
+    // name has already been diagnosed, don't diagnose a conflict.
+    auto implAttr = ext->getAttrs().getAttribute<ObjCImplementationAttr>(
+                                                         /*AllowInvalid=*/true);
+    if (implAttr && implAttr->isCategoryNameInvalid())
+      return true;
+
+    return false;
+  });
+}
+
+bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
+  // If there were no categories to check, we're done.
+  if (sf.ObjCCategories.empty())
+    return false;
+
+  // Assume one category with a given name (no conflicts)
+  using Categories = llvm::TinyPtrVector<ExtensionDecl *>;
+  // Assume many categories on a given type
+  using CategoriesByName = llvm::SmallDenseMap<Identifier, Categories, 8>;
+  // Assume a couple of types in a given source file
+  using CategoriesByNameAndClass =
+    llvm::SmallDenseMap<ClassDecl *, CategoriesByName, 2>;
+
+  auto &Ctx = sf.getASTContext();
+  DiagnosticStateRAII diagState(Ctx.Diags);
+
+  // Group together the categories we need to check.
+  CategoriesByNameAndClass categoriesByClass;
+  for (auto category : sf.ObjCCategories) {
+    auto classDecl = category->getSelfClassDecl();
+    auto catName = category->getObjCCategoryName();
+
+    categoriesByClass[classDecl][catName].push_back(category);
+  }
+
+  bool anyConflicts = false;
+
+  // Check each class's categories for conflicts.
+  for (const auto &classPair : categoriesByClass) {
+    ClassDecl *classDecl = classPair.first;
+    const CategoriesByName &categoriesByNameToCheck = classPair.second;
+
+    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>
+        categoryMap = classDecl->getObjCCategoryNameMap();
+
+    for (const auto &namePair : categoriesByNameToCheck) {
+      const auto &catName = namePair.first;
+      const auto &categoriesToCheck = namePair.second;
+      const llvm::TinyPtrVector<ExtensionDecl *> &allCategories = categoryMap[catName];
+
+      if (allCategories.size() < 2)
+        // Definitely no conflicts.
+        continue;
+
+      // Okay, figure out how to resolve this.
+      llvm::SmallVector<ExtensionDecl *, 4> resolvedCategories;
+      llvm::copy(allCategories, std::back_inserter(resolvedCategories));
+      resolveObjCCategoryConflict(resolvedCategories);
+
+      // Now figure out how to diagnose the categories that happen to be in this
+      // file.
+      for (auto catToCheck : categoriesToCheck) {
+        auto it = llvm::find(resolvedCategories, catToCheck);
+
+        // If this is the best category, or it's not in the list, nothing
+        // to diagnose.
+        if (it == resolvedCategories.begin() || it == resolvedCategories.end())
+          continue;
+
+        // Diagnose the conflict.
+        anyConflicts = true;
+
+        auto bestCat = resolvedCategories.front();
+        if (auto implCat = dyn_cast_or_null<ExtensionDecl>(
+                                       bestCat->getObjCImplementationDecl()))
+          if (implCat != catToCheck)
+            bestCat = implCat;
+
+        Ctx.Diags.diagnose(catToCheck, diag::objc_redecl_category_name,
+                           catToCheck->hasClangNode(),
+                           bestCat->hasClangNode(), catName)
+          .warnUntilSwiftVersion(6);
+
+        Ctx.Diags.diagnose(bestCat, diag::invalid_redecl_prev_name, catName);
+      }
     }
   }
 
@@ -3634,9 +3859,13 @@ public:
     if (!isa<ExtensionDecl>(decl))
       return;
 
-    diagnose(getAttr()->getLocation(),
-             diag::objc_implementation_early_spelling_deprecated)
-        .fixItReplace(getAttr()->getLocation(), "implementation");
+    auto diag = diagnose(getAttr()->getLocation(),
+                         diag::objc_implementation_early_spelling_deprecated);
+    diag.fixItReplace(getAttr()->getRangeWithAt(), "@implementation");
+
+    ObjCSelector correctSelector(decl->getASTContext(), 0,
+                                 {getAttr()->CategoryName});
+    fixDeclarationObjCName(diag, decl, ObjCSelector(), correctSelector);
   }
 };
 }

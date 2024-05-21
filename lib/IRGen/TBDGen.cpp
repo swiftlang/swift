@@ -829,6 +829,10 @@ private:
   void buildCategoryName(const ExtensionDecl *ext, const ClassDecl *cls,
                          SmallVectorImpl<char> &s) {
     llvm::raw_svector_ostream os(s);
+    if (!ext->getObjCCategoryName().empty()) {
+      os << ext->getObjCCategoryName();
+      return;
+    }
     ModuleDecl *module = ext->getParentModule();
     os << module->getName();
     unsigned categoryCount = CategoryCounts[{cls, module}]++;

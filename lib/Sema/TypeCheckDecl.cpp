@@ -960,11 +960,6 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return true;
   }
 
-  // @_objcImplementation extension member implementations are implicitly
-  // dynamic.
-  if (decl->isObjCMemberImplementation())
-    return true;
-
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     // Runtime-replaceable accessors are dynamic when their storage declaration
     // is dynamic and they were explicitly defined or they are implicitly defined

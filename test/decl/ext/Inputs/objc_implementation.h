@@ -191,6 +191,15 @@
 
 @end
 
+@interface ObjCBadClass : NSObject
+@end
+
+@interface ObjCBadClass (BadCategory1)
+@end
+
+@interface ObjCBadClass (BadCategory2)
+@end
+
 @protocol EmptyObjCProto
 @end
 
