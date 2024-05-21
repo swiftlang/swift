@@ -812,8 +812,9 @@ public:
   /// Collect a map from a secondary module name to a list of cross-import
   /// overlays, when this current module serves as the primary module.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
-  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName,
-                                 std::vector<std::string> &overlayFiles) const;
+  collectCrossImportOverlayNames(
+      ASTContext &ctx, StringRef moduleName,
+      std::vector<std::pair<std::string, std::string>> &overlayFiles) const;
 };
 
 using ModuleDependencyVector = llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>;
