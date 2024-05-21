@@ -456,22 +456,37 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
 
   if (IGM.canMakeStaticObjectReadOnly(OI->getType())) {
     if (!IGM.swiftImmortalRefCount) {
-      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
-                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
-                                        /*initializer*/ nullptr, "_swiftImmortalRefCount");
-      IGM.swiftImmortalRefCount = var;
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        // = HeapObject.immortalRefCount
+        IGM.swiftImmortalRefCount = llvm::ConstantInt::get(IGM.IntPtrTy, -1);
+      } else {
+        IGM.swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(
+            new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
+              /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
+              /*initializer*/ nullptr, "_swiftImmortalRefCount"),
+            IGM.IntPtrTy);
+      }
     }
     if (!IGM.swiftStaticArrayMetadata) {
       auto *classDecl = IGM.getStaticArrayStorageDecl();
       assert(classDecl && "no __StaticArrayStorage in stdlib");
       CanType classTy = CanType(ClassType::get(classDecl, Type(), IGM.Context));
-      LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
-      auto *metatype = IGM.getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
-      IGM.swiftStaticArrayMetadata = cast<llvm::GlobalVariable>(metatype);
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint,
+                                                        /*forceShared=*/ true);
+        // In embedded swift, the metadata for the array buffer class only needs to be very minimal:
+        // No vtable needed, because the object is never destructed. It only contains the null super-
+        // class pointer.
+        llvm::Constant *superClass = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+        IGM.swiftStaticArrayMetadata = IGM.getAddrOfLLVMVariable(entity, superClass, DebugTypeInfo());
+      } else {
+        LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
+        IGM.swiftStaticArrayMetadata = IGM.getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
+      }
     }
     elements[0].add(llvm::ConstantStruct::get(ObjectHeaderTy, {
       IGM.swiftStaticArrayMetadata,
-      llvm::ConstantExpr::getPtrToInt(IGM.swiftImmortalRefCount, IGM.IntPtrTy)}));
+      IGM.swiftImmortalRefCount }));
   } else {
     elements[0].add(llvm::Constant::getNullValue(ObjectHeaderTy));
   }
