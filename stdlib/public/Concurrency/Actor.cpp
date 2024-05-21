@@ -23,8 +23,7 @@
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
-#include "swift/Basic/HeaderFooterLayout.h"
-#include "swift/Basic/PriorityQueue.h"
+#include "swift/Basic/ListMerger.h"
 #include "swift/Concurrency/Actor.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Atomic.h"
@@ -617,6 +616,66 @@ public:
   }
 };
 
+class JobRef {
+  enum : uintptr_t {
+    NeedsPreprocessing = 0x1,
+    JobMask = ~uintptr_t(NeedsPreprocessing)
+  };
+
+  /// A Job* that may have one of the two bits above mangled into it.
+  uintptr_t Value;
+
+  JobRef(Job *job, unsigned flags)
+    : Value(reinterpret_cast<uintptr_t>(job) | flags) {}
+public:
+  constexpr JobRef() : Value(0) {}
+
+  /// Return a reference to a job that's been properly preprocessed.
+  static JobRef getPreprocessed(Job *job) {
+    /// We allow null pointers here.
+    return { job, 0 };
+  }
+
+  /// Return a reference to a job that hasn't been preprocessed yet.
+  static JobRef getUnpreprocessed(Job *job) {
+    assert(job && "passing a null job");
+    return { job, NeedsPreprocessing };
+  }
+
+  /// Is this a null reference?
+  operator bool() const { return Value != 0; }
+
+  /// Does this job need to be pre-processed before we can treat
+  /// the job queue as a proper queue?
+  bool needsPreprocessing() const {
+    return Value & NeedsPreprocessing;
+  }
+
+  /// Is this an unprocessed message to the actor, rather than a job?
+  bool isMessage() const {
+    return false; // For now, we have no messages
+  }
+
+  Job *getAsJob() const {
+    assert(!isMessage());
+    return reinterpret_cast<Job*>(Value & JobMask);
+  }
+  Job *getAsPreprocessedJob() const {
+    assert(!isMessage() && !needsPreprocessing());
+    return reinterpret_cast<Job*>(Value);
+  }
+
+  /// Get the Job pointer with no preconditions on its type, for tracing.
+  Job *getRawJob() const { return reinterpret_cast<Job *>(Value & JobMask); }
+
+  bool operator==(JobRef other) const {
+    return Value == other.Value;
+  }
+  bool operator!=(JobRef other) const {
+    return Value != other.Value;
+  }
+};
+
 /// Similar to the ActiveTaskStatus, this denotes the ActiveActorState for
 /// tracking the atomic state of the actor
 ///
@@ -629,17 +688,16 @@ public:
 /// * Pointer to list of jobs enqueued in actor
 ///
 /// It is important for all of this information to be in the same atomic so that
-/// when the actor's state changes, the information is visible to all threads
-/// that may be modifying the actor, allowing the algorithm to eventually
-/// converge.
+/// when the actor's state changes, the information is visible to all threads that
+/// may be modifying the actor, allowing the algorithm to eventually converge.
 ///
-/// In order to provide priority escalation support with actors, deeper
-/// integration is required with the OS in order to have the intended side
-/// effects. On Darwin, Swift Concurrency Tasks runs on dispatch's queues. As
-/// such, we need to use an encoding of thread identity vended by libdispatch
-/// called dispatch_lock_t, and a futex-style dispatch API in order to escalate
-/// the priority of a thread. Henceforth, the dispatch_lock_t tracked in the
-/// ActiveActorStatus will be called the DrainLock.
+/// In order to provide priority escalation support with actors, deeper integration is
+/// required with the OS in order to have the intended side effects. On Darwin, Swift
+/// Concurrency Tasks runs on dispatch's queues. As such, we need to use an
+/// encoding of thread identity vended by libdispatch called dispatch_lock_t,
+/// and a futex-style dispatch API in order to escalate the priority of a
+/// thread. Henceforth, the dispatch_lock_t tracked in the ActiveActorStatus
+/// will be called the DrainLock.
 ///
 /// When a thread starts running on an actor, it's identity is recorded in the
 /// ActiveActorStatus. This way, if a higher priority job is enqueued behind the
@@ -655,25 +713,25 @@ public:
 ///
 /// 32 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1
 ///
-///          Flags               Drain Lock               Unused Job*
+///          Flags               Drain Lock               Unused                JobRef
 /// |----------------------|----------------------|----------------------|-------------------|
 ///          32 bits                32 bits                32 bits              32 bits
 ///
 /// 64 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1
 ///
-///         Flags                Drain Lock             Job*
+///         Flags                Drain Lock             JobRef
 /// |----------------------|-------------------|----------------------|
 ///          32 bits                32 bits             64 bits
 ///
 /// 32 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=0
 ///
-///          Flags                  Job*
+///          Flags                  JobRef
 /// |----------------------|----------------------|
 ///          32 bits                32 bits
 //
 /// 64 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=0
 ///
-///         Flags                  Unused                 Job*
+///         Flags                  Unused                 JobRef
 /// |----------------------|----------------------|---------------------|
 ///         32 bits                 32 bits               64 bits
 ///
@@ -711,13 +769,14 @@ class alignas(sizeof(void *) * 2) ActiveActorStatus {
   uint32_t Flags;
   LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #endif
-  Job *FirstJob;
+  JobRef FirstJob;
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  ActiveActorStatus(uint32_t flags, dispatch_lock_t drainLockValue, Job *job)
-      : Flags(flags), DrainLock(drainLockValue), FirstJob(job) {}
+  ActiveActorStatus(uint32_t flags, dispatch_lock_t drainLockValue, JobRef job)
+    : Flags(flags), DrainLock(drainLockValue), FirstJob(job) {}
 #else
-  ActiveActorStatus(uint32_t flags, Job *job) : Flags(flags), FirstJob(job) {}
+  ActiveActorStatus(uint32_t flags, JobRef job)
+    : Flags(flags), FirstJob(job) {}
 #endif
 
   uint32_t getActorState() const {
@@ -738,9 +797,10 @@ public:
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   constexpr ActiveActorStatus()
-      : Flags(), DrainLock(DLOCK_OWNER_NULL), FirstJob(nullptr) {}
+      : Flags(), DrainLock(DLOCK_OWNER_NULL), FirstJob(JobRef()) {}
 #else
-  constexpr ActiveActorStatus() : Flags(), FirstJob(nullptr) {}
+  constexpr ActiveActorStatus()
+      : Flags(), FirstJob(JobRef()) {}
 #endif
 
   bool isIdle() const {
@@ -867,8 +927,10 @@ public:
 #endif
   }
 
-  Job *getFirstUnprioritisedJob() const { return FirstJob; }
-  ActiveActorStatus withFirstUnprioritisedJob(Job *firstJob) const {
+  JobRef getFirstJob() const {
+    return FirstJob;
+  }
+  ActiveActorStatus withFirstJob(JobRef firstJob) const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveActorStatus(Flags, DrainLock, firstJob);
 #else
@@ -913,33 +975,11 @@ public:
       break;
     }
     concurrency::trace::actor_state_changed(
-        actor, getFirstUnprioritisedJob(), traceState, distributedActorIsRemote,
+        actor, getFirstJob().getRawJob(), getFirstJob().needsPreprocessing(),
+        traceState, distributedActorIsRemote,
         isMaxPriorityEscalated(), static_cast<uint8_t>(getMaxPriority()));
   }
 };
-
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-
-/// Given that a job is enqueued normally on a default actor, get/set
-/// the next job in the actor's queue.
-static Job *getNextJob(Job *job) {
-  return *reinterpret_cast<Job **>(job->SchedulerPrivate);
-}
-static void setNextJob(Job *job, Job *next) {
-  *reinterpret_cast<Job **>(job->SchedulerPrivate) = next;
-}
-
-struct JobQueueTraits {
-  static Job *getNext(Job *job) { return getNextJob(job); }
-  static void setNext(Job *job, Job *next) { setNextJob(job, next); }
-
-  enum { prioritiesCount = PriorityBucketCount };
-  static int getPriorityIndex(Job *job) {
-    return getPriorityBucketIndex(job->getPriority());
-  }
-};
-
-#endif
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
 #define ACTIVE_ACTOR_STATUS_SIZE (4 * (sizeof(uintptr_t)))
@@ -949,45 +989,6 @@ struct JobQueueTraits {
 static_assert(sizeof(ActiveActorStatus) == ACTIVE_ACTOR_STATUS_SIZE,
   "ActiveActorStatus is of incorrect size");
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
-
-class DefaultActorImplHeader : public HeapObject {
-protected:
-#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  // If actors are locks, we don't need to maintain any extra bookkeeping in the
-  // ActiveActorStatus since all threads which are contending will block
-  // synchronously, no job queue is needed and the lock will handle all priority
-  // escalation logic
-  Mutex drainLock;
-#else
-  // Note: There is some padding that is added here by the compiler in order to
-  // enforce alignment. This is space that is available for us to use in
-  // the future
-  alignas(sizeof(ActiveActorStatus)) char StatusStorage[sizeof(ActiveActorStatus)];
-#endif
-  // TODO (rokhinip): Make this a flagset
-  bool isDistributedRemoteActor;
-};
-
-// All the fields accessed under the actor's lock should be moved
-// to the end of the default-actor reservation to minimize false sharing.
-// The memory following the DefaultActorImpl object are the stored properties of
-// the actor, which are all accessed only by the current processing thread.
-class DefaultActorImplFooter {
-protected:
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  using PriorityQueue = swift::PriorityQueue<Job *, JobQueueTraits>;
-
-  // When enqueued, jobs are atomically added to a linked list with the head
-  // stored inside ActiveActorStatus. This list contains jobs in the LIFO order
-  // regardless of their priorities.
-  //
-  // When the processing thread sees new incoming jobs in
-  // ActiveActorStatus, it reverses them and inserts them into
-  // prioritizedJobs in the appropriate priority bucket.
-  //
-  PriorityQueue prioritizedJobs;
-#endif
-};
 
 /// The default actor implementation.
 ///
@@ -1039,10 +1040,22 @@ protected:
 /// processing job for an actor at a given time. Stealers jobs support does not
 /// exist yet. As a result, the subset of rules that currently apply
 /// are (1), (3), (5), (6).
-class DefaultActorImpl
-    : public HeaderFooterLayout<DefaultActorImplHeader, DefaultActorImplFooter,
-                                sizeof(HeapObject) +
-                                    sizeof(void *) * NumWords_DefaultActor> {
+class DefaultActorImpl : public HeapObject {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  // If actors are locks, we don't need to maintain any extra bookkeeping in the
+  // ActiveActorStatus since all threads which are contending will block
+  // synchronously, no job queue is needed and the lock will handle all priority
+  // escalation logic
+  Mutex drainLock;
+#else
+  // Note: There is some padding that is added here by the compiler in order to
+  // enforce alignment. This is space that is available for us to use in
+  // the future
+  alignas(sizeof(ActiveActorStatus)) char StatusStorage[sizeof(ActiveActorStatus)];
+#endif
+  // TODO (rokhinip): Make this a flagset
+  bool isDistributedRemoteActor;
+
 public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
@@ -1051,7 +1064,6 @@ public:
     new (&this->drainLock) Mutex();
 #else
    _status().store(ActiveActorStatus(), std::memory_order_relaxed);
-   new (&this->prioritizedJobs) PriorityQueue();
 #endif
     SWIFT_TASK_DEBUG_LOG("Creating default actor %p", this);
     concurrency::trace::actor_create(this);
@@ -1079,13 +1091,8 @@ public:
   /// new priority
   void enqueueStealer(Job *job, JobPriority priority);
 
-  /// Dequeues one job from `prioritisedJobs`.
-  /// The calling thread must be holding the actor lock while calling this
+  // The calling thread must be holding the actor lock while calling this
   Job *drainOne();
-
-  /// Atomically claims incoming jobs from ActiveActorStatus, and calls `handleUnprioritizedJobs()`.
-  /// Called with actor lock held on current thread.
-  void processIncomingQueue();
 #endif
 
   /// Check if the actor is actually a distributed *remote* actor.
@@ -1096,11 +1103,11 @@ public:
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   swift::atomic<ActiveActorStatus> &_status() {
-    return reinterpret_cast<swift::atomic<ActiveActorStatus> &>(this->StatusStorage);
+    return reinterpret_cast<swift::atomic<ActiveActorStatus>&> (this->StatusStorage);
   }
 
   const swift::atomic<ActiveActorStatus> &_status() const {
-    return reinterpret_cast<const swift::atomic<ActiveActorStatus> &>(this->StatusStorage);
+    return reinterpret_cast<const swift::atomic<ActiveActorStatus>&> (this->StatusStorage);
   }
 
   // Only for static assert use below, not for actual use otherwise
@@ -1121,11 +1128,6 @@ private:
   /// It can be done when actor transitions from Idle to Scheduled or
   /// when actor gets a priority override and we schedule a stealer.
   void scheduleActorProcessJob(JobPriority priority);
-
-  /// Processes claimed incoming jobs into `prioritizedJobs`.
-  /// Incoming jobs are of mixed priorities and in LIFO order.
-  /// Called with actor lock held on current thread.
-  void handleUnprioritizedJobs(Job *head);
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 
   void deallocateUnconditional();
@@ -1201,10 +1203,135 @@ static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor)
 /*****************************************************************************/
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+/// Given that a job is enqueued normally on a default actor, get/set
+/// the next job in the actor's queue.
+static JobRef getNextJobInQueue(Job *job) {
+  return *reinterpret_cast<JobRef*>(job->SchedulerPrivate);
+}
+static void setNextJobInQueue(Job *job, JobRef next) {
+  *reinterpret_cast<JobRef*>(job->SchedulerPrivate) = next;
+}
+
+namespace {
+
+struct JobQueueTraits {
+  static Job *getNext(Job *job) {
+    return getNextJobInQueue(job).getAsPreprocessedJob();
+  }
+  static void setNext(Job *job, Job *next) {
+    setNextJobInQueue(job, JobRef::getPreprocessed(next));
+  }
+  static int compare(Job *lhs, Job *rhs) {
+    return descendingPriorityOrder(lhs->getPriority(), rhs->getPriority());
+  }
+};
+
+} // end anonymous namespace
+
+
+// Called with the actor drain lock held
+//
+// This function is called when we hit a conflict between preprocessQueue and
+// a concurrent enqueuer resulting in unprocessed jobs being queued up in the
+// middle.
+//
+// We need to find the unprocessed jobs enqueued by the enqueuer and process
+// them - We know that these unprocessed jobs must exist between the new head
+// and the previous start. We can then process these jobs and merge them into
+// the already processed list of jobs from the previous iteration of
+// preprocessQueue
+static Job *
+preprocessQueue(JobRef unprocessedStart, JobRef unprocessedEnd, Job *existingProcessedJobsToMergeInto)
+{
+  assert(existingProcessedJobsToMergeInto != NULL);
+  assert(unprocessedStart.needsPreprocessing());
+  assert(unprocessedStart.getAsJob() != unprocessedEnd.getAsJob());
+
+  // Build up a list of jobs we need to preprocess
+  using ListMerger = swift::ListMerger<Job*, JobQueueTraits>;
+  ListMerger jobsToProcess;
+
+  // Get just the prefix list of unprocessed jobs
+  auto current = unprocessedStart;
+  while (current != unprocessedEnd) {
+    assert(current.needsPreprocessing());
+    // Advance current to next pointer and process current unprocessed job
+    auto job = current.getAsJob();
+    current = getNextJobInQueue(job);
+
+    jobsToProcess.insertAtFront(job);
+  }
+
+  // Finish processing the unprocessed jobs
+  Job *newProcessedJobs = jobsToProcess.release();
+  assert(newProcessedJobs);
+
+  ListMerger mergedList(existingProcessedJobsToMergeInto);
+  mergedList.merge(newProcessedJobs);
+  return mergedList.release();
+}
+
+// Called with the actor drain lock held.
+//
+// Preprocess the queue starting from the top
+static Job *
+preprocessQueue(JobRef start) {
+  if (!start) {
+    return NULL;
+  }
+
+  // Entire queue is well formed, no pre-processing needed
+  if (!start.needsPreprocessing()) {
+    return start.getAsPreprocessedJob();
+  }
+
+  // There exist some jobs which haven't been preprocessed
+
+  // Build up a list of jobs we need to preprocess
+  using ListMerger = swift::ListMerger<Job*, JobQueueTraits>;
+  ListMerger jobsToProcess;
+
+  Job *wellFormedListStart = NULL;
+
+  auto current = start;
+  while (current) {
+    if (!current.needsPreprocessing()) {
+      // We can assume that everything from here onwards as being well formed
+      // and sorted
+      wellFormedListStart = current.getAsPreprocessedJob();
+      break;
+    }
+
+    // Advance current to next pointer and insert current fella to jobsToProcess
+    // list
+    auto job = current.getAsJob();
+    current = getNextJobInQueue(job);
+
+    jobsToProcess.insertAtFront(job);
+  }
+
+  // Finish processing the unprocessed jobs
+  auto processedJobHead = jobsToProcess.release();
+  assert(processedJobHead);
+
+  Job *firstJob = NULL;
+  if (wellFormedListStart) {
+    // Merge it with already known well formed list if we have one.
+    ListMerger mergedList(wellFormedListStart);
+    mergedList.merge(processedJobHead);
+    firstJob = mergedList.release();
+  } else {
+    // Nothing to merge with, just return the head we already have
+    firstJob = processedJobHead;
+  }
+
+  return firstJob;
+}
 
 static void traceJobQueue(DefaultActorImpl *actor, Job *first) {
-  concurrency::trace::actor_note_job_queue(
-      actor, first, [](Job *job) { return getNextJob(job); });
+  concurrency::trace::actor_note_job_queue(actor, first, [](Job *job) {
+    return getNextJobInQueue(job).getAsPreprocessedJob();
+  });
 }
 
 static SWIFT_ATTRIBUTE_ALWAYS_INLINE void traceActorStateTransition(DefaultActorImpl *actor,
@@ -1244,9 +1371,11 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     auto newState = oldState;
 
     // Link this into the queue in the atomic state
-    Job *currentHead = oldState.getFirstUnprioritisedJob();
-    setNextJob(job, currentHead);
-    newState = newState.withFirstUnprioritisedJob(job);
+    JobRef currentHead = oldState.getFirstJob();
+    setNextJobInQueue(job, currentHead);
+    JobRef newHead = JobRef::getUnpreprocessed(job);
+
+    newState = newState.withFirstJob(newHead);
 
     if (oldState.isIdle()) {
       // Schedule the actor
@@ -1371,67 +1500,56 @@ void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
 
 }
 
-void DefaultActorImpl::processIncomingQueue() {
+// Called with actor lock held on current thread
+Job * DefaultActorImpl::drainOne() {
+  SWIFT_TASK_DEBUG_LOG("Draining one job from default actor %p", this);
+
   // Pairs with the store release in DefaultActorImpl::enqueue
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
   auto oldState = _status().load(SWIFT_MEMORY_ORDER_CONSUME);
   _swift_tsan_consume(this);
 
-  // We must ensure that any jobs not seen by collectJobs() don't have any
-  // dangling references to the jobs that have been collected. For that we must
-  // atomically set head pointer to NULL. If it fails because more jobs have
-  // been added in the meantime, we have to re-read the head pointer.
+  auto jobToPreprocessFrom = oldState.getFirstJob();
+  Job *firstJob = preprocessQueue(jobToPreprocessFrom);
+  traceJobQueue(this, firstJob);
+
   while (true) {
-    // If there aren't any new jobs in the incoming queue, we can return
-    // immediately without updating the status.
-    if (!oldState.getFirstUnprioritisedJob()) {
-      return;
-    }
     assert(oldState.isAnyRunning());
 
-    auto newState = oldState;
-    newState = newState.withFirstUnprioritisedJob(nullptr);
-
-    if (_status().compare_exchange_weak(
-            oldState, newState,
-            /* success */ std::memory_order_relaxed,
-            /* failure */ std::memory_order_relaxed)) {
-      SWIFT_TASK_DEBUG_LOG("Collected some jobs from actor %p", this);
-      traceActorStateTransition(this, oldState, newState,
-                                distributedActorIsRemote);
-      break;
+    if (!firstJob) {
+      // Nothing to drain, short circuit
+      SWIFT_TASK_DEBUG_LOG("No jobs to drain on actor %p", this);
+      return NULL;
     }
+
+    auto newState = oldState;
+    // Dequeue the first job and set up a new head
+    newState = newState.withFirstJob(getNextJobInQueue(firstJob));
+    if (_status().compare_exchange_weak(oldState, newState,
+                            /* success */ std::memory_order_relaxed,
+                            /* failure */ std::memory_order_relaxed)) {
+      SWIFT_TASK_DEBUG_LOG("Drained first job %p from actor %p", firstJob, this);
+      traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
+      concurrency::trace::actor_dequeue(this, firstJob);
+      return firstJob;
+    }
+
+    // We failed the weak cmpxchg spuriously, go through loop again.
+    if (oldState.getFirstJob().getAsJob() == jobToPreprocessFrom.getAsJob()) {
+      continue;
+    }
+
+    // There were new items concurrently added to the queue. We need to
+    // preprocess the newly added unprocessed items and merge them to the already
+    // preprocessed list.
+    //
+    // The newly merged items that need to be preprocessed, are between the head
+    // of the linked list, and the last job we did the previous preprocessQueue
+    // on
+    firstJob = preprocessQueue(oldState.getFirstJob(), jobToPreprocessFrom, firstJob);
+    jobToPreprocessFrom = oldState.getFirstJob();
+    traceJobQueue(this, firstJob);
   }
-
-  handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
-}
-
-// Called with actor lock held on current thread
-void DefaultActorImpl::handleUnprioritizedJobs(Job *head) {
-  // Reverse jobs from LIFO to FIFO order
-  Job *reversed = nullptr;
-  while (head) {
-    auto next = getNextJob(head);
-    setNextJob(head, reversed);
-    reversed = head;
-    head = next;
-  }
-  prioritizedJobs.enqueueContentsOf(reversed);
-}
-
-// Called with actor lock held on current thread
-Job *DefaultActorImpl::drainOne() {
-  SWIFT_TASK_DEBUG_LOG("Draining one job from default actor %p", this);
-
-  traceJobQueue(this, prioritizedJobs.peek());
-  auto firstJob = prioritizedJobs.dequeue();
-  if (!firstJob) {
-    SWIFT_TASK_DEBUG_LOG("No jobs to drain on actor %p", this);
-  } else {
-    SWIFT_TASK_DEBUG_LOG("Drained first job %p from actor %p", firstJob, this);
-    concurrency::trace::actor_dequeue(this, firstJob);
-  }
-  return firstJob;
 }
 
 // Called from processing jobs which are created to drain an actor. We need to
@@ -1486,40 +1604,39 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
       TaskExecutorRef::undefined());
 
   while (true) {
-    Job *job = currentActor->drainOne();
-    if (job == NULL) {
-      // No work left to do, try unlocking the actor. This may fail if there is
-      // work concurrently enqueued in which case, we'd try again in the loop
-      if (currentActor->unlock(false)) {
-        break;
-      }
-    } else {
-      if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-        auto taskExecutor = task->getPreferredTaskExecutor();
-        trackingInfo.setTaskExecutor(taskExecutor);
-      }
-
-      // This thread is now going to follow the task on this actor. It may hop off
-      // the actor
-      runJobInEstablishedExecutorContext(job);
-
-      // We could have come back from the job on a generic executor and not as
-      // part of a default actor. If so, there is no more work left for us to do
-      // here.
-      auto currentExecutor = trackingInfo.getActiveExecutor();
-      if (!currentExecutor.isDefaultActor()) {
-        currentActor = nullptr;
-        break;
-      }
-      currentActor = asImpl(currentExecutor.getDefaultActor());
-    }
-
     if (shouldYieldThread()) {
       currentActor->unlock(true);
       break;
     }
 
-    currentActor->processIncomingQueue();
+    Job *job = currentActor->drainOne();
+    if (job == NULL) {
+      // No work left to do, try unlocking the actor. This may fail if there is
+      // work concurrently enqueued in which case, we'd try again in the loop
+      if (!currentActor->unlock(false)) {
+        continue;
+      }
+      break;
+    }
+
+    if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
+      auto taskExecutor = task->getPreferredTaskExecutor();
+      trackingInfo.setTaskExecutor(taskExecutor);
+    }
+
+    // This thread is now going to follow the task on this actor. It may hop off
+    // the actor
+    runJobInEstablishedExecutorContext(job);
+
+    // We could have come back from the job on a generic executor and not as
+    // part of a default actor. If so, there is no more work left for us to do
+    // here.
+    auto currentExecutor = trackingInfo.getActiveExecutor();
+    if (!currentExecutor.isDefaultActor()) {
+      currentActor = nullptr;
+      break;
+    }
+    currentActor = asImpl(currentExecutor.getDefaultActor());
   }
 
   // Leave the tracking info.
@@ -1550,18 +1667,16 @@ void DefaultActorImpl::destroy() {
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   // TODO (rokhinip): Do something to assert that the lock is unowned
 #else
-  auto oldState = _status().load(std::memory_order_acquire);
+  auto oldState = _status().load(std::memory_order_relaxed);
   // Tasks on an actor are supposed to keep the actor alive until they start
   // running and we can only get here if ref count of the object = 0 which means
   // there should be no more tasks enqueued on the actor.
-  assert(!oldState.getFirstUnprioritisedJob() && "actor has queued jobs at destruction");
+  assert(!oldState.getFirstJob() && "actor has queued jobs at destruction");
 
   if (oldState.isIdle()) {
-    assert(prioritizedJobs.empty() && "actor has queued jobs at destruction");
-    return;
+      return;
   }
   assert(oldState.isRunning() && "actor scheduled but not running at destruction");
-  // In running state we cannot safely access prioritizedJobs to assert that it is empty.
 #endif
 }
 
@@ -1613,7 +1728,7 @@ retry:;
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
   auto oldState = _status().load(std::memory_order_relaxed);
   while (true) {
-    bool assertNoJobs = false;
+
     if (asDrainer) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
       if (!oldState.isScheduled()) {
@@ -1654,10 +1769,7 @@ retry:;
       }
 
       assert(oldState.getMaxPriority() == JobPriority::Unspecified);
-      assert(!oldState.getFirstUnprioritisedJob());
-      // We cannot assert here that prioritizedJobs is empty,
-      // because lock is not held yet. Raise a flag to assert after getting the lock.
-      assertNoJobs = true;
+      assert(!oldState.getFirstJob());
     }
 
     // Taking the drain lock clears the max priority escalated bit because we've
@@ -1665,29 +1777,12 @@ retry:;
     auto newState = oldState.withRunning();
     newState = newState.withoutEscalatedPriority();
 
-    // Claim incoming jobs when obtaining lock as a drainer, to save one
-    // round of atomic load and compare-exchange.
-    // This is not useful when obtaining lock for assuming thread during actor
-    // switching, because arbitrary use code can run between locking and
-    // draining the next job. So we still need to call processIncomingQueue() to
-    // check for higher priority jobs that could have been scheduled in the
-    // meantime. And processing is more efficient when done in larger batches.
-    if (asDrainer) {
-      newState = newState.withFirstUnprioritisedJob(nullptr);
-    }
-
     // This needs an acquire since we are taking a lock
     if (_status().compare_exchange_weak(oldState, newState,
                                  std::memory_order_acquire,
                                  std::memory_order_relaxed)) {
       _swift_tsan_acquire(this);
-      if (assertNoJobs) {
-        assert(prioritizedJobs.empty());
-      }
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
-      if (asDrainer) {
-        handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
-      }
       return true;
     }
   }
@@ -1735,8 +1830,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
     }
 
     auto newState = oldState;
-    // Lock is still held at this point, so it is safe to access prioritizedJobs
-    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritisedJob()) {
+    if (oldState.getFirstJob()) {
       // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
@@ -1774,6 +1868,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
       if (newState.isScheduled()) {
         // See ownership rule (6) in DefaultActorImpl
+        assert(newState.getFirstJob());
         scheduleActorProcessJob(newState.getMaxPriority());
       } else {
         // See ownership rule (5) in DefaultActorImpl

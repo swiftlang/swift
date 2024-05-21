@@ -40,7 +40,6 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayRemoveAll
     single-source/ArraySetElement
     single-source/ArraySubscript
-    single-source/AsyncTree
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
