@@ -236,7 +236,7 @@ extension Unicode {
 
       // If we have a leftover composee, make sure to return it.
       // We may still have things in the buffer which are not complete segments.
-      return composee._take() ?? buffer.next()?.scalar
+      return composee.take() ?? buffer.next()?.scalar
     }
   }
 }
