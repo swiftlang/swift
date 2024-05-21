@@ -370,6 +370,7 @@ extension Instruction {
          is VectorInst,
          is AllocVectorInst,
          is UncheckedRefCastInst,
+         is UpcastInst,
          is ValueToBridgeObjectInst,
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,

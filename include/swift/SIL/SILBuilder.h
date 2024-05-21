@@ -1251,6 +1251,10 @@ public:
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty,
                            ValueOwnershipKind forwardingOwnershipKind) {
     assert(Ty.isObject());
+    if (isInsertingIntoGlobal()) {
+      return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                       getModule(), forwardingOwnershipKind));
+    }
     return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
                                      getFunction(), forwardingOwnershipKind));
   }

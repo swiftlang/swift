@@ -358,6 +358,9 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *URCI = dyn_cast<UncheckedRefCastInst>(operand)) {
     return emitConstantValue(IGM, URCI->getOperand(), flatten);
 
+  } else if (auto *UCI = dyn_cast<UpcastInst>(operand)) {
+    return emitConstantValue(IGM, UCI->getOperand(), flatten);
+
   } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
     SILType type = operand->getType();
     auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
