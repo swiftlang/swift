@@ -3,8 +3,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-sil-ownership-verifier -emit-module -o %t %s -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-pass=MandatoryARCOpts
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-sil-ownership-verifier -parse-as-library %t/extensions.swiftmodule -typecheck -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-pass=MandatoryARCOpts
-// RUN: %FileCheck %s < %t/extensions.h
-// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
+// RUN: %FileCheck %s --input-file %t/extensions.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s --input-file %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
 
 // This test generates invalid SIL. It will cause a compiler assert in
@@ -121,6 +121,13 @@ extension NotObjC {}
 // CHECK-NEXT: @end
 extension NSObject {
   @objc var some: Int { return 1 }
+}
+
+// CHECK-LABEL: @interface NSString (CustomName)
+// CHECK-NEXT: - (void)test3;
+// CHECK-NEXT: @end
+@objc(CustomName) extension NSString {
+  func test3() {}
 }
 
 // NEGATIVE-NOT: @class NSString;

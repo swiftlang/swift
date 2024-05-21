@@ -403,7 +403,10 @@ private:
       os << "\n";
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
-    os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
+    if (ED->getObjCCategoryName().empty())
+      os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
+    else
+      os << " (" << ED->getObjCCategoryName() << ")";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());

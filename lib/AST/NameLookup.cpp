@@ -2262,6 +2262,35 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   vec.push_back(method);
 }
 
+ObjCCategoryNameMap
+ObjCCategoryNameMapRequest::evaluate(Evaluator &evaluator,
+                                     ClassDecl *classDecl,
+                                     ExtensionDecl *lastExtension) const {
+  // The purpose of the `lastExtension` parameter is to bake something into the
+  // request that will change when another extension is added. This ensures that
+  // if more extensions are added later, we don't return an outdated version of
+  // the extension map by accident.
+
+  ObjCCategoryNameMap results;
+
+  for (auto ext : classDecl->getExtensions()) {
+    auto catName = ext->getObjCCategoryName();
+    if (!catName.empty())
+      results[catName].push_back(ext);
+
+    if (ext == lastExtension)
+      break;
+  }
+
+  return results;
+}
+
+ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ObjCCategoryNameMapRequest{this},
+                           ObjCCategoryNameMap());
+}
+
 static bool missingExplicitImportForMemberDecl(const DeclContext *dc,
                                                ValueDecl *decl) {
   // Only require explicit imports for members when MemberImportVisibility is
