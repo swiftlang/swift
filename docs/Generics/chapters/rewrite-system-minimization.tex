@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter{Rewrite System Minimization}\label{rqm minimization}
+\chapter[]{Rewrite System Minimization}\label{rqm minimization}
 
 \ifWIP
 TODO:
@@ -21,7 +21,7 @@ TODO:
 \end{itemize}
 \fi
 
-\section{Homotopy Reduction}\label{homotopy reduction}
+\section[]{Homotopy Reduction}\label{homotopy reduction}
 
 \IndexTwoFlag{debug-requirement-machine}{homotopy-reduction}
 \IndexTwoFlag{debug-requirement-machine}{homotopy-reduction-detail}
@@ -42,12 +42,12 @@ TODO:
 \end{itemize}
 \fi
 
-\section{Loop Normalization}
+\section[]{Loop Normalization}
 
+\ifWIP
 \cite{homotopyreduction}
 \IndexFlag{disable-requirement-machine-loop-normalization}
 
-\ifWIP
 TODO:
 \begin{itemize}
 \item collapse inverses together
@@ -60,7 +60,7 @@ TODO:
 \end{itemize}
 \fi
 
-\section{The Elimination Order}\label{elimination order}
+\section[]{The Elimination Order}\label{elimination order}
 
 \ifWIP
 TODO:
@@ -71,12 +71,13 @@ TODO:
 \end{itemize}
 \fi
 
-\section{Conformance Minimization}\label{minimal conformances}
+\section[]{Conformance Minimization}\label{minimal conformances}
+
+\ifWIP
 
 \IndexTwoFlag{debug-requirement-machine}{minimal-conformances}
 \IndexTwoFlag{debug-requirement-machine}{minimal-conformances-detail}
 
-\ifWIP
 TODO:
 \begin{itemize}
 \item example where homotopy reduction minimizes too much
@@ -90,9 +91,9 @@ TODO:
 \end{itemize}
 \fi
 
-\section{Correctness}\label{minimization correctness}
+\section[]{Building Requirements}\label{requirement builder}
 
-\section{Building Requirements}\label{requirement builder}
+\ifWIP
 
 \IndexFlag{requirement-machine-max-split-concrete-equiv-class-attempts}
 \IndexTwoFlag{debug-requirement-machine}{minimization}
@@ -100,15 +101,32 @@ TODO:
 \IndexTwoFlag{debug-requirement-machine}{redundant-rules-detail}
 \IndexTwoFlag{debug-requirement-machine}{split-concrete-equiv-class}
 
-\ifWIP
 TODO:
 \begin{itemize}
 \item same-type requirements: connected component thing
 \item type alias requirements: the concrete equiv class splitting equivalent
 \item splitting concrete equivalence classes: describe the problem, give example, say which generic signature invariant is violated. alternative formulation would work but breaks \index{ABI}ABI, so for GSB compatibility we split equivalence classes.
 \end{itemize}
+
+The minimization algorithm outputs the ``circuit,''
+\begin{quote}
+\begin{verbatim}
+T.A == T.B
+T.B == T.C
+T.C == T.D
+\end{verbatim}
+\end{quote}
+and not the ``star,''
+\begin{quote}
+\begin{verbatim}
+T.A == T.B
+T.A == T.C
+T.A == T.D
+\end{verbatim}
+\end{quote}
+
 \fi
 
-\section{Source Code Reference}\label{rqm minimization source ref}
+\section[]{Source Code Reference}\label{rqm minimization source ref}
 
 \end{document}
