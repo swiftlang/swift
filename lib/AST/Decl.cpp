@@ -10078,6 +10078,11 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
   if (mod->getResilienceStrategy() != ResilienceStrategy::Resilient)
     return true;
 
+  // If we perform package CMO, in-package clients must have access to the
+  // underlying type.
+  if (mod->serializePackageEnabled())
+    return true;
+
   ValueDecl *namingDecl = getNamingDecl();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl))
     return AFD->getResilienceExpansion() == ResilienceExpansion::Minimal;
