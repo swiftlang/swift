@@ -10,9 +10,15 @@ function(get_compatibility_libs sdk arch result_var_name)
       swiftCompatibilityConcurrency${vsuffix}
       swiftCompatibilityDynamicReplacements${vsuffix}
       swiftCompatibilityPacks${vsuffix}
-      swiftCompatibility50${vsuffix}
-      swiftCompatibility51${vsuffix}
       swiftCompatibility56${vsuffix})
+
+    # 64-bit watchOS doesn't do 5.0 or 5.1 back-compat
+    set(arm64Archs "arm64;arm64e")
+    if(NOT (sdk STREQUAL "WATCHOS" AND arch IN_LIST arm64Archs))
+      list(APPEND compatibility_libs
+        swiftCompatibility50${vsuffix}
+        swiftCompatibility51${vsuffix})
+    endif()
   endif()
 
   set("${result_var_name}" "${compatibility_libs}" PARENT_SCOPE)
