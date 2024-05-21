@@ -173,7 +173,7 @@
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
-                "swift-driver": "main",
+                "swift-driver": "release/6.0",
                 "swift-numerics": "1.0.2",
                 "swift-syntax": "release/6.0",
                 "swift-system": "1.2.1",
