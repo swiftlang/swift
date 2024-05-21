@@ -2242,6 +2242,22 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
   }
 }
 
+static std::optional<IRGenLLVMLTOKind>
+ParseLLVMLTOKind(const ArgList &Args, DiagnosticEngine &Diags) {
+  std::optional<IRGenLLVMLTOKind> LLVMLTOKind;
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    LLVMLTOKind =
+        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
+            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
+            .Case("llvm-full", IRGenLLVMLTOKind::Full)
+            .Default(std::nullopt);
+    if (!LLVMLTOKind)
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+  return LLVMLTOKind;
+}
+
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts, const FrontendOptions &FEOpts,
                          const TypeCheckerOptions &TCOpts,
@@ -2629,6 +2645,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
+  // If these optimizations are enabled never preserve functions for the
+  // debugger.
+  Opts.ShouldFunctionsBePreservedToDebugger =
+      !Args.hasArg(OPT_enable_llvm_wme);
+  Opts.ShouldFunctionsBePreservedToDebugger &=
+      !Args.hasArg(OPT_enable_llvm_vfe);
+  if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
+    Opts.ShouldFunctionsBePreservedToDebugger &=
+        LTOKind.value() == IRGenLLVMLTOKind::None;
+
   return false;
 }
 
@@ -2975,18 +3001,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
-    auto LLVMLTOKind =
-        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
-            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
-            .Case("llvm-full", IRGenLLVMLTOKind::Full)
-            .Default(std::nullopt);
-    if (LLVMLTOKind)
-      Opts.LLVMLTOKind = LLVMLTOKind.value();
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
+  if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
+     Opts.LLVMLTOKind = LTOKind.value();
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
