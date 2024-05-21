@@ -380,7 +380,7 @@ void ExistentialTransform::populateThunkBody() {
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {
     auto *BB = &*It++;
-    removeDeadBlock(BB);
+    BB->removeDeadBlock();
   }
 
   /// Create a basic block and the function arguments.

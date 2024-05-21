@@ -83,13 +83,6 @@ public:
   }
 };
 
-/// Remove all instructions in the body of \p bb in safe manner by using
-/// undef.
-void clearBlockBody(SILBasicBlock *bb);
-
-/// Handle the mechanical aspects of removing an unreachable block.
-void removeDeadBlock(SILBasicBlock *bb);
-
 /// Remove all unreachable blocks in a function.
 bool removeUnreachableBlocks(SILFunction &f);
 

@@ -67,37 +67,6 @@ NonErrorHandlingBlocks::NonErrorHandlingBlocks(SILFunction *function)
   }
 }
 
-/// Remove all instructions in the body of \p bb in safe manner by using
-/// undef.
-void swift::clearBlockBody(SILBasicBlock *bb) {
-
-  for (SILArgument *arg : bb->getArguments()) {
-    arg->replaceAllUsesWithUndef();
-    // To appease the ownership verifier, just set to None.
-    arg->setOwnershipKind(OwnershipKind::None);
-  }
-
-  // Instructions in the dead block may be used by other dead blocks.  Replace
-  // any uses of them with undef values.
-  while (!bb->empty()) {
-    // Grab the last instruction in the bb.
-    auto *inst = &bb->back();
-
-    // Replace any still-remaining uses with undef values and erase.
-    inst->replaceAllUsesOfAllResultsWithUndef();
-    inst->eraseFromParent();
-  }
-}
-
-// Handle the mechanical aspects of removing an unreachable block.
-void swift::removeDeadBlock(SILBasicBlock *bb) {
-  // Clear the body of bb.
-  clearBlockBody(bb);
-
-  // Now that the bb is empty, eliminate it.
-  bb->eraseFromParent();
-}
-
 bool swift::removeUnreachableBlocks(SILFunction &f) {
   ReachableBlocks reachable(&f);
   // Visit all the blocks without doing any extra work.
@@ -109,7 +78,7 @@ bool swift::removeUnreachableBlocks(SILFunction &f) {
   for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
     auto *bb = &*ii++;
     if (!reachable.isVisited(bb)) {
-      removeDeadBlock(bb);
+      bb->removeDeadBlock();
       changed = true;
     }
   }
