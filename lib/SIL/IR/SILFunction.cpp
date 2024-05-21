@@ -548,17 +548,6 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
 }
 
 ResilienceExpansion SILFunction::getResilienceExpansion() const {
-  // If package serialization is enabled, we can safely
-  // assume that the defining .swiftmodule is built from
-  // source and is never used outside of its package;
-  // Even if the module is built resiliently, return
-  // maximal expansion here so aggregate types can be
-  // treated as loadable in the same resilient domain
-  // (across modules in the same package).
-  if (getModule().getSwiftModule()->serializePackageEnabled() &&
-      getModule().getSwiftModule()->isResilient())
-    return ResilienceExpansion::Maximal;
-
   // If a function definition is in another module, and
   // it was serialized due to package serialization opt,
   // a new attribute [serialized_for_package] is added
