@@ -11,3 +11,13 @@ public func test() -> Int {
   sink(t: metatype)
   return 42
 }
+
+func castToExistential<T>(x: T) {
+  if x is any FixedWidthInteger {    // expected-error {{cannot do dynamic casting in embedded Swift}}
+  }
+}
+
+public func callCastToExistential() {
+  castToExistential(x: 42)    // expected-note {{called from here}}
+}
+
