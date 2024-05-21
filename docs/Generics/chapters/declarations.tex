@@ -4,209 +4,510 @@
 
 \chapter{Declarations}\label{decls}
 
-\IndexDefinition{declaration}
-\IndexDefinition{value declaration}
-\IndexDefinition{interface type}
-\index{extension declaration}
-\index{top-level code declaration}
-\index{identifier}
-\index{expression}
-\lettrine{D}{eclarations are the building blocks} of Swift programs. The different kinds of declarations are categorized into a taxonomy. A \emph{value declaration} is a named entity which can be directly referenced from an expression. Every value declaration also has an \emph{interface type}; roughly speaking, this is the type of the expression naming the declaration. Most declarations one encounters are value declarations, for instance structs and functions. There are some important exceptions, however; extensions, described in Chapter~\ref{extensions}, add members to a type but do not themselves have names. A \emph{top-level code declaration} is another kind of declaration that is not a value declaration; it holds the statements and expressions at the top level of a source file.
+\lettrine{D}{eclarations} are the \IndexDefinition{declaration}building blocks of Swift programs. In \ChapRef{compilation model}, we started by representing the entire program as a \index{module declaration}module declaration, and said that a module declaration consists of \index{file unit}file units. The next level of detail is that each file unit holds a list of \IndexDefinition{top-level declaration}top-level declarations. The different kinds of declarations are categorized into a taxonomy, and we will survey this taxonomy, as we did with types in \ChapRef{types}. Our principal goal will be describing the syntactic representations for declaring generic parameters and stating requirements, which are common to all generic declarations; once we have that, we can proceed to \PartRef{part blocks}.
 
-\IndexDefinition{declared interface type}
-\IndexDefinition{type declaration}
-\index{metatype type}
-A \emph{type declaration} is an important kind of value declaration. A type declaration declares a new type that you can write down in a type annotation; this is the \emph{declared interface type} of the type declaration. Since type declarations are value declarations, they also have an interface type, which is the type of an expression referencing the type declaration. When a type is used as a value, the type of the value is a metatype. A type declaration's interface type is therefore the metatype of its declared interface type.
+The declaration taxonomy has two important branches:
+\begin{enumerate}
+\item A \IndexDefinition{value declaration}\emph{value declaration} is a one that can be referenced by name from an \index{expression}expression; this includes variables, functions, and such. Every value declaration has an \IndexDefinition{interface type}\emph{interface type}, which is the type assigned to an expression that names this declaration.
+\item A \IndexDefinition{type declaration}\emph{type declaration} is one that can be referenced by name from within a \index{type representation}type representation. This includes structs, type aliases, and so on. A type declaration declares a type, called the \IndexDefinition{declared interface type}\emph{declared interface type} of the type declaration.
+\end{enumerate}
+Not all declarations are value declarations. An \index{extension declaration}extension declaration adds members to an existing nominal type declaration, as we'll see in \ChapRef{extensions}, but an extension does not itself have a name. A \IndexDefinition{top-level code declaration}\emph{top-level code declaration} holds the statements and expressions written at the top level of a source file, and again, it does not have a name, semantically.
 
-\index{struct declaration}%
-\index{enum declaration}%
-\index{class declaration}%
-\index{nominal type declaration}%
-\index{protocol declaration}%
-\IndexDefinition{self interface type}%
-\Index{protocol Self type@protocol \texttt{Self} type}%
-Struct, enum and class declarations are called \emph{nominal type declarations}. Protocols are also nominal type declarations, but they are special enough it is best to think of them as a separate kind of entity.
-The \emph{self interface type} of a nominal type or extension declaration is the type from which the \texttt{self} parameter type of a method is derived. In a struct, enum or class declaration, the self interface type and declared interface type coincide. In a protocol, they differ; the declared interface type is a nominal type, while the self interface type is the protocol \texttt{Self} type (Section~\ref{protocols}).
-
-\index{call expression}
-\index{initial value expression}
-\index{expression}
-In the following, the nominal type declaration \texttt{Fish} is referenced twice, first as a type annotation, and then in an expression:
+\paragraph{Declaration contexts.}
+The containment relation between declarations is described as follows. The parent of a declaration is not another declaration, but another related sort of entity, called a \IndexDefinition{declaration context}\emph{declaration context}. A declaration context is something that \emph{contains} declarations. Consider this example:
 \begin{Verbatim}
-struct Fish {}
-
-let myFish: Fish = Fish()
-\end{Verbatim}
-This is a very simple piece of code, but there's more going on than seems at first glance. The first occurrence of \texttt{Fish} is the type annotation for the variable declaration \texttt{myFish}, so the interface type of \texttt{myFish} becomes the nominal type \texttt{Fish}. The second occurrence is inside the initial value expression of \texttt{myFish}. The callee of the call expression \texttt{Fish()} is the type expression \texttt{Fish}, whose type is the metatype \texttt{Fish.Type}. A call of a metatype is transformed into a call of the \texttt{init} member, which names a constructor declaration. Constructors are called on an instance of the metatype of a type, and return an instance of the type. So the initial value expression has the type \texttt{Fish}, which matches the interface type of \texttt{myFish}. The constructor has the interface type \verb|(Fish.Type) -> () -> Fish|.
-
-\paragraph{Nesting}
-\IndexDefinition{declaration context}
-\index{module declaration}
-\index{function declaration}
-\index{variable declaration}
-\index{generic parameter declaration}
-\index{closure expression}
-\index{source file}
-A \emph{declaration context} contains declarations. They overlap with declarations, but neither one implies the other. Module declarations, nominal type declarations, extension declarations and function declarations are also declaration contexts. Variables and generic parameter declarations are declarations, but not declaration contexts. Last but not least, closure expressions and source files are declaration contexts, but not declarations. Table~\ref{taxonomy examples} summarizes the above.
-\begin{table}\captionabove{Classifying various entities in our taxonomy}\label{taxonomy examples}
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Entity}&\textbf{Declaration?}&\textbf{Value decl?}&\textbf{Type decl?}&\textbf{Decl context?}\\
-\midrule
-Module&\checkmark&$\checkmark$&$\checkmark$&\checkmark\\
-Source file&$\times$&$\times$&$\times$&\checkmark\\
-Nominal type&\checkmark&\checkmark&\checkmark&\checkmark\\
-Extension&\checkmark&$\times$&$\times$&\checkmark\\
-Generic parameter&\checkmark&\checkmark&\checkmark&$\times$\\
-Function&\checkmark&\checkmark&$\times$&\checkmark\\
-Variable&\checkmark&\checkmark&$\times$&$\times$\\
-Top-level code&$\checkmark$&$\times$&$\times$&\checkmark\\
-Closure expression&$\times$&$\times$&$\times$&\checkmark\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\IndexDefinition{local declaration context}%
-\index{subscript declaration}%
-\IndexDefinition{initializer declaration context}%
-Declarations and declaration contexts are nested within each other. The roots in this hierarchy are module declarations; all other declarations and declaration contexts point at a parent declaration context. Source files are always immediate children of module declarations. A \emph{local context} is any declaration context that is not a module, source file, type declaration or extension. Top-level code declarations, function declarations and closure expressions are three kinds of local contexts we've already seen.
-
-\index{initial value expression}
-The three remaining kinds of local context are subscript declarations, enum element declarations and initializer contexts:
-\begin{itemize}
-\item Subscripts and enum elements are local contexts, because they contain their parameter declarations.
-\item Subscript declarations can also be generic, so they need to contain their generic parameters.
-\item Initializer contexts represent the initial value expression of a variable that is itself not a child of a local context. This ensures that any declarations appearing in the initial value expression of a variable are always children of a local context.
-\end{itemize}
-
-\IndexDefinition{local type declaration}
-\IndexDefinition{top-level type declaration}
-\IndexDefinition{nested type declaration}
-\IndexDefinition{local type declaration}
-\IndexDefinition{top-level function declaration}
-\IndexDefinition{method declaration}
-\IndexDefinition{local function declaration}
-\IndexDefinition{global variable declaration}
-\IndexDefinition{stored property declaration}
-\IndexDefinition{local variable declaration}
-There is special terminology for type declarations in different kinds of declaration contexts:
-\begin{itemize}
-\item A \emph{top-level type} is an immediate child of a source file.
-\item A \emph{nested type} or \emph{member type} is an immediate child of a nominal type declaration or an extension.
-\item A \emph{local type} is an immediate child of a local context.
-\end{itemize}
-Similarly, for functions:
-\begin{itemize}
-\item A \emph{top-level function} or \emph{global function} is an immediate child of a source file.
-\item A \emph{method} is an immediate child of a nominal type declaration or an extension.
-\item A \emph{local function} is an immediate child of a local context.
-\end{itemize}
-And finally, for variables:
-\begin{itemize}
-\item A \emph{global variable} is an immediate child of a source file.
-\item A \emph{property} is an immediate child of a nominal type declaration or an extension.
-\item A \emph{local variable} is an immediate child of a local context.
-\end{itemize}
-
-\paragraph{Computing interface types}
-\IndexDefinition{interface type request}
-The \Request{interface type request} computes the interface type of a value declaration. The evaluation function switches over the declaration kind and takes different kinds of action, for example:
-\begin{itemize}
-\item Given a function declaration, this request recursively evaluates itself to get the interface type of each parameter declaration, and constructs a function type from the interface type of each parameter declaration together with the function's return type.
-\item For a parameter declaration, this request resolves the type representation written by the user.
-\item For a type declaration, it constructs a metatype from the declared interface type of the type declaration.
-\end{itemize}
- 
-\section{Type Declarations}\label{type declarations}
-
-\IndexDefinition{nominal type declaration}%
-\IndexDefinition{struct declaration}%
-\IndexDefinition{enum declaration}%
-\IndexDefinition{class declaration}%
-\index{declared interface type}%
-\paragraph{Struct, enum and class declarations}
-These are the concrete nominal types. The declared interface type of a non-generic nominal type declaration is a nominal type. If the nominal type declaration is generic, the declared interface type is a generic nominal type where the generic arguments are the declaration's generic parameters.
-
-Concrete nominal types can be nested inside of other declaration contexts, with a few limitations described in Section~\ref{nested nominal types}. The declared interface type reflects this nesting. For example, the declared interface type of \texttt{Outer.Inner} is the generic nominal type \texttt{Outer<T>.Inner<U>}:
-\begin{Verbatim}
-struct Outer<T> {
-  struct Inner<U> {}
+func squares(_ nums: [Int]) -> [Int] {
+  return nums.map { x in x * x }
 }
 \end{Verbatim}
-Structs, enums and classes can conform to protocols; how this is modeled is the topic of Chapter~\ref{conformances}. Classes can also inherit from other classes; Chapter~\ref{classinheritance} describes how inheritance interacts with generics.
+The \index{parameter declaration}parameter declaration ``\texttt{x}'' is a child of the closure expression ``\verb|{ x in x * x }|'', and not a direct child of the enclosing function declaration. A \index{closure expression}closure expression is thus an example of a declaration context that is not a declaration. On the other hand, a parameter declaration is a declaration, but not a declaration context.
 
-\IndexDefinition{protocol declaration}%
-\paragraph{Protocol declarations}
-The declared interface type of a protocol declaration is the protocol type \texttt{P}. Protocols are the fourth kind of nominal type, but they behave differently in many ways, because they do not have concrete instances. Protocol declarations are described in Chapter~\ref{protocols}.
+\paragraph{Type declarations.} Types can be referenced from inside expressions, so every type declaration is also a value declaration. We can better understand this by looking at this simple example in detail:
+\begin{Verbatim}
+struct Horse {}
+let myHorse: Horse = Horse()
+\end{Verbatim}
+The struct declaration \index{horse}\texttt{Horse} is referenced twice, first in the type representation on the left-hand side of ``\texttt{=}'' and then again in the \index{expression}\index{initial value expression}initial value expression on the right. In the type representation, we want the \emph{declared interface type} of our struct: this is the nominal type \texttt{Horse} whose values are \emph{instances} of this struct, because that's the type we're assigning to the value stored inside \texttt{myHorse}. The second reference, within the \index{call expression}call expression, is instead using the \emph{type itself} as a value, so we want the \emph{interface type} of the struct declaration, which is the \index{metatype type}metatype type \texttt{Horse.Type}. (Recall the diagram from \SecRef{more types}.) When a metatype is the callee in a call expression, we interpret it as looking up the member named \texttt{init}:
+\begin{Verbatim}
+struct Horse {}
+let myHorseType: Horse.Type = Horse.self
+let myHorse: Horse = myHorseType.init()
+\end{Verbatim}
+The interface type of a type declaration always wraps its declared interface type in a metatype type. (It sounds like a mouthful, but the idea is simple.)
 
-\IndexDefinition{type alias declaration}%
-\IndexDefinition{underlying type}%
-\paragraph{Type alias declarations}
-Type aliases assign a new name to an underlying type. The declared interface type is a type alias type whose canonical type is the underlying type of the type alias. While type aliases are declaration contexts, the only kind of declaration they contain is their own generic parameter declarations. The special case of type aliases in protocols is discussed in Section~\ref{protocol type alias}.
+\paragraph{Nominal type declarations.}
+\IndexDefinition{nominal type declaration}Introduced with the \texttt{struct}, \IndexDefinition{enum declaration}\texttt{enum} and \IndexDefinition{class declaration}\texttt{class} keywords; \IndexSwift{5.5}Swift~5.5 also added \texttt{actor}, which for our needs, is just a class~\cite{se0306}. These are declaration contexts, and a declaration nested within a nominal type declaration is called a \IndexDefinition{member declaration}\emph{member declaration}. If it is also a member declaration, a function is called a \IndexDefinition{method declaration}\emph{method}, a variable is called a \IndexDefinition{property declaration}\emph{property}, and a type declaration is called a \IndexDefinition{member type declaration}\emph{member type declaration}.
 
-\IndexDefinition{generic parameter declaration}%
-\paragraph{Generic parameter declarations}
-Generic parameter declarations declare generic parameter types. They appear inside the generic parameter lists of generic declarations. The declared interface type of a generic parameter declaration is a sugared type that prints as the name of the declaration; the canonical type is the generic parameter type \ttgp{d}{i}, where \texttt{d} is the depth and \texttt{i} is the index. Generic parameter declarations are described in Chapter~\ref{generic declarations}.
+Structs and classes can contain \IndexDefinition{stored property declaration}\emph{stored property declarations}. Struct values directly store their stored properties, while a class value is a reference to a heap allocated \index{boxing}box. Enum values store one element among many; their declarations contain \IndexDefinition{enum element declaration}\emph{enum element declarations}, declared with \texttt{case}, instead of stored properties.
 
-\IndexDefinition{associated type declaration}%
-\index{bound dependent member type}%
-\paragraph{Associated type declarations}
-Associated type declarations appear inside protocols. The declared interface type of an associated type \texttt{A} is a bound dependent member type \texttt{Self.[P]A} referencing the declaration of \texttt{A}, with the \texttt{Self} generic parameter of the protocol as the base type. Associated type declarations are described in Section~\ref{protocols}.
-
-\section{Function Declarations}\label{func decls}
-
-\IndexDefinition{function declaration}
-\index{generic function type}
-\paragraph{Function declarations}
-Functions can either appear at the top level, inside of a local context such as another function, or as a member of a type, called a method. If a function is itself generic or nested inside of a generic context, the interface type is a generic function type, otherwise it is a function type.
-
-The interface type of a function is constructed from the interface types of the function's parameter declarations, and the function's return type. If the return type is omitted, it becomes the empty tuple type \texttt{()}. For methods, this function type is then wrapped in another level of function type representing the base of the call which becomes the \texttt{self} parameter of the method.
-
-\index{self interface type}
-\IndexDefinition{method self parameter}
-The \texttt{self} parameter's type and parameter flags are constructed from the self interface type of the method's type declaration, and various attributes of the method:
+Member declarations are visible to name lookup (\SecRef{name lookup}) both ``inside'' the nominal type declaration (unqualified lookup) and ``outside'' (qualified lookup). We're going to look at \ListingRef{unqualified lookup listing}, which uses two features we will cover in detail later:
 \begin{itemize}
-\item If the method is \texttt{mutating}, the \texttt{self} parameter becomes \texttt{inout}.
-\item If the method returns the dynamic Self type, the \texttt{self} parameter type is wrapped in the dynamic Self type.
-\item Finally, if the method is \texttt{static}, the \texttt{self} parameter is wrapped in a metatype.
+\item Nominal type declarations can conform to protocols (\ChapRef{conformances}). Members of conformed protocols and their extensions are visible from the conforming type.
+\item A class can inherit from a \index{superclass type}superclass type (\ChapRef{classinheritance}). Members of the superclass and its extensions are visible from the subclass.
 \end{itemize}
 
-This can be summarized as follows; note that \texttt{(Self)} parameter list means the self interface type of the method's type declaration, together with any additional parameter flags computed via the above:
-\begin{quote}
-\begin{tabular}{ccll}
+\begin{listing}\captionabove{Some behaviors of name lookup}\label{unqualified lookup listing}
+\begin{Verbatim}
+class Form { static func callee1() {} }
+protocol Shape { static func callee2() }
+extension Shape { static func callee3() {} }
+
+struct Square: Shape {
+  class Circle: Form {
+    static func caller() {
+      ...  // unqualified lookup from here
+    }
+  }
+}
+\end{Verbatim}
+\end{listing}
+
+Suppose we're type checking the body of \texttt{caller()}, and some expression in the body refers to an identifier. We must resolve the identifier with unqualified lookup. All three of \texttt{callee1()}, \texttt{callee2()} and \texttt{callee3()} are in scope, so starting from the top-left corner, unqualified lookup must look through all of these declaration contexts:
+\begin{center}
+\begin{tikzpicture}[node distance=1cm]
+
+\node (caller) [class] {\texttt{\vphantom{p}func caller()}};
+
+\node (Circle) [class, right=of caller] {\texttt{\vphantom{p}class Circle}};
+\node (Square) [class, right=of Circle] {\texttt{struct Square}};
+
+\node (Form) [class, below=of Circle] {\texttt{\vphantom{p}class Form}};
+\node (Shape) [class, below=of Square] {\texttt{protocol Shape}};
+
+\node (extShape) [class, below=of Shape] {\texttt{extension Shape}};
+
+\draw [arrow] (caller) -- (Circle);
+\draw [arrow] (Circle) -- (Square);
+\draw [arrow] (Square) -- (Shape);
+\draw [arrow] (Circle) -- (Form);
+\draw [arrow] (Shape) -- (extShape);
+
+\end{tikzpicture}
+\end{center}
+We will say more about name lookup in \ChapRef{typeresolution} and \SecRef{direct lookup}.
+
+A nominal type declaration declares a new type with its own name and identity (hence ``nominal''). The declared interface type of a nominal type declaration is called a \index{nominal type}nominal type, which we already met in \SecRef{fundamental types}:
+\begin{Verbatim}
+struct Universe {     // declared interface type: Universe
+  struct Galaxy {}    // declared interface type: Universe.Galaxy
+
+  func solarSystem() {
+    struct Planet()   // declared interface type: Planet
+  }
+}
+\end{Verbatim}
+The declared interface type of \texttt{Galaxy} is \texttt{Universe.Galaxy}, while the declared interface type of \texttt{Planet} is just \texttt{Planet}, with no parent type. This reflects the semantic difference; \texttt{Galaxy} is visible to qualified lookup as a member of \texttt{Universe}, while \texttt{Planet} is only visible to unqualified lookup within the scope of \texttt{solarSystem()}; we call it a \IndexDefinition{local type declaration}\emph{local type declaration}. Further discussion of nominal type nesting appears in \SecRef{nested nominal types}.
+
+\paragraph{Type alias declarations.} These are introduced by the \IndexDefinition{type alias declaration}\texttt{typealias} keyword. The \IndexDefinition{underlying type}underlying type is written on the right-hand side of ``\texttt{=}'':
+\begin{Verbatim}
+typealias Hands = Int  // one hand is four inches
+func measure(horse: Horse) -> Hands {...}
+let metatype = Hands.self
+\end{Verbatim}
+The declared interface type of a type alias declaration is a \index{type alias type}type alias type. The canonical type of this type alias type is just the underlying type. Therefore, if we print the return type of \texttt{measure()} in a diagnostic message, we will print it as ``\texttt{Hands}'', but otherwise it behaves as if it were an \texttt{Int}.
+
+As with all type declarations, the interface type of a type alias declaration is the metatype of its declared interface type. In the above, the expression ``\texttt{Hands.self}'' has the metatype type \texttt{Hands.Type}. This is a sugared type, canonically equal to \texttt{Int.Type}.
+
+While type aliases are declaration contexts, the only declarations a type alias can contain are generic parameter declarations, in the event the type alias is generic.
+
+\paragraph{Other type declarations.}
+We've seen non-generic nominal type and type alias declarations, but of course they can also be generic. We will study the declarations of generic parameters, requirements, protocols and associated types next, and our foray into generics will begin in earnest. Here are all the type declaration kinds and their declared interface types, with a representative specimen of each:
+\begin{center}
+\begin{tabular}{ll}
 \toprule
-\textbf{Generic?}&\textbf{Method?}&\textbf{Interface type}\\
+\textbf{Type declaration}&\textbf{Declared interface type}\\
 \midrule
-$\times$&$\times$&\texttt{(Params)\ -> Result}\\
-\checkmark&$\times$&\texttt{<Sig> (Params)\ -> Result}\\
-$\times$&\checkmark&\texttt{(Self) -> (Params)\ -> Result}\\
-\checkmark&\checkmark&\texttt{<Sig> (Self) -> (Params)\ -> Result}\\
+Nominal type declaration:&Nominal type:\\
+\verb|struct Horse {...}|&\verb|Horse|\\
+\midrule
+Type alias declaration:&Type alias type:\\
+\verb|typealias Hands = Int|&\verb|Hands|\\
+\midrule
+Generic parameter declaration:&Generic parameter type:\\
+\verb|<T: Sequence>|&\verb|T| (or \rT)\\
+\midrule
+Protocol declaration:&Protocol type:\\
+\verb|protocol Sequence {...}|&\verb|Sequence|\\
+\midrule
+Associated type declaration:&Dependent member type:\\
+\verb|associatedtype Element|&\verb|Self.Element|\\
 \bottomrule
 \end{tabular}
-\end{quote}
+\end{center}
 
-\index{call expression}
-The two levels of function type in the interface type of a method mirror the two-level structure of a method call expression \texttt{foo.bar(1, 2)}, shown in Figure~\ref{method call expr}:
+\section{Generic Parameters}\label{generic params}
+
+Various kinds of declarations can have a \IndexDefinition{generic parameter list}generic parameter list. We call them \IndexDefinition{generic declaration}\emph{generic declarations}. We start with those where the generic parameter list is written in source: nominal type declarations, \IndexDefinition{generic type alias}type aliases, \index{function declaration}functions and \index{constructor declaration}constructors, and \index{subscript declaration}subscripts. A generic parameter list is \IndexDefinition{parsed generic parameter list}denoted in source with the \texttt{<...>} syntax following the name of the declaration:
+\begin{Verbatim}
+struct Outer<T> {...}
+\end{Verbatim}
+Each comma-separated element in this list is a \IndexDefinition{generic parameter declaration}\emph{generic parameter declaration}; this is a type declaration that declares a generic parameter type. Generic parameter declarations are visible to unqualified lookup in the entire source range of the parent declaration, the one that has the generic parameter list. When generic declarations nest, the inner generic declaration is effectively parameterized by all generic parameters, at every level of nesting.
+
+Any declaration that can have a generic parameter list is also a \index{declaration context}declaration context in our taxonomy, because it contains other declarations; namely, its generic parameter declarations. We say that a declaration context is a \IndexDefinition{generic context}\emph{generic context} if at least one parent context has a generic parameter list.
+
+The name of a generic parameter declaration plays no role after \index{unqualified lookup}unqualified lookup. Instead, to each generic parameter declaration, we assign a pair of integers (or more accurately, \index{natural number}natural numbers; they're non-negative), the \IndexDefinition{depth}\emph{depth} and the \IndexDefinition{index}\emph{index}:
 \begin{itemize}
-\item The self apply expression \texttt{foo.bar} applies the single argument \texttt{foo} to the method's \texttt{self} parameter. The type of the self apply expression is the method's inner function type.
-\item The outer call applies the argument list \texttt{(1, 2)} to the inner function type. The type of the outer call expression is the method's return type.
+\item The depth selects a generic parameter list; the generic parameters declared by the outermost generic parameter list are at depth zero, and we increment the depth by one for each nested generic parameter list.
+\item The index selects a generic parameter within a generic parameter list; we number sibling generic parameter declarations consecutively starting from zero.
 \end{itemize}
 
-\begin{figure}\captionabove{Two levels of function application in a method call \texttt{foo.bar(1, 2)}}\label{method call expr}
+Let's write some nested generic declarations inside the \texttt{Outer} struct above. In the following, \texttt{two()} is generic over \texttt{T}~and~\texttt{U}, while \texttt{four()} is generic over~\texttt{T}, \texttt{V}, \texttt{W}~and~\texttt{X}:
+\begin{Verbatim}
+struct Outer<T> {
+  func two<U>(u: U) -> T {...}
+
+  struct Both<V, W> {
+    func four<X>() -> X {...}
+  }
+}
+\end{Verbatim}
+
+When type resolution resolves the type representation ``\texttt{T}'' in the return type of \texttt{two()}, it outputs a generic parameter type that prints as ``\texttt{T}'', if it appears in a diagnostic for example. This is a \index{sugared type}sugared type. Every generic parameter type also has a canonical form which only records the depth and index; we denote a canonical generic parameter type by ``\ttgp{d}{i}'', where \texttt{d} is the depth and \texttt{i} is the index. Two generic parameter types are canonically equal if they have the same depth and index. This is sound, because the depth and index unambiguously identify a generic parameter within its lexical scope.
+
+Let's enumerate all generic parameters visible within \texttt{two()},
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+&\textbf{Depth}&\textbf{Index}&\textbf{Canonical type}\\
+\midrule
+\texttt{T}&0&0&\ttgp{0}{0}\\
+\texttt{U}&1&0&\ttgp{1}{0}\\
+\bottomrule
+\end{tabular}
+\end{center}
+and \texttt{four()},
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+&\textbf{Depth}&\textbf{Index}&\textbf{Canonical type}\\
+\midrule
+\texttt{T}&0&0&\ttgp{0}{0}\\
+\texttt{V}&1&0&\ttgp{1}{0}\\
+\texttt{W}&1&1&\ttgp{1}{1}\\
+\texttt{X}&2&0&\ttgp{2}{0}\\
+\bottomrule
+\end{tabular}
+\end{center}
+The generic parameter~\texttt{U} of \texttt{two()} has the same \index{declared interface type!generic parameter}declared interface type, \ttgp{1}{0}, as the generic parameter~\texttt{V} of \texttt{four()}. This is not a problem because the source ranges of their parent declarations, \texttt{two()} and \texttt{Both}, do not intersect.
+
+The numbering by depth can be seen in the \index{declared interface type!nested nominal type}declared interface type of a nested generic nominal type declaration. For example, the declared interface type of \texttt{Outer.Both} is the generic nominal type \texttt{Outer<\ttgp{0}{0}>.Both<\ttgp{1}{0}, \ttgp{1}{1}>}.
+
+\paragraph{Implicit generic parameters.} Sometimes the generic parameter list is not written in source. Every protocol declaration has a generic parameter list with a single generic parameter named \Index{protocol Self type@protocol \texttt{Self} type}\texttt{Self} (\SecRef{protocols}), and every extension declaration has a generic parameter list cloned from that of the extended type (\ChapRef{extensions}). These implicit generic parameters can be referenced by name within their scope, just like the generic parameter declarations in a parsed generic parameter list (\SecRef{identtyperepr}).
+
+Function, constructor and subscript declarations can also declare \IndexDefinition{opaque parameter}\emph{opaque parameters} with the \texttt{some} keyword, possibly in combination with a generic parameter list:
+\begin{Verbatim}
+func pickElement<E>(_ elts: some Sequence<E>) -> E {...}
+\end{Verbatim}
+An opaque parameter simultaneously declares a parameter value, a generic parameter type that is the type of the value, and a requirement this type must satisfy. Here, we can refer to ``\texttt{elts}'' from an expression inside the function body, but we cannot name the \emph{type} of ``\texttt{elts}'' in a type representation. From \index{expression}expression context however, the type of an opaque parameter can be obtained via the \texttt{type(of:)} special form, which produces a metatype value. This allows for invoking static methods and such.
+
+We append the opaque parameters to the parsed generic parameter list, so they follow parsed generic parameters in index order. In \texttt{pickElement()}, the generic parameter \texttt{E} has canonical type~\rT, while the opaque parameter associated with ``\texttt{elts}'' has canonical type~\rU. Opaque parameter declarations also state a constraint type, which imposes a requirement on this unnamed generic parameter. We will discuss this in the next section. Note that when \texttt{some} appears in the return type of a function, it declares an \emph{opaque return type}, which is a related but different feature (\ChapRef{opaqueresult}).
+
+In \ChapRef{genericsig}, we will see that the generic signature of a declaration records all visible generic parameters, regardless of how they were declared.
+
+\section{Requirements}\label{requirements}
+
+The requirements of a generic declaration constrain the generic argument types that can be provided by the caller. This endows the generic declaration's type parameters with new capabilities, so they abstract over the concrete types that satisfy those requirements. We use the following encoding for requirements in the theory and implementation.
+
+\begin{definition}\label{requirement def}
+A \IndexDefinition{requirement}\emph{requirement} is a triple consisting of a \emph{requirement kind}, a subject type, and one final piece of information that depends on the kind:
+\begin{itemize}
+\item A \IndexDefinition{conformance requirement}\textbf{conformance requirement} $\ConfReq{T}{P}$ states that the replacement type for~\texttt{T} must conform to~\texttt{P}, which must be a protocol, protocol composition, or parameterized protocol type.
+\item A \IndexDefinition{superclass requirement}\textbf{superclass requirement} $\ConfReq{T}{C}$ states that the replacement type for~\texttt{T} must be a subclass of some \index{class type}class type~\texttt{C}.
+\item A \IndexDefinition{layout requirement}\textbf{layout requirement} $\ConfReq{T}{AnyObject}$ states that the replacement type for~\texttt{T} must be represented as a single reference-counted pointer at runtime.
+\item A \IndexDefinition{same-type requirement}\textbf{same-type requirement} $\SameReq{T}{U}$ states that the replacement types for \texttt{T}~and~\texttt{U} must be \index{canonical type equality}canonically equal.
+\end{itemize}
+\end{definition}
+
+When looking at concrete instances of requirements in a self-contained snippet of code, there is no ambiguity in using the same notation for the first three kinds, because the type referenced by the right-hand side determines the requirement kind. When talking about requirements in the abstract, we will explicitly state that~\texttt{P} is some protocol, or~\texttt{C} is some class, before talking about $\ConfReq{T}{P}$ or $\ConfReq{T}{C}$.
+
+\paragraph{Constraint types.}
+Before we introduce the trailing \texttt{where} clause syntax for stating requirements in a fully general way, let's look at the shorthand of stating a \IndexDefinition{constraint type}\emph{constraint type} in the \IndexDefinition{inheritance clause!generic parameter}inheritance clause of a \index{generic parameter declaration}generic parameter declaration:
+\begin{Verbatim}
+func allEqual<E: Equatable>(_ elements: [E]) {...}
+\end{Verbatim}
+The generic parameter declaration~\texttt{E} declares the generic parameter type~\rT, and states a constraint type. This is the protocol type~\texttt{Equatable}, so the stated requirement is the conformance requirement $\ConfReq{\rT}{Equatable}$. More generally, the constraint type is one of the following:
+\begin{enumerate}
+\item A \index{protocol type!constraint type}protocol type, like \texttt{Equatable}.
+\item A \index{parameterized protocol type!constraint type}parameterized protocol type, like \texttt{Sequence<String>}.
+\item A \index{protocol composition type!constraint type}protocol composition type, like \texttt{Sequence \& MyClass}.
+\item A \index{class type!constraint type}class type, like \texttt{NSObject}.
+\item The \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} \index{layout constraint}\emph{layout constraint}, which restricts the possible concrete types to those represented as a single reference-counted pointer.
+\end{enumerate}
+In the first three cases, the stated requirement becomes a conformance requirement. Otherwise, it is a superclass or layout requirement. In all cases, the subject type of the requirement is the \index{declared interface type!generic parameter}declared interface type of the generic parameter.
+
+\begin{example}
+The constraint type of the generic parameter \texttt{B} in \texttt{open()} refers to the generic parameter \texttt{C}. This illustrates a property of \index{scope tree}scope tree: generic parameters are always visible from the entire \index{source range}source range of a generic declaration, which includes the \index{generic parameter list}generic parameter list itself.
+\begin{Verbatim}
+class Box<Contents> {
+  var contents: Contents? = nil
+}
+
+func open<B: Box<C>, C>(box: B) -> C {
+  return box.contents!
+}
+\end{Verbatim}
+The declaration of \texttt{open()} thus states a single requirement, the superclass requirement $\ConfReq{\rT}{Box<\rU>}$. Here is a possible usage of \texttt{open()}, that we will leave unexplained for now; once we learn about substitution maps there will be many more examples:
+\begin{Verbatim}
+struct Vegetable {}
+class FarmBox: Box<Vegetable> {}
+let vegetable: Vegetable = open(box: FarmBox())
+\end{Verbatim}
+\end{example}
+
+\paragraph{Opaque parameters.}
+The \index{constraint type!opaque parameter}constraint type that follows the \texttt{some} keyword imposes a conformance, superclass or layout requirement on the \index{opaque parameter}opaque parameter, just like stating a constraint type in the inheritance clause of a generic parameter declaration does. The following two declarations both state the requirement $\ConfReq{\rU}{Sequence<\rT>}$:
+\begin{Verbatim}
+func pickElement<E>(_ elts: some Sequence<E>) -> E {...}
+func pickElement<E, S: Sequence<E>>(_ elts: S) -> E {...}
+\end{Verbatim}
+
+Constraint types can appear in various other positions, and in all cases, they state a requirement with some distinguished subject type:
+\begin{enumerate}
+\item In the inheritance clause of a protocol or associated type (\SecRef{protocols}).
+\item Following the \texttt{some} keyword in return position, where it declares an opaque return type (\ChapRef{opaqueresult}).
+\item Following the \texttt{any} keyword that references an existential type (\ChapRef{existentialtypes}), with the exception that the constraint type cannot be a class by itself (for example, we allow ``\verb|any NSObject & Equatable|'', but ``\verb|any NSObject|'' is just ``\texttt{NSObject}'').
+\end{enumerate}
+
+\paragraph{Trailing where clauses.} All of the above are special cases of requirements stated in a \IndexDefinition{where clause@\texttt{where} clause}\index{trailing where clause@trailing \texttt{where} clause|see{\texttt{where} clause}}\texttt{where} clause. This allows generality that cannot be expressed using the inheritance clause of a generic parameter alone.
+
+Each entry in a \texttt{where} clause names the subject type explicitly, so that \index{dependent member type}dependent member types can be be subject to requirements; here, we state two requirements, $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT.Element}{Comparable}$:
+\begin{Verbatim}
+func isSorted<S: Sequence>(_: S) where S.Element: Comparable {...}
+\end{Verbatim}
+
+A \texttt{where} clause entry can also state a same-type requirement. Here, we state two conformance requirements $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rU}{Sequence}$, together with the same-type requirement $\SameReq{\rT.Element}{\rU.Element}$:
+\begin{Verbatim}
+func merge<S1: Sequence, S2: Sequence>(_: S1, _: S2) -> [S1.Element]
+    where S1: Comparable, S1.Element == S2.Element {...}
+\end{Verbatim}
+
+Note that there is no way to refer to an opaque parameter type within the function's \Index{where clause@\texttt{where} clause}\texttt{where} clause, but every declaration using opaque parameters can always be rewritten into an equivalent one using named generic parameters, so no generality is lost.
+
+We saw in \ChapRef{types} that when the parser reads a type annotation in the source, it constructs a \index{type representation}type representation, a lower-level syntactic object which must be \index{type resolution}resolved to obtain a \index{type}type. Similarly, requirements have a syntactic form, called a \IndexDefinition{requirement representation}\emph{requirement representation}. The parser constructs requirement representations while reading a \texttt{where} clause. The relationship between the syntactic and semantic entities is shown in this diagram:
+\begin{center}
+\begin{tikzpicture}[node distance=1cm]
+\node (ReqRepr) [data] {Requirement representation};
+\node (TypeRepr) [data, below=of ReqRepr] {Type representation};
+\node (Req) [data, right=2cm of ReqRepr] {Requirement};
+\node (Type) [data, below=of Req] {Type};
+
+\draw [arrow] (ReqRepr) -- (TypeRepr);
+\draw [arrow] (Req) -- (Type);
+
+\path [arrow] (ReqRepr) edge [left] node {\footnotesize{contains}} (TypeRepr);
+\path [arrow] (Req) edge [right] node {\footnotesize{contains}} (Type);
+
+\path [arrow] (ReqRepr) edge [above] node {\footnotesize{resolves to}} (Req);
+\path [arrow] (TypeRepr) edge [below] node {\footnotesize{resolves to}} (Type);
+
+\end{tikzpicture}
+\end{center}
+There are only two kinds of requirement representations, because the ``\texttt{:}'' form cannot distinguish conformance, superclass and layout requirements until we resolve the type representation on the right-hand side:
+\begin{enumerate}
+\item A \IndexDefinition{constraint requirement representation}\textbf{constraint requirement representation} ``\texttt{T:\ C}'', where \texttt{T} and \texttt{C} are type representations.
+\item A \IndexDefinition{same-type requirement representation}\textbf{same-type requirement representation} ``\texttt{T == U}'', where \texttt{T} and \texttt{U} are type representations.
+\end{enumerate}
+
+Recall that the right-hand side of a conformance requirement may be a protocol type, protocol composition type, or parameterized protocol type. With a protocol composition type, we decompose the conformance requirement into a series of requirements, one for each member of the composition.
+
+For example, if \texttt{MyClass} is a class, the requirement $\ConfReq{\rT}{Sequence~\&~MyClass}$ decomposes into $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT}{MyClass}$, the latter being a superclass requirement. The empty protocol composition, written \Index{Any@\texttt{Any}}\texttt{Any}, is a trivial case; stating a conformance requirement to \texttt{Any} does nothing in a \texttt{where} clause, but it is allowed. Parameterized protocol types also decompose, as we'll see in~\SecRef{protocols}.
+
+The next chapter will introduce the derived requirements formalism. We will assume that only conformance requirements to protocol types remain, and similarly, that the subject types of requirements are type parameters, and not arbitrary types. \SecRef{requirement desugaring} will show how we eliminate these unnecessary forms of generality.
+
+\paragraph{Contextually-generic declarations.} A generic declaration nested inside of another generic declaration can state a \texttt{where} clause, without introducing new generic parameters of its own. This is called a \IndexDefinition{contextually-generic declaration}\emph{contextually-generic declaration}:
+\begin{Verbatim}
+enum LinkedList<Element> {
+  ...
+  
+  func sum() -> Element where Element: AdditiveArithmetic {...}
+}
+\end{Verbatim}
+There is no semantic distinction between attaching a \texttt{where} clause to a member of a type, or moving the member to a \index{constrained extension}constrained extension (\SecRef{constrained extensions}), assuming such a transformation is possible, so the above is equivalent to the following:
+\begin{Verbatim}
+extension LinkedList where Element: AdditiveArithmetic {
+  func sum() -> Element {...}
+}
+\end{Verbatim}
+\index{mangling}
+However, for historical reasons, these two declarations have distinct \index{mangling!contextually-generic declaration}mangled symbol names, so the above is not an \index{ABI}ABI-compatible transformation.
+
+\medskip
+
+In \ChapRef{genericsig}, we will see that the generic signature of a declaration records all of its requirements, however they were stated in source.
+
+\paragraph{History.} The syntax described in this section has evolved over time:
+\begin{itemize}
+\item The \texttt{where} clause used to be written within the ``\texttt{<}'' and ``\texttt{>}'', but was moved to the current \Index{where clause@\texttt{where} clause}``trailing'' position in \IndexSwift{3.0}Swift 3 \cite{se0081}.
+\item Generic type aliases were introduced in \IndexSwift{3.0}Swift 3 \cite{se0048}.
+\item Protocol compositions involving class types were introduced in \IndexSwift{4.0}Swift 4 \cite{se0156}.
+\item Generic subscripts were introduced in \IndexSwift{4.0}Swift 4 \cite{se0148}.
+\item Implementation limitations prevented the \texttt{where} clause from stating requirements that constrain outer generic parameters until Swift 3, and contextually-generic declarations were not allowed until \IndexSwift{5.3}Swift 5.3 \cite{se0261}.
+\item Opaque parameter declarations were introduced in \IndexSwift{5.7}Swift 5.7 \cite{se0341}.
+\end{itemize}
+
+\section{Protocols}\label{protocols}
+
+The \texttt{protocol} keyword introduces a \IndexDefinition{protocol declaration}\emph{protocol declaration}, which is a special kind of nominal type declaration. The members of a protocol, with the exception of type aliases, are requirements that must be witnessed by corresponding members in each \index{conforming type}conforming type. In particular, the property, subscript and method declarations inside a protocol don't have bodies, but are otherwise represented in a similar way to the concrete case. A protocol declaration's declared interface type is a \index{protocol type}protocol type.
+
+Every protocol has an implicit generic parameter list with a single generic parameter named \IndexDefinition{protocol Self type@protocol \texttt{Self} type}\texttt{Self}, which abstracts over the conforming type. The declared interface type of \texttt{Self} is always~\rT, because protocols cannot be nested in other generic contexts (\SecRef{nested nominal types}), nor can they declare any other generic parameters.
+
+The \texttt{associatedtype} keyword introduces an \IndexDefinition{associated type declaration}\emph{associated type declaration}, which can only appear inside of a protocol. The declared interface type is a \index{dependent member type}dependent member type (\SecRef{fundamental types}). Specifically, the declared interface type of an associated type~\texttt{A} in a protocol~\texttt{P} is the \index{bound dependent member type}bound dependent member type denoted \texttt{Self.[P]A}, formed from the base type of~\texttt{Self} together with~\texttt{A}.
+
+Protocols can state \IndexDefinition{associated requirement}\emph{associated requirements} on their \texttt{Self} type and its dependent member types. The conforming type must declare a type witness for each associated type (\SecRef{type witnesses}), and the conforming type and its type witnesses must satisfy the protocol's associated requirements. We will review all the ways of stating associated requirements now.
+
+\paragraph{Protocol inheritance clauses.}
+A protocol can have an \index{inheritance clause!protocol}inheritance clause with a list of one or more comma-separated \index{constraint type!protocol inheritance clause}constraint types. Each inheritance clause entry states an associated requirement with a subject type of \texttt{Self}. These are additional requirements the conforming type itself must satisfy in order to conform.
+
+An associated conformance requirement with a subject type of \texttt{Self} establishes a \index{protocol inheritance|see{inherited protocol}}\IndexDefinition{inherited protocol}\emph{protocol inheritance} relationship. The protocol stating the requirement is the \emph{derived protocol}, and the protocol on the right-hand side is the \emph{base protocol}. The derived protocol is said to \emph{inherit} from (or sometimes, \emph{refine}) the base protocol. A \index{qualified lookup!protocol inheritance}qualified lookup will search through all base protocols, when the lookup begins at a derived protocol or one of its concrete conforming types.
+
+For example, the standard library's \texttt{Collection} protocol inherits from \texttt{Sequence} by stating the associated requirement $\ConfReq{Self}{Sequence}$:
+\begin{Verbatim}
+protocol Collection: Sequence {...}
+\end{Verbatim}
+
+Protocols can restrict their conforming types to those with a reference-counted pointer representation by stating an \texttt{AnyObject} layout constraint in the inheritance clause:
+\begin{Verbatim}
+protocol BoxProtocol: AnyObject {...}
+\end{Verbatim}
+
+Protocols can also limit their conforming types to subclasses of some superclass:
+\begin{Verbatim}
+class Plant {}
+class Animal {}
+protocol Duck: Animal {}
+class MockDuck: Plant, Duck {}  // error: not a subclass of Animal
+\end{Verbatim}
+A protocol is \IndexDefinition{class-constrained protocol}\emph{class-constrained} if the $\ConfReq{Self}{AnyObject}$ associated requirement is either explicitly stated, or a consequence of some other associated requirement. We'll say more about the semantics of protocol inheritance clauses and name lookup in \SecRef{requirement sig}, \SecRef{identtyperepr}, and \ChapRef{building generic signatures}.
+
+\paragraph{Primary associated types.}
+A protocol can declare a list of \IndexDefinition{primary associated type}\emph{primary associated types} with a syntax resembling a generic parameter list:
+\begin{Verbatim}
+protocol IteratorProtocol<Element> {
+  associatedtype Element
+  mutating func next() -> Element?
+}
+\end{Verbatim}
+While generic parameter lists introduce new generic parameter declarations, the entries in the primary associated type list reference \emph{existing} associated types declared in the protocol's body.
+
+A \index{parameterized protocol type}\emph{parameterized protocol type} can be formed from a reference to a protocol with primary associated types, together with a list of generic arguments, one for each primary associated type. When written on the right-hand side of a conformance requirement, a parameterized protocol type decomposes into a conformance requirement to the protocol, followed by a series of same-type requirements. The following are equivalent:
+\begin{Verbatim}
+func sumOfSquares<I>(_: I) -> Int
+    where I: IteratorProtocol<Int> {...}
+func sumOfSquares<I>(_: I) -> Int
+    where I: IteratorProtocol, I.Element == Int {...}
+\end{Verbatim}
+More details in \SecRef{requirement desugaring}. Parameterized protocol types and primary associated types were added to the language in \IndexSwift{5.7}Swift~5.7~\cite{se0346}. 
+
+\paragraph{Associated requirements.}
+An associated type declaration can have an \index{inheritance clause!associated type}inheritance clause, consisting of one or more comma-separated constraint types. Each entry defines a requirement on the declared interface type of the associated type declaration, so we get $\ConfReq{Self.Data}{Codable}$ and $\ConfReq{Self.Data}{Hashable}$ below:
+\begin{Verbatim}
+associatedtype Data: Codable, Hashable
+\end{Verbatim}
+
+An associated type declaration can also have a trailing \Index{where clause@\texttt{where} clause}\texttt{where} clause, where associated requirements can be stated in full generality. The standard library \texttt{Sequence} protocol demonstrates the various syntactic forms we just described:
+\begin{Verbatim}
+protocol Sequence<Element> {
+  associatedtype Iterator: IteratorProtocol
+  associatedtype Element where Element == Iterator.Element
+
+  func makeIterator() -> Iterator
+}
+\end{Verbatim}
+The associated conformance requirement on \texttt{Self.Iterator} could have been stated using a \texttt{where} clause instead:
+\begin{Verbatim}
+associatedtype Iterator where Iterator: IteratorProtocol
+\end{Verbatim}
+A \texttt{where} clause can also be attached to the protocol itself; there is no semantic difference between that and attaching it to an associated type:
+\begin{Verbatim}
+protocol Sequence where Iterator: IteratorProtocol,
+                        Element == Iterator.Element {...}
+\end{Verbatim}
+Finally, we could make the \texttt{Self} qualification explicit:
+\begin{Verbatim}
+protocol Sequence where Self.Iterator: IteratorProtocol,
+                        Self.Element == Self.Iterator.Element {...}
+\end{Verbatim}
+
+In all cases we state two associated requirements. Our notation will append a subscript with the protocol name declaring the requirement:
+\begin{gather*}
+\ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}\\
+\SameReq{Self.Element}{Self.Iterator.Element}_\texttt{Sequence}
+\end{gather*}
+
+Let's summarize all the ways of stating associated requirements in a protocol:
+\begin{itemize}
+\item The protocol can state an inheritance clause. Each entry defines a conformance, superclass or layout requirement with a subject type of \texttt{Self}.
+\item An associated type declaration \texttt{A} can state an inheritance clause. Each entry defines a conformance, superclass or layout requirement with a subject type of \texttt{Self.[P]A}.
+\item Arbitrary requirements can be stated in \Index{where clause@\texttt{where} clause}trailing \texttt{where} clauses, attached to the protocol or any of its associated types, in any combination.
+\end{itemize}
+
+A protocol's associated requirements are collected in its requirement signature, which we will see is dual to a generic signature in some sense (\SecRef{requirement sig}). How concrete types satisfy the requirement signature will be discussed in \ChapRef{conformances}.
+
+\paragraph{Self requirements.}
+The \index{value requirement}value requirements of a protocol cannot constrain \texttt{Self} or its associated types in their \Index{where clause@\texttt{where} clause}\texttt{where} clause. For example, the following protocol is rejected, because there is no way to implement the \texttt{minElement()} requirement in a concrete conforming type whose \texttt{Element} type is \emph{not} \texttt{Comparable}:
+\begin{Verbatim}
+protocol SetProtocol {
+  associatedtype Element
+  func minElement() -> Element where Element: Comparable  // error
+}
+\end{Verbatim}
+
+\paragraph{History.}
+Older releases of Swift had a model where protocols and associated types could have inheritance clauses, but more general associated requirements did not exist. The trailing \texttt{where} clause syntax was extended to cover associated types and protocols in \IndexSwift{4.0}Swift~4~\cite{se0142}.
+
+\section{Functions}\label{function decls}
+
+A \IndexDefinition{function declaration}function declaration can appear at the top level of a source file, as member of a nominal type or extension where it is also called a method declaration, or as a \IndexDefinition{local function declaration}local function nested inside of another function. In this section, we will describe the computation of the interface type of a function declaration, and then conclude with a discussion of closure captures.
+
+The \IndexDefinition{interface type request}\Request{interface type request} computes the interface type of a function declaration. This is a \index{function type}function type or \index{generic function type}generic function type, constructed from the interface types of the function's parameter declarations, together with its return type. If no return type is specified, it is assumed to be the empty tuple type~\texttt{()}:
+\begin{Verbatim}
+func f(x: Int, y: String) -> Bool {...}
+// Interface type: (Int, String) -> Bool
+
+func g() {...}
+// Interface type: () -> ()
+\end{Verbatim}
+
+\paragraph{Method declarations.}
+As well as the formal parameters declared in its parameter list, a method declaration also has an implicit \texttt{self} parameter, to receive the value on the left-hand side of the ``\texttt{.}'' in the member reference expression. The interface type of a method declaration is a function type which receives the \IndexDefinition{self parameter declaration}\texttt{self} parameter, and returns another function which then takes the method's formal parameters. The ``\texttt{->}'' operator denoting a function type is right-associative, so \verb|A -> B -> C| means \verb|A -> (B -> C)|:
+\begin{Verbatim}
+struct Universe {
+  func wormhole(x: Int, y: String) -> Bool {...}
+  // Interface type: (Universe) -> (Int, String) -> Bool
+
+  static func bigBang() {}
+  // Interface type: (Universe.Type) -> () -> ()
+
+  mutating func teleport() {}
+  // Interface type: (inout Universe) -> () -> ()
+}
+\end{Verbatim}
+The interface type of the \texttt{self} parameter is derived as follows:
+\begin{itemize}
+\item We start with the \IndexDefinition{self interface type}\emph{self interface type} of the method's parent declaration context. In a struct, enum or class declaration, the self interface type is the declared interface type. In a protocol, the self interface type is the protocol \Index{protocol Self type@protocol \texttt{Self} type}\texttt{Self} type (\SecRef{protocols}). In an extension, the self interface type is that of the extended type.
+
+\item If the method is \IndexDefinition{static method declaration}\texttt{static}, we wrap the self interface type in a \index{metatype type}metatype.
+
+\item If the method is \texttt{mutating}, we pass the \texttt{self} parameter \texttt{inout}.
+
+\item If the method is declared inside a class and it returns the \IndexDefinition{dynamic Self type@dynamic \texttt{Self} type}dynamic \texttt{Self} type, the type of \texttt{self} is the dynamic \texttt{Self} type (\SecRef{misc types}).
+\end{itemize}
+
+\begin{figure}[b!]\captionabove{The method call \texttt{universe.wormhole(x:~1, y:~"hi")}}\label{method call expr}
 \begin{center}
 \begin{tikzpicture}[%
   grow via three points={one child at (0.5,-0.7) and
   two children at (0.5,-0.7) and (0.5,-1.4)},
   edge from parent path={[->] (\tikzparentnode.south) |- (\tikzchildnode.west)}]
-  \node  [class] {\vphantom{p}call expression: \texttt{Result}}
-    child { node [class] {\vphantom{p}self apply expression: \texttt{(Int, Int) -> ()}}
-      child { node  [class] {\vphantom{p}declaration reference expression: \texttt{Foo.bar}}}
-      child { node  [class] {\vphantom{p}declaration reference expression: \texttt{foo}}}}
+  \node  [class] {\vphantom{p}call: \texttt{universe.wormhole(x:~1, y:~"hi")}}
+    child { node [class] {\vphantom{p}call: \texttt{universe.wormhole}}
+      child { node  [class] {\vphantom{p}declaration reference: \texttt{Universe.wormhole}}}
+      child { node  [class] {\vphantom{p}declaration reference: \texttt{universe}}}}
     child [missing] {}
     child [missing] {}
     child { node [class] {\vphantom{p}argument list}
-      child { node  [class] {\vphantom{p}integer literal expression: \texttt{1}}}
-      child { node  [class] {\vphantom{p}integer literal expression: \texttt{2}}}}
+      child { node  [class] {\vphantom{p}literal: \texttt{1}}}
+      child { node  [class] {\vphantom{p}literal: \texttt{"hi"}}}}
     child [missing] {}
     child [missing] {}
     child [missing] {};
@@ -214,59 +515,237 @@ The two levels of function type in the interface type of a method mirror the two
 \end{center}
 \end{figure}
 
-\IndexDefinition{constructor declaration}
-\paragraph{Constructor declarations}
-Constructor declarations always appear as members of other types, and are named \texttt{init}. The interface type of a constructor takes a metatype and returns an instance of the constructed type, possibly wrapped in an \texttt{Optional}.
+Let's compare the interface type of a method declaration with the structure of a method call expression in the abstract syntax tree, shown in \FigRef{method call expr}:
+\begin{itemize}
+\item The outer expression's callee, \texttt{universe.wormhole}, is itself a call expression, so we must evaluate this inner call expression first.
 
+The inner call expression applies the the argument \texttt{universe} to the \texttt{self} parameter of \texttt{Universe.wormhole()}. This represents the method lookup. The type of the inner call expression is \verb|(Int, String) -> Bool|.
+\item The outer call expression applies the argument list \verb|(x: 1, y: "hi")| to the result of the inner call expression. This represents the method call itself. The type of the outer call expression is the method's return type, \texttt{Bool}.
+\end{itemize}
+The extra function call disappears in \index{SILGen}SILGen, where a method lowers to a SIL function that receives all formal parameters and the \texttt{self} parameter at once.
+
+Swift also allows partially-applied method references, such as \texttt{universe.wormhole}, which are values of function type. This form binds the \texttt{self} parameter but does not call the method. We eliminate this by a process called \index{eta conversion}\emph{eta conversion}, wrapping the method reference in a closure which simply forwards each parameter:
+\begin{Verbatim}
+{ x, y in universe.wormhole(x: x, y: y) }
+\end{Verbatim}
+The fully unapplied form, \texttt{Universe.wormhole}, desugars into the following:
+\begin{Verbatim}
+{ s in { x y in s.wormhole(x: x, y: y) } }
+\end{Verbatim}
+Thus, SILGen does not need to support partially-applied and unapplied method references.
+
+\begin{wrapfigure}[25]{l}{17.2em}
+\begin{minipage}{17em}
+\begin{Verbatim}
+struct Example {
+  func instanceMethod() {}
+  static func staticMethod() {}
+
+  struct Lookup {
+    func innerMethod() {}
+
+    func test() {
+      instanceMethod()  // bad
+      staticMethod()    // ok
+      innerMethod()     // ok
+    }
+  }
+
+  func anotherMethod(x: Int) {
+    struct Local {
+      func test() {
+        print(x)        // bad
+      }
+    }
+  }
+}
+\end{Verbatim}
+\end{minipage}
+\end{wrapfigure}
+
+All function declarations must be followed by a body in the source language, except for protocol requirements. The body may contain statements, expressions, or other declarations. We will not give an exhaustive account of all statements and expressions, like we did with types and declarations.
+
+The example on the left illustrates name lookup from inside method declarations.
+
+In a method body, an unqualified reference to a member of the innermost nominal type declaration is interpreted as having an implicit ``\texttt{self.}'' qualification. Thus, instance methods can refer to other instance methods this way, and static methods can refer to other static methods.
+
+An unqualified reference to a member of an outer nominal type can only be made if the member is static, because there is no ``outer \texttt{self} value'' to invoke the method with; the nested type does not reference a value of its parent type at run time.
+
+For the same reason, methods inside \index{local type declaration}local types cannot refer to local variables declared inside parent declaration contexts. (Constrast this with \index{Java}Java inner classes for example, which can be declared as \texttt{static} or instance members of their parent class; a non-\texttt{static} inner class can then capture values from outer scopes, including ``\texttt{this}'', which plays the same role as Swift's ``\texttt{self}''.)
+
+\paragraph{Constructor declarations.}
+\IndexDefinition{constructor declaration}Constructor declarations are introduced with the \texttt{init} keyword. The parent context of a constructor must be a nominal type or extension.
+
+The interface type of a constructor is like a static method that returns the new instance. A constructor also has an \IndexDefinition{initializer interface type}\emph{initializer interface type} which describes the type of an initializing entry point, where the instance is allocated by the caller:
+\begin{Verbatim}
+struct Universe {
+  init(age: Int) {...}
+  // Interface type is (Universe.Type) -> (Int) -> Universe
+  // Initializer interface type is (Universe) -> (Int) -> Universe
+}
+\end{Verbatim}
+The interface type of the constructor's \texttt{self} parameter is the nominal type itself, and not the metatype.
+
+\paragraph{Destructor declarations.}
+\IndexDefinition{destructor declaration}Destructor declarations are introduced with the \texttt{deinit} keyword. They can only appear inside classes. They have no formal parameters, no generic parameter list, no \texttt{where} clause, and no return type.
+
+\paragraph{Local contexts.}
+A \IndexDefinition{local context}\emph{local context} is any declaration context that is not a module, source file, type declaration or extension. Swift allows variable, function and type declarations to appear in local context. The following are local contexts:
+\begin{itemize}
+\item \index{top-level code declaration}Top-level code declarations.
+\item Function declarations.
+\item \index{closure expression}Closure expressions.
+\item If a variable is not itself in local context (for example, it's a member of a nominal type declaration), then its \index{initial value expression}initial value expression defines a new local context.
+\item \index{subscript declaration}Subscript and \index{enum element declaration}enum element declarations declarations are local contexts, because they can contain parameter declarations (and also a generic parameter list, in the case of a subscript).
+\end{itemize}
+
+Local functions and closures can \IndexDefinition{captured value}\emph{capture} references to other local declarations from outer scopes. We use the standard technique of \IndexDefinition{closure conversion}\emph{closure conversion} to lower functions with captured values into ones without. We can understand this process as introducing an additional parameter for each captured value, followed by a walk to replace references to captured values with references to the corresponding parameters in the function body. In Swift, this is part of \index{SILGen}SILGen's lowering process, and not a separate transformation on the abstract syntax tree.
+
+The \IndexDefinition{capture info request}\Request{capture info request} computes the list of declarations captured by the given function, and all of its nested local functions and closure expressions.
+
+\begin{wrapfigure}[9]{l}{10.6em}
+  \begin{minipage}{10.5em}
+\begin{Verbatim}
+func f() {
+  let x = 0, y = 0
+
+  func g() {
+    var z = 0
+    print(x)
+
+    func h() {
+      print(y, z)
+    }
+  }
+}
+\end{Verbatim}
+\end{minipage}
+\end{wrapfigure}
+
+Consider the three nested functions shown on the left. We proceed to compute their captures from the inside out.
+
+The innermost function~\texttt{h()} captures \texttt{y}~and~\texttt{z}. The middle function~\texttt{g()} captures~\texttt{x}. It also captures~\texttt{y}, because~\texttt{h()} captures~\texttt{y}, but it does not capture~\texttt{z}, because~\texttt{z} is declared by~\texttt{g()} itself. Finally,~\texttt{f()} is declared at the top level, so it does not have any captures.
+
+We can summarize this as follows:
+% FIXME
 \begin{quote}
-\begin{tabular}{cl}
+\qquad\qquad
+\begin{tabular}{lll}
 \toprule
-\textbf{Generic?}&\textbf{Interface type}\\
+\textbf{Function}&\textbf{Captures}\\
 \midrule
-$\times$&\texttt{(Self.Type) -> (Params)\ -> Self}\\
-\checkmark&\texttt{<Sig> (Self.Type) -> (Params)\ -> Self}\\
+\texttt{f()}&$\varnothing$\\
+\texttt{g()}&$\{\texttt{x},\,\texttt{y}\}$\\
+\texttt{h()}&$\{\texttt{y},\,\texttt{z}\}$\\
 \bottomrule
 \end{tabular}
 \end{quote}
 
-\IndexDefinition{initializer interface type}
-Class constructors also have a \emph{initializer interface type}, used when a subclass initializer delegates to an initializer in the superclass. The initializer interface type is the same as the interface type, except it takes a self value instead of a self metatype.
+\bigskip
 
-\begin{quote}
-\begin{tabular}{cl}
+\begin{algorithm}[Computing closure captures]\label{closure captures algorithm}
+As input, takes the type-checked body of a \index{closure function}closure expression or \index{local function declaration}local function~$F$. Outputs the \index{set}set of captures of~$F$.
+\begin{enumerate}
+\item Initialize the return value with an \index{empty set}empty set, $C\leftarrow\varnothing$. (See \AppendixRef{math summary} for a description of the notation used in this algorithm.)
+\item Recursively walk the type-checked body of $F$ and handle each element:
+\item (Declaration references) If $F$ contains an expression that references some local variable or local function~$d$ by name, let $\mathsf{parent}(d)$ denote the parent declaration context of~$d$. This is either $F$ itself, or some outer local context, because we found $d$ by unqualified lookup from~$F$.
+
+If $\mathsf{parent}(d)\neq F$, set $C\leftarrow C\cup\{d\}$.
+\item (Nested closures) If $F$ contains a nested closure expression or local function $F^\prime$, then a capture $d$ of $F^\prime$ is either a local declaration of~$F$, or it is also a capture of~$F$.
+
+Recursively compute the captures of $F^\prime$. For each $d$ captured by $F^\prime$ such that $\mathsf{parent}(d)\neq F$, set $C\leftarrow C\cup\{d\}$.
+
+\item (Local types) If $F$ contains a local type, do not walk into the children of the local type. Local types do not have captures.
+
+\item (Diagnose) After the recursive walk, consider each element $d\in C$. If the path of parent declaration contexts from $F$ to $d$ contains a nominal type declaration, we have an unsupported capture inside a local type. Diagnose an error.
+
+\item Return $C$.
+\end{enumerate}
+\end{algorithm}
+
+\begin{wrapfigure}[9]{r}{16.5em}
+\begin{minipage}{16.5em}
+\begin{Verbatim}
+func f() {
+  let x = 0, y = 0, z = 0
+
+  func g() { print(x); h() }
+  func h() { print(y); g() }
+  func i() { print(z); h() }
+}
+\end{Verbatim}
+\end{minipage}
+\end{wrapfigure}
+
+Local functions can also reference each other recursively. Consider the functions shown on the right and notice how \texttt{f()} and \texttt{g()} are mutually recursive. At runtime, we cannot represent this by forming two closure contexts where each one retains the other, because then neither context will ever be released.
+
+We use a second algorithm to obtain the list of \IndexDefinition{lowered captures}\emph{lowered captures}, by replacing any captured local functions with their corresponding capture lists, repeating this until fixed point. The final list contains variable declarations only. With our example, the captures and lowered captures of each function are as follows:
+
+\begin{center}
+\begin{tabular}{lll}
 \toprule
-\textbf{Generic?}&\textbf{Initializer interface type}\\
+\textbf{Function}&\textbf{Captures}&\textbf{Lowered}\\
 \midrule
-$\times$&\texttt{(Self) -> (Params)\ -> Self}\\
-\checkmark&\texttt{<Sig> (Self) -> (Params)\ -> Self}\\
+\texttt{f()}&$\varnothing$&$\varnothing$\\
+\texttt{g()}&$\{\texttt{x},\,\texttt{h}\}$&$\{\texttt{x},\,\texttt{y}\}$\\
+\texttt{h()}&$\{\texttt{y},\,\texttt{g}\}$&$\{\texttt{x},\,\texttt{y}\}$\\
+\texttt{i()}&$\{\texttt{z},\,\texttt{h}\}$&$\{\texttt{x},\,\texttt{y},\,\texttt{z}\}$\\
 \bottomrule
 \end{tabular}
-\end{quote}
+\end{center}
 
-\IndexDefinition{destructor declaration}
-\paragraph{Destructor declarations}
-Destructor declarations cannot have a generic parameter list, a \texttt{where} clause, or a parameter list. Formally they take no parameters and return \texttt{()}.
+(As a special case, if a set of local functions reference each other but capture no other state from the outer declaration context, their lowered captures will be empty, so no runtime context allocation is necessary.)
 
-\begin{quote}
-\begin{tabular}{cl}
-\toprule
-\textbf{Generic?}&\textbf{Interface type}\\
-\midrule
-$\times$&\texttt{(Self) -> ()\ -> ()}\\
-\checkmark&\texttt{<Sig> (Self) -> ()\ -> ()}\\
-\bottomrule
-\end{tabular}
-\end{quote}
+\begin{algorithm}[Computing lowered closure captures]
+As input takes the type-checked body of a \index{closure function}closure expression or \index{local function declaration}local function~$F$. Outputs the \index{set}set of variable declarations transitively captured by~$F$.
+\begin{enumerate}
+\item Initialize the set $C\leftarrow\varnothing$; this will be the return value. Initialize an empty worklist. Initialize an empty visited set. Add $F$ to the worklist.
+\item If the worklist is empty, return $C$. Otherwise, remove the next function $F$ from the worklist.
+\item If $F$ is in the visited set, go back to Step~2. Otherwise, add $F$ to the visited set.
+\item Compute the captures of~$F$ using \AlgRef{closure captures algorithm} and consider each capture~$d$. If~$d$ is a local variable declaration, set $C\leftarrow C\cup\{d\}$. If~$d$ is a local function declaration, add~$d$ to the worklist.
+\item Go back to Step~2.
+\end{enumerate}
+\end{algorithm}
 
-\section{Storage Declarations}
+This completely explains captures of \texttt{let} variables, but mutable \texttt{var} variables and \texttt{inout} parameters merit further explanation.
+
+A \index{non-escaping function type}\emph{non-escaping} closure can capture a \texttt{var} or \texttt{inout} by simply capturing the memory address of the storage location. This is safe, because a non-escaping closure cannot outlive the dynamic extent of the storage location.
+
+An \index{escaping function type}\texttt{@escaping} closure can also capture a \texttt{var}, but this requires promoting the \texttt{var} to a \index{boxing}heap-allocated box, with all loads and stores of the variable indirecting through the box. A example like the below can be found in every \index{Lisp}Lisp textbook. Each invocation of \texttt{counter()} allocates a new counter value on the heap, and returns three closures sharing the same mutable box; the box itself is completely hidden by the abstraction:
+\begin{Verbatim}
+func counter() -> (read: () -> Int, inc: () -> (), dec: () -> ()) {
+  var count = 0  // promoted to a box
+  return ({ count }, { count += 1 }, { count -= 1 })
+}
+\end{Verbatim}
+
+Before \IndexSwift{3.0}Swift~3.0, \texttt{@escaping} closures were permitted to capture \texttt{inout} parameters as well. To make this safe, the contents of the \texttt{inout} parameter were first copied into a heap-allocated box, which was captured by the closure. The contents of this box were then copied back before the function returned to its caller. This was essentially equivalent to doing the following transform, where we introduced \verb|_n| by hand:
+\begin{Verbatim}
+func changeValue(_ n: inout Int) {
+  var _n = n  // copy the value
+
+  let escapingFn = {
+    _n += 1   // capture the box
+  }
+
+  n = _n      // write it back
+}
+\end{Verbatim}
+In this scheme, if the closure outlives the dynamic extent of the \texttt{inout} parameter, any subsequent writes from within the closure are silently dropped. This was a source of user confusion, so Swift~3.0 banned \texttt{inout} captures from escaping closures instead~\cite{se0035}.
+
+In SIL, a closure is represented abstractly, as the result of this partial application operation. The mechanics of how the partially-applied function value actually stores its captures---the partially-applied arguments---are left up to IRGen. In IRGen, we allocate space for storing the captures (either on the stack for a \index{non-escaping function type}non-escaping function type, otherwise it's on the heap for \texttt{@escaping}), and then we emit a thunk, which takes a pointer to the context as an argument, unpacks the captured values from the context, and passes them as individual arguments to the original function. This thunk together with the context forms a \IndexDefinition{thick function}\emph{thick function} value which can then be passed around.
+
+If nothing is captured (or if all captured values are zero bytes in size), we can pass a null pointer as the context, without performing a heap allocation. If there is exactly one captured value and this value can be represented as a reference-counted pointer, we can also elide the allocation by passing the captured value as the context pointer. For example, if a closure's single capture is an instance of a \index{class type}class type, nothing is allocated. If the single capture is the heap-allocated box that wraps a \texttt{var}, we must still allocate the box for the \texttt{var}, but we avoid wrapping it in an additional context.
+
+\section{Storage}\label{other decls}
+
 \IndexDefinition{storage declaration}
 \index{l-value type}
-Storage declarations represent the declaration of an l-value. Storage declarations can have zero or more associated accessor declarations. The accessor declarations are siblings of the storage declaration in the declaration context hierarchy.
+Storage declarations represent locations that can be read and written.
 
-\IndexDefinition{variable declaration}
-\paragraph{Variable declarations} The interface type of a variable is the stored value type, possibly wrapped in a reference storage type if the variable is declared as \texttt{weak} or \texttt{unowned}. The \emph{value interface type} of a variable is the storage type without any wrapping.
+\paragraph{Parameter declarations.} Functions, enum elements and subscripts can have parameter lists; each parameter is represented by a \IndexDefinition{parameter declaration}parameter declaration. Parameter declarations are a kind of variable declaration.
 
-For historical reasons, the interface type of a property (a variable appearing inside of a type) does not include the \texttt{Self} clause, the way that method declarations do.
+\paragraph{Variable declarations.} \IndexDefinition{variable declaration}Variables that are not parameters are introduced with \texttt{var} and \texttt{let}. The interface type of a variable is the stored value type, possibly wrapped in a reference storage type if the variable is declared as \texttt{weak} or \texttt{unowned}. The \IndexDefinition{value interface type}\emph{value interface type} of a variable is the storage type without any wrapping. For historical reasons, the interface type of a property (a variable appearing inside of a type) does not include the \texttt{Self} clause, the way that method declarations do.
 
 \IndexDefinition{pattern binding declaration}
 \IndexDefinition{pattern binding entry}
@@ -274,16 +753,15 @@ For historical reasons, the interface type of a property (a variable appearing i
 \IndexDefinition{initial value expression}
 Variable declarations are always created alongside a \emph{pattern binding declaration} which represents the various ways in which variables can be bound to values in Swift. A pattern binding declaration consists of one or more \emph{pattern binding entries}. Each pattern binding entry has a \emph{pattern} and an optional \emph{initial value expression}. A pattern declares zero or more variables.
 
-\begin{example}
-A pattern binding declaration with a single entry, where the pattern declares a single variable:
+Here is a pattern binding declaration with a single entry, where the pattern declares a single variable:
 \begin{Verbatim}
 let x = 123
 \end{Verbatim}
-Same as the above, except with a more complex pattern which declares a variable storing the first element of a tuple while discarding the second element:
+A more complex pattern which declares a variable storing the first element of a tuple while discarding the second element:
 \begin{Verbatim}
 let (x, _) = (123, "hello")
 \end{Verbatim}
-A pattern binding declaration with a single entry, where the pattern declares two variables \texttt{x} and \texttt{y}:
+A pattern binding declaration with a single entry, but now the pattern declares two variables \texttt{x} and \texttt{y}:
 \begin{Verbatim}
 let (x, y) = (123, "hello")
 \end{Verbatim}
@@ -300,8 +778,6 @@ And finally, two pattern binding declarations, where each one pattern binding de
 let x = 123
 let y = "hello"
 \end{Verbatim}
-\end{example}
-\begin{example}
 When a pattern binding declaration appears outside of a local context, each entry must declare at least one variable, so we reject both of the following:
 \begin{Verbatim}
 let _ = 123
@@ -310,45 +786,20 @@ struct S {
   let _ = "hello"
 }
 \end{Verbatim}
-\end{example}
+
 \index{typed pattern}
 \index{tuple pattern}
-\begin{example}
 A funny quirk of the pattern grammar is that typed patterns and tuple patterns do not compose in the way one might think. If ``\texttt{let x:~Int}'' is a typed pattern declaring a variable \texttt{x} type with annotation \texttt{Int}, and ``\texttt{let (x, y)}'' is a tuple pattern declaring two variables \texttt{x} and \texttt{y}, you might expect ``\texttt{let~(x:~Int,~y:~String)}'' to declare two variables \texttt{x} and \texttt{y} with type annotations \texttt{Int} and \texttt{String} respectively; what actually happens is you get a tuple pattern declaring two variables named \texttt{Int} and \texttt{String} that binds a two-element tuple with \emph{labels} \texttt{x} and \texttt{y}:
 \begin{Verbatim}
 let (x: Int, y: String) = (x: 123, y: "hello")
 print(Int)  // huh? prints 123
 print(String)  // weird! prints "hello"
 \end{Verbatim}
-\end{example}
 
-\IndexDefinition{parameter declaration}%
-\IndexDefinition{value ownership kind}%
-\index{autoclosure function type}%
-\paragraph{Parameter declarations} Functions, enum elements and subscripts can have parameter lists; each parameter is represented by a parameter declaration. The interface type of a declaration with a parameter list is built by first computing the interface type of each parameter. Among other things, the parameter declaration stores the value ownership kind, the variadic flag, and the \texttt{@autoclosure} attribute. This is in fact the same exact information encoded in the parameter list of a function type.
+\paragraph{Subscript declarations.} \IndexDefinition{subscript declaration}Subscripts are introduced with the \texttt{subscript} keyword. They can only appear as members of nominal types and extensions. The interface type of a subscript is a function type taking the index parameters and returning the storage type. The value interface type of a subscript is just the storage type. For historical reasons, the interface type of a subscript does not include the \texttt{Self} clause, the way that method declarations do. Subscripts can either be instance or static members; static subscripts were introduced in \IndexSwift{5.1}Swift~5.1 \cite{se0254}.
 
-\index{argument label}%
-\IndexDefinition{default argument expression}%
-\index{closure expression}%
-Closure expressions also have parameter lists and thus parent parameter declarations. Parameter declarations of named declarations can have argument labels and default argument expressions, which are not encoded in a function type. These phenomena are only visible when directly calling a named declaration and not a closure value.
-
-\IndexDefinition{subscript declaration}%
-\paragraph{Subscript declarations} Subscripts always appear as members of types, with a special declaration name. The interface type of a subscript is a function type taking the index parameters and returning the storage type. The value interface type of a subscript is just the storage type. For historical reasons, the interface type of a subscript does not include the \texttt{Self} clause, the way that method declarations do.
-\begin{quote}
-\begin{tabular}{clll}
-\toprule
-\textbf{Generic?}&\textbf{Interface type}\\
-\midrule
-$\times$&\texttt{(Indices...)\ -> Value}\\
-$\checkmark$&\texttt{<Sig...>\ (Indices...)\ -> Value}\\
-\bottomrule
-\end{tabular}
-\end{quote}
-
-\IndexDefinition{accessor declaration}
-\paragraph{Accessor declarations}
-
-The interface type of an accessor depends the accessor kind. For example, getters return the value, and setters take the new value as a parameter. Property accessors do not take any other parameters; subscript accessors also take the subscript's index parameters. There is a lot more to say about accessors and storage declarations, but unfortunately, you'll have to wait for the next book.
+\paragraph{Accessor declarations.}
+Each storage declaration has a \IndexDefinition{accessor declaration}set of accessor declarations, which are a special kind of function declaration. The accessor declarations are siblings of the storage declaration in the declaration context hierarchy. The interface type of an accessor depends the accessor kind. For example, getters return the value, and setters take the new value as a parameter. Property accessors do not take any other parameters; subscript accessors also take the subscript's index parameters. There is a lot more to say about accessors and storage declarations, but it is beyond the scope of this book.
 
 \section{Source Code Reference}\label{declarationssourceref}
 
@@ -368,7 +819,7 @@ Other source files:
 
 \IndexSource{declaration}
 \apiref{Decl}{class}
-Base class of declarations. Figure~\ref{declhierarchy} shows various subclasses, which correspond to the different kinds of declarations defined previously in this chapter.
+Base class of declarations. \FigRef{declhierarchy} shows various subclasses, which correspond to the different kinds of declarations defined previously in this chapter.
 \begin{figure}\captionabove{The \texttt{Decl} class hierarchy}\label{declhierarchy}
 \begin{center}
 \begin{tikzpicture}[%
@@ -464,7 +915,7 @@ Instances are always allocated in the permanent arena of the \texttt{ASTContext}
 \index{statement}
 \index{expression}
 \index{type representation}
-\paragraph{Visitors}
+\paragraph{Visitors.}
 If you need to exhaustively handle each kind of declaration, the simplest way is to switch over the kind, which is an instance of the \texttt{DeclKind} enum, like this:
 \begin{Verbatim}
 Decl *decl = ...;
@@ -507,6 +958,8 @@ Base class of named declarations.
 \item \texttt{getInterfaceType()} returns the declaration's interface type.
 \end{itemize}
 
+\subsection*{Type Declarations}
+
 \IndexSource{type declaration}
 \IndexSource{declared interface type}
 \apiref{TypeDecl}{class}
@@ -525,7 +978,7 @@ Base class of type declarations.
 Base class of nominal type declarations. Also a \texttt{DeclContext}.
 \begin{itemize}
 \item \texttt{getSelfInterfaceType()} returns the type of the \texttt{self} value inside the body of this declaration. Different from the declared interface type for protocols, where the declared interface type is a nominal but the declared self type is the generic parameter \texttt{Self}.
-\item \texttt{getDeclaredType()} returns the type of an instance of this declaration, without generic arguments. If the declaration is generic, this is an unbound generic type. If this declaration is not generic, this is a nominal type. This is occasionally used in diagnostics instead of the declared interface type, when the generic parameter types are irrelevant.
+\item \texttt{getDeclaredType()} returns the type of an instance of this declaration, without generic arguments. If the declaration is generic, this is an \IndexSource{unbound generic type}unbound generic type. If this declaration is not generic, this is a nominal type. This is occasionally used in diagnostics instead of the declared interface type, when the generic parameter types are irrelevant.
 \end{itemize}
 
 \IndexSource{type alias declaration}
@@ -537,41 +990,11 @@ A type alias declaration. Also a \texttt{DeclContext}.
 \item \texttt{getUnderlyingType()} returns the underlying type of the type alias declaration, without wrapping it in type alias type sugar.
 \end{itemize}
 
-\IndexSource{function declaration}
-\IndexSource{method self parameter}
-\apiref{AbstractFunctionDecl}{class}
-Base class of function-like declarations. Also a \texttt{DeclContext}.
-\begin{itemize}
-\item \texttt{getImplicitSelfDecl()} returns the implicit \texttt{self} parameter, if there is one.
-\item \texttt{getParameters()} returns the function's parameter list.
-\item \texttt{getMethodInterfaceType()} returns the type of a method without the \texttt{Self} clause.
-\item \texttt{getResultInterfaceType()} returns the return type of this function or method.
-\end{itemize}
-
-\apiref{ParameterList}{class}
-The parameter list of \texttt{AbstractFunctionDecl}, \texttt{EnumElementDecl} or \texttt{SubscriptDecl}.
-\begin{itemize}
-\item \texttt{size()} returns the number of parameters.
-\item \texttt{get()} returns the \texttt{ParamDecl} at the given index.
-\end{itemize}
-
-\IndexSource{constructor declaration}
-\apiref{ConstructorDecl}{class}
-Constructor declarations.
-\begin{itemize}
-\item \texttt{getInitializerInterfaceType()} returns the initializer interface type, used when type checking \texttt{super.init()} delegation.
-\end{itemize}
-
-\IndexSource{storage declaration}
-\apiref{AbstractStorageDecl}{class}
-Base class for storage declarations.
-\begin{itemize}
-\item \texttt{getValueInterfaceType()} returns the type of the stored value, without \texttt{weak} or \texttt{unowned} storage qualifiers.
-\end{itemize}
+\subsection*{Declaration Contexts}
 
 \IndexSource{declaration context}
 \apiref{DeclContext}{class}
-Base class for declaration contexts. The top-level \verb|isa<>|, \verb|cast<>| and \verb|dyn_cast<>| template functions also support dynamic casting from a \texttt{DeclContext *} to any of its subclasses.
+Base class for declaration contexts. The top-level \verb|isa<>|, \verb|cast<>| and \verb|dyn_cast<>| template functions also support dynamic casting from a \texttt{DeclContext *} to any of its subclasses. See also \SecRef{genericsigsourceref}.
 
 \IndexSource{closure expression}
 \IndexSource{source file}
@@ -606,6 +1029,180 @@ Operations on type contexts:
 \item \texttt{getDeclaredInterfaceType()} delegates to the method on \texttt{NominalTypeDecl} or \texttt{ExtensionDecl} as appropriate.
 \item \texttt{getSelfInterfaceType()} is similar.
 \end{itemize}
-Generics-related methods on \texttt{DeclContext} are described in Section~\ref{genericdeclsourceref}.
+
+Generic prameters and requirements:
+\begin{itemize}
+\item \texttt{isGenericContext()} answers true if either this generic context or one of its parents has a generic parameter list.
+\item \texttt{isInnermostContextGeneric()} answers if this declaration context itself has a generic parameter list. Compare with \texttt{isGenericContext()}.
+\end{itemize}
+
+\subsection*{Generic Contexts}
+
+Key source files:
+\begin{itemize}
+\item \SourceFile{include/swift/AST/GenericParamList.h}
+\item \SourceFile{include/swift/AST/Requirement.h}
+\item \SourceFile{lib/AST/GenericParamList.cpp}
+\item \SourceFile{lib/AST/NameLookup.cpp}
+\item \SourceFile{lib/AST/Requirement.cpp}
+\end{itemize}
+
+\IndexSource{generic context}
+\IndexSource{generic declaration}
+\IndexSource{parsed generic parameter list}
+\apiref{GenericContext}{class}
+Subclass of \texttt{DeclContext}. Base class for declaration kinds which can have a generic parameter list. See also \SecRef{genericsigsourceref}.
+\begin{itemize}
+\item \texttt{getParsedGenericParams()} returns the declaration's parsed generic parameter list, or \texttt{nullptr}.
+\item \texttt{getGenericParams()} returns the declaration's full generic parameter list, which includes any implicit generic parameters. Evaluates a \texttt{GenericParamListRequest}.
+\item \texttt{isGeneric()} answers if this declaration has a generic parameter list. This is equivalent to calling \texttt{DeclContext::isInnermostContextGeneric()}. Compare with \texttt{DeclContext::isGenericContext()}.
+\item \texttt{getGenericContextDepth()} returns the \IndexSource{depth}depth of the declaration's generic parameter list, or \texttt{(unsigned)-1} if neither this declaration nor any outer declaration is generic.
+\item \texttt{getTrailingWhereClause()} returns the declaration's trailing \texttt{where} clause, or \texttt{nullptr}.
+\end{itemize}
+
+Trailing \texttt{where} clauses are not preserved in serialized generic contexts. Most code should look at \texttt{GenericContext::getGenericSignature()} instead (\SecRef{genericsigsourceref}), except when actually building the generic signature.
+
+
+\IndexSource{generic parameter list}
+\apiref{GenericParamList}{class}
+A generic parameter list.
+\begin{itemize}
+\item \texttt{getParams()} returns an array of generic parameter declarations.
+\item \texttt{getOuterParameters()} returns the outer generic parameter list, linking multiple generic parameter lists for the same generic context. Only used for extensions of nested generic types.
+\end{itemize}
+
+\IndexSource{protocol Self type@protocol \texttt{Self} type}
+\apiref{GenericParamListRequest}{class}
+This request creates the full generic parameter list for a declaration. Kicked off from \texttt{GenericContext::getGenericParams()}.
+\begin{itemize}
+\item For protocols, this creates the implicit \texttt{Self} parameter.
+\item For functions and subscripts, calls \texttt{createOpaqueParameterGenericParams()} to walk the formal parameter list and look for \texttt{OpaqueTypeRepr}s.
+\item For extensions, calls \texttt{createExtensionGenericParams()} which clones the generic parameter lists of the extended nominal itself and all of its outer generic contexts, and links them together via \texttt{GenericParamList::getOuterParameters()}.
+\end{itemize}
+
+\IndexSource{generic parameter declaration}
+\apiref{GenericTypeParamDecl}{class}
+A generic parameter declaration.
+\begin{itemize}
+\item \IndexSource{depth}\texttt{getDepth()} returns the depth of the generic parameter declaration.
+\item \IndexSource{index}\texttt{getIndex()} returns the index of the generic parameter declaration.
+\item \texttt{getName()} returns the name of the generic parameter declaration.
+\item \texttt{getDeclaredInterfaceType()} returns the \IndexSource{sugared type}sugared generic parameter type for this declaration, which prints as the generic parameter's name.
+\item \texttt{isOpaque()} answers if this generic parameter is associated with an \IndexSource{opaque parameter}opaque parameter.
+\item \texttt{getOpaqueTypeRepr()} returns the associated \texttt{OpaqueReturnTypeRepr} if this is an opaque parameter, otherwise \texttt{nullptr}.
+\item \texttt{getInherited()} returns the generic parameter declaration's \IndexSource{inheritance clause}inheritance clause.
+\end{itemize}
+
+Inheritance clauses are not preserved in serialized generic parameter declarations. Requirements stated on generic parameter declarations are part of the corresponding generic context's generic signature, so except when actually building the generic signature, most code uses \texttt{GenericContext::getGenericSignature()} instead (\SecRef{genericsigsourceref}).
+
+\apiref{GenericTypeParamType}{class}
+A \IndexSource{generic parameter type}generic parameter type.
+\begin{itemize}
+\item \texttt{getDepth()} returns the depth of the generic parameter declaration.
+\item \texttt{getIndex()} returns the index of the generic parameter declaration.
+\item \texttt{getName()} returns the name of the generic parameter declaration if this is the sugared form, otherwise returns a string of the form ``\ttgp{d}{i}''.
+\end{itemize}
+
+\IndexSource{where clause@\texttt{where} clause}
+\apiref{TrailingWhereClause}{class}
+The syntactic representation of a trailing \texttt{where} clause.
+\begin{itemize}
+\item \texttt{getRequirements()} returns an array of \texttt{RequirementRepr}.
+\end{itemize}
+
+\IndexSource{requirement representation}
+\apiref{RequirementRepr}{class}
+The syntactic representation of a requirement in a trailing \texttt{where} clause.
+\begin{itemize}
+\item \texttt{getKind()} returns a \texttt{RequirementReprKind}.
+\item \texttt{getFirstTypeRepr()} returns the first \texttt{TypeRepr} of a same-type requirement.
+\item \texttt{getSecondTypeRepr()} returns the second \texttt{TypeRepr} of a same-type requirement.
+\item \texttt{getSubjectTypeRepr()} returns the first \texttt{TypeRepr} of a constraint or layout requirement.
+\item \texttt{getConstraintTypeRepr()} returns the second \texttt{TypeRepr} of a constraint requirement.
+\item \texttt{getLayoutConstraint()} returns the layout constraint of a layout requirement.
+\end{itemize}
+
+\apiref{RequirementReprKind}{enum class}
+\begin{itemize}
+\item \texttt{RequirementRepr::TypeConstraint}
+\item \texttt{RequirementRepr::SameType}
+\item \texttt{RequirementRepr::LayoutConstraint}
+\end{itemize}
+
+\apiref{WhereClauseOwner}{class}
+Represents a reference to some set of requirement representations which can be resolved to requirements, for example a trailing \texttt{where} clause. This is used by various requests, such as the \texttt{RequirementRequest} below, and the \texttt{InferredGenericSignatureRequest} in \SecRef{buildinggensigsourceref}.
+\begin{itemize}
+\item \texttt{getRequirements()} returns an array of \texttt{RequirementRepr}.
+\item \texttt{visitRequirements()} resolves each requirement representation and invokes a callback with the \texttt{RequirementRepr} and resolved \texttt{Requirement}.
+\end{itemize}
+
+\apiref{RequirementRequest}{class}
+Request which can be evaluated to resolve a single requirement representation in a \texttt{WhereClauseOwner}. Used by \texttt{WhereClauseOwner::visitRequirements()}.
+
+\IndexSource{protocol declaration}
+\IndexSource{primary associated type}
+\apiref{ProtocolDecl}{class}
+A protocol declaration.
+\begin{itemize}
+\item \texttt{getTrailingWhereClause()} returns the protocol \texttt{where} clause, or \texttt{nullptr}.
+\item \texttt{getAssociatedTypes()} returns an array of all associated type declarations in the protocol.
+\item \texttt{getPrimaryAssociatedTypes()} returns an array of all primary associated type declarations in the protocol.
+\item \texttt{getInherited()} returns the parsed inheritance clause.
+\end{itemize}
+
+Trailing \texttt{where} clauses and inheritance clauses are not preserved in serialized protocol declarations. Except when actually building the requirement signature, most code uses \texttt{ProtocolDecl::getRequirementSignature()} instead (\SecRef{genericsigsourceref}).
+
+\IndexSource{inherited protocol}
+The last four utility methods operate on the requirement signature, so are safe to use on deserialized protocols:
+\begin{itemize}
+\item \texttt{getInheritedProtocols()} returns an array of all protocols directly inherited by this protocol, computed from the inheritance clause.
+\item \texttt{inheritsFrom()} determines if this protocol inherits from the given protocol, possibly transitively.
+\item \texttt{getSuperclass()} returns the protocol's superclass type.
+\item \texttt{getSuperclassDecl()} returns the protocol's superclass declaration.
+\end{itemize}
+
+\index{associated type declaration}
+\apiref{AssociatedTypeDecl}{class}
+An associated type declaration.
+\begin{itemize}
+\item \texttt{getTrailingWhereClause()} returns the associated type's trailing \texttt{where} clause, or \texttt{nullptr}.
+\item \texttt{getInherited()} returns the associated type's inheritance clause.
+\end{itemize}
+
+Trailing \texttt{where} clauses and inheritance clauses are not preserved in serialized associated type declarations. Requirements on associated types are part of a protocol's requirement signature, so except when actually building the requirement signature, most code uses \texttt{ProtocolDecl::getRequirementSignature()} instead (\SecRef{genericsigsourceref}).
+
+\subsection*{Other Declarations}
+
+\IndexSource{function declaration}
+\IndexSource{method self parameter}
+\apiref{AbstractFunctionDecl}{class}
+Base class of function-like declarations. Also a \texttt{DeclContext}.
+\begin{itemize}
+\item \texttt{getImplicitSelfDecl()} returns the implicit \texttt{self} parameter, if there is one.
+\item \texttt{getParameters()} returns the function's parameter list.
+\item \texttt{getMethodInterfaceType()} returns the type of a method without the \texttt{Self} clause.
+\item \texttt{getResultInterfaceType()} returns the return type of this function or method.
+\end{itemize}
+
+\apiref{ParameterList}{class}
+The parameter list of \texttt{AbstractFunctionDecl}, \texttt{EnumElementDecl} or \texttt{SubscriptDecl}.
+\begin{itemize}
+\item \texttt{size()} returns the number of parameters.
+\item \texttt{get()} returns the \texttt{ParamDecl} at the given index.
+\end{itemize}
+
+\IndexSource{constructor declaration}
+\apiref{ConstructorDecl}{class}
+Constructor declarations.
+\begin{itemize}
+\item \texttt{getInitializerInterfaceType()} returns the initializer interface type, used when type checking \texttt{super.init()} delegation.
+\end{itemize}
+
+\IndexSource{storage declaration}
+\apiref{AbstractStorageDecl}{class}
+Base class for storage declarations.
+\begin{itemize}
+\item \texttt{getValueInterfaceType()} returns the type of the stored value, without \texttt{weak} or \texttt{unowned} storage qualifiers.
+\end{itemize}
 
 \end{document}
