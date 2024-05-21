@@ -195,6 +195,7 @@ LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
 SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
+LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -224,7 +225,7 @@ EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
-EXPERIMENTAL_FEATURE(BodyMacros, true)
+EXPERIMENTAL_FEATURE(PreambleMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, true)
 

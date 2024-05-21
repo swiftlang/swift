@@ -8,7 +8,6 @@
 
 import Builtin
 
-@frozen
 enum MyLittleLayout<T : ~Copyable> {
   @_transparent
   static var size: Int {
@@ -20,7 +19,6 @@ enum MyLittleLayout<T : ~Copyable> {
   }
 }
 
-@frozen
 enum MyLittleResult<Success : ~Copyable, Failure : Error> : ~Copyable {
   case success(Success)
   case failure(Failure)
