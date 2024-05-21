@@ -41,7 +41,7 @@ func testListBasic() {
   var items = List<File>(length: 5) { .init($0) }
   print(items.show())  // CHECK: [0, 1, 2, 3, 4, ]
   check(items.length() == 5)
-  check(!items.empty())
+  check(!items.isEmpty)
 
   items = items.reverse()
   check(items.length() == 5)
@@ -49,7 +49,7 @@ func testListBasic() {
 
   items = .empty
   check(items.length() == 0)
-  check(items.empty())
+  check(items.isEmpty)
 
   let nums = List<Int>().push(7).push(7).push(3)
   print(nums.show()) // CHECK: [7, 7, 3, ]
