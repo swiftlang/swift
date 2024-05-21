@@ -554,8 +554,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     libcFileMapping =
         getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs);
 
-    // WASI's module map needs fixing
-    result.requiresBuiltinHeadersInSystemModules = true;
+    // WASI's module map needs fixing (rdar://119563706)
+    result.requiresBuiltinHeadersInSystemModules = !libcFileMapping.empty();
   } else if (triple.isMusl()) {
     libcFileMapping =
         getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs);
@@ -564,8 +564,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);
 
-    // glibc.modulemap needs fixing
-    result.requiresBuiltinHeadersInSystemModules = true;
+    // glibc.modulemap needs fixing (rdar://119563686&123317003)
+    result.requiresBuiltinHeadersInSystemModules = !libcFileMapping.empty();
   }
   result.redirectedFiles.append(libcFileMapping);
 
