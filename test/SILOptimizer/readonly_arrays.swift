@@ -17,7 +17,7 @@
 // CHECK-DAG: @"$s4test3StrV9staticLet_WZTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
 // CHECK-DAG: @"$s4test3StrV9staticVar_WZTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
 // CHECK-DAG: @"$s4test3StrV9staticVarSaySiGvpZ" = global %TSa <{ %Ts12_ArrayBufferV <{ %Ts14_BridgeStorageV <{ ptr @"$s4test3StrV9staticVar_WZTv_r" }> }> }>
-// CHECK-NOT: swift_initStaticObject
+// CHECK-DAG: @"$s4test3StrV14twoDimensionalSaySaySiGGvpZ" = global %TSa <{ %Ts12_ArrayBufferV <{ %Ts14_BridgeStorageV <{ ptr @"$s4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r" }> }> }>, align 8
 
 // UNSUPPORTED: use_os_stdlib
 
@@ -28,6 +28,7 @@
 public struct Str {
   public static let staticLet = [ 200, 201, 202 ]
   public static var staticVar = [ 300, 301, 302 ]
+  public static var twoDimensional = [[1, 2], [3, 4], [5, 6]]
 }
 
 @inline(never)
@@ -71,6 +72,9 @@ print(Str.staticLet)
 
 // CHECK-OUTPUT:      [300, 301, 302]
 print(Str.staticVar)
+
+// CHECK-OUTPUT{LITERAL}: [[1, 2], [3, 4], [5, 6]]
+print(Str.twoDimensional)
 
 // CHECK-OUTPUT-NEXT: 11
 print(arrayLookup(1))
