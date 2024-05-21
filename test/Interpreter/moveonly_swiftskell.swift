@@ -53,6 +53,10 @@ func testListBasic() {
   check(items.length() == 5)
   check(!items.empty())
 
+  items = items.reverse()
+  check(items.length() == 5)
+  print(items.show())  // CHECK: [4, 3, 2, 1, 0, ]
+
   items = .empty
   check(items.length() == 0)
   check(items.empty())
@@ -60,5 +64,5 @@ func testListBasic() {
   let nums = List<Int>().push(7).push(7).push(3)
   print(nums.show()) // CHECK: [7, 7, 3, ]
 
-  
+
 }

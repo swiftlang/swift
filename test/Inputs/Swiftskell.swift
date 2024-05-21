@@ -57,7 +57,7 @@ public protocol Generator: ~Copyable {
 
 // MARK: Tuples
 public enum Pair<L: ~Copyable, R: ~Copyable>: ~Copyable {
-  case elms(L, R)
+  case pair(L, R)
 }
 extension Pair: Copyable where L: Copyable, R: Copyable {}
 
@@ -244,13 +244,23 @@ extension List where Element: ~Copyable {
   public consuming func pop() -> Optional<Pair<Element, List<Element>>> {
     switch consume self {
       case .empty: .none
-      case let .cons(elm, tail): .elms(elm, tail.take())
+      case let .cons(elm, tail): .pair(elm, tail.take())
     }
   }
 
   /// Push an element onto the list.
   public consuming func push(_ newHead: consuming Element) -> List<Element> {
     return List(newHead, self)
+  }
+
+  /// Produces a new list that is the reverse of this list.
+  public consuming func reverse() -> List<Element> {
+    var new = List<Element>()
+    while case let .pair(head, tail) = pop() {
+      new = new.push(head)
+      self = tail
+    }
+    return new
   }
 }
 
