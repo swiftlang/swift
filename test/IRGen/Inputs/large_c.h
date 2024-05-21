@@ -30,6 +30,7 @@ struct SamplesType {
     void* AA;
 };
 
+struct SamplesType samples();
 
 typedef struct _ContainedType {
   unsigned int f1;
