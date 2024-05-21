@@ -2,19 +2,7 @@
 
 \begin{document}
 
-\chapter{The Property Map}\label{propertymap}
-
-If we already have some way to compute reduced type parameters, we can define what it means to compute a reduced type for an arbitrary type containing type parameters, as follows.
-\begin{algorithm}[Computing a reduced type]\label{reducedtypealgo}
-As input, takes a type \texttt{T}. Outputs the reduced type of \texttt{T}.
-
-\begin{enumerate}
-\item If \texttt{T} does not contain any type parameters, it is already reduced. Return \texttt{T}.
-\item If \texttt{T} is a type parameter but fixed to a concrete type, replace \texttt{T} with its concrete type and continue to Step~3.
-\item If \texttt{T} is not a type parameter, transform \texttt{T} by recursively replacing any type parameters appearing in \texttt{T} with their reduced types, and return the transformed type.
-\item The final possibility is that \texttt{T} is a type parameter, not fixed to a concrete type. The reduced type of \texttt{T} is the smallest type parameter in its equivalence class. Return this type parameter.
-\end{enumerate}
-\end{algorithm}
+\chapter[]{The Property Map}\label{propertymap}
 
 \ifWIP
 Until now, you've seen how to solve the \texttt{requiresProtocol()} generic signature
@@ -53,7 +41,7 @@ of the form $V.\Pi\Rightarrow V'$, where ${T}{\downarrow}=UV$, for terms $U$, $V
 that $V=V'$. (TODO: This needs an additional assumption about conformance-valid rules.)
 \end{proof}
 
-By Theorem~\ref{propertymaptheorem}, the properties satisfied by a type term can be discovered by
+By \ThmRef{propertymaptheorem}, the properties satisfied by a type term can be discovered by
 considering all non-empty suffixes of ${T}{\downarrow}$, and collecting rewrite rules of the form
 $V.\Pi\rightarrow V$ where $\Pi$ is some property-like symbol.
 
@@ -77,7 +65,7 @@ protocol P4 {
 \end{listing}
 
 \begin{example}\label{propmapexample1}
-Consider the protocol definitions in Listing~\ref{propmaplisting1}. These definitions are used in a couple of examples below, so let's look at the constructed rewrite system first. Protocols $\proto{P1}$ and $\proto{P2}$ do not define any associated types or requirements, so they do not contribute any initial rewrite rules. Protocol $\proto{P3}$ has two associated types $\namesym{T}$ and $\namesym{U}$ conforming to $\proto{P1}$ and $\proto{P2}$ respectively, so a pair of rules introduce each associated type, and another pair impose conformance requirements:
+Consider the protocol definitions in \ListingRef{propmaplisting1}. These definitions are used in a couple of examples below, so let's look at the constructed rewrite system first. Protocols $\proto{P1}$ and $\proto{P2}$ do not define any associated types or requirements, so they do not contribute any initial rewrite rules. Protocol $\proto{P3}$ has two associated types $\namesym{T}$ and $\namesym{U}$ conforming to $\proto{P1}$ and $\proto{P2}$ respectively, so a pair of rules introduce each associated type, and another pair impose conformance requirements:
 \begin{align}
 \protosym{P3}.\namesym{T}&\Rightarrow\assocsym{P3}{T}\tag{1}\\
 \protosym{P3}.\namesym{U}&\Rightarrow\assocsym{P3}{U}\tag{2}\\
@@ -105,7 +93,7 @@ Finally, there is an overlap between Rule~9 and Rule~4:
 \end{align}
 Consider the type parameter $\genericparam{Self}.\namesym{A}.\namesym{U}$ in the generic signature of $\proto{P4}$. This type parameter is equivalent to $\genericparam{Self}.\namesym{A}.\namesym{T}$ via the same-type requirement in $\proto{P4}$. The associated type $\namesym{T}$ of $\proto{P3}$ conforms to $\proto{P1}$, and $\namesym{U}$ conforms to $\proto{P2}$. This means that $\genericparam{Self}.\namesym{A}.\namesym{U}$ conforms to \emph{both} $\proto{P1}$ and $\proto{P2}$.
 
-Let's see how this fact can be derived from the rewrite system. Applying $\Lambda_{\proto{P4}}$ to $\genericparam{Self}.\namesym{A}.\namesym{U}$ produces the type term $\assocsym{P4}{A}.\assocsym{P3}{U}$. This type term can be reduced to the canonical term $\assocsym{P4}{A}.\assocsym{P3}{T}$ with a single application of Rule~9. By the result in Theorem~\ref{propertymaptheorem}, it suffices to look at rules of the form $V.\Pi\Rightarrow V$, where $V$ is some suffix of $\assocsym{P4}{A}.\assocsym{P3}{T}$. There are two such rules:
+Let's see how this fact can be derived from the rewrite system. Applying $\Lambda_{\proto{P4}}$ to $\genericparam{Self}.\namesym{A}.\namesym{U}$ produces the type term $\assocsym{P4}{A}.\assocsym{P3}{U}$. This type term can be reduced to the canonical term $\assocsym{P4}{A}.\assocsym{P3}{T}$ with a single application of Rule~9. By the result in \ThmRef{propertymaptheorem}, it suffices to look at rules of the form $V.\Pi\Rightarrow V$, where $V$ is some suffix of $\assocsym{P4}{A}.\assocsym{P3}{T}$. There are two such rules:
 \begin{enumerate}
 \item Rule~3, which says that $\assocsym{P3}{T}$ conforms to $\proto{P1}$.
 \item Rule~14, which says that $\assocsym{P4}{A}.\assocsym{P4}{T}$ conforms to $\proto{P2}$.
@@ -114,7 +102,7 @@ This shows that the set of properties satisfied by the type parameter $\genericp
 \end{example}
 The above example might suggest that looking up the set of properties satisfied by a type parameter requires iterating over the list of rewrite rules, but in reality, it is possible to construct a multi-map of pairs $(V, \Pi)$ once, after the completion procedure ends.
 
-As you saw in the example, a type term can satisfy multiple properties via different suffixes. For the material presented in Section~\ref{moreconcretetypes}, it is convenient to avoid having to take the union of sets in the lookup path. For this reason, the construction algorithm explicitly
+As you saw in the example, a type term can satisfy multiple properties via different suffixes. For this reason, the construction algorithm explicitly
 ``inherits'' the symbols associated with a term $V$ when adding an entry for a term $UV$ that has $V$ as a suffix. As a result, the lookup algorithm only has to look for the longest suffix that appears in the multi-map to find all properties satisfied by a term.
 
 The multi-map construction and lookup can be formalized in a pair of algorithms.
@@ -161,19 +149,18 @@ term inside the symbol.
 \end{enumerate}
 \end{algorithm}
 Notice how in both algorithms, superclass and concrete type symbols are adjusted by prepending a
-prefix to each substitution. This is the same operation as described in
-Section~\ref{concretetypeadjust}.
+prefix to each substitution.
 
 \begin{example}\label{propmapexample2}
-Recall Example~\ref{propmapexample1}, where a rewrite system was constructed from Listing~\ref{propmaplisting}. The complete rewrite system contains five rewrite rules of the form $V.\Pi\Rightarrow V$:
+Recall \ExRef{propmapexample1}, where a rewrite system was constructed from \ListingRef{propmaplisting}. The complete rewrite system contains five rewrite rules of the form $V.\Pi\Rightarrow V$:
 \begin{enumerate}
 \item Rule~3 and Rule~4, which state that the associated types $\namesym{T}$ and $\namesym{U}$ of $\proto{P3}$ conform to $\proto{P1}$ and $\proto{P2}$, respectively.
 \item Rule~7 and Rule~8, which state that the associated types $\namesym{A}$ and $\namesym{B}$ of $\proto{P4}$ both conform to $\proto{P3}$.
 \item Rule~13, which states that the nested type $\genericparam{A}.\genericparam{T}$ of $\proto{P4}$ also conforms to $\proto{P2}$.
 \end{enumerate}
-The property map constructed by Algorithm~\ref{propmapconsalgo} from the above rules is shown in Table~\ref{propmapexample2table}.
+The property map constructed by \AlgRef{propmapconsalgo} from the above rules is shown in Table~\ref{propmapexample2table}.
 \end{example}
-\begin{table}\captionabove{Property map constructed from Example~\ref{propmapexample2}}\label{propmapexample2table}
+\begin{table}\captionabove{Property map constructed from \ExRef{propmapexample2}}\label{propmapexample2table}
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
@@ -190,7 +177,7 @@ $\assocsym{P4}{A}.\assocsym{P3}{T}$&$\protosym{P1}$, $\protosym{P2}$\\
 \end{center}
 \end{table}
 \begin{example}\label{propmapexample3}
-The second example explores layout, superclass and concrete type requirements. Consider the protocol definitions in Listing~\ref{propmaplisting} together with the generic signature:
+The second example explores layout, superclass and concrete type requirements. Consider the protocol definitions in \ListingRef{propmaplisting} together with the generic signature:
 \[\gensig{\genericsym{0}{0}}{\genericsym{0}{0}\colon\proto{P}, \genericsym{0}{0}.\namesym{B}\colon\proto{Q}}\]
 The three protocols $\proto{R}$, $\proto{Q}$ and $\proto{P}$ together with the generic signature generate the following initial rewrite rules:
 \begin{align*}
@@ -241,9 +228,9 @@ This final rule was added by the completion procedure to resolve the overlap of 
 \end{enumerate}
 When constructing the property map, sorting the rules by the length of their left hand sides guarantees that Rule~6 and Rule~7 are processed before Rule~10 and Rule~14. This is important because the subject type of Rule~6 and Rule~7 ($\assocsym{P}{B}$), is a suffix of the subject type of Rule~10 and Rule~14 ($\genericsym{0}{0}.\assocsym{P}{B}$), which means that the property map entries for both Rule~10 and Rule~14 inherit the superclass and layout requirements from Rule~6 and Rule~7. Furthermore, the substitution $\sigma_0:=\assocsym{P}{A}$ in the superclass requirement is adjusted by prepending the prefix $\genericsym{0}{0}$.
 
-The property map constructed by Algorithm~\ref{propmapconsalgo} from the above rules is shown in Table~\ref{propmapexample3table}.
+The property map constructed by \AlgRef{propmapconsalgo} from the above rules is shown in Table~\ref{propmapexample3table}.
 In the next section, you will see how this example property map can solve generic signature queries.
-\begin{table}\captionabove{Property map constructed from Example~\ref{propmapexample3}}\label{propmapexample3table}
+\begin{table}\captionabove{Property map constructed from \ExRef{propmapexample3}}\label{propmapexample3table}
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
@@ -264,29 +251,29 @@ $\genericsym{0}{0}.\assocsym{P}{B}$&$\protosym{Q}$, $\protosym{R}$, $\supersym{\
 
 \fi
 
-\section{Substitution Simplification}\label{subst simplification}
+\section[]{Substitution Simplification}\label{subst simplification}
 
 \begin{algorithm}[Substitution simplification]\label{subst simplification algo}
 \end{algorithm}
 
-\section{Property Unification}
+\section[]{Property Unification}
 
 \IndexTwoFlag{debug-requirement-machine}{property-map}
 \IndexTwoFlag{debug-requirement-machine}{conflicting-rules}
 
-\section{Concrete Type Unification}
+\section[]{Concrete Type Unification}
 
 \IndexTwoFlag{debug-requirement-machine}{concrete-unification}
 
-\section{Generic Signature Queries}\label{implqueries}
+\section[]{Generic Signature Queries}\label{implqueries}
 
 \ifWIP
 
-Recall the categorization of generic signature queries into predicates, properties and canonical type queries previously shown in Section~\ref{intqueries}. The predicates can be implemented in a straightforward manner using the property map. Each predicate takes a subject type parameter $T$.
+Recall the categorization of generic signature queries into predicates, properties and canonical type queries previously shown in \SecRef{genericsigqueries}. The predicates can be implemented in a straightforward manner using the property map. Each predicate takes a subject type parameter $T$.
 
-Generic signature queries are always posed relative to a generic signature, and not a protocol requirement signature, hence the type parameter $T$ is lowered with the generic signature type lowering map $\Lambda\colon\namesym{Type}\rightarrow\namesym{Term}$ (Definition~\ref{lowertypeinsig}) and not a protocol type lowering map $\Lambda_{\proto{P}}\colon\namesym{Type}\rightarrow\namesym{Term}$ for some protocol $\proto{P}$ (Definition~\ref{lowertypeinproto}).
+Generic signature queries are always posed relative to a generic signature, and not a protocol requirement signature, hence the type parameter $T$ is lowered with the generic signature type lowering map $\Lambda\colon\namesym{Type}\rightarrow\namesym{Term}$ (\AlgRef{build term generic}) and not a protocol type lowering map $\Lambda_{\proto{P}}\colon\namesym{Type}\rightarrow\namesym{Term}$ for some protocol $\proto{P}$ (\DefRef{build term protocol}).
 
-The first step is to look up the set of properties satisfied by $T$ using Algorithm~\ref{propmaplookupalgo}. Then, each predicate can be tested as follows:
+The first step is to look up the set of properties satisfied by $T$ using \AlgRef{propmaplookupalgo}. Then, each predicate can be tested as follows:
 \begin{description}
 \item[\texttt{requiresProtocol()}] A type parameter $T$ conforms to a protocol $\proto{P}$ if the property map entry for some suffix of $T$ stores $\protosym{P}$ for some suffix of $T$.
 \index{layout constraints}
@@ -301,18 +288,18 @@ Given two layout symbols $A$ and $B$, $A\wedge B$ is the most general symbol tha
 
 Layout symbols store a layout constraint as an instance of the \texttt{LayoutConstraint} class. The join operation used in the implementation of the \texttt{requiresClass()} query is defined in the \texttt{merge()} method on \texttt{LayoutConstraint}.
 
-You've already seen the \texttt{requiresProtocol()} query in Chapter~\ref{protocolsasmonoids}, where it was shown that it can be implemented by checking if $\Lambda(T).\protosym{P}\downarrow\Lambda(T)$. The property map implementation is perhaps slightly more efficient, since it only simplifies a single term and not two. The $\texttt{requiresClass()}$ and $\texttt{isConcreteType()}$ queries are new on the other hand, and demonstrate the power of the property map. With the rewrite system alone, they cannot be implemented except by exhaustive enumeration over all known layout and concrete type symbols.
+You've already seen the \texttt{requiresProtocol()} query in \ChapRef{symbols terms rules}, where it was shown that it can be implemented by checking if $\Lambda(T).\protosym{P}\downarrow\Lambda(T)$. The property map implementation is perhaps slightly more efficient, since it only simplifies a single term and not two. The $\texttt{requiresClass()}$ and $\texttt{isConcreteType()}$ queries are new on the other hand, and demonstrate the power of the property map. With the rewrite system alone, they cannot be implemented except by exhaustive enumeration over all known layout and concrete type symbols.
 
-All of the subsequent examples reference the protocol definitions from Example~\ref{propmapexample3}, and the resulting property map shown in Table~\ref{propmapexample2table}.
+All of the subsequent examples reference the protocol definitions from \ExRef{propmapexample3}, and the resulting property map shown in Table~\ref{propmapexample2table}.
 \begin{example} Consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. This type parameter conforms to $\proto{Q}$ via a requirement stated in the generic signature, and also to $\proto{R}$, because $\proto{Q}$ inherits from $\proto{R}$. The $\texttt{requiresProtocol()}$ query will confirm these facts, because the property map entry for $\genericsym{0}{0}.\assocsym{P}{B}$ contains the protocol symbols $\protosym{Q}$ and $\protosym{R}$:
 \begin{enumerate}
-\item The conformance to $\proto{Q}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{Q}\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~10 in Example~\ref{propmapexample2}. This is the initial rule generated by the conformance requirement.
-\item The conformance to $\proto{R}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{R}\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~14 in Example~\ref{propmapexample2}. This rule was added by the completion procedure to resolve the overlap between Rule~10 above, which states that $\genericsym{0}{0}.\assocsym{P}{B}$ conforms to $\proto{Q}$, and Rule~1, which states that anything conforming to $\proto{Q}$ also conforms to $\proto{R}$.
+\item The conformance to $\proto{Q}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{Q}\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~10 in \ExRef{propmapexample2}. This is the initial rule generated by the conformance requirement.
+\item The conformance to $\proto{R}$ is witnessed by the rewrite rule $\genericsym{0}{0}.\assocsym{P}{B}.\protosym{R}\Rightarrow \genericsym{0}{0}.\assocsym{P}{B}$, which is Rule~14 in \ExRef{propmapexample2}. This rule was added by the completion procedure to resolve the overlap between Rule~10 above, which states that $\genericsym{0}{0}.\assocsym{P}{B}$ conforms to $\proto{Q}$, and Rule~1, which states that anything conforming to $\proto{Q}$ also conforms to $\proto{R}$.
 \end{enumerate}
 \end{example}
 \begin{example} This example shows the \texttt{requiresClass()} query on two different type terms.
 
-First, consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{A}$. The query returns true, because the longest suffix with an entry in the property map is $\assocsym{P}{A}$, which stores a single symbol, $\layoutsym{AnyObject}$. The corresponding rewrite rule is $\assocsym{P}{A}.\layoutsym{AnyObject}\Rightarrow\assocsym{P}{A}$, or Rule~5 in Example~\ref{propmapexample2}. This is the initial rule generated by the $\namesym{A}\colon\namesym{AnyObject}$ layout requirement in protocol $\proto{P}$.
+First, consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{A}$. The query returns true, because the longest suffix with an entry in the property map is $\assocsym{P}{A}$, which stores a single symbol, $\layoutsym{AnyObject}$. The corresponding rewrite rule is $\assocsym{P}{A}.\layoutsym{AnyObject}\Rightarrow\assocsym{P}{A}$, or Rule~5 in \ExRef{propmapexample2}. This is the initial rule generated by the $\namesym{A}\colon\namesym{AnyObject}$ layout requirement in protocol $\proto{P}$.
 
 Now, consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. The query also returns true. Here, the longest suffix is the entire type term, because the property map stores an entry for $\genericsym{0}{0}.\assocsym{P}{B}$ with layout symbol $\layoutsym{\_NativeClass}$. This symbol satisfies
 \[\layoutsym{\_NativeClass}\leq\layoutsym{AnyObject},\]
@@ -345,14 +332,14 @@ $\proto{P}$ inherits from $\proto{Q}$.
 \item Construct the subgraph $H\subseteq G$ generated by $P$.
 \item Compute the set of root nodes of $H$ (that is, the nodes with no incoming edges, or zero in-degree) to obtain the minimal set protocols of
 $P$.
-\item Sort the elements of this set using the canonical protocol order (Definition~\ref{canonicalprotocol}) to obtain the
+\item Sort the elements of this set using the canonical protocol order (\AlgRef{linear protocol order}) to obtain the
 final minimal canonical list of protocols from $P$.
 \end{enumerate}
 \end{definition}
 The second step is to define a mapping from type terms to Swift type parameters, for use by the \texttt{getSuperclassBound()} and \texttt{getConcreteType()} queries when mapping substitutions back to Swift types.
 \begin{algorithm} The type lifting map $\Lambda^{-1}:\namesym{Term}\rightarrow\namesym{Type}$ takes as input
 a type term $T$ and maps it back to a Swift type parameter. This is the inverse of the type lowering
-map $\Lambda\colon\namesym{Type}\rightarrow\namesym{Term}$ from Algorithm~\ref{lowertypeinproto}.
+map $\Lambda\colon\namesym{Type}\rightarrow\namesym{Term}$ from \AlgRef{build term protocol}.
 \begin{enumerate}
 \item Initialize $S$ to an empty type parameter.
 \item The first symbol of $T$ must be a generic parameter symbol $\tau_{d,i}$, which is mapped to a
@@ -366,16 +353,16 @@ declaration is found as follows:
 $\namesym{A}$, or $\namesym{A}$ was declared in some protocol $\proto{Q}$ such that $\proto{P}_i$
 inherits from $\proto{Q}$. In both cases, collect all associated type declarations in a list.
 \item If any associated type found above is a non-root associated type declaration, replace it with
-its anchor (Definition~\ref{rootassoctypedef}).
+its anchor (\DefRef{root associated type}).
 \item Pick the associated type declaration from the above set that is minimal with respect to the
-associated type order (Definition~\ref{canonicaltypeorder}).
+associated type order (\AlgRef{associated type order}).
 \end{enumerate}
 \end{enumerate}
 \end{algorithm}
 The third and final step before the queries themselves can be presented is the algorithm for mapping a superclass or concrete type symbol back to a Swift type. This algorithm uses the above type lifting map on type parameters appearing in substitutions.
 \begin{algorithm}[Constructing a concrete type from a symbol]\label{symboltotype} As input, this algorithm takes a
 superclass symbol $\supersym{\namesym{T}\colon\sigma_0,\ldots,\sigma_n}$ or
-concrete type symbol $\concretesym{\namesym{T}\colon\sigma_0,\ldots,\sigma_n}$. This is the inverse of Algorithm~\ref{concretesymbolcons}.
+concrete type symbol $\concretesym{\namesym{T}\colon\sigma_0,\ldots,\sigma_n}$. This is the inverse of \AlgRef{concretesymbolcons}.
 
 \begin{enumerate}
 \item Let $\pi_0,\ldots,\pi_n$ be the set of positions such that $\namesym{T}|_{\pi_i}$ is a
@@ -388,7 +375,7 @@ parameter obtained by applying the lifting map to $\sigma_i$.
 
 Now, the time has finally come to describe the implementation of the four property queries.
 \begin{description}
-\item[\texttt{getRequiredProtocols()}] The list of protocol requirements satisfied by a type parameter $T$ is recorded in the form of protocol symbols in the property map. This list is transformed into a minimal canonical list of protocols using Definition~\ref{minimalproto}.
+\item[\texttt{getRequiredProtocols()}] The list of protocol requirements satisfied by a type parameter $T$ is recorded in the form of protocol symbols in the property map. This list is transformed into a minimal canonical list of protocols using \DefRef{minimalproto}.
 \index{layout constraints}
 \index{join of layout constraints}
 \item[\texttt{getLayoutConstraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
@@ -400,10 +387,10 @@ Otherwise, $T$ can be written as $T=UV$, where $V$ is the longest suffix of $T$ 
 
 The first step is to adjust the symbol by prepending $U$ to each substitution $\sigma_i$, to produce the superclass symbol
 \[\supersym{\namesym{C};\,\sigma_0,\ldots,U\sigma_n}.\]
-Then, Algorithm~\ref{symboltotype} can be applied to convert the symbol to a Swift type.
+Then, \AlgRef{symboltotype} can be applied to convert the symbol to a Swift type.
 \item\texttt{getConcreteType()}: This query is almost identical to \texttt{getSuperclassBound()}; you can replace ``superclass symbol'' with ``concrete type symbol'' above.
 \end{description}
-Note how the \texttt{getLayoutConstraint()} query deals with a multiplicity of layout symbols by computing their join, whereas the \texttt{getSuperclassBound()} and \texttt{getConcreteType()} queries just arbitrarily pick one superclass or concrete type symbol. Indeed in Section~\ref{moreconcretetypes}, you will see that picking one symbol is not always sufficient, and a complete implementation must perform joins on superclass and concrete type symbols as well, and furthermore, a situation analogous to the uninhabited layout constraint can arise, where a type parameter can be subject to conflicting superclass or concrete type requirements. For now though, the current formulation is sufficient.
+Note how the \texttt{getLayoutConstraint()} query deals with a multiplicity of layout symbols by computing their join, whereas the \texttt{getSuperclassBound()} and \texttt{getConcreteType()} queries just arbitrarily pick one superclass or concrete type symbol. Indeed, we will see that picking one symbol is not always sufficient, and a complete implementation must perform joins on superclass and concrete type symbols as well, and furthermore, a situation analogous to the uninhabited layout constraint can arise, where a type parameter can be subject to conflicting superclass or concrete type requirements. For now though, the current formulation is sufficient.
 
 Now, let's look at some examples of the four property queries. Once again, these examples use the property map shown in Table~\ref{propmapexample2table}.
 \begin{example}
@@ -413,20 +400,20 @@ Consider the computation of the \texttt{getRequiredProtocols()} query on the can
 Consider the computation of the \texttt{getSuperclassBound()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$.
 The superclass symbol $\supersym{\namesym{Cache}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}$ does not need to be adjusted by prepending a prefix to each substitution term, because the property map entry is associated with the entire term $\genericsym{0}{0}.\assocsym{P}{B}$.
 
-Applying Algorithm~\ref{symboltotype} to the superclass symbol produces the Swift type:
+Applying \AlgRef{symboltotype} to the superclass symbol produces the Swift type:
 \[\namesym{Cache}\langle\genericsym{0}{0}.\namesym{A}\rangle\].
 \end{example}
 \begin{example}
 Consider the computation of the \texttt{getConcreteType()} query on the canonical type term $\genericsym{0}{0}.\assocsym{P}{C}$. Here, the property map entry is associated with the suffix $\assocsym{P}{C}$, which means an adjustment must be performed on the concrete type symbol 
 $\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\assocsym{P}{A}}$. The adjusted symbol is
 \[\concretesym{\namesym{Array}\langle\sigma_0\rangle;\,\sigma_0:=\genericsym{0}{0}\assocsym{P}{A}}.\]
-Applying Algorithm~\ref{symboltotype} to the adjusted concrete type symbol produces the Swift type:
+Applying \AlgRef{symboltotype} to the adjusted concrete type symbol produces the Swift type:
 \[\namesym{Array}\langle\genericsym{0}{0}.\namesym{A}\rangle.\]
 \end{example}
 
 \fi
 
-\section{Reduced Types}
+\section[]{Reduced Types}
 
 \ifWIP
 
@@ -500,7 +487,7 @@ Resolving critical pairs adds a few additional rules:
 \genericsym{0}{0}.\assocsym{Q}{A}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{A}\tag{7}\\
 \genericsym{0}{0}.\namesym{A}&\Rightarrow\genericsym{0}{0}.\assocsym{P}{A}\tag{8}
 \end{align}
-Now consider the type parameter $T:=\genericsym{0}{0}.\namesym{A}$. This type parameter is a canonical anchor by Definition~\ref{canonicalanchor}. Since Swift type parameters always point to an actual associated type declaration, the type term $\Lambda(T)$ is $\genericsym{0}{0}.\assocsym{Q}{A}$, and not $\genericsym{0}{0}.\assocsym{P}{A}$. However, $\genericsym{0}{0}.\assocsym{Q}{A}$ is not canonical as a term, and reduces to $\genericsym{0}{0}.\assocsym{P}{A}$ via Rule~7, therefore $T$ is a canonical anchor and yet $\Lambda(T)$ is not a canonical term.
+Now consider the type parameter $T:=\genericsym{0}{0}.\namesym{A}$. This type parameter is reduced. Since Swift type parameters always point to an actual associated type declaration, the type term $\Lambda(T)$ is $\genericsym{0}{0}.\assocsym{Q}{A}$, and not $\genericsym{0}{0}.\assocsym{P}{A}$. However, $\genericsym{0}{0}.\assocsym{Q}{A}$ is not canonical as a term, and reduces to $\genericsym{0}{0}.\assocsym{P}{A}$ via Rule~7, therefore $T$ is a canonical anchor and yet $\Lambda(T)$ is not a canonical term.
 
 Essentially, the term $\genericsym{0}{0}.\assocsym{P}{A}$ is ``more canonical'' than any type parameter that can be output by $\Lambda:\namesym{Type}\rightarrow\namesym{Term}$. Protocol $\proto{P}$ does not actually define an associated type named $\namesym{A}$, therefore $\Lambda$ can only construct terms containing the symbol $\assocsym{Q}{A}$, and yet $\assocsym{P}{A}<\assocsym{Q}{A}$.
 
@@ -519,7 +506,7 @@ protocol P {
   associatedtype B
 }
 \end{Verbatim}
-\begin{table}\captionabove{Property map from Example~\ref{concretecanonicalpropertymapex}}\label{concretecanonicalpropertymap}
+\begin{table}\captionabove{Property map from \ExRef{concretecanonicalpropertymapex}}\label{concretecanonicalpropertymap}
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
@@ -573,7 +560,7 @@ Note the substitutions in $t_0$ now have $u$ prepended to each term $\sigma_i$.
 (Incidentally, can we say anything more about $t_1$? Is it the case that $t_0>t_1$? Since $x'\Rightarrow y'$ is a property-like rule, $x'$ is equal to $y'$ with a concrete type symbol appended, or in other words, $y'=vw$, so $t_1=uvw$. But $x=uv$, so $t_1=uvw$ reduces to $yw$. So indeed, the above critical pair either becomes trivial if $t_0$ can be reduced by some other rule, or it introduces the rewrite rule $t_0\Rightarrow yw$.)
 
 \begin{example}
-Consider the generic signature of class $\namesym{C}$ from Listing~\ref{overlapconcreteex}:
+Consider the generic signature of class $\namesym{C}$ from \ListingRef{overlapconcreteex}:
 \begin{listing}\captionabove{Example with overlap involving concrete type term}\label{overlapconcreteex}
 \begin{Verbatim}
 struct G<A> {}
@@ -619,7 +606,7 @@ $\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}$.
 This means that resolving the critical pair introduces the new rewrite rule:
 \[\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}.\concretesym{\namesym{G}\langle\sigma_0\rangle;\;\sigma_0:=\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{V}}\Rightarrow\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}.
 \]
-Intuitively, the completion process began with the fact that
+The completion process began with the fact that
 \[\assocsym{P}{U}==\namesym{G}\langle\assocsym{P}{V}\rangle,\]
 and derived that\
 \[\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}==\namesym{G}\langle\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}\rangle.\]
@@ -627,10 +614,10 @@ Adjusting the concrete type symbol by prepending the prefix $\genericsym{0}{0}.\
 \[\genericsym{0}{0}.\assocsym{S}{E}.\assocsym{P}{T}==\namesym{G}\langle\assocsym{P}{T}\rangle,\]
 which does not make sense.
 \end{example}
-The concrete type adjustment actually comes up again in the next chapter, during property map construction (Algorithm~\ref{propmapconsalgo}) and lookup (Algorithm~\ref{propmaplookupalgo}).
+The concrete type adjustment actually comes up again in the next chapter, during property map construction (\AlgRef{propmapconsalgo}) and lookup (\AlgRef{propmaplookupalgo}).
 
 \fi
 
-\section{Source Code Reference}
+\section[]{Source Code Reference}
 
 \end{document}
