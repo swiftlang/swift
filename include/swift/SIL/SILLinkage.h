@@ -165,14 +165,15 @@ enum SerializedKind_t : uint8_t {
   /// Package, PackageNonABI, and PackageExternal, if package-wide
   /// serialization is enabled with Package-CMO optimization.
   ///
-  /// A [serialized_for_package] attribute is used to indicate that a function
-  /// is serialized because of Package-CMO; this optimization allows serializing
-  /// a function containing a loadable type in a resiliently built module, which is
-  /// normally illegal. During SIL deserialization, this attribute can be used to
-  /// check whether a loaded function that was serialized can be allowed to have
-  /// loadable types. This attribute is also used to determine if a callee can be
-  /// inlined into a caller that's serialized without Package-CMO, e.g. by explicitly
-  /// annotating the caller decl with `@inlinable`.
+  /// The [serialized_for_package] attribute is used to indicate that a function
+  /// is serialized because of Package CMO, which allows loadable types in a
+  /// serialized function in a resiliently built module, which is otherwise illegal.
+  /// It's also used to determine during SIL deserialization whether loadable
+  /// types in a serialized function can be allowed in the client module that
+  /// imports the module built with Package CMO. If the client contains a [serialized]
+  /// function due to `@inlinable`, funtions with [serialized_for_package] from
+  /// the imported module are not allowed being inlined into the client function, which
+  /// is the correct behavior.
   IsSerializedForPackage
 };
 

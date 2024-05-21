@@ -11,13 +11,11 @@
 import Module
 import ModuleTBD
 
-// FIXME: sil_global should be [serialized_for_package] with package-cmo
 // CHECK-LABEL: sil_global public_external @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
 public func callPrivateFunctionPointer(_ x: Int) -> Int {
   return Module.ModuleStruct.privateFunctionPointer(x)
 }
 
-// FIXME: sil_global should be [serialized_for_package] with package-cmo
 // CHECK-LABEL: sil_global package_external @$s6Module03PkgA6StructV14closurePointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
 package func callStaticPkgClosurePointer(_ x: Int) -> Int {
   return Module.PkgModuleStruct.closurePointer(x)

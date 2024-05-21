@@ -176,6 +176,27 @@ static bool isPackageOrPublic(AccessLevel accessLevel, SILOptions options) {
   return accessLevel == AccessLevel::Public;
 }
 
+/// Checks wither this function is [serialized_for_package] due to Package CMO
+/// or [serialized] with non-package CMO. The [serialized_for_package] attribute
+/// is used to indicate that a function is serialized because of Package CMO, which
+/// allows loadable types in a serialized function in a resiliently built module, which
+/// is otherwise illegal. It's also used to determine during SIL deserialization whether
+/// loadable types in a serialized function can be allowed in the client module that
+/// imports the module built with Package CMO. If the client contains a [serialized]
+/// function due to `@inlinable`, funtions with [serialized_for_package] from
+/// the imported module are not allowed being inlined into the client function, which
+/// is the correct behavior.
+static bool isSerializedWithRightKind(const SILModule &mod,
+                                    SILFunction *f) {
+  return mod.getSwiftModule()->serializePackageEnabled() ?
+         f->isSerializedForPackage() : f->isSerialized();
+}
+
+static SerializedKind_t getRightSerializedKind(const SILModule &mod) {
+  return mod.getSwiftModule()->serializePackageEnabled() ?
+         IsSerializedForPackage : IsSerialized;
+}
+
 static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
   auto linkage = F->getLinkage();
   // We allow serializing a shared definition. For example,
@@ -192,7 +213,7 @@ static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
 
 static bool isReferenceSerializeCandidate(SILFunction *F, SILOptions options) {
   if (options.EnableSerializePackage) {
-    if (F->isSerialized())
+    if (isSerializedWithRightKind(F->getModule(), F))
       return true;
     return hasPublicOrPackageVisibility(F->getLinkage(),
                                         /*includePackage*/ true);
@@ -228,40 +249,30 @@ void CrossModuleOptimization::serializeFunctionsInModule(
 }
 
 void CrossModuleOptimization::serializeTablesInModule() {
-  if (!M.getOptions().EnableSerializePackage)
+  if (!M.getSwiftModule()->serializePackageEnabled())
     return;
 
   for (const auto &vt : M.getVTables()) {
-    if (!vt->isSerialized() &&
+    if (vt->isNotSerialized() &&
         vt->getClass()->getEffectiveAccess() >= AccessLevel::Package) {
-      vt->setSerializedKind(IsSerializedForPackage);
-    }
-    if (vt->isSerialized()) {
-      // This block shouldn't be reached, but in case it
-      // does, set it to IsSerializedForPackage.
-      vt->setSerializedKind(IsSerializedForPackage);
+      vt->setSerializedKind(getRightSerializedKind(M));
     }
   }
 
   for (auto &wt : M.getWitnessTables()) {
-    if (!wt.isSerialized() && hasPublicOrPackageVisibility(
-                                  wt.getLinkage(), /*includePackage*/ true)) {
+    if (wt.isNotSerialized() && 
+        hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true)) {
       for (auto &entry : wt.getEntries()) {
         // Witness thunks are not serialized, so serialize them here.
         if (entry.getKind() == SILWitnessTable::Method &&
-            !entry.getMethodWitness().Witness->isSerialized() &&
+            entry.getMethodWitness().Witness->isNotSerialized() &&
             isSerializeCandidate(entry.getMethodWitness().Witness,
                                  M.getOptions())) {
-          entry.getMethodWitness().Witness->setSerializedKind(IsSerialized);
+          entry.getMethodWitness().Witness->setSerializedKind(getRightSerializedKind(M));
         }
       }
       // Then serialize the witness table itself.
-      wt.setSerializedKind(IsSerializedForPackage);
-    }
-    if (wt.isSerialized()) {
-      // This block shouldn't be reached, but in case it
-      // does, set it to IsSerializedForPackage.
-      wt.setSerializedKind(IsSerializedForPackage);
+      wt.setSerializedKind(getRightSerializedKind(M));
     }
   }
 }
@@ -293,7 +304,7 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  if (function->isSerialized()) {
+  if (isSerializedWithRightKind(M, function)) {
     canSerializeFlags[function] = true;
     return true;
   }
@@ -545,7 +556,7 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 /// Decide whether to serialize a function.
 bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   // Check if we already handled this function before.
-  if (function->isSerialized())
+  if (isSerializedWithRightKind(M, function))
     return false;
 
   if (everything)
@@ -566,7 +577,7 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 
   // If package-cmo is enabled, we don't want to limit inlining
   // or should at least increase the cap.
-  if (!M.getOptions().EnableSerializePackage) {
+  if (!M.getSwiftModule()->serializePackageEnabled()) {
     // Also serialize "small" non-generic functions.
     int size = 0;
     for (SILBasicBlock &block : *function) {
@@ -581,39 +592,17 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   return true;
 }
 
-/// Adds [serialized_for_package] attribute to an already [serialized] function.
-/// It's used to indicate that a function was [serialized] because of package-cmo.
-/// Package-cmo allows serializing a function containing a loadable type in
-/// a resiliently built module, which is normally illegal. During SIL deserialization,
-/// this attribute can be used to check whether a loaded function that was serialized
-/// can be allowed to have loadable types. This attribute is also used to determine
-/// if a callee can be inlined into a caller that's serialized without package-cmo, for
-/// example, by explicitly annotating the caller decl with `@inlinable`, where
-/// the callee was serialized due to package-cmo.
-static void addSerializedForPackageAttrIfEnabled(SILFunction *f,
-                                                 const SILModule &mod) {
-  assert(f->isSerialized());
-  if (f->isSerializedForPackage())
-    return;
-  auto shouldSet = mod.getSwiftModule()->serializePackageEnabled() &&
-                   mod.getSwiftModule()->isResilient();
-  if (shouldSet)
-    f->setSerializedKind(IsSerializedForPackage);
-}
-
 /// Serialize \p function and recursively all referenced functions which are
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
-                                       const FunctionFlags &canSerializeFlags) {
-  if (function->isSerialized()) {
-    addSerializedForPackageAttrIfEnabled(function, M);
+                                                const FunctionFlags &canSerializeFlags) {
+  if (isSerializedWithRightKind(M, function))
     return;
-  }
+
   if (!canSerializeFlags.lookup(function))
     return;
 
-  function->setSerializedKind(IsSerialized);
-  addSerializedForPackageAttrIfEnabled(function, M);
+  function->setSerializedKind(getRightSerializedKind(M));
 
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
@@ -658,7 +647,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
       }
     }
     serializeFunction(callee, canSerializeFlags);
-    assert(callee->isSerialized() ||
+    assert(isSerializedWithRightKind(M, callee) ||
            isPackageOrPublic(callee->getLinkage(), M.getOptions()));
     return;
   }
@@ -668,7 +657,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (canSerializeGlobal(global)) {
       serializeGlobal(global);
     }
-    if (!hasPublicOrPackageVisibility(global->getLinkage(), M.getOptions().EnableSerializePackage)) {
+    if (!hasPublicOrPackageVisibility(global->getLinkage(), M.getSwiftModule()->serializePackageEnabled())) {
       global->setLinkage(SILLinkage::Public);
     }
     return;
@@ -696,7 +685,7 @@ void CrossModuleOptimization::serializeGlobal(SILGlobalVariable *global) {
         makeFunctionUsableFromInline(callee);
     }
   }
-  global->setSerializedKind(IsSerialized);
+  global->setSerializedKind(getRightSerializedKind(M));
 }
 
 void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
@@ -710,7 +699,7 @@ void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
 void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function) {
   assert(canUseFromInline(function));
   if (!isAvailableExternally(function->getLinkage()) &&
-      function->getLinkage() != SILLinkage::Public) {
+      !isPackageOrPublic(function->getLinkage(), M.getOptions())) {
     function->setLinkage(SILLinkage::Public);
   }
 }
@@ -734,8 +723,11 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     decl->getAttrs().add(attr);
 
     if (everything) {
-      // Serialize vtables, their superclass vtables, and make all vfunctions
-      // usable from inline.
+      // The following does _not_ apply to the Package CMO as
+      // it is only supported for the conservative mode.
+      //
+      // With non-package CMO, serialize vtables, their superclass
+      // vtables, and make all vfunctions usable from inline.
       if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
         auto *vTable = M.lookUpVTable(classDecl);
         vTable->setSerializedKind(IsSerialized);
@@ -808,7 +800,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
 
     auto &M = *getModule();
     if (M.getSwiftModule()->isResilient() &&
-        !M.getOptions().EnableSerializePackage)
+        !M.getSwiftModule()->serializePackageEnabled())
       return;
     if (!M.isWholeModule())
       return;

@@ -532,7 +532,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   auto privateLinkage = [&]() {
     // Private decls may still be serialized if they are e.g in an inlinable
     // function. In such a case, they receive shared linkage.
-    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
+    return !isNotSerialized() ? SILLinkage::Shared : SILLinkage::Private;
   };
 
   // Prespecializations are public.
@@ -792,6 +792,10 @@ bool SILDeclRef::isTransparent() const {
 
 bool SILDeclRef::isSerialized() const {
   return getSerializedKind() == IsSerialized;
+}
+
+bool SILDeclRef::isNotSerialized() const {
+  return getSerializedKind() == IsNotSerialized;
 }
 
 /// True if the function should have its body serialized.

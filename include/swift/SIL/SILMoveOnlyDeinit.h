@@ -51,7 +51,7 @@ class SILMoveOnlyDeinit final : public SILAllocated<SILMoveOnlyDeinit> {
       : nominalDecl(nullptr), funcImpl(nullptr), serialized(unsigned(IsNotSerialized)) {}
 
   SILMoveOnlyDeinit(NominalTypeDecl *nominaldecl, SILFunction *implementation,
-                    bool serialized);
+                    unsigned serialized);
   ~SILMoveOnlyDeinit();
 
 public:

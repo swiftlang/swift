@@ -385,6 +385,8 @@ struct SILDeclRef {
   bool isTransparent() const;
   /// True if the function should have its body serialized.
   bool isSerialized() const;
+  /// True if this function is neither [serialized] or [serialized_for_package].
+  bool isNotSerialized() const;
   /// Returns IsNotSerialized, IsSerializedForPackage, or IsSerialized.
   SerializedKind_t getSerializedKind() const;
   /// True if the function has noinline attribute.

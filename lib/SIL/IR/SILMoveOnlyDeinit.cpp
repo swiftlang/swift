@@ -23,7 +23,7 @@ SILMoveOnlyDeinit *SILMoveOnlyDeinit::create(SILModule &mod,
   auto buf =
       mod.allocate(sizeof(SILMoveOnlyDeinit), alignof(SILMoveOnlyDeinit));
   auto *table =
-      ::new (buf) SILMoveOnlyDeinit(nominalDecl, funcImpl, serialized);
+      ::new (buf) SILMoveOnlyDeinit(nominalDecl, funcImpl, unsigned(serialized));
   mod.moveOnlyDeinits.push_back(table);
   mod.MoveOnlyDeinitMap[nominalDecl] = table;
   return table;
@@ -31,7 +31,7 @@ SILMoveOnlyDeinit *SILMoveOnlyDeinit::create(SILModule &mod,
 
 SILMoveOnlyDeinit::SILMoveOnlyDeinit(NominalTypeDecl *nominalDecl,
                                      SILFunction *implementation,
-                                     bool serialized)
+                                     unsigned serialized)
     : nominalDecl(nominalDecl), funcImpl(implementation),
       serialized(serialized) {
   assert(funcImpl);
