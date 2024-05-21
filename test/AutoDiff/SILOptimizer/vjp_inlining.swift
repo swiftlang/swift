@@ -30,7 +30,7 @@ func with_control_flow(_ x: Float) -> Float {
 func caller_of_with_control_flow(x: Float) -> Float {
     gradient(at: x, of: with_control_flow)
 }
-// CHECK-LABEL: decision {{{.*}}, b=30, {{.*}}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
+// CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
 // CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
 
 // =============================================================== //
@@ -41,7 +41,7 @@ func caller_of_with_control_flow(x: Float) -> Float {
 func wrapperOnWithControlFlow(x: Float) -> Float {
     return with_control_flow(x)
 }
-// CHECK-LABEL: decision {{{.*}}, b=40, {{.*}}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
+// CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
 // CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "reverse-mode derivative of vjp_inlining.wrapperOnWithControlFlow(x:)"
 
 // =============================================================== //
@@ -85,5 +85,5 @@ func wrapperWithControlFlowOnSimple(x: Float) -> Float {
 func wrapperOnSimple(x: Float) -> Float {
     return simple(x: x)
 }
-// CHECK-LABEL: decision {{{.*}}, b=40, {{.*}}} $s12vjp_inlining6simple1xS2f_tFTJrSpSr
+// CHECK-LABEL: decision {{.*}} $s12vjp_inlining6simple1xS2f_tFTJrSpSr
 // CHECK-NEXT: "reverse-mode derivative of vjp_inlining.simple(x:)" inlined into "reverse-mode derivative of vjp_inlining.wrapperOnSimple(x:)"

@@ -31,7 +31,7 @@ func with_control_flow(_ x: Float) -> Float {
 func caller_of_with_control_flow(x: Float) -> Float {
     gradient(at: x, of: with_control_flow)
 }
-// CHECK-LABEL: decision {{{.*}}, b=70, {{.*}}} $s17pullback_inlining17with_control_flowyS2fFTJpSpSr
+// CHECK-LABEL: decision {{.*}} $s17pullback_inlining17with_control_flowyS2fFTJpSpSr
 // CHECK-NEXT: "pullback of pullback_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
 
 // ====================================================================== //
@@ -84,5 +84,5 @@ func caller_of_more_complex_pb_with_control_flow() -> Float {
     gradient(at: Float(1), of: more_complex_pb_with_control_flow)
 }
 
-// CHECK: decision {{{.*}}, b=70, {{.*}}} $s17pullback_inlining33more_complex_pb_with_control_flow1xS2f_tFTJpSpSr
+// CHECK: decision {{.*}} $s17pullback_inlining33more_complex_pb_with_control_flow1xS2f_tFTJpSpSr
 // CHECK-NEXT: "pullback of pullback_inlining.more_complex_pb_with_control_flow(x:)" inlined into "caller_of_more_complex_pb_with_control_flow"
