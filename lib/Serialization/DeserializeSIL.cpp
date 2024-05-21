@@ -656,7 +656,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     fn->setSerializedKind(SerializedKind_t(serializedKind));
 
-    // pcmo TODO: delete this
+    // pcmo TODO: check if this can be deleted
     // If fn was serialized in a module with package serialization
     // enabled, a new attribute [serialized_for_package] was added
     // to its definition. Preserve the attribute here if the current

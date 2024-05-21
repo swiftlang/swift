@@ -846,6 +846,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   }
 
   // A non-fragile function may not be inlined into a fragile function.
+  // pcmo TODO: remove Caller->isSerialized()
   if (Caller->isSerialized() &&
       !Callee->canBeSerializedIntoCaller(Caller->getSerializedKind())) {
     if (!Callee->hasValidLinkageForFragileRef(Caller->getSerializedKind())) {

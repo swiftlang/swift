@@ -147,7 +147,12 @@ public:
   /// might be referenced from outside the current compilation unit.
   bool isPossiblyUsedExternally() const;
 
+  /// Check if this global variable is [serialized]. This does not check
+  /// if it's [serialized_for_package].
   bool isSerialized() const;
+  /// Checks whether this global var is neither [serialized] nor
+  /// [serialized_for_package].
+  bool isNotSerialized() const;
   /// Get this global variable's serialized attribute.
   SerializedKind_t getSerializedKind() const;
   void setSerializedKind(SerializedKind_t isSerialized);

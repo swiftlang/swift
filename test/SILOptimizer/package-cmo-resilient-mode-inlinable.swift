@@ -8,10 +8,12 @@
 // RUN: -O -wmo -enable-library-evolution
 // RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
 
-// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main.sil
+// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-silgen %t/main.swift -o %t/MAIN.sil
+// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main-opt.sil
 
 // RUN: %FileCheck %s --check-prefix=CHECK < %t/Lib.sil
-// RUN: %FileCheck %s --check-prefix=CHECK-MAIN < %t/Main.sil
+// RUN: %FileCheck %s --check-prefix=CHECK-MAIN-OPT < %t/Main-opt.sil
+// RUN: %FileCheck %s --check-prefix=CHECK-MAIN < %t/MAIN.sil
 
 // REQUIRES: swift_in_compiler
 
@@ -19,101 +21,125 @@
 
 import Lib
 
-// CHECK-MAIN: sil @$s4Main10inUseInPuby3Lib0E6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
+// CHECK-MAIN-OPT-NOT: function_ref
+// CHECK-MAIN-OPT: struct $PubStruct
+// CHECK-MAIN-OPT: store {{.*}} to %0 : $*PubStruct
+// CHECK-MAIN-OPT: struct $UfiPkgStruct
+// CHECK-MAIN-OPT: store {{.*}} to %0 : $*UfiPkgStruct
+// CHECK-MAIN-OPT: struct $PkgStruct
+// CHECK-MAIN-OPT: store {{.*}} to %0 : $*PkgStruct
+
+// CHECK-MAIN: sil [serialized] [ossa] @$s4Main14inUsePubStructy3Lib0dE0VSiF : $@convention(thin) (Int) -> @out PubStruct {
 @inlinable
-public func inUseInPub(_ arg: Int) -> PubStruct {
-  // CHECK-MAIN: struct $PubStruct
-  // CHECK-MAIN: store {{.*}} to %0 : $*PubStruct
-  inLib(arg)
-}
-
-// CHECK-MAIN: sil @$s4Main8inUsePuby3Lib0D6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
-@inlinable
-public func inUsePub(_ arg: Int) -> PubStruct {
-  // CHECK-MAIN: struct $PubStruct
-  // CHECK-MAIN: store {{.*}} to %0 : $*PubStruct
-  libPub(arg)
-}
-
-// CHECK-MAIN: sil @$s4Main8useInPuby3Lib0D6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
-public func useInPub(_ arg: Int) -> PubStruct {
-  // CHECK-MAIN: struct $PubStruct
-  // CHECK-MAIN: store {{.*}} to %0 : $*PubStruct
-  inLib(arg)
-}
-
-// CHECK-MAIN: sil @$s4Main6usePuby3Lib0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
-public func usePub(_ arg: Int) -> PubStruct {
-  // CHECK-MAIN: struct $PubStruct
-  // CHECK-MAIN: store {{.*}} to %0 : $*PubStruct
-  libPub(arg)
-}
-
-// CHECK-MAIN: sil @$s4Main8useInPkgy3Lib03UfiD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
-@inlinable
-package func useInPkg(_ arg: Int) -> UfiPkgStruct {
-  // CHECK-MAIN: struct $UfiPkgStruct
-  // CHECK-MAIN: store {{.*}} to %0 : $*UfiPkgStruct
-  libInPkg(arg)
-}
-
-// CHECK-MAIN: sil package @$s4Main6usePkgy3Lib0C6StructVSiF : $@convention(thin) (Int) -> @out PkgStruct {
-package func usePkg(_ arg: Int) -> PkgStruct {
-  // CHECK-MAIN: struct $PkgStruct
-  // CHECK-MAIN: store {{.*}} to %0 : $*PkgStruct
-  libPkg(arg)
-}
-
-
-//--- Lib.swift
-
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib02inA0yAA9PubStructVSiF : $@convention(thin) (Int) -> @out PubStruct {
-@inlinable
-public func inLib(_ arg: Int) -> PubStruct {
-  // CHECK: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct
-  // CHECK: function_ref @$s3Lib9PubStructV3pubSivM : $@yield_once @convention(method) (@inout PubStruct) -> @yields @inout Int
+public func inUsePubStruct(_ arg: Int) -> PubStruct {
   var p = PubStruct(1)
+  // CHECK-MAIN: function_ref @$s3Lib9PubStructV3pubSivM : $@yield_once @convention(method) (@inout PubStruct) -> @yields @inout Int
   p.pub += arg
   return p
 }
 
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct {
-// CHECK: struct $PubStruct
-// CHECK: store {{.*}} to %0 : $*PubStruct
+// CHECK-MAIN: sil [ossa] @$s4Main12usePubStructy3Lib0cD0VSiF : $@convention(thin) (Int) -> @out PubStruct {
+public func usePubStruct(_ arg: Int) -> PubStruct {
+  var p = PubStruct(1)
+  // CHECK-MAIN: struct_element_addr {{.*}} : $*PubStruct, #PubStruct.pub
+  p.pub += arg
+  return p
+}
 
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib12UfiPkgStructVyACSicfC : $@convention(method) (Int, @thin UfiPkgStruct.Type) -> @out UfiPkgStruct {
-// CHECK: struct $UfiPkgStruct
-// CHECK: store {{.*}} to %0 : $*UfiPkgStruct
+// CHECK-MAIN: sil [serialized] [ossa] @$s4Main17inUseUfiPkgStructy3Lib0deF0VSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+@inlinable
+package func inUseUfiPkgStruct(_ arg: Int) -> UfiPkgStruct {
+  var p = UfiPkgStruct(1)
+  // CHECK-MAIN: function_ref @$s3Lib12UfiPkgStructV03ufiC0SivM : $@yield_once @convention(method) (@inout UfiPkgStruct) -> @yields @inout Int
+  p.ufiPkg += arg
+  return p
+}
 
-// CHECK: sil package [serialized_for_package] [canonical] @$s3Lib6libPkgyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PkgStruct {
-package func libPkg(_ arg: Int) -> PkgStruct {
-  // CHECK: struct $PkgStruct
-  // CHECK: store {{.*}} to %0 : $*PkgStruct
+// CHECK-MAIN: sil package [ossa] @$s4Main15useUfiPkgStructy3Lib0cdE0VSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+package func useUfiPkgStruct(_ arg: Int) -> UfiPkgStruct {
+  var p = UfiPkgStruct(1)
+  // CHECK-MAIN: struct_element_addr {{.*}} : $*UfiPkgStruct, #UfiPkgStruct.ufiPkg
+  p.ufiPkg += arg
+  return p
+}
+
+// CHECK-MAIN: sil package [ossa] @$s4Main12usePkgStructy3Lib0cD0VSiF : $@convention(thin) (Int) -> @out PkgStruct {
+package func usePkgStruct(_ arg: Int) -> PkgStruct {
   var p = PkgStruct(1)
+  // CHECK-MAIN: struct_element_addr {{.*}} : $*PkgStruct, #PkgStruct.pkg
   p.pkg += arg
   return p
 }
 
+//--- Lib.swift
+
+// CHECK: sil package [serialized_for_package] [canonical] @$s3Lib6libPkgyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PkgStruct {
+  // CHECK: struct $PkgStruct
+  // CHECK: store {{.*}} to %0 : $*PkgStruct
+
 // CHECK: sil [serialized_for_package] [canonical] @$s3Lib6libPubyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
-public func libPub(_ arg: Int) -> PubStruct {
   // CHECK: struct $PubStruct
   // CHECK: store {{.*}} to %0 : $*PubStruct
+
+// CHECK: sil package [serialized_for_package] [canonical] @$s3Lib9libUfiPkgyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+  // CHECK: struct $UfiPkgStruct
+  // CHECK: store {{.*}} to %0 : $*UfiPkgStruct
+
+/// @inlinable package func inLibUfiPkg(_ arg: Int) -> UfiPkgStruct
+// CHECK: sil [serialized_for_package] [canonical] @$s3Lib02inA6UfiPkgyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+  // CHECK: function_ref @$s3Lib12UfiPkgStructVyACSicfC : $@convention(method) (Int, @thin UfiPkgStruct.Type) -> @out UfiPkgStruct
+  // CHECK: function_ref @$s3Lib12UfiPkgStructV03ufiC0SivM : $@yield_once @convention(method) (@inout UfiPkgStruct) -> @yields @inout Int
+
+/// @inlinable func inLibUfiHid(_ arg: Int) -> UfiHidStruct
+// CHECK: sil [serialized_for_package] [canonical] @$s3Lib02inA6UfiHidyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiHidStruct {
+  // CHECK: function_ref @$s3Lib12UfiHidStructVyACSicfC : $@convention(method) (Int, @thin UfiHidStruct.Type) -> @out UfiHidStruct
+  // CHECK: function_ref @$s3Lib12UfiHidStructV03ufiC0SivM : $@yield_once @convention(method) (@inout UfiHidStruct) -> @yields @inout Int
+
+/// @inlinable public func inLibPub(_ arg: Int) -> PubStruct
+// CHECK: sil [serialized_for_package] [canonical] @$s3Lib02inA3PubyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
+  // CHECK: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct
+  // CHECK: function_ref @$s3Lib9PubStructV3pubSivM : $@yield_once @convention(method) (@inout PubStruct) -> @yields @inout Int
+
+@inlinable
+public func inLibPub(_ arg: Int) -> PubStruct {
   var p = PubStruct(1)
   p.pub += arg
   return p
 }
 
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib8libInPkgyAA03UfiD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+public func libPub(_ arg: Int) -> PubStruct {
+  var p = PubStruct(1)
+  p.pub += arg
+  return p
+}
+
 @inlinable
-package func libInPkg(_ arg: Int) -> UfiPkgStruct {
-  // CHECK: function_ref @$s3Lib12UfiPkgStructVyACSicfC : $@convention(method) (Int, @thin UfiPkgStruct.Type) -> @out UfiPkgStruct
+package func inLibUfiPkg(_ arg: Int) -> UfiPkgStruct {
   var p = UfiPkgStruct(1)
   p.ufiPkg += arg
   return p
 }
 
+package func libUfiPkg(_ arg: Int) -> UfiPkgStruct {
+  var p = UfiPkgStruct(1)
+  p.ufiPkg += arg
+  return p
+}
+
+package func libPkg(_ arg: Int) -> PkgStruct {
+  var p = PkgStruct(1)
+  p.pkg += arg
+  return p
+}
+
 @inlinable
-func libInHid(_ arg: Int) -> UfiHidStruct {
+func inLibUfiHid(_ arg: Int) -> UfiHidStruct {
+  var p = UfiHidStruct(1)
+  p.ufiHid += arg
+  return p
+}
+
+func libUfiHid(_ arg: Int) -> UfiHidStruct {
   var p = UfiHidStruct(1)
   p.ufiHid += arg
   return p
@@ -163,16 +189,6 @@ struct UfiHidStruct {
   }
   @usableFromInline
   func ufiFunc(_ arg: Int) -> Int {
-    return arg > 0 ? arg : 11
-  }
-}
-
-struct HiddenStruct {
-  var hidden: Int
-  init(_ arg: Int) {
-    hidden = arg
-  }
-  func hiddenFunc(_ arg: Int) -> Int {
     return arg > 0 ? arg : 11
   }
 }

@@ -66,7 +66,10 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
 }
 
 bool SILGlobalVariable::isSerialized() const {
-  SerializedKind_t(Serialized) == IsSerialized;
+  return SerializedKind_t(Serialized) == IsSerialized;
+}
+bool SILGlobalVariable::isNotSerialized() const {
+  return SerializedKind_t(Serialized) == IsNotSerialized;
 }
 
 /// Get this global variable's fragile attribute.

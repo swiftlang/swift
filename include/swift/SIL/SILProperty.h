@@ -53,8 +53,12 @@ public:
                              AbstractStorageDecl *Decl,
                              std::optional<KeyPathPatternComponent> Component);
 
-  bool isSerialized() const { return Serialized == SerializedKind_t(IsSerialized); }
-  
+//  bool isSerialized() const { return SerializedKind_t(Serialized) == IsSerialized; }
+  bool isNotSerialized() const { return SerializedKind_t(Serialized) == IsNotSerialized; }
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(Serialized);
+  }
+
   AbstractStorageDecl *getDecl() const { return Decl; }
   
   bool isTrivial() const {

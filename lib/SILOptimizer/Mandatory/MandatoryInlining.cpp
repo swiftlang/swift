@@ -753,6 +753,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   if (CalleeFunction->empty())
     return nullptr;
 
+  // pcmo TODO: remove F->isSerialized()
   if (F->isSerialized() &&
       !CalleeFunction->canBeSerializedIntoCaller(F->getSerializedKind())) {
     if (!CalleeFunction->hasValidLinkageForFragileRef(F->getSerializedKind())) {

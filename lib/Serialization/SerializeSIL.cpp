@@ -2870,13 +2870,13 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
-                                 g.isSerialized() ? 1 : 0,
+                                 g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  TyID, dID);
 
   // Don't emit the initializer instructions if not marked as "serialized".
-  if (!g.isSerialized())
+  if (g.isNotSerialized())
     return;
 
   ValueIDs.clear();
@@ -2966,7 +2966,7 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
       Out, ScratchRecord, SILAbbrCodes[MoveOnlyDeinitLayout::Code],
       S.addDeclRef(deinit.getNominalDecl()),
       S.addUniquedStringRef(impl->getName()),
-      deinit.isSerialized() == IsSerialized ? 1 : 0);
+      deinit.getSerializedKind());
 }
 
 void SILSerializer::writeSILProperty(const SILProperty &prop) {
@@ -2984,7 +2984,7 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     Out, ScratchRecord,
     SILAbbrCodes[PropertyLayout::Code],
     S.addDeclRef(prop.getDecl()),
-    prop.isSerialized(),
+    prop.getSerializedKind(),
     componentValues);
 }
 
@@ -3236,7 +3236,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   }
 
   for (const auto &deinit : SILMod->getMoveOnlyDeinits()) {
-    if ((ShouldSerializeAll || deinit->isSerialized()) &&
+    if ((ShouldSerializeAll || !deinit->isNotSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
             deinit->getNominalDecl()))
       writeSILMoveOnlyDeinit(*deinit);
@@ -3244,7 +3244,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out property descriptors.
   for (const SILProperty &prop : SILMod->getPropertyList()) {
-    if ((ShouldSerializeAll || prop.isSerialized()) &&
+    if ((ShouldSerializeAll || !prop.isNotSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                      prop.getDecl()->getInnermostDeclContext()))
       writeSILProperty(prop);
@@ -3269,7 +3269,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Add global variables that must be emitted to the list.
   for (const SILGlobalVariable &g : SILMod->getSILGlobals()) {
-    if (g.isSerialized() || ShouldSerializeAll)
+    if (!g.isNotSerialized() || ShouldSerializeAll)
       addReferencedGlobalVariable(&g);
   }
 

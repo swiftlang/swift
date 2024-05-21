@@ -256,7 +256,8 @@ public:
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass) {
-    isResilient = theClass->isResilient();
+    isResilient = theClass->isResilient() &&
+                  !theClass->getModuleContext()->allowNonResilientAccess();
   }
 
   void emitVTable() {
@@ -305,7 +306,7 @@ public:
     SerializedKind_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !isResilient) // pcmo TODO: isFragile?
+    if (classIsPublic && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.

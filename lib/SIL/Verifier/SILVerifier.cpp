@@ -2502,6 +2502,7 @@ public:
       require(!checkResilience(VD, F),
               "cannot access storage of resilient global");
     }
+    // pcmo TODO: replace this with F.canInlineCalleeBody(RefG)
     if (F.isSerialized()) {
       // If it has a package linkage at this point, package CMO must
       // have been enabled, so opt in for visibility.

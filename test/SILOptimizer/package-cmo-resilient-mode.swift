@@ -517,9 +517,7 @@ final package class FinalPkgKlass {
   }
 }
 
-// CHECK-RES-LABEL: sil_vtable [serialized_for_package] PubKlass {
-// FIXME: should be [serialized_for_package] in non-resilient mode as well?
-// CHECK-NONRES-LABEL: sil_vtable [serialized] PubKlass {
+// CHECK-COMMON-LABEL: sil_vtable [serialized_for_package] PubKlass {
 // CHECK-COMMON-NEXT:   #PubKlass.data!getter: (PubKlass) -> () -> Int : @$s3Lib8PubKlassC4dataSivg
 // CHECK-COMMON-NEXT:   #PubKlass.data!setter: (PubKlass) -> (Int) -> () : @$s3Lib8PubKlassC4dataSivs
 // CHECK-COMMON-NEXT:   #PubKlass.data!modify: (PubKlass) -> () -> () : @$s3Lib8PubKlassC4dataSivM
@@ -527,9 +525,7 @@ final package class FinalPkgKlass {
 // CHECK-COMMON-NEXT:   #PubKlass.pubfunc: (PubKlass) -> (Int) -> Int : @$s3Lib8PubKlassC7pubfuncyS2iF
 // CHECK-COMMON-NEXT:   #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD
 
-// CHECK-RES-LABEL: sil_vtable [serialized_for_package] FinalPubKlass {
-// FIXME: should be [serialized_for_package] in non-resilient mode as well?
-// CHECK-NONRES-LABEL: sil_vtable [serialized] FinalPubKlass {
+// CHECK-COMMON-LABEL: sil_vtable [serialized_for_package] FinalPubKlass {
 // CHECK-COMMON-NEXT:  #FinalPubKlass.init!allocator: (FinalPubKlass.Type) -> (Int) -> FinalPubKlass : @$s3Lib13FinalPubKlassCyACSicfC
 // CHECK-COMMON-NEXT:  #FinalPubKlass.deinit!deallocator: @$s3Lib13FinalPubKlassCfD
 
