@@ -449,10 +449,24 @@ protected:
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
 
+  bool shouldSubstOpaqueArchetypes() const { return false; }
+
   SILType remapType(SILType Ty) {
     if (Functor.SubsMap || Ty.hasLocalArchetype()) {
       Ty = Ty.subst(Builder.getModule(), Functor, Functor,
                     CanGenericSignature());
+    }
+
+    if (asImpl().shouldSubstOpaqueArchetypes()) {
+      auto context = getBuilder().getTypeExpansionContext();
+
+      if (!Ty.hasOpaqueArchetype() ||
+          !context.shouldLookThroughOpaqueTypeArchetypes())
+        return Ty;
+
+      // Remap types containing opaque result types in the current context.
+      Ty = getBuilder().getTypeLowering(Ty).getLoweredType().getCategoryType(
+          Ty.getCategory());
     }
 
     return Ty;
@@ -462,14 +476,61 @@ protected:
     if (Functor.SubsMap || ty->hasLocalArchetype())
       ty = ty.subst(Functor, Functor)->getCanonicalType();
 
+    if (asImpl().shouldSubstOpaqueArchetypes()) {
+      auto context = getBuilder().getTypeExpansionContext();
+
+      if (!ty->hasOpaqueArchetype() ||
+          !context.shouldLookThroughOpaqueTypeArchetypes())
+        return ty;
+
+      // Remap types containing opaque result types in the current context.
+      return substOpaqueTypesWithUnderlyingTypes(ty, context,
+                                                 /*allowLoweredTypes=*/false);
+    }
+
     return ty;
   }
 
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
-    if (Functor.SubsMap || Ty->hasLocalArchetype())
+    if (Functor.SubsMap || Ty->hasLocalArchetype()) {
       C = C.subst(Ty, Functor, Functor);
+      if (asImpl().shouldSubstOpaqueArchetypes())
+        Ty = Ty.subst(Functor, Functor);
+    }
+
+    if (asImpl().shouldSubstOpaqueArchetypes()) {
+      auto context = getBuilder().getTypeExpansionContext();
+
+      if (!Ty->hasOpaqueArchetype() ||
+          !context.shouldLookThroughOpaqueTypeArchetypes())
+        return C;
+
+      return substOpaqueTypesWithUnderlyingTypes(C, Ty, context);
+    }
 
     return C;
+  }
+
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    // If we have local archetypes to substitute, do so now.
+    if (Subs.hasLocalArchetypes() || Functor.SubsMap)
+      Subs = Subs.subst(Functor, Functor);
+
+    if (asImpl().shouldSubstOpaqueArchetypes()) {
+      auto context = getBuilder().getTypeExpansionContext();
+
+      if (!Subs.hasOpaqueArchetypes() ||
+          !context.shouldLookThroughOpaqueTypeArchetypes())
+        return Subs;
+
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        context.getContext(), context.getResilienceExpansion(),
+        context.isWholeModuleContext());
+      return Subs.subst(replacer, replacer,
+                        SubstFlags::SubstituteOpaqueArchetypes);
+    }
+
+    return Subs;
   }
 
   /// Get the value that takes the place of the given `Value` within the cloned
@@ -480,14 +541,6 @@ protected:
   SILFunction *remapFunction(SILFunction *Func) { return Func; }
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
-
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    // If we have local archetypes to substitute, do so now.
-    if (Subs.hasLocalArchetypes() || Functor.SubsMap)
-      Subs = Subs.subst(Functor, Functor);
-
-    return Subs;
-  }
 
   /// This is called by either of the top-level visitors, cloneReachableBlocks
   /// or cloneSILFunction, after all other visitors are have been called.
