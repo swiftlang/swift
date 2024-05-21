@@ -1421,6 +1421,14 @@ bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
 /// \returns true if there were any conflicts diagnosed.
 bool diagnoseObjCMethodConflicts(SourceFile &sf);
 
+/// Diagnose all conflicts between extensions of the same class that have the
+/// same Objective-C category name.
+///
+/// \param sf The source file for which we are diagnosing conflicts.
+///
+/// \returns true if there were any conflicts diagnosed.
+bool diagnoseObjCCategoryConflicts(SourceFile &sf);
+
 /// Diagnose any unsatisfied @objc optional requirements of
 /// protocols that conflict with methods.
 bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
