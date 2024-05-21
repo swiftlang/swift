@@ -239,10 +239,12 @@ extension List where Element: ~Copyable {
 /// Basic utilities
 extension List where Element: ~Copyable {
   /// Is this list empty?
-  public borrowing func empty() -> Bool {
-    switch self {
-    case .empty: return true
-    case .cons(_, _): return false
+  public var isEmpty: Bool {
+    borrowing get {
+      switch self {
+      case .empty: true
+      case .cons(_, _): false
+      }
     }
   }
 
