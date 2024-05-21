@@ -103,6 +103,19 @@ swift_stdlib_connectNSBaseClasses() {
   return true;
 }
 
+@interface __SwiftNativeNSArrayBase (Compatibility)
++ (id) new;
+@end
+
+@implementation __SwiftNativeNSArrayBase (Compatibility)
+
++ (id) new {
+  // Some apps accidentally do [[[aSwiftArray class] new] mutableCopy]
+  return [objc_lookUpClass("NSArray") new];
+}
+
+@end
+
 #endif
 
 // ${'Local Variables'}:
