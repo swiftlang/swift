@@ -14,13 +14,6 @@
 
 // REQUIRES: executable_test
 
-// XFAIL: *
-/* FIXME: there's a cycle getting triggered somehow (rdar://124117857)
-<unknown>:0: error: circular reference
-<unknown>:0: note: through reference here
-<unknown>:0: error: merge-module command failed with exit code 1 (use -v to see invocation)
-*/
-
 import Swiftskell
 
 print("hello, world")
