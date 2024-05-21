@@ -14,21 +14,12 @@
 // RUN:                     -module-name E -o %t/E %target-rpath(%t)
 // RUN: %target-codesign %t/E
 // RUN: %target-codesign %t/%target-library-name(Swiftskell)
-// RUN: %target-run %t/E %t/%target-library-name(Swiftskell) | %FileCheck %s
+// RUN: %target-run %t/E %t/%target-library-name(Swiftskell) \
+// RUN:     | %FileCheck %s --implicit-check-not destroy
 
 // REQUIRES: executable_test
 
 import Swiftskell
-
-/// assertion function
-func check(_ result: Bool, _ string: String? = nil, _ line: Int = #line) {
-  if result { return }
-  var msg = "assertion failure (line \(line))"
-  if let extra = string {
-    msg += ":\t" + extra
-  }
-  fatalError(msg)
-}
 
 /// Basic noncopyable type for testing.
 struct File: ~Copyable, Show {
@@ -37,6 +28,8 @@ struct File: ~Copyable, Show {
     self.id = id
   }
   func show() -> String { return id.show() }
+
+  deinit { print("destroying file \(id)") }
 }
 
 
@@ -51,14 +44,31 @@ func testListBasic() {
   var items = List<File>(length: 5) { .init($0) }
   print(items.show())  // CHECK: [0, 1, 2, 3, 4, ]
   check(items.length() == 5)
-  check(!items.empty())
+  check(!items.isEmpty)
+
+  items = List<File>(length: 5) { .init($0) }
+  // CHECK: destroying file 4
+  // CHECK: destroying file 3
+  // CHECK: destroying file 2
+  // CHECK: destroying file 1
+  // CHECK: destroying file 0
+
+  items = items.reverse()
+  check(items.length() == 5)
+  print(items.show())  // CHECK: [4, 3, 2, 1, 0, ]
 
   items = .empty
+  // CHECK: destroying file 0
+  // CHECK: destroying file 1
+  // CHECK: destroying file 2
+  // CHECK: destroying file 3
+  // CHECK: destroying file 4
+
   check(items.length() == 0)
-  check(items.empty())
+  check(items.isEmpty)
 
   let nums = List<Int>().push(7).push(7).push(3)
   print(nums.show()) // CHECK: [7, 7, 3, ]
 
-  
+
 }
