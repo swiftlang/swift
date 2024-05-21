@@ -127,6 +127,29 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->eraseBlock(this);
 }
 
+/// Handle the mechanical aspects of removing an unreachable block.
+void SILBasicBlock::removeDeadBlock() {
+  for (SILArgument *arg : getArguments()) {
+    arg->replaceAllUsesWithUndef();
+    // To appease the ownership verifier, just set to None.
+    arg->setOwnershipKind(OwnershipKind::None);
+  }
+
+  // Instructions in the dead block may be used by other dead blocks.  Replace
+  // any uses of them with undef values.
+  while (!empty()) {
+    // Grab the last instruction in the bb.
+    auto *inst = &back();
+
+    // Replace any still-remaining uses with undef values and erase.
+    inst->replaceAllUsesOfAllResultsWithUndef();
+    inst->eraseFromParent();
+  }
+
+  // Now that the bb is empty, eliminate it.
+  eraseFromParent();
+}
+
 void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   assert(Other->isEntry() == isEntry() &&
          "Expected to both blocks to be entries or not");
