@@ -20,16 +20,6 @@
 
 import Swiftskell
 
-/// assertion function
-func check(_ result: Bool, _ string: String? = nil, _ line: Int = #line) {
-  if result { return }
-  var msg = "assertion failure (line \(line))"
-  if let extra = string {
-    msg += ":\t" + extra
-  }
-  fatalError(msg)
-}
-
 /// Basic noncopyable type for testing.
 struct File: ~Copyable, Show {
   let id: Int
