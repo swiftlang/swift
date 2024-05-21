@@ -16,6 +16,6 @@ public struct S {
 // S.x.unsafeMutableAddressor
 // CHECK-SIL-HID: sil hidden [global_init] @$s4File1SV1xSSvau : $@convention(thin) () -> Builtin.RawPointer {
 
-// CHECK-IR: define swiftcc ptr @"$s4File1SV1xSSvau"()
+// CHECK-IR: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @"$s4File1SV1xSSvau"()
 // CHECK-IR-HID: define hidden swiftcc ptr @"$s4File1SV1xSSvau"()
 
