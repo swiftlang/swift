@@ -1138,12 +1138,13 @@ namespace {
       return pair.second;
     }
 
-    std::optional<StringRef> getObjCImplCategoryName() const {
-      if (!TheExtension || !TheExtension->isObjCImplementation())
+    std::optional<StringRef> getCustomCategoryName() const {
+      if (!TheExtension)
         return std::nullopt;
-      if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
-        assert(!ident->empty());
-        return ident->str();
+      assert(!TheExtension->hasClangNode());
+      auto ident = TheExtension->getObjCCategoryName();
+      if (!ident.empty()) {
+        return ident.str();
       }
       return std::nullopt;
     }
@@ -1425,8 +1426,8 @@ namespace {
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
 
-      if (auto implementationCategoryName = getObjCImplCategoryName()) {
-        os << *implementationCategoryName;
+      if (auto customCategoryName = getCustomCategoryName()) {
+        os << *customCategoryName;
         return;
       }
 
@@ -2448,8 +2449,8 @@ namespace {
         os << "@";
         TheExtension->getLoc().print(os, IGM.Context.SourceMgr);
       }
-      if (auto name = getObjCImplCategoryName()) {
-        os << " objc_impl_category_name=" << *name;
+      if (auto name = getCustomCategoryName()) {
+        os << " custom_category_name=" << *name;
       }
       
       if (HasNonTrivialConstructor)

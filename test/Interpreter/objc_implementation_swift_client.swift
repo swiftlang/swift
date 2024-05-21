@@ -58,7 +58,6 @@ class SwiftClientSubclass: ImplClass {
 #if RESILIENCE
   override class func makeResilientImpl() -> ImplClassWithResilientStoredProperty {
     SwiftResilientStoredClientSubclass()
-    fatalError()
   }
 #endif
 }

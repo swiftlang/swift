@@ -37,3 +37,16 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+
+@main struct Main {
+  static func main() {
+    ImplClass.runTests()
+    
+    do {
+      print("*** SwiftClientSubclass init ***")
+      let swiftClientSub = SwiftClientSubclass()
+      swiftClientSub.testSelf()
+      print("*** SwiftClientSubclass end ***")
+    }
+  }
+}

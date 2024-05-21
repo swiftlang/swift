@@ -359,6 +359,10 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   llvm::SetVector<ObjCMethodConflict> ObjCMethodConflicts;
 
+  /// Categories (extensions with explicit @objc names) declared in this
+  /// source file. They need to be checked for conflicts after type checking.
+  llvm::TinyPtrVector<ExtensionDecl *> ObjCCategories;
+
   /// List of attributes added by access notes, used to emit remarks for valid
   /// ones.
   llvm::DenseMap<ValueDecl *, std::vector<DeclAttribute *>>

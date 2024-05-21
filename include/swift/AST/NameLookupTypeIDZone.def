@@ -116,3 +116,5 @@ SWIFT_REQUEST(NameLookup, ImplementsAttrProtocolRequest,
               ProtocolDecl *(const ImplementsAttr *, DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupIntrinsicRequest,
               FuncDecl *(ModuleDecl *, Identifier), Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ObjCCategoryNameMapRequest,
+              ObjCCategoryNameMap(ClassDecl *, ExtensionDecl *), Cached, NoLocationInfo)
