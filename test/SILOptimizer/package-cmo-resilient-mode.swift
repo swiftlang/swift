@@ -239,7 +239,7 @@ public func runPub(_ arg: PubStruct) -> Int {
 public func runPubInlinable(_ arg: Int) -> PubStruct {
   // CHECK-RES-DAG: sil [serialized] [serialized_for_package] [canonical] @$s3Lib15runPubInlinableyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
   // CHECK-NONRES-DAG: sil [serialized] [canonical] @$s3Lib15runPubInlinableyAA0C6StructVSiF : $@convention(thin) (Int) -> PubStruct {
-  // CHECK-RES-DAG: alloc_stack [var_decl] $PubStruct
+  // CHECK-RES-DAG: alloc_stack {{.*}} [var_decl] $PubStruct
   // CHECK-RES-DAG: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct
   // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> PubStruct
   var x = PubStruct(1)
@@ -485,3 +485,22 @@ final package class FinalPkgKlass {
 // CHECK-COMMON-NEXT:   method #PkgProto.data!setter: <Self where Self : PkgProto> (inout Self) -> (Int) -> () : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP4dataSivsTW
 // CHECK-COMMON-NEXT:   method #PkgProto.data!modify: <Self where Self : PkgProto> (inout Self) -> () -> () : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP4dataSivMTW
 // CHECK-COMMON-NEXT:   method #PkgProto.pkgfunc: <Self where Self : PkgProto> (Self) -> (Int) -> Int : @$s3Lib8PkgKlassCAA0B5ProtoA2aDP7pkgfuncyS2iFTW
+
+public struct Something {
+  public init() {}
+
+  public func f() -> Int {
+    return 7
+  }
+}
+
+@usableFromInline
+func use(_ c: () -> Int) { }
+
+// Don't crash on this example
+@inlinable
+public func reproduce(_ e: Something) {
+  use {
+    return e.f()
+  }
+}
