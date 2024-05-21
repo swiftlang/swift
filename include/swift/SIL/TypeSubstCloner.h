@@ -175,68 +175,13 @@ public:
   }
 
 protected:
+  bool shouldSubstOpaqueArchetypes() const { return true; }
+
   SILType remapType(SILType Ty) {
     SILType &Sty = TypeCache[Ty];
-    if (!Sty) {
-      Sty = Ty;
-
-      Sty = Sty.subst(getBuilder().getModule(), Functor, Functor);
-
-      auto context = getBuilder().getTypeExpansionContext();
-
-      if (!Sty.hasOpaqueArchetype() ||
-          !context.shouldLookThroughOpaqueTypeArchetypes())
-        return Sty;
-
-      // Remap types containing opaque result types in the current context.
-      Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
-          Sty.getCategory());
-    }
+    if (!Sty)
+      Sty = SILClonerWithScopes<ImplClass>::remapType(Ty);
     return Sty;
-  }
-
-  CanType remapASTType(CanType ty) {
-    auto substTy = ty.subst(Functor, Functor)->getCanonicalType();
-
-    auto context = getBuilder().getTypeExpansionContext();
-
-    if (!substTy->hasOpaqueArchetype() ||
-        !context.shouldLookThroughOpaqueTypeArchetypes())
-      return substTy;
-
-    // Remap types containing opaque result types in the current context.
-    return substOpaqueTypesWithUnderlyingTypes(substTy, context,
-                                               /*allowLoweredTypes=*/false);
-  }
-
-  ProtocolConformanceRef remapConformance(Type ty,
-                                          ProtocolConformanceRef conf) {
-    auto substTy = ty.subst(Functor, Functor)->getCanonicalType();
-    auto substConf = conf.subst(ty, Functor, Functor);
-
-    auto context = getBuilder().getTypeExpansionContext();
-
-    if (!substTy->hasOpaqueArchetype() ||
-        !context.shouldLookThroughOpaqueTypeArchetypes())
-      return substConf;
-
-    return substOpaqueTypesWithUnderlyingTypes(substConf, substTy, context);
-  }
-
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    Subs = Subs.subst(Functor, Functor);
-
-    auto context = getBuilder().getTypeExpansionContext();
-
-    if (!Subs.hasOpaqueArchetypes() ||
-        !context.shouldLookThroughOpaqueTypeArchetypes())
-      return Subs;
-
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context.getContext(), context.getResilienceExpansion(),
-      context.isWholeModuleContext());
-    return Subs.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes);
   }
 
   void visitApplyInst(ApplyInst *Inst) {
