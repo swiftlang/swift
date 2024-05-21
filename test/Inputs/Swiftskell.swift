@@ -164,6 +164,8 @@ public struct Box<Wrapped: ~Copyable>: ~Copyable {
 
 
 /// MARK: Data.List
+///
+/// A singly-linked list
 public enum List<Element: ~Copyable>: ~Copyable {
   case cons(Element, Box<List<Element>>)
   case empty
@@ -179,7 +181,7 @@ public enum List<Element: ~Copyable>: ~Copyable {
 /// Pure Iteration
 extension List where Element: ~Copyable {
   /// Performs forward iteration through the list, accumulating a result value.
-  /// Returns f(xn,...,f(x2, f(x1, init))...), or init if the list is empty.
+  /// Returns f(xn,...,f(x2, f(x1, init))...), or `init` if the list is empty.
   public borrowing func foldl<Out>(
                         init initial: consuming Out,
                         _ f: (borrowing Element, consuming Out) -> Out) -> Out
@@ -196,7 +198,7 @@ extension List where Element: ~Copyable {
   }
 
   /// Performs reverse iteration through the list, accumulating a result value.
-  /// Returns f(x1, f(x2,...,f(xn, init)...)) or init if the list is empty.
+  /// Returns f(x1, f(x2,...,f(xn, init)...)) or `init` if the list is empty.
   public borrowing func foldr<Out>(
                         init initial: consuming Out,
                         _ f: (borrowing Element, consuming Out) -> Out) -> Out
@@ -239,6 +241,8 @@ extension List where Element: ~Copyable {
 /// Basic utilities
 extension List where Element: ~Copyable {
   /// Is this list empty?
+  ///
+  /// Complexity: O(1)
   public var isEmpty: Bool {
     borrowing get {
       switch self {
@@ -249,11 +253,15 @@ extension List where Element: ~Copyable {
   }
 
   /// How many elements are in this list?
+  ///
+  /// Complexity: O(n)
   public borrowing func length() -> Int {
     return foldl(init: 0) { $1 + 1 }
   }
 
   /// Pop the first element off the list, if present.
+  ///
+  /// Complexity: O(1)
   public consuming func pop() -> Optional<Pair<Element, List<Element>>> {
     switch consume self {
       case .empty: .none
@@ -261,12 +269,16 @@ extension List where Element: ~Copyable {
     }
   }
 
-  /// Push an element onto the list.
+  /// Push an element onto the front of the list.
+  ///
+  /// Complexity: O(1)
   public consuming func push(_ newHead: consuming Element) -> List<Element> {
     return List(newHead, self)
   }
 
   /// Produces a new list that is the reverse of this list.
+  ///
+  /// Complexity: O(n)
   public consuming func reverse() -> List<Element> {
     var new = List<Element>()
     while case let .pair(head, tail) = pop() {
