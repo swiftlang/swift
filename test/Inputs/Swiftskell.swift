@@ -55,6 +55,17 @@ public protocol Generator: ~Copyable {
   func next() -> Maybe<Element>
 }
 
+/// Eager assertion function, to avoid autoclosures.
+public func check(_ result: Bool, _ string: String? = nil,
+                  _ file: String = #file, _ line: Int = #line) {
+  if result { return }
+  var msg = "assertion failure (\(file):\(line))"
+  if let extra = string {
+    msg += ":\t" + extra
+  }
+  fatalError(msg)
+}
+
 // MARK: Tuples
 public enum Pair<L: ~Copyable, R: ~Copyable>: ~Copyable {
   case pair(L, R)
