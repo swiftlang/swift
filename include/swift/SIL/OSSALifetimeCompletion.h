@@ -123,6 +123,8 @@ public:
   enum class LifetimeEnd : uint8_t {
     /// The lifetime ends at the boundary.
     Boundary,
+    /// The lifetime "ends" in a loop.
+    Loop,
   };
 
   static void visitAvailabilityBoundary(

@@ -276,6 +276,9 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   OSSALifetimeCompletion::visitAvailabilityBoundary(
       getCurrentDef(), OSSALifetimeCompletion::DoNotAllowLeaks,
       completeLiveness, [&](auto *unreachable, auto end) {
+        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+          recordUnreachableLifetimeEnd(unreachable);
+        }
         unreachable->visitPriorInstructions([&](auto *inst) {
           liveness->extendToNonUse(inst);
           return true;
