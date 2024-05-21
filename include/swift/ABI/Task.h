@@ -352,7 +352,11 @@ public:
   /// failing that will return ResumeTask. The returned function pointer may
   /// have a different signature than ResumeTask, and it's only for identifying
   /// code associated with the task.
-  const void *getResumeFunctionForLogging();
+  ///
+  /// If isStarting is true, look into the resume context when appropriate
+  /// to pull out a wrapped resume function. If isStarting is false, assume the
+  /// resume context may not be valid and just return the wrapper.
+  const void *getResumeFunctionForLogging(bool isStarting);
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
