@@ -55,9 +55,20 @@ public protocol Generator: ~Copyable {
   func next() -> Maybe<Element>
 }
 
+/// Eager assertion function, to avoid autoclosures.
+public func check(_ result: Bool, _ string: String? = nil,
+                  _ file: String = #file, _ line: Int = #line) {
+  if result { return }
+  var msg = "assertion failure (\(file):\(line))"
+  if let extra = string {
+    msg += ":\t" + extra
+  }
+  fatalError(msg)
+}
+
 // MARK: Tuples
 public enum Pair<L: ~Copyable, R: ~Copyable>: ~Copyable {
-  case elms(L, R)
+  case pair(L, R)
 }
 extension Pair: Copyable where L: Copyable, R: Copyable {}
 
@@ -153,6 +164,8 @@ public struct Box<Wrapped: ~Copyable>: ~Copyable {
 
 
 /// MARK: Data.List
+///
+/// A singly-linked list
 public enum List<Element: ~Copyable>: ~Copyable {
   case cons(Element, Box<List<Element>>)
   case empty
@@ -168,7 +181,7 @@ public enum List<Element: ~Copyable>: ~Copyable {
 /// Pure Iteration
 extension List where Element: ~Copyable {
   /// Performs forward iteration through the list, accumulating a result value.
-  /// Returns f(xn,...,f(x2, f(x1, init))...), or init if the list is empty.
+  /// Returns f(xn,...,f(x2, f(x1, init))...), or `init` if the list is empty.
   public borrowing func foldl<Out>(
                         init initial: consuming Out,
                         _ f: (borrowing Element, consuming Out) -> Out) -> Out
@@ -185,7 +198,7 @@ extension List where Element: ~Copyable {
   }
 
   /// Performs reverse iteration through the list, accumulating a result value.
-  /// Returns f(x1, f(x2,...,f(xn, init)...)) or init if the list is empty.
+  /// Returns f(x1, f(x2,...,f(xn, init)...)) or `init` if the list is empty.
   public borrowing func foldr<Out>(
                         init initial: consuming Out,
                         _ f: (borrowing Element, consuming Out) -> Out) -> Out
@@ -228,29 +241,51 @@ extension List where Element: ~Copyable {
 /// Basic utilities
 extension List where Element: ~Copyable {
   /// Is this list empty?
-  public borrowing func empty() -> Bool {
-    switch self {
-    case .empty: return true
-    case .cons(_, _): return false
+  ///
+  /// Complexity: O(1)
+  public var isEmpty: Bool {
+    borrowing get {
+      switch self {
+      case .empty: true
+      case .cons(_, _): false
+      }
     }
   }
 
   /// How many elements are in this list?
+  ///
+  /// Complexity: O(n)
   public borrowing func length() -> Int {
     return foldl(init: 0) { $1 + 1 }
   }
 
   /// Pop the first element off the list, if present.
+  ///
+  /// Complexity: O(1)
   public consuming func pop() -> Optional<Pair<Element, List<Element>>> {
     switch consume self {
       case .empty: .none
-      case let .cons(elm, tail): .elms(elm, tail.take())
+      case let .cons(elm, tail): .pair(elm, tail.take())
     }
   }
 
-  /// Push an element onto the list.
+  /// Push an element onto the front of the list.
+  ///
+  /// Complexity: O(1)
   public consuming func push(_ newHead: consuming Element) -> List<Element> {
     return List(newHead, self)
+  }
+
+  /// Produces a new list that is the reverse of this list.
+  ///
+  /// Complexity: O(n)
+  public consuming func reverse() -> List<Element> {
+    var new = List<Element>()
+    while case let .pair(head, tail) = pop() {
+      new = new.push(head)
+      self = tail
+    }
+    return new
   }
 }
 
