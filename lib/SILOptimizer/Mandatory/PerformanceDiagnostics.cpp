@@ -526,6 +526,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
         diagnose(loc, diag::embedded_swift_keypath);
         return true;
       }
+      if (isa<CheckedCastAddrBranchInst>(inst) || isa<UnconditionalCheckedCastAddrInst>(inst)) {
+        diagnose(loc, diag::embedded_swift_dynamic_cast);
+        return true;
+      }
       if (!allowedMetadataUseInEmbeddedSwift(inst)) {
         PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
         if (impactType) {
