@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift
 
+// REQUIRES: executable_test
+
 func callee<X: P1, T: P2, U: P3, V: P4>(x: X, t: T, u: U, v: V)
     -> (any P1, any P2, any P3, any P4) {
   return (x, t, u, v)
