@@ -332,6 +332,11 @@ ImportObjCHeader("import-objc-header",
                  llvm::cl::desc("header to implicitly import"),
                  llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+InProcessPluginServerPath("in-process-plugin-server-path",
+                          llvm::cl::desc("in-process plugin server"),
+                          llvm::cl::cat(Category));
+
 static llvm::cl::list<std::string>
 PluginPath("plugin-path",
                llvm::cl::desc("plugin-path"),
@@ -4541,6 +4546,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (!options::InProcessPluginServerPath.empty()) {
+    InitInvok.getSearchPathOptions().InProcessPluginServerPath =
+        options::InProcessPluginServerPath;
+  }
   if (!options::LoadPluginLibrary.empty()) {
     std::vector<std::string> paths;
     for (auto path: options::LoadPluginLibrary) {

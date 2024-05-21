@@ -1983,6 +1983,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   }
   Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
+  if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
+    Opts.InProcessPluginServerPath = A->getValue();
+
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'
   // are grouped, and plugins are searched by the order of these options.
