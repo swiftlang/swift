@@ -866,7 +866,9 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($HostArch.SDKInstallRoot)\usr\bin;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($HostArch.SDKInstallRoot)\usr\bin;$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+    } elseif ($UsePinnedCompilers.Contains("Swift")) {
+      $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
@@ -1106,8 +1108,6 @@ function Build-Compilers() {
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
       }
     }
-
-    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
 
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
