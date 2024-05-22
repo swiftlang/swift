@@ -748,13 +748,11 @@ do {
     (repeat takesClosure { each t }) // Ok
   }
 
-  // FIXME: multi-statement closures should type-check.
   func testMultiStmtClosure<each T>(_ t: repeat each T) -> (repeat each T) {
      (repeat takesClosure {
-       // expected-error@-1 {{pack expansion requires that '_' and 'each T' have the same shape}}
        let v = each t
        return v
-    })
+    }) // Ok
   }
 
   func takesAutoclosure<T>(_ fn: @autoclosure () -> T) -> T { return fn() }
