@@ -6453,6 +6453,7 @@ public:
 ///
 /// This includes:
 /// - Not yet resolved outer VarDecls (including closure parameters)
+/// - Outer pack expansions that are not yet fully resolved
 /// - Return statements with a contextual type that has not yet been resolved
 ///
 /// This is required because isolated conjunctions, just like single-expression
@@ -6474,6 +6475,7 @@ public:
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
+  void inferTypeVars(PackExpansionExpr *);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
