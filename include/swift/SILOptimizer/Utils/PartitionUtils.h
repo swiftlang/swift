@@ -342,7 +342,7 @@ struct TransferringOperandState {
   /// The dynamic isolation info of the region of value when we transferred.
   ///
   /// This will contain the isolated value if we found one.
-  SILIsolationInfo isolationInfo;
+  SILDynamicMergedIsolationInfo isolationInfo;
 
   /// The dynamic isolation history at this point.
   IsolationHistory isolationHistory;
@@ -888,17 +888,16 @@ public:
   }
 
   /// Call handleTransferNonTransferrable on our CRTP subclass.
-  void
-  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                 SILIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     return asImpl().handleTransferNonTransferrable(op, elt,
                                                    isolationRegionInfo);
   }
   /// Just call our CRTP subclass.
-  void
-  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                 Element otherElement,
-                                 SILIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt, Element otherElement,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     return asImpl().handleTransferNonTransferrable(op, elt, otherElement,
                                                    isolationRegionInfo);
   }
@@ -916,10 +915,10 @@ public:
   ///
   /// The bool result is if it is captured by a closure element. That only is
   /// computed if \p sourceOp is non-null.
-  std::pair<SILIsolationInfo, bool>
+  std::pair<SILDynamicMergedIsolationInfo, bool>
   getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
-    SILIsolationInfo isolationRegionInfo;
+    SILDynamicMergedIsolationInfo isolationRegionInfo;
 
     for (const auto &pair : p.range()) {
       if (pair.second == region) {
@@ -1039,7 +1038,7 @@ public:
       // dynamic isolation region info found by the dataflow.
       Region transferredRegion = p.getRegion(transferredElement);
       bool isClosureCapturedElt = false;
-      SILIsolationInfo transferredRegionIsolation;
+      SILDynamicMergedIsolationInfo transferredRegionIsolation;
       std::tie(transferredRegionIsolation, isClosureCapturedElt) =
           getIsolationRegionInfo(transferredRegion, op.getSourceOp());
 
@@ -1189,7 +1188,7 @@ private:
   // use have the same isolation.
   void handleTransferNonTransferrableHelper(
       const PartitionOp &op, Element elt,
-      SILIsolationInfo dynamicMergedIsolationInfo) const {
+      SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) const {
     if (shouldTryToSquelchErrors()) {
       // If we have a temporary that is initialized with an unsafe nonisolated
       // value... squelch the error like if we were that value.
@@ -1252,13 +1251,13 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 
   /// This is called if we detect a never transferred element that was passed to
   /// a transfer instruction.
-  void handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                      SILIsolationInfo regionInfo) const {}
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt,
+      SILDynamicMergedIsolationInfo regionInfo) const {}
 
-  void
-  handleTransferNonTransferrable(const PartitionOp &op, Element elt,
-                                 Element otherElement,
-                                 SILIsolationInfo isolationRegionInfo) const {}
+  void handleTransferNonTransferrable(
+      const PartitionOp &op, Element elt, Element otherElement,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {}
 
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
