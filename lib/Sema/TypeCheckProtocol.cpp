@@ -3313,10 +3313,10 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         !Conformance->isPreconcurrency() &&
         !suggestedPreconcurrency &&
         !requirementIsolation.isActorIsolated()) {
-      Context.Diags.diagnose(Conformance->getLoc(),
+      Context.Diags.diagnose(Conformance->getProtocolNameLoc(),
                              diag::add_preconcurrency_to_conformance,
                              Proto->getName())
-          .fixItInsert(Conformance->getLoc(), "@preconcurrency ");
+          .fixItInsert(Conformance->getProtocolNameLoc(), "@preconcurrency ");
       suggestedPreconcurrency = true;
     }
   }

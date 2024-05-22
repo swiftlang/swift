@@ -9,7 +9,7 @@ import APINotesFrameworkTest
 
 // CHECK-DIAGS-5-NOT: versioned-objc.swift:[[@LINE-1]]:
 class ProtoWithVersionedUnavailableMemberImpl: ProtoWithVersionedUnavailableMember {
-  // CHECK-DIAGS-4: versioned-objc.swift:[[@LINE-1]]:48: error: type 'ProtoWithVersionedUnavailableMemberImpl' cannot conform to protocol 'ProtoWithVersionedUnavailableMember' because it has requirements that cannot be satisfied
+  // CHECK-DIAGS-4: versioned-objc.swift:[[@LINE-1]]:7: error: type 'ProtoWithVersionedUnavailableMemberImpl' cannot conform to protocol 'ProtoWithVersionedUnavailableMember' because it has requirements that cannot be satisfied
   func requirement() -> Any? { return nil }
 }
 
