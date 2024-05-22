@@ -579,7 +579,7 @@ public:
 
   void visitVarDecl(VarDecl *VD) {
     // Variables inside non-resilient modules have some additional symbols.
-    if (VD->isFragile()) {
+    if (!VD->isStrictlyResilient()) {
       // Non-global variables might have an explicit initializer symbol in
       // non-resilient modules.
       if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
