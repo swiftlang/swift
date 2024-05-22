@@ -5,7 +5,7 @@
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
-// RUN: -O -wmo -enable-library-evolution
+// RUN: -O -wmo -enable-library-evolution -Xfrontend -disable-availability-checking
 
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-OPAQUE < %t/Main-res.sil
