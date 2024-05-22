@@ -16,7 +16,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
@@ -988,16 +987,11 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
     return false;
 
-  if (getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  if (!getModule().getOptions().ShouldFunctionsBePreservedToDebugger)
     return false;
 
-  if (const IRGenOptions *options = getModule().getIRGenOptionsOrNull()) {
-    if (options->WitnessMethodElimination ||
-        options->VirtualFunctionElimination ||
-        options->LLVMLTOKind != IRGenLLVMLTOKind::None) {
-      return false;
-    }
-  }
+  if (getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
 
   if (isAvailableExternally())
     return false;
