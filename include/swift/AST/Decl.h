@@ -4151,6 +4151,13 @@ public:
   /// is built resiliently.
   bool isResilient() const;
 
+  /// True if the decl is resilient AND also its defining module does
+  /// _not_ allow non-resilient access; the module can allow such access
+  /// if package optimization is enabled so its client modules within the
+  /// same package can have a direct access to this decl even if it's
+  /// resilient.
+  bool isStrictlyResilient() const;
+
   /// Returns whether this decl is accessed non/resiliently at the _use_ site
   /// in \p accessingModule, depending on \p expansion.
   ///
@@ -6015,10 +6022,12 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  /// True if the decl is non-resilient, or its defining module allows
-  /// non-resilient access so its consuming modules within the same
-  /// package can have visibility into this decl.
-  bool isFragile() const;
+  /// True if the decl is resilient AND also its defining module does
+  /// _not_ allow non-resilient access; the module can allow such access
+  /// if package optimization is enabled so its client modules within the
+  /// same package can have a direct access to this decl even if it's
+  /// resilient.
+  bool isStrictlyResilient() const;
 
   /// True if the storage can be referenced by a keypath directly.
   /// Otherwise, its override must be referenced.
