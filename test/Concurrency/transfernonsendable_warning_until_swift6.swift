@@ -12,7 +12,7 @@ class NonSendableType {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
 func useValue<T>(_ t: T) {}
-func transferValue<T>(_ t: transferring T) {}
+func transferValue<T>(_ t: sending T) {}
 
 /////////////////
 // MARK: Tests //
@@ -32,17 +32,17 @@ func testTransferArgumentError(_ x: NonSendableType) async {
 
 func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
   transferValue(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' is passed as a transferring parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
 }
 
-func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) async {
+func testAssignmentIntoTransferringParameter(_ x: sending NonSendableType) async {
   let y = NonSendableType()
   await transferToMain(x)
   x = y
   useValue(y)
 }
 
-func testAssigningParameterIntoTransferringParameter(_ x: transferring NonSendableType, _ y: NonSendableType) async {
+func testAssigningParameterIntoTransferringParameter(_ x: sending NonSendableType, _ y: NonSendableType) async {
   x = y
 }
 

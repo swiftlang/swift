@@ -5457,6 +5457,10 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
                    false, getFeatureName(Feature::TransferringArgsAndResults));
+      } else {
+        // Now that we have sending, warn users to convert 'transferring' to
+        // 'sendable'.
+        P.diagnose(Tok, diag::transferring_is_now_sendable);
       }
 
       // Do not allow for transferring to be parsed after a specifier has been
@@ -5475,7 +5479,38 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         P.diagnose(Tok, diag::transferring_repeated).fixItRemove(Tok.getLoc());
       }
 
+      // If we have already seen 'sending', emit an error to the user and give a
+      // fixit that removes the transferring.
+      if (SendingLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_and_transferring_used_together)
+            .fixItRemove(Tok.getLoc());
+      }
+
       TransferringLoc = P.consumeToken();
+      continue;
+    }
+
+    // Perform an extra check for 'sending'. Since it is a specifier, we use
+    // the actual parsing logic below.
+    if (Tok.isContextualKeyword("sending")) {
+      if (!P.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
+        P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
+                   false, getFeatureName(Feature::SendingArgsAndResults));
+      }
+
+      // Only allow for 'sending' to be written once.
+      if (SendingLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_repeated).fixItRemove(Tok.getLoc());
+      }
+
+      // If 'transferring' was written before 'sending', suggest the user remove
+      // 'transferring' since 'sendable' is the final form.
+      if (TransferringLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_and_transferring_used_together)
+            .fixItRemove(TransferringLoc);
+      }
+
+      SendingLoc = P.consumeToken();
       continue;
     }
 
@@ -5506,6 +5541,12 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         } else if (Tok.getRawText().equals("consuming")) {
           Specifier = ParamDecl::Specifier::Consuming;
         }
+      }
+
+      // A specifier must come before 'sending'.
+      if (bool(Specifier) && SendingLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_before_parameter_specifier,
+                   getNameForParamSpecifier(Specifier));
       }
     }
     Tok.setKind(tok::contextual_keyword);
@@ -7122,6 +7163,20 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
           TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
     }
     status |= whereStatus;
+  }
+
+  // @implementation requires an explicit @objc attribute, but
+  // @_objcImplementation didn't. Insert one if necessary.
+  auto implAttr = Attributes.getAttribute<ObjCImplementationAttr>();
+  if (implAttr && implAttr->isEarlyAdopter()
+        && !Attributes.hasAttribute<ObjCAttr>()) {
+    ObjCAttr *objcAttr;
+    if (implAttr->CategoryName.empty())
+      objcAttr = ObjCAttr::createUnnamedImplicit(Context);
+    else
+      objcAttr = ObjCAttr::createNullary(Context, implAttr->CategoryName,
+                                         /*isNameImplicit=*/false);
+    Attributes.add(objcAttr);
   }
 
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,

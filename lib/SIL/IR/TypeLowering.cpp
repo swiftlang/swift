@@ -2324,31 +2324,34 @@ namespace {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
+        // The same should happen if the type was resilient and serialized in
+        // another module in the same package with package-cmo enabled, which
+        // treats those modules to be in the same resilience domain.
         auto declModule = D->getModuleContext();
         bool sameModule = (declModule == &TC.M);
-        if (sameModule)
-          properties.addSubobject(RecursiveProperties::forResilient());
-
-        // If the type is in a different module, or if we're using a minimal
-        // expansion, the type is address only and completely opaque to us.
-        // However, this is not true if the different module is in the same
-        // package and package serialization is enabled (resilience expansion
-        // is maximal), e.g. in case of package-cmo.
-        //
-        // Note: if the type is in a different module, the lowering does
-        // not depend on the resilience expansion, so we do not need to set
-        // the isResilient() flag above.
-        bool serializedPackage = declModule->inSamePackage(&TC.M) &&
+        bool serializedPackage = declModule != &TC.M &&
+                                 declModule->inSamePackage(&TC.M) &&
                                  declModule->isResilient() &&
                                  declModule->serializePackageEnabled();
-        if ((!sameModule && !serializedPackage) ||
+        auto inSameResilienceDomain = sameModule || serializedPackage;
+        if (inSameResilienceDomain)
+          properties.addSubobject(RecursiveProperties::forResilient());
+
+        // If the type is in a different module and not in the same package
+        // resilience domain (with package-cmo), or if we're using a minimal
+        // expansion, the type is address only and completely opaque to us.
+        //
+        // Note: if the type is in a different module and not in the same
+        // package resilience domain, the lowering does not depend on the
+        // resilience expansion, so we do not need to set the isResilient()
+        // flag above.
+        if (!inSameResilienceDomain ||
             Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
           return true;
         }
       }
-
       return false;
     }
 
@@ -3895,7 +3898,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
-          .withTransferringResult(funcType->hasTransferringResult())
+          .withSendingResult(funcType->hasSendingResult())
           .build();
 
   return CanAnyFunctionType::get(
@@ -4101,10 +4104,25 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
         vd->getDeclContext()->getGenericSignatureOfContext());
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-    llvm_unreachable("Doesn't have generic signature");
+    return GenericSignatureWithCapturedEnvironments();
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+SubstitutionMap
+TypeConverter::getSubstitutionMapWithCapturedEnvironments(
+    SILDeclRef constant, const CaptureInfo &captureInfo,
+    SubstitutionMap subs) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+  if (!sig.genericSig) {
+    assert(!sig.baseGenericSig);
+    assert(sig.capturedEnvs.empty());
+    return SubstitutionMap();
+  }
+
+  return buildSubstitutionMapWithCapturedEnvironments(
+      subs, sig.genericSig, sig.capturedEnvs);
 }
 
 GenericEnvironment *
@@ -4113,17 +4131,15 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
       .genericSig.getGenericEnvironment();
 }
 
-std::pair<GenericEnvironment *, SubstitutionMap>
+std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
 TypeConverter::getForwardingSubstitutionsForLowering(SILDeclRef constant) {
   auto sig = getGenericSignatureWithCapturedEnvironments(constant);
 
-  GenericEnvironment *genericEnv = nullptr;
+  auto *genericEnv = sig.baseGenericSig.getGenericEnvironment();
   SubstitutionMap forwardingSubs;
 
-  if (sig.baseGenericSig) {
-    genericEnv = sig.baseGenericSig.getGenericEnvironment();
+  if (sig.baseGenericSig)
     forwardingSubs = genericEnv->getForwardingSubstitutionMap();
-  }
 
   if (!sig.capturedEnvs.empty()) {
     assert(sig.genericSig && !sig.genericSig->isEqual(sig.baseGenericSig));
@@ -4132,7 +4148,7 @@ TypeConverter::getForwardingSubstitutionsForLowering(SILDeclRef constant) {
         forwardingSubs, sig.genericSig, sig.capturedEnvs);
   }
 
-  return std::make_pair(genericEnv, forwardingSubs);
+  return std::make_tuple(genericEnv, sig.capturedEnvs, forwardingSubs);
 }
 
 SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,

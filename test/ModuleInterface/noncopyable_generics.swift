@@ -192,6 +192,31 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public func substGenericNC<T>(_ t: borrowing T?)
 // CHECK-MISC-NEXT: #endif
 
+// CHECK-MISC:      #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public protocol Publik : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NEXT: public protocol Publik {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: public struct Concrete : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct Generic<T> : ~Copyable where T : {{.*}}.Publik, T : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #else
+// CHECK-MISC-NEXT: public struct Generic<T> where T : {{.*}}.Publik {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: public struct VeryNested : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: public struct Twice : ~Copyable, ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: public struct RegularTwice : ~Swift.Copyable, ~Swift.Copyable {
+// CHECK-MISC-NEXT: }
+
+// NOTE: below are extensions emitted at the end of NoncopyableGenerics_Misc.swift
+// CHECK-MISC: extension {{.*}}.VeryNested : {{.*}}.Publik {}
 
 import Swiftskell
 
@@ -225,7 +250,11 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public enum Maybe<Value> : ~Swift.Copyable where Value : ~Copyable {
+// CHECK-NEXT: extension Swiftskell.Pair : Swift.Copyable {
+// CHECK: #endif
+
+// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-NEXT: public enum Maybe<Wrapped> : ~Swift.Copyable where Wrapped : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
@@ -233,11 +262,11 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show where Value : Swiftskell.Show, Value : ~Copyable {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show where Wrapped : Swiftskell.Show, Wrapped : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Value : Swiftskell.Eq, Value : ~Copyable {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Wrapped : Swiftskell.Eq, Wrapped : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics

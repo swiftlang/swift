@@ -27,26 +27,22 @@
 // CHECK-NOT: .section
 // CHECK: $s7section8MyStructV7static0SivpZ:
 
-// CHECKELF: .section{{.*}}"__TEXT,__mysection","ax"
+// CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
 // CHECKELF-NOT: .section
 // CHECKELF: $s7section3fooyyF:
 
-// CHECKELF: .section{{.*}}"__TEXT,__mysection","ax"
+// CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
 // CHECKELF-NOT: .section
 // CHECKELF: $s7section8MyStructV3fooyyF:
 
-// CHECKELF: .section{{.*}}"__DATA,__mysection","aw"
+// CHECKELF: .section{{.*}}"__DATA,__mysection","awR"
 // CHECKELF-NOT: .section
 // CHECKELF: $s7section2g0Sivp:
-// CHECKELF-NOT: .section
 // CHECKELF: $s7section2g1Si_Sitvp:
-// CHECKELF-NOT: .section
 // CHECKELF: $s7section2g2Sbvp:
 // CHECKELF: .section{{.*}}"__DATA,__mysection","awR"
 // CHECKELF: $s7section2g3Sbvp:
-// CHECKELF: .section{{.*}}"__DATA,__mysection","aw"
+// CHECKELF: .section{{.*}}"__DATA,__mysection","awR"
 // CHECKELF: $s7section2g4SpySiGSgvp:
-// CHECKELF-NOT: .section
 // CHECKELF: $s7section2g5SpySiGSgvp:
-// CHECKELF-NOT: .section
 // CHECKELF: $s7section8MyStructV7static0SivpZ:

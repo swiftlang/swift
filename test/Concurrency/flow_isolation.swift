@@ -15,7 +15,7 @@ func takeNonSendable(_ ns: NonSendableType) {}
 @available(SwiftStdlib 5.1, *)
 func takeSendable(_ s: SendableType) {}
 
-class NonSendableType {
+class NonSendableType { // expected-note *{{class 'NonSendableType' does not conform to the 'Sendable' protocol}}
   var x: Int = 0
   func f() {}
 }
@@ -520,8 +520,9 @@ struct CardboardBox<T> {
 
 @available(SwiftStdlib 5.1, *)
 var globalVar: EscapeArtist? // expected-warning {{var 'globalVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{isolate 'globalVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
-// expected-note@-2 2 {{var declared here}}
+// expected-note@-1 {{restrict 'globalVar' to the main actor if it will only be accessed from the main thread}}
+// expected-note@-2 {{unsafely mark 'globalVar' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
+// expected-note@-3 {{convert 'globalVar' to a 'let' constant to make the shared state immutable}}
 
 @available(SwiftStdlib 5.1, *)
 actor EscapeArtist {
@@ -530,11 +531,9 @@ actor EscapeArtist {
     init(attempt1: Bool) {
         self.x = 0
 
-        // expected-note@+2 {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
-        // expected-warning@+1 {{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
+        // expected-note@+1 {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
         globalVar = self
 
-        // expected-warning@+1 {{reference to var 'globalVar' is not concurrency-safe because it involves shared mutable state}}
         Task { await globalVar!.isolatedMethod() }
 
         if self.x == 0 {  // expected-warning {{cannot access property 'x' here in non-isolated initializer; this is an error in the Swift 6 language mode}}

@@ -25,6 +25,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Frontend/CachingUtils.h"
@@ -202,6 +203,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
+  serializationOpts.SDKVersion = swift::getSDKBuildVersion(
+                                          getSearchPathOptions().getSDKPath());
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
   serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
 
@@ -1091,6 +1094,26 @@ bool CompilerInvocation::shouldImportSwiftBacktracing() const {
       FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
+bool CompilerInvocation::shouldImportCxx() const {
+  // C++ Interop is disabled
+  if (!getLangOptions().EnableCXXInterop)
+    return false;
+  // Avoid C++ stdlib when building Swift stdlib
+  if (getImplicitStdlibKind() == ImplicitStdlibKind::Builtin)
+    return false;
+  // Avoid importing Cxx when building Cxx itself
+  if (getFrontendOptions().ModuleName == CXX_MODULE_NAME)
+    return false;
+  // Cxx cannot be imported when Library evolution is enabled
+  if (getFrontendOptions().EnableLibraryEvolution)
+    return false;
+  // Implicit import of Cxx is disabled
+  if (getLangOptions().DisableImplicitCxxModuleImport)
+    return false;
+
+  return true;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -1168,6 +1191,13 @@ void CompilerInstance::verifyImplicitBacktracingImport() {
 bool CompilerInstance::canImportSwiftBacktracing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().testImportModule(modulePath);
+}
+
+bool CompilerInstance::canImportCxx() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(CXX_MODULE_NAME));
   auto modulePath = builder.get();
   return getASTContext().testImportModule(modulePath);
 }
@@ -1275,8 +1305,11 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     }
   }
 
-  if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
-    pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
+  if (Invocation.getLangOptions().EnableCXXInterop) {
+    if (Invocation.shouldImportCxx() && canImportCxx())
+      pushImport(CXX_MODULE_NAME);
+    if (canImportCxxShim())
+      pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;

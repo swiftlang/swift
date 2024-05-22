@@ -25,6 +25,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
@@ -2155,7 +2156,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
-    if (param.hasOption(SILParameterInfo::Transferring))
+    if (param.hasOption(SILParameterInfo::Sending))
       OpArgs.push_back('T');
     if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
@@ -2163,7 +2164,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   }
 
   // Mangle if we have a transferring result.
-  if (fn->hasTransferringResult())
+  if (fn->hasSendingResult())
     OpArgs.push_back('T');
 
   // Mangle the results.
@@ -3095,7 +3096,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     break;
   }
 
-  if (fn->hasTransferringResult()) {
+  if (fn->hasSendingResult()) {
     appendOperator("YT");
   }
 
@@ -3275,7 +3276,7 @@ void ASTMangler::appendParameterTypeListElement(
   }
   if (flags.isIsolated())
     appendOperator("Yi");
-  if (flags.isTransferring())
+  if (flags.isSending())
     appendOperator("Yu");
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
@@ -3733,29 +3734,48 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
 
 void ASTMangler::appendClosureEntity(
                               const SerializedAbstractClosureExpr *closure) {
+  assert(!closure->getType()->hasLocalArchetype() &&
+         "Not enough information here to handle this case");
+
   appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          closure->isImplicit(), closure->getParent());
+                          closure->isImplicit(), closure->getParent(),
+                          ArrayRef<GenericEnvironment *>());
 }
 
 void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
-  appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          isa<AutoClosureExpr>(closure), closure->getParent());
+  ArrayRef<GenericEnvironment *> capturedEnvs;
+
+  auto type = closure->getType();
+
+  // FIXME: CodeCompletionResultBuilder calls printValueDeclUSR() but the
+  // closure hasn't been type checked yet.
+  if (!type)
+    type = ErrorType::get(closure->getASTContext());
+
+  if (type->hasLocalArchetype())
+    capturedEnvs = closure->getCaptureInfo().getGenericEnvironments();
+
+  appendClosureComponents(type, closure->getDiscriminator(),
+                          isa<AutoClosureExpr>(closure), closure->getParent(),
+                          capturedEnvs);
 }
 
 void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
                                          bool isImplicit,
-                                         const DeclContext *parentContext) {
+                                         const DeclContext *parentContext,
+                                         ArrayRef<GenericEnvironment *> capturedEnvs) {
   assert(discriminator != AbstractClosureExpr::InvalidDiscriminator
          && "closure must be marked correctly with discriminator");
 
   BaseEntitySignature base(parentContext->getInnermostDeclarationDeclContext());
   appendContext(parentContext, base, StringRef());
 
-  if (!Ty)
-    Ty = ErrorType::get(parentContext->getASTContext());
-
   auto Sig = parentContext->getGenericSignatureOfContext();
-  Ty = Ty->mapTypeOutOfContext();
+
+  Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
+                MakeAbstractConformanceForGenericType(),
+                SubstFlags::PreservePackExpansionLevel);
+
   appendType(Ty->getCanonicalType(), Sig);
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }

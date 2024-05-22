@@ -500,3 +500,11 @@ struct TestResolution3 {
   var dictNC: [String: NC] = [:] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
   var exampleNC: Example<NC> = Example() // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
 }
+
+public struct Box<Wrapped: ~Copyable>: ~Copyable {}
+// Box is never copyable, so we can't support this conditional conformance.
+public enum List<Element: ~Copyable>: ~Copyable {
+  case cons(Element, Box<List<Element>>)   // expected-error {{associated value 'cons' of 'Copyable'-conforming generic enum 'List' has non-Copyable type '(Element, Box<List<Element>>)'}}
+  case empty
+}
+extension List: Copyable where Element: Copyable {}

@@ -70,6 +70,9 @@ namespace swift {
                    AccessLevel desiredAccess, bool isForSetter = false,
                    bool shouldUseDefaultAccess = false);
 
+  /// Compute the location of the 'var' keyword for a 'var'-to-'let' Fix-It.
+  SourceLoc getFixItLocForVarToLet(VarDecl *var);
+
   /// Describes the context of a parameter, for use in diagnosing argument
   /// label problems.
   enum class ParameterContext : unsigned {

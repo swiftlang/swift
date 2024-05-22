@@ -355,6 +355,9 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand)) {
     return emitConstantValue(IGM, CFI->getOperand(), flatten);
 
+  } else if (auto *URCI = dyn_cast<UncheckedRefCastInst>(operand)) {
+    return emitConstantValue(IGM, URCI->getOperand(), flatten);
+
   } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
     SILType type = operand->getType();
     auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
@@ -405,6 +408,14 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
       return llvm::ConstantPointerNull::get(IGM.OpaquePtrTy);
     }
 
+    Address addr = IGM.getAddrOfSILGlobalVariable(var, ti, NotForDefinition);
+    return addr.getAddress();
+  } else if (auto *gVal = dyn_cast<GlobalValueInst>(operand)) {
+    assert(IGM.canMakeStaticObjectReadOnly(gVal->getType()));
+    SILGlobalVariable *var = gVal->getReferencedGlobal();
+    auto &ti = IGM.getTypeInfo(var->getLoweredType());
+    auto expansion = IGM.getResilienceExpansionForLayout(var);
+    assert(ti.isFixedSize(expansion));
     Address addr = IGM.getAddrOfSILGlobalVariable(var, ti, NotForDefinition);
     return addr.getAddress();
   } else if (auto *atp = dyn_cast<AddressToPointerInst>(operand)) {

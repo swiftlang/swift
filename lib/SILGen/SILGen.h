@@ -625,6 +625,11 @@ public:
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
 
+  /// Replace local archetypes captured from outer AST contexts with primary
+  /// archetypes.
+  void recontextualizeCapturedLocalArchetypes(
+      SILFunction *F, GenericSignatureWithCapturedEnvironments sig);
+
 private:
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;

@@ -220,6 +220,13 @@ def swift_module_file: Joined<["-"], "swift-module-file=">,
   MetaVarName<"<name>=<path>">,
   HelpText<"Specify Swift module input explicitly built from textual interface">;
 
+def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
+  MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
+  HelpText<"Specify the cross import module">;
+
+def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
+  HelpText<"Disable searching for cross import overlay file">;
+
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
@@ -501,6 +508,10 @@ def enable_implicit_backtracing_module_import : Flag<["-"],
 def disable_implicit_backtracing_module_import : Flag<["-"],
   "disable-implicit-backtracing-module-import">,
   HelpText<"Disable the implicit import of the _Backtracing module.">;
+
+def disable_implicit_cxx_module_import : Flag<["-"],
+  "disable-implicit-cxx-module-import">,
+  HelpText<"Disable the implicit import of the C++ Standard Library module.">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
@@ -1355,6 +1366,16 @@ def disable_experimental_parser_round_trip : Flag<["-"],
 def disable_strict_concurrency_region_based_isolation : Flag<["-"],
   "disable-region-based-isolation-with-strict-concurrency">,
   HelpText<"Disable region based isolation when running with strict concurrency enabled. Only enabled with asserts">,
+  Flags<[HelpHidden]>;
+
+def disable_transferring_args_and_results_with_region_isolation : Flag<["-"],
+  "disable-transferring-args-and-results-with-region-based-isolation">,
+  HelpText<"Disable transferring args and results when region based isolation is enabled. Only enabled with asserts">,
+  Flags<[HelpHidden]>;
+
+def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
+  "disable-sending-args-and-results-with-region-based-isolation">,
+  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,

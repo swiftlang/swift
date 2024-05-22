@@ -215,7 +215,7 @@ func testUnsafeSendableInAsync() async {
 // ----------------------------------------------------------------------
 // Sendable restriction on key paths.
 // ----------------------------------------------------------------------
-class NC: Hashable { // expected-note 2{{class 'NC' does not conform to the 'Sendable' protocol}}
+class NC: Hashable { // expected-note 3{{class 'NC' does not conform to the 'Sendable' protocol}}
   func hash(into: inout Hasher) { }
   static func==(_: NC, _: NC) -> Bool { true }
 }
@@ -274,7 +274,9 @@ typealias BadGenericCF<T> = @Sendable () -> T?
 typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
 var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{isolate 'concurrentFuncVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
+// expected-note@-1 {{restrict 'concurrentFuncVar' to the main actor if it will only be accessed from the main thread}}
+// expected-note@-2 {{unsafely mark 'concurrentFuncVar' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
+// expected-note@-3 {{convert 'concurrentFuncVar' to a 'let' constant to make the shared state immutable}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on @Sendable closures.

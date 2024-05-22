@@ -69,6 +69,21 @@
 #  endif
 #endif
 
+// A feature that's both suppressible and upcoming.
+// Delegates to whichever the includer defines.
+#ifndef SUPPRESSIBLE_UPCOMING_FEATURE
+#  if defined(SUPPRESSIBLE_UPCOMING_FEATURE) && \
+      defined(UPCOMING_FEATURE)
+#    error ambiguous defines when including Features.def
+#  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
+       SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
+#  else
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
+       UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#  endif
+#endif
+
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
 #  define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
   LANGUAGE_FEATURE(FeatureName, SENumber, Description)
@@ -180,6 +195,7 @@ LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
 SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
+LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -198,6 +214,8 @@ UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 UPCOMING_FEATURE(BorrowingSwitch, 432, 6)
+UPCOMING_FEATURE(TransferringArgsAndResults, 430, 6)
+SUPPRESSIBLE_UPCOMING_FEATURE(SendingArgsAndResults, 430, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -207,7 +225,7 @@ EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
-EXPERIMENTAL_FEATURE(BodyMacros, true)
+EXPERIMENTAL_FEATURE(PreambleMacros, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, true)
 
@@ -352,9 +370,6 @@ EXPERIMENTAL_FEATURE(FixedArrays, true)
 // Group Main Actor Isolation Errors by Scope
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
-// Allow for the 'transferring' keyword to be applied to arguments and results.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
-
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
@@ -391,5 +406,6 @@ EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef SUPPRESSIBLE_EXPERIMENTAL_FEATURE
+#undef SUPPRESSIBLE_UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

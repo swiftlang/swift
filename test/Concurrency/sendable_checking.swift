@@ -407,3 +407,35 @@ struct DowngradeForPreconcurrency {
     }
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+@MainActor protocol InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+struct ImplicitSendableViaMain: InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+extension ImplicitSendableViaMain {
+  nonisolated func capture() {
+    Task { @MainActor in
+      _ = self
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+struct TestImplicitSendable: Sendable {
+  var x: ImplicitSendableViaMain
+}
+
+struct UnavailableSendable {}
+
+@available(*, unavailable)
+extension UnavailableSendable: Sendable {}
+// expected-note@-1 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+
+@available(SwiftStdlib 5.1, *)
+func checkOpaqueType() -> some Sendable {
+  UnavailableSendable()
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
+}

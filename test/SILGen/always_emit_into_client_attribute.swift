@@ -58,3 +58,21 @@ public final class C {
   @_alwaysEmitIntoClient
   deinit {}
 }
+
+
+// We drop AEIC if the containing context does not have effective public
+// visibility.
+internal struct InternalContext {
+// CHECK-LABEL: sil hidden [ossa] @$s33always_emit_into_client_attribute15InternalContextV1vSivgZ
+  @_alwaysEmitIntoClient
+  internal static var v : Int { 1 }
+}
+
+// We drop AEIC if the containing context does not have effective public
+// visibility.
+package struct PackageContext {
+// CHECK-LABEL: sil package [ossa] @$s33always_emit_into_client_attribute14PackageContextV1vSivgZ
+
+  @_alwaysEmitIntoClient
+  package static var v : Int { 1 }
+}

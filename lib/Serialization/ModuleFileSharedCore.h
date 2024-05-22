@@ -66,6 +66,9 @@ class ModuleFileSharedCore {
   /// The canonical name of the SDK the module was built with.
   StringRef SDKName;
 
+  /// Version string of the SDK against which the module was built.
+  StringRef SDKVersion;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.

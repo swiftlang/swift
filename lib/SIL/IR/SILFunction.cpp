@@ -16,6 +16,8 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -244,13 +246,13 @@ void SILFunction::init(
          "function type has open type parameters");
 
   this->LoweredType = LoweredType;
-  this->GenericEnv = genericEnv;
   this->SpecializationInfo = nullptr;
   this->EntryCount = entryCount;
   this->Availability = AvailabilityContext::alwaysAvailable();
   this->Bare = isBareSILFunction;
   this->Transparent = isTrans;
   this->Serialized = isSerialized;
+  this->SerializedForPackage = false;
   this->Thunk = isThunk;
   this->ClassSubclassScope = unsigned(classSubclassScope);
   this->GlobalInitFlag = false;
@@ -280,6 +282,7 @@ void SILFunction::init(
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
   setDebugScope(DebugScope);
+  setGenericEnvironment(genericEnv);
 }
 
 SILFunction::~SILFunction() {
@@ -490,24 +493,51 @@ bool SILFunction::shouldOptimize() const {
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
-  return GenericEnvironment::mapTypeIntoContext(
-      getGenericEnvironment(), type);
+  assert(!type->hasPrimaryArchetype());
+
+  if (GenericEnv) {
+    // The complication here is that we sometimes call this with an AST interface
+    // type, which might contain element archetypes, if it was the interface type
+    // of a closure or local variable.
+    if (type->hasElementArchetype())
+      return GenericEnv->mapTypeIntoContext(type);
+
+    // Otherwise, assume we have an interface type for the "combined" captured
+    // environment.
+    return type.subst(MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
+                      LookUpConformanceInModule(Module.getSwiftModule()),
+                      SubstFlags::AllowLoweredTypes |
+                      SubstFlags::PreservePackExpansionLevel);
+  }
+
+  assert(!type->hasTypeParameter());
+  return type;
 }
 
 SILType SILFunction::mapTypeIntoContext(SILType type) const {
-  if (auto *genericEnv = getGenericEnvironment())
-    return genericEnv->mapTypeIntoContext(getModule(), type);
+  assert(!type.hasPrimaryArchetype());
+
+  if (GenericEnv) {
+    auto genericSig = GenericEnv->getGenericSignature().getCanonicalSignature();
+    return type.subst(Module,
+                      MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
+                      LookUpConformanceInModule(Module.getSwiftModule()),
+                      genericSig,
+                      SubstFlags::PreservePackExpansionLevel);
+  }
+
+  assert(!type.hasTypeParameter());
   return type;
 }
 
 SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
-  assert(!type.hasArchetype());
+  assert(!type.hasPrimaryArchetype());
 
   auto genericSig = getGenericSignature().getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInSignature(genericSig.getPointer()),
+                    LookUpConformanceInModule(M.getSwiftModule()),
                     genericSig,
                     SubstFlags::PreservePackExpansionLevel);
 }
@@ -518,15 +548,14 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
 }
 
 ResilienceExpansion SILFunction::getResilienceExpansion() const {
-  // If package serialization is enabled, we can safely
-  // assume that the defining .swiftmodule is built from
-  // source and is never used outside of its package;
-  // Even if the module is built resiliently, return
-  // maximal expansion here so aggregate types can be
-  // loadable in the same resilient domain (from a client
-  // module in the same package.
-  if (getModule().getSwiftModule()->serializePackageEnabled() &&
-      getModule().getSwiftModule()->isResilient())
+  // If a function definition is in another module, and
+  // it was serialized due to package serialization opt,
+  // a new attribute [serialized_for_package] is added
+  // to the definition site. During deserialization, this
+  // attribute is preserved if the current module is in
+  // the same package, thus should be in the same resilience
+  // domain.
+  if (isSerializedForPackage() == IsSerializedForPackage)
     return ResilienceExpansion::Maximal;
 
   return (isSerialized()
@@ -959,6 +988,17 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
     return false;
 
+  if (getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  if (const IRGenOptions *options = getModule().getIRGenOptionsOrNull()) {
+    if (options->WitnessMethodElimination ||
+        options->VirtualFunctionElimination ||
+        options->LLVMLTOKind != IRGenLLVMLTOKind::None) {
+      return false;
+    }
+  }
+
   if (isAvailableExternally())
     return false;
 
@@ -1010,14 +1050,10 @@ void SILFunction::eraseAllBlocks() {
   BlockList.clear();
 }
 
-SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
-  if (ForwardingSubMap)
-    return ForwardingSubMap;
-
-  if (auto *env = getGenericEnvironment())
-    ForwardingSubMap = env->getForwardingSubstitutionMap();
-
-  return ForwardingSubMap;
+void SILFunction::setGenericEnvironment(GenericEnvironment *env) {
+  setGenericEnvironment(env, ArrayRef<GenericEnvironment *>(),
+                        env ? env->getForwardingSubstitutionMap()
+                            : SubstitutionMap());
 }
 
 bool SILFunction::shouldVerifyOwnership() const {

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking
-// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -strict-concurrency=complete
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -151,10 +151,10 @@ struct World {
 
 let helloworld:  @Sendable () -> Void = World.greet
 
-class NonSendableC {
+class NonSendableC { // expected-note{{class 'NonSendableC' does not conform to the 'Sendable' protocol}}
     var x: Int = 0
 
-    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
+    @Sendable func inc() { // expected-warning {{instance method of non-Sendable type 'NonSendableC' cannot be marked as '@Sendable'}}
         x += 1
     }
 }
@@ -185,10 +185,6 @@ actor TestActor {}
 struct SomeGlobalActor {
   static var shared: TestActor { TestActor() }
 }
-
-@SomeGlobalActor
-let globalValue: NonSendable = NonSendable()
-
 
 @SomeGlobalActor
 // CHECK-LABEL: sil hidden [ossa] @$s16sendable_methods8generic3yyxYalF : $@convention(thin) @async <T> (@in_guaranteed T) -> ()

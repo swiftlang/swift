@@ -23,6 +23,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/TracingCommon.h"
 #include <inttypes.h>
 #include <os/log.h>
 #include <os/signpost.h>
@@ -79,6 +80,8 @@ void setupLogs(void *unused);
 // optimized out.
 #define ENSURE_LOGS(...)                                                       \
   do {                                                                         \
+    if (!runtime::trace::tracingReady())                                       \
+      return __VA_ARGS__;                                                      \
     swift::once(LogsToken, setupLogs, nullptr);                                \
     if (!TracingEnabled)                                                       \
       return __VA_ARGS__;                                                      \

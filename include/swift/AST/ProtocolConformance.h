@@ -530,6 +530,9 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
+  /// The location of the `@preconcurrency` attribute, if any.
+  SourceLoc PreconcurrencyLoc;
+
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   DeclContext *Context;
@@ -562,10 +565,12 @@ public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state, bool isUnchecked,
-                            bool isPreconcurrency)
+                            bool isPreconcurrency,
+                            SourceLoc preconcurrencyLoc)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
-        Protocol(protocol), Loc(loc), Context(dc) {
+        Protocol(protocol), Loc(loc), PreconcurrencyLoc(preconcurrencyLoc),
+        Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
     setState(state);
@@ -580,7 +585,7 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return Protocol; }
 
-  /// Retrieve the location of this
+  /// Retrieve the location of this conformance.
   SourceLoc getLoc() const { return Loc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -628,6 +633,10 @@ public:
   bool isPreconcurrency() const {
     return Bits.NormalProtocolConformance.IsPreconcurrency;
   }
+
+  /// Retrieve the location of `@preconcurrency`, if there is one and it is
+  /// known.
+  SourceLoc getPreconcurrencyLoc() const { return PreconcurrencyLoc; }
 
   /// Determine whether we've lazily computed the associated conformance array
   /// already.

@@ -40,56 +40,7 @@ public:
     clonedEntryBlock = fun.createBasicBlock();
   }
 
-  SILType remapType(SILType Ty) {
-    // Substitute local archetypes, if we have any.
-    if (Ty.hasLocalArchetype()) {
-      Ty = Ty.subst(getBuilder().getModule(), Functor, Functor,
-                    CanGenericSignature());
-    }
-
-    if (!Ty.hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return Ty;
-
-    return getBuilder().getTypeLowering(Ty).getLoweredType().getCategoryType(
-        Ty.getCategory());
-  }
-
-  CanType remapASTType(CanType ty) {
-    // Substitute local archetypes, if we have any.
-    if (ty->hasLocalArchetype())
-      ty = ty.subst(Functor, Functor)->getCanonicalType();
-
-    if (!ty->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return ty;
-
-    return substOpaqueTypesWithUnderlyingTypes(
-        ty,
-        TypeExpansionContext(getBuilder().getFunction()),
-        /*allowLoweredTypes=*/false);
-  }
-
-  ProtocolConformanceRef remapConformance(Type ty,
-                                          ProtocolConformanceRef conf) {
-    // If we have local archetypes to substitute, do so now.
-    if (ty->hasLocalArchetype()) {
-      conf = conf.subst(ty, Functor, Functor);
-      ty = ty.subst(Functor, Functor);
-    }
-
-    auto context = getBuilder().getTypeExpansionContext();
-    if (ty->hasOpaqueArchetype() &&
-        context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conf =
-          substOpaqueTypesWithUnderlyingTypes(conf, ty, context);
-    }
-    return conf;
-  }
+  bool shouldSubstOpaqueArchetypes() const { return true; }
 
   void replace();
 };

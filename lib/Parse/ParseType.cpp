@@ -61,6 +61,10 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
   }
 
+  if (SendingLoc.isValid()) {
+    ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
+  }
+
   if (!lifetimeDependenceSpecifiers.empty()) {
     ty = LifetimeDependentReturnTypeRepr::create(p.Context, ty,
                                                  lifetimeDependenceSpecifiers);

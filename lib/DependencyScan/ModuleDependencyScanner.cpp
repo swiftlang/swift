@@ -21,6 +21,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -774,24 +775,46 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
         // FIXME: Once all clients know to fetch these dependencies from
         // `swiftOverlayDependencies`, the goal is to no longer have them in
         // `directDependencies` so the following will need to go away.
-	directDependencies.insert({moduleName, cachedInfo->getKind()});
+        directDependencies.insert({moduleName, cachedInfo->getKind()});
       } else {
         // Cache discovered module dependencies.
         cache.recordDependencies(lookupResult.value());
         if (!lookupResult.value().empty()) {
-          swiftOverlayDependencies.insert(
-                                          {moduleName, lookupResult.value()[0].first.Kind});
+          swiftOverlayDependencies.insert({moduleName, lookupResult.value()[0].first.Kind});
           // FIXME: Once all clients know to fetch these dependencies from
           // `swiftOverlayDependencies`, the goal is to no longer have them in
           // `directDependencies` so the following will need to go away.
-	  directDependencies.insert(
-                                    {moduleName, lookupResult.value()[0].first.Kind});
-	}
+          directDependencies.insert({moduleName, lookupResult.value()[0].first.Kind});
+        }
       }
     }
   };
   for (const auto &clangDep : clangDependencies)
     recordResult(clangDep);
+
+  // C++ Interop requires additional handling
+  if (ScanCompilerInvocation.getLangOptions().EnableCXXInterop) {
+    for (const auto &clangDepName : clangDependencies) {
+      // If this Clang module is a part of the C++ stdlib, and we haven't loaded
+      // the overlay for it so far, it is a split libc++ module (e.g.
+      // std_vector). Load the CxxStdlib overlay explicitly.
+      const auto &clangDepInfo =
+          cache.findDependency(clangDepName, ModuleDependencyKind::Clang)
+              .value()
+              ->getAsClangModule();
+      if (importer::isCxxStdModule(clangDepName, clangDepInfo->IsSystem) &&
+          !swiftOverlayDependencies.contains(
+              {clangDepName, ModuleDependencyKind::SwiftInterface}) &&
+          !swiftOverlayDependencies.contains(
+              {clangDepName, ModuleDependencyKind::SwiftBinary})) {
+        ScanningThreadPool.async(
+            scanForSwiftDependency,
+            getModuleImportIdentifier(ScanASTContext.Id_CxxStdlib.str()));
+        ScanningThreadPool.wait();
+        recordResult(ScanASTContext.Id_CxxStdlib.str().str());
+      }
+    }
+  }
 }
 
 void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
@@ -800,7 +823,7 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
-  std::vector<std::string> overlayFiles;
+  std::vector<std::pair<std::string, std::string>> overlayFiles;
   for (auto dep : allDependencies) {
     auto moduleName = dep.ModuleName;
     // Do not look for overlays of main module under scan
@@ -887,9 +910,15 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
                     mainDep.addModuleDependency(crossImportOverlayModID);
                 });
 
-  llvm::for_each(overlayFiles, [&mainDep](const std::string &file) {
-    mainDep.addAuxiliaryFile(file);
-  });
+  auto cmdCopy = mainDep.getCommandline();
+  cmdCopy.push_back("-disable-cross-import-overlay-search");
+  for (auto &entry : overlayFiles) {
+    mainDep.addAuxiliaryFile(entry.second);
+    cmdCopy.push_back("-swift-module-cross-import");
+    cmdCopy.push_back(entry.first);
+    cmdCopy.push_back(entry.second);
+  }
+  mainDep.updateCommandLine(cmdCopy);
 
   cache.updateDependency(
       {mainModuleName.str(), ModuleDependencyKind::SwiftSource}, mainDep);

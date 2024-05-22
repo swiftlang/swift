@@ -152,7 +152,7 @@ protocol WithNonIsolated {
 
 do {
   class TestExplicitOtherIsolation : @preconcurrency WithNonIsolated {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{38-54=}}
 
     @GlobalActor var prop: Int = 42
     // expected-warning@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated protocol requirement}}
@@ -164,7 +164,7 @@ do {
 
 do {
   class InferredGlobalActorAttrs : @preconcurrency WithNonIsolated {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{36-52=}}
     var prop: Int = 42
     func test() {}
   }

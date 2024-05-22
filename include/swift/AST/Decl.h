@@ -532,8 +532,8 @@ protected:
     /// analysis.
     HasTopLevelLocalContextCaptures : 1,
 
-    /// Set to true if this FuncDecl has a transferring result.
-    HasTransferringResult : 1
+    /// Set to true if this FuncDecl has a 'sending' result.
+    HasSendingResult : 1
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
@@ -1024,6 +1024,10 @@ public:
 
   /// Returns the source range of the declaration including its attributes.
   SourceRange getSourceRangeIncludingAttrs() const;
+
+  /// Retrieve the location at which we should insert a new attribute or
+  /// modifier.
+  SourceLoc getAttributeInsertionLoc(bool forModifier) const;
 
   using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
@@ -1911,11 +1915,6 @@ public:
   /// extension X where T: Q, T: ~Copyable { }
   /// \endcode
   bool isWrittenWithConstraints() const;
-
-  /// Returns the name of the category specified by the \c \@_objcImplementation
-  /// attribute, or \c None if the name is invalid or
-  /// \c isObjCImplementation() is false.
-  std::optional<Identifier> getCategoryNameForObjCImplementation() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -3177,10 +3176,6 @@ public:
   /// can't be "static" or are in a context where "static" doesn't make sense.
   bool isStatic() const;
 
-  /// Retrieve the location at which we should insert a new attribute or
-  /// modifier.
-  SourceLoc getAttributeInsertionLoc(bool forModifier) const;
-
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
@@ -4204,6 +4199,12 @@ public:
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
 
+  /// Retrieve the extension most recently added to this type. Helpful to
+  /// determine if an extension has been added.
+  ExtensionDecl *getLastExtension() const {
+    return LastExtension;
+  }
+
   /// Special-behaviour flags passed to lookupDirect()
   enum class LookupDirectFlags {
     /// Whether to include @_implements members.
@@ -5068,6 +5069,11 @@ public:
   /// category by that name.
   llvm::TinyPtrVector<Decl *>
   getImportedObjCCategory(Identifier name) const;
+
+  /// Return a map of category names to extensions with that category name,
+  /// whether imported or otherwise. 
+  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>
+  getObjCCategoryNameMap();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -6639,8 +6645,8 @@ class ParamDecl : public VarDecl {
     /// Whether or not this paramater is '_resultDependsOn'
     IsResultDependsOn = 1 << 3,
 
-    /// Whether or not this parameter is 'transferring'.
-    IsTransferring = 1 << 4,
+    /// Whether or not this parameter is 'sending'.
+    IsSending = 1 << 4,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -6918,16 +6924,14 @@ public:
       removeFlag(Flag::IsIsolated);
   }
 
-  /// Whether or not this parameter is marked with 'transferring'.
-  bool isTransferring() const {
-    return getOptions().contains(Flag::IsTransferring);
-  }
+  /// Whether or not this parameter is marked with 'sending'.
+  bool isSending() const { return getOptions().contains(Flag::IsSending); }
 
-  void setTransferring(bool value = true) {
+  void setSending(bool value = true) {
     if (value)
-      addFlag(Flag::IsTransferring);
+      addFlag(Flag::IsSending);
     else
-      removeFlag(Flag::IsTransferring);
+      removeFlag(Flag::IsSending);
   }
 
   /// Whether or not this parameter is marked with '_const'.
@@ -7966,7 +7970,7 @@ protected:
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
-    Bits.FuncDecl.HasTransferringResult = false;
+    Bits.FuncDecl.HasSendingResult = false;
   }
 
   void setResultInterfaceType(Type type);
@@ -8119,14 +8123,12 @@ public:
     Bits.FuncDecl.ForcedStaticDispatch = flag;
   }
 
-  /// Returns true if this FuncDecl has a transferring result... returns false
+  /// Returns true if this FuncDecl has a sending result... returns false
   /// otherwise.
-  bool hasTransferringResult() const {
-    return Bits.FuncDecl.HasTransferringResult;
-  }
+  bool hasSendingResult() const { return Bits.FuncDecl.HasSendingResult; }
 
-  void setTransferringResult(bool newValue = true) {
-    Bits.FuncDecl.HasTransferringResult = newValue;
+  void setSendingResult(bool newValue = true) {
+    Bits.FuncDecl.HasSendingResult = newValue;
   }
 
   static bool classof(const Decl *D) {

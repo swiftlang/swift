@@ -602,7 +602,7 @@ struct [[nodiscard]] ManglingError {
     InvalidImplCoroutineKind,
     InvalidImplFunctionAttribute,
     InvalidImplParameterConvention,
-    InvalidImplParameterTransferring,
+    InvalidImplParameterSending,
     InvalidMetatypeRepresentation,
     MultiByteRelatedEntity,
     BadValueWitnessKind,

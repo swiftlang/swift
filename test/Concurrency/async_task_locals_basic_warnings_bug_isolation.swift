@@ -18,7 +18,7 @@ actor Test {
                      _ body: (consuming NonSendableValue, isolated (any Actor)?) -> Void) async {
     Self.$local.withValue(12) {
       // Unexpected errors here:
-      //  error: unexpected warning produced: transferring 'body' risks causing data races; this is an error in the Swift 6 language mode
+      //  error: unexpected warning produced: sending 'body' risks causing data races; this is an error in the Swift 6 language mode
       //  error: unexpected note produced: actor-isolated 'body' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses
       body(NonSendableValue(), isolation)
     }

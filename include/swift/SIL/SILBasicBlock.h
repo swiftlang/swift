@@ -174,6 +174,9 @@ public:
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
 
+  /// Replaces usages of this block with 'undef's and then deletes it.
+  void removeDeadBlock();
+
   /// Remove all instructions of a SILGlobalVariable's static initializer block.
   void clearStaticInitializerBlock(SILModule &module);
 
