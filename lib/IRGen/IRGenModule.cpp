@@ -2029,8 +2029,14 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
+// In embedded swift features are available independent of deployment and
+// runtime targets because the runtime library is always statically linked
+// to the program.
+
 #define FEATURE(N, V)                                                   \
 bool IRGenModule::is##N##FeatureAvailable(const ASTContext &context) {  \
+  if (Context.LangOpts.hasFeature(Feature::Embedded))                   \
+    return true;                                                        \
   auto deploymentAvailability                                           \
     = AvailabilityContext::forDeploymentTarget(context);                \
   auto runtimeAvailability                                              \

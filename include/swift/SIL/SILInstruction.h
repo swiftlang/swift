@@ -5881,6 +5881,10 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
   }
 
   static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILModule &Mod,
+                            ValueOwnershipKind forwardingOwnershipKind);
+
+  static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                             SILType Ty, SILFunction &F,
                             ValueOwnershipKind forwardingOwnershipKind);
 };
