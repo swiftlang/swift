@@ -387,17 +387,9 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
     // the expected executor however, so we need to try a bit harder before
     // we fail.
 
-    // Legacy special handling the main executor by detecting the main thread.
-    //
-    // When 'checkIsolated' is available it will perform a dispatch queue assertion
-    // against the main queue, potentially resulting in a crash (expected).
-    //
-    // In legacy mode, we cannot allow crashes here, and therefore we keep the
-    // special best-effort handling of the "main thread".
-    if (isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing) {
-      if (expectedExecutor.isMainExecutor() && isExecutingOnMainThread()) {
-        return true;
-      }
+    // Special handling the main executor by detecting the main thread.
+    if (expectedExecutor.isMainExecutor() && isExecutingOnMainThread()) {
+      return true;
     }
 
     // We cannot use 'complexEquality' as it requires two executor instances,
