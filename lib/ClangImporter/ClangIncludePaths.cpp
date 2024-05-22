@@ -178,18 +178,11 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   return clangDriverArgs;
 }
 
-static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
-  return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
-         triple.isAndroid() || triple.isMusl() || triple.isOSWASI();
-}
-
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
                    std::optional<StringRef> maybeHeaderFileName,
                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  if (!shouldInjectLibcModulemap(triple))
-    return {};
 
   // Extract the libc path from Clang driver.
   auto clangDriver = createClangDriver(ctx, vfs);
@@ -559,7 +552,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   } else if (triple.isMusl()) {
     libcFileMapping =
         getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs);
-  } else {
+  } else if (triple.isOSGlibc() || triple.isOSOpenBSD() ||
+             triple.isOSFreeBSD() || triple.isAndroid()) {
     // Android/BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);
