@@ -1655,6 +1655,7 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
     export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
     export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+    export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
         SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
@@ -2724,6 +2725,7 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
     export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
     export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+    export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
         SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
@@ -3084,6 +3086,7 @@ for host in "${ALL_HOSTS[@]}"; do
     fi
     export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
     export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+    export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
 
     # Set the build options for this host
     set_build_options_for_host $host
