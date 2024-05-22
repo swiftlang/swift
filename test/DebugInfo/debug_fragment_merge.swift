@@ -31,12 +31,12 @@ func test(cond: Int, external: External) async {
 // CHECK-SIL: debug_value %{{.*}} : $String, let, (name "data", {{.*}}), type $Data, expr op_fragment:#Data.a
 // CHECK-SIL: debug_value %{{.*}} : $String, let, (name "data", {{.*}}), type $Data, expr op_fragment:#Data.b
 
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR:[0-9]+]], metadata !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} !dbg ![[LOC1]]
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} !dbg ![[LOC1]]
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} !dbg ![[LOC1]]
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} !dbg ![[LOC1]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR:[0-9]+]], metadata !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} !dbg ![[LOC1]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} !dbg ![[LOC1]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} !dbg ![[LOC1]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} !dbg ![[LOC1]]
 //
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} !dbg ![[LOC2]]
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} !dbg ![[LOC2]]
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} !dbg ![[LOC2]]
-// CHECK-DAG: llvm.dbg.declare{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} !dbg ![[LOC2]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} !dbg ![[LOC2]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} !dbg ![[LOC2]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} !dbg ![[LOC2]]
+// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} !dbg ![[LOC2]]
