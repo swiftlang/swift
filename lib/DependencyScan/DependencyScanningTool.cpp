@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DependencyScan/DependencyScanningTool.h"
-#include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
-#include "swift/DependencyScan/StringUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/TargetInfo.h"
+#include "swift/Basic/ColorUtils.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
+#include "swift/DependencyScan/StringUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/VirtualOutputBackends.h"
@@ -94,25 +95,43 @@ void DependencyScanDiagnosticCollector::addDiagnostic(
     SMKind = llvm::SourceMgr::DK_Remark;
     break;
   }
+
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
   for (auto R : Info.Ranges)
     Ranges.push_back(getRawRange(SM, R));
+
   // Translate fix-its.
   SmallVector<llvm::SMFixIt, 2> FixIts;
   for (DiagnosticInfo::FixIt F : Info.FixIts)
     FixIts.push_back(getRawFixIt(SM, F));
 
-  std::string ResultingMessage;
-  llvm::raw_string_ostream Stream(ResultingMessage);
-
+  // Display the diagnostic.
+  std::string FormattedMessage;
+  llvm::raw_string_ostream Stream(FormattedMessage);
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
-  llvm::raw_svector_ostream Out(Text);
-  DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
-                                         Info.FormatArgs);
-  auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts);
-  Diagnostics.push_back(ScannerDiagnosticInfo{Msg.getMessage().str(), SMKind});
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
+    auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts, true);
+    Msg.print(nullptr, Stream, false, false, false);
+    Stream.flush();
+  }
+
+  if (Info.Loc && Info.Loc.isValid()) {
+    auto bufferIdentifier = SM.getDisplayNameForLoc(Info.Loc);
+    auto lineAndColumnNumbers = SM.getLineAndColumnInBuffer(Info.Loc);
+    auto importLocation = ScannerImportStatementInfo::ImportDiagnosticLocationInfo(
+      bufferIdentifier.str(), lineAndColumnNumbers.first,
+      lineAndColumnNumbers.second);
+    Diagnostics.push_back(
+      ScannerDiagnosticInfo{FormattedMessage, SMKind, importLocation});
+  } else {
+    Diagnostics.push_back(
+      ScannerDiagnosticInfo{FormattedMessage, SMKind, std::nullopt});
+  }
 }
 
 void LockingDependencyScanDiagnosticCollector::addDiagnostic(

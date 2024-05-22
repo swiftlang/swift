@@ -21,7 +21,7 @@
 namespace swift {
 namespace dependencies {
 class DependencyScanningTool;
-}
+} // namespace dependencies
 } // namespace swift
 
 struct swiftscan_dependency_graph_s {
@@ -212,7 +212,13 @@ struct swiftscan_scan_invocation_s {
 struct swiftscan_diagnostic_info_s {
   swiftscan_string_ref_t message;
   swiftscan_diagnostic_severity_t severity;
-  // TODO: SourceLoc
+  swiftscan_source_location_t source_location;
+};
+
+struct swiftscan_source_location_s {
+  swiftscan_string_ref_t buffer_identifier;
+  uint32_t line_number;
+  uint32_t column_number;
 };
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

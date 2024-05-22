@@ -37,10 +37,11 @@ private:
   struct ScannerDiagnosticInfo {
     std::string Message;
     llvm::SourceMgr::DiagKind Severity;
+    std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo> ImportLocation;
   };
+  std::vector<ScannerDiagnosticInfo> Diagnostics;
 
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
-  std::vector<ScannerDiagnosticInfo> Diagnostics;
 
 protected:
   virtual void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
