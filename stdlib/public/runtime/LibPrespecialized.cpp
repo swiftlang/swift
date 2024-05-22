@@ -391,18 +391,20 @@ getMetadataFromPointerKeyedMap(const LibPrespecializedState &state,
                                const TypeContextDescriptor *description,
                                const void *const *arguments) {
 #if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
-  auto *generics = description->getGenericContext();
-  if (!generics)
-    return nullptr;
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    auto *generics = description->getGenericContext();
+    if (!generics)
+      return nullptr;
 
-  auto argumentCount = generics->getGenericContextHeader().NumKeyArguments;
+    auto argumentCount = generics->getGenericContextHeader().NumKeyArguments;
 
-  auto *map = state.data->getPointerKeyedMetadataMap();
-  auto result = _dyld_find_pointer_hash_table_entry(
-      map, description, argumentCount, const_cast<const void **>(arguments));
-  LOG("Looking up description %p in dyld table, found %p.", description,
-      result);
-  return reinterpret_cast<Metadata *>(const_cast<void *>(result));
+    auto *map = state.data->getPointerKeyedMetadataMap();
+    auto result = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, description, argumentCount, const_cast<const void **>(arguments)));
+    LOG("Looking up description %p in dyld table, found %p.", description,
+        result);
+    return reinterpret_cast<Metadata *>(const_cast<void *>(result));
+  }
 #else
   LOG("Looking up description %p but dyld hash table call not available.",
       description);
