@@ -334,10 +334,9 @@ enum IsCurrentExecutorCheckMode: unsigned {
 static IsCurrentExecutorCheckMode isCurrentExecutorMode =
     Swift6_UseCheckIsolated_AllowCrash;
 
-
 // Shimming call to Swift runtime because Swift Embedded does not have
 // these symbols defined.
-bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+bool __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #if !SWIFT_CONCURRENCY_EMBEDDED
   return swift::runtime::bincompat::
       swift_bincompat_useLegacyNonCrashingExecutorChecks();
@@ -346,22 +345,30 @@ bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #endif
 }
 
-// Check override of executor checking mode.
-static void checkIsCurrentExecutorMode(void *context) {
-  auto useLegacyMode =
-      swift_bincompat_useLegacyNonCrashingExecutorChecks();
+// Done this way because of the interaction with the initial value of
+// 'unexpectedExecutorLogLevel'
+bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+  bool legacyMode = __swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
   // Potentially, override the platform detected mode, primarily used in tests.
 #if SWIFT_STDLIB_HAS_ENVIRON
-  if (const char *modeStr = runtime::environment::concurrencyIsCurrentExecutorLegacyModeOverride()) {
+  if (const char *modeStr = runtime::environment::
+        concurrencyIsCurrentExecutorLegacyModeOverride()) {
     if (strcmp(modeStr, "nocrash") == 0 || strcmp(modeStr, "legacy") == 0) {
-      useLegacyMode = true;
+      return true;
     } else if (strcmp(modeStr, "crash") == 0 || strcmp(modeStr, "swift6") == 0) {
-      useLegacyMode = false;
+      return false; // don't use the legacy mode
     } // else, just use the platform detected mode
-  }
+  } // no override, use the default mode
 #endif // SWIFT_STDLIB_HAS_ENVIRON
 
+  return legacyMode;
+}
+
+// Check override of executor checking mode.
+static void checkIsCurrentExecutorMode(void *context) {
+  bool useLegacyMode =
+      swift_bincompat_useLegacyNonCrashingExecutorChecks();
   isCurrentExecutorMode = useLegacyMode ? Legacy_NoCheckIsolated_NonCrashing
                                         : Swift6_UseCheckIsolated_AllowCrash;
 }
@@ -520,12 +527,9 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
   if (!levelStr)
     return;
 
-  auto isCurrentExecutorLegacyMode =
-      swift_bincompat_useLegacyNonCrashingExecutorChecks();
-
   long level = strtol(levelStr, nullptr, 0);
   if (level >= 0 && level < 3) {
-    if (isCurrentExecutorLegacyMode) {
+    if (swift_bincompat_useLegacyNonCrashingExecutorChecks()) {
       // legacy mode permits doing nothing or just logging, since the method
       // used to perform the check itself is not going to crash:
       unexpectedExecutorLogLevel = level;
