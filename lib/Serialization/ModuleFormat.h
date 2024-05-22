@@ -861,11 +861,11 @@ namespace control_block {
     MODULE_NAME,
     TARGET,
     SDK_NAME,
-    SDK_VERSION,
     REVISION,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     CHANNEL,
+    SDK_VERSION,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -896,11 +896,6 @@ namespace control_block {
     BCBlob
   >;
 
-  using SDKVersionLayout = BCRecordLayout<
-    SDK_VERSION,
-    BCBlob
-  >;
-
   using RevisionLayout = BCRecordLayout<
     REVISION,
     BCBlob
@@ -918,6 +913,11 @@ namespace control_block {
 
   using ChannelLayout = BCRecordLayout<
     CHANNEL,
+    BCBlob
+  >;
+
+  using SDKVersionLayout = BCRecordLayout<
+    SDK_VERSION,
     BCBlob
   >;
 }
