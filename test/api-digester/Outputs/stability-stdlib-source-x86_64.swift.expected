@@ -341,5 +341,5 @@ Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has generic signatur
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) is now without @rethrows
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) is now without @rethrows
-Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, Result where Result : ~Copyable>
-Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, Result where T : ~Copyable, Result : ~Copyable>
+Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func withExtendedLifetime(_:_:) is now without @rethrows
