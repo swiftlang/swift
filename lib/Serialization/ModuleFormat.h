@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 874; // SDKVersion
+const uint16_t SWIFTMODULE_VERSION_MINOR = 875; // Reorder control block enum
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -863,9 +863,9 @@ namespace control_block {
     SDK_NAME,
     SDK_VERSION,
     REVISION,
-    CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
+    CHANNEL,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -906,11 +906,6 @@ namespace control_block {
     BCBlob
   >;
 
-  using ChannelLayout = BCRecordLayout<
-    CHANNEL,
-    BCBlob
-  >;
-
   using IsOSSALayout = BCRecordLayout<
     IS_OSSA,
     BCFixed<1>
@@ -918,6 +913,11 @@ namespace control_block {
 
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
+    BCBlob
+  >;
+
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
     BCBlob
   >;
 }
