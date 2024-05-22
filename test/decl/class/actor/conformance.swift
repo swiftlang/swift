@@ -36,6 +36,8 @@ protocol SyncProtocol {
 
 
 actor OtherActor: SyncProtocol {
+  // expected-note@-1{{add '@preconcurrency' to the 'SyncProtocol' conformance to defer isolation checking to run time}}{{19-19=@preconcurrency }}
+
   var propertyB: Int = 17
   // expected-error@-1{{actor-isolated property 'propertyB' cannot be used to satisfy nonisolated protocol requirement}}
 

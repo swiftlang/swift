@@ -18,7 +18,8 @@ func test(ss: StrictStruct, ns: NonStrictClass) {
 
 let nonStrictGlobal = NonStrictClass()
 let strictGlobal = StrictStruct() // expected-warning{{let 'strictGlobal' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
-// expected-note@-1{{isolate 'strictGlobal' to a global actor, or conform 'StrictStruct' to 'Sendable'}}
+// expected-note@-1{{annotate 'strictGlobal' with '@MainActor' if property should only be accessed from the main actor}}
+// expected-note@-2{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
 
 extension NonStrictClass {
   @Sendable func f() { }

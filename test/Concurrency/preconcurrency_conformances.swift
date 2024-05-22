@@ -91,11 +91,19 @@ extension MyActor : @preconcurrency TestSendability {
 
 protocol Initializable {
   init()
+  // expected-note@-1{{mark the protocol requirement 'init()' 'async' to allow actor-isolated conformances}}
 }
 
 final class K : @preconcurrency Initializable {
   // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Initializable' has no effect}}
   init() {} // Ok
+}
+
+@MainActor
+final class MainActorK: Initializable {
+  // expected-note@-1{{add '@preconcurrency' to the 'Initializable' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
+  init() { } // expected-warning{{main actor-isolated initializer 'init()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{add 'nonisolated' to 'init()' to make this initializer not isolated to the actor}}
 }
 
 protocol WithAssoc {
@@ -152,7 +160,7 @@ protocol WithNonIsolated {
 
 do {
   class TestExplicitOtherIsolation : @preconcurrency WithNonIsolated {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{38-54=}}
 
     @GlobalActor var prop: Int = 42
     // expected-warning@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated protocol requirement}}
@@ -164,7 +172,7 @@ do {
 
 do {
   class InferredGlobalActorAttrs : @preconcurrency WithNonIsolated {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{36-52=}}
     var prop: Int = 42
     func test() {}
   }

@@ -2063,7 +2063,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
   auto proto = conformance->getProtocol();
   Type protoType = proto->getDeclaredInterfaceType();
   auto implyingProto = implyingConf->getProtocol()->getDeclaredInterfaceType();
-  auto loc = implyingConf->getLoc();
+  auto loc = extractNearestSourceLoc(implyingConf->getDeclContext());
   Diags.diagnose(loc, diag::conditional_conformances_cannot_imply_conformances,
                  conformance->getType(), implyingProto, protoType);
 
@@ -3297,13 +3297,28 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     missingOptions -= MissingFlags::WitnessDistributed;
   }
 
-  // One way to address the issue is to make the witness function nonisolated.
-  if ((isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) &&
-      !hasExplicitGlobalActorAttr(witness) &&
-      !isDistributedDecl(requirement) &&
-      !isDistributedDecl(witness)) {
-    witness->diagnose(diag::note_add_nonisolated_to_decl, witness)
-          .fixItInsert(witness->getAttributeInsertionLoc(true), "nonisolated ");
+  // If 'nonisolated' or 'preconcurrency' might help us, provide those as
+  // options.
+  if (!isDistributedDecl(requirement) && !isDistributedDecl(witness)) {
+    // One way to address the issue is to make the witness function nonisolated.
+    if ((isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) &&
+        !hasExplicitGlobalActorAttr(witness)) {
+      witness->diagnose(diag::note_add_nonisolated_to_decl, witness)
+            .fixItInsert(witness->getAttributeInsertionLoc(true), "nonisolated ");
+    }
+
+    // Another way to address the issue is to mark the conformance as
+    // "preconcurrency".
+    if (Conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
+        !Conformance->isPreconcurrency() &&
+        !suggestedPreconcurrency &&
+        !requirementIsolation.isActorIsolated()) {
+      Context.Diags.diagnose(Conformance->getProtocolNameLoc(),
+                             diag::add_preconcurrency_to_conformance,
+                             Proto->getName())
+          .fixItInsert(Conformance->getProtocolNameLoc(), "@preconcurrency ");
+      suggestedPreconcurrency = true;
+    }
   }
 
   // If there are remaining options, they are missing async/throws on the
@@ -5120,9 +5135,15 @@ void ConformanceChecker::resolveValueWitnesses() {
   }
 
   if (Conformance->isPreconcurrency() && !usesPreconcurrencyConformance) {
-    DC->getASTContext().Diags.diagnose(
+    auto diag = DC->getASTContext().Diags.diagnose(
         Conformance->getLoc(), diag::preconcurrency_conformance_not_used,
         Proto->getDeclaredInterfaceType());
+
+    SourceLoc preconcurrencyLoc = Conformance->getPreconcurrencyLoc();
+    if (preconcurrencyLoc.isValid()) {
+      SourceLoc endLoc = preconcurrencyLoc.getAdvancedLoc(1);
+      diag.fixItRemove(SourceRange(preconcurrencyLoc, endLoc));
+    }
   }
 
   // Finally, check some ad-hoc protocol requirements.

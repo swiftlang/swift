@@ -2592,7 +2592,8 @@ ASTContext::getNormalConformance(Type conformingType,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
                                  bool isUnchecked,
-                                 bool isPreconcurrency) {
+                                 bool isPreconcurrency,
+                                 SourceLoc preconcurrencyLoc) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2608,7 +2609,7 @@ ASTContext::getNormalConformance(Type conformingType,
   // Build a new normal protocol conformance.
   auto result = new (*this, AllocationArena::Permanent)
       NormalProtocolConformance(conformingType, protocol, loc, dc, state,
-                                isUnchecked, isPreconcurrency);
+                                isUnchecked, isPreconcurrency, preconcurrencyLoc);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
