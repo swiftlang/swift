@@ -102,6 +102,8 @@ public:
   }
 };
 
+class SILDynamicMergedIsolationInfo;
+
 class SILIsolationInfo {
 public:
   /// The lattice is:
@@ -230,7 +232,12 @@ public:
     return (kind == Task || kind == Actor) && bool(isolatedValue);
   }
 
-  [[nodiscard]] SILIsolationInfo merge(SILIsolationInfo other) const;
+  /// Merge this SILIsolationInfo with \p other and produce a
+  /// SILDynamicMergedIsolationInfo that represents the dynamic isolation of a
+  /// value found by merging the value's region's isolation info. This causes
+  /// nonisolated(unsafe) to be dropped.
+  [[nodiscard]] SILDynamicMergedIsolationInfo
+  merge(SILIsolationInfo other) const;
 
   static SILIsolationInfo getDisconnected(bool isUnsafeNonIsolated) {
     return {Kind::Disconnected, isUnsafeNonIsolated};
@@ -372,6 +379,45 @@ public:
   bool isEqual(const SILIsolationInfo &other) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const;
+};
+
+/// A SILIsolationInfo that has gone through merging and represents the dynamic
+/// isolation info of a value found by merging its isolation at a region
+/// point. This means that nonisolated(unsafe) has been removed. It is used so
+/// that in the type system we can distinguish in between isolation info that is
+/// static isolation info associated with a value and dynamic isolation info
+/// that can just be used for dataflow.
+class SILDynamicMergedIsolationInfo {
+  SILIsolationInfo innerInfo;
+
+public:
+  SILDynamicMergedIsolationInfo() : innerInfo() {}
+  SILDynamicMergedIsolationInfo(SILIsolationInfo innerInfo)
+      : innerInfo(innerInfo) {}
+
+  [[nodiscard]] SILDynamicMergedIsolationInfo
+  merge(SILIsolationInfo other) const;
+
+  [[nodiscard]] SILDynamicMergedIsolationInfo
+  merge(SILDynamicMergedIsolationInfo other) const {
+    return merge(other.getIsolationInfo());
+  }
+
+  operator bool() const { return bool(innerInfo); }
+
+  SILIsolationInfo getIsolationInfo() const { return innerInfo; }
+
+  bool isDisconnected() const { return innerInfo.isDisconnected(); }
+
+  bool hasSameIsolation(SILIsolationInfo other) const {
+    return innerInfo.hasSameIsolation(other);
+  }
+
+  SWIFT_DEBUG_DUMP { innerInfo.dump(); }
+
+  void printForDiagnostics(llvm::raw_ostream &os) const {
+    innerInfo.printForDiagnostics(os);
+  }
 };
 
 } // namespace swift

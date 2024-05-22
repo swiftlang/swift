@@ -160,7 +160,9 @@ public:
   }
 
   void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
-    regionInfo = getIsolationRegionInfo().merge(newRegionInfo);
+    // TODO: Remove this.
+    regionInfo =
+        getIsolationRegionInfo().merge(newRegionInfo).getIsolationInfo();
   }
 
   void setDisconnectedNonisolatedUnsafe() {
