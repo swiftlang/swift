@@ -2465,6 +2465,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       SDK = *It;
   }
 
+assert(false && "test symbolication!");
   bool EnableCXXInterop =
       IGM.getSILModule().getASTContext().LangOpts.EnableCXXInterop;
   bool EnableEmbeddedSwift =
