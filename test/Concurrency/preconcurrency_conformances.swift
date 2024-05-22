@@ -91,11 +91,19 @@ extension MyActor : @preconcurrency TestSendability {
 
 protocol Initializable {
   init()
+  // expected-note@-1{{mark the protocol requirement 'init()' 'async' to allow actor-isolated conformances}}
 }
 
 final class K : @preconcurrency Initializable {
   // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Initializable' has no effect}}
   init() {} // Ok
+}
+
+@MainActor
+final class MainActorK: Initializable {
+  // expected-note@-1{{add '@preconcurrency' to the 'Initializable' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
+  init() { } // expected-warning{{main actor-isolated initializer 'init()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{add 'nonisolated' to 'init()' to make this initializer not isolated to the actor}}
 }
 
 protocol WithAssoc {
