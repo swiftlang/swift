@@ -938,21 +938,24 @@ public:
   ///
   /// The bool result is if it is captured by a closure element. That only is
   /// computed if \p sourceOp is non-null.
-  std::pair<SILDynamicMergedIsolationInfo, bool>
+  std::optional<std::pair<SILDynamicMergedIsolationInfo, bool>>
   getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
-    SILDynamicMergedIsolationInfo isolationRegionInfo;
+    std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo =
+        SILDynamicMergedIsolationInfo();
 
     for (const auto &pair : p.range()) {
       if (pair.second == region) {
         isolationRegionInfo =
-            isolationRegionInfo.merge(getIsolationRegionInfo(pair.first));
+            isolationRegionInfo->merge(getIsolationRegionInfo(pair.first));
+        if (!isolationRegionInfo)
+          return {};
         if (sourceOp)
           isClosureCapturedElt |= isClosureCaptured(pair.first, sourceOp);
       }
     }
 
-    return {isolationRegionInfo, isClosureCapturedElt};
+    return {{isolationRegionInfo.value(), isClosureCapturedElt}};
   }
 
   /// Overload of \p getIsolationRegionInfo without an Operand.
@@ -1062,8 +1065,13 @@ public:
       Region transferredRegion = p.getRegion(transferredElement);
       bool isClosureCapturedElt = false;
       SILDynamicMergedIsolationInfo transferredRegionIsolation;
-      std::tie(transferredRegionIsolation, isClosureCapturedElt) =
+      auto pairOpt =
           getIsolationRegionInfo(transferredRegion, op.getSourceOp());
+      if (!pairOpt) {
+        handleUnknownCodePattern(op);
+        return;
+      }
+      std::tie(transferredRegionIsolation, isClosureCapturedElt) = *pairOpt;
 
       // Before we do anything, see if our dynamic isolation kind is the same as
       // the isolation info for our partition op. If they match, this is not a
@@ -1089,8 +1097,12 @@ public:
       // Mark op.getOpArgs()[0] as transferred.
       TransferringOperandState &state = operandToStateMap.get(op.getSourceOp());
       state.isClosureCaptured |= isClosureCapturedElt;
-      state.isolationInfo =
-          state.isolationInfo.merge(transferredRegionIsolation);
+      if (auto newInfo =
+              state.isolationInfo.merge(transferredRegionIsolation)) {
+        state.isolationInfo = *newInfo;
+      } else {
+        handleUnknownCodePattern(op);
+      }
       assert(state.isolationInfo && "Cannot have unknown");
       state.isolationHistory.pushCFGHistoryJoin(p.getIsolationHistory());
       auto *ptrSet = ptrSetFactory.get(op.getSourceOp());

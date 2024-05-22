@@ -159,12 +159,6 @@ public:
     return getIsolationRegionInfo().getActorIsolation();
   }
 
-  void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
-    // TODO: Remove this.
-    regionInfo =
-        getIsolationRegionInfo().merge(newRegionInfo).getIsolationInfo();
-  }
-
   void setDisconnectedNonisolatedUnsafe() {
     auto oldRegionInfo = getIsolationRegionInfo();
     assert(oldRegionInfo.isDisconnected());
@@ -386,9 +380,17 @@ private:
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
-  bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   Element lookupValueID(SILValue value);
+
+  /// Initialize a TrackableValue with a SILIsolationInfo that we already know
+  /// instead of inferring.
+  ///
+  /// If we successfully initialize \p value with \p info, returns
+  /// {TrackableValue(), true}. If we already had a TrackableValue, we return
+  /// {TrackableValue(), false}.
+  std::pair<TrackableValue, bool>
+  initializeTrackableValue(SILValue value, SILIsolationInfo info) const;
 };
 
 class RegionAnalysisFunctionInfo {

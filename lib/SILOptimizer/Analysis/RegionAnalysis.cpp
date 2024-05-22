@@ -1500,16 +1500,28 @@ private:
     return valueMap.tryToTrackValue(value);
   }
 
+  /// If \p value already has state associated with it, return that. Otherwise
+  /// begin tracking \p value and initialize its isolation info to be \p.
+  ///
+  /// This is in contrast to tryToTrackValue which infers isolation
+  /// information. This should only be used in exceptional cases when one 100%
+  /// knows what the isolation is already. E.x.: a partial_apply.
+  std::optional<std::pair<TrackableValue, bool>>
+  initializeTrackedValue(SILValue value, SILIsolationInfo info) const {
+    auto trackedValuePair = valueMap.initializeTrackableValue(value, info);
+    if (trackedValuePair.first.isNonSendable()) {
+      assert(trackedValuePair.second);
+      return trackedValuePair;
+    }
+    assert(trackedValuePair.second);
+    return {};
+  }
+
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo actorIsolation) const {
     return valueMap.getActorIntroducingRepresentative(introducingInst,
                                                       actorIsolation);
-  }
-
-  bool mergeIsolationRegionInfo(SILValue value,
-                                SILIsolationInfo isolationRegion) {
-    return valueMap.mergeIsolationRegionInfo(value, isolationRegion);
   }
 
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false) {
@@ -1542,9 +1554,6 @@ public:
       if (tryApplyInst->getErrorBB()->getNumArguments() > 0) {
         foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
       }
-      for (auto indirectResults : tryApplyInst->getIndirectSILResults()) {
-        foundResults.emplace_back(indirectResults);
-      }
       return;
     }
 
@@ -1568,11 +1577,20 @@ public:
     }
 
     for (SILValue result : resultValues) {
-      if (auto value = tryToTrackValue(result)) {
-        assignResults.push_back(value->getRepresentative().getValue());
-        // TODO: Can we pass back a reference to value perhaps?
-        if (isolationInfo) {
-          mergeIsolationRegionInfo(result, isolationInfo);
+      if (isolationInfo) {
+        // We only get back result if it is non-Sendable.
+        if (auto nonSendableValue =
+                initializeTrackedValue(result, isolationInfo)) {
+          if (!nonSendableValue->second) {
+            builder.addUnknownPatternError(result);
+            continue;
+          }
+          assignResults.push_back(
+              nonSendableValue->first.getRepresentative().getValue());
+        }
+      } else {
+        if (auto value = tryToTrackValue(result)) {
+          assignResults.push_back(value->getRepresentative().getValue());
         }
       }
     }
@@ -1741,10 +1759,12 @@ public:
     if (pai->getFunctionType()->isSendable())
       return;
 
-    auto paiValue = tryToTrackValue(pai).value();
-    SILValue rep = paiValue.getRepresentative().getValue();
-    mergeIsolationRegionInfo(rep, actorIsolation);
-    translateSILAssignFresh(rep);
+    auto trackedValue = initializeTrackedValue(pai, actorIsolation);
+    assert(trackedValue && "Should not have happened already");
+    assert(
+        trackedValue->second &&
+        "Insert should have happened since this could not happen before this");
+    translateSILAssignFresh(trackedValue->first.getRepresentative().getValue());
   }
 
   void translateSILPartialApply(PartialApplyInst *pai) {
@@ -3258,6 +3278,27 @@ RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
   return iter->getSecond().getIsolationRegionInfo();
 }
 
+std::pair<TrackableValue, bool>
+RegionAnalysisValueMap::initializeTrackableValue(
+    SILValue value, SILIsolationInfo newInfo) const {
+  auto info = getUnderlyingTrackedValue(value);
+  value = info.value;
+
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.try_emplace(
+      value, TrackableValueState(equivalenceClassValuesToState.size()));
+
+  // If we did not insert, just return the already stored value.
+  if (!iter.second) {
+    return {{iter.first->first, iter.first->second}, false};
+  }
+
+  self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+  iter.first->getSecond().setIsolationRegionInfo(newInfo);
+
+  return {{iter.first->first, iter.first->second}, true};
+}
+
 /// If \p isAddressCapturedByPartialApply is set to true, then this value is
 /// an address that is captured by a partial_apply and we want to treat it as
 /// may alias.
@@ -3275,6 +3316,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
     return {iter.first->first, iter.first->second};
   }
 
+  // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
   // Otherwise, we need to compute our flags.
@@ -3409,18 +3451,8 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
   // Otherwise, wire up the value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] =
       introducingInst;
-  iter.first->getSecond().mergeIsolationRegionInfo(actorIsolation);
+  iter.first->getSecond().setIsolationRegionInfo(actorIsolation);
   return {iter.first->first, iter.first->second};
-}
-
-bool RegionAnalysisValueMap::mergeIsolationRegionInfo(
-    SILValue value, SILIsolationInfo actorIsolation) {
-  value = getUnderlyingTrackedValue(value).value;
-  auto iter = equivalenceClassValuesToState.find(value);
-  if (iter == equivalenceClassValuesToState.end())
-    return false;
-  iter->getSecond().mergeIsolationRegionInfo(actorIsolation);
-  return true;
 }
 
 bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
