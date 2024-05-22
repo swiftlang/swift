@@ -474,6 +474,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE")
   endif()
 
+  if(SWIFT_USE_OS_TRACE_LAZY_INIT)
+    list(APPEND result "-DSWIFT_USE_OS_TRACE_LAZY_INIT")
+  endif()
+
   list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
