@@ -53,3 +53,17 @@ func f(isolation: isolated MyActor, ns: NotSendable) {
 }
 
 func test() async {}
+
+// A generic actor type, which causes the generic self parameter
+// (actor isolation parameter) to be added to captures of the
+// local/nested function.
+actor GenericActor<K> {
+  var i: Int = 0
+  private func outerFunc() {
+    func accessSelf() -> Int {
+      // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation12GenericActorC9outerFunc33_7B9E2B75110B8600A136A469D51CAF2BLLyyF10accessSelfL_SiylF : $@convention(thin) <K> (@sil_isolated @guaranteed GenericActor<K>) -> Int {
+      return 0
+    }
+    print(accessSelf())
+  }
+}
