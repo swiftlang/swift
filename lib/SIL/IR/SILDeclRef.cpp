@@ -460,12 +460,8 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::EnumElement:
     return Limit::OnDemand;
 
-  case Kind::GlobalAccessor: {
-    auto varDecl = cast<VarDecl>(d);
-    return varDecl->isResilient() &&
-           !varDecl->getModuleContext()->allowNonResilientAccess() ?
-           Limit::NeverPublic : Limit::None;
-  }
+  case Kind::GlobalAccessor:
+    return cast<VarDecl>(d)->isStrictlyResilient() ? Limit::NeverPublic : Limit::None;
 
   case Kind::DefaultArgGenerator:
     // If the default argument is to be serialized, only use non-ABI public
@@ -511,7 +507,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::AlwaysEmitIntoClient;
 
     // FIXME: This should always be true.
-    if (d->getModuleContext()->isResilient())
+    if (d->getModuleContext()->isStrictlyResilient())
       return Limit::NeverPublic;
 
     break;
@@ -1536,10 +1532,10 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   // FIXME: This is too narrow. Any class with resilient metadata should
   // probably have this, at least for method overrides that don't add new
   // vtable entries.
-  bool isResilientClass = classType->isResilient();
+  bool isStrictResilientClass = classType->isStrictlyResilient();
 
   if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-    if (isResilientClass)
+    if (isStrictResilientClass)
       return SubclassScope::NotApplicable;
     // Initializing entry points do not appear in the vtable.
     if (kind == SILDeclRef::Kind::Initializer)
@@ -1570,14 +1566,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     // In the resilient case, we're going to be making symbols _less_
     // visible, so make sure we stop now; final methods can always be
     // called directly.
-    if (isResilientClass)
+    if (isStrictResilientClass)
       return SubclassScope::Internal;
   }
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
-  if (isResilientClass) {
+  if (isStrictResilientClass) {
     // The symbol should _only_ be reached via the vtable, so we're
     // going to make it hidden.
     return SubclassScope::Resilient;
