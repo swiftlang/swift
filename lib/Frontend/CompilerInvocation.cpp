@@ -506,6 +506,9 @@ validateCxxInteropCompatibilityMode(StringRef mode) {
   // Swift 5 is the default language version.
   if (mode == "swift-5.9")
     return {CxxCompatMode::enabled, version::Version({5})};
+  // Note: If this is updated, corresponding code in
+  // InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl needs
+  // to be updated also.
   return {CxxCompatMode::invalid, {}};
 }
 
@@ -638,6 +641,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableImplicitStringProcessingModuleImport |=
     Args.hasArg(OPT_disable_implicit_string_processing_module_import);
+
+  Opts.DisableImplicitCxxModuleImport |=
+    Args.hasArg(OPT_disable_implicit_cxx_module_import);
 
   Opts.DisableImplicitBacktracingModuleImport =
     Args.hasFlag(OPT_disable_implicit_backtracing_module_import,
