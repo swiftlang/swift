@@ -539,7 +539,7 @@ const void
     *const swift::_swift_concurrency_debug_task_future_wait_resume_adapter =
         reinterpret_cast<void *>(task_future_wait_resume_adapter);
 
-const void *AsyncTask::getResumeFunctionForLogging() {
+const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
   const void *result = reinterpret_cast<const void *>(ResumeTask);
 
   if (ResumeTask == non_future_adapter) {
@@ -553,11 +553,16 @@ const void *AsyncTask::getResumeFunctionForLogging() {
         sizeof(FutureAsyncContextPrefix));
     result =
         reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
-  } else if (ResumeTask == task_wait_throwing_resume_adapter) {
-    auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
-    result = reinterpret_cast<const void *>(context->ResumeParent);
-  } else if (ResumeTask == task_future_wait_resume_adapter) {
-    result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
+  }
+
+  // Future contexts may not be valid if the task was already running before.
+  if (isStarting) {
+    if (ResumeTask == task_wait_throwing_resume_adapter) {
+      auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
+      result = reinterpret_cast<const void *>(context->ResumeParent);
+    } else if (ResumeTask == task_future_wait_resume_adapter) {
+      result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
+    }
   }
 
   return __ptrauth_swift_runtime_function_entry_strip(result);

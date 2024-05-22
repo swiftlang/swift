@@ -148,10 +148,10 @@ DependencyScanningTool::DependencyScanningTool()
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
-    ArrayRef<const char *> Command,
-    const llvm::StringSet<> &PlaceholderModules) {
+    ArrayRef<const char *> Command, const llvm::StringSet<> &PlaceholderModules,
+    StringRef WorkingDirectory) {
   // The primary instance used to scan the query Swift source-code
-  auto QueryContextOrErr = initScannerForAction(Command);
+  auto QueryContextOrErr = initScannerForAction(Command, WorkingDirectory);
   if (std::error_code EC = QueryContextOrErr.getError())
     return EC;
   auto QueryContext = std::move(*QueryContextOrErr);
@@ -173,9 +173,10 @@ DependencyScanningTool::getDependencies(
 }
 
 llvm::ErrorOr<swiftscan_import_set_t>
-DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
+DependencyScanningTool::getImports(ArrayRef<const char *> Command,
+                                   StringRef WorkingDirectory) {
   // The primary instance used to scan the query Swift source-code
-  auto QueryContextOrErr = initScannerForAction(Command);
+  auto QueryContextOrErr = initScannerForAction(Command, WorkingDirectory);
   if (std::error_code EC = QueryContextOrErr.getError())
     return EC;
   auto QueryContext = std::move(*QueryContextOrErr);
@@ -199,9 +200,9 @@ std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const std::vector<BatchScanInput> &BatchInput,
-    const llvm::StringSet<> &PlaceholderModules) {
+    const llvm::StringSet<> &PlaceholderModules, StringRef WorkingDirectory) {
   // The primary instance used to scan Swift modules
-  auto QueryContextOrErr = initScannerForAction(Command);
+  auto QueryContextOrErr = initScannerForAction(Command, WorkingDirectory);
   if (std::error_code EC = QueryContextOrErr.getError())
     return std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>(
         BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
@@ -264,17 +265,17 @@ void DependencyScanningTool::resetDiagnostics() {
 
 llvm::ErrorOr<ScanQueryInstance>
 DependencyScanningTool::initScannerForAction(
-    ArrayRef<const char *> Command) {
+    ArrayRef<const char *> Command, StringRef WorkingDirectory) {
   // The remainder of this method operates on shared state in the
   // scanning service and global LLVM state with:
   // llvm::cl::ResetAllOptionOccurrences
   llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  return initCompilerInstanceForScan(Command);
+  return initCompilerInstanceForScan(Command, WorkingDirectory);
 }
 
 llvm::ErrorOr<ScanQueryInstance>
 DependencyScanningTool::initCompilerInstanceForScan(
-    ArrayRef<const char *> CommandArgs) {
+    ArrayRef<const char *> CommandArgs, StringRef WorkingDir) {
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
   auto ScanDiagnosticConsumer = std::make_unique<DependencyScanDiagnosticCollector>();
@@ -291,8 +292,9 @@ DependencyScanningTool::initCompilerInstanceForScan(
   }
 
   CompilerInvocation Invocation;
-  SmallString<128> WorkingDirectory;
-  llvm::sys::fs::current_path(WorkingDirectory);
+  SmallString<128> WorkingDirectory(WorkingDir);
+  if (WorkingDirectory.empty())
+    llvm::sys::fs::current_path(WorkingDirectory);
 
   // We must reset option occurrences because we are handling an unrelated
   // command-line to those possibly parsed before using the same tool.
