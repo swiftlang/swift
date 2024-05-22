@@ -46,6 +46,7 @@ public struct HeapObject {
   static let refcountMask = Int(bitPattern: 0x7fff_ffff)
 #endif
 
+  // Note: The immortalRefCount value of -1 is also hard-coded in IRGen in `irgen::emitConstantObject`.
   static let immortalRefCount = -1
 }
 
