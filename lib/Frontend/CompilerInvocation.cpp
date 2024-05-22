@@ -1582,6 +1582,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
 static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                                  DiagnosticEngine &Diags,
+                                 const LangOptions &LangOpts,
                                  const FrontendOptions &FrontendOpts) {
   using namespace options;
 
@@ -1622,17 +1623,43 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // Check for SkipFunctionBodies arguments in order from skipping less to
   // skipping more.
   if (Args.hasArg(
-        OPT_experimental_skip_non_inlinable_function_bodies_without_types))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+        OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-inlinable-function-bodies-without-types",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+  }
 
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
-  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
-      Args.hasArg(OPT_tbd_is_installapi))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-inlinable-function-bodies",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+  }
 
-  if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::All;
+  if (Args.hasArg(OPT_tbd_is_installapi)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-tbd-is-installapi",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+  }
+
+  if (Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-all-function-bodies",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::All;
+  }
 
   if (Opts.SkipFunctionBodies != FunctionBodySkipping::None &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
@@ -1702,6 +1729,14 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-skip-non-inlinable-function-bodies-is-lazy",
                      "-enable-library-evolution");
+  }
+
+  if (LangOpts.AllowNonResilientAccess &&
+      Opts.EnableLazyTypecheck) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                   "-experimental-lazy-typecheck",
+                   "-experimental-allow-non-resilient-access");
+    Opts.EnableLazyTypecheck = false;
   }
 
   // HACK: The driver currently erroneously passes all flags to module interface
@@ -3429,7 +3464,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseTypeCheckerArgs(TypeCheckerOpts, ParsedArgs, Diags, FrontendOpts)) {
+  if (ParseTypeCheckerArgs(TypeCheckerOpts, ParsedArgs, Diags, LangOpts, FrontendOpts)) {
     return true;
   }
 
