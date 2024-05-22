@@ -61,10 +61,10 @@ public:
   CharSourceRange generatedSourceRange;
 
   /// The opaque pointer for an ASTNode for which this buffer was generated.
-  void *astNode;
+  void *astNode = nullptr;
 
   /// The declaration context in which this buffer logically resides.
-  DeclContext *declContext;
+  DeclContext *declContext = nullptr;
 
   /// The custom attribute for an attached macro.
   CustomAttr *attachedMacroCustomAttr = nullptr;

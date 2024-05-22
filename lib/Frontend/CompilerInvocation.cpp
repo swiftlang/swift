@@ -2172,7 +2172,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
-  // If no style options are specified, default to LLVM style.
+  // If no style options are specified, default to Swift style.
   Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
@@ -2186,6 +2186,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       return true;
     }
   }
+  // Swift style is not fully supported in cached mode yet.
+  if (Args.hasArg(OPT_cache_compile_job))
+    Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
