@@ -3022,6 +3022,10 @@ bool Decl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
+bool AbstractStorageDecl::isStrictlyResilient() const {
+  return isResilient() && !getModuleContext()->allowNonResilientAccess();
+}
+
 bool AbstractStorageDecl::isResilient() const {
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
@@ -5205,6 +5209,10 @@ bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
   return getModuleContext()->isResilient();
+}
+
+bool NominalTypeDecl::isStrictlyResilient() const {
+  return isResilient() && !getModuleContext()->allowNonResilientAccess();
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {

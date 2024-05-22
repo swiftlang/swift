@@ -779,6 +779,15 @@ public:
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
 
+  /// True if this module is resilient AND also does _not_ allow
+  /// non-resilient access; the module can allow such access if
+  /// package optimization is enabled so its client modules within
+  /// the same package can have a direct access to decls in this
+  /// module even if it's built resiliently.
+  bool isStrictlyResilient() const {
+    return isResilient() && !allowNonResilientAccess();
+  }
+
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.
