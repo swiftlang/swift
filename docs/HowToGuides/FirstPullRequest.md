@@ -6,7 +6,7 @@ you are an experienced open source contributor who is excited about Swift, or
 maybe you are somewhere in-between. Regardless of your background, we are
 excited to have you contribute and improve the developer experience for Swift
 programmers all over the globe.
-:sparkles:🧒🏾🧑🏼‍🎓👩🏽‍💻🧑🏻‍💻👨🏿‍💻:sparkles:
+✨🧒🏾🧑🏼‍🎓👩🏽‍💻🧑🏻‍💻👨🏿‍💻✨
 
 This document provides a high-level overview of different parts of the
 contribution process.
