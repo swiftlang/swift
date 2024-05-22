@@ -640,36 +640,6 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
   }
 }
 
-SILDynamicMergedIsolationInfo
-SILIsolationInfo::merge(SILIsolationInfo other) const {
-  // If we are greater than the other kind, then we are further along the
-  // lattice. We ignore the change.
-  if (unsigned(other.kind) < unsigned(kind))
-    return {*this};
-
-  // TODO: Make this failing mean that we emit an unknown SIL error instead of
-  // asserting.
-  assert((!other.isActorIsolated() || !isActorIsolated() ||
-          hasSameIsolation(other)) &&
-         "Actor can only be merged with the same actor");
-
-  // If we are both disconnected and other has the unsafeNonIsolated bit set,
-  // drop that bit and return that.
-  //
-  // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
-  // merging. These bits should not propagate through merging and should instead
-  // always be associated with non-merged infos.
-  //
-  // TODO: We should really bake the above into the type system by having merged
-  // and non-merged SILIsolationInfo.
-  if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
-    return other.withUnsafeNonIsolated(false);
-  }
-
-  // Otherwise, just return other.
-  return other;
-}
-
 bool SILIsolationInfo::hasSameIsolation(ActorIsolation actorIsolation) const {
   if (getKind() != Kind::Actor)
     return false;
@@ -846,18 +816,18 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
 //                    MARK: SILDynamicMergedIsolationInfo
 //===----------------------------------------------------------------------===//
 
-SILDynamicMergedIsolationInfo
+std::optional<SILDynamicMergedIsolationInfo>
 SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // If we are greater than the other kind, then we are further along the
   // lattice. We ignore the change.
   if (unsigned(other.getKind()) < unsigned(innerInfo.getKind()))
     return {*this};
 
-  // TODO: Make this failing mean that we emit an unknown SIL error instead of
-  // asserting.
-  assert((!other.isActorIsolated() || !innerInfo.isActorIsolated() ||
-          innerInfo.hasSameIsolation(other)) &&
-         "Actor can only be merged with the same actor");
+  // If we are both actor isolated and our isolations are not
+  // compatible... return None.
+  if (other.isActorIsolated() && innerInfo.isActorIsolated() &&
+      !innerInfo.hasSameIsolation(other))
+    return {};
 
   // If we are both disconnected and other has the unsafeNonIsolated bit set,
   // drop that bit and return that.
@@ -865,9 +835,6 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
   // merging. These bits should not propagate through merging and should instead
   // always be associated with non-merged infos.
-  //
-  // TODO: We should really bake the above into the type system by having merged
-  // and non-merged SILIsolationInfo.
   if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
     return other.withUnsafeNonIsolated(false);
   }

@@ -102,8 +102,6 @@ public:
   }
 };
 
-class SILDynamicMergedIsolationInfo;
-
 class SILIsolationInfo {
 public:
   /// The lattice is:
@@ -231,13 +229,6 @@ public:
   bool hasIsolatedValue() const {
     return (kind == Task || kind == Actor) && bool(isolatedValue);
   }
-
-  /// Merge this SILIsolationInfo with \p other and produce a
-  /// SILDynamicMergedIsolationInfo that represents the dynamic isolation of a
-  /// value found by merging the value's region's isolation info. This causes
-  /// nonisolated(unsafe) to be dropped.
-  [[nodiscard]] SILDynamicMergedIsolationInfo
-  merge(SILIsolationInfo other) const;
 
   static SILIsolationInfo getDisconnected(bool isUnsafeNonIsolated) {
     return {Kind::Disconnected, isUnsafeNonIsolated};
@@ -395,10 +386,12 @@ public:
   SILDynamicMergedIsolationInfo(SILIsolationInfo innerInfo)
       : innerInfo(innerInfo) {}
 
-  [[nodiscard]] SILDynamicMergedIsolationInfo
+  /// Returns nullptr only if both this isolation info and \p other are actor
+  /// isolated to incompatible actors.
+  [[nodiscard]] std::optional<SILDynamicMergedIsolationInfo>
   merge(SILIsolationInfo other) const;
 
-  [[nodiscard]] SILDynamicMergedIsolationInfo
+  [[nodiscard]] std::optional<SILDynamicMergedIsolationInfo>
   merge(SILDynamicMergedIsolationInfo other) const {
     return merge(other.getIsolationInfo());
   }
