@@ -530,6 +530,9 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
+  /// The location of the protocol name within the conformance.
+  SourceLoc ProtocolNameLoc;
+
   /// The location of the `@preconcurrency` attribute, if any.
   SourceLoc PreconcurrencyLoc;
 
@@ -569,10 +572,13 @@ public:
                             SourceLoc preconcurrencyLoc)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
-        Protocol(protocol), Loc(loc), PreconcurrencyLoc(preconcurrencyLoc),
+        Protocol(protocol), Loc(extractNearestSourceLoc(dc)),
+        ProtocolNameLoc(loc), PreconcurrencyLoc(preconcurrencyLoc),
         Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
+    assert((preconcurrencyLoc.isInvalid() || isPreconcurrency) &&
+           "Cannot have a @preconcurrency location without isPreconcurrency");
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
     Bits.NormalProtocolConformance.IsUnchecked = isUnchecked;
@@ -587,6 +593,9 @@ public:
 
   /// Retrieve the location of this conformance.
   SourceLoc getLoc() const { return Loc; }
+
+  /// Retrieve the name of the protocol location.
+  SourceLoc getProtocolNameLoc() const { return ProtocolNameLoc; }
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
