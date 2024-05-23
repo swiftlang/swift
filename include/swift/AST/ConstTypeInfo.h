@@ -37,6 +37,7 @@ public:
     Tuple,
     Enum,
     Type,
+    KeyPath,
     Runtime
   };
 
@@ -197,6 +198,34 @@ public:
 
 private:
   swift::Type Type;
+};
+
+/// A representation of a Keypath
+class KeyPathValue : public CompileTimeValue {
+public:
+  struct Component {
+    std::string Label;
+    swift::Type Type;
+  };
+  KeyPathValue(std::string Path,
+               swift::Type RootType,
+               std::vector<Component> Components)
+  : CompileTimeValue(ValueKind::KeyPath), Path(Path), RootType(RootType), Components(Components) {}
+
+  std::string getPath() const { return Path; }
+  swift::Type getRootType() const { return RootType; }
+  std::vector<Component> getComponents() const {
+    return Components;
+  }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::KeyPath;
+  }
+
+private:
+  std::string Path;
+  swift::Type RootType;
+  std::vector<Component> Components;
 };
 
 /// A representation of an arbitrary value that does not fall under
