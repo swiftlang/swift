@@ -942,6 +942,12 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
     return false;
 
+  if (!getModule().getOptions().ShouldFunctionsBePreservedToDebugger)
+    return false;
+
+  if (getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   if (isAvailableExternally())
     return false;
 

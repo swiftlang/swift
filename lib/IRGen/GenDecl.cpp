@@ -2826,6 +2826,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Mark as llvm.used if @_used, set section if @_section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
+    else if (var->shouldBePreservedForDebugger() && forDefinition) 
+      addUsedGlobal(gvar);
     if (auto *sectionAttr = var->getSectionAttr())
       gvar->setSection(sectionAttr->Name);
   }
@@ -3695,7 +3697,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   // Also mark as llvm.used any functions that should be kept for the debugger.
   // Only definitions should be kept.
-  if (f->shouldBePreservedForDebugger() && !fn->isDeclaration())
+  if (f->shouldBePreservedForDebugger() && forDefinition)
     addUsedGlobal(fn);
 
   // If `hasCReferences` is true, then the function is either marked with

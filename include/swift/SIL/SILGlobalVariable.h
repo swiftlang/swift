@@ -147,6 +147,10 @@ public:
   /// might be referenced from outside the current compilation unit.
   bool isPossiblyUsedExternally() const;
 
+  /// Returns true if this global variable should be preserved so it can
+  /// potentially be inspected by the debugger.
+  bool shouldBePreservedForDebugger() const;
+
   /// Get this global variable's serialized attribute.
   IsSerialized_t isSerialized() const;
   void setSerialized(IsSerialized_t isSerialized);
