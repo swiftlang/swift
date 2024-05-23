@@ -2809,7 +2809,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   static bool isEffectAnchor(Expr *e) {
     return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
-           isa<AssignExpr>(e);
+           isa<AssignExpr>(e) || (isa<DeclRefExpr>(e) && e->isImplicit());
   }
 
   static bool isAnchorTooEarly(Expr *e) {
@@ -3589,19 +3589,35 @@ private:
     Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
   }
 
+  std::pair<SourceLoc, std::string>
+  getFixItForUncoveredAsyncSite(const Expr *anchor) const {
+    SourceLoc awaitInsertLoc = anchor->getStartLoc();
+    std::string insertText = "await ";
+    if (auto *tryExpr = dyn_cast<AnyTryExpr>(anchor))
+      awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
+    else if (auto *autoClosure = dyn_cast<AutoClosureExpr>(anchor)) {
+      if (auto *tryExpr =
+              dyn_cast<AnyTryExpr>(autoClosure->getSingleExpressionBody()))
+        awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
+      // Supply a tailored fixIt including the identifier if we are
+      // looking at a shorthand optional binding.
+    } else if (anchor->isImplicit()) {
+      if (auto declRef = dyn_cast<DeclRefExpr>(anchor))
+        if (auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl())) {
+          insertText = " = await " + var->getNameStr().str();
+          awaitInsertLoc = Lexer::getLocForEndOfToken(Ctx.Diags.SourceMgr,
+                                                       anchor->getStartLoc());
+        }
+    }
+    return std::make_pair(awaitInsertLoc, insertText);
+  }
+
   void diagnoseUncoveredAsyncSite(const Expr *anchor) const {
     auto asyncPointIter = uncoveredAsync.find(anchor);
     if (asyncPointIter == uncoveredAsync.end())
       return;
-    const std::vector<DiagnosticInfo> &errors = asyncPointIter->getSecond();
-    SourceLoc awaitInsertLoc = anchor->getStartLoc();
-    if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(anchor))
-      awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
-    else if (const AutoClosureExpr *autoClosure = dyn_cast<AutoClosureExpr>(anchor)) {
-      if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(autoClosure->getSingleExpressionBody()))
-        awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
-    }
-
+    const auto &errors = asyncPointIter->getSecond();
+    const auto &[loc, insertText] = getFixItForUncoveredAsyncSite(anchor);
     bool downgradeToWarning = llvm::all_of(errors,
         [&](DiagnosticInfo diag) -> bool {
           return diag.downgradeToWarning;
@@ -3609,7 +3625,7 @@ private:
 
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
       .warnUntilSwiftVersionIf(downgradeToWarning, 6)
-      .fixItInsert(awaitInsertLoc, "await ")
+      .fixItInsert(loc, insertText)
       .highlight(anchor->getSourceRange());
 
     for (const DiagnosticInfo &diag: errors) {
