@@ -74,6 +74,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include <algorithm>
@@ -785,6 +786,12 @@ ASTContext::ASTContext(
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
+
+  // Register canImport module info.
+  for (auto &info: SearchPathOpts.CanImportModuleInfo) {
+    addSucceededCanImportModule(info.ModuleName, false, info.Version);
+    addSucceededCanImportModule(info.ModuleName, true, info.UnderlyingVersion);
+  }
 
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
@@ -2385,23 +2392,56 @@ getModuleVersionKindString(const ModuleLoader::ModuleVersionInfo &info) {
   }
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
-                                     llvm::VersionTuple version,
-                                     bool underlyingVersion,
-                                     bool updateFailingList) const {
+void ASTContext::addSucceededCanImportModule(
+    StringRef moduleName, bool underlyingVersion,
+    const llvm::VersionTuple &versionInfo) {
+  auto &entry = CanImportModuleVersions[moduleName.str()];
+  if (!versionInfo.empty()) {
+    if (underlyingVersion)
+      entry.UnderlyingVersion = versionInfo;
+    else
+      entry.Version = versionInfo;
+  }
+}
+
+bool ASTContext::canImportModuleImpl(
+    ImportPath::Module ModuleName, llvm::VersionTuple version,
+    bool underlyingVersion, bool updateFailingList,
+    llvm::VersionTuple &foundVersion) const {
   SmallString<64> FullModuleName;
   ModuleName.getString(FullModuleName);
-  auto ModuleNameStr = FullModuleName.str();
+  auto ModuleNameStr = FullModuleName.str().str();
 
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
 
-  if (version.empty()) {
-    // If this module has already been checked successfully, it is importable.
-    if (SucceededModuleImportNames.count(ModuleNameStr))
+  // If this module has already been checked or there is information for the
+  // module from commandline, use that information instead of loading the
+  // module.
+  auto Found = CanImportModuleVersions.find(ModuleNameStr);
+  if (Found != CanImportModuleVersions.end()) {
+    if (version.empty())
       return true;
 
+    if (underlyingVersion) {
+      if (!Found->second.UnderlyingVersion.empty())
+        return version <= Found->second.UnderlyingVersion;
+    } else {
+      if (!Found->second.Version.empty())
+        return version <= Found->second.Version;
+    }
+
+    // If the canImport information is coming from the command-line, then no
+    // need to continue the search, return false. For checking modules that are
+    // not passed from command-line, allow fallback to the module loading since
+    // this is not in a canImport request context that has already been resolved
+    // by scanner.
+    if (!SearchPathOpts.CanImportModuleInfo.empty())
+      return false;
+  }
+
+  if (version.empty()) {
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
@@ -2453,28 +2493,38 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     return true;
   }
 
+  foundVersion = bestVersionInfo.getVersion();
   return version <= bestVersionInfo.getVersion();
 }
 
-bool ASTContext::canImportModule(ImportPath::Module ModuleName,
+void ASTContext::forEachCanImportVersionCheck(
+    std::function<void(StringRef, const llvm::VersionTuple &,
+                       const llvm::VersionTuple &)>
+        Callback) const {
+  for (auto &entry : CanImportModuleVersions)
+    Callback(entry.first, entry.second.Version, entry.second.UnderlyingVersion);
+}
+
+bool ASTContext::canImportModule(ImportPath::Module moduleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
-  if (!canImportModuleImpl(ModuleName, version, underlyingVersion, true))
+  llvm::VersionTuple versionInfo;
+  if (!canImportModuleImpl(moduleName, version, underlyingVersion, true,
+                           versionInfo))
     return false;
 
-  // If checked successfully, add the top level name to success list as
-  // dependency to handle clang submodule correctly. Swift does not have
-  // submodule so the name should be the same.
-  SmallString<64> TopModuleName;
-  ModuleName.getTopLevelPath().getString(TopModuleName);
-  SucceededModuleImportNames.insert(TopModuleName.str());
+  SmallString<64> fullModuleName;
+  moduleName.getString(fullModuleName);
+  addSucceededCanImportModule(fullModuleName, underlyingVersion, versionInfo);
   return true;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
                                   llvm::VersionTuple version,
                                   bool underlyingVersion) const {
-  return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
+  llvm::VersionTuple versionInfo;
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, false,
+                             versionInfo);
 }
 
 ModuleDecl *
