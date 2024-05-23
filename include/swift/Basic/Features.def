@@ -192,9 +192,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on asso
 LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
 LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
 LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
+SUPPRESSIBLE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
 SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
-SUPPRESSIBLE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
 LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
 
 // Swift 6
