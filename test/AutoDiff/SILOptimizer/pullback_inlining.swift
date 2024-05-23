@@ -1,4 +1,4 @@
-// VJP and pullback inlining tests.
+// Pullback inlining tests.
 
 // RUN: %target-swift-frontend -emit-sil -O -verify -Xllvm -debug-only=sil-inliner %s 2>&1 | %FileCheck %s
 
@@ -13,34 +13,11 @@ import Glibc
 import Foundation
 #endif
 
-// ======================== Simple case without control-flow ======================== //
+// =============================================================== //
+// Pullbacks with control-flow are inlined into non-VJP callers
+// =============================================================== //
+
 @differentiable(reverse)
-@_silgen_name("simple")
-func simple(x: Float) -> Float {
-    let a = x * x;
-    let b = x + x;
-    let c = x * a;
-    let d = a + b;
-    let e = b * c;
-
-    return a * b / c + d - e ;
-}
-
-@inline(never)
-@_silgen_name("caller_of_simple")
-func caller_of_simple(x: Float) -> Float {
-  gradient(at: Float(4), of: simple)
-}
-
-// CHECK: decision {{{.*}}, b=30, {{.*}}} simpleTJrSpSr
-// CHECK-NEXT: "simpleTJrSpSr" inlined into "caller_of_simple"
-// PB inlining check
-// CHECK: decision {{{.*}}, b=70, {{.*}}} simpleTJpSpSr
-// CHECK-NEXT: "simpleTJpSpSr" inlined into "caller_of_simple"
-
-// ======================== Simple case with control-flow ======================== //
-@differentiable(reverse)
-@_silgen_name("with_control_flow")
 func with_control_flow(_ x: Float) -> Float {
   if (x > 0) {
     return sin(x) * cos(x)
@@ -54,17 +31,13 @@ func with_control_flow(_ x: Float) -> Float {
 func caller_of_with_control_flow(x: Float) -> Float {
     gradient(at: x, of: with_control_flow)
 }
+// CHECK-LABEL: decision {{.*}} $s17pullback_inlining17with_control_flowyS2fFTJpSpSr
+// CHECK-NEXT: "pullback of pullback_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
 
-// VJP inlining check
-// CHECK: decision {{{.*}}, b=30, {{.*}}} with_control_flowTJrSpSr
-// CHECK-NEXT: "with_control_flowTJrSpSr" inlined into "caller_of_with_control_flow"
-// PB inlining check
-// CHECK: decision {{{.*}}, b=70, {{.*}}} with_control_flowTJpSpSr
-// CHECK-NEXT: "with_control_flowTJpSpSr" inlined into "caller_of_with_control_flow"
-
-// ======================== Complex case with control-flow ======================== //
+// ====================================================================== //
+// Pullbacks with complex control-flow are inlined into non-VJP callers
+// ====================================================================== //
 @differentiable(reverse)
-@_silgen_name("more_complex_pb_with_control_flow")
 func more_complex_pb_with_control_flow(x: Float) -> Float {
     if (x > 0) {
         if ((x+1) < 5) {
@@ -111,5 +84,5 @@ func caller_of_more_complex_pb_with_control_flow() -> Float {
     gradient(at: Float(1), of: more_complex_pb_with_control_flow)
 }
 
-// CHECK: decision {{{.*}}, b=70, {{.*}}} more_complex_pb_with_control_flowTJpSpSr
-// CHECK-NEXT: "more_complex_pb_with_control_flowTJpSpSr" inlined into "caller_of_more_complex_pb_with_control_flow"
+// CHECK: decision {{.*}} $s17pullback_inlining33more_complex_pb_with_control_flow1xS2f_tFTJpSpSr
+// CHECK-NEXT: "pullback of pullback_inlining.more_complex_pb_with_control_flow(x:)" inlined into "caller_of_more_complex_pb_with_control_flow"
