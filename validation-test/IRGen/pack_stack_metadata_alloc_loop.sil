@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -parse-sil -enable-pack-metadata-stack-promotion=true -emit-ir -primary-file %s | %IRGenFileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: CPU=arm64
 
 // Allocate metadata packs on the stack in a loop.  If these packs weren't
 // deallocated, the stack would be exhausted.
