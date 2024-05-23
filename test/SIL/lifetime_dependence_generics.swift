@@ -15,6 +15,7 @@ extension P {
 }
 
 public struct View: ~Escapable {
+  // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init() { }
 }

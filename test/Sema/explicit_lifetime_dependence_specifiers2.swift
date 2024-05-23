@@ -4,8 +4,7 @@
 
 struct AnotherBufferView : ~Escapable, BitwiseCopyable {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer) {
+  init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self  {
     self.ptr = ptr
   }
 }

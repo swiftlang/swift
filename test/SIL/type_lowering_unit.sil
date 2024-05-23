@@ -248,6 +248,7 @@ extension GSNCInt: Copyable where T: Copyable  {}
 
 struct GSNEInt<T: ~Escapable>: ~Escapable {
     var x: Int
+    // TODO: dependsOn(immortal)
     @_unsafeNonescapableResult
     init() { x = 0 }
 }
