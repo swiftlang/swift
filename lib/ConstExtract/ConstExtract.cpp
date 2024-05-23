@@ -376,6 +376,33 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
     } break;
 
+    case ExprKind::KeyPath: {
+        auto keyPathExpr = cast<KeyPathExpr>(expr);
+
+        auto rootType = keyPathExpr->getRootType();
+        std::vector<KeyPathValue::Component> components;
+
+        for (auto component: keyPathExpr->getComponents()) {
+            if (component.isResolved()) {
+                auto declRef = component.getDeclRef();
+                auto identifier = declRef.getDecl()->getBaseIdentifier().str();
+                auto type = component.getComponentType()->getRValueType();
+                components.push_back({identifier.str(), type});
+            }
+        }
+
+        std::string path = "";
+        auto numberOfComponents = static_cast<int>(components.size());
+        for (int i = 0; i < numberOfComponents; i++) {
+            if (i != 0) {
+                path += ".";
+            }
+            path += components[i].Label;
+        }
+
+        return std::make_shared<KeyPathValue>(path, rootType, components);
+    }
+
     case ExprKind::InjectIntoOptional: {
       auto injectIntoOptionalExpr = cast<InjectIntoOptionalExpr>(expr);
       return extractCompileTimeValue(injectIntoOptionalExpr->getSubExpr());
@@ -696,6 +723,25 @@ void writeValue(llvm::json::OStream &JSON,
                      toMangledTypeNameString(type));
     });
     break;
+  }
+
+  case CompileTimeValue::KeyPath: {
+      auto keyPathValue = cast<KeyPathValue>(value);
+      JSON.attribute("valueKind", "KeyPath");
+      JSON.attributeObject("value", [&]() {
+        JSON.attribute("path", keyPathValue->getPath());
+        JSON.attribute("rootType", toFullyQualifiedTypeNameString(keyPathValue->getRootType()));
+        JSON.attributeArray("components", [&] {
+          auto components = keyPathValue->getComponents();
+          for (auto c : components) {
+            JSON.object([&] {
+              JSON.attribute("label", c.Label);
+              JSON.attribute("type", toFullyQualifiedTypeNameString(c.Type));
+            });
+          }
+        });
+      });
+      break;
   }
 
   case CompileTimeValue::ValueKind::Runtime: {
