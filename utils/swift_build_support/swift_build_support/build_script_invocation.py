@@ -626,6 +626,9 @@ class BuildScriptInvocation(object):
         builder.add_product(products.LLVM,
                             is_enabled=True)
 
+        builder.add_product(products.StaticSwiftLinuxConfig,
+                            is_enabled=self.args.install_static_linux_config)
+
         builder.add_product(products.LibXML2,
                             is_enabled=self.args.build_libxml2)
 

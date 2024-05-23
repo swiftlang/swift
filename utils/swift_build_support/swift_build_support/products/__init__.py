@@ -28,6 +28,7 @@ from .ninja import Ninja
 from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
+from .staticswiftlinux import StaticSwiftLinuxConfig
 from .swift import Swift
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
@@ -58,6 +59,7 @@ __all__ = [
     'MinimalStdlib',
     'Ninja',
     'PlaygroundSupport',
+    'StaticSwiftLinuxConfig',
     'Swift',
     'SwiftFormat',
     'SwiftInspect',
