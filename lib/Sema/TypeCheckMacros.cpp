@@ -1369,6 +1369,22 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getInnermostDeclContext();
   }
 
+  // FIXME: compatibility hack for the transition from property wrapper
+  // to macro for TaskLocal.
+  //
+  // VarDecls with `@_projectedValueProperty` have already had the property
+  // wrapper transform applied. This only impacts swiftinterfaces, and if
+  // a swiftinterface was produced against a Concurrency library that does
+  // not declare TaskLocal as a macro, we need to ignore the macro to avoid
+  // producing duplicate declarations. This is only needed temporarily until
+  // all swiftinterfaces have been built against the Concurrency library
+  // containing the new macro declaration.
+  if (auto *var = dyn_cast<VarDecl>(attachedTo)) {
+    if (var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()) {
+      return nullptr;
+    }
+  }
+
   ASTContext &ctx = dc->getASTContext();
 
   auto moduleDecl = dc->getParentModule();
