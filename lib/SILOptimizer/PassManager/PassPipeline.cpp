@@ -1008,9 +1008,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   if (Options.StopOptimizationAfterSerialization)
     return P;
 
+  P.addAutodiffClosureSpecialization();
+
   // After serialization run the function pass pipeline to iteratively lower
   // high-level constructs like @_semantics calls.
   addMidLevelFunctionPipeline(P);
+
+  P.addAutodiffClosureSpecialization();
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
