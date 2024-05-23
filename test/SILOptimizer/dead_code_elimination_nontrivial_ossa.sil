@@ -1203,3 +1203,20 @@ sil [ossa] @dont_dce_lexical_phi : $() -> () {
    return %retval : $()
 }
 
+class KlassWithDeinit {
+  init()
+  deinit
+}
+
+// DCE should not delete dead allocations, leave it to DOE
+// CHECK-LABEL: sil [ossa] @dont_delete_allocation :
+// CHECK: alloc_ref
+// CHECK-LABEL: } // end sil function 'dont_delete_allocation'
+sil [ossa] @dont_delete_allocation : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_ref $KlassWithDeinit
+  destroy_value %a : $KlassWithDeinit
+  %t = tuple ()
+  return %t : $()
+}
+
