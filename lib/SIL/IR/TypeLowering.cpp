@@ -4441,6 +4441,12 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           if (auto *var = actorIsolation.getActorInstance()) {
             assert(isa<ParamDecl>(var));
             recordCapture(CapturedValue(var, 0, afd->getLoc()));
+	    if (var->getInterfaceType()->hasTypeParameter()) {
+	      // If the isolated parameter is of a generic (actor)
+	      // type, we need to treat as if the local function is
+	      // generic.
+	      capturesGenericParams = true;
+	    }
           }
         }
       }
