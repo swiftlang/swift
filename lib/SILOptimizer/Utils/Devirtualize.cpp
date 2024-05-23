@@ -91,7 +91,8 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
 
   auto *cmi = cast<MethodInst>(applySite.getCallee());
 
-  if (!calleesAreStaticallyKnowable(applySite.getModule(), cmi->getMember()))
+  if (!calleesAreStaticallyKnowable(applySite.getModule(), cmi->getMember()) &&
+      (!cd || cd->getFormalAccess() != AccessLevel::Package))
     return false;
 
   auto *method = cmi->getMember().getAbstractFunctionDecl();

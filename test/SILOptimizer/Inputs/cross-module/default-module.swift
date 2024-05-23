@@ -35,6 +35,14 @@ public final class ModuleKlass {
   }
 }
 
+package class PackageClass {
+  package func test() -> Int { 42 }
+}
+
+package class PackageClassDerived: PackageClass {
+  override package func test() -> Int { 0 }
+}
+
 public func moduleKlassMember() -> Int {
   let k = ModuleKlass()
   return k.i

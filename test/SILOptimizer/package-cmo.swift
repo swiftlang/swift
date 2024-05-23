@@ -193,6 +193,22 @@ package func getPkgModuleKlassMemberTBD() -> Int {
   return ModuleTBD.pkgModuleKlassMember()
 }
 
+// CHECK-LABEL: sil package @$s4Main23callsPackageClassMethod1cSi6Module0cD0C_tF : $@convention(thin) (@guaranteed PackageClass) -> Int
+// CHECK-NOT:     class_method
+// CHECK-NOT:     apply
+// CHECK:         return
+public func callsPackageClassMethod(c: PackageClass) -> Int {
+  return c.test()
+}
+
+// CHECK-LABEL: sil package @$s4Main23callsPackageClassMethod1cSi6Module0cD7DerivedC_tF : $@convention(thin) (@guaranteed PackageClassDerived) -> Int
+// CHECK-NOT:     class_method
+// CHECK-NOT:     apply
+// CHECK:         return
+public func callsPackageClassMethod(c: PackageClassDerived) -> Int {
+  return c.test()
+}
+
 
 // CHECK-LABEL: sil [_semantics "optimize.no.crossmodule"] @$s9Submodule19incrementByOneNoCMOyS2iF : $@convention(thin) (Int) -> Int
 
