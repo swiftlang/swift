@@ -23,7 +23,7 @@ struct NonTrivial {
 }
 
 // SILGen diagnostics prohibits these implicit casts:
-func test_errors<T>(arg: T, sarg: String) {
+func test_errors<T>(arg: T, sarg: String, anyBCArg: BitwiseCopyable) {
     var nonTrivial = NonTrivial(c: C())
     readBytes(&nonTrivial)   // expected-warning {{forming 'UnsafeRawPointer' to a variable of type 'NonTrivial'; this is likely incorrect because 'NonTrivial' may contain an object reference.}}
     writeBytes(&nonTrivial)  // expected-warning {{forming 'UnsafeMutableRawPointer' to a variable of type 'NonTrivial'; this is likely incorrect because 'NonTrivial' may contain an object reference.}}
@@ -49,6 +49,28 @@ func test_errors<T>(arg: T, sarg: String) {
     write_char(&array)  // expected-warning {{forming 'UnsafeMutablePointer<Int8>' to a variable of type 'Array<T>'; this is likely incorrect because 'T' may contain an object reference.}}
     read_uchar(&array)  // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type 'Array<T>'; this is likely incorrect because 'T' may contain an object reference.}}
     write_uchar(&array) // expected-warning {{forming 'UnsafeMutablePointer<UInt8>' to a variable of type 'Array<T>'; this is likely incorrect because 'T' may contain an object reference.}}
+
+    var anyBC: BitwiseCopyable = anyBCArg
+    readBytes(&anyBC)   // expected-warning {{forming 'UnsafeRawPointer' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    writeBytes(&anyBC)  // expected-warning {{forming 'UnsafeMutableRawPointer' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_char(&anyBC)   // expected-warning {{forming 'UnsafePointer<Int8>' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    write_char(&anyBC)  // expected-warning {{forming 'UnsafeMutablePointer<Int8>' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_uchar(&anyBC)  // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    write_uchar(&anyBC) // expected-warning {{forming 'UnsafeMutablePointer<UInt8>' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+
+    let constBCArray: [BitwiseCopyable] = [anyBCArg]
+    readBytes(constBCArray) // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_char(constBCArray) // expected-warning {{forming 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_uchar(constBCArray) // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+
+    var bcArray: [BitwiseCopyable] = [anyBCArg]
+    readBytes(&bcArray)     // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    writeBytes(&bcArray)  // expected-warning {{forming 'UnsafeMutableRawPointer' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+
+    read_char(&bcArray)   // expected-warning {{forming 'UnsafePointer<Int8>' to a variable of type 'Array<any BitwiseCopyable>'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    write_char(&bcArray)  // expected-warning {{forming 'UnsafeMutablePointer<Int8>' to a variable of type 'Array<any BitwiseCopyable>'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_uchar(&bcArray)  // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type 'Array<any BitwiseCopyable>'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    write_uchar(&bcArray) // expected-warning {{forming 'UnsafeMutablePointer<UInt8>' to a variable of type 'Array<any BitwiseCopyable>'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
 
     var string: String = sarg
     readBytes(&string)   // expected-warning {{forming 'UnsafeRawPointer' to an inout variable of type String exposes the internal representation rather than the string contents.}}
@@ -105,7 +127,8 @@ func test_explicit<T>(arg: T, sarg: String) {
 }
 
 // SILGen diagnostics accepts these implicit casts:
-func test_accepted<I: FixedWidthInteger>(intArg: I, sarg: String, simdArg: SIMD4<Float>) {
+func test_accepted<I: FixedWidthInteger, BC: BitwiseCopyable>(intArg: I, bcArg: BC,
+                                                              sarg: String, simdArg: SIMD4<Float>) {
     var aggregate = Aggregate(pointer: UnsafeRawPointer(bitPattern: 0), value: 0)
     readBytes(&aggregate)
     writeBytes(&aggregate)
@@ -134,6 +157,27 @@ func test_accepted<I: FixedWidthInteger>(intArg: I, sarg: String, simdArg: SIMD4
     write_char(&intArray)
     read_uchar(&intArray)
     write_uchar(&intArray)
+
+    var bc: BC = bcArg
+    readBytes(&bc)
+    writeBytes(&bc)
+    read_char(&bc)
+    write_char(&bc)
+    read_uchar(&bc)
+    write_uchar(&bc)
+
+    let constBCArray: [BC] = [bcArg]
+    readBytes(constBCArray)
+    read_char(constBCArray)
+    read_uchar(constBCArray)
+
+    var bcArray: [BC] = [bcArg]
+    readBytes(&bcArray)
+    writeBytes(&bcArray)
+    read_char(&bcArray)
+    write_char(&bcArray)
+    read_uchar(&bcArray)
+    write_uchar(&bcArray)
 
     let constByteArray: [UInt8] = [0]
     readBytes(constByteArray)
