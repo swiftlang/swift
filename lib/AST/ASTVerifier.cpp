@@ -198,19 +198,23 @@ class Verifier : public ASTWalker {
   using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
   SmallVector<ScopeLike, 4> Scopes;
 
-  /// The stack of generic contexts.
-  using GenericLike = llvm::PointerUnion<DeclContext *, GenericEnvironment *>;
-  SmallVector<GenericLike, 2> Generics;
+  /// The stack of declaration contexts we're visiting. The primary
+  /// archetypes from the innermost generic environment are in scope.
+  SmallVector<DeclContext *, 2> Generics;
+
+  /// The set of all opened existential and opened pack element generic
+  /// environments that are currently in scope.
+  llvm::DenseSet<GenericEnvironment *> LocalGenerics;
+
+  /// We track the pack expansion expressions in ForEachStmts, because
+  /// their local generics remain in scope until the end of the statement.
+  llvm::DenseSet<PackExpansionExpr *> ForEachPatternSequences;
 
   /// The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
 
   /// The set of opaque value expressions active at this point.
   llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
-
-  /// The set of opened existential archetypes that are currently
-  /// active.
-  llvm::DenseSet<OpenedArchetypeType *> OpenedExistentialArchetypes;
 
   /// The set of inout to pointer expr that match the following pattern:
   ///
@@ -632,11 +636,10 @@ public:
 
       bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
-          auto root = archetype->getRoot();
           
           // Opaque archetypes are globally available. We don't need to check
           // them here.
-          if (isa<OpaqueTypeArchetypeType>(root))
+          if (isa<OpaqueTypeArchetypeType>(archetype))
             return false;
           
           // Only visit each archetype once.
@@ -645,11 +648,10 @@ public:
           
           // We should know about archetypes corresponding to opened
           // existential archetypes.
-          if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
-            if (OpenedExistentialArchetypes.count(opened) == 0) {
-              Out << "Found opened existential archetype "
-                  << root->getString()
-                  << " outside enclosing OpenExistentialExpr\n";
+          if (isa<LocalArchetypeType>(archetype)) {
+            if (LocalGenerics.count(archetype->getGenericEnvironment()) == 0) {
+              Out << "Found local archetype " << archetype
+                  << " outside its defining scope\n";
               return true;
             }
 
@@ -659,34 +661,19 @@ public:
           // Otherwise, the archetype needs to be from this scope.
           if (Generics.empty() || !Generics.back()) {
             Out << "AST verification error: archetype outside of generic "
-                   "context: " << root->getString() << "\n";
+                   "context: " << archetype << "\n";
             return true;
           }
 
           // Get the archetype's generic signature.
-          GenericEnvironment *archetypeEnv = root->getGenericEnvironment();
+          GenericEnvironment *archetypeEnv = archetype->getGenericEnvironment();
           auto archetypeSig = archetypeEnv->getGenericSignature();
 
           auto genericCtx = Generics.back();
-          GenericSignature genericSig;
-          if (auto *genericDC = genericCtx.dyn_cast<DeclContext *>()) {
-            genericSig = genericDC->getGenericSignatureOfContext();
-          } else {
-            auto *genericEnv = genericCtx.get<GenericEnvironment *>();
-            genericSig = genericEnv->getGenericSignature();
-
-            // Check whether this archetype is a substitution from the
-            // outer generic context of an opened element environment.
-            if (genericEnv->getKind() == GenericEnvironment::Kind::OpenedElement) {
-              auto contextSubs = genericEnv->getPackElementContextSubstitutions();
-              QuerySubstitutionMap isInContext{contextSubs};
-              if (isInContext(root->getInterfaceType()->castTo<GenericTypeParamType>()))
-                return false;
-            }
-          }
+          GenericSignature genericSig = genericCtx->getGenericSignatureOfContext();
 
           if (genericSig.getPointer() != archetypeSig.getPointer()) {
-            Out << "Archetype " << root->getString() << " not allowed "
+            Out << "Archetype " << archetype->getString() << " not allowed "
                 << "in this context\n";
             Out << "Archetype generic signature: "
                 << archetypeSig->getAsString() << "\n";
@@ -735,7 +722,7 @@ public:
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-      assert(Generics.back().get<DeclContext*>() == scope);
+      assert(Generics.back() == scope);
       Scopes.pop_back();
       Generics.pop_back();
     }
@@ -808,6 +795,9 @@ public:
         if (!shouldVerify(expansion)) {
           return false;
         }
+
+        assert(ForEachPatternSequences.count(expansion) == 0);
+        ForEachPatternSequences.insert(expansion);
       }
 
       if (!S->getElementExpr())
@@ -821,6 +811,10 @@ public:
     void cleanup(ForEachStmt *S) {
       if (auto *expansion =
               dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        assert(ForEachPatternSequences.count(expansion) != 0);
+        ForEachPatternSequences.erase(expansion);
+
+        // Clean up for real.
         cleanup(expansion);
       }
 
@@ -851,6 +845,16 @@ public:
       OpaqueValues.erase(expr->getInterpolationExpr());
     }
 
+    void pushLocalGenerics(GenericEnvironment *env) {
+      assert(LocalGenerics.count(env)==0);
+      LocalGenerics.insert(env);
+    }
+
+    void popLocalGenerics(GenericEnvironment *env) {
+      assert(LocalGenerics.count(env)==1);
+      LocalGenerics.erase(env);
+    }
+
     bool shouldVerify(OpenExistentialExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
@@ -862,8 +866,8 @@ public:
 
       assert(!OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues[expr->getOpaqueValue()] = 0;
-      assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
-      OpenedExistentialArchetypes.insert(expr->getOpenedArchetype());
+
+      pushLocalGenerics(expr->getOpenedArchetype()->getGenericEnvironment());
       return true;
     }
 
@@ -875,22 +879,28 @@ public:
 
       assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
-      assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
-      OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
+
+      popLocalGenerics(expr->getOpenedArchetype()->getGenericEnvironment());
     }
 
     bool shouldVerify(PackExpansionExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
-      Generics.push_back(expr->getGenericEnvironment());
+      // Don't push local generics again when we visit the expr inside
+      // the ForEachStmt.
+      if (auto *genericEnv = expr->getGenericEnvironment())
+        if (ForEachPatternSequences.count(expr) == 0)
+          pushLocalGenerics(genericEnv);
       return true;
     }
 
-    void cleanup(PackExpansionExpr *E) {
-      assert(Generics.back().get<GenericEnvironment *>() ==
-             E->getGenericEnvironment());
-      Generics.pop_back();
+    void cleanup(PackExpansionExpr *expr) {
+      // If this is a pack iteration pattern, don't pop local generics
+      // until we exit the ForEachStmt.
+      if (auto *genericEnv = expr->getGenericEnvironment())
+        if (ForEachPatternSequences.count(expr) == 0)
+          popLocalGenerics(genericEnv);
     }
 
     bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {

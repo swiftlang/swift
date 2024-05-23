@@ -22,7 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -3634,20 +3634,37 @@ const TypeLowering *TypeConverter::getTypeLoweringForExpansion(
   return nullptr;
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(DeclContext *dc,
-                             CaptureInfo captureInfo) {
-  if (dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures())
-    return nullptr;
+static GenericSignatureWithCapturedEnvironments
+getGenericSignatureWithCapturedEnvironments(DeclContext *dc,
+                                            CaptureInfo captureInfo) {
+  auto capturedEnvs = captureInfo.getGenericEnvironments();
 
-  return dc->getGenericSignatureOfContext();
+  // A closure or local function does not need a generic signature if it
+  // doesn't capture the primary generic environment or any pack element
+  // environments from the outer scope.
+  if (dc->getParent()->isLocalContext() &&
+      capturedEnvs.empty() &&
+      !captureInfo.hasGenericParamCaptures())
+    return GenericSignatureWithCapturedEnvironments();
+
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (capturedEnvs.empty())
+    return GenericSignatureWithCapturedEnvironments(genericSig);
+
+  // Build a new generic signature where all captured element archetypes
+  // are represented by new generic parameters.
+  auto newSig = buildGenericSignatureWithCapturedEnvironments(
+      dc->getASTContext(), genericSig, capturedEnvs);
+
+  LLVM_DEBUG(llvm::dbgs() << "-- effective generic signature: " << newSig << "\n");
+  return GenericSignatureWithCapturedEnvironments(genericSig, newSig, capturedEnvs);
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(AnyFunctionRef fn,
-                             CaptureInfo captureInfo) {
-  return getEffectiveGenericSignature(fn.getAsDeclContext(), captureInfo);
+static GenericSignatureWithCapturedEnvironments
+getGenericSignatureWithCapturedEnvironments(AnyFunctionRef fn,
+                                            CaptureInfo captureInfo) {
+  return getGenericSignatureWithCapturedEnvironments(
+      fn.getAsDeclContext(), captureInfo);
 }
 
 static CanGenericSignature
@@ -3704,7 +3721,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
-  auto sig = TC.getConstantGenericSignature(c);
+  auto sig = TC.getGenericSignatureWithCapturedEnvironments(c).genericSig;
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
@@ -3757,7 +3774,8 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
     inputType = interfaceType->getCanonicalType();
   }
 
-  GenericSignature sig = TC.getConstantGenericSignature(c);
+  GenericSignature sig = TC.getGenericSignatureWithCapturedEnvironments(c)
+      .genericSig;
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
@@ -3839,7 +3857,16 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
-  auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
+  auto sig = getGenericSignatureWithCapturedEnvironments(closure, captureInfo);
+
+  if (funcType->hasArchetype()) {
+    assert(isa<FunctionType>(funcType));
+    auto substType = Type(funcType).subst(
+        MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
+        MakeAbstractConformanceForGenericType(),
+        SubstFlags::PreservePackExpansionLevel);
+    funcType = cast<FunctionType>(substType->getCanonicalType());
+  }
 
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
@@ -3853,7 +3880,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
           .build();
 
   return CanAnyFunctionType::get(
-      getCanonicalSignatureOrNull(genericSig),
+      getCanonicalSignatureOrNull(sig.genericSig),
       funcType.getParams(), funcType.getResult(),
       innerExtInfo);
 }
@@ -3939,12 +3966,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      // FIXME: Closures could have an interface type computed by Sema.
-      funcTy = cast<AnyFunctionType>(
-        ACE->getType()->mapTypeOutOfContext()->getCanonicalType());
+      funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
     } else {
-      funcTy = cast<AnyFunctionType>(
-        vd->getInterfaceType()->getCanonicalType());
+      funcTy = cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
     }
     return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
   }
@@ -4007,10 +4031,10 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-GenericSignature 
-TypeConverter::getConstantGenericSignature(SILDeclRef c) {
+GenericSignatureWithCapturedEnvironments
+TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
-  
+
   /// Get the function generic params, including outer params.
   switch (c.kind) {
   case SILDeclRef::Kind::Func:
@@ -4019,16 +4043,17 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator: {
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
+    return ::getGenericSignatureWithCapturedEnvironments(
       *c.getAnyFunctionRef(), captureInfo);
   }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    return cast<ClassDecl>(vd)->getGenericSignature();
+    return GenericSignatureWithCapturedEnvironments(
+        cast<ClassDecl>(vd)->getGenericSignature());
   case SILDeclRef::Kind::DefaultArgGenerator: {
     // Use the generic environment of the original function.
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
+    return ::getGenericSignatureWithCapturedEnvironments(
       vd->getInnermostDeclContext(), captureInfo);
   }
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
@@ -4045,25 +4070,63 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
       } else {
         enclosingDecl = SILDeclRef(cast<AbstractFunctionDecl>(dc));
       }
-      return getConstantGenericSignature(enclosingDecl);
+      return getGenericSignatureWithCapturedEnvironments(enclosingDecl);
     }
-    return dc->getGenericSignatureOfContext();
+    return GenericSignatureWithCapturedEnvironments(
+        dc->getGenericSignatureOfContext());
   }
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return vd->getDeclContext()->getGenericSignatureOfContext();
+    return GenericSignatureWithCapturedEnvironments(
+        vd->getDeclContext()->getGenericSignatureOfContext());
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-    llvm_unreachable("Doesn't have generic signature");
+    return GenericSignatureWithCapturedEnvironments();
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
+SubstitutionMap
+TypeConverter::getSubstitutionMapWithCapturedEnvironments(
+    SILDeclRef constant, const CaptureInfo &captureInfo,
+    SubstitutionMap subs) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+  if (!sig.genericSig) {
+    assert(!sig.baseGenericSig);
+    assert(sig.capturedEnvs.empty());
+    return SubstitutionMap();
+  }
+
+  return buildSubstitutionMapWithCapturedEnvironments(
+      subs, sig.genericSig, sig.capturedEnvs);
+}
+
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  return getConstantGenericSignature(c).getGenericEnvironment();
+  return getGenericSignatureWithCapturedEnvironments(c)
+      .genericSig.getGenericEnvironment();
+}
+
+std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
+TypeConverter::getForwardingSubstitutionsForLowering(SILDeclRef constant) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+
+  auto *genericEnv = sig.baseGenericSig.getGenericEnvironment();
+  SubstitutionMap forwardingSubs;
+
+  if (sig.baseGenericSig)
+    forwardingSubs = genericEnv->getForwardingSubstitutionMap();
+
+  if (!sig.capturedEnvs.empty()) {
+    assert(sig.genericSig && !sig.genericSig->isEqual(sig.baseGenericSig));
+
+    forwardingSubs = buildSubstitutionMapWithCapturedEnvironments(
+        forwardingSubs, sig.genericSig, sig.capturedEnvs);
+  }
+
+  return std::make_tuple(genericEnv, sig.capturedEnvs, forwardingSubs);
 }
 
 SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
@@ -4162,6 +4225,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // that IRGen can pass dynamic 'Self' metadata.
   std::optional<CapturedValue> selfCapture;
 
+  // Captured pack element environments.
+  llvm::SetVector<GenericEnvironment *> genericEnv;
+
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
@@ -4179,6 +4245,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       capturesDynamicSelf = captureInfo.getDynamicSelfType();
     if (captureInfo.hasOpaqueValueCapture())
       capturesOpaqueValue = captureInfo.getOpaqueValue();
+
+    // Any set of mutually-recursive local functions will capture the same
+    // element environments, because we can't "cross" a pack expansion
+    // expression.
+    for (auto *env : captureInfo.getGenericEnvironments()) {
+      genericEnv.insert(env);
+    }
 
     SmallVector<CapturedValue, 4> localCaptures;
     captureInfo.getLocalCaptures(localCaptures);
@@ -4397,8 +4470,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the uniqued set of transitive captures.
-  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
-                   capturesOpaqueValue, capturesGenericParams};
+  CaptureInfo info(Context, resultingCaptures,
+                   capturesDynamicSelf, capturesOpaqueValue,
+                   capturesGenericParams, genericEnv.getArrayRef());
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;

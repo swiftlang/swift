@@ -3454,7 +3454,7 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                                      ArrayRef<ProtocolDecl *> ConformsTo,
                                      Type Superclass, LayoutConstraint Layout)
   : ArchetypeType(TypeKind::PrimaryArchetype, Ctx,
-                  RecursiveTypeProperties::HasArchetype,
+                  RecursiveTypeProperties::HasPrimaryArchetype,
                   InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
 {
   assert(!InterfaceType->isParameterPack());
@@ -3518,8 +3518,7 @@ OpenedArchetypeType::OpenedArchetypeType(
     LayoutConstraint layout)
   : LocalArchetypeType(TypeKind::OpenedArchetype,
                        interfaceType->getASTContext(),
-                       RecursiveTypeProperties::HasArchetype
-                         | RecursiveTypeProperties::HasOpenedExistential,
+                       RecursiveTypeProperties::HasOpenedExistential,
                        interfaceType, conformsTo, superclass, layout,
                        environment)
 {
@@ -3535,8 +3534,8 @@ PackArchetypeType::PackArchetypeType(
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout, PackShape Shape)
     : ArchetypeType(TypeKind::PackArchetype, Ctx,
-                    RecursiveTypeProperties::HasArchetype |
-                        RecursiveTypeProperties::HasPackArchetype,
+                    RecursiveTypeProperties::HasPrimaryArchetype |
+                    RecursiveTypeProperties::HasPackArchetype,
                     InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;
@@ -3586,7 +3585,6 @@ ElementArchetypeType::ElementArchetypeType(
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout)
     : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
-                         RecursiveTypeProperties::HasArchetype |
                          RecursiveTypeProperties::HasElementArchetype,
                          InterfaceType,
                          ConformsTo, Superclass, Layout, GenericEnv) {

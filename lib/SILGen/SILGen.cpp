@@ -1223,8 +1223,11 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
                                    SILLocation Loc) {
   assert(F->empty() && "already emitted function?!");
 
-  if (F->getLoweredFunctionType()->isPolymorphic())
-    F->setGenericEnvironment(Types.getConstantGenericEnvironment(constant));
+  if (F->getLoweredFunctionType()->isPolymorphic()) {
+    auto [genericEnv, capturedEnvs, forwardingSubs]
+        = Types.getForwardingSubstitutionsForLowering(constant);
+    F->setGenericEnvironment(genericEnv, capturedEnvs, forwardingSubs);
+  }
 
   // If we have global actor isolation for our constant, put the isolation onto
   // the function.
@@ -1256,6 +1259,9 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
 void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
   emitLazyConformancesForFunction(F);
+
+  auto sig = Types.getGenericSignatureWithCapturedEnvironments(constant);
+  recontextualizeCapturedLocalArchetypes(F, sig);
 
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";

@@ -9411,35 +9411,6 @@ static std::optional<PackIterationInfo> applySolutionToForEachStmt(
         std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
         rewriteTarget) {
 
-  // A special walker to record opened element environment for var decls in a
-  // for-each loop.
-  class Walker : public ASTWalker {
-    GenericEnvironment *Environment;
-
-  public:
-    Walker(GenericEnvironment *Environment) { this->Environment = Environment; }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (isa<ForEachStmt>(S)) {
-        return Action::SkipNode(S);
-      }
-      return Action::Continue(S);
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *decl = dyn_cast<VarDecl>(D)) {
-        decl->setOpenedElementEnvironment(Environment);
-      }
-      if (isa<AbstractFunctionDecl>(D)) {
-        return Action::SkipNode();
-      }
-      if (isa<NominalTypeDecl>(D)) {
-        return Action::SkipNode();
-      }
-      return Action::Continue();
-    }
-  };
-
   auto &cs = solution.getConstraintSystem();
   auto *sequenceExpr = stmt->getParsedSequence();
   PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
@@ -9452,11 +9423,6 @@ static std::optional<PackIterationInfo> applySolutionToForEachStmt(
 
   // Simplify the pattern type of the pack expansion.
   info.patternType = solution.simplifyType(info.patternType);
-
-  // Record the opened element environment for the VarDecls inside the loop
-  Walker forEachWalker(expansion->getGenericEnvironment());
-  stmt->getPattern()->walk(forEachWalker);
-  stmt->getBody()->walk(forEachWalker);
 
   return info;
 }
