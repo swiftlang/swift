@@ -718,7 +718,7 @@ bool BridgedFunction::isSerialized() const {
 }
 
 bool BridgedFunction::hasValidLinkageForFragileRef() const {
-  return getFunction()->hasValidLinkageForFragileRef();
+  return getFunction()->hasValidLinkageForFragileRef(swift::SerializedKind_t::IsSerialized);
 }
 
 bool BridgedFunction::needsStackProtection() const {

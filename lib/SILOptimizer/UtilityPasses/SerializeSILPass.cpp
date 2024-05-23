@@ -426,7 +426,7 @@ class SerializeSILPass : public SILModuleTransform {
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
     for (auto &F : M) {
-      bool wasSerialized = !F.isNotSerialized();
+      bool wasSerialized = F.isAnySerialized();
       F.setSerializedKind(IsNotSerialized);
 
       // We are removing [serialized] from the function. This will change how

@@ -87,7 +87,7 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
     return;
   }
 
-  assert(F->isNotSerialized() == Mod.isSerialized() &&
+  assert(!F->isAnySerialized() == Mod.isSerialized() &&
          "the de-serializer did set the wrong serialized flag");
   
   F->setBare(IsBare);
@@ -186,8 +186,8 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   for (auto &entry : Vtbl->getEntries()) {
     SILFunction *impl = entry.getImplementation();
-    if (!Vtbl->isSerialized() ||
-        impl->hasValidLinkageForFragileRef()) {
+    if (!Vtbl->isAnySerialized() ||
+        impl->hasValidLinkageForFragileRef(Vtbl->getSerializedKind())) {
       // Deserialize and recursively walk any vtable entries that do not have
       // bodies yet.
       maybeAddFunctionToWorklist(impl, 

@@ -559,7 +559,7 @@ TermInst *swift::addArgumentsToBranch(ArrayRef<SILValue> vals,
 }
 
 SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
-  if (hasPrivateVisibility(linkage) && f->isNotSerialized()) {
+  if (hasPrivateVisibility(linkage) && !f->isAnySerialized()) {
     // Specializations of private symbols should remain so, unless
     // they were serialized, which can only happen when specializing
     // definitions from a standard library built with -sil-serialize-all.

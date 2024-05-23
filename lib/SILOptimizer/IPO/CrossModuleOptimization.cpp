@@ -199,15 +199,19 @@ static bool isPackageOrPublic(AccessLevel accessLevel, SILOptions options) {
 /// is the correct behavior.
 static bool isSerializedWithRightKind(const SILModule &mod,
                                     SILFunction *f) {
+  // If Package CMO is enabled in resilient mode, return
+  // true if the function is [serialized] due to @inlinable
+  // (or similar) or [serialized_for_pkg] due to this 
+  // optimization.
   return mod.getSwiftModule()->serializePackageEnabled() &&
          mod.getSwiftModule()->isResilient() ?
-         f->isSerializedForPackage() : f->isSerialized();
+         f->isAnySerialized() : f->isSerialized();
 }
 static bool isSerializedWithRightKind(const SILModule &mod,
                                       SILGlobalVariable *g) {
   return mod.getSwiftModule()->serializePackageEnabled() &&
          mod.getSwiftModule()->isResilient() ?
-         g->isSerializedForPackage() : g->isSerialized();
+         g->isAnySerialized() : g->isSerialized();
 }
 static SerializedKind_t getRightSerializedKind(const SILModule &mod) {
   return mod.getSwiftModule()->serializePackageEnabled() &&
@@ -271,19 +275,19 @@ void CrossModuleOptimization::serializeTablesInModule() {
     return;
 
   for (const auto &vt : M.getVTables()) {
-    if (vt->isNotSerialized() &&
+    if (!vt->isAnySerialized() &&
         vt->getClass()->getEffectiveAccess() >= AccessLevel::Package) {
       vt->setSerializedKind(getRightSerializedKind(M));
     }
   }
 
   for (auto &wt : M.getWitnessTables()) {
-    if (wt.isNotSerialized() && 
+    if (!wt.isAnySerialized() &&
         hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true)) {
       for (auto &entry : wt.getEntries()) {
         // Witness thunks are not serialized, so serialize them here.
         if (entry.getKind() == SILWitnessTable::Method &&
-            entry.getMethodWitness().Witness->isNotSerialized() &&
+            !entry.getMethodWitness().Witness->isAnySerialized() &&
             isSerializeCandidate(entry.getMethodWitness().Witness,
                                  M.getOptions())) {
           entry.getMethodWitness().Witness->setSerializedKind(getRightSerializedKind(M));
@@ -322,8 +326,7 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  if (function->isSerialized() ||
-      isSerializedWithRightKind(M, function)) {
+  if (function->isAnySerialized()) {
     canSerializeFlags[function] = true;
     return true;
   }
@@ -615,13 +618,6 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                                 const FunctionFlags &canSerializeFlags) {
-  // This means the function is @inlinable (or similar)
-  // so should have [serialized] attribute.
-  if (function->isSerialized())
-    return;
-
-  // If not, check whether it was serialized with
-  // this optimization.
   if (isSerializedWithRightKind(M, function))
     return;
 

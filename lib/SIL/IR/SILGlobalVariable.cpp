@@ -78,11 +78,10 @@ bool SILGlobalVariable::shouldBePreservedForDebugger() const {
 bool SILGlobalVariable::isSerialized() const {
   return SerializedKind_t(Serialized) == IsSerialized;
 }
-bool SILGlobalVariable::isSerializedForPackage() const {
-  return SerializedKind_t(Serialized) == IsSerializedForPackage;
-}
-bool SILGlobalVariable::isNotSerialized() const {
-  return SerializedKind_t(Serialized) == IsNotSerialized;
+
+bool SILGlobalVariable::isAnySerialized() const {
+  return SerializedKind_t(Serialized) == IsSerialized ||
+         SerializedKind_t(Serialized) == IsSerializedForPackage;
 }
 
 /// Get this global variable's fragile attribute.

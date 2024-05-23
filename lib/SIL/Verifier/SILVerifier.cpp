@@ -158,7 +158,7 @@ namespace {
 template <typename DeclType>
 bool checkResilience(DeclType *D, ModuleDecl *accessingModule,
                      ResilienceExpansion expansion,
-                     bool isSerializedForPackage) {
+                     SerializedKind_t serializedKind) {
   auto declModule = D->getModuleContext();
 
   // For DEBUGGING: this check looks up
@@ -174,7 +174,7 @@ bool checkResilience(DeclType *D, ModuleDecl *accessingModule,
   // from a client module should be allowed.
   if (accessingModule != declModule &&
       expansion == ResilienceExpansion::Maximal &&
-      isSerializedForPackage)
+      serializedKind == IsSerializedForPackage)
       return false;
 
   return D->isResilient(accessingModule, expansion);
@@ -184,7 +184,7 @@ template <typename DeclType>
 bool checkResilience(DeclType *D, const SILFunction &f) {
   return checkResilience(D, f.getModule().getSwiftModule(),
                          f.getResilienceExpansion(),
-                         f.isSerializedForPackage());
+                         f.getSerializedKind());
 }
 
 bool checkTypeABIAccessible(SILFunction const &F, SILType ty) {
@@ -218,7 +218,7 @@ namespace {
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
                             TypeExpansionContext typeExpansionContext,
-                            bool isSerializedForPackage,
+                            SerializedKind_t serializedKind,
                             llvm::function_ref<void(bool, StringRef)> require,
                             CanType &baseTy,
                             CanType leafTy,
@@ -327,7 +327,7 @@ void verifyKeyPathComponent(SILModule &M,
             "as the component");
     require(property->hasStorage(), "property must be stored");
     require(!checkResilience(property, M.getSwiftModule(),
-                             expansion, isSerializedForPackage),
+                             expansion, serializedKind),
             "cannot access storage of resilient property");
     auto propertyTy =
         loweredBaseTy.getFieldType(property, M, typeExpansionContext);
@@ -360,7 +360,8 @@ void verifyKeyPathComponent(SILModule &M,
     {
       auto getter = component.getComputedPropertyGetter();
       if (expansion == ResilienceExpansion::Minimal) {
-        require(getter->hasValidLinkageForFragileRef(),
+        require(serializedKind != IsNotSerialized &&
+                getter->hasValidLinkageForFragileRef(serializedKind),
                 "Key path in serialized function should not reference "
                 "less visible getters");
       }
@@ -406,7 +407,8 @@ void verifyKeyPathComponent(SILModule &M,
       
       auto setter = component.getComputedPropertySetter();
       if (expansion == ResilienceExpansion::Minimal) {
-        require(setter->hasValidLinkageForFragileRef(),
+        require(serializedKind != IsNotSerialized &&
+                setter->hasValidLinkageForFragileRef(serializedKind),
                 "Key path in serialized function should not reference "
                 "less visible setters");
       }
@@ -2449,11 +2451,9 @@ public:
 
     // A direct reference to a non-public or shared but not fragile function
     // from a fragile function is an error.
-    // pcmo TODO: change to !isNotSerialized and pass serializedKind to
-    // hasValidLinkageForFragileRef
-    if (F.isSerialized()) {
+    if (F.isAnySerialized()) {
       require((SingleFunction && RefF->isExternalDeclaration()) ||
-              RefF->hasValidLinkageForFragileRef(),
+              RefF->hasValidLinkageForFragileRef(F.getSerializedKind()),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -5736,7 +5736,7 @@ public:
       
         verifyKeyPathComponent(F.getModule(),
                                F.getTypeExpansionContext(),
-                               F.isSerializedForPackage(),
+                               F.getSerializedKind(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
           baseTy,
           leafTy,
@@ -7040,7 +7040,7 @@ public:
     SILModule &mod = F->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    require(F->isNotSerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
+    require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
             "cannot have a serialized function after the module has been serialized");
 
     switch (F->getLinkage()) {
@@ -7054,25 +7054,25 @@ public:
     case SILLinkage::PackageNonABI:
       require(F->isDefinition(),
               "alwaysEmitIntoClient function must have a body");
-      require(!F->isNotSerialized() || mod.isSerialized(),
+      require(F->isAnySerialized() || mod.isSerialized(),
               "alwaysEmitIntoClient function must be serialized");
       break;
     case SILLinkage::Hidden:
     case SILLinkage::Private:
       require(F->isDefinition() || F->hasForeignBody(),
               "internal/private function must have a body");
-      require(F->isNotSerialized() || embedded,
+      require(!F->isAnySerialized() || embedded,
               "internal/private function cannot be serialized or serializable");
       break;
     case SILLinkage::PublicExternal:
       require(F->isExternalDeclaration() ||
-              !F->isNotSerialized() ||
+              F->isAnySerialized() ||
               mod.isSerialized(),
             "public-external function definition must be serialized");
       break;
     case SILLinkage::PackageExternal:
       require(F->isExternalDeclaration() ||
-              !F->isNotSerialized() ||
+              F->isAnySerialized() ||
               mod.isSerialized(),
               "package-external function definition must be serialized");
       break;
@@ -7247,7 +7247,7 @@ void SILProperty::verify(const SILModule &M) const {
             ResilienceExpansion::Maximal);
     verifyKeyPathComponent(const_cast<SILModule&>(M),
                            typeExpansionContext,
-                           /* isSerializedForPackage */ false, // SILProperty doesn't get serialized
+                           getSerializedKind(),
                            require,
                            baseTy,
                            leafTy,
@@ -7409,8 +7409,8 @@ void SILWitnessTable::verify(const SILModule &M) const {
       if (F) {
         // If a SILWitnessTable is going to be serialized, it must only
         // reference public or serializable functions.
-        if (isSerialized()) {
-          assert(F->hasValidLinkageForFragileRef() &&
+        if (isAnySerialized()) {
+          assert(F->hasValidLinkageForFragileRef(getSerializedKind()) &&
                  "Fragile witness tables should not reference "
                  "less visible functions.");
         }
@@ -7436,7 +7436,7 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
 
 #if 0
     // FIXME: For now, all default witnesses are private.
-    assert(F->hasValidLinkageForFragileRef() &&
+    assert(F->hasValidLinkageForFragileRef(IsSerialized) &&
            "Default witness tables should not reference "
            "less visible functions.");
 #endif
