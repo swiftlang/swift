@@ -207,24 +207,16 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
                                           Type paramType,
                                           ValueOwnership ownership) {
     auto loc = specifier.getLoc();
-
-    // Diagnose when we have lifetime dependence on a type that is
-    // BitwiseCopyable & Escapable.
-    // ~Escapable types are non-trivial in SIL and we should not raise this
-    // error.
-    // TODO: Diagnose ~Escapable types are always non-trivial in SIL.
-    if (paramType->isEscapable()) {
-      if (isBitwiseCopyable(paramType, mod, ctx)) {
-        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
-        return true;
-      }
-    }
-
     auto parsedLifetimeKind = specifier.getParsedLifetimeDependenceKind();
     auto lifetimeKind =
         getLifetimeDependenceKindFromDecl(parsedLifetimeKind, paramType);
-    bool isCompatible = isLifetimeDependenceCompatibleWithOwnership(
+    bool isCompatible = true;
+    // Lifetime dependence always propagates through temporary BitwiseCopyable
+    // values, even if the dependence is scoped.
+    if (!isBitwiseCopyable(paramType, mod, ctx)) {
+      isCompatible = isLifetimeDependenceCompatibleWithOwnership(
         lifetimeKind, ownership, afd);
+    }
     if (parsedLifetimeKind == ParsedLifetimeDependenceKind::Scope &&
         !isCompatible) {
       diags.diagnose(

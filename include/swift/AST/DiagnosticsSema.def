@@ -7985,8 +7985,6 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "expected nil or self as return values in an initializer with "
        "lifetime dependent specifiers",
        ())
- ERROR(lifetime_dependence_on_bitwise_copyable, none,
-       "invalid lifetime dependence on BitwiseCopyable type", ())
  ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
        "lifetime dependence specifiers cannot be applied to tuple elements", ())
  ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,
