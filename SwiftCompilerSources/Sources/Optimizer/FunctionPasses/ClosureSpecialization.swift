@@ -428,7 +428,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
         possibleMarkDependenceBases.insert(pai)
         rootClosurePossibleLiveRange.insert(use.instruction)
         haveUsedReabstraction = true
-      } else {
+      } else if pai.isPullbackInResultOfAutodiffVJP {
         rootClosureApplies.pushIfNotVisited(use)
       }
 
@@ -677,6 +677,9 @@ private func markConvertedAndReabstractedClosuresAsUsed(rootClosure: Value, conv
         markConvertedAndReabstractedClosuresAsUsed(rootClosure: rootClosure, convertedAndReabstractedClosure: mdi.value,
                                                    convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
     default:
+      log("Parent function of callSite: \(rootClosure.parentFunction)")
+      log("Root closure: \(rootClosure)")
+      log("Converted/reabstracted closure: \(convertedAndReabstractedClosure)")
       fatalError("While marking converted/reabstracted closures as used, found unexpected instruction: \(convertedAndReabstractedClosure)")
     }
   }
@@ -814,7 +817,7 @@ private extension SpecializationCloner {
       if closureArgDesc.isClosureGuaranteed || closureArgDesc.parameterInfo.isTrivialNoescapeClosure,
          !allClonedReleasableClosures.isEmpty
       {
-        for exitBlock in closureArgDesc.reachableExitBBs {
+        for exitBlock in callSite.reachableExitBBsInCallee {
           let clonedExitBlock = self.getClonedBlock(for: exitBlock)
           
           let terminator = clonedExitBlock.terminator is UnreachableInst
@@ -824,12 +827,8 @@ private extension SpecializationCloner {
           let builder = Builder(before: terminator, self.context)
 
           for closure in allClonedReleasableClosures {
-            if let pai = closure as? PartialApplyInst,
-               pai.isOnStack
-            {
-              builder.destroyPartialApplyOnStack(paiOnStack: pai, self.context)  
-            } else {
-              builder.createReleaseValue(operand: closure)
+            if let pai = closure as? PartialApplyInst {
+              builder.destroyPartialApply(pai: pai, self.context)  
             }
           }
         }
@@ -960,6 +959,9 @@ private extension Builder {
                                        &releasableClonedReabstractedClosures, &origToClonedValueMap)
           
           guard let function = pai.referencedFunction else {
+            log("Parent function of callSite: \(rootClosure.parentFunction)")
+            log("Root closure: \(rootClosure)")
+            log("Unsupported reabstraction closure: \(pai)")
             fatalError("Encountered unsupported reabstraction (via partial_apply) of root closure!")
           }
 
@@ -982,6 +984,9 @@ private extension Builder {
           return reabstracted
         
         default:
+          log("Parent function of callSite: \(rootClosure.parentFunction)")
+          log("Root closure: \(rootClosure)")
+          log("Converted/reabstracted closure: \(reabstractedClosure)")
           fatalError("Encountered unsupported reabstraction of root closure: \(reabstractedClosure)")
       }
     }
@@ -993,27 +998,32 @@ private extension Builder {
     return (finalClonedReabstractedClosure as! SingleValueInstruction, releasableClonedReabstractedClosures)
   }
 
-  func destroyPartialApplyOnStack(paiOnStack: PartialApplyInst, _ context: FunctionPassContext){
-    precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
-
+  func destroyPartialApply(pai: PartialApplyInst, _ context: FunctionPassContext){
     // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization 
     // passes.
-    //
-    // for arg in paiOnStack.arguments {
-    //   self.createDestroyValue(operand: arg)
-    // }
 
-    // self.createDestroyValue(operand: paiOnStack)
+    if pai.isOnStack {
+      // for arg in pai.arguments {
+      //   self.createDestroyValue(operand: arg)
+      // }
+      // self.createDestroyValue(operand: pai)
 
-    if paiOnStack.parentFunction.hasOwnership {
+      if pai.parentFunction.hasOwnership {
       // Under OSSA, the closure acts as an owned value whose lifetime is a borrow scope for the captures, so we need to
       // end the borrow scope before ending the lifetimes of the captures themselves.
-      self.createDestroyValue(operand: paiOnStack)
-      self.destroyCapturedArgs(for: paiOnStack)
+        self.createDestroyValue(operand: pai)
+        self.destroyCapturedArgs(for: pai)
+      } else {
+        self.destroyCapturedArgs(for: pai)
+        self.createDeallocStack(pai)
+        context.notifyInvalidatedStackNesting()
+      }
     } else {
-      self.destroyCapturedArgs(for: paiOnStack)
-      self.createDeallocStack(paiOnStack)
-      context.notifyInvalidatedStackNesting()
+      if pai.parentFunction.hasOwnership {
+        self.createDestroyValue(operand: pai)
+      } else {
+        self.createReleaseValue(operand: pai)
+      }
     }
   }
 }
@@ -1107,9 +1117,11 @@ private extension PartialApplyInst {
   }
 
   var isPartialApplyOfThunk: Bool {
-    if self.numArguments == 1 || self.numArguments == 2, 
+    if self.numArguments == 1, 
        let fun = self.referencedFunction,
-       fun.thunkKind == .reabstractionThunk || fun.thunkKind == .thunk
+       fun.thunkKind == .reabstractionThunk || fun.thunkKind == .thunk,
+       self.arguments[0].type.isFunction,
+       self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
     {
       return true
     }
@@ -1279,10 +1291,6 @@ private struct ClosureArgDescriptor {
   var isClosureConsumed: Bool {
     closureParamInfo.convention.isConsumed
   }
-
-  var reachableExitBBs: [BasicBlock] {
-    closure.parentFunction.blocks.filter { $0.isReachableExitBlock }
-  }
 }
 
 /// Represents a callsite containing one or more closure arguments.
@@ -1300,6 +1308,10 @@ private struct CallSite {
 
   var applyCallee: Function {
     applySite.referencedFunction!
+  }
+
+  var reachableExitBBsInCallee: [BasicBlock] {
+    applyCallee.blocks.filter { $0.isReachableExitBlock }
   }
 
   func hasClosureArg(at index: Int) -> Bool {
