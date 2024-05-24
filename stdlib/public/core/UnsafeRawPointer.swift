@@ -517,7 +517,10 @@ extension UnsafeRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(_isPOD(T.self))
+    _debugPrecondition(
+      _isPOD(T.self),
+      "loadUnaligned only supports loading BitwiseCopyable types."
+    )
     return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1351,7 +1354,10 @@ extension UnsafeMutableRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(_isPOD(T.self))
+    _debugPrecondition(
+      _isPOD(T.self),
+      "loadUnaligned only supports loading BitwiseCopyable types."
+    )
     return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1456,7 +1462,10 @@ extension UnsafeMutableRawPointer {
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _debugPrecondition(_isPOD(T.self))
+    _debugPrecondition(
+      _isPOD(T.self),
+      "storeBytes only supports storing the bytes of BitwiseCopyable types."
+    )
 
 #if $TypedThrows
     withUnsafePointer(to: value) { source in
