@@ -4262,7 +4262,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     ValueDecl *value = capture.getDecl();
     auto existing = captures.find(value);
     if (existing != captures.end()) {
-      existing->second = existing->second.mergeFlags(capture);
+      existing->second = existing->second.mergeFlags(capture.getFlags());
     } else {
       captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
     }
@@ -4398,7 +4398,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             // If we've already captured the same value already, just merge
             // flags.
             if (selfCapture && selfCapture->getDecl() == capture.getDecl()) {
-              selfCapture = selfCapture->mergeFlags(capture);
+              selfCapture = selfCapture->mergeFlags(capture.getFlags());
               continue;
 
             // Otherwise, record the canonical self capture. It will appear
