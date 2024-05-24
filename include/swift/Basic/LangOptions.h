@@ -237,6 +237,9 @@ namespace swift {
     /// overlay.
     bool EnableCrossImportRemarks = false;
 
+    /// Remark if we fail to serialize a function in CMO.
+    bool RemarkWhenFailedToSerialize = false;
+
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
 
