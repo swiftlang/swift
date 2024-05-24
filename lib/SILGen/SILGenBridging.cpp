@@ -392,7 +392,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   if (blockTy->getNumResults() != 0) {
     auto result = blockTy->getSingleResult();
     if (result.getConvention() == ResultConvention::Indirect) {
-      indirectResult = entry->createFunctionArgument(blockResultTy);
+      indirectResult =
+          entry->createFunctionArgument(blockResultTy.getAddressType());
     }
   }
 
