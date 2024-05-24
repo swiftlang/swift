@@ -190,6 +190,14 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     if (paramInfo.isIndirectMutating())
       continue;
 
+    // The ExistentialSpecializerCloner copies the incoming generic argument
+    // into an existential if it is non-consuming (if it's consuming, it's
+    // moved into the existential via `copy_addr [take]`).  Introducing a copy
+    // of a move-only value isn't legal.
+    if (!paramInfo.isConsumed() &&
+        paramInfo.getSILStorageInterfaceType().isMoveOnly())
+      continue;
+
     ETAD.AccessType = paramInfo.isConsumed()
                           ? OpenedExistentialAccess::Mutable
                           : OpenedExistentialAccess::Immutable;
