@@ -12,7 +12,7 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) () async -> ()) {}
+func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) @Sendable () async -> ()) {}
 
 // CHECK-LABEL: sil hidden [distributed] [ossa] @$s4test2DAC0A20DistributedIsolationyyF
 // CHECK:         // function_ref closure #1

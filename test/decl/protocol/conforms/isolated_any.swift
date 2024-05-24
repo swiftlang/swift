@@ -9,7 +9,7 @@ protocol AnnotatedEnqueuer {
   associatedtype Result
 
   // expected-note @+1 {{protocol requires function}}
-  func enqueue(operation: @escaping @isolated(any) () async -> Result)
+  func enqueue(operation: @escaping @isolated(any) @Sendable () async -> Result)
 }
 
 // expected-error @+1 {{type 'A<T>' does not conform to protocol 'AnnotatedEnqueuer'}}
