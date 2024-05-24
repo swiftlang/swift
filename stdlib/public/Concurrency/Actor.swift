@@ -28,6 +28,8 @@ import Swift
 /// impossible for one to refine the other.
 @_marker
 @available(SwiftStdlib 5.1, *)
+@available(*, deprecated, message: "Use 'any Actor' with 'DistributedActor.asLocalActor' instead")
+@available(swift, obsoleted: 6.0, message: "Use 'any Actor' with 'DistributedActor.asLocalActor' instead")
 public protocol AnyActor: AnyObject, Sendable {}
 
 /// Common protocol to which all actors conform.
