@@ -106,12 +106,8 @@ public:
   /// values with decls are the only values that are able to be local captures.
   bool isLocalCapture() const;
 
-  CapturedValue mergeFlags(CapturedValue cv) {
-    assert(Value.getPointer() == cv.Value.getPointer() &&
-           "merging flags on two different value decls");
-    return CapturedValue(
-        Storage(Value.getPointer(), getFlags() & cv.getFlags()),
-        Loc);
+  CapturedValue mergeFlags(unsigned flags) const {
+    return CapturedValue(Storage(Value.getPointer(), getFlags() & flags), Loc);
   }
 
   ValueDecl *getDecl() const {

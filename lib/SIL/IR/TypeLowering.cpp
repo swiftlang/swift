@@ -4238,7 +4238,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
   collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
     assert(captureInfo.hasBeenComputed());
-
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
@@ -4367,7 +4366,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             // If we've already captured the same value already, just merge
             // flags.
             if (selfCapture && selfCapture->getDecl() == capture.getDecl()) {
-              selfCapture = selfCapture->mergeFlags(capture);
+              selfCapture = selfCapture->mergeFlags(capture.getFlags());
               continue;
 
             // Otherwise, record the canonical self capture. It will appear
