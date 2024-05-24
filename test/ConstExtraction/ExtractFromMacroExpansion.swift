@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: echo "[MyProto]" > %t/protocols.json
 
