@@ -426,8 +426,8 @@ class SerializeSILPass : public SILModuleTransform {
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
     for (auto &F : M) {
-      bool wasSerialized = F.isSerialized() != IsNotSerialized;
-      F.setSerialized(IsNotSerialized);
+      bool wasSerialized = !F.isNotSerialized();
+      F.setSerializedKind(IsNotSerialized);
 
       // We are removing [serialized] from the function. This will change how
       // opaque archetypes are lowered in SIL - they might lower to their
@@ -459,15 +459,15 @@ class SerializeSILPass : public SILModuleTransform {
     }
 
     for (auto &WT : M.getWitnessTables()) {
-      WT.setSerialized(IsNotSerialized);
+      WT.setSerializedKind(IsNotSerialized);
     }
 
     for (auto &VT : M.getVTables()) {
-      VT->setSerialized(IsNotSerialized);
+      VT->setSerializedKind(IsNotSerialized);
     }
 
     for (auto &Deinit : M.getMoveOnlyDeinits()) {
-      Deinit->setSerialized(IsNotSerialized);
+      Deinit->setSerializedKind(IsNotSerialized);
     }
   }
 

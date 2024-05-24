@@ -1,3 +1,5 @@
+/// This tests serializing v-table and witness-table in non-resilient mode Package-CMO.
+///
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

@@ -1704,9 +1704,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *differential = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
       diffGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, jvp->isSerialized(),
-      original->isDynamicallyReplaceable(),
-      original->isDistributed(),
+      IsNotTransparent, jvp->getSerializedKind(),
+      original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));

@@ -671,7 +671,7 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
       /*isVTableThunk*/ true);
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, SILLinkage::Private, constantTy, IsBare,
-      IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
+      IsTransparent, derivativeFnDeclRef.getSerializedKind(), IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
