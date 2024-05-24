@@ -982,6 +982,14 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
       module == contextModule)
     return OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience;
 
+  // Allow replacement of opaque result types in the context of maximal
+  // resilient expansion if the context's and the opaque type's module are in
+  // the same package.
+  if (contextExpansion == ResilienceExpansion::Maximal &&
+      module->isResilient() && module->serializePackageEnabled() &&
+      module->inSamePackage(contextModule))
+    return OpaqueSubstitutionKind::SubstituteSamePackageMaximalResilience;
+
   // Allow general replacement from non resilient modules. Otherwise, disallow.
   if (module->isResilient())
     return OpaqueSubstitutionKind::DontSubstitute;
@@ -1046,6 +1054,10 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
       return true;
 
     return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;
+
+  case OpaqueSubstitutionKind::SubstituteSamePackageMaximalResilience: {
+    return typeDecl->getEffectiveAccess() >= AccessLevel::Package;
+  }
 
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
