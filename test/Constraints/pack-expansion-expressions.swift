@@ -739,3 +739,25 @@ do {
     // expected-warning@-2 {{immutable value 'y' was never used; consider replacing with '_' or removing it}}
   }
 }
+
+// Closures wrapped in a pack expansion
+do {
+  func takesClosure<T>(_ fn: () -> T) -> T { return fn() }
+
+  func testClosure<each T>(_ t: repeat each T) -> (repeat each T) {
+    (repeat takesClosure { each t }) // Ok
+  }
+
+  func testMultiStmtClosure<each T>(_ t: repeat each T) -> (repeat each T) {
+     (repeat takesClosure {
+       let v = each t
+       return v
+    }) // Ok
+  }
+
+  func takesAutoclosure<T>(_ fn: @autoclosure () -> T) -> T { return fn() }
+
+  func f2<each T>(_ t: repeat each T) -> (repeat each T) {
+    (repeat takesAutoclosure(each t)) // Ok
+  }
+}
