@@ -1189,6 +1189,11 @@ struct PartitionOpBuilder {
         PartitionOp::Require(lookupValueID(value), currentInst));
   }
 
+  void addUnknownPatternError(SILValue value) {
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
+  }
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const;
@@ -2148,6 +2153,11 @@ public:
         builder.addTransfer(ns->getRepresentative().getValue(), &op);
       }
     }
+  }
+
+  /// Emit an unknown pattern error.
+  void translateUnknownPatternError(SILValue value) {
+    builder.addUnknownPatternError(value);
   }
 
   /// Translate the instruction's in \p basicBlock to a vector of PartitionOps
