@@ -98,7 +98,7 @@ split_embedded_sources(
   EMBEDDED Integers.swift
     NORMAL Join.swift
   EMBEDDED KeyPath.swift
-    NORMAL KeyValuePairs.swift
+  EMBEDDED KeyValuePairs.swift
   EMBEDDED LazyCollection.swift
   EMBEDDED LazySequence.swift
     NORMAL LegacyABI.swift
@@ -227,7 +227,7 @@ split_embedded_sources(
   EMBEDDED FloatingPointRandom.swift
   EMBEDDED Instant.swift
   EMBEDDED Int128.swift
-    NORMAL Mirror.swift
+  EMBEDDED Mirror.swift
     NORMAL PlaygroundDisplay.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
