@@ -2482,3 +2482,12 @@ public struct AllLexicalContextsMacro: DeclarationMacro {
   }
 }
 
+public struct AddGetterMacro: AccessorMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    return ["get { 0 }"]
+  }
+}

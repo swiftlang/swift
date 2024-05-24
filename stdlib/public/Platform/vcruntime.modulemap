@@ -702,6 +702,11 @@ module std [system] {
   module _Private [system] {
     requires cplusplus
 
+    explicit module xatomic {
+      header "xatomic.h"
+      export *
+    }
+
     explicit module xhash {
       header "xhash"
       export *

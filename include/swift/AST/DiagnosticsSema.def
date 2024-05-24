@@ -7635,6 +7635,9 @@ ERROR(external_macro_arg_not_type_name,none,
 ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
+ERROR(let_accessor_expansion,none,
+      "cannot expand accessors on variable declared with 'let'",
+      ())
 ERROR(invalid_main_type_in_macro_expansion,none,
       "macro expansion cannot introduce '@main' type",
       ())
@@ -7985,8 +7988,6 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "expected nil or self as return values in an initializer with "
        "lifetime dependent specifiers",
        ())
- ERROR(lifetime_dependence_on_bitwise_copyable, none,
-       "invalid lifetime dependence on BitwiseCopyable type", ())
  ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
        "lifetime dependence specifiers cannot be applied to tuple elements", ())
  ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,

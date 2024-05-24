@@ -46,7 +46,7 @@ namespace swift {
   class EffectsAttr;
   class FileUnit;
   class SILFunctionType;
-  enum IsSerialized_t : unsigned char;
+  enum SerializedKind_t : uint8_t;
   enum class SubclassScope : unsigned char;
   class SILModule;
   class SILLocation;
@@ -384,7 +384,11 @@ struct SILDeclRef {
   /// True if the function should be treated as transparent.
   bool isTransparent() const;
   /// True if the function should have its body serialized.
-  IsSerialized_t isSerialized() const;
+  bool isSerialized() const;
+  /// True if this function is neither [serialized] or [serialized_for_package].
+  bool isNotSerialized() const;
+  /// Returns IsNotSerialized, IsSerializedForPackage, or IsSerialized.
+  SerializedKind_t getSerializedKind() const;
   /// True if the function has noinline attribute.
   bool isNoinline() const;
   /// True if the function has __always inline attribute.

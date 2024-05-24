@@ -1653,9 +1653,12 @@ for host in "${ALL_HOSTS[@]}"; do
     else
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
     fi
-    export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
-    export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
-    export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
+
+    if [[ -f "${CLANG_BIN}/clang" ]]; then
+      export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
+      export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+      export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
+    fi
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
         SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
@@ -2723,9 +2726,12 @@ for host in "${ALL_HOSTS[@]}"; do
     else
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
     fi
-    export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
-    export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
-    export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
+
+    if [[ -f "${CLANG_BIN}/clang" ]]; then
+      export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
+      export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+      export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
+    fi
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
         SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
@@ -3084,9 +3090,12 @@ for host in "${ALL_HOSTS[@]}"; do
     else
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
     fi
-    export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
-    export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
-    export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
+
+    if [[ -f "${CLANG_BIN}/clang" ]]; then
+      export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
+      export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+      export LLVM_SYMBOLIZER_PATH="${CLANG_BIN}/llvm-symbolizer"
+    fi
 
     # Set the build options for this host
     set_build_options_for_host $host

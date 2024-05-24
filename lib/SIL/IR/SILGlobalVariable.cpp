@@ -22,7 +22,7 @@ using namespace swift;
 SwiftMetatype SILGlobalVariable::registeredMetatype;
 
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
-                                             IsSerialized_t isSerialized,
+                                             SerializedKind_t serializedKind,
                                              StringRef name,
                                              SILType loweredType,
                                              std::optional<SILLocation> loc,
@@ -35,7 +35,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   assert(!entry->getValue() && "global variable already exists");
   name = entry->getKey();
 
-  auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
+  auto var = new (M) SILGlobalVariable(M, linkage, serializedKind, name,
                                        loweredType, loc, Decl);
 
   if (entry) entry->setValue(var);
@@ -43,14 +43,14 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 }
 
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
-                                     IsSerialized_t isSerialized,
+                                     SerializedKind_t serializedKind,
                                      StringRef Name, SILType LoweredType,
                                      std::optional<SILLocation> Loc,
                                      VarDecl *Decl)
     : SwiftObjectHeader(registeredMetatype), Module(Module), Name(Name),
       LoweredType(LoweredType), Location(Loc.value_or(SILLocation::invalid())),
       Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), VDecl(Decl) {
-  setSerialized(isSerialized);
+  setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(Decl ? Decl->isLet() : false);
   Module.silGlobals.push_back(this);
@@ -75,12 +75,23 @@ bool SILGlobalVariable::shouldBePreservedForDebugger() const {
   return VDecl != nullptr;
 }
 
-/// Get this global variable's fragile attribute.
-IsSerialized_t SILGlobalVariable::isSerialized() const {
-  return Serialized ? IsSerialized : IsNotSerialized;
+bool SILGlobalVariable::isSerialized() const {
+  return SerializedKind_t(Serialized) == IsSerialized;
 }
-void SILGlobalVariable::setSerialized(IsSerialized_t isSerialized) {
-  Serialized = isSerialized ? 1 : 0;
+bool SILGlobalVariable::isSerializedForPackage() const {
+  return SerializedKind_t(Serialized) == IsSerializedForPackage;
+}
+bool SILGlobalVariable::isNotSerialized() const {
+  return SerializedKind_t(Serialized) == IsNotSerialized;
+}
+
+/// Get this global variable's fragile attribute.
+SerializedKind_t SILGlobalVariable::getSerializedKind() const {
+  return SerializedKind_t(Serialized);
+}
+
+void SILGlobalVariable::setSerializedKind(SerializedKind_t serializedKind) {
+  Serialized = unsigned(serializedKind);
 }
 
 /// Return the value that is written into the global variable.

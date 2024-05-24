@@ -230,7 +230,7 @@ static SILFunction *specializeVTableMethod(SILFunction *origMethod,
   module.linkFunction(SpecializedF, SILModule::LinkingMode::LinkAll);
 
   SpecializedF->setLinkage(SILLinkage::Public);
-  SpecializedF->setSerialized(IsNotSerialized);
+  SpecializedF->setSerializedKind(IsNotSerialized);
 
   return SpecializedF;
 }

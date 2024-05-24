@@ -60,24 +60,19 @@ class SILFunctionBuilder {
 
   /// Return the declaration of a utility function that can, but needn't, be
   /// shared between different parts of a program.
-  SILFunction *getOrCreateSharedFunction(SILLocation loc, StringRef name,
-                                         CanSILFunctionType type,
-                                         IsBare_t isBareSILFunction,
-                                         IsTransparent_t isTransparent,
-                                         IsSerialized_t isSerialized,
-                                         ProfileCounter entryCount,
-                                         IsThunk_t isThunk,
-                                         IsDynamicallyReplaceable_t isDynamic,
-                                         IsDistributed_t isDistributed,
-                                         IsRuntimeAccessible_t isRuntimeAccessible);
+  SILFunction *getOrCreateSharedFunction(
+      SILLocation loc, StringRef name, CanSILFunctionType type,
+      IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
+      SerializedKind_t serializedKind, ProfileCounter entryCount,
+      IsThunk_t isThunk, IsDynamicallyReplaceable_t isDynamic,
+      IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible);
 
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
-      IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-      IsDynamicallyReplaceable_t isDynamic,
-      IsDistributed_t isDistributed,
+      IsTransparent_t isTransparent, SerializedKind_t serializedKind,
+      IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
       IsRuntimeAccessible_t isRuntimeAccessible,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
@@ -104,7 +99,7 @@ class SILFunctionBuilder {
       SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
       GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-      IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
+      SerializedKind_t serializedKind, IsDynamicallyReplaceable_t isDynamic,
       IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
