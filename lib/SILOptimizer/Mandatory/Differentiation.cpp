@@ -110,9 +110,10 @@ public:
   ///
   /// \param serializeFunctions specifies whether generated functions should be
   ///        serialized.
-  bool canonicalizeDifferentiabilityWitness(
-      SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
-      IsSerialized_t serializeFunctions);
+  bool
+  canonicalizeDifferentiabilityWitness(SILDifferentiabilityWitness *witness,
+                                       DifferentiationInvoker invoker,
+                                       SerializedKind_t serializeFunctions);
 
   /// Process the given `differentiable_function` instruction, filling in
   /// missing derivative functions if necessary.
@@ -772,7 +773,7 @@ emitDerivativeFunctionReference(
 
 static SILFunction *createEmptyVJP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
-                                   IsSerialized_t isSerialized) {
+                                   SerializedKind_t isSerialized) {
   auto original = witness->getOriginalFunction();
   auto config = witness->getConfig();
   LLVM_DEBUG({
@@ -817,7 +818,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
 
 static SILFunction *createEmptyJVP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
-                                   IsSerialized_t isSerialized) {
+                                   SerializedKind_t isSerialized) {
   auto original = witness->getOriginalFunction();
   auto config = witness->getConfig();
   LLVM_DEBUG({
@@ -894,7 +895,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
 /// Returns true on error.
 bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
-    IsSerialized_t serializeFunctions) {
+    SerializedKind_t serializeFunctions) {
   std::string traceMessage;
   llvm::raw_string_ostream OS(traceMessage);
   OS << "processing ";
@@ -1043,10 +1044,10 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   SILOptFunctionBuilder fb(dt.getTransform());
   auto *newThunk = fb.getOrCreateFunction(
       loc, newThunkName, getSpecializedLinkage(thunk, thunk->getLinkage()),
-      thunkType, thunk->isBare(), thunk->isTransparent(), thunk->isSerialized(),
-      thunk->isDynamicallyReplaceable(), thunk->isDistributed(),
-      thunk->isRuntimeAccessible(),
-      ProfileCounter(), thunk->isThunk());
+      thunkType, thunk->isBare(), thunk->isTransparent(),
+      thunk->getSerializedKind(), thunk->isDynamicallyReplaceable(),
+      thunk->isDistributed(), thunk->isRuntimeAccessible(), ProfileCounter(),
+      thunk->isThunk());
   // If new thunk is newly created: clone the old thunk body, wrap the
   // returned function value with an `differentiable_function`
   // instruction, and process the `differentiable_function` instruction.
@@ -1395,7 +1396,8 @@ void Differentiation::run() {
     auto *witness = invokerPair.first;
     auto invoker = invokerPair.second;
     if (transformer.canonicalizeDifferentiabilityWitness(
-            witness, invoker, witness->getOriginalFunction()->isSerialized()))
+            witness, invoker,
+            witness->getOriginalFunction()->getSerializedKind()))
       errorOccurred = true;
   }
 
