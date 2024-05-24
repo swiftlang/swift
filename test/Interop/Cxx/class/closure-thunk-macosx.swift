@@ -20,3 +20,18 @@ import Closure
 public func testClosureToFuncPtr() {
  cfuncARCStrong({N in})
 }
+
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo10NonTrivialVIegr_ABIeyBr_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> @out NonTrivial) -> @out NonTrivial {
+// CHECK: bb0(%[[V0:.*]] : $*NonTrivial, %[[V1:.*]] : $*@block_storage @callee_guaranteed () -> @out NonTrivial):
+// CHECK: %[[V2:.*]] = project_block_storage %[[V1]] : $*@block_storage @callee_guaranteed () -> @out NonTrivial
+// CHECK: %[[V3:.*]] = load [copy] %[[V2]] : $*@callee_guaranteed () -> @out NonTrivial
+// CHECK: %[[V4:.*]] = begin_borrow %[[V3]] : $@callee_guaranteed () -> @out NonTrivial
+// CHECK: apply %[[V4]](%[[V0]]) : $@callee_guaranteed () -> @out NonTrivial
+// CHECK: end_borrow %[[V4]] : $@callee_guaranteed () -> @out NonTrivial
+// CHECK: %[[V8:.*]] = tuple ()
+// CHECK: destroy_value %[[V3]] : $@callee_guaranteed () -> @out NonTrivial
+// CHECK: return %[[V8]] : $()
+
+public func testClosureToBlockReturnNonTrivial() {
+  cfuncReturnNonTrivial({() -> NonTrivial in return NonTrivial() })
+}
