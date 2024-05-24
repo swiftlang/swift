@@ -93,17 +93,17 @@ struct S2: DistributedActor {
 
 // ==== -----------------------------------------------------------------------
 
-actor A3: AnyActor {} // ok
-distributed actor DA3: AnyActor {} // ok
+actor A3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
+distributed actor DA3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
-class C3: AnyActor, @unchecked Sendable {
+class C3: AnyActor, @unchecked Sendable { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
   // expected-error@-1{{non-actor type 'C3' cannot conform to the 'AnyActor' protocol}} {{1-6=actor}}
 }
 
-struct S3: AnyActor {
+struct S3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
   // expected-error@-1{{non-class type 'S3' cannot conform to class protocol 'AnyActor'}}
 }
 
-enum E3: AnyActor {
+enum E3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
   // expected-error@-1{{non-class type 'E3' cannot conform to class protocol 'AnyActor'}}
 }

@@ -68,7 +68,7 @@ distributed actor D5: P1 {
 
 // Make sure the conformances have been added implicitly.
 func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
-func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
+func acceptAnyActor<Act: AnyActor>(_: Act.Type) { } // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
 func testConformance() {
   acceptDistributedActor(D1.self)
