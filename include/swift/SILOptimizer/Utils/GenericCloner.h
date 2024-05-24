@@ -34,7 +34,7 @@ class GenericCloner
   using SuperTy = TypeSubstCloner<GenericCloner, SILOptFunctionBuilder>;
 
   SILOptFunctionBuilder &FuncBuilder;
-  IsSerialized_t Serialized;
+  SerializedKind_t Serialized;
   const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>

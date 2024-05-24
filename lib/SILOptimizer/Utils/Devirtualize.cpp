@@ -719,6 +719,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
     return false;
   }
 
+  // pcmo TODO: check for tri-state serialized kind
   if (applySite.getFunction()->isSerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
@@ -1167,6 +1168,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   if (!f)
     return false;
 
+  // pcmo TODO: check for tri-state serialized kind
   if (applySite.getFunction()->isSerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.

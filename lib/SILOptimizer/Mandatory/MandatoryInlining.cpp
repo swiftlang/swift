@@ -753,8 +753,10 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   if (CalleeFunction->empty())
     return nullptr;
 
+  // pcmo TODO: remove F->isSerialiezd() and pass its kind to
+  // canBeInlinedIntoCaller instead.
   if (F->isSerialized() &&
-      !CalleeFunction->hasValidLinkageForFragileInline()) {
+      !CalleeFunction->canBeInlinedIntoCaller()) {
     if (!CalleeFunction->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << F->getName() << "\n";
       llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
