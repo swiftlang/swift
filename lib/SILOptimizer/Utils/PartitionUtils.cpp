@@ -94,6 +94,10 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     os << "%%" << opArgs[0];
     break;
   }
+  case PartitionOpKind::UnknownPatternError:
+    os << "unknown pattern error ";
+    os << "%%" << opArgs[0];
+    break;
   }
   os << ": " << *getSourceInst();
 }

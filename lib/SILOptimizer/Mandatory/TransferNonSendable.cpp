@@ -1600,6 +1600,11 @@ struct DiagnosticEvaluator final
     }
   }
 
+  void handleUnknownCodePattern(const PartitionOp &op) const {
+    diagnoseError(op.getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern);
+  }
+
   bool isActorDerived(Element element) const {
     return info->getValueMap().getIsolationRegion(element).isActorIsolated();
   }

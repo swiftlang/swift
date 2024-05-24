@@ -400,6 +400,16 @@ enum class PartitionOpKind : uint8_t {
 
   /// Require the region of a value to be non-transferred, takes one arg.
   Require,
+
+  /// Emit an error saying that the given instruction was not understood for
+  /// some reason and that a bug should be filed. It expects some sort of
+  /// Element number since in most cases we need to define a value for later
+  /// potential uses of the value (e.x.: an alloc_stack that we emit an unknown
+  /// pattern error will have later uses that will use the value... without
+  /// defining the value, the dataflow will assert).
+  ///
+  /// This is used if we need to reject the program and do not want to assert.
+  UnknownPatternError,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
@@ -444,6 +454,9 @@ private:
            "Transfer needs a sourceInst");
   }
 
+  PartitionOp(PartitionOpKind opKind, SILInstruction *sourceInst)
+      : opKind(opKind), opArgs(), source(sourceInst) {}
+
   friend class Partition;
 
 public:
@@ -474,6 +487,11 @@ public:
   static PartitionOp Require(Element tgt,
                              SILInstruction *sourceInst = nullptr) {
     return PartitionOp(PartitionOpKind::Require, tgt, sourceInst);
+  }
+
+  static PartitionOp UnknownPatternError(Element elt,
+                                         SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::UnknownPatternError, elt, sourceInst);
   }
 
   bool operator==(const PartitionOp &other) const {
@@ -881,6 +899,11 @@ public:
     return asImpl().shouldEmitVerboseLogging();
   }
 
+  /// Call handleUnknownCodePattern on our CRTP subclass.
+  void handleUnknownCodePattern(const PartitionOp &op) const {
+    return asImpl().handleUnknownCodePattern(op);
+  }
+
   /// Call handleLocalUseAfterTransfer on our CRTP subclass.
   void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
                                    Operand *transferringOp) const {
@@ -1119,6 +1142,13 @@ public:
         }
       }
       return;
+    case PartitionOpKind::UnknownPatternError:
+      // Begin tracking the specified element in case we have a later use.
+      p.trackNewElement(op.getOpArgs()[0]);
+
+      // Then emit an unknown code pattern error.
+      handleUnknownCodePattern(op);
+      return;
     }
 
     llvm_unreachable("Covered switch isn't covered?!");
@@ -1258,6 +1288,13 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   void handleTransferNonTransferrable(
       const PartitionOp &op, Element elt, Element otherElement,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {}
+
+  /// Used to signify an "unknown code pattern" has occured while performing
+  /// dataflow.
+  ///
+  /// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback
+  /// to our user so that we can emit that error as we process.
+  void handleUnknownCodePattern(const PartitionOp &op) const {}
 
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
