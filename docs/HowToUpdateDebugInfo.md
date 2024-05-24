@@ -133,11 +133,11 @@ be dereferenced.
 debug_value %0 : $*T, var, name "value", expr op_deref
 ```
 
-SILGen can use `SILBuilder::createDebugValue` and
-`SILBuilder::createDebugValueAddr` to create debug values, respectively without
-and with an op_deref, or use `SILBuilder::emitDebugDescription` which will
-automatically choose the correct one depending on the type of the SSA value. As
-there are no pointers in Swift, this should always do the right thing.
+SILGen should always use `SILBuilder::emitDebugDescription` to create debug
+values, which will automatically add an op_deref depending on the type of the
+SSA value. As there are no pointers in Swift, this will always do the right
+thing. In SIL passes, use `SILBuilder::createDebugValue` to create debug values,
+or `SILBuilder::createDebugValueAddr` to add an op_deref.
 
 > [!Warning]
 > At the optimizer level, Swift `Unsafe*Pointer` types can be simplified

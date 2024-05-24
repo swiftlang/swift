@@ -1163,7 +1163,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
-    B.createDebugValue(PrologueLoc, selfArg.getValue(), DbgVar);
+    B.emitDebugDescription(PrologueLoc, selfArg.getValue(), DbgVar);
   }
 
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
@@ -1719,7 +1719,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   PrologueLoc.markAsPrologue();
   // Hard-code self as argument number 1.
   SILDebugVariable DbgVar(selfDecl->isLet(), 1);
-  B.createDebugValue(PrologueLoc, selfArg, DbgVar);
+  B.emitDebugDescription(PrologueLoc, selfArg, DbgVar);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
