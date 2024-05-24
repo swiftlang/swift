@@ -118,6 +118,19 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
                                               TypeExpansionContext expansion) {
+  if (auto *expr = capture.getPackElement()) {
+    auto contextTy = expr->getType();
+    auto &lowering = getTypeLowering(
+        contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                            expansion.getResilienceExpansion()));
+
+    assert(!contextTy->isNoncopyable() && "Not implemented");
+    if (!lowering.isAddressOnly())
+      return CaptureKind::Constant;
+
+    return CaptureKind::Immutable;
+  }
+
   auto decl = capture.getDecl();
   auto *var = cast<VarDecl>(decl);
   assert(var->hasStorage() &&
