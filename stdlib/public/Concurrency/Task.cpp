@@ -729,17 +729,29 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     assert(initialContextSize >= sizeof(FutureAsyncContext));
   }
 
-  // Add to the task group, if requested.
-  if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
-    assert(group && "Missing group");
-    swift_taskGroup_addPending(group, /*unconditionally=*/true);
-  }
-
-  AsyncTask *parent = nullptr;
   AsyncTask *currentTask = swift_task_getCurrent();
-  if (jobFlags.task_isChildTask()) {
-    parent = currentTask;
-    assert(parent != nullptr && "creating a child task with no active task");
+  AsyncTask *parent = jobFlags.task_isChildTask() ? currentTask : nullptr;
+
+  if (group) {
+    assert(parent && "a task created in a group must be a child task");
+
+    // Prevent task-local misuse;
+    // We must not allow an addTask {} wrapped immediately with a withValue {}
+    auto ParentLocal = parent->_private().Local;
+    if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
+      if (taskLocalHeadLinkType ==
+          swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
+        swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
+            nullptr, 0, true, 0);
+        abort();
+      }
+    }
+
+    // Add to the task group, if requested.
+    if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
+      assert(group && "Missing group");
+      swift_taskGroup_addPending(group, /*unconditionally=*/true);
+    }
   }
 
   // Start with user specified priority at creation time (if any)
