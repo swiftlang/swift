@@ -254,7 +254,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
     const unsigned char *_unused_file, uintptr_t _unused_fileLength,
     bool _unused_fileIsASCII, uintptr_t _unused_line) {
 
-  char *message =
+  char const *message =
       "error: task-local: detected illegal task-local value binding.\n"
       "Task-local values must only be set in a structured-context, such as: "
       "around any (synchronous or asynchronous function invocation), "
