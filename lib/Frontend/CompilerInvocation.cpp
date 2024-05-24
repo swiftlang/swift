@@ -1157,11 +1157,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_library_evolution)) {
     Opts.SkipNonExportableDecls |=
         Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
   } else {
     if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
@@ -1714,20 +1709,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_library_evolution)) {
     Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
-    Opts.EnableLazyTypecheck |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
   } else {
     if (Args.hasArg(OPT_experimental_lazy_typecheck))
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-lazy-typecheck",
-                     "-enable-library-evolution");
-
-    if (Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy))
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-skip-non-inlinable-function-bodies-is-lazy",
                      "-enable-library-evolution");
   }
 
