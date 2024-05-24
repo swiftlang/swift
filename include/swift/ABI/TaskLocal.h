@@ -44,6 +44,10 @@ public:
     /// lookups by skipping empty parent tasks during get(), and explained
     /// in depth in `createParentLink`.
     IsParent = 0b01,
+    /// The task local binding was created inside the body of a `withTaskGroup`,
+    /// and therefore must either copy it, or crash when a child task is created
+    /// using 'group.addTask' and it would refer to this task local.
+    IsNextCreatedInTaskGroupBody = 0b10,
   };
 
   class Item {
@@ -103,7 +107,17 @@ public:
 
     static Item *createLink(AsyncTask *task,
                             const HeapObject *key,
+                            const Metadata *valueType,
+                            bool inTaskGroupBody);
+
+    static Item *createLink(AsyncTask *task,
+                            const HeapObject *key,
                             const Metadata *valueType);
+
+    static Item *createLinkInTaskGroup(
+        AsyncTask *task,
+        const HeapObject *key,
+        const Metadata *valueType);
 
     void destroy(AsyncTask *task);
 
@@ -113,6 +127,16 @@ public:
 
     NextLinkType getNextLinkType() const {
       return static_cast<NextLinkType>(next & statusMask);
+    }
+
+    bool isNextLinkPointer() const {
+      return static_cast<NextLinkType>(next & statusMask) ==
+             NextLinkType::IsNext;
+    }
+
+    bool IsNextCreatedInTaskGroupBody() const {
+      return static_cast<NextLinkType>(next & statusMask) ==
+             NextLinkType::IsNextCreatedInTaskGroupBody;
     }
 
     /// Item does not contain any actual value, and is only used to point at
@@ -136,9 +160,9 @@ public:
       if (valueType) {
         size_t alignment = valueType->vw_alignment();
         return (offset + alignment - 1) & ~(alignment - 1);
-      } else {
-        return offset;
       }
+
+      return offset;
     }
 
     /// Determine the size of the item given a particular value type.
@@ -199,6 +223,8 @@ public:
     /// and `false` if the just popped value was the last one and the storage
     /// can be safely disposed of.
     bool popValue(AsyncTask *task);
+
+    std::optional<NextLinkType> peekHeadLinkType() const;
 
     /// Copy all task-local bindings to the target task.
     ///

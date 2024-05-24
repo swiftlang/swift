@@ -21,11 +21,11 @@ enum TL {
 func bindAroundDiscardingGroupAddTask() async {
   await TL.$number.withValue(1111) { // ok
     await withTaskGroup(of: Int.self) { group in
-      // CHECK: error: task-local: detected illegal task-local value binding at {{.*}}illegal_use_taskgroup.swift:[[# @LINE + 1]]
+      // CHECK: error: task-local: detected illegal task-local value binding
       TL.$number.withValue(2222) { // bad!
-        print("Survived, inside withValue!") // CHECK-NOT: Survived, inside withValue!
         group.addTask {
-          0 // don't actually perform the read, it would be unsafe.
+          print("Survived, inside withValue!") // CHECK-NOT: Survived, inside withValue!
+          return 0 // don't actually perform the read, it would be unsafe.
         }
       }
 

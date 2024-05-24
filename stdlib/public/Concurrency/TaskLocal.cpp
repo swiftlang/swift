@@ -171,6 +171,7 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
                        static_cast<uintptr_t>(NextLinkType::IsParent);
           break;
         case NextLinkType::IsNext:
+        case NextLinkType::IsNextCreatedInTaskGroupBody:
           if (parentHead->getNext()) {
             assert(false && "empty taskValue head in parent task, yet parent's 'head' is `IsNext`, "
                             "this should not happen, as it implies the parent must have stored some value.");
@@ -194,7 +195,8 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
 TaskLocal::Item*
 TaskLocal::Item::createLink(AsyncTask *task,
                             const HeapObject *key,
-                            const Metadata *valueType) {
+                            const Metadata *valueType,
+                            bool inTaskGroupBody) {
   size_t amountToAllocate = Item::itemSize(valueType);
   void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
                           : malloc(amountToAllocate);
@@ -203,9 +205,26 @@ TaskLocal::Item::createLink(AsyncTask *task,
   auto next = task ? task->_private().Local.head
                    : FallbackTaskLocalStorage::get()->head;
   item->next = reinterpret_cast<uintptr_t>(next) |
-      static_cast<uintptr_t>(NextLinkType::IsNext);
+               static_cast<uintptr_t>(
+                   inTaskGroupBody ? NextLinkType::IsNextCreatedInTaskGroupBody
+                                   : NextLinkType::IsNext);
 
   return item;
+}
+
+TaskLocal::Item*
+TaskLocal::Item::createLink(AsyncTask *task,
+                            const HeapObject *key,
+                            const Metadata *valueType) {
+  return createLink(task, key, valueType, /*=inTaskGroupBody=*/false);
+}
+
+
+TaskLocal::Item*
+TaskLocal::Item::createLinkInTaskGroup(AsyncTask *task,
+                                       const HeapObject *key,
+                                       const Metadata *valueType) {
+  return createLink(task, key, valueType, /*=inTaskGroupBody=*/true);
 }
 
 
@@ -232,13 +251,11 @@ void TaskLocal::Item::copyTo(AsyncTask *target) {
 
 SWIFT_CC(swift)
 static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
-    const unsigned char *file, uintptr_t fileLength,
-    bool fileIsASCII, uintptr_t line) {
+    const unsigned char *_unused_file, uintptr_t _unused_fileLength,
+    bool _unused_fileIsASCII, uintptr_t _unused_line) {
 
-  char *message;
-  swift_asprintf(
-      &message,
-      "error: task-local: detected illegal task-local value binding at %.*s:%d.\n"
+  char *message =
+      "error: task-local: detected illegal task-local value binding.\n"
       "Task-local values must only be set in a structured-context, such as: "
       "around any (synchronous or asynchronous function invocation), "
       "around an 'async let' declaration, or around a 'with(Throwing)TaskGroup(...){ ... }' "
@@ -272,9 +289,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "        }\n"
       "\n"
       "        group.addTask { ... }\n"
-      "    }\n",
-      (int)fileLength, file,
-      (int)line);
+      "    }\n";
 
   if (_swift_shouldReportFatalErrorsToDebugger()) {
     RuntimeErrorDetails details = {
@@ -329,6 +344,7 @@ void TaskLocal::Storage::destroy(AsyncTask *task) {
     auto linkType = item->getNextLinkType();
     switch (linkType) {
     case TaskLocal::NextLinkType::IsNext:
+    case TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody:
         next = item->getNext();
         item->destroy(task);
         item = next;
@@ -351,8 +367,25 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
                                    /* +1 */ OpaqueValue *value,
                                    const Metadata *valueType) {
   assert(value && "Task local value must not be nil");
+  assert(swift_task_getCurrent() == task &&
+         "must only be pushing task locals onto current task");
 
-  auto item = Item::createLink(task, key, valueType);
+  // We're in a task group body.
+  // We specifically need to prevent this pattern:
+  //
+  //    $number.withValue(0xBAADF00D) { // push
+  //      group.addTask { ... }
+  //    } // pop! BOOM!
+  //
+  // because the end of the withValue scope would pop the value,
+  // and thus if the child task didn't copy the value, it'd refer to a bad
+  // memory location at this point.
+
+  TaskLocal::Item* item = Item::createLink(
+      task, key, valueType,
+      /*inTaskGroupBody=*/swift_task_hasTaskGroupStatusRecord());
+
+
   valueType->vw_initializeWithTake(item->getStoragePtr(), value);
   head = item;
 }
@@ -365,6 +398,14 @@ bool TaskLocal::Storage::popValue(AsyncTask *task) {
 
   /// if pointing at not-null next item, there are remaining bindings.
   return head != nullptr;
+}
+
+std::optional<TaskLocal::NextLinkType>
+TaskLocal::Storage::peekHeadLinkType() const {
+  if (!head)
+    return {};
+
+  return head->getNextLinkType();
 }
 
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,

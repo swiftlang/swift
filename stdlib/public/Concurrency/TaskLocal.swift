@@ -252,9 +252,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
                                  operation: () async throws -> R,
                                  isolation: isolated (any Actor)?,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
-    // check if we're not trying to bind a value from an illegal context; this may crash
-    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
-
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
 
@@ -269,9 +266,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
                                  operation: () async throws -> R,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
-    // check if we're not trying to bind a value from an illegal context; this may crash
-    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
-
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
 
@@ -296,9 +290,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
                            file: String = #fileID, line: UInt = #line) rethrows -> R {
-    // check if we're not trying to bind a value from an illegal context; this may crash
-    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
-
     _taskLocalValuePush(key: key, value: valueDuringOperation)
     defer { _taskLocalValuePop() }
 
