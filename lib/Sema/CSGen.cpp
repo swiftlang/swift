@@ -4630,7 +4630,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     // `next` is always async but witness might not be throwing
     if (isAsync) {
       nextCall =
-          AwaitExpr::createImplicit(ctx, /*awaitLoc=*/SourceLoc(), nextCall);
+          AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
     }
 
     // The iterator type must conform to IteratorProtocol.
