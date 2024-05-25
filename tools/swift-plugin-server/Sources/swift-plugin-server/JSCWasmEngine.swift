@@ -37,10 +37,8 @@ final class JSCWasmEngine: WasmEngine {
   private let runner: JSValue
   private let api: JSValue
 
-  init(path: FilePath, imports: WASIBridgeToHost) async throws {
-    guard #available(macOS 10.15, *) else { fatalError("JSCWasmEngine requires macOS 10.15+") }
-
-    let factory = try await JSCWasmFactory.shared
+  init(path: FilePath, imports: WASIBridgeToHost) throws {
+    let factory = try JSCWasmFactory.shared
     let context = factory.context
 
     var memory: JSCGuestMemory?
@@ -70,7 +68,7 @@ final class JSCWasmEngine: WasmEngine {
       throw JSCWasmError(message: "Failed to load plugin", value: context.exception)
     }
 
-    runner = try await promise.promiseValue
+    runner = try promise.synchronousPromiseValue()
     api = runner.objectForKeyedSubscript("api")!
 
     let getMemory = runner.objectForKeyedSubscript("read")!
@@ -111,14 +109,13 @@ private struct JSCGuestMemory: GuestMemory {
   }
 }
 
-@available(macOS 10.15, *)
 private struct JSCWasmFactory {
   let context: JSContext
   let value: JSValue
 
-  private init() async throws {
-    // the VM must be created on the MainActor for async methods to work.
-    let vm = await MainActor.run { JSVirtualMachine() }
+  // NB: the VM must be created on the MainActor for promises to work.
+  private init() throws {
+    let vm = JSVirtualMachine()
     guard let context = JSContext(virtualMachine: vm) else {
       throw JSCWasmError(message: "Failed to load plugin")
     }
@@ -126,13 +123,13 @@ private struct JSCWasmFactory {
     self.value = context.evaluateScript(js)
   }
 
-  private static let _shared = Task {
-    try await JSCWasmFactory()
+  private static let _shared = Result {
+    try JSCWasmFactory()
   }
 
   static var shared: JSCWasmFactory {
-    get async throws {
-      try await _shared.value
+    get throws {
+      try _shared.get()
     }
   }
 }
@@ -219,34 +216,40 @@ extension JSValue {
     withUnsafeArrayBuffer { Data($0) }
   }
 
-  @available(macOS 10.15, *)
-  fileprivate var promiseValue: JSValue {
-    get async throws {
-      try await withCheckedThrowingContinuation { continuation in
-        typealias Handler = @convention(block) (JSValue) -> Void
-        let successFunc = JSValue(
-          object: {
-            continuation.resume(returning: $0)
-          } as Handler,
-          in: context
-        )
-        let rejectFunc = JSValue(
-          object: { error in
-            continuation.resume(
-              throwing: JSCWasmError(message: "Promise rejected", value: error)
-            )
-          } as @convention(block) (JSValue) -> Void,
-          in: context
-        )
-        guard let successFunc, let rejectFunc else {
-          continuation.resume(throwing: JSCWasmError(message: "Could not await promise"))
-          return
-        }
-        invokeMethod("then", withArguments: [successFunc, rejectFunc])
-        if let exception = context.exception {
-          continuation.resume(throwing: JSCWasmError(message: "Promise.then threw", value: exception))
-        }
-      }
+  private func getPromise(completion: @escaping (Result<JSValue, Error>) -> Void) {
+    typealias Handler = @convention(block) (JSValue) -> Void
+    let successFunc = JSValue(
+      object: {
+        completion(.success($0))
+      } as Handler,
+      in: context
+    )
+    let rejectFunc = JSValue(
+      object: { error in
+        completion(.failure(
+          JSCWasmError(message: "Promise rejected", value: error)
+        ))
+      } as @convention(block) (JSValue) -> Void,
+      in: context
+    )
+    guard let successFunc, let rejectFunc else {
+      completion(.failure(JSCWasmError(message: "Could not await promise")))
+      return
+    }
+    invokeMethod("then", withArguments: [successFunc, rejectFunc])
+    if let exception = context.exception {
+      completion(.failure(JSCWasmError(message: "Promise.then threw", value: exception)))
+    }
+  }
+
+  func synchronousPromiseValue() throws -> JSValue {
+    var result: Result<JSValue, Error>?
+    getPromise {
+      result = $0
+    }
+    while true {
+      if let result { return try result.get() }
+      RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
     }
   }
 }
