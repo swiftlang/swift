@@ -3093,7 +3093,7 @@ bool AbstractStorageDecl::isSetterMutating() const {
 
 StorageMutability 
 AbstractStorageDecl::mutability(const DeclContext *useDC,
-                                const DeclRefExpr *base) const {
+                                std::optional<const DeclRefExpr *> base ) const {
   if (auto vd = dyn_cast<VarDecl>(this))
     return vd->mutability(useDC, base);
 
@@ -3109,8 +3109,10 @@ AbstractStorageDecl::mutability(const DeclContext *useDC,
 /// 'optional' storage requirements, which lack support for direct
 /// writes in Swift.
 StorageMutability
-AbstractStorageDecl::mutabilityInSwift(const DeclContext *useDC,
-                                       const DeclRefExpr *base) const {
+AbstractStorageDecl::mutabilityInSwift(
+    const DeclContext *useDC,
+    std::optional<const DeclRefExpr *> base
+) const {
   // TODO: Writing to an optional storage requirement is not supported in Swift.
   if (getAttrs().hasAttribute<OptionalAttr>()) {
     return StorageMutability::Immutable;
@@ -7312,7 +7314,7 @@ static StorageMutability storageIsMutable(bool isMutable) {
 /// is a let member in an initializer.
 StorageMutability
 VarDecl::mutability(const DeclContext *UseDC,
-                    const DeclRefExpr *base) const {
+                    std::optional<const DeclRefExpr *> base) const {
   // Parameters are settable or not depending on their ownership convention.
   if (auto *PD = dyn_cast<ParamDecl>(this))
     return storageIsMutable(!PD->isImmutableInFunctionBody());
@@ -7322,9 +7324,12 @@ VarDecl::mutability(const DeclContext *UseDC,
   if (!isLet()) {
     if (hasInitAccessor()) {
       if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
-        if (base && ctor->getImplicitSelfDecl() != base->getDecl())
-          return storageIsMutable(supportsMutation());
-        return StorageMutability::Initializable;
+        // If we're referencing 'self.', it's initializable.
+        if (!base ||
+            (*base && ctor->getImplicitSelfDecl() == (*base)->getDecl()))
+          return StorageMutability::Initializable;
+
+        return storageIsMutable(supportsMutation());
       }
     }
 
@@ -7382,9 +7387,6 @@ VarDecl::mutability(const DeclContext *UseDC,
         getDeclContext()->getSelfNominalTypeDecl())
       return StorageMutability::Immutable;
 
-    if (base && CD->getImplicitSelfDecl() != base->getDecl())
-      return StorageMutability::Immutable;
-
     // If this is a convenience initializer (i.e. one that calls
     // self.init), then let properties are never mutable in it.  They are
     // only mutable in designated initializers.
@@ -7392,7 +7394,11 @@ VarDecl::mutability(const DeclContext *UseDC,
     if (initKindAndExpr.initKind == BodyInitKind::Delegating)
       return StorageMutability::Immutable;
 
-    return StorageMutability::Initializable;
+    // If we were given a base and it is 'self', it's initializable.
+    if (!base || (*base && CD->getImplicitSelfDecl() == (*base)->getDecl()))
+      return StorageMutability::Initializable;
+
+    return StorageMutability::Immutable;
   }
 
   // If the 'let' has a value bound to it but has no PBD, then it is
