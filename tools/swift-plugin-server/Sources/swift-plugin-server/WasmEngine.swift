@@ -17,7 +17,7 @@ import SystemPackage
 typealias WasmFunction = ([UInt32]) throws -> [UInt32]
 
 protocol WasmEngine {
-  init(path: FilePath, imports: WASIBridgeToHost) async throws
+  init(path: FilePath, imports: WASIBridgeToHost) throws
 
   func function(named name: String) throws -> WasmFunction?
 }
@@ -31,7 +31,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   private let pumpFunction: WasmFunction
   let engine: Engine
 
-  init(path: FilePath) async throws {
+  init(path: FilePath) throws {
     let hostToPluginPipes = try FileDescriptor.pipe()
     let pluginToHostPipes = try FileDescriptor.pipe()
     self.hostToPlugin = hostToPluginPipes.writeEnd
@@ -42,7 +42,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
       stdout: pluginToHostPipes.writeEnd,
       stderr: .standardError
     )
-    engine = try await Engine(path: path, imports: bridge)
+    engine = try Engine(path: path, imports: bridge)
 
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
@@ -56,7 +56,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     _ = try start([])
   }
 
-  func handleMessage(_ json: [UInt8]) async throws -> [UInt8] {
+  func handleMessage(_ json: [UInt8]) throws -> [UInt8] {
     try withUnsafeBytes(of: UInt64(json.count).littleEndian) {
       _ = try hostToPlugin.writeAll($0)
     }

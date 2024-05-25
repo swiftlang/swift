@@ -6,46 +6,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   FetchContent_Declare(WasmKit SOURCE_DIR "${PROJECT_SOURCE_DIR}/../wasmkit")
   FetchContent_MakeAvailable(WasmKit)
 
-  # _swiftCSwiftPluginServer is just a C support library for swift-plugin-server
-  # Don't bother to create '.a' for that.
-  add_swift_host_library(_swiftCSwiftPluginServer OBJECT
-    Sources/CSwiftPluginServer/PluginServer.cpp
-  )
-  target_link_libraries(_swiftCSwiftPluginServer PRIVATE
-    swiftDemangling
-  )
-  target_include_directories(_swiftCSwiftPluginServer PUBLIC
-    Sources/CSwiftPluginServer/include
-  )
-
-  add_pure_swift_host_library(SwiftPluginServerSupport EMIT_MODULE
-    Sources/SwiftPluginServerSupport/SwiftPluginServerSupport.swift
-    DEPENDENCIES
-      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
-      SwiftCompilerPluginMessageHandling
-  )
-  target_include_directories(SwiftPluginServerSupport PRIVATE
-    Sources/CSwiftPluginServer/include
-  )
-
-  add_pure_swift_host_tool(swift-plugin-server
-    Sources/swift-plugin-server/swift-plugin-server.swift
-    DEPENDENCIES
-      swiftDemangling
-      $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
-    SWIFT_COMPONENT
-      compiler
-    SWIFT_DEPENDENCIES
-      SwiftSyntaxMacros
-      SwiftSyntaxMacroExpansion
-      SwiftCompilerPluginMessageHandling
-      swiftLLVMJSON
-      SwiftPluginServerSupport
-  )
-  target_include_directories(swift-plugin-server PRIVATE
-    Sources/CSwiftPluginServer/include
-  )
-
   set(SWIFT_WASM_ALLOW_JSC ON CACHE BOOL "Use JavaScriptCore Wasm runtime if possible" FORCE)
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -62,26 +22,25 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     set(jsc_defines)
   endif()
 
-  add_pure_swift_host_tool(swift-wasm-plugin-server
-    Sources/swift-wasm-plugin-server/swift-wasm-plugin-server.swift
-    Sources/swift-wasm-plugin-server/JSCWasmEngine.swift
-    Sources/swift-wasm-plugin-server/WasmEngine.swift
-    Sources/swift-wasm-plugin-server/WasmKitEngine.swift
+  add_pure_swift_host_tool(swift-plugin-server
+    Sources/swift-plugin-server/swift-plugin-server.swift
+    Sources/swift-plugin-server/JSCWasmEngine.swift
+    Sources/swift-plugin-server/WasmEngine.swift
+    Sources/swift-plugin-server/WasmKitEngine.swift
+    Sources/swift-plugin-server/WasmMessageHandler.swift
     SWIFT_COMPONENT
       compiler
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
-      swiftLLVMJSON
-      SwiftPluginServerSupport
+      SwiftLibraryPluginProvider
       ${wasi_dep}
   )
-  target_compile_definitions(swift-wasm-plugin-server PRIVATE ${jsc_defines})
-  target_include_directories(swift-wasm-plugin-server PRIVATE
-    Sources/CSwiftPluginServer/include
-  )
+
+  target_compile_definitions(swift-plugin-server PRIVATE ${jsc_defines})
+
   if (swift_wasm_use_jsc)
-    add_custom_command(TARGET swift-wasm-plugin-server POST_BUILD COMMAND
-      codesign -fs - $<TARGET_FILE:swift-wasm-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
+    add_custom_command(TARGET swift-plugin-server POST_BUILD COMMAND
+      codesign -fs - $<TARGET_FILE:swift-plugin-server> --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/allow-jit.plist
     )
   endif()
 endif()
