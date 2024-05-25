@@ -14,10 +14,12 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
 using namespace swift;
@@ -139,6 +141,204 @@ bool DeclRefExprAnalysis::compute(Expr *expr) {
   }
 
   return result;
+}
+
+static SILIsolationInfo
+inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
+  // We want to search for an alloc_stack that is not from a VarDecl and that is
+  // initially isolated along all paths to the same actor isolation. If they
+  // differ, then we emit a we do not understand error.
+  struct AddressWalkerState {
+    AllocStackInst *asi = nullptr;
+    SmallVector<Operand *, 8> indirectResultUses;
+    llvm::SmallSetVector<SILInstruction *, 8> writes;
+    Operand *sameBlockIndirectResultUses = nullptr;
+  };
+
+  struct AddressWalker final : TransitiveAddressWalker<AddressWalker> {
+    AddressWalkerState &state;
+
+    AddressWalker(AddressWalkerState &state) : state(state) {
+      assert(state.asi);
+    }
+
+    bool visitUse(Operand *use) {
+      // If we do not write to memory, then it is harmless.
+      if (!use->getUser()->mayWriteToMemory())
+        return true;
+
+      if (auto fas = FullApplySite::isa(use->getUser())) {
+        if (fas.isIndirectResultOperand(*use)) {
+          // If our indirect result use is in the same block...
+          auto *parentBlock = state.asi->getParent();
+          if (fas.getParent() == parentBlock) {
+            // If we haven't seen any indirect result use yet... just cache it
+            // and return true.
+            if (!state.sameBlockIndirectResultUses) {
+              state.sameBlockIndirectResultUses = use;
+              return true;
+            }
+
+            // If by walking from the alloc stack to the full apply site, we do
+            // not see the current sameBlockIndirectResultUses, we have a new
+            // newest use.
+            if (llvm::none_of(
+                    llvm::make_range(state.asi->getIterator(),
+                                     fas->getIterator()),
+                    [&](const SILInstruction &inst) {
+                      return &inst ==
+                             state.sameBlockIndirectResultUses->getUser();
+                    })) {
+              state.sameBlockIndirectResultUses = use;
+            }
+            return true;
+          }
+
+          // If not, just stash it into the non-same block indirect result use
+          // array.
+          state.indirectResultUses.push_back(use);
+          return true;
+        }
+      }
+
+      state.writes.insert(use->getUser());
+      return true;
+    }
+  };
+
+  AddressWalkerState state;
+  state.asi = asi;
+  AddressWalker walker(state);
+
+  // If we fail to walk, emit an unknown patten error.
+  if (AddressUseKind::Unknown == std::move(walker).walk(asi)) {
+    return SILIsolationInfo();
+  }
+
+  // If we do not have any indirect result uses... we can just assign fresh.
+  if (!state.sameBlockIndirectResultUses && state.indirectResultUses.empty())
+    return SILIsolationInfo::getDisconnected(false /*isUnsafeNonIsolated*/);
+
+  // Otherwise, lets see if we had a same block indirect result.
+  if (state.sameBlockIndirectResultUses) {
+    // If we do not have any writes in between the alloc stack and the
+    // initializer, then we have a good target. Otherwise, we just return
+    // AssignFresh.
+    if (llvm::none_of(
+            llvm::make_range(
+                asi->getIterator(),
+                state.sameBlockIndirectResultUses->getUser()->getIterator()),
+            [&](SILInstruction &inst) { return state.writes.count(&inst); })) {
+      auto isolationInfo =
+          SILIsolationInfo::get(state.sameBlockIndirectResultUses->getUser());
+      if (isolationInfo) {
+        return isolationInfo;
+      }
+    }
+
+    // If we did not find an isolation info, just do a normal assign fresh.
+    return SILIsolationInfo::getDisconnected(false /*is unsafe non isolated*/);
+  }
+
+  // Check if any of our writes are within the first block. This would
+  // automatically stop our search and we should assign fresh. Since we are
+  // going over the writes here, also setup a writeBlocks set.
+  auto *defBlock = asi->getParent();
+  BasicBlockSet writeBlocks(defBlock->getParent());
+  for (auto *write : state.writes) {
+    if (write->getParent() == defBlock)
+      return SILIsolationInfo::getDisconnected(false /*unsafe non isolated*/);
+    writeBlocks.insert(write->getParent());
+  }
+
+  // Ok, at this point we know that we do not have any indirect result uses in
+  // the def block and also we do not have any writes in that initial
+  // block. This sets us up for our global analysis. Our plan is as follows:
+  //
+  // 1. We are going to create a set of writeBlocks and a map from SILBasicBlock
+  // -> first indirect result block if there isn't a write before it.
+  //
+  // 2. We walk from our def block until we reach the first indirect result
+  // block. We stop processing successor if we find a write block successor that
+  // is not also an indirect result block. This makes sense since we earlier
+  // required that any notates indirect result block do not have any writes in
+  // between the indirect result and the beginning of the block.
+  llvm::SmallDenseMap<SILBasicBlock *, Operand *, 2> blockToOperandMap;
+  for (auto *use : state.indirectResultUses) {
+    // If our indirect result use has a write before it in the block, do not
+    // store it. It cannot be our indirect result initializer.
+    if (writeBlocks.contains(use->getParentBlock()) &&
+        llvm::any_of(
+            use->getParentBlock()->getRangeEndingAtInst(use->getUser()),
+            [&](SILInstruction &inst) { return state.writes.contains(&inst); }))
+      continue;
+
+    // Ok, we now know that there aren't any writes before us in the block. Now
+    // try to insert.
+    auto iter = blockToOperandMap.try_emplace(use->getParentBlock(), use);
+
+    // If we actually inserted, then we are done.
+    if (iter.second) {
+      continue;
+    }
+
+    // Otherwise, if we are before the current value, set us to be the value
+    // instead.
+    if (llvm::none_of(
+            use->getParentBlock()->getRangeEndingAtInst(use->getUser()),
+            [&](const SILInstruction &inst) {
+              return &inst == iter.first->second->getUser();
+            })) {
+      iter.first->getSecond() = use;
+    }
+  }
+
+  // Ok, we now have our data all setup.
+  BasicBlockWorklist worklist(asi->getFunction());
+  for (auto *succBlock : asi->getParentBlock()->getSuccessorBlocks()) {
+    worklist.pushIfNotVisited(succBlock);
+  }
+
+  Operand *targetOperand = nullptr;
+  while (auto *next = worklist.pop()) {
+    // First check if this is one of our target blocks.
+    auto iter = blockToOperandMap.find(next);
+
+    // If this is our target blocks...
+    if (iter != blockToOperandMap.end()) {
+      // If we already have an assigned target block, make sure this is the same
+      // one. If it is, just continue. Otherwise, something happened we do not
+      // understand... assign fresh.
+      if (!targetOperand) {
+        targetOperand = iter->second;
+        continue;
+      }
+
+      if (targetOperand->getParentBlock() == iter->first) {
+        continue;
+      }
+
+      return SILIsolationInfo::getDisconnected(
+          false /*is unsafe non isolated*/);
+    }
+
+    // Otherwise, see if this block is a write block. If so, we have a path to a
+    // write block that does not go through one of our blockToOperandMap
+    // blocks... return assign fresh.
+    if (writeBlocks.contains(next))
+      return SILIsolationInfo::getDisconnected(
+          false /*is unsafe non isolated*/);
+
+    // Otherwise, visit this blocks successors if we have not yet visited them.
+    for (auto *succBlock : next->getSuccessorBlocks()) {
+      worklist.pushIfNotVisited(succBlock);
+    }
+  }
+
+  // At this point, we know that we have a single indirect result use that
+  // dominates all writes and other indirect result uses. We can say that our
+  // alloc_stack temporary is that indirect result use's isolation.
+  return SILIsolationInfo::get(targetOperand->getUser());
 }
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
@@ -474,6 +674,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           return SILIsolationInfo::getDisconnected(
               true /*is nonisolated(unsafe)*/);
         }
+      }
+    } else {
+      // Ok, we have a temporary. If it is non-Sendable...
+      if (SILIsolationInfo::isNonSendableType(asi)) {
+        if (auto isolation = inferIsolationInfoForTempAllocStack(asi))
+          return isolation;
       }
     }
   }
@@ -842,3 +1048,28 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // Otherwise, just return other.
   return other;
 }
+
+//===----------------------------------------------------------------------===//
+//                                MARK: Tests
+//===----------------------------------------------------------------------===//
+
+namespace swift::test {
+
+// Arguments:
+// - SILValue: value to emit a name for.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest
+    IsolationInfoInferrence("sil-isolation-info-inference",
+                            [](auto &function, auto &arguments, auto &test) {
+                              auto value = arguments.takeValue();
+
+                              SILIsolationInfo info =
+                                  SILIsolationInfo::get(value);
+                              llvm::outs() << "Input Value: " << *value;
+                              llvm::outs() << "Isolation: ";
+                              info.printForOneLineLogging(llvm::outs());
+                              llvm::outs() << "\n";
+                            });
+
+} // namespace swift::test
