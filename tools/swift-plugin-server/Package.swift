@@ -10,8 +10,7 @@ let package = Package(
     .macOS(.v10_15)
   ],
   products: [
-    .library(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
-    .library(name: "swift-wasm-plugin-server", targets: ["swift-wasm-plugin-server"]),
+    .executable(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
   ],
   dependencies: [
     .package(path: "../../../swift-syntax"),
@@ -22,12 +21,7 @@ let package = Package(
       name: "swift-plugin-server",
       dependencies: [
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-      ]
-    ),
-    .target(
-      name: "swift-wasm-plugin-server",
-      dependencies: [
-        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "SwiftLibraryPluginProvider", package: "swift-syntax"),
         .product(name: "WASI", package: "WasmKit"),
         .product(name: "WasmKitWASI", package: "WasmKit", condition: .when(
             platforms: [.linux, .windows] + (allowJSC ? [] : [.macOS])
