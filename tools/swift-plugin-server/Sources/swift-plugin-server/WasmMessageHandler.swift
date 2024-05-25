@@ -1,5 +1,4 @@
 import SystemPackage
-import Dispatch
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 
 /// A `PluginMessageHandler` that intercepts messages intended for Wasm plugins.
