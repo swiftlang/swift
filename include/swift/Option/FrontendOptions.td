@@ -1158,11 +1158,6 @@ def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
 
-def experimental_skip_non_inlinable_function_bodies_is_lazy
-  : Flag<["-"], "experimental-skip-non-inlinable-function-bodies-is-lazy">,
-  HelpText<"Infer lazy typechecking for "
-           "-experimental-skip-non-inlinable-function-bodies">;
-
 def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
   Flags<[HelpHidden]>,
