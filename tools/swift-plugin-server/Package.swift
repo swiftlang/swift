@@ -9,9 +9,6 @@ let package = Package(
   platforms: [
     .macOS(.v10_15)
   ],
-  products: [
-    .executable(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
-  ],
   dependencies: [
     .package(path: "../../../swift-syntax"),
     .package(path: "../../../wasmkit"),
