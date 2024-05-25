@@ -3117,10 +3117,10 @@ static void suppressingFeatureOptionalIsolatedParameters(
   action();
 }
 
-static void suppressingFeatureTransferringArgsAndResults(
-    PrintOptions &options, llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressTransferringArgsAndResults,
-                                   true);
+static void
+suppressingFeatureSendingArgsAndResults(PrintOptions &options,
+                                        llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressSendingArgsAndResults, true);
   action();
 }
 
@@ -3722,8 +3722,6 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
-  if (!options.SuppressTransferringArgsAndResults && flags.isTransferring())
-    printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -3749,11 +3747,14 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("__owned", options, " ");
     break;
   case ParamSpecifier::ImplicitlyCopyableConsuming:
-    // Nothing... we infer from transferring.
-    assert(flags.isTransferring() && "Only valid when transferring is enabled");
+    // Nothing... we infer from sending.
+    assert(flags.isSending() && "Only valid when sending is enabled");
     break;
   }
-  
+
+  if (!options.SuppressSendingArgsAndResults && flags.isSending())
+    printer.printAttrName("sending ");
+
   if (flags.isIsolated()) {
     if (!(param && param->getInterfaceType()->isOptional() &&
           options.SuppressOptionalIsolatedParams))
@@ -4183,13 +4184,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
       }
 
-      if (!Options.SuppressTransferringArgsAndResults) {
-        if (decl->hasTransferringResult()) {
-          Printer << "transferring ";
+      if (!Options.SuppressSendingArgsAndResults) {
+        if (decl->hasSendingResult()) {
+          Printer << "sending ";
         } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
                        decl->getInterfaceType())) {
-          if (ft->hasExtInfo() && ft->hasTransferringResult()) {
-            Printer << "transferring ";
+          if (ft->hasExtInfo() && ft->hasSendingResult()) {
+            Printer << "sending ";
           }
         }
       }
@@ -6652,9 +6653,9 @@ public:
 
     Printer << " -> ";
 
-    if (!Options.SuppressTransferringArgsAndResults && T->hasExtInfo() &&
-        T->hasTransferringResult()) {
-      Printer.printKeyword("transferring ", Options);
+    if (!Options.SuppressSendingArgsAndResults && T->hasExtInfo() &&
+        T->hasSendingResult()) {
+      Printer.printKeyword("sending ", Options);
     }
 
     if (T->hasLifetimeDependenceInfo()) {
@@ -7572,9 +7573,9 @@ void SILParameterInfo::print(ASTPrinter &Printer,
     Printer << "@noDerivative ";
   }
 
-  if (options.contains(SILParameterInfo::Transferring)) {
-    options -= SILParameterInfo::Transferring;
-    Printer << "@sil_transferring ";
+  if (options.contains(SILParameterInfo::Sending)) {
+    options -= SILParameterInfo::Sending;
+    Printer << "@sil_sending ";
   }
 
   if (options.contains(SILParameterInfo::Isolated)) {
@@ -7615,9 +7616,9 @@ void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
     Printer << "@noDerivative ";
   }
 
-  if (options.contains(SILResultInfo::IsTransferring)) {
-    options -= SILResultInfo::IsTransferring;
-    Printer << "@sil_transferring ";
+  if (options.contains(SILResultInfo::IsSending)) {
+    options -= SILResultInfo::IsSending;
+    Printer << "@sil_sending ";
   }
 
   assert(!bool(options) && "ResultInfo has option that was not handled?!");
@@ -7861,7 +7862,24 @@ swift::getInheritedForPrinting(
   // Collect explicit inherited types.
   for (auto i : inherited.getIndices()) {
     if (auto ty = inherited.getResolvedType(i)) {
+      // Preserve inverses separately, because the `foundUnprintable` logic
+      // doesn't handle compositions with a mix of printable and unprintable
+      // types! That's handled later by `InheritedProtocolCollector`.
+      //
+      // Generally speaking, `getInheritedForPrinting` needs to be
+      // querying `InheritedProtocolCollector` to find out what protocols it
+      // should print in the inheritance clause, to reduce code duplication
+      // in the printer.
+      InvertibleProtocolSet printableInverses;
+
       bool foundUnprintable = ty.findIf([&](Type subTy) {
+        {
+          // We canonicalize the composition to ensure no inverses are missed.
+          auto subCanTy = subTy->getCanonicalType();
+          if (auto PCT = subCanTy->getAs<ProtocolCompositionType>()) {
+            printableInverses.insertAll(PCT->getInverses());
+          }
+        }
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !options.shouldPrint(aliasTy->getDecl());
         if (auto NTD = subTy->getAnyNominal()) {
@@ -7870,8 +7888,22 @@ swift::getInheritedForPrinting(
         }
         return false;
       });
-      if (foundUnprintable)
+
+      // Preserve any inverses that appeared in the unprintable type.
+      if (foundUnprintable) {
+        if (printableInverses.contains(InvertibleProtocolKind::Copyable)
+            && options.SuppressNoncopyableGenerics)
+          printableInverses.remove(InvertibleProtocolKind::Copyable);
+
+        if (!printableInverses.empty()) {
+          auto inversesTy = ProtocolCompositionType::get(decl->getASTContext(),
+                                                         /*members=*/{},
+                                                         printableInverses,
+                                                         /*anyObject=*/false);
+          Results.push_back(InheritedEntry(TypeLoc::withoutLoc(inversesTy)));
+        }
         continue;
+      }
 
       // Suppress Copyable and ~Copyable.
       if (options.SuppressNoncopyableGenerics) {

@@ -153,6 +153,7 @@ extension BridgedTestArguments {
 public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
+    getAccessBaseTest,
     argumentConventionsTest,
     borrowIntroducersTest,
     enclosingValuesTest,
@@ -165,7 +166,9 @@ public func registerOptimizerTests() {
     linearLivenessTest,
     parseTestSpecificationTest,
     variableIntroducerTest,
-    gatherCallSitesTest
+    gatherCallSitesTest,
+    specializedFunctionSignatureAndBodyTest,
+    rewrittenCallerBodyTest
   )
 
   // Finally register the thunk they all call through.

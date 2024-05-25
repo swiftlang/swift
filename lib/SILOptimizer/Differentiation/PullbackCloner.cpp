@@ -225,7 +225,11 @@ private:
         getPullback().getLoweredFunctionType()->getSubstGenericSignature());
     auto remappedSILType =
         SILType::getPrimitiveType(remappedType, ty.getCategory());
-    return getPullback().mapTypeIntoContext(remappedSILType);
+    // FIXME: Sometimes getPullback() doesn't have a generic environment, in which
+    // case callers are apparently happy to receive an interface type.
+    if (getPullback().getGenericEnvironment())
+      return getPullback().mapTypeIntoContext(remappedSILType);
+    return remappedSILType;
   }
 
   std::optional<TangentSpace> getTangentSpace(CanType type) {
@@ -665,6 +669,11 @@ private:
             }
             adjNameStream << " (scope #" << origBB->getDebugID() << ")";
             dv.Name = adjName;
+            // We have no meaningful debug location, and the type is different.
+            dv.Scope = nullptr;
+            dv.Loc = {};
+            dv.Type = {};
+            dv.DIExpr = {};
             return dv;
           }));
     return (insertion.first->getSecond() = newBuf);

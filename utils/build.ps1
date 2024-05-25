@@ -866,7 +866,9 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($HostArch.SDKInstallRoot)\usr\bin;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($HostArch.SDKInstallRoot)\usr\bin;$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+    } elseif ($UsePinnedCompilers.Contains("Swift")) {
+      $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
@@ -1106,8 +1108,6 @@ function Build-Compilers() {
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
       }
     }
-
-    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
 
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
@@ -1391,12 +1391,18 @@ function Build-Runtime([Platform]$Platform, $Arch) {
 }
 
 function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  $Targets = if ($Test) { @("default", "ExperimentalTest") } else { @("default", "install") }
+  if ($Test) {
+    $Targets = @("default", "ExperimentalTest")
+    $InstallPath = ""
+  } else {
+    $Targets = @("default", "install")
+    $InstallPath = "$($Arch.SDKInstallRoot)\usr"
+  }
 
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
     -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
-    -InstallTo "$($Arch.SDKInstallRoot)\usr" `
+    -InstallTo $InstallPath `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
@@ -1420,16 +1426,18 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       }
       $Targets = @("default", "test")
       $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-TargetProjectBinaryCache $Arch Runtime)\bin;$env:Path"
+      $InstallPath = ""
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
+      $InstallPath = "$($Arch.SDKInstallRoot)\usr"
     }
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin $FoundationBinaryCache `
-      -InstallTo "$($Arch.SDKInstallRoot)\usr" `
+      -InstallTo $InstallPath `
       -Arch $Arch `
       -Platform $Platform `
       -UseBuiltCompilers ASM,C,Swift `
@@ -1469,16 +1477,18 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
         XCTEST_PATH_TO_FOUNDATION_BUILD = $FoundationBinaryCache;
       }
       $Targets = @("default", "check-xctest")
+      $InstallPath = ""
       $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-TargetProjectBinaryCache $Arch Runtime)\bin;$env:Path;$UnixToolsBinDir"
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
+      $InstallPath = "$($Arch.XCTestInstallRoot)\usr"
     }
 
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin $XCTestBinaryCache `
-      -InstallTo "$($Arch.XCTestInstallRoot)\usr" `
+      -InstallTo $InstallPath `
       -Arch $Arch `
       -Platform $Platform `
       -UseBuiltCompilers Swift `

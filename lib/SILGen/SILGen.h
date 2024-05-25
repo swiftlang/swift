@@ -381,7 +381,7 @@ public:
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
-                      IsSerialized_t isSerialized, SILDeclRef requirement,
+                      SerializedKind_t serializedKind, SILDeclRef requirement,
                       SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
                       Witness witness);
 
@@ -624,6 +624,11 @@ public:
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
+
+  /// Replace local archetypes captured from outer AST contexts with primary
+  /// archetypes.
+  void recontextualizeCapturedLocalArchetypes(
+      SILFunction *F, GenericSignatureWithCapturedEnvironments sig);
 
 private:
   /// The most recent declaration we considered for emission.

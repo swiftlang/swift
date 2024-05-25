@@ -98,6 +98,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
+  public func getLoweredType(in function: Function) -> Type {
+    function.bridged.getLoweredType(self.bridged).type
+  }
+
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.

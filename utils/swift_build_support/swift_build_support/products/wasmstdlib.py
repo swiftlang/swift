@@ -42,6 +42,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self._build(host_target, 'wasm32-wasi')
 
     def _build(self, host_target, target_triple):
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', '/usr')
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
@@ -61,6 +62,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'SWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
         self.cmake_options.define(
             'SWIFT_NATIVE_LLVM_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
+        self.cmake_options.define(
+            'BOOTSTRAPPING_MODE:STRING', 'CROSSCOMPILE')
         self.cmake_options.define(
             'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
@@ -99,6 +102,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL', 'TRUE')
         self.cmake_options.define(
             'SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE:PATH',
@@ -112,7 +116,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         # Test configuration
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
-        lit_test_paths = ['IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded']
+        lit_test_paths = ['IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded/wasm']
         lit_test_paths = [os.path.join(
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',

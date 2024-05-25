@@ -59,16 +59,25 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
     return
   }
 
-  for inst in function.instructions {
-    if let ari = inst as? AllocRefInstBase {
-      if !context.continueWithNextSubpassRun(for: inst) {
+  var allocRefs = Stack<AllocRefInstBase>(context)
+  defer { allocRefs.deinitialize() }
+
+  allocRefs.append(contentsOf: function.instructions.lazy.compactMap { $0 as? AllocRefInstBase })
+
+  // Try multiple iterations to handle multi-dimensional arrays.
+  var changed: Bool
+  repeat {
+    changed = false
+    for ari in allocRefs where !ari.isDeleted {
+      if !context.continueWithNextSubpassRun(for: ari) {
         return
       }
       if let globalValue = optimizeObjectAllocation(allocRef: ari, context) {
         optimizeFindStringCall(stringArray: globalValue, context)
+        changed = true
       }
     }
-  }
+  } while changed
 }
 
 private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: FunctionPassContext) -> GlobalValueInst? {
@@ -87,7 +96,10 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
     return nil
   }
 
-  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef, ignore: endOfInitInst) else {
+  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef,
+                                                                            ignore: endOfInitInst,
+                                                                            context) else
+  {
     return nil
   }
 
@@ -136,7 +148,8 @@ private func findEndOfInitialization(of object: Value, canStoreToGlobal: Bool) -
   return nil
 }
 
-private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst: Instruction)
+private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst: Instruction,
+                               _ context: FunctionPassContext)
   -> (storesToClassFields: [StoreInst], storesToTailElements: [StoreInst])?
 {
   guard let numTailElements = allocRef.numTailElements else {
@@ -154,7 +167,7 @@ private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst:
   let tailCount = numTailElements != 0 ? numTailElements * allocRef.numStoresPerTailElement : 0
   var tailStores = Array<StoreInst?>(repeating: nil, count: tailCount)
 
-  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: ignoreInst) {
+  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: ignoreInst, context) {
     return nil
   }
 
@@ -168,7 +181,9 @@ private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst:
 private func findInitStores(of object: Value,
                             _ fieldStores: inout [StoreInst?],
                             _ tailStores: inout [StoreInst?],
-                            ignore ignoreInst: Instruction) -> Bool {
+                            ignore ignoreInst: Instruction,
+                            _ context: FunctionPassContext) -> Bool
+{
   for use in object.uses {
     let user = use.instruction
     switch user {
@@ -177,15 +192,15 @@ private func findInitStores(of object: Value,
          is MoveValueInst,
          is EndInitLetRefInst,
          is BeginBorrowInst:
-      if !findInitStores(of: user as! SingleValueInstruction, &fieldStores, &tailStores, ignore: ignoreInst) {
+      if !findInitStores(of: user as! SingleValueInstruction, &fieldStores, &tailStores, ignore: ignoreInst, context) {
         return false
       }
     case let rea as RefElementAddrInst:
-      if !findStores(inUsesOf: rea, index: rea.fieldIndex, stores: &fieldStores) {
+      if !findStores(inUsesOf: rea, index: rea.fieldIndex, stores: &fieldStores, context) {
         return false
       }
     case let rta as RefTailAddrInst:
-      if !findStores(toTailAddress: rta, tailElementIndex: 0, stores: &tailStores) {
+      if !findStores(toTailAddress: rta, tailElementIndex: 0, stores: &tailStores, context) {
         return false
       }
     case ignoreInst,
@@ -200,7 +215,8 @@ private func findInitStores(of object: Value,
   return true
 }
 
-private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, stores: inout [StoreInst?]) -> Bool {
+private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, stores: inout [StoreInst?],
+                        _ context: FunctionPassContext) -> Bool {
   for use in tailAddr.uses {
     switch use.instruction {
     case let indexAddr as IndexAddrInst:
@@ -209,26 +225,26 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
       {
         return false
       }
-      if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores) {
+      if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores, context) {
         return false
       }
     case let tea as TupleElementAddrInst:
       // The tail elements are tuples. There is a separate store for each tuple element.
       let numTupleElements = tea.tuple.type.tupleElements.count
       let tupleIdx = tea.fieldIndex
-      if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores) {
+      if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores, context) {
         return false
       }
     case let atp as AddressToPointerInst:
-      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores) {
+      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let mdi as MarkDependenceInst:
-      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores) {
+      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let pta as PointerToAddressInst:
-      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores) {
+      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let store as StoreInst:
@@ -237,7 +253,7 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
         // Just to be on the safe side..
         return false
       }
-      if !handleStore(store, index: tailElementIndex, stores: &stores) {
+      if !handleStore(store, index: tailElementIndex, stores: &stores, context) {
         return false
       }
     default:
@@ -249,10 +265,12 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
   return true
 }
 
-private func findStores(inUsesOf address: Value, index: Int, stores: inout [StoreInst?]) -> Bool {
+private func findStores(inUsesOf address: Value, index: Int, stores: inout [StoreInst?],
+                        _ context: FunctionPassContext) -> Bool
+{
   for use in address.uses {
     if let store = use.instruction as? StoreInst {
-      if !handleStore(store, index: index, stores: &stores) {
+      if !handleStore(store, index: index, stores: &stores, context) {
         return false
       }
     } else if !isValidUseOfObject(use) {
@@ -262,9 +280,11 @@ private func findStores(inUsesOf address: Value, index: Int, stores: inout [Stor
   return true
 }
 
-private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreInst?]) -> Bool {
+private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreInst?],
+                         _ context: FunctionPassContext) -> Bool
+{
   if index >= 0 && index < stores.count,
-     store.source.isValidGlobalInitValue,
+     store.source.isValidGlobalInitValue(context),
      stores[index] == nil {
     stores[index] = store
     return true

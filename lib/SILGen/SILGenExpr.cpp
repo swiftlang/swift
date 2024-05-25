@@ -3028,14 +3028,11 @@ RValueEmitter::emitClosureReference(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e, contextInfo);
 
-  SubstitutionMap subs;
-  if (e->getCaptureInfo().hasGenericParamCaptures())
-    subs = SGF.getForwardingSubstitutionMap();
-
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   SILLocation loc = e;
-  return SGF.emitClosureValue(loc, SILDeclRef(e), contextInfo, subs);
+  return SGF.emitClosureValue(loc, SILDeclRef(e), contextInfo,
+                              SubstitutionMap());
 }
 
 RValue RValueEmitter::
@@ -6142,6 +6139,11 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
     return;
 
   auto *SM = SGF.getModule().getSwiftModule();
+  if (auto *bitwiseCopyableDecl = SM->getASTContext().getProtocol(
+        KnownProtocolKind::BitwiseCopyable)) {
+    if (SM->checkConformance(eltTy, bitwiseCopyableDecl))
+      return;
+  }
   if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
     if (SM->checkConformance(eltTy, fixedWidthIntegerDecl))

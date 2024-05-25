@@ -350,7 +350,8 @@ public:
 
   FullApplySite getApplyInst() const { return AI; }
 
-  IsSerialized_t isSerialized() const;
+  bool isSerialized() const;
+  SerializedKind_t getSerializedKind() const;
 
   std::string createName() const;
 
@@ -597,16 +598,17 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // AI from parent?
 }
 
-IsSerialized_t CallSiteDescriptor::isSerialized() const {
-  if (getClosure()->getFunction()->isSerialized())
-    return IsSerialized;
-  return IsNotSerialized;
+bool CallSiteDescriptor::isSerialized() const {
+  return getClosure()->getFunction()->getSerializedKind() == IsSerialized;
+}
+SerializedKind_t CallSiteDescriptor::getSerializedKind() const {
+  return getClosure()->getFunction()->getSerializedKind();
 }
 
 std::string CallSiteDescriptor::createName() const {
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, isSerialized(),
-                                                              getApplyCallee());
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, getSerializedKind(),
+                                                         getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     Mangler.setArgumentClosureProp(getClosureIndex(), PAI);
@@ -801,7 +803,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()), ClonedName,
       ClonedTy, ClosureUser->getGenericEnvironment(),
       ClosureUser->getLocation(), IsBare, ClosureUser->isTransparent(),
-      CallSiteDesc.isSerialized(), IsNotDynamic, IsNotDistributed,
+      CallSiteDesc.getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, ClosureUser->getEntryCount(),
       ClosureUser->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
@@ -1308,8 +1310,10 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // Don't specialize non-fragile callees if the caller is fragile;
         // the specialized callee will have shared linkage, and thus cannot
         // be referenced from the fragile caller.
+        // pcmo TODO: remove F->isSerialiezd() and pass its kind to
+        // canBeInlinedIntoCaller instead.
         if (Caller->isSerialized() &&
-            !ApplyCallee->hasValidLinkageForFragileInline())
+            !ApplyCallee->canBeInlinedIntoCaller())
           continue;
 
         // If the callee uses a dynamic Self, we cannot specialize it,

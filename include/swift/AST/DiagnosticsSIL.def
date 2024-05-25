@@ -390,6 +390,8 @@ ERROR(embedded_swift_metatype,none,
       "cannot use metatype in embedded Swift", ())
 ERROR(embedded_swift_keypath,none,
       "cannot use key path in embedded Swift", ())
+ERROR(embedded_swift_dynamic_cast,none,
+      "cannot do dynamic casting in embedded Swift", ())
 ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating,none,
@@ -694,9 +696,6 @@ ERROR(isolated_after_nonisolated, none,
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
      "only non-isolated properties of 'self' can be accessed from "
      "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
-ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
-        (Type, DescriptiveDeclKind, DeclName))
 ERROR(isolated_property_mutation_in_nonisolated_context,none,
       "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
       "from a non-isolated context",
@@ -995,14 +994,14 @@ NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
 NOTE(regionbasedisolation_named_transfer_non_transferrable_callee, none,
       "sending %1%0 to %2 %3 %4 risks causing data races between %2 and %5 uses",
       (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, StringRef))
-NOTE(regionbasedisolation_named_transfer_into_transferring_param, none,
-     "%0%1 is passed as a transferring parameter; Uses in callee may race with later %0uses",
+NOTE(regionbasedisolation_named_transfer_into_sending_param, none,
+     "%0%1 is passed as a 'sending' parameter; Uses in callee may race with later %0uses",
      (StringRef, Identifier))
 NOTE(regionbasedisolation_named_notransfer_transfer_into_result, none,
-     "%0%1 cannot be a transferring result. %2 uses may race with caller uses",
+     "%0%1 cannot be a 'sending' result. %2 uses may race with caller uses",
      (StringRef, Identifier, StringRef))
-NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
-      "%0 used after being passed as a transferring parameter; Later uses could race",
+NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
+      "%0 used after being passed as a 'sending' parameter; Later uses could race",
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",

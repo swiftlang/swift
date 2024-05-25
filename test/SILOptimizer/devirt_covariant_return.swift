@@ -235,7 +235,7 @@ public class D2: D1 {
 // that D2.foo() is inlined thanks to this.
 // CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver2ys5Int32VAA2D2CF
 // CHECK-NOT: class_method
-// CHECK: checked_cast_br [exact] D1 in %{{.*}} : $D1 to D2
+// CHECK: checked_cast_br [exact] D1 in
 // CHECK: bb2
 // CHECK: global_addr
 // CHECK: load

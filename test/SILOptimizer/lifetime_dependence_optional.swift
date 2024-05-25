@@ -2,8 +2,7 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -enable-experimental-feature BorrowingSwitch
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -11,6 +10,7 @@
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
+  // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init(nilLiteral: ())
 }
@@ -30,6 +30,7 @@ extension Nillable: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable { 
 extension Nillable: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 extension Nillable: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
+  // TODO: dependsOn(immortal)
   @_transparent
   @_unsafeNonescapableResult
   public init(nilLiteral: ()) {
@@ -58,7 +59,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
-    case .some(borrowing y):
+    case .some(let y):
       return .some(try transform(y))
     case .none:
       return .none
@@ -82,7 +83,7 @@ extension Nillable where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(borrowing y):
+    case .some(let y):
       return try transform(y)
     case .none:
       return .none

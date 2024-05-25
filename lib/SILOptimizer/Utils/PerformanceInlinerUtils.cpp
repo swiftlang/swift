@@ -846,8 +846,10 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   }
 
   // A non-fragile function may not be inlined into a fragile function.
+  // pcmo TODO: remove Caller->isSerialized() and pass its kind to
+  // canBeInlinedIntoCaller instead.
   if (Caller->isSerialized() &&
-      !Callee->hasValidLinkageForFragileInline()) {
+      !Callee->canBeInlinedIntoCaller()) {
     if (!Callee->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
       llvm::errs() << "callee: " << Callee->getName() << "\n";

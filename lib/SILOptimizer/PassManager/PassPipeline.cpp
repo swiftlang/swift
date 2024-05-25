@@ -735,7 +735,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addLoopUnroll();
 }
 
-  static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
+static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionAndGlobalElimination();
   P.addReadOnlyGlobalVariablesPass();
@@ -810,6 +810,9 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addDeadObjectElimination();
   P.addObjectOutliner();
   P.addDeadStoreElimination();
+  P.addDCE();
+  P.addSimplification();
+  P.addInitializeStaticGlobals();
 
   // dead-store-elimination can expose opportunities for dead object elimination.
   P.addDeadObjectElimination();
@@ -1005,9 +1008,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   if (Options.StopOptimizationAfterSerialization)
     return P;
 
+  P.addAutodiffClosureSpecialization();
+
   // After serialization run the function pass pipeline to iteratively lower
   // high-level constructs like @_semantics calls.
   addMidLevelFunctionPipeline(P);
+
+  P.addAutodiffClosureSpecialization();
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);

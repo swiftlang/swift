@@ -655,12 +655,33 @@ namespace {
       }
 
       auto ref = resolveConcreteDeclRef(decl, locator);
+
+      // If we have a variable that's treated as an rvalue but allows
+      // assignment (for initialization) in the current context,
+      // treat it as an rvalue that we immediately load. This is
+      // the AST that's expected by SILGen.
+      bool loadImmediately = false;
+      if (auto var = dyn_cast_or_null<VarDecl>(ref.getDecl())) {
+        if (!fullType->hasLValueType()) {
+          if (var->mutability(dc) == StorageMutability::Initializable) {
+            fullType = LValueType::get(fullType);
+            adjustedFullType = LValueType::get(adjustedFullType);
+            loadImmediately = true;
+          }
+        }
+      }
+
+
       auto declRefExpr =
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
       Expr *result = adjustTypeForDeclReference(
           declRefExpr, fullType, adjustedFullType, locator);
+      // If we have to load, do so now.
+      if (loadImmediately)
+        result = cs.addImplicitLoadExpr(result);
+
       result = forceUnwrapIfExpected(result, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1695,9 +1716,23 @@ namespace {
       // For properties, build member references.
       if (auto *varDecl = dyn_cast<VarDecl>(member)) {
         // \returns result of the given function type
-        auto resultType = [](Type fnTy) -> Type {
-          return fnTy->castTo<FunctionType>()->getResult();
+        bool loadImmediately = false;
+        auto resultType = [&loadImmediately](Type fnTy) -> Type {
+          Type resultTy = fnTy->castTo<FunctionType>()->getResult();
+          if (loadImmediately)
+            return LValueType::get(resultTy);
+          return resultTy;
         };
+
+        // If we have an instance property that's treated as an rvalue
+        // but allows assignment (for initialization) in the current
+        // context, treat it as an rvalue that we immediately load.
+        // This is the AST that's expected by SILGen.
+        if (baseIsInstance && !resultType(refTy)->hasLValueType() &&
+            varDecl->mutability(dc, dyn_cast<DeclRefExpr>(base))
+                == StorageMutability::Initializable) {
+          loadImmediately = true;
+        }
 
         if (isUnboundInstanceMember) {
           assert(memberLocator.getBaseLocator() &&
@@ -1744,6 +1779,12 @@ namespace {
                 result, conversionTy));
           }
         }
+
+        // If we need to load, do so now.
+        if (loadImmediately) {
+          result = cs.addImplicitLoadExpr(result);
+        }
+
         return forceUnwrapIfExpected(result, memberLocator);
       }
 
@@ -8973,8 +9014,8 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 }
 
 /// Pattern match if an initializer has as its value a callee that returns
-/// transferring.
-static bool isTransferringInitializer(Expr *initializer) {
+/// a sent value.
+static bool isSendingInitializer(Expr *initializer) {
   auto *await = dyn_cast<AwaitExpr>(initializer);
   if (!await)
     return false;
@@ -8987,7 +9028,7 @@ static bool isTransferringInitializer(Expr *initializer) {
   if (!fType)
     return false;
 
-  return fType->hasTransferringResult();
+  return fType->hasSendingResult();
 }
 
 /// For the initializer of an `async let`, wrap it in an autoclosure and then
@@ -9001,14 +9042,14 @@ static Expr *wrapAsyncLetInitializer(
   Type initializerType = initializer->getType();
   bool throws = TypeChecker::canThrow(cs.getASTContext(), initializer)
                   .has_value();
-  bool hasTransferringResult = isTransferringInitializer(initializer);
+  bool hasSendingeResult = isSendingInitializer(initializer);
   bool isSendable = !cs.getASTContext().LangOpts.hasFeature(
       Feature::TransferringArgsAndResults);
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
                      .withThrows(throws, /*FIXME:*/ Type())
                      .withSendable(isSendable)
-                     .withTransferringResult(hasTransferringResult)
+                     .withSendingResult(hasSendingeResult)
                      .build();
 
   // Form the autoclosure expression. The actual closure here encapsulates the

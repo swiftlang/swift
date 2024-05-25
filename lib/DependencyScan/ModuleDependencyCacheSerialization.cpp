@@ -155,9 +155,9 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
   bool hasCurrentModule = false;
   std::string currentModuleName;
   unsigned currentContextHashID;
-  std::optional<std::vector<std::string>> currentModuleImports;
-  std::optional<std::vector<std::string>> currentOptionalModuleImports;
-  std::optional<std::vector<ModuleDependencyID>> currentModuleDependencyIDs;
+  std::vector<ScannerImportStatementInfo> currentModuleImports;
+  std::vector<ScannerImportStatementInfo> currentOptionalModuleImports;
+  std::vector<ModuleDependencyID> currentModuleDependencyIDs;
 
   auto getContextHash = [&]() {
     assert(currentContextHashID &&
@@ -225,15 +225,22 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
         llvm::report_fatal_error("Bad module name");
       currentModuleName = *moduleName;
       currentContextHashID = contextHashID;
-      currentModuleImports = getStringArray(moduleImportsArrayID);
-      currentOptionalModuleImports = getStringArray(optionalModuleImportsArrayID);
-      currentModuleDependencyIDs = getModuleDependencyIDArray(moduleDependencyIDArrayID);
-      if (!currentModuleImports)
-        llvm::report_fatal_error("Bad direct dependencies: no imports");
-      if (!currentOptionalModuleImports)
-        llvm::report_fatal_error("Bad direct dependencies: no optional imports");
-      if (!currentModuleDependencyIDs)
+      auto importStrings = getStringArray(moduleImportsArrayID);
+      auto optionalImportStrings = getStringArray(optionalModuleImportsArrayID);
+      if (importStrings.has_value()) {
+        for (const auto &is : importStrings.value())
+          currentModuleImports.push_back(is);
+      }
+
+      if (optionalImportStrings.has_value()) {
+        for (const auto &ois : optionalImportStrings.value())
+          currentOptionalModuleImports.push_back(ois);
+      }
+
+      auto optionalCurrentModuleDependencyIDs = getModuleDependencyIDArray(moduleDependencyIDArrayID);
+      if (!optionalCurrentModuleDependencyIDs)
         llvm::report_fatal_error("Bad direct dependencies: no qualified dependencies");
+      currentModuleDependencyIDs = optionalCurrentModuleDependencyIDs.value();
       break;
     }
 
@@ -301,14 +308,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
           *contextHash, isFramework, *rootFileSystemID, *moduleCacheKey);
 
       // Add imports of this module
-      for (const auto &moduleName : *currentModuleImports)
-        moduleDep.addModuleImport(moduleName);
+      for (const auto &moduleName : currentModuleImports)
+        moduleDep.addModuleImport(moduleName.importIdentifier);
       // Add optional imports of this module
-      for (const auto &moduleName : *currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName);
+      for (const auto &moduleName : currentOptionalModuleImports)
+        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
 
       // Add qualified dependencies of this module
-      moduleDep.resolveDirectDependencies(*currentModuleDependencyIDs);
+      moduleDep.resolveDirectDependencies(currentModuleDependencyIDs);
 
       // Add bridging header file path
       if (bridgingHeaderFileID != 0) {
@@ -412,11 +419,11 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
           extraPCMRefs);
 
       // Add dependencies of this module
-      for (const auto &moduleName : *currentModuleImports)
-        moduleDep.addModuleImport(moduleName);
+      for (const auto &moduleName : currentModuleImports)
+        moduleDep.addModuleImport(moduleName.importIdentifier);
       // Add optional imports of this module
-      for (const auto &moduleName : *currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName);
+      for (const auto &moduleName : currentOptionalModuleImports)
+        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
 
       // Add bridging header file path
       if (bridgingHeaderFileID != 0) {
@@ -504,7 +511,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
            *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
-           *currentModuleImports, *currentOptionalModuleImports,
+           currentModuleImports, currentOptionalModuleImports,
            *headerImport, isFramework, *moduleCacheKey);
 
       auto headerModuleDependencies = getStringArray(headerModuleDependenciesArrayID);
@@ -555,12 +562,13 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath);
+
       // Add dependencies of this module
-      for (const auto &moduleName : *currentModuleImports)
-        moduleDep.addModuleImport(moduleName);
+      for (const auto &moduleName : currentModuleImports)
+        moduleDep.addModuleImport(moduleName.importIdentifier);
       // Add optional imports of this module
-      for (const auto &moduleName : *currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName);
+      for (const auto &moduleName : currentOptionalModuleImports)
+        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep),
                              getContextHash());
@@ -574,12 +582,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       cache.configureForContextHash(getContextHash());
       unsigned pcmOutputPathID, mappedPCMPathID, moduleMapPathID, contextHashID,
           commandLineArrayID, fileDependenciesArrayID, capturedPCMArgsArrayID,
-          CASFileSystemRootID, clangIncludeTreeRootID, moduleCacheKeyID;
+          CASFileSystemRootID, clangIncludeTreeRootID, moduleCacheKeyID, isSystem;
       ClangModuleDetailsLayout::readRecord(
           Scratch, pcmOutputPathID, mappedPCMPathID, moduleMapPathID,
           contextHashID, commandLineArrayID, fileDependenciesArrayID,
           capturedPCMArgsArrayID, CASFileSystemRootID, clangIncludeTreeRootID,
-          moduleCacheKeyID);
+          moduleCacheKeyID, isSystem);
       auto pcmOutputPath = getIdentifier(pcmOutputPathID);
       if (!pcmOutputPath)
         llvm::report_fatal_error("Bad pcm output path");
@@ -615,14 +623,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       auto moduleDep = ModuleDependencyInfo::forClangModule(
           *pcmOutputPath, *mappedPCMPath, *moduleMapPath, *contextHash,
           *commandLineArgs, *fileDependencies, *capturedPCMArgs,
-          *rootFileSystemID, *clangIncludeTreeRoot, *moduleCacheKey);
+          *rootFileSystemID, *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
 
       // Add dependencies of this module
-      for (const auto &moduleName : *currentModuleImports)
-        moduleDep.addModuleImport(moduleName);
+      for (const auto &moduleName : currentModuleImports)
+        moduleDep.addModuleImport(moduleName.importIdentifier);
       // Add optional imports of this module
-      for (const auto &moduleName : *currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName);
+      for (const auto &moduleName : currentOptionalModuleImports)
+        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep),
                              getContextHash());
@@ -1064,7 +1072,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
         getArrayID(moduleID, ModuleIdentifierArrayKind::CapturedPCMArgs),
         getIdentifier(clangDeps->CASFileSystemRootID),
         getIdentifier(clangDeps->CASClangIncludeTreeRootID),
-        getIdentifier(clangDeps->moduleCacheKey));
+        getIdentifier(clangDeps->moduleCacheKey), clangDeps->IsSystem);
 
     break;
   }
@@ -1162,11 +1170,27 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
       auto dependencyInfo = optionalDependencyInfo.value();
       // Add the module's name
       addIdentifier(moduleID.ModuleName);
+
+      // Map import infos to their respective module identifiers
+      auto importInfoArrayToIdentifier =
+        [](const auto &importInfo) -> std::string {
+          return importInfo.importIdentifier;
+        };
+
       // Add the module's dependencies
+      std::vector<std::string> importIdentifiers;
+      llvm::transform(dependencyInfo->getModuleImports(),
+                      std::back_inserter(importIdentifiers),
+                      importInfoArrayToIdentifier);
+      std::vector<std::string> optionalImportIdentifiers;
+      llvm::transform(dependencyInfo->getOptionalModuleImports(),
+                      std::back_inserter(optionalImportIdentifiers),
+                      importInfoArrayToIdentifier);
+
       addStringArray(moduleID, ModuleIdentifierArrayKind::DependencyImports,
-                     dependencyInfo->getModuleImports());
+                     importIdentifiers);
       addStringArray(moduleID, ModuleIdentifierArrayKind::OptionalDependencyImports,
-                     dependencyInfo->getOptionalModuleImports());
+                     optionalImportIdentifiers);
       addDependencyIDArray(
           moduleID, ModuleIdentifierArrayKind::QualifiedModuleDependencyIDs,
           dependencyInfo->getDirectModuleDependencies());

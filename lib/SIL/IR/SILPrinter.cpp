@@ -1446,7 +1446,7 @@ public:
     if (AVI->usesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
-    printDebugVar(AVI->getVarInfo(),
+    printDebugVar(AVI->getVarInfo(false),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
   void visitAllocVectorInst(AllocVectorInst *AVI) {
@@ -1503,7 +1503,7 @@ public:
     }
 
     *this << ABI->getType();
-    printDebugVar(ABI->getVarInfo(),
+    printDebugVar(ABI->getVarInfo(false),
                   &ABI->getModule().getASTContext().SourceMgr);
   }
 
@@ -1550,11 +1550,17 @@ public:
       *this << "[noasync] ";
     if (auto isolationCrossing = AI->getIsolationCrossing()) {
       auto callerIsolation = isolationCrossing->getCallerIsolation();
-      if (callerIsolation != ActorIsolation::Unspecified)
-        *this << "[callee_isolation=" << callerIsolation << "] ";
+      if (callerIsolation != ActorIsolation::Unspecified) {
+        *this << "[callee_isolation=";
+        callerIsolation.printForSIL(PrintState.OS);
+        *this << "] ";
+      }
       auto calleeIsolation = isolationCrossing->getCalleeIsolation();
-      if (calleeIsolation != ActorIsolation::Unspecified)
-        *this << "[caller_isolation=" << calleeIsolation << "] ";
+      if (calleeIsolation != ActorIsolation::Unspecified) {
+        *this << "[caller_isolation=";
+        calleeIsolation.printForSIL(PrintState.OS);
+        *this << "] ";
+      }
     }
     visitApplyInstBase(AI);
   }
@@ -1915,7 +1921,7 @@ public:
     if (DVI->hasTrace())
       *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
-    printDebugVar(DVI->getVarInfo(),
+    printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
   }
 
@@ -3289,6 +3295,20 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
   OS << getLinkageString(linkage);
 }
 
+
+static void printSerializedKind(llvm::raw_ostream &OS, SerializedKind_t kind) {
+  switch (kind) {
+  case IsNotSerialized:
+    break;
+  case IsSerializedForPackage:
+    OS << "[serialized_for_package] ";
+    break;
+  case IsSerialized:
+    OS << "[serialized] ";
+    break;
+  }
+}
+
 static void printClangQualifiedNameCommentIfPresent(llvm::raw_ostream &OS,
                                                     const clang::Decl *decl) {
   if (decl) {
@@ -3328,6 +3348,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     P.printDebugScopeRef(getDebugScope(), SM);
   }
   OS << '\n';
+
+  if (auto functionIsolation = getActorIsolation()) {
+    OS << "// Isolation: ";
+    functionIsolation.print(OS);
+    OS << '\n';
+  }
   printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
 
   OS << "sil ";
@@ -3336,10 +3362,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isTransparent())
     OS << "[transparent] ";
 
-  switch (isSerialized()) {
-  case IsNotSerialized: break;
-  case IsSerialized: OS << "[serialized] "; break;
-  }
+  printSerializedKind(OS, getSerializedKind());
 
   switch (isThunk()) {
   case IsNotThunk: break;
@@ -3525,10 +3548,8 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   // Passing true for 'isDefinition' lets print the (external) linkage if it's
   // not a definition.
   printLinkage(OS, getLinkage(), /*isDefinition*/ true);
+  printSerializedKind(OS, getSerializedKind());
 
-  if (isSerialized())
-    OS << "[serialized] ";
-  
   if (isLet())
     OS << "[let] ";
 
@@ -3838,9 +3859,8 @@ void SILProperty::print(SILPrintContext &Ctx) const {
 
   auto &OS = Ctx.OS();
   OS << "sil_property ";
-  if (isSerialized())
-    OS << "[serialized] ";
-  
+  printSerializedKind(OS, getSerializedKind());
+
   OS << '#';
   printValueDecl(getDecl(), OS);
   if (auto sig = getDecl()->getInnermostDeclContext()
@@ -4017,8 +4037,8 @@ void SILVTableEntry::print(llvm::raw_ostream &OS) const {
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
-  if (isSerialized())
-    OS << "[serialized] ";
+  printSerializedKind(OS, getSerializedKind());
+  
   if (SILType classTy = getClassType()) {
     OS << classTy;
   } else {
@@ -4038,8 +4058,7 @@ void SILVTable::dump() const { print(llvm::errs()); }
 
 void SILMoveOnlyDeinit::print(llvm::raw_ostream &OS, bool verbose) const {
   OS << "sil_moveonlydeinit ";
-  if (isSerialized())
-    OS << "[serialized] ";
+  printSerializedKind(OS, getSerializedKind());
   OS << getNominalDecl()->getName() << " {\n";
   OS << "  @" << getImplementation()->getName();
   OS << "\t// " << demangleSymbol(getImplementation()->getName());
@@ -4129,8 +4148,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
-  if (isSerialized())
-    OS << "[serialized] ";
+  printSerializedKind(OS, getSerializedKind());
 
   getConformance()->printName(OS, Options);
   Options.GenericSig =

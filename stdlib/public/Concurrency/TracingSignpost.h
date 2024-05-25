@@ -23,6 +23,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/TracingCommon.h"
 #include <inttypes.h>
 #include <os/log.h>
 #include <os/signpost.h>
@@ -79,6 +80,8 @@ void setupLogs(void *unused);
 // optimized out.
 #define ENSURE_LOGS(...)                                                       \
   do {                                                                         \
+    if (!runtime::trace::tracingReady())                                       \
+      return __VA_ARGS__;                                                      \
     swift::once(LogsToken, setupLogs, nullptr);                                \
     if (!TracingEnabled)                                                       \
       return __VA_ARGS__;                                                      \
@@ -190,7 +193,7 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
       " resumefn=%p jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
       "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRIx64
       " group=%p asyncLet=%p",
-      task->getTaskId(), task->getResumeFunctionForLogging(), jobPriority,
+      task->getTaskId(), task->getResumeFunctionForLogging(true), jobPriority,
       isChildTask, isFuture, isGroupChildTask, isAsyncLetTask, parentID, group,
       asyncLet);
 }
@@ -204,7 +207,7 @@ inline void task_destroy(AsyncTask *task) {
 
 inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
                                 bool isCancelled, bool isEscalated,
-                                bool isRunning, bool isEnqueued) {
+                                bool isStarting, bool isRunning, bool isEnqueued) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_event_emit(
@@ -212,7 +215,7 @@ inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
       "task=%" PRIx64 " resumefn=%p "
       "maxPriority=%u, isCancelled=%{bool}d "
       "isEscalated=%{bool}d, isRunning=%{bool}d, isEnqueued=%{bool}d",
-      task->getTaskId(), task->getResumeFunctionForLogging(), maxPriority,
+      task->getTaskId(), task->getResumeFunctionForLogging(isStarting), maxPriority,
       isCancelled, isEscalated, isRunning, isEnqueued);
 }
 

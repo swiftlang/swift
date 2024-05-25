@@ -97,7 +97,7 @@ public actor MyActor: MyProto {
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
     // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
-    // expected-tns-note @-2 {{sending actor-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and actor-isolated uses}}
+    // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
@@ -239,7 +239,7 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 
 @available(SwiftStdlib 5.1, *)
 final class NonSendable {
-  // expected-note @-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-note @-1 4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // TransferNonSendable emits 3 fewer errors here.
   // expected-targeted-and-complete-note @-3 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // expected-complete-and-tns-note @-4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
@@ -397,12 +397,45 @@ struct DowngradeForPreconcurrency {
     }
   }
 
-  var x: Int
-  func createStream() -> AsyncStream<Int> {
-    AsyncStream<Int> {
+  var x: NonSendable
+  func createStream() -> AsyncStream<NonSendable> {
+    AsyncStream<NonSendable> {
       self.x
       // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
       // expected-note@-2 {{property access is 'async'}}
+      // expected-warning@-3 {{non-sendable type 'NonSendable' in implicitly asynchronous access to main actor-isolated property 'x' cannot cross actor boundary; this is an error in the Swift 6 language mode}}
     }
   }
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor protocol InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+struct ImplicitSendableViaMain: InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+extension ImplicitSendableViaMain {
+  nonisolated func capture() {
+    Task { @MainActor in
+      _ = self
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+struct TestImplicitSendable: Sendable {
+  var x: ImplicitSendableViaMain
+}
+
+struct UnavailableSendable {}
+
+@available(*, unavailable)
+extension UnavailableSendable: Sendable {}
+// expected-note@-1 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+
+@available(SwiftStdlib 5.1, *)
+func checkOpaqueType() -> some Sendable {
+  UnavailableSendable()
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
 }

@@ -269,3 +269,30 @@ bb0(%0 : $*C1, %1 : $*Small):
   %t = tuple ()
   return %t : $()
 }
+
+sil @use : $@convention(thin) (UInt32) -> ()
+
+// We need to make sure we use the bigger alloc_stack for the address of
+// unchecked_trivial_bit_cast. A bitcast can go from bigger to smaller type.
+
+// CHECK: sil @test11 : $@convention(thin) (@in union_t) -> () {
+// CHECK-NOT: unchecked_addr_cast %1 : $*union_t.__Unnamed_struct_in to $*union_t
+// CHECK: unchecked_addr_cast {{.*}} : $*union_t to $*union_t.__Unnamed_struct_in
+// CHECK: } // end sil function 'test11'
+
+sil @test11 : $@convention(thin) (@in union_t) -> () {
+bb0(%0 : $*union_t):
+  %1 = alloc_stack $union_t
+  %2 = alloc_stack $union_t
+  copy_addr [take] %0 to [init] %2 : $*union_t
+  %4 = load %2 : $*union_t
+  %7 = unchecked_trivial_bit_cast %4 : $union_t to $union_t.__Unnamed_struct_in
+  %8 = struct_extract %7 : $union_t.__Unnamed_struct_in, #union_t.__Unnamed_struct_in.slot
+  %10 = struct_extract %8 : $enum_t, #enum_t.rawValue
+  %11 = function_ref @use : $@convention(thin) (UInt32) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (UInt32) -> ()
+  %13 = tuple ()
+  dealloc_stack %2 : $*union_t
+  dealloc_stack %1 : $*union_t
+  return %13 : $()
+}

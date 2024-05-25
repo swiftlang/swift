@@ -126,6 +126,8 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("borrowing") &&
         (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
          !Tok.isContextualKeyword("transferring")) &&
+        (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
+         !Tok.isContextualKeyword("sending")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
         (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
          !Tok.isContextualKeyword("_resultDependsOn")))
@@ -272,7 +274,40 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             continue;
           }
 
+          diagnose(Tok, diag::transferring_is_now_sendable)
+              .fixItReplace(Tok.getLoc(), "sending");
+
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::sending_and_transferring_used_together)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
           param.TransferringLoc = consumeToken();
+          continue;
+        }
+
+        if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
+            Tok.isContextualKeyword("sending")) {
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
+                   Tok.getText())
+              .warnUntilSwiftVersion(6);
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::parameter_specifier_repeated)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
+          if (param.TransferringLoc.isValid()) {
+            diagnose(Tok, diag::sending_and_transferring_used_together)
+                .fixItRemove(param.TransferringLoc);
+            consumeToken();
+            continue;
+          }
+
+          param.SendingLoc = consumeToken();
           continue;
         }
 
@@ -294,6 +329,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
+          }
+
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::sending_before_parameter_specifier,
+                     getNameForParamSpecifier(param.SpecifierKind));
           }
 
           hasSpecifier = true;
@@ -581,7 +621,12 @@ mapParsedParameters(Parser &parser,
       if (paramInfo.TransferringLoc.isValid()) {
         type = new (parser.Context)
             TransferringTypeRepr(type, paramInfo.TransferringLoc);
-        param->setTransferring();
+        param->setSending();
+      }
+
+      if (paramInfo.SendingLoc.isValid()) {
+        type = new (parser.Context) SendingTypeRepr(type, paramInfo.SendingLoc);
+        param->setSending();
       }
 
       param->setTypeRepr(type);
@@ -612,7 +657,9 @@ mapParsedParameters(Parser &parser,
             else if (isa<ResultDependsOnTypeRepr>(STR))
               param->setResultDependsOn(true);
             else if (isa<TransferringTypeRepr>(STR))
-              param->setTransferring(true);
+              param->setSending(true);
+            else if (isa<SendingTypeRepr>(STR))
+              param->setSending(true);
             unwrappedType = STR->getBase();
             continue;
           }
@@ -1323,45 +1370,41 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   
   // The `borrowing` modifier is a contextual keyword, so it's only accepted
   // directly applied to a binding name, as in `case .foo(borrowing x)`.
-  if (Context.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if ((Tok.isContextualKeyword("_borrowing")
-         || Tok.isContextualKeyword("borrowing"))
-        && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
-                             tok::code_complete)
-        && !peekToken().isAtStartOfLine()) {
-      if (Tok.isContextualKeyword("_borrowing")) {
-        diagnose(Tok.getLoc(),
-                 diag::borrowing_syntax_change)
-          .fixItReplace(Tok.getLoc(), "borrowing");
-      }
+  if ((Tok.isContextualKeyword("_borrowing")
+       || Tok.isContextualKeyword("borrowing"))
+      && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                           tok::code_complete)
+      && !peekToken().isAtStartOfLine()) {
+    diagnose(Tok.getLoc(),
+             diag::borrowing_syntax_change)
+      .fixItReplace(Tok.getLoc(), "let");
 
-      Tok.setKind(tok::contextual_keyword);
-      SourceLoc borrowingLoc = consumeToken();
-      
-      // If we have `case borrowing x.`, `x(`, `x[`, or `x<` then this looks
-      // like an attempt to include a subexpression under a `borrowing`
-      // binding, which isn't yet supported.
-      if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
-                            tok::l_square)
-          || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc borrowingLoc = consumeToken();
+    
+    // If we have `case borrowing x.`, `x(`, `x[`, or `x<` then this looks
+    // like an attempt to include a subexpression under a `borrowing`
+    // binding, which isn't yet supported.
+    if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
+                          tok::l_square)
+        || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
 
-        // Diagnose the unsupported production.
-        diagnose(Tok.getLoc(),
-                 diag::borrowing_subpattern_unsupported);
-        
-        // Recover by parsing as if it was supported.
-        return parseMatchingPattern(isExprBasic);
-      }
-      Identifier name;
-      SourceLoc nameLoc = consumeIdentifier(name,
-                                            /*diagnoseDollarPrefix*/ false);
-      auto namedPattern = createBindingFromPattern(nameLoc, name,
-                                             VarDecl::Introducer::Borrowing);
-      auto bindPattern = new (Context) BindingPattern(
-        borrowingLoc, VarDecl::Introducer::Borrowing, namedPattern);
+      // Diagnose the unsupported production.
+      diagnose(Tok.getLoc(),
+               diag::borrowing_subpattern_unsupported);
       
-      return makeParserResult(bindPattern);
+      // Recover by parsing as if it was supported.
+      return parseMatchingPattern(isExprBasic);
     }
+    Identifier name;
+    SourceLoc nameLoc = consumeIdentifier(name,
+                                          /*diagnoseDollarPrefix*/ false);
+    auto namedPattern = createBindingFromPattern(nameLoc, name,
+                                           VarDecl::Introducer::Borrowing);
+    auto bindPattern = new (Context) BindingPattern(
+      borrowingLoc, VarDecl::Introducer::Borrowing, namedPattern);
+    
+    return makeParserResult(bindPattern);
   }
 
   // matching-pattern ::= 'is' type
@@ -1442,14 +1485,12 @@ Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  if (Context.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if ((Tok.isContextualKeyword("_borrowing")
-         || Tok.isContextualKeyword("borrowing"))
-        && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
-                             tok::code_complete)
-        && !peekToken().isAtStartOfLine()) {
-      return true;
-    }
+  if ((Tok.isContextualKeyword("_borrowing")
+       || Tok.isContextualKeyword("borrowing"))
+      && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                           tok::code_complete)
+      && !peekToken().isAtStartOfLine()) {
+    return true;
   }
 
   return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is) ||

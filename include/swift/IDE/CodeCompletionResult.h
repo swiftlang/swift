@@ -261,8 +261,6 @@ enum class NotRecommendedReason : uint8_t {
   RedundantImportIndirect,               // contextual
   Deprecated,                            // context-free
   SoftDeprecated,                        // context-free
-  InvalidAsyncContext,                   // contextual
-  CrossActorReference,                   // contextual
   VariableUsedInOwnDefinition,           // contextual
   NonAsyncAlternativeUsedInAsyncContext, // contextual
 
@@ -300,9 +298,6 @@ enum class ContextualNotRecommendedReason : uint8_t {
   None = 0,
   RedundantImport,
   RedundantImportIndirect,
-  /// A method that is async is being used in a non-async context.
-  InvalidAsyncContext,
-  CrossActorReference,
   VariableUsedInOwnDefinition,
   /// A method that is sync and has an async alternative is used in an async
   /// context.
@@ -374,7 +369,6 @@ class ContextFreeCodeCompletionResult {
   CodeCompletionMacroRoles MacroRoles;
 
   bool IsSystem : 1;
-  bool IsAsync : 1;
   /// Whether the result has been annotated as having an async alternative that
   /// should be preferred in async contexts.
   bool HasAsyncAlternative : 1;
@@ -409,7 +403,7 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
       CodeCompletionOperatorKind KnownOperatorKind,
-      CodeCompletionMacroRoles MacroRoles, bool IsSystem, bool IsAsync,
+      CodeCompletionMacroRoles MacroRoles, bool IsSystem,
       bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
@@ -421,7 +415,7 @@ public:
       NullTerminatedStringRef FilterName,
       NullTerminatedStringRef NameForDiagnostics)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind),
-        MacroRoles(MacroRoles), IsSystem(IsSystem), IsAsync(IsAsync),
+        MacroRoles(MacroRoles), IsSystem(IsSystem),
         HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
@@ -438,8 +432,6 @@ public:
            "Completion item should have diagnostic message iff the diagnostics "
            "severity is not none");
     assert(CompletionString && "Result should have a completion string");
-    assert(!(HasAsyncAlternative && IsAsync) &&
-           "A function shouldn't be both async and have an async alternative");
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None) {
       this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
     }
@@ -456,7 +448,7 @@ public:
   static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
       CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
       CodeCompletionString *CompletionString,
-      CodeCompletionOperatorKind KnownOperatorKind, bool IsAsync,
+      CodeCompletionOperatorKind KnownOperatorKin,
       NullTerminatedStringRef BriefDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
@@ -494,7 +486,7 @@ public:
   static ContextFreeCodeCompletionResult *
   createDeclResult(CodeCompletionResultSink &Sink,
                    CodeCompletionString *CompletionString,
-                   const Decl *AssociatedDecl, bool IsAsync,
+                   const Decl *AssociatedDecl,
                    bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
                    NullTerminatedStringRef BriefDocComment,
                    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
@@ -532,8 +524,6 @@ public:
   CodeCompletionMacroRoles getMacroRoles() const { return MacroRoles; }
 
   bool isSystem() const { return IsSystem; };
-
-  bool isAsync() const { return IsAsync; };
 
   bool hasAsyncAlternative() const { return HasAsyncAlternative; };
 
@@ -716,12 +706,8 @@ public:
       return NotRecommendedReason::RedundantImport;
     case ContextualNotRecommendedReason::RedundantImportIndirect:
       return NotRecommendedReason::RedundantImportIndirect;
-    case ContextualNotRecommendedReason::InvalidAsyncContext:
-      return NotRecommendedReason::InvalidAsyncContext;
     case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
       return NotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext;
-    case ContextualNotRecommendedReason::CrossActorReference:
-      return NotRecommendedReason::CrossActorReference;
     case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
       return NotRecommendedReason::VariableUsedInOwnDefinition;
     }

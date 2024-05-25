@@ -763,6 +763,9 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
+NOTE(make_decl_objc_for_implementation,none,
+     "add '@objc' to implement an Objective-C %0",
+     (DescriptiveDeclKind))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -1760,10 +1763,6 @@ WARNING(objc_implementation_early_spelling_deprecated,none,
 ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
-ERROR(attr_objc_implementation_must_extend_class,none,
-      "cannot mark extension of %kind0 with '@_objcImplementation'; it is not "
-      "an imported Objective-C class",
-      (ValueDecl *))
 ERROR(attr_objc_implementation_must_be_imported,none,
       "'@_objcImplementation' cannot be used to extend %kind0 because it was "
       "defined by a Swift 'class' declaration, not an imported Objective-C "
@@ -1800,6 +1799,14 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (StringRef, llvm::VersionTuple))
+ERROR(attr_implementation_requires_language,none,
+      "'@implementation' used without specifying the language being "
+      "implemented",
+      ())
+ERROR(attr_implementation_category_goes_on_objc_attr,none,
+      "Objective-C category should be specified on '@objc', not "
+      "'@implementation'",
+      ())
 
 ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%kind0 does not match any %kindonly0 declared in the headers for %1; "
@@ -2217,6 +2224,8 @@ ERROR(alignment_not_power_of_two,none,
 
 // Dependency Scanning
 ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+NOTE(unresolved_import_location,none,
+     "also imported here", ())
 NOTE(dependency_as_imported_by_main_module,none,
      "a dependency of main module '%0'", (StringRef))
 NOTE(dependency_as_imported_by, none,
@@ -2655,6 +2664,8 @@ WARNING(add_predates_concurrency_import,none,
      "%select{| as warnings}0", (bool, Identifier))
 WARNING(remove_predates_concurrency_import,none,
      "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
+NOTE(add_preconcurrency_to_conformance,none,
+     "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (const ModuleDecl *))
@@ -5520,8 +5531,8 @@ ERROR(sendable_isolated_sync_function,none,
       "%0 synchronous %kind1 cannot be marked as '@Sendable'",
       (ActorIsolation, const ValueDecl *))
 ERROR(nonsendable_instance_method,none,
-      "instance methods of non-Sendable types cannot be marked as '@Sendable'",
-      ())
+      "instance method of non-Sendable type %0 cannot be marked as '@Sendable'",
+      (Type))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %kind1 in "
       "concurrently-executing code",
@@ -5610,16 +5621,17 @@ ERROR(shared_mutable_state_access,none,
 ERROR(shared_mutable_state_decl,none,
       "%kind0 is not concurrency-safe because it is non-isolated global shared "
       "mutable state", (const ValueDecl *))
-NOTE(shared_mutable_state_decl_note,none,
-     "isolate %0 to a global actor, or convert it to a 'let' constant and "
-     "conform it to 'Sendable'", (const ValueDecl *))
 ERROR(shared_immutable_state_decl,none,
-      "%kind0 is not concurrency-safe because non-'Sendable' type %1 may have "
+      "%kind1 is not concurrency-safe because non-'Sendable' type %0 may have "
       "shared mutable state",
-      (const ValueDecl *, Type))
-NOTE(shared_immutable_state_decl_note,none,
-     "isolate %0 to a global actor, or conform %1 to 'Sendable'",
-     (const ValueDecl *, Type))
+      (Type, const ValueDecl *))
+NOTE(shared_state_make_immutable,none,
+     "convert %0 to a 'let' constant to make 'Sendable' shared state immutable",
+     (const ValueDecl *))
+NOTE(shared_state_main_actor_node,none,
+     "annotate %0 with '@MainActor' if property should only be accessed from the main actor", (const ValueDecl *))
+NOTE(shared_state_nonisolated_unsafe,none,
+     "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
      "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
      "requirement",
@@ -5795,6 +5807,10 @@ ERROR(nonisolated_actor_sync_init,none,
 ERROR(nonisolated_wrapped_property,none,
       "'nonisolated' is not supported on properties with property wrappers",
       ())
+
+ERROR(non_sendable_from_deinit,none,
+        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
+        (Type, DescriptiveDeclKind, DeclName))
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
@@ -6305,7 +6321,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @_objcImplementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @objc @implementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -6459,6 +6475,12 @@ ERROR(objc_redecl_same,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
       "previous declaration with the same Objective-C selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
+
+ERROR(objc_redecl_category_name,none,
+      "%select{|imported }0extension with Objective-C category name %2 "
+      "conflicts with previous %select{|imported }1extension with the same "
+      "category name",
+      (bool, bool, Identifier))
 
 ERROR(objc_override_other,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
@@ -7613,6 +7635,9 @@ ERROR(external_macro_arg_not_type_name,none,
 ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
+ERROR(let_accessor_expansion,none,
+      "cannot expand accessors on variable declared with 'let'",
+      ())
 ERROR(invalid_main_type_in_macro_expansion,none,
       "macro expansion cannot introduce '@main' type",
       ())
@@ -7963,8 +7988,6 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "expected nil or self as return values in an initializer with "
        "lifetime dependent specifiers",
        ())
- ERROR(lifetime_dependence_on_bitwise_copyable, none,
-       "invalid lifetime dependence on BitwiseCopyable type", ())
  ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
        "lifetime dependence specifiers cannot be applied to tuple elements", ())
  ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,
@@ -7972,17 +7995,23 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "Escapable",
        ())
 
- //===----------------------------------------------------------------------===//
- //                             MARK: Transferring
- //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//                             MARK: Transferring
+//===----------------------------------------------------------------------===//
 
- ERROR(transferring_unsupported_param_specifier, none,
-       "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
+ERROR(transferring_unsupported_param_specifier, none,
+      "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
 
- ERROR(transferring_only_on_parameters_and_results, none,
-       "'transferring' may only be used on parameters and results", ())
- ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
-       "'transferring' cannot be applied to tuple elements", ())
+ERROR(transferring_only_on_parameters_and_results, none,
+      "'transferring' may only be used on parameters and results", ())
+ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
+      "'transferring' cannot be applied to tuple elements", ())
+ERROR(sending_unsupported_param_specifier, none,
+      "'%0' cannot be applied to a 'sending' parameter", (StringRef))
+ERROR(sending_only_on_parameters_and_results, none,
+      "'sending' may only be used on parameters and results", ())
+ERROR(sending_cannot_be_applied_to_tuple_elt, none,
+      "'sending' cannot be applied to tuple elements", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-none -Xllvm -sil-disable-pass=simplification -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 
-sil_stage canonical
+sil_stage lowered
+
 import c_layout
 import Builtin
 import Swift
@@ -307,13 +308,17 @@ bb0(%0 : $AnyObject):
   dynamic_method_br %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self, #X.foo!foreign, bb1, bb2
 
 bb1(%6 : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> BitfieldOne): // Preds: bb0
+  %addr = alloc_stack $BitfieldOne
   strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
-  %8 = partial_apply [callee_guaranteed] %6(%2) : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> BitfieldOne
-  %9 = apply %8() : $@callee_guaranteed () -> BitfieldOne
+  %cvt = convert_function %6 : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> BitfieldOne to $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> @out BitfieldOne
+  %8 = partial_apply [callee_guaranteed] %cvt(%2) : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self) -> @out BitfieldOne
+  %9 = apply %8(%addr) : $@callee_guaranteed () -> @out BitfieldOne
   %10 = init_enum_data_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt
-  store %9 to %10 : $*BitfieldOne
+  %val = load %addr : $*BitfieldOne
+  store %val  to %10 : $*BitfieldOne
   inject_enum_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt
-  strong_release %8 : $@callee_guaranteed () -> BitfieldOne
+  strong_release %8 : $@callee_guaranteed () -> @out BitfieldOne
+  dealloc_stack %addr : $*BitfieldOne
   br bb3
 
 bb2:                                              // Preds: bb0

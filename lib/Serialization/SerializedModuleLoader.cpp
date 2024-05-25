@@ -392,7 +392,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-SerializedModuleLoaderBase::BinaryModuleImports
+llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
 SerializedModuleLoaderBase::getImportsOfModule(
     const ModuleFileSharedCore &loadedModuleFile,
     ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
@@ -421,6 +421,13 @@ SerializedModuleLoaderBase::getImportsOfModule(
     auto dotPos = moduleName.find('.');
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
+
+    // Reverse rewrite of user-specified C++ standard
+    // library module name to one used in the modulemap.
+    // TODO: If we are going to do this for more than this module,
+    // we will need a centralized system for doing module import name remap.
+    if (moduleName == Ctx.Id_CxxStdlib.str())
+      moduleName = "std";
 
     importedModuleNames.insert(moduleName);
   }
@@ -477,27 +484,26 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
                          Ctx.LangOpts.PackageName, isTestableImport);
 
-  auto importedModuleSet = binaryModuleImports.moduleImports;
-  std::vector<std::string> importedModuleNames;
-  importedModuleNames.reserve(importedModuleSet.size());
-  llvm::transform(importedModuleSet.keys(),
-                  std::back_inserter(importedModuleNames),
-                  [](llvm::StringRef N) {
-                     return N.str();
-                  });
+  auto importedModuleSet = binaryModuleImports->moduleImports;
+  std::vector<ScannerImportStatementInfo> moduleImports;
+  moduleImports.reserve(importedModuleSet.size());
+  llvm::transform(
+      importedModuleSet.keys(), std::back_inserter(moduleImports),
+      [](llvm::StringRef N) { return ScannerImportStatementInfo(N.str()); });
 
-  auto importedHeader = binaryModuleImports.headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports.moduleImports;
-  std::vector<std::string> importedOptionalModuleNames;
+  auto importedHeader = binaryModuleImports->headerImport;
+  auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
+  std::vector<ScannerImportStatementInfo> optionalModuleImports;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
-      importedOptionalModuleNames.push_back(optionalImportedModule.str());
+      optionalModuleImports.push_back(
+          ScannerImportStatementInfo(optionalImportedModule.str()));
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-       modulePath.str(), moduleDocPath, sourceInfoPath,
-       importedModuleNames, importedOptionalModuleNames,
-       importedHeader, isFramework, /*module-cache-key*/ "");
+      modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
+      optionalModuleImports, importedHeader, isFramework,
+      /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }
@@ -1024,7 +1030,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasCxxInteroperability() &&
       M.getResilienceStrategy() != ResilienceStrategy::Resilient &&
       !Ctx.LangOpts.EnableCXXInterop &&
-      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule) {
+      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule &&
+      M.getName().str() != CXX_MODULE_NAME) {
     auto loc = diagLoc.value_or(SourceLoc());
     Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
                        M.getName());

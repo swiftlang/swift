@@ -13,6 +13,7 @@
 // This file implements type checking support for Swift's concurrency model.
 //
 //===----------------------------------------------------------------------===//
+#include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
@@ -511,17 +512,14 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
     return true;
 
   if (!var->isLet()) {
-    ASTContext &ctx = var->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
-      // A mutable storage of a value type accessed from within the module is
-      // okay.
-      if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
-          !var->isStatic() && 
-          var->hasStorage() &&
-          var->getTypeInContext()->isSendableType() &&
-          accessWithinModule) {
-        return true;
-      }
+    // A mutable storage of a value type accessed from within the module is
+    // okay.
+    if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
+        !var->isStatic() &&
+        var->hasStorage() &&
+        var->getTypeInContext()->isSendableType() &&
+        accessWithinModule) {
+      return true;
     }
     // Otherwise, must be immutable.
     return false;
@@ -838,11 +836,15 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 }
 
 std::optional<DiagnosticBehavior>
-SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
-  if (!decl)
-    return std::nullopt;
-
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+swift::getConcurrencyDiagnosticBehaviorLimit(NominalTypeDecl *nominal,
+                                             const DeclContext *fromDC,
+                                             bool ignoreExplicitConformance) {
+  ModuleDecl *importedModule = nullptr;
+  if (nominal->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+    // If the declaration itself has the @preconcurrency attribute,
+    // respect it.
+    importedModule = nominal->getParentModule();
+  } else {
     // Determine whether this nominal type is visible via a @preconcurrency
     // import.
     auto import = nominal->findImport(fromDC);
@@ -854,16 +856,32 @@ SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
     if (sourceFile)
       sourceFile->setImportUsedPreconcurrency(*import);
 
-    // When the type is explicitly non-Sendable, @preconcurrency imports
-    // downgrade the diagnostic to a warning in Swift 6.
-    if (hasExplicitSendableConformance(nominal))
-      return DiagnosticBehavior::Warning;
+    importedModule = import->module.importedModule;
+  }
 
-    // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
-    // diagnostics until the imported module enables Swift 6.
-    return import->module.importedModule->isConcurrencyChecked()
-        ? DiagnosticBehavior::Warning
-        : DiagnosticBehavior::Ignore;
+  // When the type is explicitly non-Sendable, @preconcurrency imports
+  // downgrade the diagnostic to a warning in Swift 6.
+  if (!ignoreExplicitConformance &&
+      hasExplicitSendableConformance(nominal))
+    return DiagnosticBehavior::Warning;
+
+  // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
+  // diagnostics until the imported module enables Swift 6.
+  return importedModule->isConcurrencyChecked()
+      ? DiagnosticBehavior::Warning
+      : DiagnosticBehavior::Ignore;
+}
+
+std::optional<DiagnosticBehavior>
+SendableCheckContext::preconcurrencyBehavior(
+    Decl *decl,
+    bool ignoreExplicitConformance) const {
+  if (!decl)
+    return std::nullopt;
+
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    return getConcurrencyDiagnosticBehaviorLimit(nominal, fromDC,
+                                                 ignoreExplicitConformance);
   }
 
   return std::nullopt;
@@ -3076,6 +3094,14 @@ namespace {
         return false;
       }
 
+      // If global variable checking is enabled and the global variable is
+      // from the same module as the reference, we'll already have diagnosed
+      // the global variable itself.
+      if (ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+          var->getDeclContext()->getParentModule() ==
+              getDeclContext()->getParentModule())
+        return false;
+
       const auto import = var->findImport(getDeclContext());
       const bool isPreconcurrencyImport =
           import && import->options.contains(ImportFlags::Preconcurrency);
@@ -3575,7 +3601,7 @@ namespace {
       // Check for sendability of the result type if we do not have a
       // transferring result.
       if ((!ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
-           !fnType->hasTransferringResult())) {
+           !fnType->hasSendingResult())) {
         // See if we are a autoclosure that has a direct callee that has the
         // same non-transferred type value returned. If so, do not emit an
         // error... we are going to emit an error on the call expr and do not
@@ -4545,6 +4571,37 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
   return foundIsolation;
 }
 
+/// Compute the isolation of a protocol
+static std::optional<ActorIsolation>
+getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
+  std::optional<ActorIsolation> foundIsolation;
+  for (auto inherited : protocol->getInheritedProtocols()) {
+    switch (auto protoIsolation = getActorIsolation(inherited)) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("protocol cannot have erased isolation");
+
+    case ActorIsolation::GlobalActor:
+      if (!foundIsolation) {
+        foundIsolation = protoIsolation;
+        continue;
+      }
+
+      if (*foundIsolation != protoIsolation)
+        return std::nullopt;
+
+      break;
+    }
+  }
+
+  return foundIsolation;
+}
+
 /// Compute the isolation of a nominal type from the property wrappers on
 /// any stored properties.
 static std::optional<ActorIsolation>
@@ -4777,12 +4834,7 @@ static bool checkClassGlobalActorIsolation(
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    auto &ctx = classDecl->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability))
-      return false;
-
-    downgradeToWarning = true;
-    break;
+    return false;
   }
 
   case ActorIsolation::Erased:
@@ -4987,19 +5039,41 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (auto *originalVar = var->getOriginalWrappedProperty()) {
           diagVar = originalVar;
         }
+
+        bool diagnosed = false;
         if (var->isLet()) {
           auto type = var->getInterfaceType();
-          if (!type->isSendableType()) {
-            diagVar->diagnose(diag::shared_immutable_state_decl,
-                              diagVar, type)
-                .warnUntilSwiftVersion(6);
-            diagVar->diagnose(diag::shared_immutable_state_decl_note,
-                              diagVar, type);
-          }
+          diagnosed = diagnoseIfAnyNonSendableTypes(
+              type, SendableCheckContext(var->getDeclContext()),
+              /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
+              /*diagnoseLoc=*/var->getLoc(),
+              diag::shared_immutable_state_decl, diagVar);
         } else {
           diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
               .warnUntilSwiftVersion(6);
-          diagVar->diagnose(diag::shared_mutable_state_decl_note, diagVar);
+          diagnosed = true;
+        }
+
+        // If we diagnosed this global, tack on notes to suggest potential
+        // courses of action.
+        if (diagnosed) {
+          if (!var->isLet()) {
+            auto diag = diagVar->diagnose(diag::shared_state_make_immutable,
+                                          diagVar);
+            SourceLoc fixItLoc = getFixItLocForVarToLet(diagVar);
+            if (fixItLoc.isValid()) {
+              diag.fixItReplace(fixItLoc, "let");
+            }
+          }
+
+          diagVar->diagnose(diag::shared_state_main_actor_node,
+                            diagVar)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(false),
+                           "@MainActor ");
+          diagVar->diagnose(diag::shared_state_nonisolated_unsafe,
+                            diagVar)
+              .fixItInsert(diagVar->getAttributeInsertionLoc(true),
+                           "nonisolated(unsafe) ");
         }
       }
     }
@@ -5235,6 +5309,17 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (auto conformanceIsolation = getIsolationFromConformances(nominal))
         if (auto inferred = inferredIsolation(*conformanceIsolation))
           return inferred;
+
+      // For a protocol, inherit isolation from the directly-inherited
+      // protocols.
+      if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+        if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+          if (auto protoIsolation = getIsolationFromInheritedProtocols(proto)) {
+            if (auto inferred = inferredIsolation(*protoIsolation))
+              return inferred;
+          }
+        }
+      }
 
       // Before Swift 6: If the declaration is a nominal type and any property
       // wrappers on its stored properties require isolation, use that.
@@ -5670,7 +5755,7 @@ static bool checkSendableInstanceStorage(
           /*inDerivedConformance*/Type(), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             auto preconcurrency =
-                context.preconcurrencyBehavior(elementType->getAnyNominal());
+                context.preconcurrencyBehavior(type->getAnyNominal());
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -5681,7 +5766,7 @@ static bool checkSendableInstanceStorage(
               // If we are to ignore this diagnostic, just continue.
               if (behavior == DiagnosticBehavior::Ignore ||
                   preconcurrency == DiagnosticBehavior::Ignore)
-                return false;
+                return true;
 
               invalid = true;
               return true;
@@ -5794,8 +5879,16 @@ bool swift::checkSendableConformance(
 
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  auto behavior = SendableCheckContext(conformanceDC, check)
-      .defaultDiagnosticBehavior();
+  SendableCheckContext checkContext(conformanceDC, check);
+  DiagnosticBehavior behavior = checkContext.defaultDiagnosticBehavior();
+  if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+      conformance->getProtocol()->isSpecificProtocol(
+          KnownProtocolKind::Sendable)) {
+    if (auto optBehavior = checkContext.preconcurrencyBehavior(
+            nominal, /*ignoreExplicitConformance=*/true))
+      behavior = *optBehavior;
+  }
+
   if (conformanceDC->getOutermostParentSourceFile() &&
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
@@ -6012,15 +6105,15 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
       // Classes that add global actor isolation to non-Sendable
       // superclasses cannot be 'Sendable'.
-      if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
-          nominal->getGlobalActorAttr()) {
+      auto superclassDecl = classDecl->getSuperclassDecl();
+      if (nominal->getGlobalActorAttr() && !superclassDecl->isNSObject()) {
         return nullptr;
       }
     }
   }
 
   // A non-protocol type with a global actor is implicitly Sendable.
-  if (nominal->getGlobalActorAttr()) {
+  if (getActorIsolation(nominal).isGlobalActor()) {
     // Form the implicit conformance to Sendable.
     return formConformance(nullptr);
   }
@@ -6791,4 +6884,15 @@ ActorReferenceResult ActorReferenceResult::forReference(
   }
 
   return forEntersActor(declIsolation, options);
+}
+
+bool swift::diagnoseNonSendableFromDeinit(
+    SourceLoc refLoc, VarDecl *var, DeclContext *dc) {
+  return diagnoseIfAnyNonSendableTypes(var->getTypeInContext(),
+                                SendableCheckContext(dc),
+                                Type(),
+                                SourceLoc(),
+                                refLoc,
+                                diag::non_sendable_from_deinit,
+                                var->getDescriptiveKind(), var->getName());
 }

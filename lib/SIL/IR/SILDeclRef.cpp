@@ -461,7 +461,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return Limit::OnDemand;
 
   case Kind::GlobalAccessor:
-    return cast<VarDecl>(d)->isResilient() ? Limit::NeverPublic : Limit::None;
+    return cast<VarDecl>(d)->isStrictlyResilient() ? Limit::NeverPublic : Limit::None;
 
   case Kind::DefaultArgGenerator:
     // If the default argument is to be serialized, only use non-ABI public
@@ -507,7 +507,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::AlwaysEmitIntoClient;
 
     // FIXME: This should always be true.
-    if (d->getModuleContext()->isResilient())
+    if (d->getModuleContext()->isStrictlyResilient())
       return Limit::NeverPublic;
 
     break;
@@ -531,7 +531,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   auto privateLinkage = [&]() {
     // Private decls may still be serialized if they are e.g in an inlinable
     // function. In such a case, they receive shared linkage.
-    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
+    return isNotSerialized() ? SILLinkage::Private : SILLinkage::Shared;
   };
 
   // Prespecializations are public.
@@ -621,7 +621,11 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     case Limit::None:
       return SILLinkage::Package;
     case Limit::AlwaysEmitIntoClient:
-      return SILLinkage::PackageNonABI;
+      // Drop the AEIC if the enclosing decl is not effectively public.
+      // This matches what we do in the `internal` case.
+      if (isSerialized())
+        return SILLinkage::PackageNonABI;
+      else return SILLinkage::Package;
     case Limit::OnDemand:
       return SILLinkage::Shared;
     case Limit::NeverPublic:
@@ -789,8 +793,16 @@ bool SILDeclRef::isTransparent() const {
   return false;
 }
 
+bool SILDeclRef::isSerialized() const {
+  return getSerializedKind() == IsSerialized;
+}
+
+bool SILDeclRef::isNotSerialized() const {
+  return getSerializedKind() == IsNotSerialized;
+}
+
 /// True if the function should have its body serialized.
-IsSerialized_t SILDeclRef::isSerialized() const {
+SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (auto closure = getAbstractClosureExpr()) {
     // Ask the AST if we're inside an @inlinable context.
     if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {
@@ -863,6 +875,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Anything else that is not public is not serializable.
+  // pcmo TODO: should check if package-cmo is enabled?
   if (d->getEffectiveAccess() < AccessLevel::Public)
     return IsNotSerialized;
 
@@ -1528,10 +1541,10 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   // FIXME: This is too narrow. Any class with resilient metadata should
   // probably have this, at least for method overrides that don't add new
   // vtable entries.
-  bool isResilientClass = classType->isResilient();
+  bool isStrictResilientClass = classType->isStrictlyResilient();
 
   if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-    if (isResilientClass)
+    if (isStrictResilientClass)
       return SubclassScope::NotApplicable;
     // Initializing entry points do not appear in the vtable.
     if (kind == SILDeclRef::Kind::Initializer)
@@ -1562,14 +1575,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     // In the resilient case, we're going to be making symbols _less_
     // visible, so make sure we stop now; final methods can always be
     // called directly.
-    if (isResilientClass)
+    if (isStrictResilientClass)
       return SubclassScope::Internal;
   }
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
-  if (isResilientClass) {
+  if (isStrictResilientClass) {
     // The symbol should _only_ be reached via the vtable, so we're
     // going to make it hidden.
     return SubclassScope::Resilient;

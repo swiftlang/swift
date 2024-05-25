@@ -18,24 +18,10 @@ let package = Package(
     .package(path: "../../../wasmkit"),
   ],
   targets: [
-    .target(
-      name: "CSwiftPluginServer",
-      cxxSettings: [
-        .unsafeFlags([
-          "-I", "../../include",
-          "-I", "../../stdlib/public/SwiftShims",
-          "-I", "../../../build/Default/swift/include",
-          "-I", "../../../build/Default/llvm/include",
-          "-I", "../../../llvm-project/llvm/include",
-        ])
-      ]
-    ),
-    .target(
+    .executableTarget(
       name: "swift-plugin-server",
       dependencies: [
         .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-        "CSwiftPluginServer"
       ]
     ),
     .target(

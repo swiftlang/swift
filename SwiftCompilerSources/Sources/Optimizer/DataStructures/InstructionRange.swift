@@ -20,7 +20,7 @@ import SIL
 /// One or more "potential" end instructions can be inserted.
 /// Though, not all inserted instructions end up as "end" instructions.
 ///
-/// `InstructionRange` is useful for calculating the liferange of values.
+/// `InstructionRange` is useful for calculating the liverange of values.
 ///
 /// The `InstructionRange` is similar to a `BasicBlockRange`, but defines the range
 /// in a "finer" granularity, i.e. on instructions instead of blocks.

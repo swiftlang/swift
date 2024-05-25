@@ -1000,9 +1000,16 @@ public:
   ///    Tangent: tan[y] = alloc_stack $T.Tangent
   CLONE_AND_EMIT_TANGENT(AllocStack, asi) {
     auto &diffBuilder = getDifferentialBuilder();
+    auto varInfo = asi->getVarInfo();
+    if (varInfo) {
+      // This is a new variable, it shouldn't keep the old scope, type, etc.
+      varInfo->Type = {};
+      varInfo->DIExpr = {};
+      varInfo->Loc = {};
+      varInfo->Scope = nullptr;
+    }
     auto *mappedAllocStackInst = diffBuilder.createAllocStack(
-        asi->getLoc(), getRemappedTangentType(asi->getElementType()),
-        asi->getVarInfo());
+        asi->getLoc(), getRemappedTangentType(asi->getElementType()), varInfo);
     setTangentBuffer(asi->getParent(), asi, mappedAllocStackInst);
   }
 
@@ -1697,9 +1704,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *differential = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
       diffGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, jvp->isSerialized(),
-      original->isDynamicallyReplaceable(),
-      original->isDistributed(),
+      IsNotTransparent, jvp->getSerializedKind(),
+      original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));

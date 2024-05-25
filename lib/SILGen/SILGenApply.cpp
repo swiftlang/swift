@@ -1225,9 +1225,8 @@ public:
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
     
-    if (afd->getDeclContext()->isLocalContext() &&
-        !captureInfo.hasGenericParamCaptures())
-      subs = SubstitutionMap();
+    subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+        constant, captureInfo, subs);
 
     // Check whether we have to dispatch to the original implementation of a
     // dynamically_replaceable inside of a dynamic_replacement(for:) function.
@@ -1304,17 +1303,14 @@ public:
 
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
-
-    auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
-
     SubstitutionMap subs;
-    if (captureInfo.hasGenericParamCaptures())
-      subs = SGF.getForwardingSubstitutionMap();
+    std::tie(std::ignore, std::ignore, subs)
+        = SGF.SGM.Types.getForwardingSubstitutionsForLowering(constant);
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
     // If the closure requires captures, emit them.
-    if (!captureInfo.getCaptures().empty()) {
+    if (SGF.SGM.Types.hasLoweredLocalCaptures(constant)) {
       SmallVector<ManagedValue, 4> captures;
       SGF.emitCaptures(e, constant, CaptureEmission::ImmediateApplication,
                        captures);
@@ -6712,14 +6708,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
         subs, loc, true);
   }
 
-  // The accessor might be a local function that does not capture any
-  // generic parameters, in which case we don't want to pass in any
-  // substitutions.
   auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
-  if (decl->getDeclContext()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
-    subs = SubstitutionMap();
-  }
+  subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+      constant, captureInfo, subs);
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {

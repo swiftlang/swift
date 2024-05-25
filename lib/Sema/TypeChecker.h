@@ -944,10 +944,6 @@ Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
 /// of the first one and the expression will still type check.
 bool isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB);
 
-/// Build a type-checked reference to the given value.
-Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC, DeclNameLoc nameLoc,
-                          bool Implicit);
-
 /// Build a reference to a declaration, where name lookup returned
 /// the given set of declarations.
 Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
@@ -1424,6 +1420,14 @@ bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
 ///
 /// \returns true if there were any conflicts diagnosed.
 bool diagnoseObjCMethodConflicts(SourceFile &sf);
+
+/// Diagnose all conflicts between extensions of the same class that have the
+/// same Objective-C category name.
+///
+/// \param sf The source file for which we are diagnosing conflicts.
+///
+/// \returns true if there were any conflicts diagnosed.
+bool diagnoseObjCCategoryConflicts(SourceFile &sf);
 
 /// Diagnose any unsatisfied @objc optional requirements of
 /// protocols that conflict with methods.

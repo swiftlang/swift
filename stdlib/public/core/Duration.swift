@@ -112,8 +112,8 @@ extension Duration {
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
     guard let high = Int64(exactly: seconds >> 64) else { fatalError() }
     let low = UInt64(truncatingIfNeeded: seconds)
-    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000_000)
-    var highScaled = high * 1_000_000_000_000_000_000
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
   
@@ -158,8 +158,8 @@ extension Duration {
   ) -> Duration {
     guard let high = Int64(exactly: milliseconds >> 64) else { fatalError() }
     let low = UInt64(truncatingIfNeeded: milliseconds)
-    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000)
-    var highScaled = high * 1_000_000_000_000_000
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
@@ -187,8 +187,8 @@ extension Duration {
   ) -> Duration {
     guard let high = Int64(exactly: microseconds >> 64) else { fatalError() }
     let low = UInt64(truncatingIfNeeded: microseconds)
-    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000)
-    var highScaled = high * 1_000_000_000_000
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
@@ -216,8 +216,8 @@ extension Duration {
   ) -> Duration {
     guard let high = Int64(exactly: nanoseconds >> 64) else { fatalError() }
     let low = UInt64(truncatingIfNeeded: nanoseconds)
-    var lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
-    var highScaled = high * 1_000_000_000
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
+    let highScaled = high * 1_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 }

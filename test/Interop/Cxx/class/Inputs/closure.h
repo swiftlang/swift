@@ -20,4 +20,6 @@ struct ARCStrong {
 void cfuncARCStrong(void (*_Nonnull)(ARCStrong));
 #endif
 
+void cfuncReturnNonTrivial(NonTrivial (^_Nonnull)()) noexcept;
+
 #endif // __CLOSURE__

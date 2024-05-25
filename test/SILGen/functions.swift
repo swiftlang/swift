@@ -488,6 +488,7 @@ func testNoescape() {
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: closure #1 () -> () in functions.testNoescape() -> ()
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 
@@ -508,7 +509,9 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden [ossa] @$s9functions13testNoescape2yyF : $@convention(thin) () -> () {
 
 // CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {

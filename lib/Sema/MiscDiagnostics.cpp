@@ -3779,6 +3779,28 @@ public:
 
 } // end anonymous namespace
 
+SourceLoc swift::getFixItLocForVarToLet(VarDecl *var) {
+  // Try to find the location of the 'var' so we can produce a fixit.  If
+  // this is a simple PatternBinding, use its location.
+  if (auto *PBD = var->getParentPatternBinding()) {
+    if (PBD->getSingleVar() == var)
+      return PBD->getLoc();
+  } else if (auto *pattern = var->getParentPattern()) {
+    BindingPattern *foundVP = nullptr;
+    pattern->forEachNode([&](Pattern *P) {
+      if (auto *VP = dyn_cast<BindingPattern>(P))
+        if (VP->getSingleVar() == var)
+          foundVP = VP;
+    });
+
+    if (foundVP && foundVP->getIntroducer() != VarDecl::Introducer::Let) {
+      return foundVP->getLoc();
+    }
+  }
+
+  return SourceLoc();
+}
+
 // After we have scanned the entire region, diagnose variables that could be
 // declared with a narrower usage kind.
 VarDeclUsageChecker::~VarDeclUsageChecker() {
@@ -3998,25 +4020,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         // Don't warn if we have something like "let (x,y) = ..." and 'y' was
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
-      SourceLoc FixItLoc;
-
-      // Try to find the location of the 'var' so we can produce a fixit.  If
-      // this is a simple PatternBinding, use its location.
-      if (auto *PBD = var->getParentPatternBinding()) {
-        if (PBD->getSingleVar() == var)
-          FixItLoc = PBD->getLoc();
-      } else if (auto *pattern = var->getParentPattern()) {
-        BindingPattern *foundVP = nullptr;
-        pattern->forEachNode([&](Pattern *P) {
-          if (auto *VP = dyn_cast<BindingPattern>(P))
-            if (VP->getSingleVar() == var)
-              foundVP = VP;
-        });
-
-        if (foundVP && foundVP->getIntroducer() != VarDecl::Introducer::Let) {
-          FixItLoc = foundVP->getLoc();
-        }
-      }
+      SourceLoc FixItLoc = getFixItLocForVarToLet(var);
 
       // If this is a parameter explicitly marked 'var', remove it.
       if (FixItLoc.isInvalid()) {
@@ -4574,18 +4578,6 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
       || subjectType->hasError()
       || !subjectType->isNoncopyable()) {
     return;
-  }
-
-  // A bare reference to, or load from, a move-only binding must be consumed.
-  subjectExpr = subjectExpr->getSemanticsProvidingExpr();
-  if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
-    subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
-  }
-  if (!C.LangOpts.hasFeature(Feature::BorrowingSwitch)
-      && isa<DeclRefExpr>(subjectExpr)) {
-    C.Diags.diagnose(subjectExpr->getLoc(),
-                           diag::move_only_pattern_match_not_consumed)
-      .fixItInsert(subjectExpr->getStartLoc(), "consume ");
   }
 }
 

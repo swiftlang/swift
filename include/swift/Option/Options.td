@@ -541,6 +541,11 @@ def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption]>,
   HelpText<"Name of the module to build">;
+def project_name : Separate<["-"], "project-name">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption]>,
+  HelpText<"Name of the project this module to build belongs to">;
+
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
