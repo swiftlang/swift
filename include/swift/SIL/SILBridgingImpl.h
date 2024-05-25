@@ -717,8 +717,20 @@ bool BridgedFunction::isSerialized() const {
   return getFunction()->isSerialized();
 }
 
-bool BridgedFunction::hasValidLinkageForFragileRef() const {
-  return getFunction()->hasValidLinkageForFragileRef(swift::SerializedKind_t::IsSerialized);
+bool BridgedFunction::isAnySerialized() const {
+  return getFunction()->isAnySerialized();
+}
+
+BridgedFunction::SerializedKind BridgedFunction::getSerializedKind() const {
+  return (SerializedKind)getFunction()->getSerializedKind();
+}
+
+bool BridgedFunction::canBeInlinedIntoCaller(SerializedKind kind) const {
+  return getFunction()->canBeInlinedIntoCaller(swift::SerializedKind_t(kind));
+}
+
+bool BridgedFunction::hasValidLinkageForFragileRef(SerializedKind kind) const {
+  return getFunction()->hasValidLinkageForFragileRef(swift::SerializedKind_t(kind));
 }
 
 bool BridgedFunction::needsStackProtection() const {

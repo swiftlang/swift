@@ -2948,7 +2948,11 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
     return;
 
   SILFunction *impl = deinit.getImplementation();
-  if (!ShouldSerializeAll && !impl->hasValidLinkageForFragileRef(IsSerialized))
+  if (!ShouldSerializeAll &&
+      // Package CMO for MoveOnlyDeinit is not supported so
+      // pass the IsSerialized argument to keep the behavior
+      // consistent with or without the optimization.
+      !impl->hasValidLinkageForFragileRef(IsSerialized))
     return;
 
   // Use the mangled name of the class as a key to distinguish between classes
@@ -3100,7 +3104,11 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
           SILAbbrCodes[DefaultWitnessTableNoEntryLayout::Code]);
       continue;
     }
-    writeSILWitnessTableEntry(entry, IsNotSerialized);
+
+    // Default witness table is not serialized. The IsSerialized
+    // argument is passed here to call hasValidLinkageForFragileRef
+    // to keep the behavior consistent with or without any optimizations.
+    writeSILWitnessTableEntry(entry, IsSerialized);
   }
 }
 
