@@ -10,21 +10,27 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
     self.base = base
   }
 
+  /// Handle the message ourselves if it references a Wasm plugin.
+  /// Otherwise, forward it to `base`.
   func handleMessage(_ message: HostToPluginMessage) -> PluginToHostMessage {
     switch message {
     case .loadPluginLibrary(let libraryPath, let moduleName):
       guard libraryPath.hasSuffix(".wasm") else { break }
+      let libraryFilePath = FilePath(libraryPath)
       do {
-        loadedWasmPlugins[moduleName] = try defaultWasmPlugin.init(path: FilePath(libraryPath))
+        loadedWasmPlugins[moduleName] = try defaultWasmPlugin.init(path: libraryFilePath)
       } catch {
-        printError("Error: \(error)")
-        return .loadPluginLibraryResult(loaded: false, diagnostics: [])
+        return .loadPluginLibraryResult(
+          loaded: false,
+          diagnostics: [PluginMessage.Diagnostic(errorMessage: "\(error)")]
+        )
       }
       return .loadPluginLibraryResult(loaded: true, diagnostics: [])
     case .expandAttachedMacro(let macro, _, _, _, _, _, _, _, _),
         .expandFreestandingMacro(let macro, _, _, _, _):
-      guard let wasmPlugin = loadedWasmPlugins[macro.moduleName] else { break }
-      return expandMacro(plugin: wasmPlugin, message: message)
+      if let response = expandMacro(macro, message: message) {
+        return response
+      } // else break
     case .getCapability:
       break
 #if !SWIFT_PACKAGE
@@ -36,9 +42,10 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   }
 
   private func expandMacro(
-    plugin: WasmPlugin,
+    _ macro: PluginMessage.MacroReference,
     message: HostToPluginMessage
-  ) -> PluginToHostMessage {
+  ) -> PluginToHostMessage? {
+    guard let plugin = loadedWasmPlugins[macro.moduleName] else { return nil }
     do {
       let request = try JSON.encode(message)
       let responseRaw = try plugin.handleMessage(request)
@@ -48,9 +55,30 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
         }
       }
     } catch {
-      printError("Error: \(error)")
-      return .expandMacroResult(expandedSource: nil, diagnostics: [])
+      return .expandMacroResult(
+        expandedSource: nil,
+        diagnostics: [PluginMessage.Diagnostic(
+          errorMessage: """
+          failed to communicate with external macro implementation type \
+          '\(macro.moduleName).\(macro.typeName)' to expand macro '\(macro.name)()'; \
+          \(error)
+          """
+        )]
+      )
     }
+  }
+}
+
+extension PluginMessage.Diagnostic {
+  fileprivate init(errorMessage: String) {
+    self.init(
+      message: errorMessage,
+      severity: .error,
+      position: .invalid,
+      highlights: [],
+      notes: [],
+      fixIts: []
+    )
   }
 }
 
@@ -61,8 +89,3 @@ protocol WasmPlugin {
 }
 
 private var defaultWasmPlugin: (some WasmPlugin).Type { DefaultWasmPlugin.self }
-
-// TODO: return actual diagnostics instead of using this
-private func printError(_ error: String) {
-  _ = try? FileDescriptor.standardError.writeAll("\(error)\n".utf8)
-}
