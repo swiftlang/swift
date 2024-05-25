@@ -129,39 +129,6 @@ namespace dependencies {
                                   bool);
 }
 
-struct ScannerImportStatementInfo {
-  struct ImportDiagnosticLocationInfo {
-    ImportDiagnosticLocationInfo() = delete;
-    ImportDiagnosticLocationInfo(std::string bufferIdentifier,
-                                 uint32_t lineNumber,
-                                 uint32_t columnNumber)
-    : bufferIdentifier(bufferIdentifier),
-      lineNumber(lineNumber),
-      columnNumber(columnNumber) {}
-    std::string bufferIdentifier;
-    uint32_t lineNumber;
-    uint32_t columnNumber;
-  };
-
-  ScannerImportStatementInfo(std::string importIdentifier)
-  : importLocations(),
-    importIdentifier(importIdentifier) {}
-
-  ScannerImportStatementInfo(std::string importIdentifier,
-                             ImportDiagnosticLocationInfo location)
-  : importLocations({location}),
-    importIdentifier(importIdentifier) {}
-
-  void addImportLocation(ImportDiagnosticLocationInfo location) {
-    importLocations.push_back(location);
-  }
-
-  // Buffer, line & column number of the import statement
-  SmallVector<ImportDiagnosticLocationInfo, 4> importLocations;
-  // Imported module string. e.g. "Foo.Bar" in 'import Foo.Bar'
-  std::string importIdentifier;
-};
-
 /// Base class for the variant storage of ModuleDependencyInfo.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencyInfo.
@@ -174,27 +141,25 @@ public:
       : dependencyKind(dependencyKind), moduleCacheKey(moduleCacheKey.str()),
         resolved(false), finalized(false) {}
 
-  ModuleDependencyInfoStorageBase(
-      ModuleDependencyKind dependencyKind,
-      const std::vector<ScannerImportStatementInfo> &moduleImports,
-      const std::vector<ScannerImportStatementInfo> &optionalModuleImports,
-      StringRef moduleCacheKey = "")
+  ModuleDependencyInfoStorageBase(ModuleDependencyKind dependencyKind,
+                                  const std::vector<std::string> &moduleImports,
+                                  const std::vector<std::string> &optionalModuleImports,
+                                  StringRef moduleCacheKey = "")
       : dependencyKind(dependencyKind), moduleImports(moduleImports),
         optionalModuleImports(optionalModuleImports),
-        moduleCacheKey(moduleCacheKey.str()), resolved(false),
-        finalized(false) {}
+        moduleCacheKey(moduleCacheKey.str()), resolved(false), finalized(false)  {}
 
   virtual ModuleDependencyInfoStorageBase *clone() const = 0;
 
   virtual ~ModuleDependencyInfoStorageBase();
 
   /// The set of modules on which this module depends.
-  std::vector<ScannerImportStatementInfo> moduleImports;
+  std::vector<std::string> moduleImports;
 
   /// The set of modules which constitute optional module
   /// dependencies for this module, such as `@_implementationOnly`
   /// or `internal` imports.
-  std::vector<ScannerImportStatementInfo> optionalModuleImports;
+  std::vector<std::string> optionalModuleImports;
 
   /// The set of modules on which this module depends, resolved
   /// to Module IDs, qualified by module kind: Swift, Clang, etc.
@@ -355,23 +320,21 @@ public:
   }
 };
 
-/// Describes the dependencies of a pre-built Swift module (with no
-/// .swiftinterface).
+/// Describes the dependencies of a pre-built Swift module (with no .swiftinterface).
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencyInfo.
-class SwiftBinaryModuleDependencyStorage
-    : public ModuleDependencyInfoStorageBase {
+class SwiftBinaryModuleDependencyStorage : public ModuleDependencyInfoStorageBase {
 public:
-  SwiftBinaryModuleDependencyStorage(
-      const std::string &compiledModulePath, const std::string &moduleDocPath,
-      const std::string &sourceInfoPath,
-      const std::vector<ScannerImportStatementInfo> &moduleImports,
-      const std::vector<ScannerImportStatementInfo> &optionalModuleImports,
-      const std::string &headerImport, const bool isFramework,
-      const std::string &moduleCacheKey)
+  SwiftBinaryModuleDependencyStorage(const std::string &compiledModulePath,
+                                     const std::string &moduleDocPath,
+                                     const std::string &sourceInfoPath,
+                                     const std::vector<std::string> &moduleImports,
+                                     const std::vector<std::string> &optionalModuleImports,
+                                     const std::string &headerImport,
+                                     const bool isFramework,
+                                     const std::string &moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
-                                        moduleImports, optionalModuleImports,
-                                        moduleCacheKey),
+                                        moduleImports, optionalModuleImports, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), headerImport(headerImport),
         isFramework(isFramework) {}
@@ -557,8 +520,8 @@ public:
       const std::string &compiledModulePath,
       const std::string &moduleDocPath,
       const std::string &sourceInfoPath,
-      const std::vector<ScannerImportStatementInfo> &moduleImports,
-      const std::vector<ScannerImportStatementInfo> &optionalModuleImports,
+      const std::vector<std::string> &moduleImports,
+      const std::vector<std::string> &optionalModuleImports,
       const std::string &headerImport,
       bool isFramework, const std::string &moduleCacheKey) {
     return ModuleDependencyInfo(
@@ -609,12 +572,12 @@ public:
   }
 
   /// Retrieve the module-level imports.
-  ArrayRef<ScannerImportStatementInfo> getModuleImports() const {
+  ArrayRef<std::string> getModuleImports() const {
     return storage->moduleImports;
   }
 
   /// Retrieve the module-level optional imports.
-  ArrayRef<ScannerImportStatementInfo> getOptionalModuleImports() const {
+  ArrayRef<std::string> getOptionalModuleImports() const {
     return storage->optionalModuleImports;
   }
 
@@ -791,24 +754,31 @@ public:
   void addOptionalModuleImport(StringRef module,
                                llvm::StringSet<> *alreadyAddedModules = nullptr);
 
-  /// Add all of the module imports in the given source
-  /// file to the set of module imports.
-  void addModuleImports(const SourceFile &sourceFile,
-                        llvm::StringSet<> &alreadyAddedModules,
-                        const SourceManager *sourceManager);
-
-  /// Add a dependency on the given module, if it was not already in the set.
-  void addModuleImport(ImportPath::Module module,
-                       llvm::StringSet<> *alreadyAddedModules = nullptr,
-                       const SourceManager *sourceManager = nullptr,
-                       SourceLoc sourceLocation = SourceLoc());
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleImport(StringRef module,
-                       llvm::StringSet<> *alreadyAddedModules = nullptr,
-                       const SourceManager *sourceManager = nullptr,
-                       SourceLoc sourceLocation = SourceLoc());
+                       llvm::StringSet<> *alreadyAddedModules = nullptr);
 
+  /// Add a dependency on the given module, if it was not already in the set.
+  void addModuleImport(ImportPath::Module module,
+                       llvm::StringSet<> *alreadyAddedModules = nullptr) {
+    std::string ImportedModuleName = module.front().Item.str().str();
+    auto submodulePath = module.getSubmodulePath();
+    if (submodulePath.size() > 0 && !submodulePath[0].Item.empty()) {
+      auto submoduleComponent = submodulePath[0];
+      // Special case: a submodule named "Foo.Private" can be moved to a top-level
+      // module named "Foo_Private". ClangImporter has special support for this.
+      if (submoduleComponent.Item.str() == "Private")
+        addOptionalModuleImport(ImportedModuleName + "_Private", alreadyAddedModules);
+    }
+
+    addModuleImport(ImportedModuleName, alreadyAddedModules);
+  }
+
+  /// Add all of the module imports in the given source
+  /// file to the set of module imports.
+  void addModuleImport(const SourceFile &sf,
+                       llvm::StringSet<> &alreadyAddedModules);
   /// Add a kind-qualified module dependency ID to the set of
   /// module dependencies.
   void addModuleDependency(ModuleDependencyID dependencyID);
