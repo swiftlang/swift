@@ -744,13 +744,8 @@ class NonIsolatedUnsafeFieldGenericKlass<T> { // expected-complete-note 4{{}}
     await transferToMainIndirect(nonIsolatedUnsafeLetAddressOnly)
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'T?' into main actor-isolated context may introduce data races}}
 
-    // TODO: We emit a diagnostic here since we are dropping the
-    // nonisolated(unsafe) when we assign to the temporary. This is easy to work
-    // around by just creating a local variable. I am going to figure out if I
-    // can make it inferred.
     await transferToMainIndirect(nonIsolatedUnsafeVarAddressOnly)
-    // expected-tns-warning @-1 {{sending task-isolated value of type 'T?' with later accesses to main actor-isolated context risks causing data races}}
-    // expected-complete-warning @-2 {{passing argument of non-sendable type 'T?' into main actor-isolated context may introduce data races}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'T?' into main actor-isolated context may introduce data races}}
 
     await transferToMainIndirect(letAddressOnly)
     // expected-tns-warning @-1 {{sending 'self.letAddressOnly' risks causing data races}}

@@ -1073,26 +1073,22 @@ public:
       }
       std::tie(transferredRegionIsolation, isClosureCapturedElt) = *pairOpt;
 
-      // Before we do anything, see if our dynamic isolation kind is the same as
-      // the isolation info for our partition op. If they match, this is not a
-      // real transfer operation.
-      //
-      // DISCUSSION: We couldn't not emit this earlier since we needed the
-      // dynamic isolation info of our value.
-      if (auto calleeIsolationInfo = getIsolationInfo(op)) {
-        if (transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
-          return;
-        }
-      }
-
-      // If we merged anything, we need to handle a transfer
-      // non-transferrable. We pass in the dynamic isolation region info of our
-      // region.
-      if (bool(transferredRegionIsolation) &&
+      // If we merged anything, we need to handle a transfer non-transferrable
+      // unless our value has the same isolation info as our callee.
+      auto calleeIsolationInfo = getIsolationInfo(op);
+      if (!(calleeIsolationInfo &&
+            transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo)) &&
           !transferredRegionIsolation.isDisconnected()) {
         return handleTransferNonTransferrableHelper(op, op.getOpArgs()[0],
                                                     transferredRegionIsolation);
       }
+
+      // Next see if we are disconnected and have the same isolation. In such a
+      // case, we do not transfer since the disconnected value is allowed to be
+      // resued after we return.
+      if (transferredRegionIsolation.isDisconnected() && calleeIsolationInfo &&
+          transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+        return;
 
       // Mark op.getOpArgs()[0] as transferred.
       TransferringOperandState &state = operandToStateMap.get(op.getSourceOp());

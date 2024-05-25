@@ -29,6 +29,7 @@
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PatternMatch.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -2018,6 +2019,17 @@ public:
                                    TinyPtrVector<SILValue>());
   }
 
+  void translateSILAssignFresh(SILValue val, SILIsolationInfo info) {
+    auto v = initializeTrackedValue(val, info);
+    if (!v)
+      return translateSILAssignFresh(val);
+
+    if (!v->second)
+      return translateUnknownPatternError(val);
+
+    return translateSILAssignFresh(v->first.getRepresentative().getValue());
+  }
+
   template <typename Collection>
   void translateSILMerge(SILValue dest, Collection collection) {
     auto trackableDest = tryToTrackValue(dest);
@@ -2386,7 +2398,6 @@ CONSTANT_TRANSLATION(AllocBoxInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocPackInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefDynamicInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefInst, AssignFresh)
-CONSTANT_TRANSLATION(AllocStackInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocVectorInst, AssignFresh)
 CONSTANT_TRANSLATION(KeyPathInst, AssignFresh)
 CONSTANT_TRANSLATION(FunctionRefInst, AssignFresh)
@@ -2740,6 +2751,40 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
+  // Before we do anything, see if asi is Sendable or if it is non-Sendable,
+  // that it is from a var decl. In both cases, we can just return assign fresh
+  // and exit early.
+  if (!SILIsolationInfo::isNonSendableType(asi) || asi->isFromVarDecl())
+    return TranslationSemantics::AssignFresh;
+
+  // Ok at this point we know that our value is a non-Sendable temporary.
+  auto isolationInfo = SILIsolationInfo::get(asi);
+  if (!bool(isolationInfo)) {
+    return TranslationSemantics::AssignFresh;
+  }
+
+  if (isolationInfo.isDisconnected()) {
+    return TranslationSemantics::AssignFresh;
+  }
+
+  // Ok, we can handle this and have a valid isolation. Initialize the value.
+  auto v = initializeTrackedValue(asi, isolationInfo);
+  if (!v)
+    return TranslationSemantics::AssignFresh;
+
+  // If we already had a value for this alloc_stack (which we shouldn't
+  // ever)... emit an unknown pattern error.
+  if (!v->second) {
+    translateUnknownPatternError(asi);
+    return TranslationSemantics::Special;
+  }
+
+  translateSILAssignFresh(v->first.getRepresentative().getValue());
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitMoveValueInst(MoveValueInst *mvi) {
