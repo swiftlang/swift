@@ -2595,9 +2595,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
       break;
     }
     default:
-      llvm::errs() << "option: ";
-      A->getOption().print(llvm::errs());
-      llvm::errs() << "\n";
       llvm_unreachable("unhandled plugin search option");
     }
   }
