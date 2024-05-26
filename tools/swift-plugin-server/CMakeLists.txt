@@ -16,7 +16,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SWIFT_DEPENDENCIES
       SwiftCompilerPluginMessageHandling
       SwiftLibraryPluginProvider
-      SystemPackage
-      ${wasi_dep}
+      WasmKitWASI
   )
 endif()
