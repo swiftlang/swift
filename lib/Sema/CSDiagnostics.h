@@ -1861,20 +1861,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-class NotCopyableFailure final : public FailureDiagnostic {
-  Type noncopyableTy;
-  NoncopyableMatchFailure failure;
-public:
-  NotCopyableFailure(const Solution &solution,
-                     Type noncopyableTy,
-                     NoncopyableMatchFailure failure,
-                     ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
-        noncopyableTy(noncopyableTy), failure(failure) {}
-
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose \c each applied to an expression that is not a pack type.
 class InvalidPackElement final : public FailureDiagnostic {
   Type packElementType;

@@ -8850,18 +8850,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
       }
     }
-
-    // If this is a failure to conform to Copyable, tailor the error message.
-    if (kind == ConstraintKind::ConformsTo &&
-        protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      auto *fix =
-          MustBeCopyable::create(*this,
-                                 type,
-                                 NoncopyableMatchFailure::forCopyableConstraint(),
-                                 getConstraintLocator(locator));
-      if (!recordFix(fix))
-        return SolutionKind::Solved;
-    }
   }
 
   // There's nothing more we can do; fail.
@@ -15158,7 +15146,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAutoClosurePointerConversion:
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
-  case FixKind::MustBeCopyable:
   case FixKind::AllowInvalidPackElement:
   case FixKind::AllowInvalidPackReference:
   case FixKind::AllowInvalidPackExpansion:

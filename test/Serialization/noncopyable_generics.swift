@@ -35,7 +35,7 @@ struct NC: ~Copyable {}
 struct RegularStruct {}
 
 func isItCopyable<T: Copyable>(_ t: T) {}
-// expected-note@-1 {{generic parameter 'T' has an implicit Copyable requirement}}
+// expected-note@-1 {{'where T: Copyable' is implicit here}}
 
 func check() {
     var tr = TestRequirements()
@@ -43,7 +43,7 @@ func check() {
 
     isItCopyable(TestRequirements())
     isItCopyable(RegularStruct())
-    isItCopyable(NC()) // expected-error {{noncopyable type 'NC' cannot be substituted for copyable generic parameter 'T' in 'isItCopyable'}}
+    isItCopyable(NC()) // expected-error {{global function 'isItCopyable' requires that 'NC' conform to 'Copyable'}}
 
     let x: Maybe<NC> = .none
 }
