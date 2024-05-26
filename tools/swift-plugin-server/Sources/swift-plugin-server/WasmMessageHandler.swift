@@ -38,9 +38,9 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
         )
       }
       return .loadPluginLibraryResult(loaded: true, diagnostics: [])
-    case .expandAttachedMacro(let macro, _, _, _, _, _, _, _, _),
-        .expandFreestandingMacro(let macro, _, _, _, _):
-      if let response = expandMacro(macro, message: message) {
+    case .expandAttachedMacro(let macro, _, _, let syntax, _, _, _, _, _),
+        .expandFreestandingMacro(let macro, _, _, let syntax, _):
+      if let response = expandMacro(macro, message: message, location: syntax.location) {
         return response
       } // else break
     case .getCapability:
@@ -55,7 +55,8 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
 
   private func expandMacro(
     _ macro: PluginMessage.MacroReference,
-    message: HostToPluginMessage
+    message: HostToPluginMessage,
+    location: PluginMessage.SourceLocation?
   ) -> PluginToHostMessage? {
     guard let plugin = loadedWasmPlugins[macro.moduleName] else { return nil }
     do {
@@ -72,9 +73,10 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
         diagnostics: [PluginMessage.Diagnostic(
           errorMessage: """
           failed to communicate with external macro implementation type \
-          '\(macro.moduleName).\(macro.typeName)' to expand macro '\(macro.name)()'; \
+          '\(macro.moduleName).\(macro.typeName)' to expand macro '\(macro.name)'; \
           \(error)
-          """
+          """,
+          position: location?.position ?? .invalid
         )]
       )
     }
@@ -82,15 +84,24 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
 }
 
 extension PluginMessage.Diagnostic {
-  fileprivate init(errorMessage: String) {
+  fileprivate init(
+    errorMessage: String,
+    position: PluginMessage.Diagnostic.Position = .invalid
+  ) {
     self.init(
       message: errorMessage,
       severity: .error,
-      position: .invalid,
+      position: position,
       highlights: [],
       notes: [],
       fixIts: []
     )
+  }
+}
+
+extension PluginMessage.SourceLocation {
+  fileprivate var position: PluginMessage.Diagnostic.Position {
+    .init(fileName: fileName, offset: offset)
   }
 }
 
