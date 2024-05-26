@@ -2071,6 +2071,11 @@ namespace {
       return (SF && SF->Kind == SourceFileKind::SIL);
     }
 
+    bool isInterfaceFile() const {
+      auto SF = getDeclContext()->getParentSourceFile();
+      return (SF && SF->Kind == SourceFileKind::Interface);
+    }
+
     /// Short-hand to query the current stage of type resolution.
     bool inStage(TypeResolutionStage stage) const {
       return resolution.getStage() == stage;
@@ -4779,6 +4784,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       if (auto known = proto->getKnownProtocol()) {
         if (*known == KnownProtocolKind::Escapable
             && !isSILSourceFile()
+            && !isInterfaceFile()
             && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
           diagnoseInvalid(repr, repr->getLoc(),
                           diag::escapable_requires_feature_flag);
