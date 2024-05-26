@@ -13,6 +13,7 @@
 
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
+// DEP: _memmove
 // DEP: _memset
 // DEP: _putchar
 

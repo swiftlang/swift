@@ -257,6 +257,7 @@ extension String {
       return (result, repairsMade: false)
     }
 
+    #if !$Embedded
     // Fast path for untyped raw storage and known stdlib types
     if let contigBytes = input as? _HasContiguousBytes,
       contigBytes._providesContiguousBytesNoCopy {
@@ -267,6 +268,7 @@ extension String {
         return String._fromASCIIValidating(buffer)
       })
     }
+    #endif
 
     // Fast path for user-defined Collections
     if let strOpt = input.withContiguousStorageIfAvailable({

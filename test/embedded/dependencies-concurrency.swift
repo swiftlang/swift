@@ -28,6 +28,8 @@
 // DEP: _fprintf
 // DEP: _free
 // DEP: _malloc
+// DEP: _memmove
+// DEP: _memset
 // DEP: _memset_s
 // DEP: _nanosleep
 // DEP: _posix_memalign
