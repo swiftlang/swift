@@ -2041,7 +2041,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
         moduleNames.emplace_back(name);
       }
       if (path.empty() || server.empty() || moduleNames.empty()) {
-        Diags.diagnose(SourceLoc(), diag::error_load_plugin_executable,
+        Diags.diagnose(SourceLoc(), diag::error_load_plugin,
                        A->getValue());
       } else {
         Opts.PluginSearchOpts.emplace_back(
