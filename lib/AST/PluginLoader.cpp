@@ -124,8 +124,7 @@ PluginLoader::getPluginMap() {
 
     case PluginSearchOption::Kind::LoadPlugin: {
       auto &val = entry.get<PluginSearchOption::LoadPlugin>();
-      std::vector<std::string> moduleNames = val.ModuleNames;
-      for (auto &moduleName : moduleNames) {
+      for (auto &moduleName : val.ModuleNames) {
         try_emplace(moduleName, val.LibraryPath, val.ServerPath);
       }
       continue;
