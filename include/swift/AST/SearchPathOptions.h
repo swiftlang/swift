@@ -213,17 +213,23 @@ public:
     std::string SearchPath;
     std::string ServerPath;
   };
+  struct LoadPlugin {
+    std::string LibraryPath;
+    std::string ServerPath;
+    std::vector<std::string> ModuleNames;
+  };
 
   enum class Kind : uint8_t {
     LoadPluginLibrary,
     LoadPluginExecutable,
     PluginPath,
     ExternalPluginPath,
+    LoadPlugin,
   };
 
 private:
   using Members = ExternalUnionMembers<LoadPluginLibrary, LoadPluginExecutable,
-                                       PluginPath, ExternalPluginPath>;
+                                       PluginPath, ExternalPluginPath, LoadPlugin>;
   static Members::Index getIndexForKind(Kind kind) {
     switch (kind) {
     case Kind::LoadPluginLibrary:
@@ -234,6 +240,8 @@ private:
       return Members::indexOf<PluginPath>();
     case Kind::ExternalPluginPath:
       return Members::indexOf<ExternalPluginPath>();
+    case Kind::LoadPlugin:
+      return Members::indexOf<LoadPlugin>();
     }
   };
   using Storage = ExternalUnion<Kind, Members, getIndexForKind>;
@@ -256,6 +264,9 @@ public:
   PluginSearchOption(const ExternalPluginPath &v)
       : kind(Kind::ExternalPluginPath) {
     storage.emplace<ExternalPluginPath>(kind, v);
+  }
+  PluginSearchOption(const LoadPlugin &v) : kind(Kind::LoadPlugin) {
+    storage.emplace<LoadPlugin>(kind, v);
   }
   PluginSearchOption(const PluginSearchOption &o) : kind(o.kind) {
     storage.copyConstruct(o.kind, o.storage);
@@ -467,9 +478,6 @@ public:
 
   /// Plugin search path options.
   std::vector<PluginSearchOption> PluginSearchOpts;
-
-  /// Path to swift-wasm-plugin-server executable.
-  std::string PluginWasmServerPath;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;

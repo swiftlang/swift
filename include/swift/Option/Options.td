@@ -2002,6 +2002,13 @@ def load_plugin_executable:
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
 
+def load_plugin:
+  Separate<["-"], "load-plugin">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Path to a plugin library, a server to load it in, and a comma-separated "
+           "list of module names where the macro types are declared">,
+  MetaVarName<"<library-path>:<server-path>#<module-names>">;
+
 def disable_sandbox:
   Flag<["-"], "disable-sandbox">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,

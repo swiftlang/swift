@@ -2027,6 +2027,30 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
       }
       break;
     }
+    case OPT_load_plugin: {
+      // '<path to library>:<path to server>#<module names>' where the module names are
+      // comma separated.
+      StringRef pathAndServer;
+      StringRef modulesStr;
+      std::tie(pathAndServer, modulesStr) = StringRef(A->getValue()).rsplit('#');
+      StringRef path;
+      StringRef server;
+      std::tie(path, server) = pathAndServer.rsplit(':');
+      std::vector<std::string> moduleNames;
+      for (auto name : llvm::split(modulesStr, ',')) {
+        moduleNames.emplace_back(name);
+      }
+      if (path.empty() || server.empty() || moduleNames.empty()) {
+        Diags.diagnose(SourceLoc(), diag::error_load_plugin_executable,
+                       A->getValue());
+      } else {
+        Opts.PluginSearchOpts.emplace_back(
+            PluginSearchOption::LoadPlugin{resolveSearchPath(path),
+                                           resolveSearchPath(server),
+                                           std::move(moduleNames)});
+      }
+      break;
+    }
     case OPT_plugin_path: {
       Opts.PluginSearchOpts.emplace_back(
           PluginSearchOption::PluginPath{resolveSearchPath(A->getValue())});
@@ -2043,12 +2067,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
       break;
     }
     default:
+      llvm::errs() << "option: ";
+      A->getOption().print(llvm::errs());
+      llvm::errs() << "\n";
       llvm_unreachable("unhandled plugin search option");
     }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_wasm_plugin_server_path)) {
-    Opts.PluginWasmServerPath = A->getValue();
   }
 
   for (const Arg *A : Args.filtered(OPT_L)) {

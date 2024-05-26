@@ -116,18 +116,17 @@ PluginLoader::getPluginMap() {
     case PluginSearchOption::Kind::LoadPluginExecutable: {
       auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
       assert(!val.ExecutablePath.empty() && "empty plugin path");
-      if (llvm::sys::path::filename(val.ExecutablePath).ends_with(".wasm")) {
-        // we treat wasm plugins like library plugins that can be loaded by an external
-        // "wasm server" that in turn invokes the wasm runtime.
-        const auto &wasmServerPath = Ctx.SearchPathOpts.PluginWasmServerPath;
-        assert(!wasmServerPath.empty() && "wasm load requested but got empty wasm server path");
-        for (auto &moduleName : val.ModuleNames) {
-          try_emplace(moduleName, val.ExecutablePath, wasmServerPath);
-        }
-      } else {
-        for (auto &moduleName : val.ModuleNames) {
-          try_emplace(moduleName, /*libraryPath=*/"", val.ExecutablePath);
-        }
+      for (auto &moduleName : val.ModuleNames) {
+        try_emplace(moduleName, /*libraryPath=*/"", val.ExecutablePath);
+      }
+      continue;
+    }
+
+    case PluginSearchOption::Kind::LoadPlugin: {
+      auto &val = entry.get<PluginSearchOption::LoadPlugin>();
+      std::vector<std::string> moduleNames = val.ModuleNames;
+      for (auto &moduleName : moduleNames) {
+        try_emplace(moduleName, val.LibraryPath, val.ServerPath);
       }
       continue;
     }
