@@ -432,9 +432,6 @@ enum class FixKind : uint8_t {
   /// vs.`@OtherActor () -> Void`
   AllowGlobalActorMismatch,
 
-  /// Produce an error about a type that must be Copyable
-  MustBeCopyable,
-
   /// Allow 'each' applied to a non-pack type.
   AllowInvalidPackElement,
 
@@ -2136,32 +2133,6 @@ public:
   static NoncopyableMatchFailure forExistentialCast(Type existential) {
     assert(existential->isAnyExistentialType());
     return NoncopyableMatchFailure(ExistentialCast, existential);
-  }
-};
-
-class MustBeCopyable final : public ConstraintFix {
-  Type noncopyableTy;
-  NoncopyableMatchFailure failure;
-
-  MustBeCopyable(ConstraintSystem &cs,
-                 Type noncopyableTy,
-                 NoncopyableMatchFailure failure,
-                 ConstraintLocator *locator);
-
-public:
-  std::string getName() const override { return "remove move-only from type"; }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
-
-  static MustBeCopyable *create(ConstraintSystem &cs,
-                             Type noncopyableTy,
-                             NoncopyableMatchFailure failure,
-                             ConstraintLocator *locator);
-
-  static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::MustBeCopyable;
   }
 };
 
