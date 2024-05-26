@@ -64,6 +64,7 @@ extension _StringGuts {
     self.init(_StringObject(storage))
   }
 
+  #if !$Embedded
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
@@ -73,6 +74,7 @@ extension _StringGuts {
       isASCII: isASCII,
       length: length))
   }
+  #endif
 }
 
 // Queries
