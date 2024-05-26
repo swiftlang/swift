@@ -6582,6 +6582,13 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 
+/// Assuming the expression appears in a consuming context,
+/// if it does not already have an explicit `consume`,
+/// can I add `consume` around this expression?
+///
+/// \param module represents the module in which the expr appears
+bool canAddExplicitConsume(ModuleDecl *module, Expr *expr);
+
 // Count the number of overload sets present
 // in the expression and all of the children.
 class OverloadSetCounter : public ASTWalker {
