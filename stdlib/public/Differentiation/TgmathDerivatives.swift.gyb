@@ -24,7 +24,7 @@ import Swift
   import WASILibc
 #elseif os(Windows)
   import CRT
-#elseif os(Android)
+#elseif canImport(Android)
   import Android
 #else
 #error("Unsupported platform")
