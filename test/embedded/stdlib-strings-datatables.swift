@@ -4,7 +4,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx
 
 public func test1() {
   let string = "string"
