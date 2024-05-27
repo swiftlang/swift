@@ -3909,6 +3909,7 @@ private:
         case SILFunctionLanguage::Swift:
           return Conversion::getSubstToOrig(origParamType,
                                             arg.getSubstRValueType(),
+                                            loweredSubstArgType,
                                             param.getSILStorageInterfaceType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
@@ -4134,7 +4135,9 @@ private:
         convertingInit.emplace(
             Conversion::getSubstToOrig(
                 origExpansionType.getPackExpansionPatternType(),
-                substPatternType, expectedElementType),
+                substPatternType,
+                SILType::getPrimitiveObjectType(loweredPatternTy),
+                expectedElementType),
             SGFContext(innermostInit));
         innermostInit = &*convertingInit;
       }
@@ -7361,6 +7364,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       origParamType);
   
   auto conversion = Conversion::getSubstToOrig(origParam, substParamType,
+                                     getLoweredType(asyncLetEntryPoint->getType()),
                                      getLoweredType(origParam, substParamType));
   auto taskFunction = emitConvertedRValue(asyncLetEntryPoint, conversion);
 
