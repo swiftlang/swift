@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -runtime-compatibility-version none -wmo %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswiftUnicodeDataTables.a) | %FileCheck %s
-// RUN: %target-run-simple-swift(-Osize -Xlinker -dead_strip -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswiftUnicodeDataTables.a) | %FileCheck %s
+// RUN: %target-run-simple-swift(                            -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xlinker %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswiftUnicodeDataTables.a) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Osize -Xlinker -dead_strip -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xlinker %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswiftUnicodeDataTables.a) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
