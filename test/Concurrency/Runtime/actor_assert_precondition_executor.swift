@@ -7,6 +7,9 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 
+// TODO: The actual reason is that we do these %env- tricks, which e.g. Windows is confused about
+// REQUIRES: libdispatch
+
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
