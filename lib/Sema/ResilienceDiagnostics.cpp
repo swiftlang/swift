@@ -136,6 +136,21 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   if (!allowedForPkgCtx) {
     auto diagID = diag::resilience_decl_unavailable;
+
+    // FIXME: rdar://128175704
+    // This is a hack; the following shouldn't happen but
+    // apparently can in some generated code, showing an
+    // error that's not legit (most likely where::isPackage
+    // bit is not set or gets lost somewhere).
+    // Since there should have been other errors if legit
+    // prior to reaching here, downgrade the error to a
+    // warning for this isolated case until a proper fix
+    // is in.
+    if ((where.isPackage() || declAccessScope.isPackage()) &&
+        where.getFragileFunctionKind().kind ==
+            FragileFunctionKind::DefaultArgument)
+      downgradeToWarning = DowngradeToWarning::Yes;
+
     if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::resilience_decl_unavailable_warn;
 
