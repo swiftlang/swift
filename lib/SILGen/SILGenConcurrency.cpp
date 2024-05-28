@@ -16,6 +16,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Range.h"
 
@@ -661,75 +662,29 @@ SILValue SILGenFunction::emitGetCurrentExecutor(SILLocation loc) {
   return ExpectedExecutor;
 }
 
-/// Find the extension on DistributedActor that defines __actorUnownedExecutor.
-static ExtensionDecl *findDistributedActorAsActorExtension(
-    ProtocolDecl *distributedActorProto, ModuleDecl *module) {
-  ASTContext &ctx = distributedActorProto->getASTContext();
-  auto name = ctx.getIdentifier("__actorUnownedExecutor");
-  auto results = distributedActorProto->lookupDirect(
-      name, SourceLoc(),
-      NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
-  for (auto result : results) {
-    if (auto var = dyn_cast<VarDecl>(result)) {
-      return dyn_cast<ExtensionDecl>(var->getDeclContext());
-    }
-  }
-
-  return nullptr;
-}
-
-ProtocolConformanceRef
-SILGenModule::getDistributedActorAsActorConformance(SubstitutionMap subs) {
-  ASTContext &ctx = M.getASTContext();
-  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
-  Type distributedActorType = subs.getReplacementTypes()[0];
-
-  if (!distributedActorAsActorConformance) {
-    auto distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-    if (!distributedActorProto)
-      return ProtocolConformanceRef();
-
-    auto ext = findDistributedActorAsActorExtension(
-        distributedActorProto, M.getSwiftModule());
-    if (!ext)
-      return ProtocolConformanceRef();
-
-    // Conformance of DistributedActor to Actor.
-    auto genericParam = subs.getGenericSignature().getGenericParams()[0];
-    distributedActorAsActorConformance = ctx.getNormalConformance(
-        Type(genericParam), actorProto, SourceLoc(), ext,
-        ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
-        /*isPreconcurrency=*/false);
-  }
-
-  return ProtocolConformanceRef(
-      actorProto,
-      ctx.getSpecializedConformance(distributedActorType,
-                                    distributedActorAsActorConformance,
-                                    subs));
-}
-
 ManagedValue
 SILGenFunction::emitDistributedActorAsAnyActor(SILLocation loc,
                                            SubstitutionMap distributedActorSubs,
                                                ManagedValue actorValue) {
-  ProtocolConformanceRef conformances[1] = {
-    SGM.getDistributedActorAsActorConformance(distributedActorSubs)
-  };
+  auto &ctx = SGM.getASTContext();
+
+  auto distributedActorAsActorConformance =
+      getDistributedActorAsActorConformance(ctx);
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  auto distributedActorType = distributedActorSubs.getReplacementTypes()[0];
+  auto ref = ProtocolConformanceRef(
+      actorProto, ctx.getSpecializedConformance(
+                      distributedActorType, distributedActorAsActorConformance,
+                      distributedActorSubs));
+  ProtocolConformanceRef conformances[1] = {ref};
 
   // Erase the distributed actor instance into an `any Actor` existential with
   // the special conformance.
-  auto &ctx = SGM.getASTContext();
-  CanType distributedActorType =
-    distributedActorSubs.getReplacementTypes()[0]->getCanonicalType();
-  auto &distributedActorTL = getTypeLowering(distributedActorType);
-  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  CanType distributedActorCanType = distributedActorType->getCanonicalType();
+  auto &distributedActorTL = getTypeLowering(distributedActorCanType);
   auto &anyActorTL = getTypeLowering(actorProto->getDeclaredExistentialType());
-  return emitExistentialErasure(loc, distributedActorType,
-                                distributedActorTL, anyActorTL,
-                                ctx.AllocateCopy(conformances),
-                                SGFContext(),
-                                [actorValue](SGFContext) {
-    return actorValue;
-  });
+  return emitExistentialErasure(
+      loc, distributedActorCanType, distributedActorTL, anyActorTL,
+      ctx.AllocateCopy(conformances), SGFContext(),
+      [actorValue](SGFContext) { return actorValue; });
 }
