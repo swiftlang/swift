@@ -24,6 +24,7 @@ add_swift_host_library(swiftClangImporter STATIC
   ImportMacro.cpp
   ImportName.cpp
   ImportType.cpp
+  PolyglotAST.cpp
   Serializability.cpp
   SwiftifyDecl.cpp
   SwiftLookupTable.cpp

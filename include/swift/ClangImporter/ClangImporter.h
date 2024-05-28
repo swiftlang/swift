@@ -380,6 +380,11 @@ public:
   void lookupBridgingHeaderDecls(llvm::function_ref<bool(ClangNode)> filter,
                                 llvm::function_ref<void(Decl*)> receiver) const;
 
+  /// Write a coarse grain AST to \p OS in JSON format with the information
+  /// needed for @implementation conversion of the target Objective-C
+  /// implementation file.
+  void printPolyglotAST(StringRef Filename, raw_ostream &OS);
+
   /// Look for declarations from a particular header. The header may be part of
   /// a clang module or included from the bridging header.
   ///

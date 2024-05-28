@@ -1976,6 +1976,18 @@ public:
       return *SinglePCHImport;
     return StringRef();
   }
+
+  /// List decls and imports from the implementation file at \p filename.
+  llvm::Error
+  lookupImplementationFileDeclsFromFile(StringRef filename,
+    llvm::function_ref<void(const clang::Decl*)> receiver,
+    llvm::function_ref<void(const swift::ImportDecl *)> receiverImports) const;
+
+  /// List decls and imports from the bridging header respecting \p filter.
+  void
+  lookupImplementationFileDecls(llvm::function_ref<bool(ClangNode)> filter,
+    llvm::function_ref<void(const clang::Decl*)> receiver,
+    llvm::function_ref<void(const swift::ImportDecl *)> receiverImports) const;
 };
 
 class ImportDiagnosticAdder {
