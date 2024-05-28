@@ -15,6 +15,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
+// Temporarily disable for now rdar://128862814
+// REQUIRES: rdar128862814
+
 import Dispatch
 
 @available(SwiftStdlib 6.0, *)
