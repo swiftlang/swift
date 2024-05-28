@@ -1031,22 +1031,22 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     //  Task is not running, it's enqueued somewhere waiting to be run
     //
     // TODO (rokhinip): Add a stealer to escalate the thread request for
-    // the task. Still mark the task has having been escalated so that the
-    // thread will self override when it starts draining the task
+    //  the task. Still mark the task has having been escalated so that the
+    //  thread will self override when it starts draining the task
     //
     // TODO (rokhinip): Add a signpost to flag that this is a potential
-    // priority inversion
+    //  priority inversion
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
 
-  } else {
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
-    // We must have at least one record - the task dependency one.
-    assert(newStatus.getInnermostRecord() != NULL);
   }
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
   }
+
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  // We must have at least one record - the task dependency one.
+  assert(newStatus.getInnermostRecord() != NULL);
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
     // We know that none of the escalation actions will recursively
