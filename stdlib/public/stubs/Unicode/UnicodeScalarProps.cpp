@@ -26,7 +26,7 @@
 #endif
 
 #include "swift/shims/UnicodeData.h"
-#include <limits>
+#include <stdint.h>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
@@ -124,7 +124,7 @@ __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar) {
   // If we made it out here, then our scalar was not found in the composition
   // array.
   // Return the max here to indicate that we couldn't find one.
-  return std::numeric_limits<__swift_uint8_t>::max();
+  return UINT8_MAX;
 #endif
 }
 
@@ -153,7 +153,7 @@ const char *_swift_stdlib_getNameAlias(__swift_uint32_t scalar) {
                                                     _swift_stdlib_nameAlias,
                                                   _swift_stdlib_nameAlias_ranks);
 
-  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+  if (dataIdx == INTPTR_MAX) {
     return nullptr;
   }
 
@@ -171,7 +171,7 @@ __swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
                                                     _swift_stdlib_mappings,
                                                   _swift_stdlib_mappings_ranks);
 
-  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+  if (dataIdx == INTPTR_MAX) {
     return 0;
   }
 
@@ -219,7 +219,7 @@ const __swift_uint8_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar,
                                                  _swift_stdlib_special_mappings,
                                           _swift_stdlib_special_mappings_ranks);
 
-  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+  if (dataIdx == INTPTR_MAX) {
     return nullptr;
   }
 
@@ -261,7 +261,7 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
 #else
   auto setOffset = _swift_stdlib_names_scalar_sets[scalar >> 7];
 
-  if (setOffset == std::numeric_limits<__swift_uint16_t>::max()) {
+  if (setOffset == UINT16_MAX) {
     return 0;
   }
 
@@ -385,7 +385,7 @@ __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar) {
   // If we made it out here, then our scalar was not found in the composition
   // array.
   // Return the max here to indicate that we couldn't find one.
-  return std::numeric_limits<__swift_uint16_t>::max();
+  return UINT16_MAX;
 #endif
 }
 
@@ -427,7 +427,7 @@ __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
   // If we made it out here, then our scalar was not found in the composition
   // array.
   // Return the max here to indicate that we couldn't find one.
-  return std::numeric_limits<__swift_uint8_t>::max();
+  return UINT8_MAX;
 #endif
 }
 
@@ -485,7 +485,7 @@ __swift_uint8_t _swift_stdlib_getScript(__swift_uint32_t scalar) {
   // all in the array. This should never happen because the array represents all
   // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
   // return 255 to indicate a failure.
-  return std::numeric_limits<__swift_uint8_t>::max();
+  return UINT8_MAX;
 #endif
 }
 
@@ -501,7 +501,7 @@ const __swift_uint8_t *_swift_stdlib_getScriptExtensions(__swift_uint32_t scalar
   
   // If we don't have an index into the data indices, then this scalar has no
   // script extensions
-  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+  if (dataIdx == INTPTR_MAX) {
     return 0;
   }
   
