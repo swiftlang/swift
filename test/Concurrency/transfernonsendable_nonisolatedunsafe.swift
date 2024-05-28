@@ -11,7 +11,7 @@
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass { // expected-complete-note 96{{}}
+class NonSendableKlass { // expected-complete-note 98{{}}
   var field: NonSendableKlass? = nil
 }
 
@@ -588,6 +588,8 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
 @CustomActor struct CustomActorNonIsolatedUnsafeFieldAddressOnlyStruct<T> {
   nonisolated(unsafe) let nonIsolatedUnsafeLetObject = NonSendableKlass()
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject = NonSendableKlass()
+  nonisolated(unsafe) var nonIsolatedUnsafeVarComputedObject: NonSendableKlass { NonSendableKlass() }
+
   var t: T? = nil
 
   func test() async {
@@ -606,6 +608,19 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     // expected-tns-warning @-1 {{sending 'x' risks causing data races}}
     // expected-tns-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+    let x2 = nonIsolatedUnsafeVarObject
+    await transferToMainDirect(x2)
+    // expected-tns-warning @-1 {{sending 'x2' risks causing data races}}
+    // expected-tns-note @-2 {{sending global actor 'CustomActor'-isolated 'x2' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
+    // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+    let x3 = nonIsolatedUnsafeVarComputedObject
+    await transferToMainDirect(x3)
+    // expected-tns-warning @-1 {{sending 'x3' risks causing data races}}
+    // expected-tns-note @-2 {{sending global actor 'CustomActor'-isolated 'x3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
+    // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
     print(x)
   }
 }
@@ -627,15 +642,17 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
     let x = nonIsolatedUnsafeVarObject
     await transferToMainDirect(x)
     // expected-tns-warning @-1 {{sending 'x' risks causing data races}}
-    // expected-tns-note @-2 {{sending 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and local global actor 'CustomActor'-isolated uses}}
+    // expected-tns-note @-2 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
-    print(x) // expected-tns-note {{access can happen concurrently}}
+    print(x)
   }
 }
 
 struct NonIsolatedUnsafeFieldNonSendableStruct {
   nonisolated(unsafe) let nonIsolatedUnsafeLetObject = NonSendableKlass()
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject = NonSendableKlass()
+  nonisolated(unsafe) var nonIsolatedUnsafeVarComputedObject: NonSendableKlass { NonSendableKlass() }
+
   let letObject = NonSendableKlass()
   var varObject = NonSendableKlass()
 

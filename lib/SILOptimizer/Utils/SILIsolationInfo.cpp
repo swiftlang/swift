@@ -349,19 +349,26 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
 
     if (fas.hasSelfArgument()) {
-      auto &self = fas.getSelfArgumentOperand();
-      if (fas.getArgumentParameterInfo(self).hasOption(
+      auto &selfOp = fas.getSelfArgumentOperand();
+      CanType selfASTType = selfOp.get()->getType().getASTType();
+      selfASTType =
+          selfASTType->lookThroughAllOptionalTypes()->getCanonicalType();
+
+      if (fas.getArgumentParameterInfo(selfOp).hasOption(
               SILParameterInfo::Isolated)) {
-        CanType astType = self.get()->getType().getASTType();
-        if (auto *nomDecl =
-                astType->lookThroughAllOptionalTypes()->getAnyActor()) {
+        if (auto *nomDecl = selfASTType->getAnyActor()) {
           // TODO: We really should be doing this based off of an Operand. Then
           // we would get the SILValue() for the first element. Today this can
           // only mess up isolation history.
           return SILIsolationInfo::getActorInstanceIsolated(
-              SILValue(), self.get(), nomDecl);
+              SILValue(), selfOp.get(), nomDecl);
         }
       }
+    }
+
+    // See if we can infer isolation from our callee.
+    if (auto isolationInfo = get(fas.getCallee())) {
+      return isolationInfo;
     }
   }
 
@@ -456,6 +463,9 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // Treat function ref as either actor isolated or sendable.
   if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
     auto isolation = fri->getReferencedFunction()->getActorIsolation();
+
+    // First check if we are actor isolated at the AST level... if we are, then
+    // create the relevant actor isolated.
     if (isolation.isActorIsolated()) {
       if (isolation.isGlobalActor()) {
         return SILIsolationInfo::getGlobalActorIsolated(
@@ -474,6 +484,38 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
       assert(isolation.getKind() != ActorIsolation::Erased &&
              "Implement this!");
+    }
+
+    // Then check if we have something that is nonisolated unsafe.
+    if (isolation.isNonisolatedUnsafe()) {
+      // First check if our function_ref is a method of a global actor isolated
+      // type. In such a case, we create a global actor isolated
+      // nonisolated(unsafe) so that if we assign the value to another variable,
+      // the variable still says that it is the appropriate global actor
+      // isolated thing.
+      //
+      // E.x.:
+      //
+      // @MainActor
+      // struct X { nonisolated(unsafe) var x: NonSendableThing { ... } }
+      //
+      // We want X.x to be safe to use... but to have that 'z' in the following
+      // is considered MainActor isolated.
+      //
+      // let z = X.x
+      //
+      auto *func = fri->getReferencedFunction();
+      auto funcType = func->getLoweredFunctionType();
+      auto selfParam = funcType->getSelfInstanceType(
+          fri->getModule(), func->getTypeExpansionContext());
+      if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
+        auto isolation = swift::getActorIsolation(nomDecl);
+        if (isolation.isGlobalActor()) {
+          return SILIsolationInfo::getGlobalActorIsolated(
+                     fri, isolation.getGlobalActor())
+              .withUnsafeNonIsolated(true);
+        }
+      }
     }
 
     // Otherwise, lets look at the AST and see if our function ref is from an

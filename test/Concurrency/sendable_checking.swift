@@ -238,10 +238,19 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 }
 
 @available(SwiftStdlib 5.1, *)
+actor CustomActorInstance {}
+
+@available(SwiftStdlib 5.1, *)
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+@available(SwiftStdlib 5.1, *)
 final class NonSendable {
-  // expected-note @-1 4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-note @-1 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // TransferNonSendable emits 3 fewer errors here.
-  // expected-targeted-and-complete-note @-3 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-targeted-and-complete-note @-3 7 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // expected-complete-and-tns-note @-4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
@@ -270,19 +279,52 @@ final class NonSendable {
 
   @MainActor
   var x: Int { 0 }
+
+  @CustomActor
+  var y: Int { 0 }
+
+  var z: Int { 0 }
 }
 
+// This is not an error since t.update and t.x are both main actor isolated. We
+// still get the returning main actor-isolated property 'x' error though.
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
+  let t = NonSendable()
+  await t.update()
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+
+  _ = await t.x
+  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+}
+
+// We get the region isolation error here since t.y is custom actor isolated.
+@available(SwiftStdlib 5.1, *)
+func testNonSendableBaseArg2() async {
+  let t = NonSendable()
+  await t.update()
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{sending 't' risks causing data races}}
+  // TODO: Improve the diagnostic so that we say custom actor isolated instead since t.y
+  // is custom actor isolated.
+  // expected-tns-note @-5 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = await t.y
+  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to global actor 'CustomActor'-isolated property 'y' cannot cross actor boundary}}
+  // expected-tns-note @-2 {{access can happen concurrently}}
+}
+
+// We get the region isolation error here since t.z is not isolated.
+@available(SwiftStdlib 5.1, *)
+func testNonSendableBaseArg3() async {
   let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{sending 't' risks causing data races}}
   // expected-tns-note @-3 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
-  _ = await t.x
-  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-tns-note@-2 {{access can happen concurrently}}
+  _ = t.z
+  // expected-tns-note @-1 {{access can happen concurrently}}
 }
 
 @available(SwiftStdlib 5.1, *)
