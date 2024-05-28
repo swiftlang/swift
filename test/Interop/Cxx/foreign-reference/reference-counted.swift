@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // XFAIL: OS=windows-msvc
 
+// Temporarily disable on arm64e (rdar://128681137)
+// UNSUPPORTED: CPU=arm64e
+
 import StdlibUnittest
 import ReferenceCounted
 
