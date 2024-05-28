@@ -233,7 +233,7 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
 
       status = newStatus;
 
-      status.traceStatusChanged(task);
+      status.traceStatusChanged(task, false);
       worker.flagQueueIsPublished(lockingRecord);
       installedLockRecord = true;
 
@@ -268,7 +268,7 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
     if (task->_private()._status().compare_exchange_weak(status, newStatus,
             /*success*/ std::memory_order_release,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task);
+      newStatus.traceStatusChanged(task, false);
       break;
     }
   }
@@ -322,7 +322,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task);
+        newStatus.traceStatusChanged(task, false);
         return true;
       } else {
         // Retry
@@ -404,7 +404,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
         if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /*success*/ std::memory_order_relaxed,
                /*failure*/ std::memory_order_relaxed)) {
-          newStatus.traceStatusChanged(task);
+          newStatus.traceStatusChanged(task, false);
           return;
         }
       }
@@ -436,7 +436,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
              /*success*/ std::memory_order_relaxed,
              /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task);
+        newStatus.traceStatusChanged(task, false);
         return;
       }
       // Restart the loop again - someone else modified status concurrently
@@ -494,7 +494,7 @@ void swift::removeStatusRecordWhere(
         if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /*success*/ std::memory_order_relaxed,
                /*failure*/ std::memory_order_relaxed)) {
-          newStatus.traceStatusChanged(task);
+          newStatus.traceStatusChanged(task, false);
           return;
         }
       }
@@ -904,7 +904,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task);
+  newStatus.traceStatusChanged(task, false);
   if (newStatus.getInnermostRecord() == NULL) {
      // No records, nothing to propagate
      return;
@@ -1031,22 +1031,22 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     //  Task is not running, it's enqueued somewhere waiting to be run
     //
     // TODO (rokhinip): Add a stealer to escalate the thread request for
-    // the task. Still mark the task has having been escalated so that the
-    // thread will self override when it starts draining the task
+    //  the task. Still mark the task has having been escalated so that the
+    //  thread will self override when it starts draining the task
     //
     // TODO (rokhinip): Add a signpost to flag that this is a potential
-    // priority inversion
+    //  priority inversion
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
 
-  } else {
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
-    // We must have at least one record - the task dependency one.
-    assert(newStatus.getInnermostRecord() != NULL);
   }
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
   }
+
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  // We must have at least one record - the task dependency one.
+  assert(newStatus.getInnermostRecord() != NULL);
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
     // We know that none of the escalation actions will recursively

@@ -19,6 +19,7 @@
 #ifndef SWIFT_SIL_SILBRIDGING_IMPL_H
 #define SWIFT_SIL_SILBRIDGING_IMPL_H
 
+#include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1587,6 +1588,18 @@ BridgedInstruction BridgedBuilder::createBeginDeallocRef(BridgedValue reference,
 
 BridgedInstruction BridgedBuilder::createEndInitLetRef(BridgedValue op) const {
   return {unbridged().createEndInitLetRef(regularLoc(), op.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createRetainValue(BridgedValue op) const {
+  auto b = unbridged();
+  return {b.createRetainValue(regularLoc(), op.getSILValue(),
+                              b.getDefaultAtomicity())};
+}
+
+BridgedInstruction BridgedBuilder::createReleaseValue(BridgedValue op) const {
+  auto b = unbridged();
+  return {b.createReleaseValue(regularLoc(), op.getSILValue(),
+                               b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createStrongRetain(BridgedValue op) const {

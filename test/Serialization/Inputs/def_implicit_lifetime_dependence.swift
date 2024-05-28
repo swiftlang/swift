@@ -1,8 +1,7 @@
 public struct BufferView : ~Escapable {
   public let ptr: UnsafeRawBufferPointer
   public let c: Int
-  @_unsafeNonescapableResult
-  public init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
+  public init(_ ptr: UnsafeRawBufferPointer, _ c: Int) -> dependsOn(ptr) Self {
     self.ptr = ptr
     self.c = c
   }
@@ -16,8 +15,7 @@ public struct BufferView : ~Escapable {
 public struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
   let c: Int
-  @_unsafeNonescapableResult
-  public init(_ ptr: UnsafeMutableRawBufferPointer, _ c: Int) {
+  public init(_ ptr: UnsafeMutableRawBufferPointer, _ c: Int) -> dependsOn(ptr) Self {
     self.ptr = ptr
     self.c = c
   }

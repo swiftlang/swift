@@ -243,14 +243,15 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
-        Result->addModuleImport(*sourceFile, alreadyAddedModules);
+        Result->addModuleImports(*sourceFile, alreadyAddedModules,
+                                 &Ctx.SourceMgr);
 
         // Collect implicitly imported modules in case they are not explicitly
         // printed in the interface file, e.g. SwiftOnoneSupport.
         auto &imInfo = mainMod->getImplicitImportInfo();
         for (auto import : imInfo.AdditionalUnloadedImports) {
           Result->addModuleImport(import.module.getModulePath(),
-                                  &alreadyAddedModules);
+                                  &alreadyAddedModules, &Ctx.SourceMgr);
         }
 
         return std::error_code();

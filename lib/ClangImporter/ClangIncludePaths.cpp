@@ -180,18 +180,11 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   return clangDriverArgs;
 }
 
-static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
-  return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
-         triple.isAndroid() || triple.isMusl() || triple.isOSWASI();
-}
-
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
                    std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  if (!shouldInjectLibcModulemap(triple))
-    return {};
 
   // Extract the libc path from Clang driver.
   auto clangDriver = createClangDriver(ctx, vfs);
@@ -568,7 +561,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     StringRef headerFiles[] = {"SwiftAndroidNDK.h", "SwiftBionic.h"};
     libcFileMapping =
         getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs);
-  } else {
+  } else if (triple.isOSGlibc() || triple.isOSOpenBSD() ||
+             triple.isOSFreeBSD()) {
     // BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);

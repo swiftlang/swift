@@ -2087,13 +2087,14 @@ struct AccessUseTestVisitor : public AccessUseVisitor {
   }
 };
 
-static FunctionTest AccessPathBaseTest("accesspath-base", [](auto &function,
-                                                             auto &arguments,
-                                                             auto &test) {
+static FunctionTest AccessPathBaseTest("accesspath", [](auto &function,
+                                                        auto &arguments,
+                                                        auto &test) {
   auto value = arguments.takeValue();
   function.print(llvm::outs());
-  llvm::outs() << "Access path base: " << value;
+  llvm::outs() << "Access path for: " << value;
   auto accessPathWithBase = AccessPathWithBase::compute(value);
+  llvm::outs() << "  base: " << accessPathWithBase.base;
   AccessUseTestVisitor visitor;
   visitAccessPathBaseUses(visitor, accessPathWithBase, &function);
 });

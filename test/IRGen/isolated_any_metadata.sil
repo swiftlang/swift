@@ -13,8 +13,8 @@ sil_stage canonical
 // CHECK-NEXT:           ret ptr [[METADATA]]
 sil @get_metadata : $() -> @thick Any.Type {
 entry:
-  %type = metatype $@thick (@isolated(any) () -> ()).Type
-  %result = init_existential_metatype %type : $@thick (@isolated(any) () -> ()).Type, $@thick Any.Type
+  %type = metatype $@thick (@isolated(any) @Sendable () -> ()).Type
+  %result = init_existential_metatype %type : $@thick (@isolated(any) @Sendable () -> ()).Type, $@thick Any.Type
   return %result : $@thick Any.Type
 }
 

@@ -97,6 +97,17 @@ func simple() async {
   TL.$number.withValue(1) {
     printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (1)
   }
+
+  // async body
+  await TL.$number.withValue(1) {
+    await Task.yield()
+    print("OK: \(TL.number)")
+  }
+
+  // sync body
+  TL.$number.withValue(1) {
+    print("OK: \(TL.number)")
+  }
 }
 
 @available(SwiftStdlib 5.1, *)

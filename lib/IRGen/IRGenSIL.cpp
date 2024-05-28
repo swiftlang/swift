@@ -2338,7 +2338,9 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   // First, claim all the indirect results.
   ArrayRef<SILArgument *> args = emitEntryPointIndirectReturn(
       *emission, IGF, entry, funcTy, [&](SILType directResultType) -> bool {
-        return FI.getReturnInfo().isIndirect();
+        // Indirect at the IR level but direct at the SIL level.
+        return FI.getReturnInfo().isIndirect() &&
+               !funcTy->hasIndirectFormalResults();
       });
 
   unsigned nextArgTyIdx = 0;
@@ -6674,6 +6676,20 @@ void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
+  auto &lv = getLoweredValue(i->getOperand());
+  if (lv.kind == LoweredValue::Kind::ObjCMethod) {
+    // LoadableByAddress lowering will insert convert_function instructions to
+    // change the type of a partial_apply instruction involving a objc_method
+    // convention, to change the partial_apply's SIL type (rewriting large types
+    // to @in_guaranteed/@out). This is important for pointer authentication.
+
+    // The convert_function instruction will carry the desired SIL type.
+    // Here we just forward the objective-c method.
+    auto &objcMethod = lv.getObjCMethod();
+    setLoweredObjCMethod(i, objcMethod.getMethod());
+    return;
+  }
+
   // This instruction is specified to be a no-op.
   Explosion temp = getLoweredExplosion(i->getOperand());
 

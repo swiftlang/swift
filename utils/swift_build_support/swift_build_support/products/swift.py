@@ -15,6 +15,7 @@ from . import earlyswiftdriver
 from . import libcxx
 from . import llvm
 from . import product
+from . import staticswiftlinux
 from ..cmake import CMakeOptions
 
 
@@ -265,4 +266,5 @@ updated without updating swift.py?")
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
+                staticswiftlinux.StaticSwiftLinuxConfig,
                 libcxx.LibCXX]

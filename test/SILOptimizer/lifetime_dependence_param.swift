@@ -12,8 +12,13 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
+  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+    self.p = p
+    self.i = i
+  }
+
   @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ i: Int) {
+  init(independent p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
@@ -25,7 +30,7 @@ struct BV : ~Escapable {
   consuming func derive() -> dependsOn(self) BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
-    return BV(self.p, self.i)
+    return BV(independent: self.p, self.i)
   }
 }
 
@@ -33,8 +38,7 @@ struct BV : ~Escapable {
 struct NE {
   var bv: BV
 
-  @_unsafeNonescapableResult
-  init(_ bv: BV) {
+  init(_ bv: BV) -> dependsOn(bv) Self {
     self.bv = bv
   }
 }

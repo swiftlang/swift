@@ -15,6 +15,7 @@ import Builtin
 
 struct NCNEInt: ~Copyable, ~Escapable {
   var i: Builtin.Int64
+  // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init() {}
   deinit {}
@@ -49,12 +50,14 @@ sil_vtable D {
 
 struct NE : ~Escapable {
   var d: D
+  // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init() { }
 }
 
 struct NEWrap : ~Escapable {
   var ne: NE
+  // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init() { }
 }

@@ -42,6 +42,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self._build(host_target, 'wasm32-wasi')
 
     def _build(self, host_target, target_triple):
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', '/usr')
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
@@ -101,6 +102,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL', 'TRUE')
         self.cmake_options.define(
             'SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE:PATH',

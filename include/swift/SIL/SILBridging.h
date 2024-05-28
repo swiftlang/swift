@@ -147,7 +147,7 @@ enum class BridgedArgumentConvention {
 };
 
 #ifdef USED_IN_CPP_SOURCE
-static swift::ParameterConvention getParameterConvention(BridgedArgumentConvention convention) {
+inline swift::ParameterConvention getParameterConvention(BridgedArgumentConvention convention) {
   switch (convention) {
     case BridgedArgumentConvention::Indirect_In:             return swift::ParameterConvention::Indirect_In;
     case BridgedArgumentConvention::Indirect_In_Guaranteed:  return swift::ParameterConvention::Indirect_In_Guaranteed;
@@ -165,7 +165,7 @@ static swift::ParameterConvention getParameterConvention(BridgedArgumentConventi
   llvm_unreachable("invalid parameter convention");
 }
 
-static BridgedArgumentConvention getArgumentConvention(swift::ParameterConvention convention) {
+inline BridgedArgumentConvention getArgumentConvention(swift::ParameterConvention convention) {
   switch (convention) {
     case swift::ParameterConvention::Indirect_In:              return BridgedArgumentConvention::Indirect_In;
     case swift::ParameterConvention::Indirect_In_Guaranteed:   return BridgedArgumentConvention::Indirect_In_Guaranteed;
@@ -1210,6 +1210,10 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginDeallocRef(BridgedValue reference,
                                                                               BridgedValue allocation) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndInitLetRef(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createRetainValue(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createReleaseValue(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStrongRetain(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStrongRelease(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnownedRetain(BridgedValue op) const;

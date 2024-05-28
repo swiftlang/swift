@@ -870,6 +870,14 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
   TypeVars.insert(typeVars.begin(), typeVars.end());
 }
 
+void TypeVarRefCollector::inferTypeVars(PackExpansionExpr *E) {
+  auto expansionType = CS.getType(E)->castTo<PackExpansionType>();
+
+  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  expansionType->getTypeVariables(referencedVars);
+  TypeVars.insert(referencedVars.begin(), referencedVars.end());
+}
+
 ASTWalker::PreWalkResult<Expr *>
 TypeVarRefCollector::walkToExprPre(Expr *expr) {
   if (isa<ClosureExpr>(expr))
@@ -891,6 +899,14 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
       inferTypeVars(D);
     }
   }
+
+  if (auto *packElement = getAsExpr<PackElementExpr>(expr)) {
+    // If environment hasn't been established yet, it means that pack expansion
+    // appears inside of this closure.
+    if (auto *outerEnvironment = CS.getPackEnvironment(packElement))
+      inferTypeVars(outerEnvironment);
+  }
+
   return Action::Continue(expr);
 }
 
@@ -4630,7 +4646,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     // `next` is always async but witness might not be throwing
     if (isAsync) {
       nextCall =
-          AwaitExpr::createImplicit(ctx, /*awaitLoc=*/SourceLoc(), nextCall);
+          AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
     }
 
     // The iterator type must conform to IteratorProtocol.

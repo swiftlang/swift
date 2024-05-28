@@ -4423,7 +4423,7 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param memberLocator The locator anchored at this value reference, when
+  /// \param locator The locator anchored at this value reference, when
   /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
@@ -4441,7 +4441,7 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param memberLocator The locator anchored at this value reference, when
+  /// \param locator The locator anchored at this value reference, when
   /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
@@ -6453,6 +6453,7 @@ public:
 ///
 /// This includes:
 /// - Not yet resolved outer VarDecls (including closure parameters)
+/// - Outer pack expansions that are not yet fully resolved
 /// - Return statements with a contextual type that has not yet been resolved
 ///
 /// This is required because isolated conjunctions, just like single-expression
@@ -6474,6 +6475,7 @@ public:
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
+  void inferTypeVars(PackExpansionExpr *);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;

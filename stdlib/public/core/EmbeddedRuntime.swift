@@ -46,7 +46,18 @@ public struct HeapObject {
   static let refcountMask = Int(bitPattern: 0x7fff_ffff)
 #endif
 
+  // Note: The immortalRefCount value of -1 is also hard-coded in IRGen in `irgen::emitConstantObject`.
   static let immortalRefCount = -1
+
+#if _pointerBitWidth(_64)
+  static let immortalObjectPointerBit = UInt(0x8000_0000_0000_0000)
+#endif
+
+#if _pointerBitWidth(_64)
+  static let bridgeObjectToPlainObjectMask = UInt(0x8fff_ffff_ffff_fff8)
+#else
+  static let bridgeObjectToPlainObjectMask = UInt(0xffff_ffff)
+#endif
 }
 
 
@@ -161,13 +172,25 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
 
 /// Refcounting
 
+func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  if objectBits == 0 { return false }
+
+  #if _pointerBitWidth(_64)
+  if (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
+  #endif
+  
+  return true
+}
+
 @_cdecl("swift_setDeallocating")
 public func swift_setDeallocating(object: Builtin.RawPointer) {
 }
 
 @_cdecl("swift_isUniquelyReferenced_native")
 public func swift_isUniquelyReferenced_native(object: Builtin.RawPointer) -> Bool {
-  if Int(Builtin.ptrtoint_Word(object)) == 0 { return false }
+  if !isValidPointerForNativeRetain(object: object) { return false }
+
   return swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>(object))
 }
 
@@ -183,7 +206,8 @@ func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<Heap
 
 @_cdecl("swift_retain")
 public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
-  if Int(Builtin.ptrtoint_Word(object)) == 0 { return object }
+  if !isValidPointerForNativeRetain(object: object) { return object }
+
   let o = UnsafeMutablePointer<HeapObject>(object)
   return swift_retain_n_(object: o, n: 1)._rawValue
 }
@@ -191,7 +215,8 @@ public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
 // Cannot use UnsafeMutablePointer<HeapObject>? directly in the function argument or return value as it causes IRGen crashes
 @_cdecl("swift_retain_n")
 public func swift_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
-  if Int(Builtin.ptrtoint_Word(object)) == 0 { return object }
+  if !isValidPointerForNativeRetain(object: object) { return object }
+
   let o = UnsafeMutablePointer<HeapObject>(object)
   return swift_retain_n_(object: o, n: n)._rawValue
 }
@@ -207,16 +232,30 @@ func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> Uns
   return object
 }
 
+@_cdecl("swift_bridgeObjectRetain")
+public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_bridgeObjectRetain_n(object: object, n: 1)
+}
+
+@_cdecl("swift_bridgeObjectRetain_n")
+public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
+  return swift_retain_n(object: untaggedObject, n: n)
+}
+
 @_cdecl("swift_release")
 public func swift_release(object: Builtin.RawPointer) {
-  if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
+  if !isValidPointerForNativeRetain(object: object) { return }
+
   let o = UnsafeMutablePointer<HeapObject>(object)
   swift_release_n_(object: o, n: 1)
 }
 
 @_cdecl("swift_release_n")
 public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
-  if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
+  if !isValidPointerForNativeRetain(object: object) { return }
+
   let o = UnsafeMutablePointer<HeapObject>(object)
   swift_release_n_(object: o, n: n)
 }
@@ -237,6 +276,18 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
   } else if resultingRefcount < 0 {
     fatalError("negative refcount")
   }
+}
+
+@_cdecl("swift_bridgeObjectRelease")
+public func swift_bridgeObjectRelease(object: Builtin.RawPointer) {
+  swift_bridgeObjectRelease_n(object: object, n: 1)
+}
+
+@_cdecl("swift_bridgeObjectRelease_n")
+public func swift_bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
+  swift_release_n(object: untaggedObject, n: n)
 }
 
 

@@ -18,18 +18,26 @@
 // RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test1.swift -o %t/test1.out
 // RUN: %target-codesign %t/test1.out
 // RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test1.out 2>&1 | %FileCheck %t/src/Test1.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test1.out 2>&1 | %FileCheck %t/src/Test1.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test1.out 2>&1 | %FileCheck %t/src/Test1.swift
 
 // RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test2.swift -o %t/test2.out
 // RUN: %target-codesign %t/test2.out
 // RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test2.out 2>&1 | %FileCheck %t/src/Test2.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test2.out 2>&1 | %FileCheck %t/src/Test2.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test2.out 2>&1 | %FileCheck %t/src/Test2.swift
 
 // RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test3.swift -o %t/test3.out
 // RUN: %target-codesign %t/test3.out
 // RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test3.out 2>&1 | %FileCheck %t/src/Test3.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test3.out 2>&1 | %FileCheck %t/src/Test3.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test3.out 2>&1 | %FileCheck %t/src/Test3.swift
 
 // RUN: %target-build-swift -I %t -L %t -l Types %t/src/Test4.swift -o %t/test4.out
 // RUN: %target-codesign %t/test4.out
 // RUN: env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test4.out 2>&1 | %FileCheck %t/src/Test4.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test4.out 2>&1 | %FileCheck %t/src/Test4.swift
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/test4.out 2>&1 | %FileCheck %t/src/Test4.swift
 
 // REQUIRES: asserts
 // REQUIRES: concurrency

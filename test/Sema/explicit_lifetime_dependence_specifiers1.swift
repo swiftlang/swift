@@ -7,16 +7,18 @@ struct Container {
 
 struct AnotherBufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer) {
+  init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
 }
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
+  init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
+    self.ptr = ptr
+  }
   @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer) {
+  init(independent ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
   init(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Int>) -> dependsOn(arr) Self {
@@ -53,8 +55,8 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
   }
 
-  consuming func consume() -> dependsOn(scoped self) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
-    return BufferView(self.ptr)
+  consuming func consume() -> dependsOn(scoped self) BufferView {
+    return BufferView(independent: self.ptr)
   }
 
   func get() -> dependsOn(self) Self { // expected-note{{'get()' previously declared here}}
@@ -68,8 +70,7 @@ struct BufferView : ~Escapable {
 
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeMutableRawBufferPointer) {
+  init(_ ptr: UnsafeMutableRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
 }
@@ -104,7 +105,7 @@ func duplicateParamInvalidLifetimeDependence3(_ x: borrowing BufferView) -> depe
   return BufferView(x.ptr)
 }
 
-func consumingParamInvalidLifetimeDependence1(_ x: consuming BufferView) -> dependsOn(scoped x) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
+func consumingParamInvalidLifetimeDependence1(_ x: consuming BufferView) -> dependsOn(scoped x) BufferView {
   return BufferView(x.ptr)
 }
 
@@ -174,7 +175,7 @@ struct Wrapper : ~Escapable {
     return view
   }
 
-  consuming func consumingMethodInvalidLifetimeDependence1() -> dependsOn(scoped self) BufferView { // expected-error{{invalid use of scoped lifetime dependence with consuming ownership}}
+  consuming func consumingMethodInvalidLifetimeDependence1() -> dependsOn(scoped self) BufferView {
     return view
   }
 
@@ -203,8 +204,7 @@ public struct GenericBufferView<Element> : ~Escapable {
     return self
   }
   // unsafe private API
-  @_unsafeNonescapableResult
-  init(baseAddress: Pointer, count: Int) {
+  init(baseAddress: Pointer, count: Int) -> dependsOn(baseAddress) Self {
     precondition(count >= 0, "Count must not be negative")
     self.baseAddress = baseAddress
     self.count = count
@@ -221,7 +221,6 @@ func derive(_ x: BufferView) -> dependsOn(scoped x) BufferView { // expected-err
 
 struct RawBufferView {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }

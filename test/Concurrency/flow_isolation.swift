@@ -520,9 +520,9 @@ struct CardboardBox<T> {
 
 @available(SwiftStdlib 5.1, *)
 var globalVar: EscapeArtist? // expected-warning {{var 'globalVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
-// expected-note@-1 {{restrict 'globalVar' to the main actor if it will only be accessed from the main thread}}
-// expected-note@-2 {{unsafely mark 'globalVar' as concurrency-safe if all accesses are protected by an external synchronization mechanism}}
-// expected-note@-3 {{convert 'globalVar' to a 'let' constant to make the shared state immutable}}
+// expected-note@-1 {{annotate 'globalVar' with '@MainActor' if property should only be accessed from the main actor}}
+// expected-note@-2 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+// expected-note@-3 {{convert 'globalVar' to a 'let' constant to make 'Sendable' shared state immutable}}
 
 @available(SwiftStdlib 5.1, *)
 actor EscapeArtist {

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
@@ -153,7 +154,9 @@ swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
     Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
-  auto ScanResult = ScanningTool->getDependencies(Compilation, {});
+  auto ScanResult = ScanningTool->getDependencies(
+      Compilation, {},
+      swift::c_string_utils::get_C_string(invocation->working_directory));
   if (ScanResult.getError())
     return nullptr;
   auto DependencyGraph = std::move(*ScanResult);
@@ -179,8 +182,9 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
   }
 
   // Execute the scan and bridge the result
-  auto BatchScanResult =
-      ScanningTool->getDependencies(Compilation, BatchInput, {});
+  auto BatchScanResult = ScanningTool->getDependencies(
+      Compilation, BatchInput, {},
+      swift::c_string_utils::get_C_string(invocation->working_directory));
   swiftscan_batch_scan_result_t *Result = new swiftscan_batch_scan_result_t;
   auto ResultGraphs = new swiftscan_dependency_graph_t[BatchScanResult.size()];
   for (size_t i = 0; i < BatchScanResult.size(); ++i) {
@@ -208,7 +212,9 @@ swiftscan_import_set_create(swiftscan_scanner_t scanner,
     Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
-  auto PreScanResult = ScanningTool->getImports(Compilation);
+  auto PreScanResult = ScanningTool->getImports(
+      Compilation,
+      swift::c_string_utils::get_C_string(invocation->working_directory));
   if (PreScanResult.getError())
     return nullptr;
   auto ImportSet = std::move(*PreScanResult);
@@ -505,7 +511,7 @@ void swiftscan_scan_invocation_set_working_directory(
   invocation->working_directory = swift::c_string_utils::create_clone(working_directory);
 }
 
-SWIFTSCAN_PUBLIC void
+void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
                                    int argc, const char **argv) {
   invocation->argv = swift::c_string_utils::create_set(argc, argv);
@@ -662,6 +668,9 @@ swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
       DiagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK;
       break;
     }
+    // swiftscan_scanner_diagnostics_query is deprecated,
+    // so it does not support source locations.
+    DiagnosticInfo->source_location = nullptr;
     Result->diagnostics[i] = DiagnosticInfo;
   }
 
@@ -684,8 +693,17 @@ swiftscan_diagnostic_get_severity(swiftscan_diagnostic_info_t diagnostic) {
   return diagnostic->severity;
 }
 
+swiftscan_source_location_t
+swiftscan_diagnostic_get_source_location(swiftscan_diagnostic_info_t diagnostic) {
+  return diagnostic->source_location;
+}
+
 void swiftscan_diagnostic_dispose(swiftscan_diagnostic_info_t diagnostic) {
   swiftscan_string_dispose(diagnostic->message);
+  if (diagnostic->source_location) {
+    swiftscan_string_dispose(diagnostic->source_location->buffer_identifier);
+    delete diagnostic->source_location;
+  }
   delete diagnostic;
 }
 
@@ -696,6 +714,23 @@ swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics){
   }
   delete[] diagnostics->diagnostics;
   delete diagnostics;
+}
+
+//=== Source Location -----------------------------------------------------===//
+
+swiftscan_string_ref_t
+swiftscan_source_location_get_buffer_identifier(swiftscan_source_location_t source_location) {
+  return source_location->buffer_identifier;
+}
+
+int64_t
+swiftscan_source_location_get_line_number(swiftscan_source_location_t source_location) {
+  return source_location->line_number;
+}
+
+int64_t
+swiftscan_source_location_get_column_number(swiftscan_source_location_t source_location) {
+  return source_location->column_number;
 }
 
 //=== Experimental Compiler Invocation Functions ------------------------===//

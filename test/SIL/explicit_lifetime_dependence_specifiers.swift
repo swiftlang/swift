@@ -8,15 +8,19 @@ import Builtin
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer) {
+  init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
+  // TODO:  -> dependsOn(ptr) Self
   @_unsafeNonescapableResult
   init?(_ ptr: UnsafeRawBufferPointer, _ i: Int) {
     if (i % 2 == 0) {
       return nil
     } 
+    self.ptr = ptr
+  }
+  @_unsafeNonescapableResult
+  init(independent ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
 // CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
@@ -38,8 +42,7 @@ struct BufferView : ~Escapable {
 
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeMutableRawBufferPointer) {
+  init(_ ptr: UnsafeMutableRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
 }
@@ -57,28 +60,28 @@ func testBasic() {
 
 // CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(0) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> dependsOn(scoped x) BufferView {
-  return BufferView(x.ptr)
+  return BufferView(independent: x.ptr)
 }
 
 // CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> dependsOn(x) BufferView {
-  return BufferView(x.ptr)
+  return BufferView(independent: x.ptr)
 }
 
 // CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat1yAA10BufferViewVADYls_ADYlstF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(0, 1) @owned BufferView {
 func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferView) -> dependsOn(scoped this, that) BufferView {
   if (Int.random(in: 1..<100) == 0) {
-    return BufferView(this.ptr)
+    return BufferView(independent: this.ptr)
   }
-  return BufferView(that.ptr)
+  return BufferView(independent: that.ptr)
 }
 
 // CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVADYls_ADnYlitF : $@convention(thin) (@guaranteed BufferView, @owned BufferView) -> _inherit(1) _scope(0) @owned BufferView {
 func deriveThisOrThat2(_ this: borrowing BufferView, _ that: consuming BufferView) -> dependsOn(scoped this) dependsOn(that) BufferView {
   if (Int.random(in: 1..<100) == 0) {
-    return BufferView(this.ptr)
+    return BufferView(independent: this.ptr)
   }
-  return BufferView(that.ptr)
+  return BufferView(independent: that.ptr)
 }
 
 func use(_ x: borrowing BufferView) {}
@@ -101,19 +104,18 @@ struct Wrapper : ~Escapable {
 
 struct Container : ~Escapable {
  let ptr: UnsafeRawBufferPointer
- @_unsafeNonescapableResult
- init(_ ptr: UnsafeRawBufferPointer) {
+ init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
    self.ptr = ptr
  }
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnYliF : $@convention(thin) (@owned Container) -> _inherit(0) @owned BufferView {
 func getConsumingView(_ x: consuming Container) -> dependsOn(x) BufferView {
-  return BufferView(x.ptr)
+  return BufferView(independent: x.ptr)
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getBorrowingViewyAA06BufferG0VAA9ContainerVYlsF : $@convention(thin) (@guaranteed Container) -> _scope(0) @owned BufferView {
 func getBorrowingView(_ x: borrowing Container) -> dependsOn(scoped x) BufferView {
-  return BufferView(x.ptr)
+  return BufferView(independent: x.ptr)
 }
 

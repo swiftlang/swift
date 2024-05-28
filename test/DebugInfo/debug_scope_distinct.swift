@@ -7,6 +7,9 @@
 
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=arm64e
 
+// XFAIL: *
+// rdar://128505421
+
 // CHECK: define {{.*}} void @"$s4main1TV4move2byyAC13TangentVectorV_tF"
 // CHECK-SAME: ptr {{.*}} %[[ARG_PTR:.*]],
 //

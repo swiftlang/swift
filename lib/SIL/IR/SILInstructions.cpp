@@ -2715,6 +2715,15 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
 }
 
 UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                               SILType Ty, SILModule &Mod,
+                               ValueOwnershipKind forwardingOwnershipKind) {
+  unsigned size = totalSizeToAlloc<swift::Operand>(1);
+  void *Buffer = Mod.allocateInst(size, alignof(UpcastInst));
+  return ::new (Buffer) UpcastInst(DebugLoc, Operand, {}, Ty,
+                                   forwardingOwnershipKind);
+}
+
+UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                SILType Ty, SILFunction &F,
                                ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &Mod = F.getModule();

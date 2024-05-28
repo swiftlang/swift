@@ -64,7 +64,7 @@ void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
 void task_destroy(AsyncTask *task);
 
 void task_status_changed(AsyncTask *task, uint8_t maxPriority, bool isCancelled,
-                         bool isEscalated, bool isRunning, bool isEnqueued);
+                         bool isEscalated, bool isStarting, bool isRunning, bool isEnqueued);
 
 void task_flags_changed(AsyncTask *task, uint8_t jobPriority, bool isChildTask,
                         bool isFuture, bool isGroupChildTask,

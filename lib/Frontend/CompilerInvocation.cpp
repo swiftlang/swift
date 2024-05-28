@@ -1154,19 +1154,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
 
-  if (Args.hasArg(OPT_enable_library_evolution)) {
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
-  } else {
-    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
+  if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
+    // Only allow -experimental-skip-non-exportable-decls if either library
+    // evolution is enabled (in which case the module's ABI is independent of
+    // internal declarations) or when -experimental-skip-all-function-bodies is
+    // present. The latter implies the module will not be used for code
+    // generation, so omitting details needed for ABI should be safe.
+    if (Args.hasArg(OPT_enable_library_evolution) ||
+        Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
+      Opts.SkipNonExportableDecls |= true;
+    } else {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-skip-non-exportable-decls",
                      "-enable-library-evolution");
+    }
   }
 
   Opts.AllowNonResilientAccess =
@@ -1712,23 +1713,18 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
   Opts.DebugInverseRequirements |= Args.hasArg(OPT_debug_inverse_requirements);
 
-  if (Args.hasArg(OPT_enable_library_evolution)) {
-    Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
-    Opts.EnableLazyTypecheck |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
-  } else {
-    if (Args.hasArg(OPT_experimental_lazy_typecheck))
+  if (Args.hasArg(OPT_experimental_lazy_typecheck)) {
+    // Same restrictions as -experimental-skip-non-exportable-decls. These
+    // could be relaxed in the future, since lazy typechecking is probably not
+    // inherently unsafe without these options.
+    if (Args.hasArg(OPT_enable_library_evolution) ||
+        Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
+      Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
+    } else {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-lazy-typecheck",
                      "-enable-library-evolution");
-
-    if (Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy))
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-skip-non-inlinable-function-bodies-is-lazy",
-                     "-enable-library-evolution");
+    }
   }
 
   if (LangOpts.AllowNonResilientAccess &&
@@ -2175,7 +2171,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
-  // If no style options are specified, default to LLVM style.
+  // If no style options are specified, default to Swift style.
   Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
@@ -2189,6 +2185,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       return true;
     }
   }
+  // Swift style is not fully supported in cached mode yet.
+  if (Args.hasArg(OPT_cache_compile_job))
+    Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
@@ -2279,6 +2278,22 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
+}
+
+static std::optional<IRGenLLVMLTOKind>
+ParseLLVMLTOKind(const ArgList &Args, DiagnosticEngine &Diags) {
+  std::optional<IRGenLLVMLTOKind> LLVMLTOKind;
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    LLVMLTOKind =
+        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
+            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
+            .Case("llvm-full", IRGenLLVMLTOKind::Full)
+            .Default(std::nullopt);
+    if (!LLVMLTOKind)
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+  return LLVMLTOKind;
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
@@ -2681,6 +2696,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalSwiftBasedClosureSpecialization = 
       Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
 
+  // If these optimizations are enabled never preserve functions for the
+  // debugger.
+  Opts.ShouldFunctionsBePreservedToDebugger =
+      !Args.hasArg(OPT_enable_llvm_wme);
+  Opts.ShouldFunctionsBePreservedToDebugger &=
+      !Args.hasArg(OPT_enable_llvm_vfe);
+  if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
+    Opts.ShouldFunctionsBePreservedToDebugger &=
+        LTOKind.value() == IRGenLLVMLTOKind::None;
+
   return false;
 }
 
@@ -3027,18 +3052,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
-    auto LLVMLTOKind =
-        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
-            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
-            .Case("llvm-full", IRGenLLVMLTOKind::Full)
-            .Default(std::nullopt);
-    if (LLVMLTOKind)
-      Opts.LLVMLTOKind = LLVMLTOKind.value();
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
+  if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
+     Opts.LLVMLTOKind = LTOKind.value();
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =

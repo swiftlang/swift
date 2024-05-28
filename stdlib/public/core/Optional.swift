@@ -434,7 +434,11 @@ extension Optional: CustomDebugStringConvertible {
     case .some(let value):
 #if !SWIFT_STDLIB_STATIC_PRINT
       var result = "Optional("
+      #if !$Embedded
       debugPrint(value, terminator: "", to: &result)
+      #else
+      "(cannot print value in embedded Swift)".write(to: &result)
+      #endif
       result += ")"
       return result
 #else

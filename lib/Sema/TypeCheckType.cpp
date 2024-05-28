@@ -2071,6 +2071,11 @@ namespace {
       return (SF && SF->Kind == SourceFileKind::SIL);
     }
 
+    bool isInterfaceFile() const {
+      auto SF = getDeclContext()->getParentSourceFile();
+      return (SF && SF->Kind == SourceFileKind::Interface);
+    }
+
     /// Short-hand to query the current stage of type resolution.
     bool inStage(TypeResolutionStage stage) const {
       return resolution.getStage() == stage;
@@ -3941,9 +3946,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                           conventionAttr->getConventionName());
         } else {
           isolation = FunctionTypeIsolation::forErased();
-
-          // @isolated(any) implies @Sendable, unconditionally for now.
-          sendable = true;
         }
         break;
       }
@@ -4782,6 +4784,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       if (auto known = proto->getKnownProtocol()) {
         if (*known == KnownProtocolKind::Escapable
             && !isSILSourceFile()
+            && !isInterfaceFile()
             && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
           diagnoseInvalid(repr, repr->getLoc(),
                           diag::escapable_requires_feature_flag);

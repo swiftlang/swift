@@ -2449,6 +2449,8 @@ public:
 
     // A direct reference to a non-public or shared but not fragile function
     // from a fragile function is an error.
+    // pcmo TODO: change to !isNotSerialized and pass serializedKind to
+    // hasValidLinkageForFragileRef
     if (F.isSerialized()) {
       require((SingleFunction && RefF->isExternalDeclaration()) ||
               RefF->hasValidLinkageForFragileRef(),
@@ -2497,6 +2499,7 @@ public:
       require(!checkResilience(VD, F),
               "cannot access storage of resilient global");
     }
+    // pcmo TODO: replace this with F.canInlineCalleeBody(RefG)
     if (F.isSerialized()) {
       // If it has a package linkage at this point, package CMO must
       // have been enabled, so opt in for visibility.
@@ -7037,7 +7040,7 @@ public:
     SILModule &mod = F->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    require(!F->isSerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
+    require(F->isNotSerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
             "cannot have a serialized function after the module has been serialized");
 
     switch (F->getLinkage()) {
@@ -7051,23 +7054,25 @@ public:
     case SILLinkage::PackageNonABI:
       require(F->isDefinition(),
               "alwaysEmitIntoClient function must have a body");
-      require(F->isSerialized() || mod.isSerialized(),
+      require(!F->isNotSerialized() || mod.isSerialized(),
               "alwaysEmitIntoClient function must be serialized");
       break;
     case SILLinkage::Hidden:
     case SILLinkage::Private:
       require(F->isDefinition() || F->hasForeignBody(),
               "internal/private function must have a body");
-      require(!F->isSerialized() || embedded,
+      require(F->isNotSerialized() || embedded,
               "internal/private function cannot be serialized or serializable");
       break;
     case SILLinkage::PublicExternal:
-      require(F->isExternalDeclaration() || F->isSerialized() ||
+      require(F->isExternalDeclaration() ||
+              !F->isNotSerialized() ||
               mod.isSerialized(),
             "public-external function definition must be serialized");
       break;
     case SILLinkage::PackageExternal:
-      require(F->isExternalDeclaration() || F->isSerialized() ||
+      require(F->isExternalDeclaration() ||
+              !F->isNotSerialized() ||
               mod.isSerialized(),
               "package-external function definition must be serialized");
       break;
