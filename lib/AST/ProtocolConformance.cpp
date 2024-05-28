@@ -1142,9 +1142,40 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 }
 
+/// Handle special cased protocol-to-protocol conformances, such as e.g.
+/// DistributedActor-to-Actor.
+///
+/// \returns true when the conformance lookup was handled successfully
+static bool lookupSpecialProtocolToProtocolConformance(
+    const ProtocolDecl *thisProtocol, ProtocolDecl *toProtocol,
+    SmallVectorImpl<ProtocolConformance *> &conformances) {
+  auto &C = toProtocol->getASTContext();
+
+  // DistributedActor-to-Actor
+  if (thisProtocol->isSpecificProtocol(KnownProtocolKind::DistributedActor) &&
+      toProtocol->isSpecificProtocol(KnownProtocolKind::Actor)) {
+    if (auto conformance = getDistributedActorAsActorConformance(C)) {
+      conformances.push_back(conformance);
+      return true;
+    }
+  }
+
+  return false;
+}
+
 bool NominalTypeDecl::lookupConformance(
        ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
+
+  // In general, protocols cannot conform to other protocols, however there are
+  // exceptions, special handle those.
+  if (auto thisProtocol = dyn_cast<ProtocolDecl>(this)) {
+    if (lookupSpecialProtocolToProtocolConformance(thisProtocol, protocol,
+                                                   conformances)) {
+      return true;
+    }
+  }
+
   assert(!isa<ProtocolDecl>(this) &&
          "Self-conformances are only found by the higher-level "
          "ModuleDecl::lookupConformance() entry point");
@@ -1187,7 +1218,7 @@ void NominalTypeDecl::getImplicitProtocols(
 }
 
 void NominalTypeDecl::registerProtocolConformance(
-       NormalProtocolConformance *conformance, bool synthesized) {
+    NormalProtocolConformance *conformance, bool synthesized) {
   prepareConformanceTable();
   auto *dc = conformance->getDeclContext();
   ConformanceTable->registerProtocolConformance(dc, conformance, synthesized);
