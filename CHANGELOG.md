@@ -5,6 +5,25 @@
 
 ## Swift 6.0
 
+* [SE-0429][]:
+  Certain types that contain noncopyable fields, such as those without a deinit,
+  can now be consumed field-by-field:
+
+  ```swift
+  struct Token: ~Copyable {}
+
+  struct Authentication: ~Copyable {
+    let id: Token
+    let name: String
+
+    mutating func exchange(_ new: consuming Token) -> Token {
+      let old = self.id  // <- partial consumption of 'self'
+      self = .init(id: new, name: self.name)
+      return old
+    } 
+  }
+  ```
+
 * [SE-0427][]:
   You can now suppress `Copyable` on protocols, generic parameters, 
   and existentials:
@@ -10287,6 +10306,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
+[SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
