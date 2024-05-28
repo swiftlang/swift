@@ -792,6 +792,15 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
 
+            # Avoid building the embedded stdlib and other embedded libraries when cross-compiling.
+            # Those are already provided by the local host build, and are identical and only cause
+            # trouble when lipo-ing if they are produced in cross-compile builds too.
+            if [[ $(is_cross_tools_host "${host}") ]] ; then
+                swift_cmake_options+=(
+                    -DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB:BOOL=FALSE
+                )
+            fi
+
             lldb_cmake_options+=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
