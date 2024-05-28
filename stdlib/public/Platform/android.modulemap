@@ -178,7 +178,8 @@ module posix_filesystem [system] {
   }
   explicit module fcntl {
     header "fcntl.h"
-    export *
+    // Note: Do not re-export imported modules
+    // to prevent exporting constants from linux/stat.h .
   }
   explicit module fnmatch {
     header "fnmatch.h"
@@ -228,6 +229,10 @@ module posix_filesystem [system] {
     header "bits/ioctl.h"
     export *
   }
+  explicit module linux_stat {
+    private header "linux/stat.h"
+    export *
+  }
   explicit module sys_epoll {
     header "sys/epoll.h"
     export *
@@ -262,7 +267,8 @@ module posix_filesystem [system] {
   }
   explicit module sys_stat {
     header "sys/stat.h"
-    export *
+    // Note: Do not re-export imported modules
+    // to prevent exporting constants from linux/stat.h .
   }
   explicit module sys_statvfs {
     header "sys/statvfs.h"
