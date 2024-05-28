@@ -21,6 +21,13 @@ public distributed actor FakeRoundtripActorSystemDistributedActor {
   public typealias ActorSystem = FakeRoundtripActorSystem
 }
 
+
+@available(SwiftStdlib 5.7, *)
+@_transparent
+public func takeIsolatedDistributedActorReturnAsLocalActor<T: DistributedActor>(_ t: isolated T) -> any Actor {
+  return t.asLocalActor
+}
+
 // ==== Fake Address -----------------------------------------------------------
 
 public struct ActorAddress: Hashable, Sendable, Codable {

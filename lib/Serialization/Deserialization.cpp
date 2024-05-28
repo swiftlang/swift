@@ -19,6 +19,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -1011,6 +1012,29 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
       isUnchecked, isPreconcurrency);
+
+  if (conformance->isConformanceOfProtocol()) {
+    auto &C = dc->getASTContext();
+
+    // Currently this should only be happening for the
+    // "DistributedActor as Actor" SILGen generated conformance.
+    // See `isConformanceOfProtocol` for details, if adding more such
+    // conformances, consider changing the way we structure their construction.
+    assert(conformance->getProtocol()->getInterfaceType()->isEqual(
+               C.getProtocol(KnownProtocolKind::Actor)->getInterfaceType()) &&
+           "Only expected to 'skip' finishNormalConformance for manually "
+           "created DistributedActor-as-Actor conformance.");
+
+    // Swap the conformance for the special conjured up one.
+    // We do NOT 'registerProtocolConformance' it because it is a
+    // protocol-to-protocol conformance, and we cannot register those since
+    // protocols do not have a conformance table which registration requires.
+    conformance = getDistributedActorAsActorConformance(C);
+    conformanceEntry = conformance; // record it
+
+    return conformance;
+  }
+
   // Record this conformance.
   if (conformanceEntry.isComplete()) {
     assert(conformanceEntry.get() == conformance);
@@ -1020,8 +1044,6 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
-  // Note: the DistributedActor -> Actor pseudo-conformance can be deserialized
-  // but must not be registered, so don't register it here.
   if (!dc->getSelfProtocolDecl())
     dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
 
@@ -1030,6 +1052,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
     return conformance;
 
   conformance->setState(ProtocolConformanceState::Complete);
+
   conformance->setLazyLoader(&MF, offset);
   return conformance;
 }
@@ -8335,7 +8358,6 @@ Type ModuleFile::loadTypeEraserType(const TypeEraserAttr *TRA,
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                          uint64_t contextData) {
   using namespace decls_block;
-
   PrettyStackTraceModuleFile traceModule(*this);
   PrettyStackTraceConformance trace("finishing conformance for",
                                     conformance);
