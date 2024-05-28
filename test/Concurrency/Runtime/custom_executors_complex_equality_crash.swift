@@ -6,6 +6,8 @@
 // RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %import-libdispatch %t/a.out
 // RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %import-libdispatch %t/a.out
 
+// TODO: Need to find out how to combine %env- and %target-run and %import-libdispatch reliably.
+// UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
