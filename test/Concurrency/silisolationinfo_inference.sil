@@ -121,7 +121,7 @@ bb0:
   destroy_addr %0 : $*NonSendableKlass
 
   // Then do it indirect. The write before should have inhibited the inference.
-  %f2 = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f2 = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
   dealloc_stack %0 : $*NonSendableKlass
@@ -140,7 +140,7 @@ bb0:
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
 
-  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
 
@@ -162,7 +162,7 @@ bb0:
   %0 = alloc_stack $NonSendableKlass
   debug_value [trace] %0 : $*NonSendableKlass
 
-  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
 
@@ -193,7 +193,7 @@ bb2:
   br bb3
 
 bb3:
-  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
 
@@ -227,7 +227,7 @@ bb2:
   br bb3
 
 bb3:
-  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
 
@@ -261,7 +261,7 @@ bb2:
   br bb3
 
 bb3:
-  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
 
@@ -297,7 +297,7 @@ bb2:
   br bb3
 
 bb3:
-  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass  
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
 
@@ -699,4 +699,3 @@ bb7:
   %9999 = tuple ()
   return %9999 : $()
 }
-

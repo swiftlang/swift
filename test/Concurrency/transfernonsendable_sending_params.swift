@@ -355,19 +355,32 @@ func testTransferOtherParamTuple(_ x: sending Klass, y: (Klass, Klass)) async {
   x = y.0
 }
 
-func taskIsolatedError(_ x: @escaping @MainActor () async -> ()) {
+func fakeInitOutside(operation: sending @escaping () async -> ()) {}
+
+func taskIsolatedOutsideError(_ x: @escaping @MainActor () async -> ()) {
+  fakeInitOutside(operation: x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+}
+
+@MainActor func actorIsolatedOutsideError(_ x: @escaping @MainActor () async -> ()) {
+  fakeInitOutside(operation: x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{main actor-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
+}
+
+func taskIsolatedInsideError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: sending @escaping () async -> ()) {}
 
   fakeInit(operation: x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
 }
 
-@MainActor func actorIsolatedError(_ x: @escaping @MainActor () async -> ()) {
+@MainActor func actorIsolatedInsideError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: sending @escaping () async -> ()) {}
 
-  // TODO: This needs to say actor-isolated.
-  fakeInit(operation: x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
+  // We do not get an error here since fakeInit is main actor isolated since it
+  // is defined within this function. As a result, we are sending a @MainActor
+  // isolated thing to a MainActor isolated thing.
+  fakeInit(operation: x)
 }
 
 // Make sure we error here on only the second since x by being assigned a part

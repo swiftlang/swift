@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency -verify-additional-prefix without-transferring- -disable-transferring-args-and-results-with-region-based-isolation -disable-sending-args-and-results-with-region-based-isolation
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -disable-transferring-args-and-results-with-region-based-isolation -disable-sending-args-and-results-with-region-based-isolation -verify-additional-prefix without-transferring-
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -16,18 +16,32 @@ actor MyActor {
 
   func testAsyncLetIsolation() async {
     async let x = self.synchronous()
-
     async let y = await self.asynchronous()
-
     async let z = synchronous()
 
     var localText = text
+    // TODO: We should allow this since text is Sendable and localText is a
+    // separate box. localText should be disconnected.
     async let w = localText.removeLast() // expected-without-transferring-warning {{mutation of captured var 'localText' in concurrently-executing code}}
+    // expected-tns-warning @-1 {{task or actor isolated value cannot be sent}}
 
     _ = await x
     _ = await y
     _ = await z
     _ = await w
+  }
+}
+
+final class MyFinalActor {
+  let immutable: Int = 17
+  var text: [String] = []
+
+  func testAsyncLetIsolation() async {
+    var localText = text
+    async let w = localText.removeLast() // expected-without-transferring-warning {{mutation of captured var 'localText' in concurrently-executing code}}
+
+    _ = await w
+
   }
 }
 

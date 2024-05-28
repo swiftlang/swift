@@ -1830,6 +1830,10 @@ public:
       // NOTE: We want to process indirect parameters as if they are
       // parameters... so we process them in nonTransferringParameters.
       for (auto &op : fas.getOperandsWithoutSelf()) {
+        // If op is the callee operand, skip it.
+        if (fas.isCalleeOperand(op))
+          continue;
+
         if (!fas.getArgumentConvention(op).isIndirectOutParameter() &&
             fas.getArgumentParameterInfo(op).hasOption(
                 SILParameterInfo::Sending)) {
@@ -2014,6 +2018,9 @@ public:
 
   /// If the passed SILValue is NonSendable, then create a fresh region for it,
   /// otherwise do nothing.
+  ///
+  /// By default this is initialized with disconnected isolation info unless \p
+  /// isolationInfo is set.
   void translateSILAssignFresh(SILValue val) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(val),
                                    TinyPtrVector<SILValue>());
@@ -3337,6 +3344,7 @@ RegionAnalysisValueMap::initializeTrackableValue(
     return {{iter.first->first, iter.first->second}, false};
   }
 
+  // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
   iter.first->getSecond().setIsolationRegionInfo(newInfo);
 
