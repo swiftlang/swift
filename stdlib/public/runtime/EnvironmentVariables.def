@@ -121,7 +121,7 @@ VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          "non-crashing behavior. This flag enables temporarily restoring the "
          "legacy 'nocrash' behavior until adopting code has been adjusted. "
          "Legal values are: "
-         " 'nocrash' (Legacy behavior), "
-         " 'crash' (Swift 6.0+ behavior)")
+         " 'legacy' (Legacy behavior), "
+         " 'swift6' (Swift 6.0+ behavior)")
 
 #undef VARIABLE

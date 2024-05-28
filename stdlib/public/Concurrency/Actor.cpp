@@ -323,7 +323,7 @@ bool _task_serialExecutor_isSameExclusiveExecutionContext(
 enum IsCurrentExecutorCheckMode: unsigned {
   /// The default mode when an app was compiled against "new" enough SDK.
   /// It allows crashing in isCurrentExecutor, and calls into `checkIsolated`.
-  Default_UseCheckIsolated_AllowCrash,
+  Swift6_UseCheckIsolated_AllowCrash,
   /// Legacy mode; Primarily to support old applications which used data race
   /// detector with "warning" mode, which is no longer supported. When such app
   /// is re-compiled against a new SDK, it will see crashes in what was
@@ -332,39 +332,45 @@ enum IsCurrentExecutorCheckMode: unsigned {
   Legacy_NoCheckIsolated_NonCrashing,
 };
 static IsCurrentExecutorCheckMode isCurrentExecutorMode =
-    Default_UseCheckIsolated_AllowCrash;
-
+    Swift6_UseCheckIsolated_AllowCrash;
 
 // Shimming call to Swift runtime because Swift Embedded does not have
-// these symbols defined
-bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+// these symbols defined.
+bool __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  swift::runtime::bincompat::
+  return swift::runtime::bincompat::
       swift_bincompat_useLegacyNonCrashingExecutorChecks();
-#endif
+#else
   return false;
+#endif
+}
+
+// Done this way because of the interaction with the initial value of
+// 'unexpectedExecutorLogLevel'
+bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+  bool legacyMode = __swift_bincompat_useLegacyNonCrashingExecutorChecks();
+
+  // Potentially, override the platform detected mode, primarily used in tests.
+#if SWIFT_STDLIB_HAS_ENVIRON
+  if (const char *modeStr = runtime::environment::
+        concurrencyIsCurrentExecutorLegacyModeOverride()) {
+    if (strcmp(modeStr, "nocrash") == 0 || strcmp(modeStr, "legacy") == 0) {
+      return true;
+    } else if (strcmp(modeStr, "crash") == 0 || strcmp(modeStr, "swift6") == 0) {
+      return false; // don't use the legacy mode
+    } // else, just use the platform detected mode
+  } // no override, use the default mode
+#endif // SWIFT_STDLIB_HAS_ENVIRON
+
+  return legacyMode;
 }
 
 // Check override of executor checking mode.
 static void checkIsCurrentExecutorMode(void *context) {
-  auto useLegacyMode =
+  bool useLegacyMode =
       swift_bincompat_useLegacyNonCrashingExecutorChecks();
-
-  // Potentially, override the platform detected mode, primarily used in tests.
-#if SWIFT_STDLIB_HAS_ENVIRON
-  if (const char *modeStr =
-          runtime::environment::concurrencyIsCurrentExecutorLegacyModeOverride()) {
-    if (modeStr) {
-      if (strcmp(modeStr, "nocrash") == 0) {
-        useLegacyMode = true;
-      } else if (strcmp(modeStr, "crash") == 0) {
-        useLegacyMode = false;
-      } // else, just use the platform detected mode
-    }
-  }
-#endif // SWIFT_STDLIB_HAS_ENVIRON
   isCurrentExecutorMode = useLegacyMode ? Legacy_NoCheckIsolated_NonCrashing
-                                        : Default_UseCheckIsolated_AllowCrash;
+                                        : Swift6_UseCheckIsolated_AllowCrash;
 }
 
 SWIFT_CC(swift)
@@ -373,6 +379,12 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
 
   // To support old applications on apple platforms which assumed this call
   // does not crash, try to use a more compatible mode for those apps.
+  //
+  // We only allow returning `false` directly from this function when operating
+  // in 'Legacy_NoCheckIsolated_NonCrashing' mode. If allowing crashes, we
+  // instead must call into 'checkIsolated' or crash directly.
+  //
+  // Whenever we confirm an executor equality, we can return true, in any mode.
   static swift::once_t checkModeToken;
   swift::once(checkModeToken, checkIsCurrentExecutorMode, nullptr);
 
@@ -382,20 +394,19 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
     // the expected executor however, so we need to try a bit harder before
     // we fail.
 
-    // Are we expecting the main executor and are using the main thread?
+    // Special handling the main executor by detecting the main thread.
     if (expectedExecutor.isMainExecutor() && isExecutingOnMainThread()) {
-      // Due to compatibility with pre-checkIsolated code, we cannot remove
-      // this special handling. CheckIsolated can handle this if the expected
-      // executor is the main queue / main executor, however, if we cannot call
-      // checkIsolated we cannot rely on it to handle this.
-      // TODO: consider removing this branch when `useCrashingCheckIsolated=true`
       return true;
     }
 
+    // We cannot use 'complexEquality' as it requires two executor instances,
+    // and we do not have a 'current' executor here.
+
     // Otherwise, as last resort, let the expected executor check using
     // external means, as it may "know" this thread is managed by it etc.
-    if (isCurrentExecutorMode == Default_UseCheckIsolated_AllowCrash) {
-      swift_task_checkIsolated(expectedExecutor);
+    if (isCurrentExecutorMode == Swift6_UseCheckIsolated_AllowCrash) {
+      swift_task_checkIsolated(expectedExecutor); // will crash if not same context
+
       // checkIsolated did not crash, so we are on the right executor, after all!
       return true;
     }
@@ -418,46 +429,50 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
     return true;
   }
 
-  // If the expected executor is "default" then we should have matched
-  // by pointer equality already with the current executor.
-  if (expectedExecutor.isDefaultActor()) {
-    // If the expected executor is a default actor, it makes no sense to try
-    // the 'checkIsolated' call, it must be equal to the other actor, or it is
-    // not the same isolation domain.
-    swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
-    return false;
+  // Only in legacy mode:
+  // We check if the current xor expected executor are the main executor.
+  // If so only one of them is, we know that WITHOUT 'checkIsolated' or invoking
+  // 'dispatch_assert_queue' we cannot be truly sure the expected/current truly
+  // are "on the same queue". There exists no non-crashing API to check this,
+  // so we PESSIMISTICALLY return false here.
+  //
+  // In Swift6 mode:
+  // We don't do this naive check, because we'll fall back to
+  // `expected.checkIsolated()` which, if it is the main executor, will invoke
+  // the crashing 'dispatch_assert_queue(main queue)' which will either crash
+  // or confirm we actually are on the main queue; or the custom expected
+  // executor has a chance to implement a similar queue check.
+  if (isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing) {
+    if ((expectedExecutor.isMainExecutor() && !currentExecutor.isMainExecutor()) ||
+        (!expectedExecutor.isMainExecutor() && currentExecutor.isMainExecutor())) {
+      return false;
+    }
   }
 
-  if (expectedExecutor.isMainExecutor() && !currentExecutor.isMainExecutor()) {
-    // TODO: Invoke checkIsolated() on "main" SerialQueue once it implements `checkIsolated`, otherwise messages will be sub-par and hard to address
-    swift_Concurrency_fatalError(0, "Incorrect actor executor assumption; Expected MainActor executor");
-    return false;
-  } else if (!expectedExecutor.isMainExecutor() && currentExecutor.isMainExecutor()) {
-    // TODO: Invoke checkIsolated() on "main" SerialQueue once it implements `checkIsolated`, otherwise messages will be sub-par and hard to address
-    swift_Concurrency_fatalError(0, "Incorrect actor executor assumption; Expected not-MainActor executor");
-    return false;
-  }
-
+  // Complex equality means that if two executors of the same type have some
+  // special logic to check if they are "actually the same".
   if (expectedExecutor.isComplexEquality()) {
-    if (!swift_compareWitnessTables(
-        reinterpret_cast<const WitnessTable*>(currentExecutor.getSerialExecutorWitnessTable()),
-        reinterpret_cast<const  WitnessTable*>(expectedExecutor.getSerialExecutorWitnessTable()))) {
-      // different witness table, we cannot invoke complex equality call
-      return false;
+    if (currentExecutor.getIdentity() &&
+        expectedExecutor.getIdentity() &&
+        swift_compareWitnessTables(
+            reinterpret_cast<const WitnessTable *>(
+                currentExecutor.getSerialExecutorWitnessTable()),
+            reinterpret_cast<const WitnessTable *>(
+                expectedExecutor.getSerialExecutorWitnessTable()))) {
+
+      auto isSameExclusiveExecutionContextResult =
+          _task_serialExecutor_isSameExclusiveExecutionContext(
+              currentExecutor.getIdentity(), expectedExecutor.getIdentity(),
+              swift_getObjectType(currentExecutor.getIdentity()),
+              expectedExecutor.getSerialExecutorWitnessTable());
+
+      // if the 'isSameExclusiveExecutionContext' returned true we trust
+      // it and return; if it was false, we need to give checkIsolated another
+      // chance to check.
+      if (isSameExclusiveExecutionContextResult) {
+        return true;
+      } // else, we must give 'checkIsolated' a last chance to verify isolation
     }
-
-    // Avoid passing nulls to Swift for the isSame check:
-    if (!currentExecutor.getIdentity() || !expectedExecutor.getIdentity()) {
-      return false;
-    }
-
-    auto result = _task_serialExecutor_isSameExclusiveExecutionContext(
-        currentExecutor.getIdentity(),
-        expectedExecutor.getIdentity(),
-        swift_getObjectType(currentExecutor.getIdentity()),
-        expectedExecutor.getSerialExecutorWitnessTable());
-
-    return result;
   }
 
   // This provides a last-resort check by giving the expected SerialExecutor the
@@ -480,21 +495,22 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
   // Note that this only works because the closure in assumeIsolated is
   // synchronous, and will not cause suspensions, as that would require the
   // presence of a Task.
-  // compat_invoke_swift_task_checkIsolated(expectedExecutor);
-  if (isCurrentExecutorMode == Default_UseCheckIsolated_AllowCrash) {
-    swift_task_checkIsolated(expectedExecutor);
+  if (isCurrentExecutorMode == Swift6_UseCheckIsolated_AllowCrash) {
+    swift_task_checkIsolated(expectedExecutor); // will crash if not same context
+
     // The checkIsolated call did not crash, so we are on the right executor.
     return true;
   }
 
-  // Using legacy mode, if no explicit executor match worked, we assume `false`
+  // In the end, since 'checkIsolated' could not be used, so we must assume
+  // that the executors are not the same context.
   assert(isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing);
   return false;
 }
 
 /// Logging level for unexpected executors:
-/// 0 - no logging
-/// 1 - warn on each instance
+/// 0 - no logging -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
+/// 1 - warn on each instance -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
 /// 2 - fatal error
 ///
 /// NOTE: The default behavior on Apple platforms depends on the SDK version
@@ -512,8 +528,24 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
     return;
 
   long level = strtol(levelStr, nullptr, 0);
-  if (level >= 0 && level < 3)
-    unexpectedExecutorLogLevel = level;
+  if (level >= 0 && level < 3) {
+    if (swift_bincompat_useLegacyNonCrashingExecutorChecks()) {
+      // legacy mode permits doing nothing or just logging, since the method
+      // used to perform the check itself is not going to crash:
+      unexpectedExecutorLogLevel = level;
+    } else {
+      // We are in swift6/crash mode of isCurrentExecutor which means that
+      // rather than returning false, that method will always CRASH when an
+      // executor mismatch is discovered.
+      //
+      // Thus, for clarity, we set this mode also to crashing, as runtime should
+      // not expect to be able to get any logging or ignoring done. In practice,
+      // the crash would happen before logging or "ignoring", but this should
+      // help avoid confusing situations like "I thought it should log" when
+      // debugging the runtime.
+      unexpectedExecutorLogLevel = 2;
+    }
+  }
 #endif // SWIFT_STDLIB_HAS_ENVIRON
 }
 
