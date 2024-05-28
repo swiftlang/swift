@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -enable-experimental-feature CImplementation -target %target-stable-abi-triple
 // REQUIRES: objc_interop
 
+// Temporarily disabled rdar://128683206
+// REQUIRES: rdar128683206
+
 protocol EmptySwiftProto {}
 
 @objc @implementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
