@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
+// Temporarily disable on arm64e (rdar://127874706)
+// UNSUPPORTED: CPU=arm64e
+
 sil_stage canonical
 
 import Builtin

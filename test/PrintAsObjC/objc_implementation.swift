@@ -2,6 +2,9 @@
 
 // REQUIRES: objc_interop
 
+// Temporarily disable on arm64e (rdar://127675057)
+// UNSUPPORTED: CPU=arm64e
+
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
