@@ -317,7 +317,6 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
 
-  free(message);
   abort();
 }
 
