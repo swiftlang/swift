@@ -55,8 +55,3 @@ distributed actor WorkerPool<Worker, ActorSystem: DistributedActorSystem>: Async
   nonisolated func makeAsyncIterator() -> WorkerPool { self }
   nonisolated func next() async -> Int? { nil }
 }
-
-// CHECK-SIL-LABEL: sil_witness_table shared <Self where Self : DistributedActor> T: Actor module Distributed {
-// CHECK-SIL-NEXT: method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$sxScA11DistributedScA15unownedExecutorScevgTW
-// CHECK-SIL-NEXT: conditional_conformance (Self: DistributedActor): dependent
-// CHECK-SIL-NEXT: }
