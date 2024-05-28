@@ -5,6 +5,26 @@
 
 ## Swift 6.0
 
+* [SE-0432][]:
+  Noncopyable enums can be pattern-matched with switches without consuming the
+  value you switch over:
+
+  ```swift
+  enum Lunch: ~Copyable {
+    case soup
+    case salad
+    case sandwich
+  }
+  
+  func isSoup(_ lunch: borrowing Lunch) -> Bool {
+    switch lunch {
+      case .soup: true
+      default: false
+    }
+  }
+  ```
+
+
 * [SE-0428][]:
   Distributed actors now have the ability to support complete split server / 
   client systems, thanks to the new `@Resolvable` macro and runtime changes.
@@ -10537,6 +10557,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
+[SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [SE-0414]: https://github.com/apple/swift-evolution/blob/main/proposals/0414-region-based-isolation.md
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
