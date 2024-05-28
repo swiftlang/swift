@@ -1935,11 +1935,14 @@ function(add_swift_target_library name)
   list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
 
   # Support adding a "NOT" on the front to mean all SDKs except the following
-  list(GET SWIFTLIB_TARGET_SDKS 0 first_sdk)
-  if("${first_sdk}" STREQUAL "NOT")
-    list(REMOVE_AT SWIFTLIB_TARGET_SDKS 0)
-    list_subtract("${SWIFT_SDKS}" "${SWIFTLIB_TARGET_SDKS}"
-      "SWIFTLIB_TARGET_SDKS")
+  list(LENGTH SWIFTLIB_TARGET_SDKS number_of_target_sdks)
+  if(number_of_target_sdks GREATER_EQUAL "1")
+    list(GET SWIFTLIB_TARGET_SDKS 0 first_sdk)
+    if("${first_sdk}" STREQUAL "NOT")
+        list(REMOVE_AT SWIFTLIB_TARGET_SDKS 0)
+        list_subtract("${SWIFT_SDKS}" "${SWIFTLIB_TARGET_SDKS}"
+        "SWIFTLIB_TARGET_SDKS")
+    endif()
   endif()
 
   list_intersect(
@@ -2985,11 +2988,14 @@ function(add_swift_target_executable name)
   list_replace(SWIFTEXE_TARGET_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
 
   # Support adding a "NOT" on the front to mean all SDKs except the following
-  list(GET SWIFTEXE_TARGET_TARGET_SDKS 0 first_sdk)
-  if("${first_sdk}" STREQUAL "NOT")
-    list(REMOVE_AT SWIFTEXE_TARGET_TARGET_SDKS 0)
-    list_subtract("${SWIFT_SDKS}" "${SWIFTEXE_TARGET_TARGET_SDKS}"
-      "SWIFTEXE_TARGET_TARGET_SDKS")
+  list(LENGTH SWIFTEXE_TARGET_TARGET_SDKS number_of_target_sdks)
+  if(number_of_target_sdks GREATER_EQUAL "1")
+    list(GET SWIFTEXE_TARGET_TARGET_SDKS 0 first_sdk)
+    if("${first_sdk}" STREQUAL "NOT")
+        list(REMOVE_AT SWIFTEXE_TARGET_TARGET_SDKS 0)
+        list_subtract("${SWIFT_SDKS}" "${SWIFTEXE_TARGET_TARGET_SDKS}"
+        "SWIFTEXE_TARGET_TARGET_SDKS")
+    endif()
   endif()
 
   list_intersect(
