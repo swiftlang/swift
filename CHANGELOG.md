@@ -238,6 +238,25 @@ And the module structure to support such applications looks like this:
   }
   ```
 
+* [SE-0429][]:
+  Certain types that contain noncopyable fields, such as those without a deinit,
+  can now be consumed field-by-field:
+
+  ```swift
+  struct Token: ~Copyable {}
+
+  struct Authentication: ~Copyable {
+    let id: Token
+    let name: String
+
+    mutating func exchange(_ new: consuming Token) -> Token {
+      let old = self.id  // <- partial consumption of 'self'
+      self = .init(id: new, name: self.name)
+      return old
+    } 
+  }
+  ```
+
 * [SE-0427][]:
   You can now suppress `Copyable` on protocols, generic parameters, 
   and existentials:
@@ -10517,6 +10536,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
+[SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
 [SE-0414]: https://github.com/apple/swift-evolution/blob/main/proposals/0414-region-based-isolation.md
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
