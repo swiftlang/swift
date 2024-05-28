@@ -891,6 +891,17 @@ public:
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
 
+  /// Returns the @_rawLayout attribute on this type if it has one.
+  RawLayoutAttr *getRawLayout() const {
+    auto sd = getStructOrBoundGenericStruct();
+
+    if (!sd) {
+      return nullptr;
+    }
+
+    return sd->getAttrs().getAttribute<RawLayoutAttr>();
+  }
+
   /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
   /// SILType().
   ///
