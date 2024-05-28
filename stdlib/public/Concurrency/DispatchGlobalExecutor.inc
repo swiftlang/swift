@@ -33,6 +33,11 @@
 #endif
 #endif
 
+#if __has_include(<dispatch/private.h>)
+#include <dispatch/private.h>
+#define SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE 1
+#endif
+
 // Ensure that Job's layout is compatible with what Dispatch expects.
 // Note: MinimalDispatchObjectHeader just has the fields we care about, it is
 // not complete and should not be used for anything other than these asserts.
@@ -89,7 +94,10 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
   // Always fall back to plain dispatch_async_f for back-deployed concurrency.
 #if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
   if (runtime::environment::concurrencyEnableJobDispatchIntegration())
-#if defined(_WIN32)
+#if SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE
+    if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
+      func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
+#elif defined(_WIN32)
     func = reinterpret_cast<dispatchEnqueueFuncType>(
         GetProcAddress(LoadLibraryW(L"dispatch.dll"),
         "dispatch_async_swift_job"));
