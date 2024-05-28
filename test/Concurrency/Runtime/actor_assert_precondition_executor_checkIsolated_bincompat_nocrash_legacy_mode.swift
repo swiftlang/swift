@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -10,6 +13,8 @@
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
+
+import StdlibUnittest
 
 final class NaiveQueueExecutor: SerialExecutor {
   init() {}
@@ -38,32 +43,28 @@ actor ActorOnNaiveQueueExecutor {
     self.executor.asUnownedSerialExecutor()
   }
 
+  // Executes on global pool, but our `checkIsolated` impl pretends
+  // that it is the same executor by never crashing.
   nonisolated func checkPreconditionIsolated() async {
     print("Before preconditionIsolated")
     self.preconditionIsolated()
     print("After preconditionIsolated")
-
-    print("Before assumeIsolated")
-    self.assumeIsolated { iso in
-      print("Inside assumeIsolated")
-    }
-    print("After assumeIsolated")
   }
 }
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 6.0, *) {
-      let actor = ActorOnNaiveQueueExecutor()
-      await actor.checkPreconditionIsolated()
-      // CHECK: Before preconditionIsolated
-      // CHECK-NEXT: checkIsolated: pretend it is ok!
-      // CHECK-NEXT: After preconditionIsolated
+    let tests = TestSuite("AssertPreconditionIsolationTests")
 
-      // CHECK-NEXT: Before assumeIsolated
-      // CHECK-NEXT: checkIsolated: pretend it is ok!
-      // CHECK-NEXT: Inside assumeIsolated
-      // CHECK-NEXT: After assumeIsolated
+    if #available(SwiftStdlib 6.0, *) {
+      tests.test("[legacy mode] expect crash since unable to invoke 'checkIsolated'") {
+        expectCrashLater() // In legacy mode we do NOT invoke 'checkIsolated' and therefore will crash
+
+        let actor = ActorOnNaiveQueueExecutor()
+        await actor.checkPreconditionIsolated()
+      }
     }
+
+    await runAllTestsAsync()
   }
 }
