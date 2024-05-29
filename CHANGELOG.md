@@ -259,8 +259,7 @@ And the module structure to support such applications looks like this:
   ```
 
 * [SE-0429][]:
-  Certain types that contain noncopyable fields, such as those without a deinit,
-  can now be consumed field-by-field:
+  The noncopyable fields of certain types can now be consumed individually:
 
   ```swift
   struct Token: ~Copyable {}
