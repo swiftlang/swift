@@ -1671,6 +1671,16 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       break;
     }
 
+    case ConstraintKind::OptionalObject: {
+      // Type variable that represents an object type of
+      // an un-inferred optional is adjacent to a type
+      // variable that presents such optional (`bindingTypeVar`
+      // in this case).
+      if (kind == AllowedBindingKind::Supertypes)
+        AdjacentVars.insert({bindingTypeVar, constraint});
+      break;
+    }
+
     default:
       break;
     }
