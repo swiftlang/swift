@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -340,6 +341,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   }
 
   switch (target.getOS()) {
+  case llvm::Triple::XROS:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
@@ -1939,6 +1941,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   if (Args.hasArg(options::OPT_help_hidden)) {
     printHelp(true);
     return false;
+  }
+
+  if (Args.hasArg(options::OPT_compiler_assertions)) {
+    CONDITIONAL_ASSERT_Global_enable_flag = 1;
   }
 
   if (Args.hasArg(options::OPT_version)) {

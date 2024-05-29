@@ -908,7 +908,7 @@ private:
                         bool lookThroughAutoclosure) const {
     auto param = fnTy->getParams()[ParamIdx];
     auto paramTy = param.getPlainType();
-    if (lookThroughAutoclosure && param.isAutoClosure())
+    if (lookThroughAutoclosure && param.isAutoClosure() && paramTy->is<FunctionType>())
       paramTy = paramTy->castTo<FunctionType>()->getResult();
     return paramTy;
   }
@@ -2092,6 +2092,14 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
+/// Determine whether the given expression is part of the left-hand side
+/// of an assignment expression.
+struct IsInLeftHandSideOfAssignment {
+  ConstraintSystem &cs;
+
+  bool operator()(Expr *expr) const;
+};
+
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2228,6 +2236,10 @@ private:
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+
+  /// Maps closures and local functions to the pack expansion expressions they
+  /// capture.
+  llvm::MapVector<AnyFunctionRef, SmallVector<PackExpansionExpr *, 1>> CapturedExpansions;
 
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
@@ -3162,6 +3174,19 @@ public:
     if (result != ClosureTypes.end())
       return result->second;
     return nullptr;
+  }
+
+  SmallVector<PackExpansionExpr *, 1> getCapturedExpansions(AnyFunctionRef func) const {
+    auto result = CapturedExpansions.find(func);
+    if (result == CapturedExpansions.end())
+      return {};
+
+    return result->second;
+  }
+
+  void setCapturedExpansions(AnyFunctionRef func, SmallVector<PackExpansionExpr *, 1> exprs) {
+    assert(CapturedExpansions.count(func) == 0 && "Cannot reset captured expansions");
+    CapturedExpansions.insert({func, exprs});
   }
 
   TypeVariableType *getKeyPathValueType(const KeyPathExpr *keyPath) const {
@@ -4398,13 +4423,13 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param memberLocator The locator anchored at this value reference, when
+  /// \param locator The locator anchored at this value reference, when
   /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
-                                  ConstraintLocator *memberLocator = nullptr,
+                                  ConstraintLocator *locator,
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
@@ -4416,7 +4441,7 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param memberLocator The locator anchored at this value reference, when
+  /// \param locator The locator anchored at this value reference, when
   /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
@@ -4426,7 +4451,7 @@ public:
   getUnopenedTypeOfReference(
       VarDecl *value, Type baseType, DeclContext *UseDC,
       llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *memberLocator = nullptr,
+      ConstraintLocator *locator,
       bool wantInterfaceType = false,
       bool adjustForPreconcurrency = true,
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
@@ -4436,14 +4461,16 @@ public:
       llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
         [](const ClosureExpr *closure) {
           return closure->isIsolatedByPreconcurrency();
-        });
+        },
+      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
+        return false;
+      });
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-      ConstraintLocator *locator, bool hasAppliedSelf,
-      bool isStaticMemberRefOnProtocol, bool isDynamicResult,
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
       OpenedTypeMap &replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
@@ -4453,16 +4480,14 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isDynamicResult Indicates that this declaration was found via
+  /// \param isDynamicLookup Indicates that this declaration was found via
   /// dynamic lookup.
   ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
-                          Type baseTy, ValueDecl *decl, DeclContext *useDC,
-                          bool isDynamicResult,
-                          FunctionRefKind functionRefKind,
-                          ConstraintLocator *locator,
-                          OpenedTypeMap *replacements = nullptr);
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
+      FunctionRefKind functionRefKind, ConstraintLocator *locator,
+      OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
@@ -6428,6 +6453,7 @@ public:
 ///
 /// This includes:
 /// - Not yet resolved outer VarDecls (including closure parameters)
+/// - Outer pack expansions that are not yet fully resolved
 /// - Return statements with a contextual type that has not yet been resolved
 ///
 /// This is required because isolated conjunctions, just like single-expression
@@ -6449,6 +6475,7 @@ public:
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
+  void inferTypeVars(PackExpansionExpr *);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;

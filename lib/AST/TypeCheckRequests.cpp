@@ -102,30 +102,58 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
 // Inherited type computation.
 //----------------------------------------------------------------------------//
 
-const TypeLoc &InheritedTypeRequest::getTypeLoc() const {
+const InheritedEntry &InheritedTypeRequest::getInheritedEntry() const {
   const auto &storage = getStorage();
   auto inheritedTypes = InheritedTypes(std::get<0>(storage));
   return inheritedTypes.getEntry(std::get<1>(storage));
 }
 
+ASTContext &InheritedTypeRequest::getASTContext() const {
+  auto declUnion = std::get<0>(getStorage());
+  if (auto *td = declUnion.dyn_cast<const TypeDecl *>()) {
+    return td->getASTContext();
+  }
+  return declUnion.get<const ExtensionDecl *>()->getASTContext();
+}
+
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
-  return getTypeLoc().getLoc();
+  return getInheritedEntry().getLoc();
 }
 
 bool InheritedTypeRequest::isCached() const {
   return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
 }
 
-std::optional<Type> InheritedTypeRequest::getCachedResult() const {
-  auto &typeLoc = getTypeLoc();
-  if (typeLoc.wasValidated())
-    return typeLoc.getType();
+std::optional<InheritedTypeResult>
+InheritedTypeRequest::getCachedResult() const {
+  auto &inheritedEntry = getInheritedEntry();
+  if (inheritedEntry.isSuppressed()) {
+    auto itr = cast_or_null<InverseTypeRepr>(inheritedEntry.getTypeRepr());
+    return InheritedTypeResult::forSuppressed(inheritedEntry.getType(), itr);
+  }
+  if (inheritedEntry.wasValidated()) {
+    return InheritedTypeResult::forInherited(inheritedEntry.getType());
+  }
 
   return std::nullopt;
 }
 
-void InheritedTypeRequest::cacheResult(Type value) const {
-  const_cast<TypeLoc &>(getTypeLoc()).setType(value);
+void InheritedTypeRequest::cacheResult(InheritedTypeResult value) const {
+  auto &inheritedEntry = const_cast<InheritedEntry &>(getInheritedEntry());
+  Type ty;
+  switch (value) {
+  case InheritedTypeResult::Inherited:
+    ty = value.getInheritedType();
+    break;
+  case InheritedTypeResult::Default:
+    ty = Type();
+    break;
+  case InheritedTypeResult::Suppressed:
+    inheritedEntry.setSuppressed();
+    ty = value.getSuppressed().first;
+    break;
+  }
+  inheritedEntry.setType(ty);
 }
 
 //----------------------------------------------------------------------------//
@@ -1046,7 +1074,9 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasArchetype() && "Archetype in interface type");
+    assert(!type->hasPrimaryArchetype() && "Archetype in interface type");
+    assert(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
+           "Local archetype in interface type of non-local declaration");
   }
   decl->TypeAndAccess.setPointer(type);
 }
@@ -1271,7 +1301,7 @@ std::optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
 
 void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
   auto *param = std::get<0>(getStorage());
-  param->setDefaultExpr(expr, /*isTypeChecked*/ true);
+  param->setTypeCheckedDefaultExpr(expr);
 }
 
 //----------------------------------------------------------------------------//
@@ -1703,6 +1733,62 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     }
     break;
   }
+}
+
+void ActorIsolation::print(llvm::raw_ostream &os) const {
+  switch (getKind()) {
+  case Unspecified:
+    os << "unspecified";
+    return;
+  case ActorInstance:
+    os << "actor_instance";
+    if (auto *vd = getActorInstance()) {
+      os << ". name: '" << vd->getBaseIdentifier() << "'";
+    }
+    return;
+  case Nonisolated:
+    os << "nonisolated";
+    return;
+  case NonisolatedUnsafe:
+    os << "nonisolated_unsafe";
+    return;
+  case GlobalActor:
+    os << "global_actor. type: " << getGlobalActor();
+    return;
+  case Erased:
+    os << "erased";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
+  switch (getKind()) {
+  case Unspecified:
+    os << "unspecified";
+    return;
+  case ActorInstance:
+    os << "actor_instance";
+    return;
+  case Nonisolated:
+    os << "nonisolated";
+    return;
+  case NonisolatedUnsafe:
+    os << "nonisolated_unsafe";
+    return;
+  case GlobalActor:
+    os << "global_actor";
+    return;
+  case Erased:
+    os << "erased";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+void ActorIsolation::dump() const {
+  print(llvm::dbgs());
+  llvm::dbgs() << '\n';
 }
 
 void ActorIsolation::dumpForDiagnostics() const {
@@ -2229,4 +2315,26 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
                  diag::macro_expand_circular_reference_entity_through,
                  "body",
                  decl->getName());
+}
+
+std::optional<CaptureInfo>
+CaptureInfoRequest::getCachedResult() const {
+  auto *func = std::get<0>(getStorage());
+  return func->getCachedCaptureInfo();
+}
+
+void CaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *func = std::get<0>(getStorage());
+  return func->setCaptureInfo(info);
+}
+
+std::optional<CaptureInfo>
+ParamCaptureInfoRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  return param->getCachedDefaultArgumentCaptureInfo();
+}
+
+void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultArgumentCaptureInfo(info);
 }

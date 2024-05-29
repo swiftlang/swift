@@ -51,14 +51,12 @@ internal struct _${U}Int128 {
   internal static var one: Self { Self(high: 0, low: 1) }
 }
 
-@_unavailableInEmbedded
 extension _${U}Int128: CustomStringConvertible {
   internal var description: String {
     String(self, radix: 10)
   }
 }
 
-@_unavailableInEmbedded
 extension _${U}Int128: CustomDebugStringConvertible {
   internal var debugDescription: String {
     description

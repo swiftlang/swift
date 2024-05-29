@@ -90,7 +90,6 @@ macOS platform               | @swift-ci Please benchmark                    | S
 macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - soundness)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
-macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test macOS Platform
 Linux platform               | @swift-ci Please test WebAssembly             | Swift Test WebAssembly (Ubuntu 20.04)
 
 The core principles of validation testing is that:
@@ -224,6 +223,12 @@ To test the minimal freestanding stdlib on macho, you can use the support for ru
 preset=stdlib_S_standalone_minimal_macho_x86_64,build,test
 @swift-ci please test with toolchain and preset
 ```
+
+### Useful preset triggers
+
+Platform        | Comment | Use
+--------------- | ------- | ---
+macOS platform  | preset=asan <br> @swift-ci Please test with preset macOS platform | Runs the validation test suite with an ASan build
 
 ### Testing Compiler Performance
 

@@ -415,6 +415,7 @@ static bool usesFeatureCodeItemMacros(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BodyMacros)
+UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
 
 static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
@@ -449,10 +450,8 @@ static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
 
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 
-static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
-  // Partial consumption does not affect declarations directly.
-  return false;
-}
+// Partial consumption does not affect declarations directly.
+UNINTERESTING_FEATURE(MoveOnlyPartialConsumption)
 
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
 
@@ -508,21 +507,26 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl);
+
+static bool allSubstTypesAreCopyable(Type type, DeclContext *context) {
+  assert(type->getAnyNominal());
+  auto bgt = type->getAs<BoundGenericType>();
+  if (!bgt)
+    return false;  // nothing is bound.
+
+  for (auto argInterfaceTy : bgt->getGenericArgs())
+    if (context->mapTypeIntoContext(argInterfaceTy)->isNoncopyable())
+      return false;
+
+  return true;
+}
+
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
     return true;
 
   if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
-      auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
-
-      InvertibleProtocolSet inverses;
-      bool anyObject = false;
-      getDirectlyInheritedNominalTypeDecls(nominalDecl, inverses, anyObject);
-      if (!inverses.empty())
-        return true;
-    }
-
     if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
       auto reqSig = proto->getRequirementSignature();
 
@@ -535,15 +539,32 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
 
     if (isa<AbstractFunctionDecl>(valueDecl) ||
         isa<AbstractStorageDecl>(valueDecl)) {
-      if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
-            if (auto *nominalDecl = type->getAnyNominal()) {
-              if (isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
-                return usesFeatureNoncopyableGenerics(nominalDecl);
-            }
-            return false;
-          })) {
+      auto *context = decl->getInnermostDeclContext();
+      auto usesFeature = valueDecl->getInterfaceType().findIf(
+          [&](Type type) -> bool {
+        auto *nominalDecl = type->getAnyNominal();
+        if (!nominalDecl || !isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
+          return false;
+
+        if (!usesFeatureNoncopyableGenerics(nominalDecl))
+          return false;
+
+        // If we only _refer_ to a TypeDecl that uses NoncopyableGenerics,
+        // and a suppressed version of that decl is in the interface, and
+        // if we only substitute Copyable types for the generic parameters,
+        // then we can say this decl is not "using" the feature such that
+        // a feature guard is required. In other words, this reference to the
+        // type will always be valid, regardless of whether the feature is
+        // enabled or not. (rdar://127389991)
+        if (!disallowFeatureSuppression("NoncopyableGenerics", nominalDecl)
+            && allSubstTypesAreCopyable(type, context)) {
+          return false;
+        }
+
         return true;
-      }
+      });
+      if (usesFeature)
+        return true;
     }
   }
 
@@ -624,56 +645,102 @@ UNINTERESTING_FEATURE(BitwiseCopyable)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
-static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
-  if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->isTransferring())
-      return true;
+UNINTERESTING_FEATURE(TransferringArgsAndResults)
+static bool usesFeatureSendingArgsAndResults(Decl *decl) {
+  auto functionTypeUsesSending = [](Decl *decl) {
+    return usesTypeMatching(decl, [](Type type) {
+      auto fnType = type->getAs<AnyFunctionType>();
+      if (!fnType)
+        return false;
 
-  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
-    auto fnTy = fDecl->getInterfaceType();
-    bool hasTransferring = false;
-    if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    } else if (auto *ft =
-                   llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    }
-    if (hasTransferring)
-      return true;
-  }
+      if (fnType->hasExtInfo() && fnType->hasSendingResult())
+        return true;
 
-  return false;
-}
-
-static bool usesFeatureDynamicActorIsolation(Decl *decl) {
-  auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
-    return llvm::any_of(
-        inherited.getEntries(),
-        [](const InheritedEntry &entry) { return entry.isPreconcurrency(); });
+      return llvm::any_of(fnType->getParams(),
+                          [](AnyFunctionType::Param param) {
+                            return param.getParameterFlags().isSending();
+                          });
+    });
   };
 
-  if (auto *T = dyn_cast<TypeDecl>(decl))
-    return usesPreconcurrencyConformance(T->getInherited());
-
-  if (auto *E = dyn_cast<ExtensionDecl>(decl)) {
-    // If type has `@preconcurrency` conformance(s) all of its
-    // extensions have to be guarded by the flag too.
-    if (auto *T = dyn_cast<TypeDecl>(E->getExtendedNominal())) {
-      if (usesPreconcurrencyConformance(T->getInherited()))
-        return true;
+  if (auto *pd = dyn_cast<ParamDecl>(decl)) {
+    if (pd->isSending()) {
+      return true;
     }
 
-    return usesPreconcurrencyConformance(E->getInherited());
+    if (functionTypeUsesSending(pd))
+      return true;
+  }
+
+  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
+    // First check for param decl results.
+    if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
+          return usesFeatureSendingArgsAndResults(pd);
+        }))
+      return true;
+    if (functionTypeUsesSending(decl))
+      return true;
   }
 
   return false;
 }
+
+UNINTERESTING_FEATURE(DynamicActorIsolation)
+
+UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)
+
+static bool usesFeatureConformanceSuppression(Decl *decl) {
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominal)
+    return false;
+
+  auto inherited = InheritedTypes(nominal);
+  for (auto index : indices(inherited.getEntries())) {
+    // Ensure that InheritedTypeRequest has set the isSuppressed bit if
+    // appropriate.
+    auto resolvedTy = inherited.getResolvedType(index);
+    (void)resolvedTy;
+
+    auto entry = inherited.getEntry(index);
+
+    if (!entry.isSuppressed())
+      continue;
+
+    auto ty = entry.getType();
+
+    if (!ty)
+      continue;
+
+    auto kp = ty->getKnownProtocol();
+    if (!kp)
+      continue;
+
+    auto rpk = getRepressibleProtocolKind(*kp);
+    if (!rpk)
+      continue;
+
+    return true;
+  }
+
+  return false;
+}
+
+static bool usesFeatureBitwiseCopyable2(Decl *decl) {
+  if (!decl->getModuleContext()->isStdlibModule()) {
+    return false;
+  }
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    return proto->getNameStr() == "BitwiseCopyable";
+  }
+  if (auto *typealias = dyn_cast<TypeAliasDecl>(decl)) {
+    return typealias->getNameStr() == "_BitwiseCopyable";
+  }
+  return false;
+}
 
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
@@ -684,7 +751,7 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
-UNINTERESTING_FEATURE(ExtensionImportVisibility)
+UNINTERESTING_FEATURE(MemberImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
 
 static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
@@ -692,11 +759,14 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 UNINTERESTING_FEATURE(CImplementation)
 
 static bool usesFeatureSensitive(Decl *decl) {
   return decl->getAttrs().hasAttribute<SensitiveAttr>();
 }
+
+UNINTERESTING_FEATURE(DebugDescriptionMacro)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

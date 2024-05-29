@@ -13,22 +13,27 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Demangling/Demangle.h"
-#include "../../IRGen/IRGenModule.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -41,7 +46,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
-
+#include "llvm/Support/Casting.h"
 #include <fstream>
 
 using namespace swift;
@@ -203,6 +208,11 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::value_desc("pass number"),
               llvm::cl::location(DebugOnlyPassNumberOptLoc),
               llvm::cl::ValueRequired);
+
+static llvm::cl::opt<bool> SILPrintEverySubpass(
+    "sil-print-every-subpass", llvm::cl::init(false),
+    llvm::cl::desc("Print the function before every subpass run of passes that "
+                   "have multiple subpasses"));
 
 static bool isInPrintFunctionList(SILFunction *F) {
   for (const std::string &printFnName : SILPrintFunction) {
@@ -478,13 +488,22 @@ bool SILPassManager::continueTransforming() {
 bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
                                                 SILFunction *function,
                                                 SILTransform *trans) {
+  unsigned subPass = numSubpassesRun++;
+
+  if (forInst && isFunctionSelectedForPrinting(function) &&
+      SILPrintEverySubpass) {
+    dumpPassInfo("*** SIL function before ", trans, function);
+    if (forInst) {
+      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    }
+    function->dump(getOptions().EmitVerboseSIL);
+  }
+
   if (isMandatory)
     return true;
   if (NumPassesRun != maxNumPassesToRun - 1)
     return true;
 
-  unsigned subPass = numSubpassesRun++;
-  
   if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast) {
     dumpPassInfo("*** SIL function before ", trans, function);
     if (forInst) {
@@ -1569,6 +1588,26 @@ void SwiftPassInvocation::endVerifyFunction() {
 SwiftPassInvocation::~SwiftPassInvocation() {}
 
 //===----------------------------------------------------------------------===//
+//                           SIL Bridging
+//===----------------------------------------------------------------------===//
+bool BridgedFunction::mayBindDynamicSelf() const {
+  return swift::mayBindDynamicSelf(getFunction());
+}
+
+bool BridgedFunction::isTrapNoReturn() const {
+  return swift::isTrapNoReturnFunction(getFunction());
+}
+
+bool BridgedFunction::isAutodiffVJP() const {
+  return swift::isDifferentiableFuncComponent(
+      getFunction(), swift::AutoDiffFunctionComponent::VJP);
+}
+
+SwiftInt BridgedFunction::specializationLevel() const {
+  return swift::getSpecializationLevel(getFunction());
+}
+
+//===----------------------------------------------------------------------===//
 //                           OptimizerBridging
 //===----------------------------------------------------------------------===//
 
@@ -1618,8 +1657,9 @@ bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure, bool n
 
 BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(BridgedInstruction apply,
                                                                           bool isMandatory) const {
-  auto cha = invocation->getPassManager()->getAnalysis<ClassHierarchyAnalysis>();
-  auto result = ::tryDevirtualizeApply(ApplySite(apply.unbridged()), cha,
+  SILPassManager *pm = invocation->getPassManager();
+  auto cha = pm->getAnalysis<ClassHierarchyAnalysis>();
+  auto result = ::tryDevirtualizeApply(pm, ApplySite(apply.unbridged()), cha,
                                        nullptr, isMandatory);
   if (result.first) {
     OptionalBridgedInstruction newApply(result.first.getInstruction()->asSILNode());
@@ -1689,6 +1729,13 @@ SwiftInt BridgedPassContext::getStaticStride(BridgedType type) const {
   return integerValueFromConstant(c);
 }
 
+bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
+  if (irgen::IRGenModule *IGM = invocation->getIRGenModule()) {
+    return IGM->canMakeStaticObjectReadOnly(type.unbridged());
+  }
+  return false;
+}
+
 swift::SILVTable * BridgedPassContext::specializeVTableForType(BridgedType type, BridgedFunction function) const {
   return ::specializeVTableForType(type.unbridged(),
                                    function.getFunction()->getModule(),
@@ -1739,8 +1786,8 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   // FIXME: hard assumption on what pass is requesting this.
   auto P = Demangle::SpecializationPass::AsyncDemotion;
 
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, F->isSerialized(),
-                                                         F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(
+      P, F->getSerializedKind(), F);
   Mangler.setRemovedEffect(EffectKind::Async);
   return Mangler.mangle();
 }
@@ -1749,11 +1796,47 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Null
                                                           SwiftInt numDeadArgs,
                                                           BridgedFunction function) const {
   SILFunction *f = function.getFunction();
-  Mangle::FunctionSignatureSpecializationMangler Mangler(Demangle::SpecializationPass::FunctionSignatureOpts,                                                        f->isSerialized(), f);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(
+      Demangle::SpecializationPass::FunctionSignatureOpts,
+      f->getSerializedKind(), f);
   for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
     Mangler.setArgumentDead((unsigned)idx);
   }
   return Mangler.mangle();
+}
+
+BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
+  BridgedValueArray bridgedClosureArgs,
+  BridgedArrayRef bridgedClosureArgIndices,
+  BridgedFunction applySiteCallee
+) const {
+  auto pass = Demangle::SpecializationPass::ClosureSpecializer;
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  llvm::SmallVector<swift::SILValue, 16> closureArgsStorage;
+  auto closureArgs = bridgedClosureArgs.getValues(closureArgsStorage);
+  auto closureArgIndices = bridgedClosureArgIndices.unbridged<SwiftInt>();
+
+  assert(closureArgs.size() == closureArgIndices.size() &&
+         "Number of closures arguments and number of closure indices do not match!");
+
+  for (size_t i = 0; i < closureArgs.size(); i++) {
+    auto closureArg = closureArgs[i];
+    auto closureArgIndex = closureArgIndices[i];
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
+      mangler.setArgumentClosureProp(closureArgIndex,
+                                     const_cast<PartialApplyInst *>(PAI));
+    } else {
+      auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
+      mangler.setArgumentClosureProp(closureArgIndex, 
+                                     const_cast<ThinToThickFunctionInst *>(TTTFI));
+    }
+  }
+
+  return mangler.mangle();
 }
 
 BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
@@ -1849,11 +1932,12 @@ createEmptyFunction(BridgedStringRef name,
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
 
   SILFunction *newF = functionBuilder.createFunction(
-    fromFn->getLinkage(), name.unbridged(), newTy, nullptr, fromFn->getLocation(), fromFn->isBare(),
-    fromFn->isTransparent(), fromFn->isSerialized(), IsNotDynamic, IsNotDistributed,
-    IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
-    fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(), fromFn->getEffectsKind(),
-    nullptr, fromFn->getDebugScope());
+      fromFn->getLinkage(), name.unbridged(), newTy, nullptr,
+      fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
+      fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
+      fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
+      fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
 
   return {newF};
 }
@@ -1864,6 +1948,68 @@ void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFun
   destFn->moveAllBlocksFromOtherFunction(sourceFn);
   invocation->getPassManager()->invalidateAnalysis(sourceFn, SILAnalysis::InvalidationKind::Everything);
   invocation->getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
+}
+
+BridgedFunction BridgedPassContext::
+ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
+                                            const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                            SwiftInt paramCount,
+                                            BridgedFunction bridgedApplySiteCallee,
+                                            bool isSerialized)  const {
+  auto *applySiteCallee = bridgedApplySiteCallee.getFunction();
+  auto applySiteCalleeType = applySiteCallee->getLoweredFunctionType();
+
+  llvm::SmallVector<SILParameterInfo> specializedParams;
+  for (unsigned idx = 0; idx < paramCount; ++idx) {
+    specializedParams.push_back(specializedBridgedParams[idx].unbridged());
+  }
+
+  // The specialized function is always a thin function. This is important
+  // because we may add additional parameters after the Self parameter of
+  // witness methods. In this case the new function is not a method anymore.
+  auto extInfo = applySiteCalleeType->getExtInfo();
+  extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  auto ClonedTy = SILFunctionType::get(
+      applySiteCalleeType->getInvocationGenericSignature(), extInfo,
+      applySiteCalleeType->getCoroutineKind(),
+      applySiteCalleeType->getCalleeConvention(), specializedParams,
+      applySiteCalleeType->getYields(), applySiteCalleeType->getResults(),
+      applySiteCalleeType->getOptionalErrorResult(),
+      applySiteCalleeType->getPatternSubstitutions(),
+      applySiteCalleeType->getInvocationSubstitutions(),
+      applySiteCallee->getModule().getASTContext());
+
+  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
+
+  // We make this function bare so we don't have to worry about decls in the
+  // SILArgument.
+  auto *specializedApplySiteCallee = functionBuilder.createFunction(
+      // It's important to use a shared linkage for the specialized function
+      // and not the original linkage.
+      // Otherwise the new function could have an external linkage (in case the
+      // original function was de-serialized) and would not be code-gen'd.
+      // It's also important to disconnect this specialized function from any
+      // classes (the classSubclassScope), because that may incorrectly
+      // influence the linkage.
+      getSpecializedLinkage(applySiteCallee, applySiteCallee->getLinkage()), specializedName.unbridged(),
+      ClonedTy, applySiteCallee->getGenericEnvironment(),
+      applySiteCallee->getLocation(), IsBare, applySiteCallee->isTransparent(),
+      isSerialized ? IsSerialized : IsNotSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, applySiteCallee->getEntryCount(),
+      applySiteCallee->isThunk(),
+      /*classSubclassScope=*/SubclassScope::NotApplicable,
+      applySiteCallee->getInlineStrategy(), applySiteCallee->getEffectsKind(),
+      applySiteCallee, applySiteCallee->getDebugScope());
+  
+  if (!applySiteCallee->hasOwnership()) {
+    specializedApplySiteCallee->setOwnershipEliminated();
+  }
+  
+  for (auto &Attr : applySiteCallee->getSemanticsAttrs())
+    specializedApplySiteCallee->addSemanticsAttr(Attr);
+  
+  return {specializedApplySiteCallee};
 }
 
 bool FullApplySite_canInline(BridgedInstruction apply) {
@@ -1995,5 +2141,41 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
 void SILPassManager::runSwiftModuleVerification() {
   for (SILFunction &f : *Mod) {
     runSwiftFunctionVerification(&f);
+  }
+}
+
+namespace swift {
+  class ClosureSpecializationCloner: public SILClonerWithScopes<ClosureSpecializationCloner> {
+    friend class SILInstructionVisitor<ClosureSpecializationCloner>;
+    friend class SILCloner<ClosureSpecializationCloner>;
+  public: 
+    using SuperTy = SILClonerWithScopes<ClosureSpecializationCloner>;
+    ClosureSpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
+  };
+} // namespace swift
+
+BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
+  closureSpecCloner(new ClosureSpecializationCloner(*emptySpecializedFunction.getFunction())) {}
+
+BridgedFunction BridgedSpecializationCloner::getCloned() const {
+  return { &closureSpecCloner->getBuilder().getFunction() };
+}
+
+BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+  return { closureSpecCloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+}
+
+void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
+  llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
+  auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
+  closureSpecCloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
+}
+
+void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
+  if (auto *pai = llvm::dyn_cast<PartialApplyInst>(partialApply.unbridged()); pai->isOnStack()) {
+    auto b = unbridged();
+    return swift::insertDestroyOfCapturedArguments(pai, b); 
+  } else {
+    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
   }
 }

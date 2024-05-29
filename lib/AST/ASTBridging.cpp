@@ -840,22 +840,10 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  auto *declContext = cDeclContext.unbridged();
-
-  auto *defaultValue = opaqueDefaultValue.unbridged();
-  DefaultArgumentKind defaultArgumentKind;
-
-  if (declContext->getParentSourceFile()->Kind == SourceFileKind::Interface &&
-      isa<SuperRefExpr>(defaultValue)) {
-    defaultValue = nullptr;
-    defaultArgumentKind = DefaultArgumentKind::Inherited;
-  } else {
-    defaultArgumentKind = getDefaultArgKind(defaultValue);
-  }
-
-  auto *paramDecl = new (cContext.unbridged()) ParamDecl(
-      cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(), cArgName.unbridged(),
-      cParamNameLoc.unbridged(), cParamName.unbridged(), declContext);
+  auto *paramDecl = ParamDecl::createParsed(
+      cContext.unbridged(), cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(),
+      cArgName.unbridged(), cParamNameLoc.unbridged(), cParamName.unbridged(),
+      opaqueDefaultValue.unbridged(), cDeclContext.unbridged());
 
   if (auto type = opaqueType.unbridged()) {
     paramDecl->setTypeRepr(type);
@@ -889,7 +877,9 @@ BridgedParamDecl BridgedParamDecl_createParsed(
         else if (isa<CompileTimeConstTypeRepr>(STR))
           paramDecl->setCompileTimeConst(true);
         else if (isa<TransferringTypeRepr>(STR))
-          paramDecl->setTransferring(true);
+          paramDecl->setSending(true);
+        else if (isa<SendingTypeRepr>(STR))
+          paramDecl->setSending(true);
 
         unwrappedType = STR->getBase();
         continue;
@@ -898,9 +888,6 @@ BridgedParamDecl BridgedParamDecl_createParsed(
       break;
     }
   }
-
-  paramDecl->setDefaultExpr(defaultValue, /*isTypeChecked*/ false);
-  paramDecl->setDefaultArgumentKind(defaultArgumentKind);
 
   return paramDecl;
 }
@@ -2239,6 +2226,9 @@ BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
   }
   case BridgedAttributedTypeSpecifierTransferring: {
     return new (context) TransferringTypeRepr(baseType, loc);
+  }
+  case BridgedAttributedTypeSpecifierSending: {
+    return new (context) SendingTypeRepr(baseType, loc);
   }
   case BridgedAttributedTypeSpecifierConst: {
     return new (context) CompileTimeConstTypeRepr(baseType, loc);

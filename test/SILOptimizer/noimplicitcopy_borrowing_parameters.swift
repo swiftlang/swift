@@ -129,8 +129,7 @@ func testLoadableBorrowingConsumeOperator(_ x: borrowing NonTrivialStruct) {
 }
 
 func testLoadableBorrowingEnum(_ x: borrowing LoadableEnum) {
-    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    switch x { // expected-note {{consumed here}}
+    switch x {
     case let .x(y):
         _ = y
         break
@@ -218,8 +217,7 @@ func testTrivialBorrowingConsumeOperator(_ x: borrowing TrivialStruct) {
 }
 
 func testTrivialBorrowingEnum(_ x: borrowing TrivialEnum) {
-    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
-    switch x { // expected-note {{consumed here}}
+    switch x {
     case let .x(y):
         _ = y
         break
@@ -401,7 +399,7 @@ struct LoadableSelfTest {
         // expected-error @-1 {{'self' cannot be captured by an escaping closure since it is a borrowed parameter}}
         var f: () -> () = {}
         f = { // expected-note {{closure capturing 'self' here}}
-            let _ = self
+            let _ = copy self
         }
         f()
     }
@@ -479,7 +477,7 @@ struct AddressOnlySelfTest<T> {
         // TODO: Capture.
         var f: () -> () = {}
         f = { // expected-note {{consumed here}}
-            let _ = self
+            let _ = copy self
         }
         f()
     }

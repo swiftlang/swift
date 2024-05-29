@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -enable-experimental-feature NonescapableTypes %s -verify
 
 // REQUIRES: objc_interop
 // REQUIRES: asserts

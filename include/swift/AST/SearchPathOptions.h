@@ -372,10 +372,10 @@ private:
                            FrameworkSearchPaths.size() - 1);
   }
 
-  std::optional<StringRef> WinSDKRoot = std::nullopt;
-  std::optional<StringRef> WinSDKVersion = std::nullopt;
-  std::optional<StringRef> VCToolsRoot = std::nullopt;
-  std::optional<StringRef> VCToolsVersion = std::nullopt;
+  std::optional<std::string> WinSDKRoot = std::nullopt;
+  std::optional<std::string> WinSDKVersion = std::nullopt;
+  std::optional<std::string> VCToolsRoot = std::nullopt;
+  std::optional<std::string> VCToolsVersion = std::nullopt;
 
 public:
   StringRef getSDKPath() const { return SDKPath; }
@@ -499,6 +499,18 @@ public:
 
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
+
+  /// Path to the file that defines platform mapping for availability
+  /// version inheritance.
+  std::optional<std::string> PlatformAvailabilityInheritanceMapPath;
+
+  /// Cross import module information. Map from module name to the list of cross
+  /// import overlay files that associate with that module.
+  using CrossImportMap = llvm::StringMap<std::vector<std::string>>;
+  CrossImportMap CrossImportInfo;
+
+  /// Whether to search for cross import overlay on file system.
+  bool DisableCrossImportOverlaySearch = false;
 
   /// Debug path mappings to apply to serialized search paths. These are
   /// specified in LLDB from the target.source-map entries.

@@ -30,6 +30,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -1364,8 +1365,14 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
-      diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                     first, first->getFormalAccess());
+      auto formalAccess = first->getFormalAccess();
+      auto nameLoc = repr->getNameLoc();
+      if (formalAccess >= AccessLevel::Public &&
+          diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
+        return ErrorType::get(ctx);
+
+      diags.diagnose(nameLoc, diag::candidate_inaccessible, first,
+                     formalAccess);
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1454,8 +1461,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
-    diags.diagnose(repr->getNameLoc(), diag::candidate_inaccessible,
-                   first, first->getFormalAccess());
+    auto formalAccess = first->getFormalAccess();
+    auto nameLoc = repr->getNameLoc();
+    if (formalAccess >= AccessLevel::Public &&
+        diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
+      return ErrorType::get(ctx);
+
+    diags.diagnose(nameLoc, diag::candidate_inaccessible, first, formalAccess);
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
@@ -2059,6 +2071,11 @@ namespace {
       return (SF && SF->Kind == SourceFileKind::SIL);
     }
 
+    bool isInterfaceFile() const {
+      auto SF = getDeclContext()->getParentSourceFile();
+      return (SF && SF->Kind == SourceFileKind::Interface);
+    }
+
     /// Short-hand to query the current stage of type resolution.
     bool inStage(TypeResolutionStage stage) const {
       return resolution.getStage() == stage;
@@ -2137,6 +2154,8 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveTransferringTypeRepr(TransferringTypeRepr *repr,
                                               TypeResolutionOptions options);
+    NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
     NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
@@ -2560,6 +2579,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Transferring:
     return resolveTransferringTypeRepr(cast<TransferringTypeRepr>(repr),
                                        options);
+  case TypeReprKind::Sending:
+    return resolveSendingTypeRepr(cast<SendingTypeRepr>(repr), options);
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
@@ -3317,28 +3338,21 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   }
 
   if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
-    auto &ctx = getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
-      if (ty->hasError())
-        return ty;
+    if (ty->hasError())
+      return ty;
 
-      if (!options.is(TypeResolverContext::Inherited) ||
-          getDeclContext()->getSelfProtocolDecl()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_inheritance_clause);
-        ty = ErrorType::get(getASTContext());
-      } else if (!ty->isConstraintType()) {
-        diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                        diag::preconcurrency_not_existential, ty);
-        ty = ErrorType::get(getASTContext());
-      }
-
-      // Nothing to record in the type.
-    } else {
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_attr_disabled);
+                      diag::preconcurrency_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
+                      diag::preconcurrency_not_existential, ty);
       ty = ErrorType::get(getASTContext());
     }
+
+    // Nothing to record in the type.
   }
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {
@@ -3632,7 +3646,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     bool isolated = false;
     bool compileTimeConst = false;
     bool hasResultDependsOn = false;
-    bool isTransferring = false;
+    bool isSending = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -3642,7 +3656,11 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::Transferring:
-          isTransferring = true;
+          isSending = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::Sending:
+          isSending = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::Isolated:
@@ -3751,21 +3769,16 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       parameterName = inputRepr->getElementName(i);
     }
 
-    if (isTransferring) {
+    if (isSending) {
       if (ownership == ParamSpecifier::Default) {
         ownership = ParamSpecifier::ImplicitlyCopyableConsuming;
-      } else {
-        assert(ownershipRepr);
-        diagnose(eltTypeRepr->getLoc(),
-                 diag::transferring_unsupported_param_specifier,
-                 ownershipRepr->getSpecifierSpelling());
       }
     }
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         isolated, noDerivative, compileTimeConst, hasResultDependsOn,
-        isTransferring);
+        isSending);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -3933,9 +3946,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                           conventionAttr->getConventionName());
         } else {
           isolation = FunctionTypeIsolation::forErased();
-
-          // @isolated(any) implies @Sendable, unconditionally for now.
-          sendable = true;
         }
         break;
       }
@@ -4021,8 +4031,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  bool hasTransferringResult =
-      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
+  bool hasSendingResult =
+      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr()) ||
+      isa_and_nonnull<SendingTypeRepr>(repr->getResultTypeRepr());
 
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
@@ -4030,7 +4041,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      LifetimeDependenceInfo(), hasTransferringResult);
+      LifetimeDependenceInfo(), hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4489,8 +4500,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
         parameterOptions |= SILParameterInfo::Isolated;
         return true;
 
-      case TypeAttrKind::SILTransferring:
-        parameterOptions |= SILParameterInfo::Transferring;
+      case TypeAttrKind::SILSending:
+        parameterOptions |= SILParameterInfo::Sending;
         return true;
 
       default:
@@ -4592,8 +4603,8 @@ bool TypeResolver::resolveSingleSILResult(
       resultInfoOptions |= SILResultInfo::NotDifferentiable;
     }
 
-    if (claim<SILTransferringTypeAttr>(attrs)) {
-      resultInfoOptions |= SILResultInfo::IsTransferring;
+    if (claim<SILSendingTypeAttr>(attrs)) {
+      resultInfoOptions |= SILResultInfo::IsSending;
     }
 
     type = resolveAttributedType(repr, options, attrs);
@@ -4765,6 +4776,22 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
+    // Gate the 'Escapable' type behind a specific flag for now.
+    //
+    // NOTE: we do not return an ErrorType, though! We're just artificially
+    // preventing people from referring to the type without the feature.
+    if (auto proto = result->getAs<ProtocolType>()) {
+      if (auto known = proto->getKnownProtocol()) {
+        if (*known == KnownProtocolKind::Escapable
+            && !isSILSourceFile()
+            && !isInterfaceFile()
+            && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escapable_requires_feature_flag);
+        }
+      }
+    }
+
     if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) &&
         options.isConstraintImplicitExistential()) {
       // Check whether this type is an implicit opaque result type.
@@ -4933,6 +4960,27 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   }
 
   return type;
+}
+
+NeverNullType
+TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  if (options.is(TypeResolverContext::TupleElement)) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::sending_cannot_be_applied_to_tuple_elt);
+    return ErrorType::get(getASTContext());
+  }
+
+  if (!options.is(TypeResolverContext::FunctionResult) &&
+      (!options.is(TypeResolverContext::FunctionInput) ||
+       options.hasBase(TypeResolverContext::EnumElementDecl))) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::sending_only_on_parameters_and_results);
+    return ErrorType::get(getASTContext());
+  }
+
+  // Return the type.
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType
@@ -5769,10 +5817,9 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
     if (auto kind = getInvertibleProtocolKind(*kp)) {
 
       // Gate the '~Escapable' type behind a specific flag for now.
+      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
       if (*kind == InvertibleProtocolKind::Escapable &&
           !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        diagnoseInvalid(repr, repr->getLoc(),
-                        diag::escapable_requires_feature_flag);
         return wrapInExistential(ErrorType::get(getASTContext()));
       }
 
@@ -6036,6 +6083,7 @@ private:
     case TypeReprKind::SILBox:
     case TypeReprKind::Isolated:
     case TypeReprKind::Transferring:
+    case TypeReprKind::Sending:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
     case TypeReprKind::Vararg:

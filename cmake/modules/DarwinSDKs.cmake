@@ -15,6 +15,8 @@ set(SUPPORTED_TVOS_SIMULATOR_ARCHS "x86_64;arm64")
 set(SUPPORTED_WATCHOS_ARCHS "armv7k;arm64_32")
 set(SUPPORTED_WATCHOS_SIMULATOR_ARCHS "i386;x86_64;arm64")
 set(SUPPORTED_OSX_ARCHS "x86_64;arm64")
+set(SUPPORTED_XROS_ARCHS "arm64;arm64e")
+set(SUPPORTED_XROS_SIMULATOR_ARCHS "arm64")
 
 is_sdk_requested(OSX swift_build_osx)
 if(swift_build_osx)
@@ -50,7 +52,8 @@ if(swift_build_freestanding AND (SWIFT_FREESTANDING_FLAVOR STREQUAL "apple"))
 endif()
 
 # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
-#   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
+#   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR, XROS, XROS_SIMULATOR
+#   (archs hardcoded below).
 
 is_sdk_requested(IOS swift_build_ios)
 if(swift_build_ios)
@@ -119,4 +122,29 @@ if(swift_build_watchos_simulator)
   configure_target_variant(WATCHOS_SIMULATOR-DA "watchOS Debug+Asserts"   WATCHOS_SIMULATOR DA "Debug+Asserts")
   configure_target_variant(WATCHOS_SIMULATOR-RA "watchOS Release+Asserts" WATCHOS_SIMULATOR RA "Release+Asserts")
   configure_target_variant(WATCHOS_SIMULATOR-R  "watchOS Release"         WATCHOS_SIMULATOR R "Release")
+endif()
+
+is_sdk_requested(XROS swift_build_xros)
+if(swift_build_xros)
+  configure_sdk_darwin(
+      XROS "xrOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS}"
+      xros xros xros "${SUPPORTED_XROS_ARCHS}")
+  configure_target_variant(XROS-DA "xrOS Debug+Asserts"   XROS DA "Debug+Asserts")
+  configure_target_variant(XROS-RA "xrOS Release+Asserts" XROS RA "Release+Asserts")
+  configure_target_variant(XROS-R  "xrOS Release"         XROS R "Release")
+endif()
+
+is_sdk_requested(XROS_SIMULATOR swift_build_xros_simulator)
+if(swift_build_xros_simulator)
+  configure_sdk_darwin(
+      XROS_SIMULATOR "xrOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS}"
+      xrsimulator xros xros-simulator
+      "${SUPPORTED_XROS_SIMULATOR_ARCHS}")
+
+  configure_target_variant(
+      XROS_SIMULATOR-DA "xrOS Simulator Debug+Asserts"   XROS_SIMULATOR DA "Debug+Asserts")
+  configure_target_variant(
+      XROS_SIMULATOR-RA "xrOS Simulator Release+Asserts" XROS_SIMULATOR RA "Release+Asserts")
+  configure_target_variant(
+      XROS_SIMULATOR-R  "xrOS Simulator Release"         XROS_SIMULATOR R "Release")
 endif()

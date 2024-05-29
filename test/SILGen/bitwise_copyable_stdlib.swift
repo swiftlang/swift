@@ -1,4 +1,4 @@
-// R N: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
+// R N: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
 // RUN: %target-swift-frontend                               \
 // RUN:     -emit-sil                                        \
@@ -7,8 +7,6 @@
 // RUN:     -module-name Swift                               \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature BuiltinModule       \
-// RUN:     -enable-experimental-feature BitwiseCopyable     \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-builtin-module
 
@@ -20,11 +18,11 @@ import Builtin
 
 @_marker public protocol Copyable: ~Escapable {}
 @_marker public protocol Escapable: ~Copyable {}
-@_marker public protocol _BitwiseCopyable : ~Escapable {}
+@_marker public protocol BitwiseCopyable : ~Escapable {}
 
-struct Storage : ~Escapable, _BitwiseCopyable {}
+struct Storage : ~Escapable, BitwiseCopyable {}
 
 
-func take<T : _BitwiseCopyable & ~Escapable>(_ t: T) {}
+func take<T : BitwiseCopyable & ~Escapable>(_ t: T) {}
 
 func passStorage(_ s: Storage) { take(s) }

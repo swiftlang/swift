@@ -1,8 +1,4 @@
 // RUN: %target-swift-emit-silgen -module-name test %s | %FileCheck %s --enable-var-scope
-// RUN: %target-swift-emit-silgen -enable-experimental-feature NoncopyableGenerics -module-name test %s | %FileCheck %s --enable-var-scope
-
-// For -enable-experimental-feature NoncopyableGenerics
-
 
 class Retainable {}
 

@@ -6239,7 +6239,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->isSerialized(),
+      customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),
@@ -7021,7 +7021,10 @@ void SILGenFunction::emitProtocolWitness(
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
-      emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+
+      if (getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled()) {
+        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+      }
     } else {
       emitHopToTargetActor(loc, enterIsolation, actorSelf);
     }

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <fstream>
+
 #include "ToolChains.h"
 
 #include "swift/Basic/LLVM.h"
@@ -108,9 +110,26 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 
   return II;
 }
+// Amazon Linux 2023 requires lld as the default linker.
+bool isAmazonLinux2023Host() {
+      std::ifstream file("/etc/os-release");
+      std::string line;
+
+      while (std::getline(file, line)) {
+        if (line.substr(0, 12) == "PRETTY_NAME=") {
+          if (line.substr(12) == "\"Amazon Linux 2023\"") {
+            file.close();
+            return true;
+          }
+        }
+      }
+      return false;
+    }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  if (getTriple().isAndroid())
+  if (getTriple().isAndroid() || isAmazonLinux2023Host()
+      || (getTriple().isMusl()
+          && getTriple().getVendor() == llvm::Triple::Swift))
     return "lld";
 
   switch (getTriple().getArch()) {
@@ -214,17 +233,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 #else
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 #endif
-    // Starting with lld 13, Swift stopped working with the lld --gc-sections
-    // implementation for ELF, unless -z nostart-stop-gc is also passed to lld:
-    //
-    // https://reviews.llvm.org/D96914
-    if (Linker == "lld" || (Linker.length() > 5 &&
-                            Linker.substr(Linker.length() - 6) == "ld.lld")) {
-      Arguments.push_back("-Xlinker");
-      Arguments.push_back("-z");
-      Arguments.push_back("-Xlinker");
-      Arguments.push_back("nostart-stop-gc");
-    }
   }
 
   // Configure the toolchain.
@@ -279,7 +287,8 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  getResourceDirPath(SharedResourceDirPath, context.Args,
+                     /*Shared=*/!(staticExecutable || staticStdlib));
 
   SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,

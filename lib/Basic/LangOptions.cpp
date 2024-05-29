@@ -47,6 +47,9 @@ LangOptions::LangOptions() {
 #endif
 
   // Note: Introduce default-on language options here.
+  Features.insert(Feature::NoncopyableGenerics);
+  Features.insert(Feature::BorrowingSwitch);
+  Features.insert(Feature::MoveOnlyPartialConsumption);
 
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
@@ -72,6 +75,8 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "tvOS",
   "watchOS",
   "iOS",
+  "visionOS",
+  "xrOS",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -450,6 +455,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::IOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
+    break;
+  case llvm::Triple::XROS:
+    addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
     break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)

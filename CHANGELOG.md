@@ -5,6 +5,69 @@
 
 ## Swift 6.0
 
+* [SE-0427][]:
+  You can now suppress `Copyable` on protocols, generic parameters, 
+  and existentials:
+
+  ```swift
+  // Protocol does not require conformers to be Copyable.
+  protocol Flower: ~Copyable {
+    func bloom()
+  }
+
+  // Noncopyable type
+  struct Marigold: Flower, ~Copyable {
+    func bloom() { print("Marigold blooming!") }
+  }
+
+  // Copyable type
+  struct Hibiscus: Flower {
+    func bloom() { print("Hibiscus blooming!") }
+  }
+
+  func startSeason(_ flower: borrowing some Flower & ~Copyable) {
+    flower.bloom()
+  }
+
+  startSeason(Marigold())
+  startSeason(Hibiscus())
+  ```
+
+  By writing `~Copyable` on a generic type, you're suppressing a default
+  `Copyable` constraint that would otherwise appear on that type. This permits
+  noncopyable types, which have no `Copyable` conformance, to conform to such 
+  protocols and be substituted for those generic types. Full functionality of this
+  feature requires the newer Swift 6 runtime.
+
+* Since its introduction in Swift 5.1 the @TaskLocal property wrapper was used to   
+  create and access task-local value bindings. Property wrappers introduce mutable storage,
+  which was now properly flagged as potential source of concurrency unsafety.
+ 
+  In order for Swift 6 language mode to not flag task-locals as potentially thread-unsafe,
+  task locals are now implemented using a macro. The macro has the same general semantics 
+  and usage patterns, however there are two source-break situations which the Swift 6 
+  task locals cannot handle:
+
+  Using an implicit default `nil` value for task local initialization, when combined with a type alias:
+  ```swift
+  // allowed in Swift 5.x, not allowed in Swift 6.x
+  
+  typealias MyValue = Optional<Int> 
+  
+  @TaskLocal
+  static var number: MyValue // Swift 6: error, please specify default value explicitly
+  
+  // Solution 1: Specify the default value
+  @TaskLocal
+  static var number: MyValue = nil
+  
+  // Solution 2: Avoid the type-alias
+  @TaskLocal
+  static var number: Optional<Int>
+  ```
+
+  At the same time, task locals can now be declared as global properties, which wasn't possible before.
+
 * Swift 5.10 missed a semantic check from [SE-0309][]. In type context, a reference to a
   protocol `P` that has associated types or `Self` requirements should use
   the `any` keyword, but this was not enforced in nested generic argument positions.
@@ -10223,6 +10286,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
+[SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

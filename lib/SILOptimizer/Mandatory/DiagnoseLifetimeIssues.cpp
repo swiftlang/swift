@@ -316,7 +316,7 @@ static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   //
   // A more sophisticated analysis would be to check if there are no
   // (potential) loads from the store's destination address after the store,
-  // but within the object's liferange. But without a good alias analysis (and
+  // but within the object's liverange. But without a good alias analysis (and
   // we don't want to use AliasAnalysis in a mandatory pass) it's practically
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the

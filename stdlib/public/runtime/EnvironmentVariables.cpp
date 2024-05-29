@@ -272,3 +272,7 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration() {
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
   return runtime::environment::SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS();
 }
+
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride() {
+  return runtime::environment::SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE();
+}

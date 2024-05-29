@@ -890,10 +890,20 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
 final public
 class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {
   public var fromFunction: Value { operand.value }
+  public var withoutActuallyEscaping: Bool { bridged.ConvertFunctionInst_withoutActuallyEscaping() }
 }
 
 final public
-class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {}
+class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {
+  public var callee: Value { operand.value }
+
+  public var referencedFunction: Function? {
+    if let fri = callee as? FunctionRefInst {
+      return fri.referencedFunction
+    }
+    return nil
+  }
+}
 
 final public class ThickToObjCMetatypeInst : SingleValueInstruction {}
 final public class ObjCToThickMetatypeInst : SingleValueInstruction {}
@@ -955,6 +965,18 @@ final public class RefToBridgeObjectInst : SingleValueInstruction {
 final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class BorrowedFromInst : SingleValueInstruction, BorrowIntroducingInstruction {
+  public var borrowedValue: Value { operands[0].value }
+  public var borrowedPhi: Phi { Phi(borrowedValue)! }
+  public var enclosingOperands: OperandArray {
+    let ops = operands
+    return ops[1..<ops.count]
+  }
+  public var enclosingValues: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
+    enclosingOperands.values
+  }
+}
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
   public var box: Value { operand.value }
@@ -1019,7 +1041,9 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
     return arguments.contains { $0.type.containsNoEscapeFunction }
   }
 
+  public var hasUnknownResultIsolation: Bool { bridged.PartialApplyInst_hasUnknownResultIsolation() }
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
+  public var calleeConvention: ArgumentConvention { type.bridged.getCalleeConvention().convention }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {

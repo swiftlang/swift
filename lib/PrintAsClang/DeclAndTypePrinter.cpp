@@ -403,7 +403,10 @@ private:
       os << "\n";
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
-    os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
+    if (ED->getObjCCategoryName().empty())
+      os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
+    else
+      os << " (" << ED->getObjCCategoryName() << ")";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());
@@ -1715,6 +1718,9 @@ public:
       case PlatformKind::watchOS:
         plat = "watchos";
         break;
+      case PlatformKind::visionOS:
+        plat = "visionos";
+        break;
       case PlatformKind::macOSApplicationExtension:
         plat = "macos_app_extension";
         break;
@@ -1729,6 +1735,9 @@ public:
         break;
       case PlatformKind::watchOSApplicationExtension:
         plat = "watchos_app_extension";
+        break;
+      case PlatformKind::visionOSApplicationExtension:
+        plat = "visionos_app_extension";
         break;
       case PlatformKind::OpenBSD:
         plat = "openbsd";

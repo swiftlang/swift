@@ -295,13 +295,14 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_clang_tools_extra:
             llvm_enable_projects.append('clang-tools-extra')
 
-        # Always build lld -- on non-Darwin so we can always have a
+        # Building lld is on by default -- on non-Darwin so we can always have a
         # linker that is compatible with the swift we are using to
         # compile the stdlib, but on Darwin too for Embedded Swift use cases.
         #
         # This makes it easier to build target stdlibs on systems that
         # have old toolchains without more modern linker features.
-        llvm_enable_projects.append('lld')
+        if self.args.build_lld:
+            llvm_enable_projects.append('lld')
 
         llvm_cmake_options.define('LLVM_ENABLE_PROJECTS',
                                   ';'.join(llvm_enable_projects))
@@ -346,6 +347,11 @@ class LLVM(cmake_product.CMakeProduct):
         if not self.args.llvm_include_tests:
             llvm_cmake_options.define('LLVM_INCLUDE_TESTS', 'NO')
             llvm_cmake_options.define('CLANG_INCLUDE_TESTS', 'NO')
+
+        build_root = os.path.dirname(self.build_dir)
+        host_machine_target = targets.StdlibDeploymentTarget.host_target().name
+        host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
+            host_machine_target))
 
         if self.is_cross_compile_target(host_target):
             build_root = os.path.dirname(self.build_dir)
@@ -481,8 +487,9 @@ class LLVM(cmake_product.CMakeProduct):
 
         self.install_with_cmake(install_targets, host_install_destdir)
 
+        clang_dest_dir = '{}{}'.format(host_install_destdir,
+                                       self.args.install_prefix)
+
         if self.args.llvm_install_components and system() == 'Darwin':
-            clang_dest_dir = '{}{}'.format(host_install_destdir,
-                                           self.args.install_prefix)
             self.copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain(
                 clang_dest_dir)

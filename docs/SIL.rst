@@ -692,6 +692,18 @@ autorelease in the callee.
   type behaves like a non-generic type, as if the substitutions were
   actually applied to the underlying function type.
 
+- SIL functions may optionally mark a function parameter as
+  ``@sil_isolated``. An ``@sil_isolated`` parameter must be one of:
+
+  - An actor or any actor type.
+  - A generic type that conforms to Actor or AnyActor.
+
+  and must be the actor instance that a function is isolated to. Importantly
+  this means that global actor isolated nominal types are never
+  ``@sil_isolated``. Only one parameter can ever be marked as ``@sil_isolated``
+  since a function cannot be isolated to multiple actors at the same time.
+
+
 Async Functions
 ```````````````
 
@@ -4612,6 +4624,38 @@ the original SILValue can not be modified. This means that:
 2. If ``%0`` is a non-trivial value, ``%0`` can not be destroyed.
 
 We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
+
+This instruction is only valid in functions in Ownership SSA form.
+
+borrowed from
+`````````````
+
+::
+
+   sil-instruction ::= 'borrowed' sil-operand 'from' '(' (sil-operand (',' sil-operand)*)? ')'
+
+   bb1(%1 : @owned $T, %2 : @guaranteed $T):
+     %3 = borrowed %2 : $T from (%1 : $T, %0 : $S)
+     // %3 has type $T and guaranteed ownership
+
+Declares from which enclosing values a guaranteed phi argument is borrowed
+from.
+An enclosing value is either a dominating borrow introducer (``%0``) of the
+borrowed operand (``%2``) or an adjacent phi-argument in the same block
+(``%1``).
+In case of an adjacent phi, all incoming values of the adjacent phi must be
+borrow introducers for the corresponding incoming value of the borrowed
+operand in all predecessor blocks.
+
+The borrowed operand (``%2``) must be a guaranteed phi argument and is
+forwarded to the instruction result.
+
+The list of enclosing values (operands after ``from``) can be empty if the
+borrowed operand stems from a borrow introducer with no enclosing value, e.g.
+a ``load_borrow``.
+
+Guaranteed phi arguments must not have other users than borrowed-from
+instructions.
 
 This instruction is only valid in functions in Ownership SSA form.
 

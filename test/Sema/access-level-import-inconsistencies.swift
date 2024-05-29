@@ -49,6 +49,7 @@ private import Lib
 // RUN:   -primary-file %t/ManyFiles_ImplicitVsInternal_FileA.swift -verify
 //--- ManyFiles_ImplicitVsInternal_FileA.swift
 import Lib // expected-error {{ambiguous implicit access level for import of 'Lib'; it is imported as 'internal' elsewhere}}
+// expected-note @-1 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
 //--- ManyFiles_ImplicitVsInternal_FileB.swift
 internal import Lib // expected-note {{imported 'internal' here}}
 
@@ -56,11 +57,10 @@ internal import Lib // expected-note {{imported 'internal' here}}
 // RUN:   -primary-file %t/ManyFiles_ImplicitVsPackage_FileA.swift -verify
 //--- ManyFiles_ImplicitVsPackage_FileA.swift
 import Lib // expected-error {{ambiguous implicit access level for import of 'Lib'; it is imported as 'package' elsewhere}}
+// expected-note @-1 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
 //--- ManyFiles_ImplicitVsPackage_FileB.swift
 package import Lib // expected-note {{imported 'package' here}} @:1
 
-// RUN: %target-swift-frontend -typecheck %t/ManyFiles_AmbiguitySwift6_File?.swift -I %t \
-// RUN:   -verify -swift-version 6
 // RUN: %target-swift-frontend -typecheck %t/ManyFiles_AmbiguitySwift6_File?.swift -I %t \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 //--- ManyFiles_AmbiguitySwift6_FileA.swift

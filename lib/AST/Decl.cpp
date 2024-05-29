@@ -567,6 +567,15 @@ std::optional<llvm::VersionTuple>
 Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
   if (auto *attr = getAttrs().getBackDeployed(Ctx)) {
     auto version = attr->Version;
+    StringRef ignoredPlatformString;
+    AvailabilityInference::updateBeforePlatformForFallback(
+        attr, getASTContext(), ignoredPlatformString, version);
+
+    // If the remap for fallback resulted in 1.0, then the
+    // backdeployment prior to that is not meaningful.
+    if (version == clang::VersionTuple(1, 0, 0, 0))
+      return std::nullopt;
+
     return version;
   }
 
@@ -1669,7 +1678,8 @@ Type InheritedTypes::getResolvedType(unsigned i,
                         ? Decl.get<const ExtensionDecl *>()->getASTContext()
                         : Decl.get<const TypeDecl *>()->getASTContext();
   return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
-                           Type());
+                           InheritedTypeResult::forDefault())
+      .getInheritedTypeOrNull(getASTContext());
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -1879,16 +1889,6 @@ Type ExtensionDecl::getExtendedType() const {
 
 bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-}
-
-std::optional<Identifier>
-ExtensionDecl::getCategoryNameForObjCImplementation() const {
-  auto attr = getAttrs()
-                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-  if (!attr || attr->isCategoryNameInvalid())
-    return std::nullopt;
-
-  return attr->CategoryName;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2314,7 +2314,7 @@ bool VarDecl::isLayoutExposedToClients() const {
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
-  if (!nominalAccess.isPublic()) return false;
+  if (!nominalAccess.isPublicOrPackage()) return false;
 
   if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
       !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
@@ -3022,6 +3022,10 @@ bool Decl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
+bool AbstractStorageDecl::isStrictlyResilient() const {
+  return isResilient() && !getModuleContext()->allowNonResilientAccess();
+}
+
 bool AbstractStorageDecl::isResilient() const {
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
@@ -3050,7 +3054,7 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Maximal:
     if (M == getModuleContext())
       return false;
-    // Non-resilient if bypass optimization in package is enabled
+    // Access non-resiliently if package optimization is enabled
     if (bypassResilienceInPackage(M))
       return false;
     return isResilient();
@@ -3079,6 +3083,36 @@ bool AbstractStorageDecl::isSetterMutating() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
     IsSetterMutatingRequest{const_cast<AbstractStorageDecl *>(this)}, {});
+}
+
+StorageMutability 
+AbstractStorageDecl::mutability(const DeclContext *useDC,
+                                std::optional<const DeclRefExpr *> base ) const {
+  if (auto vd = dyn_cast<VarDecl>(this))
+    return vd->mutability(useDC, base);
+
+  auto sd = cast<SubscriptDecl>(this);
+  return sd->supportsMutation() ? StorageMutability::Mutable
+                                : StorageMutability::Immutable;
+}
+
+/// Determine the mutability of this storage declaration when
+/// accessed from a given declaration context in Swift.
+///
+/// This method differs only from 'mutability()' in its handling of
+/// 'optional' storage requirements, which lack support for direct
+/// writes in Swift.
+StorageMutability
+AbstractStorageDecl::mutabilityInSwift(
+    const DeclContext *useDC,
+    std::optional<const DeclRefExpr *> base
+) const {
+  // TODO: Writing to an optional storage requirement is not supported in Swift.
+  if (getAttrs().hasAttribute<OptionalAttr>()) {
+    return StorageMutability::Immutable;
+  }
+
+  return mutability(useDC, base);
 }
 
 OpaqueReadOwnership AbstractStorageDecl::getOpaqueReadOwnership() const {
@@ -3707,6 +3741,20 @@ void ValueDecl::setIsObjC(bool value) {
   LazySemanticInfo.isObjC = value;
 }
 
+Identifier ExtensionDecl::getObjCCategoryName() const {
+  // If there's an @objc attribute, it's authoritative. (ClangImporter
+  // attaches one automatically.)
+  if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid*/true)) {
+    if (objcAttr->hasName() && objcAttr->getName()->getNumArgs() == 0)
+      return objcAttr->getName()->getSimpleName();
+
+    return Identifier();
+  }
+
+  // Not a category, evidently.
+  return Identifier();
+}
+
 bool ValueDecl::isSemanticallyFinal() const {
   // Actor types are semantically final.
   if (auto classDecl = dyn_cast<ClassDecl>(this)) {
@@ -3856,7 +3904,7 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
 }
 
 std::optional<AttributedImport<ImportedModule>>
-ValueDecl::findImport(const DeclContext *fromDC) {
+ValueDecl::findImport(const DeclContext *fromDC) const {
   // If the type is from the current module, there's no import.
   auto module = getModuleContext();
   if (module == fromDC->getParentModule())
@@ -4001,25 +4049,86 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
-SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
+SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
+  // Some decls have a parent/child split where the introducer keyword is on the
+  // parent, but the attributes are on the children. If this is a child in such
+  // a pair, `introDecl` will be changed to point to the parent. (The parent
+  // decl should delegate to one of its children.)
+  const Decl *introDecl = this;
+
+  switch (getKind()) {
+  case DeclKind::Module:
+  case DeclKind::TopLevelCode:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+  case DeclKind::Missing:
+  case DeclKind::MissingMember:
+  case DeclKind::MacroExpansion:
+  case DeclKind::BuiltinTuple:
+    // These don't take attributes.
+    return SourceLoc();
+
+  case DeclKind::EnumCase:
+    // An ECD's attributes are attached to its elements.
+    if (auto elem = cast<EnumCaseDecl>(this)->getFirstElement())
+      return elem->getAttributeInsertionLoc(forModifier);
+    break;
+
+  case DeclKind::EnumElement:
+    // An EED's introducer keyword is on its parent case.
+    if (auto parent = cast<EnumElementDecl>(this)->getParentCase())
+      introDecl = parent;
+    break;
+
+  case DeclKind::PatternBinding: {
+    // A PBD's attributes are attached to the vars in its patterns.
+    auto pbd = cast<PatternBindingDecl>(this);
+
+    for (unsigned i = 0; i < pbd->getNumPatternEntries(); i++) {
+      if (auto var = pbd->getAnchoringVarDecl(i)) {
+        return var->getAttributeInsertionLoc(forModifier);
+      }
+    }
+
+    break;
+  }
+
+  case DeclKind::Var:
+  case DeclKind::Param:
+    // A VarDecl's introducer keyword, if it has one, is on its pattern binding.
+    if (auto pbd = cast<VarDecl>(this)->getParentPatternBinding())
+      introDecl = pbd;
+    break;
+
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::OpaqueType:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::Macro:
+  case DeclKind::Extension:
+  case DeclKind::Import:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    // Both the introducer keyword and the attributes are on `this`.
+    break;
+  }
+
   if (isImplicit())
     return SourceLoc();
 
-  if (auto var = dyn_cast<VarDecl>(this)) {
-    // [attrs] var ...
-    // The attributes are part of the VarDecl, but the 'var' is part of the PBD.
-    SourceLoc resultLoc = var->getAttrs().getStartLoc(forModifier);
-    if (resultLoc.isValid()) {
-      return resultLoc;
-    } else if (auto pbd = var->getParentPatternBinding()) {
-      return pbd->getStartLoc();
-    } else {
-      return var->getStartLoc();
-    }
-  }
-
   SourceLoc resultLoc = getAttrs().getStartLoc(forModifier);
-  return resultLoc.isValid() ? resultLoc : getStartLoc();
+  return resultLoc.isValid() ? resultLoc : introDecl->getStartLoc();
 }
 
 /// Returns true if \p VD needs to be treated as publicly-accessible
@@ -4261,13 +4370,23 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
-  // Client needs to opt in to bypass resilience checks at the use site.
-  // Client and the loaded module both need to be in the same package.
-  // The loaded module needs to be built from source and opt in to allow
-  // non-resilient access.
-  return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
-         getModuleContext()->inSamePackage(accessingModule) &&
-         getModuleContext()->allowNonResilientAccess();
+  auto declModule = getModuleContext();
+  if (declModule->inSamePackage(accessingModule) &&
+      declModule->allowNonResilientAccess()) {
+    // If the defining module is built with package-cmo,
+    // allow direct access from the use site that belongs
+    // to accessingModule (client module).
+    if (declModule->isResilient() &&
+        declModule->serializePackageEnabled())
+      return true;
+
+    // If not, check if the client can still opt in to
+    // have a direct access to this decl from the use
+    // site with a flag.
+    // FIXME: serialize this flag to Module and get it via accessingModule.
+    return getASTContext().LangOpts.EnableBypassResilienceInPackage;
+  }
+  return false;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -4561,8 +4680,10 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
 
   if (scope.isPublic())
     return !otherScope.isPublic();
+  else if (scope.isPackage())
+    return !otherScope.isPublicOrPackage();
   else if (scope.isInternal())
-    return !otherScope.isPublic() && !otherScope.isInternal();
+    return !otherScope.isPublicOrPackage() && !otherScope.isInternal();
   else
     return false;
 }
@@ -5092,6 +5213,10 @@ bool NominalTypeDecl::isResilient() const {
   return getModuleContext()->isResilient();
 }
 
+bool NominalTypeDecl::isStrictlyResilient() const {
+  return isResilient() && !getModuleContext()->allowNonResilientAccess();
+}
+
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
   if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
     return nullptr;
@@ -5122,7 +5247,7 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
     // non-resiliently in a maximal context.
     if (M == getModuleContext())
       return false;
-    // Non-resilient if bypass optimization in package is enabled
+    // Access non-resiliently if package optimization is enabled
     if (bypassResilienceInPackage(M))
       return false;
 
@@ -5365,6 +5490,13 @@ bool NominalTypeDecl::isMainActor() const {
          getParentModule()->getName() == getASTContext().Id_Concurrency;
 }
 
+bool NominalTypeDecl::suppressesConformance(KnownProtocolKind kp) const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SuppressesConformanceRequest{mutableThis, kp},
+                           false);
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<InheritedEntry> inherited,
@@ -5404,8 +5536,8 @@ Type TypeAliasDecl::getUnderlyingType() const {
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
-  if (underlying->hasArchetype() && isGenericContext())
-    underlying = underlying->mapTypeOutOfContext();
+  assert(!underlying->hasArchetype() || !isGenericContext());
+
   getASTContext().evaluator.cacheOutput(
           StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
           std::move(underlying));
@@ -6308,7 +6440,14 @@ bool ClassDecl::walkSuperclasses(
 }
 
 bool ClassDecl::isForeignReferenceType() const {
-  return getClangDecl() && isa<clang::RecordDecl>(getClangDecl());
+  auto clangRecordDecl = dyn_cast_or_null<clang::RecordDecl>(getClangDecl());
+  if (!clangRecordDecl)
+    return false;
+
+  CxxRecordSemanticsKind kind = evaluateOrDefault(
+      getASTContext().evaluator,
+      CxxRecordSemantics({clangRecordDecl, getASTContext()}), {});
+  return kind == CxxRecordSemanticsKind::Reference;
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {
@@ -7241,41 +7380,45 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getTypeInContext() const {
-  // If the variable is declared in context of a for-in loop over the elements
-  // of a parameter pack, its interface type must be mapped into context using
-  // the opened element environment of the pack expansion.
-  if (auto *env = getOpenedElementEnvironment())
-    return GenericEnvironment::mapTypeIntoContext(env, getInterfaceType());
-
   return getDeclContext()->mapTypeIntoContext(getInterfaceType());
+}
+
+/// Translate an "is mutable" bit into a StorageMutability value.
+static StorageMutability storageIsMutable(bool isMutable) {
+  return isMutable ? StorageMutability::Mutable
+                   : StorageMutability::Immutable;
 }
 
 /// Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
-bool VarDecl::isSettable(const DeclContext *UseDC,
-                         const DeclRefExpr *base) const {
+StorageMutability
+VarDecl::mutability(const DeclContext *UseDC,
+                    std::optional<const DeclRefExpr *> base) const {
   // Parameters are settable or not depending on their ownership convention.
   if (auto *PD = dyn_cast<ParamDecl>(this))
-    return !PD->isImmutableInFunctionBody();
+    return storageIsMutable(!PD->isImmutableInFunctionBody());
 
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
   if (!isLet()) {
     if (hasInitAccessor()) {
       if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
-        if (base && ctor->getImplicitSelfDecl() != base->getDecl())
-          return supportsMutation();
-        return true;
+        // If we're referencing 'self.', it's initializable.
+        if (!base ||
+            (*base && ctor->getImplicitSelfDecl() == (*base)->getDecl()))
+          return StorageMutability::Initializable;
+
+        return storageIsMutable(supportsMutation());
       }
     }
 
-    return supportsMutation();
+    return storageIsMutable(supportsMutation());
   }
 
   // Static 'let's are always immutable.
   if (isStatic()) {
-    return false;
+    return StorageMutability::Immutable;
   }
 
   //
@@ -7285,11 +7428,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
 
   // Debugger expression 'let's are initialized through a side-channel.
   if (isDebuggerVar())
-    return false;
+    return StorageMutability::Immutable;
 
   // 'let's are only ever settable from a specific DeclContext.
   if (UseDC == nullptr)
-    return false;
+    return StorageMutability::Immutable;
 
   // 'let' properties in structs/classes are only ever settable in their
   // designated initializer(s) or by init accessors.
@@ -7301,61 +7444,65 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
       // Check whether this property is part of `initializes` list,
       // and allow assignment/mutation if so. DI would be responsible
       // for checking for re-assignment.
-      return accessor->isInitAccessor() &&
+      if (accessor->isInitAccessor() &&
              llvm::is_contained(accessor->getInitializedProperties(),
-                                const_cast<VarDecl *>(this));
+                                const_cast<VarDecl *>(this)))
+        return StorageMutability::Initializable;
+
+      return StorageMutability::Immutable;
     }
 
     auto *CD = dyn_cast<ConstructorDecl>(UseDC);
-    if (!CD) return false;
-    
+    if (!CD) return StorageMutability::Immutable;
+
     auto *CDC = CD->getDeclContext();
 
     // 'let' properties are not valid inside protocols.
     if (CDC->getExtendedProtocolDecl())
-      return false;
+      return StorageMutability::Immutable;
 
     // If this init is defined inside of the same type (or in an extension
     // thereof) as the let property, then it is mutable.
     if (CDC->getSelfNominalTypeDecl() !=
         getDeclContext()->getSelfNominalTypeDecl())
-      return false;
-
-    if (base && CD->getImplicitSelfDecl() != base->getDecl())
-      return false;
+      return StorageMutability::Immutable;
 
     // If this is a convenience initializer (i.e. one that calls
     // self.init), then let properties are never mutable in it.  They are
     // only mutable in designated initializers.
     auto initKindAndExpr = CD->getDelegatingOrChainedInitKind();
     if (initKindAndExpr.initKind == BodyInitKind::Delegating)
-      return false;
+      return StorageMutability::Immutable;
 
-    return true;
+    // If we were given a base and it is 'self', it's initializable.
+    if (!base || (*base && CD->getImplicitSelfDecl() == (*base)->getDecl()))
+      return StorageMutability::Initializable;
+
+    return StorageMutability::Immutable;
   }
 
   // If the 'let' has a value bound to it but has no PBD, then it is
   // already initializedand not settable.
   if (getParentPatternBinding() == nullptr)
-    return false;
+    return StorageMutability::Immutable;
 
   // If the 'let' has an explicitly written initializer with a pattern binding,
   // then it isn't settable.
   if (isParentInitialized())
-    return false;
+    return StorageMutability::Immutable;
 
   // Normal lets (e.g. globals) are only mutable in the context of the
   // declaration.  To handle top-level code properly, we look through
   // the TopLevelCode decl on the use (if present) since the vardecl may be
   // one level up.
   if (getDeclContext() == UseDC)
-    return true;
+    return StorageMutability::Initializable;
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
       getDeclContext() == UseDC->getParent())
-    return true;
+    return StorageMutability::Initializable;
 
-  return false;
+  return StorageMutability::Immutable;
 }
 
 bool VarDecl::isLazilyInitializedGlobal() const {
@@ -8125,7 +8272,7 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
     return Type();
 
   Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
-  if (valueInterfaceTy->hasArchetype())
+  if (valueInterfaceTy->hasPrimaryArchetype())
     valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 
   return valueInterfaceTy;
@@ -8236,13 +8383,19 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
-ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
+ParamDecl *
+ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD,
+                            std::optional<DefaultArgumentKind> defaultArgKind) {
   auto *Clone = new (Ctx) ParamDecl(
       SourceLoc(), SourceLoc(), PD->getArgumentName(),
       SourceLoc(), PD->getParameterName(), PD->getDeclContext());
   Clone->setOptionsAndPointers(nullptr, nullptr, PD->getOptions());
-  Clone->Bits.ParamDecl.defaultArgumentKind =
-      PD->Bits.ParamDecl.defaultArgumentKind;
+
+  if (defaultArgKind) {
+    Clone->setDefaultArgumentKind(*defaultArgKind);
+  } else {
+    Clone->setDefaultArgumentKind(PD->getDefaultArgumentKind());
+  }
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
@@ -8284,7 +8437,9 @@ ParamDecl *ParamDecl::createImplicit(ASTContext &Context,
                                    interfaceType, Parent, specifier);
 }
 
-DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
+/// Determine the kind of a default argument for the given expression.
+static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
+                                                      Expr *init) {
   if (!init)
     return DefaultArgumentKind::None;
 
@@ -8296,6 +8451,19 @@ DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
 
   if (isa<MacroExpansionExpr>(init))
     return DefaultArgumentKind::ExpressionMacro;
+
+  if (isa<SuperRefExpr>(init)) {
+    // The compiler does not synthesize inherited initializers when
+    // type-checking Swift module interfaces. Instead, module interfaces are
+    // expected to include them explicitly in subclasses. A default argument of
+    // '= super' in a parameter of such initializer indicates that the default
+    // argument is inherited.
+    if (dc->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+      return DefaultArgumentKind::Inherited;
+    } else {
+      return DefaultArgumentKind::Normal;
+    }
+  }
 
   auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
@@ -8309,6 +8477,36 @@ DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
   }
 
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
+}
+
+ParamDecl *ParamDecl::createParsed(ASTContext &Context, SourceLoc specifierLoc,
+                                   SourceLoc argumentNameLoc,
+                                   Identifier argumentName,
+                                   SourceLoc parameterNameLoc,
+                                   Identifier parameterName, Expr *defaultValue,
+                                   DeclContext *dc) {
+  auto *decl =
+      new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
+                              parameterNameLoc, parameterName, dc);
+
+  const auto kind = computeDefaultArgumentKind(dc, defaultValue);
+  if (kind == DefaultArgumentKind::Inherited) {
+    // The 'super' in inherited default arguments is a specifier rather than an
+    // expression.
+    // TODO: However, we may want to retain its location for diagnostics.
+    defaultValue = nullptr;
+  }
+
+  decl->setDefaultExpr(defaultValue);
+  decl->setDefaultArgumentKind(kind);
+
+  return decl;
+}
+
+void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
+  assert(getDefaultArgumentKind() == DefaultArgumentKind::None &&
+         "Overwrite of default argument kind");
+  Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
 }
 
 /// Retrieve the type of 'self' for the given context.
@@ -8461,7 +8659,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      hasResultDependsOn(), isTransferring());
+      hasResultDependsOn(), isSending());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -8559,28 +8757,39 @@ Type ParamDecl::getTypeOfDefaultExpr() const {
   return Type();
 }
 
-void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
-  if (!DefaultValueAndFlags.getPointer()) {
+void ParamDecl::setDefaultExpr(Expr *E) {
+  auto *defaultInfo = DefaultValueAndFlags.getPointer();
+  if (defaultInfo) {
+    assert(defaultInfo->DefaultArg.isNull() ||
+           defaultInfo->DefaultArg.is<Expr *>());
+
+    auto *const oldE = defaultInfo->DefaultArg.dyn_cast<Expr *>();
+    assert((bool)E == (bool)oldE && "Overwrite of non-null default with null");
+    assert((!oldE || !oldE->getType() || (bool)E->getType()) &&
+           "Overwrite of type-checked default with non-type-checked default");
+  } else {
     if (!E) return;
 
-    DefaultValueAndFlags.setPointer(
-        getASTContext().Allocate<StoredDefaultArgument>());
+    defaultInfo = getASTContext().Allocate<StoredDefaultArgument>();
+    DefaultValueAndFlags.setPointer(defaultInfo);
+
+    defaultInfo->InitContextAndIsTypeChecked.setInt(false);
   }
+
+  defaultInfo->DefaultArg = E;
+}
+
+void ParamDecl::setTypeCheckedDefaultExpr(Expr *E) {
+  assert(E || getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
+  setDefaultExpr(E);
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
-  assert(defaultInfo->DefaultArg.isNull() ||
-         defaultInfo->DefaultArg.is<Expr *>());
-
-  if (!isTypeChecked) {
-    assert(!defaultInfo->InitContextAndIsTypeChecked.getInt() &&
-           "Can't overwrite type-checked default with un-type-checked default");
+  if (!defaultInfo) {
+    defaultInfo = getASTContext().Allocate<StoredDefaultArgument>();
+    DefaultValueAndFlags.setPointer(defaultInfo);
   }
-  defaultInfo->DefaultArg = E;
-  // `Inherited` default arguments do not have an expression,
-  // so if the storage has been pre-allocated already we need
-  // to be careful requesting type here.
-  defaultInfo->ExprType = E ? E->getType() : Type();
-  defaultInfo->InitContextAndIsTypeChecked.setInt(isTypeChecked);
+
+  defaultInfo->InitContextAndIsTypeChecked.setInt(true);
 }
 
 void ParamDecl::setDefaultExprType(Type type) {
@@ -8637,8 +8846,19 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   defaultInfo->InitContextAndIsTypeChecked.setPointer(initContext);
 }
 
+CaptureInfo ParamDecl::getDefaultArgumentCaptureInfo() const {
+  if (!DefaultValueAndFlags.getPointer())
+    return CaptureInfo::empty();
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ParamCaptureInfoRequest{const_cast<ParamDecl *>(this)},
+                           CaptureInfo::empty());
+}
+
 void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   assert(DefaultValueAndFlags.getPointer());
+  assert(captures.hasBeenComputed());
   DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
@@ -9089,6 +9309,13 @@ const ParamDecl *swift::getParameterAt(const DeclContext *source,
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
+}
+
+CaptureInfo AbstractFunctionDecl::getCaptureInfo() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           CaptureInfoRequest{const_cast<AbstractFunctionDecl *>(this)},
+                           CaptureInfo::empty());
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -9872,6 +10099,11 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
   if (mod->getResilienceStrategy() != ResilienceStrategy::Resilient)
     return true;
 
+  // If we perform package CMO, in-package clients must have access to the
+  // underlying type.
+  if (mod->serializePackageEnabled())
+    return true;
+
   ValueDecl *namingDecl = getNamingDecl();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl))
     return AFD->getResilienceExpansion() == ResilienceExpansion::Minimal;
@@ -10101,8 +10333,9 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
-  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR))
-    FD->setTransferringResult();
+  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR) ||
+      llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
+    FD->setSendingResult();
   return FD;
 }
 
@@ -10288,10 +10521,6 @@ AccessorDecl *AccessorDecl::createParsed(
 
       // The cloned parameter is implicit.
       param->setImplicit();
-
-      // It has no default arguments; these will be always be taken
-      // from the subscript declaration.
-      param->setDefaultArgumentKind(DefaultArgumentKind::None);
 
       newParams.push_back(param);
     }
@@ -11185,7 +11414,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   }
 
   if (auto value = dyn_cast<ValueDecl>(decl)) {
-    simple_display(out, value);
+    return simple_display(out, value);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     out << "extension of ";
     if (auto typeRepr = ext->getExtendedTypeRepr())
@@ -11195,12 +11424,12 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   } else if (auto med = dyn_cast<MacroExpansionDecl>(decl)) {
     out << '#' << med->getMacroName() << " in ";
     printContext(out, med->getDeclContext());
-    if (med->getLoc().isValid()) {
-      out << '@';
-      med->getLoc().print(out, med->getASTContext().SourceMgr);
-    }
   } else {
     out << "(unknown decl)";
+  }
+  if (decl->getLoc().isValid()) {
+    out << '@';
+    decl->getLoc().print(out, decl->getASTContext().SourceMgr);
   }
 }
 

@@ -1402,9 +1402,10 @@ namespace {
         printField(PD->getDefaultArgumentKind(), "default_arg");
       }
       if (PD->hasDefaultExpr() &&
-          !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
+          PD->getCachedDefaultArgumentCaptureInfo() &&
+          !PD->getCachedDefaultArgumentCaptureInfo()->isTrivial()) {
         printFieldRaw([&](raw_ostream &OS) {
-          PD->getDefaultArgumentCaptureInfo().print(OS);
+          PD->getCachedDefaultArgumentCaptureInfo()->print(OS);
         }, "", CapturesColor);
       }
       
@@ -1488,10 +1489,12 @@ namespace {
 
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
       printCommon(D, Type, Label, FuncColor);
-      if (!D->getCaptureInfo().isTrivial()) {
-        printFlagRaw([&](raw_ostream &OS) {
-          D->getCaptureInfo().print(OS);
-        });
+      if (auto captureInfo = D->getCachedCaptureInfo()) {
+        if (!captureInfo->isTrivial()) {
+          printFlagRaw([&](raw_ostream &OS) {
+            captureInfo->print(OS);
+          });
+        }
       }
 
       if (auto *attr = D->getAttrs().getAttribute<NonisolatedAttr>()) {
@@ -2826,10 +2829,12 @@ public:
       break;
     }
 
-    if (!E->getCaptureInfo().isTrivial()) {
-      printFieldRaw([&](raw_ostream &OS) {
-        E->getCaptureInfo().print(OS);
-      }, "", CapturesColor);
+    if (auto captureInfo = E->getCachedCaptureInfo()) {
+      if (!captureInfo->isTrivial()) {
+        printFieldRaw([&](raw_ostream &OS) {
+          captureInfo->print(OS);
+        }, "", CapturesColor);
+      }
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
@@ -3441,6 +3446,12 @@ public:
 
   void visitTransferringTypeRepr(TransferringTypeRepr *T, StringRef label) {
     printCommon("transferring", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
+  void visitSendingTypeRepr(SendingTypeRepr *T, StringRef label) {
+    printCommon("sending", label);
     printRec(T->getBase());
     printFoot();
   }
@@ -4319,7 +4330,7 @@ namespace {
         printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
-        printFlag(T->hasTransferringResult(), "transferring_result");
+        printFlag(T->hasSendingResult(), "sending_result");
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");

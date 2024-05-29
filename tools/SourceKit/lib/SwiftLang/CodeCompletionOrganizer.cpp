@@ -135,7 +135,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             sink.swiftSink, CodeCompletionResultKind::Pattern, completionString,
-            CodeCompletionOperatorKind::None, /*IsAsync=*/false,
+            CodeCompletionOperatorKind::None,
             /*BriefDocComment=*/"", CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
@@ -1156,7 +1156,7 @@ Completion *CompletionBuilder::finish() {
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
             contextFreeBase.getMacroRoles(), contextFreeBase.isSystem(),
-            contextFreeBase.isAsync(), contextFreeBase.hasAsyncAlternative(),
+            contextFreeBase.hasAsyncAlternative(),
             newCompletionString, contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),

@@ -25,6 +25,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -498,6 +499,29 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   return MadeChange;
 }
 
+namespace swift::test {
+// Arguments:
+// - instruction: the instruction to be canonicalized
+// Dumps:
+// - the function after the canonicalization is attempted
+static FunctionTest SILCombineCanonicalizeInstruction(
+    "sil_combine_instruction", [](auto &function, auto &arguments, auto &test) {
+      SILCombiner combiner(test.getPass(), false, false);
+      auto inst = arguments.takeInstruction();
+      combiner.Builder.setInsertionPoint(inst);
+      auto *result = combiner.visit(inst);
+      if (result) {
+        combiner.Worklist.replaceInstructionWithInstruction(inst, result
+#ifndef NDEBUG
+                                                            ,
+                                                            ""
+#endif
+        );
+      }
+      function.dump();
+    });
+} // end namespace swift::test
+
 bool SILCombiner::runOnFunction(SILFunction &F) {
   clear();
 
@@ -615,6 +639,7 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst);
   } else {
+    swift::salvageDebugInfo(inst);
     if (inst->isStaticInitializerInst()) {
       inst->getParent()->erase(inst, *getPassManager()->getModule());
     } else {

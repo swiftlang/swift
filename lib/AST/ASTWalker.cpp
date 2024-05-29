@@ -370,7 +370,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto *E = P->getStructuralDefaultExpr()) {
       auto res = doIt(E);
       if (!res) return true;
-      P->setDefaultExpr(res, /*isTypeChecked*/ (bool)res->getType());
+      P->setDefaultExpr(res);
     }
 
     if (!Walker.shouldWalkAccessorsTheOldWay()) {
@@ -2337,6 +2337,10 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
 }
 
 bool Traversal::visitTransferringTypeRepr(TransferringTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitSendingTypeRepr(SendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 

@@ -163,7 +163,7 @@
 public protocol AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
-  associatedtype AtomicRepresentation
+  associatedtype AtomicRepresentation: BitwiseCopyable
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
   /// type to be used for atomic operations.

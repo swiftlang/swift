@@ -617,7 +617,6 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeInitializer(initContext, init);
-    (void)binding->getInitializerIsolation(i);
     TypeChecker::checkInitializerEffects(initContext, init);
   }
 }
@@ -3511,8 +3510,7 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
 
       // @_objcImplementation extensions on a non-category can declare stored
       // properties; StoredPropertiesRequest knows to look for them there.
-      if (ext->isObjCImplementation() &&
-          ext->getCategoryNameForObjCImplementation() == Identifier())
+      if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty())
         return;
 
       storage->diagnose(diag::extension_stored_property);

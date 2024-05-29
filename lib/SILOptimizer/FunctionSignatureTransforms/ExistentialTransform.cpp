@@ -277,10 +277,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
   params.append(FTy->getParameters().begin(), FTy->getParameters().end());
 
   /// Determine the existing generic parameter depth.
-  int Depth = 0;
-  if (OrigGenericSig != nullptr) {
-    Depth = OrigGenericSig.getGenericParams().back()->getDepth() + 1;
-  }
+  int Depth = OrigGenericSig.getNextDepth();
 
   /// Index of the Generic Parameter.
   int GPIdx = 0;
@@ -383,7 +380,7 @@ void ExistentialTransform::populateThunkBody() {
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {
     auto *BB = &*It++;
-    removeDeadBlock(BB);
+    BB->removeDeadBlock();
   }
 
   /// Create a basic block and the function arguments.
@@ -514,10 +511,7 @@ void ExistentialTransform::populateThunkBody() {
     }
   }
 
-  unsigned int OrigDepth = 0;
-  if (F->getLoweredFunctionType()->isPolymorphic()) {
-    OrigDepth = OrigCalleeGenericSig.getGenericParams().back()->getDepth() + 1;
-  }
+  unsigned int OrigDepth = OrigCalleeGenericSig.getNextDepth();
   SubstitutionMap OrigSubMap = F->getForwardingSubstitutionMap();
 
   /// Create substitutions for Apply instructions.
@@ -622,11 +616,11 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
     NewF = FunctionBuilder.createFunction(
-      linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+        linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
+        F->isTransparent(), F->getSerializedKind(), IsNotDynamic,
+        IsNotDistributed, IsNotRuntimeAccessible, F->getEntryCount(),
+        F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
+        F->getEffectsKind(), nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())

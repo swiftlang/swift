@@ -25,6 +25,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
@@ -2155,7 +2156,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
-    if (param.hasOption(SILParameterInfo::Transferring))
+    if (param.hasOption(SILParameterInfo::Sending))
       OpArgs.push_back('T');
     if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
@@ -2163,7 +2164,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   }
 
   // Mangle if we have a transferring result.
-  if (fn->hasTransferringResult())
+  if (fn->hasSendingResult())
     OpArgs.push_back('T');
 
   // Mangle the results.
@@ -2514,10 +2515,19 @@ void ASTMangler::appendModule(const ModuleDecl *module,
   // For example, if a module Foo has 'import Bar', and '-module-alias Bar=Baz'
   // was passed, the name 'Baz' will be used for mangling besides loading.
   StringRef ModName = module->getRealName().str();
-  if (RespectOriginallyDefinedIn &&
-      module->getABIName() != module->getName()) { // check if the ABI name is set
+
+  // If RespectOriginallyDefinedIn is not set, ignore the ABI name only for
+  // _Concurrency and swift-syntax (which adds "Compiler" as a prefix when
+  // building swift-syntax as part of the compiler).
+  // TODO: Mangling for the debugger should respect originally defined in, but
+  // as of right now there is not enough information in the mangled name to
+  // reconstruct AST types from mangled names when using that attribute.
+  if ((RespectOriginallyDefinedIn ||
+       (module->getName().str() != SWIFT_CONCURRENCY_NAME &&
+        !module->getABIName().str().starts_with(
+            SWIFT_MODULE_ABI_NAME_PREFIX))) &&
+      module->getABIName() != module->getName())
     ModName = module->getABIName().str();
-  }
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
@@ -2739,7 +2749,7 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
   parts.params = std::nullopt;
 
   // The depth of parameters for this extension is +1 of the extended signature.
-  parts.initialParamDepth = sig.getGenericParams().back()->getDepth() + 1;
+  parts.initialParamDepth = sig.getNextDepth();
 
   appendModule(module, alternateModuleName);
   appendGenericSignatureParts(sig, parts);
@@ -3086,7 +3096,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     break;
   }
 
-  if (fn->hasTransferringResult()) {
+  if (fn->hasSendingResult()) {
     appendOperator("YT");
   }
 
@@ -3266,7 +3276,7 @@ void ASTMangler::appendParameterTypeListElement(
   }
   if (flags.isIsolated())
     appendOperator("Yi");
-  if (flags.isTransferring())
+  if (flags.isSending())
     appendOperator("Yu");
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
@@ -3382,7 +3392,7 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
   } else {
     inverseReqs.clear();
   }
-  base.setDepth(canSig.getGenericParams().back()->getDepth());
+  base.setDepth(canSig->getMaxDepth());
 
   unsigned &initialParamDepth = parts.initialParamDepth;
   auto &genericParams = parts.params;
@@ -3403,7 +3413,7 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
 
   // The signature depth starts above the depth of the context signature.
   if (!contextSig.getGenericParams().empty()) {
-    initialParamDepth = contextSig.getGenericParams().back()->getDepth() + 1;
+    initialParamDepth = contextSig.getNextDepth();
   }
 
   // If both signatures have exactly the same requirements, ignoring
@@ -3724,29 +3734,48 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
 
 void ASTMangler::appendClosureEntity(
                               const SerializedAbstractClosureExpr *closure) {
+  assert(!closure->getType()->hasLocalArchetype() &&
+         "Not enough information here to handle this case");
+
   appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          closure->isImplicit(), closure->getParent());
+                          closure->isImplicit(), closure->getParent(),
+                          ArrayRef<GenericEnvironment *>());
 }
 
 void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
-  appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          isa<AutoClosureExpr>(closure), closure->getParent());
+  ArrayRef<GenericEnvironment *> capturedEnvs;
+
+  auto type = closure->getType();
+
+  // FIXME: CodeCompletionResultBuilder calls printValueDeclUSR() but the
+  // closure hasn't been type checked yet.
+  if (!type)
+    type = ErrorType::get(closure->getASTContext());
+
+  if (type->hasLocalArchetype())
+    capturedEnvs = closure->getCaptureInfo().getGenericEnvironments();
+
+  appendClosureComponents(type, closure->getDiscriminator(),
+                          isa<AutoClosureExpr>(closure), closure->getParent(),
+                          capturedEnvs);
 }
 
 void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
                                          bool isImplicit,
-                                         const DeclContext *parentContext) {
+                                         const DeclContext *parentContext,
+                                         ArrayRef<GenericEnvironment *> capturedEnvs) {
   assert(discriminator != AbstractClosureExpr::InvalidDiscriminator
          && "closure must be marked correctly with discriminator");
 
   BaseEntitySignature base(parentContext->getInnermostDeclarationDeclContext());
   appendContext(parentContext, base, StringRef());
 
-  if (!Ty)
-    Ty = ErrorType::get(parentContext->getASTContext());
-
   auto Sig = parentContext->getGenericSignatureOfContext();
-  Ty = Ty->mapTypeOutOfContext();
+
+  Ty = Ty.subst(MapLocalArchetypesOutOfContext(Sig, capturedEnvs),
+                MakeAbstractConformanceForGenericType(),
+                SubstFlags::PreservePackExpansionLevel);
+
   appendType(Ty->getCanonicalType(), Sig);
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
@@ -4751,11 +4780,10 @@ static std::optional<unsigned> getEnclosingTypeGenericDepth(const Decl *decl) {
   if (!typeDecl)
     return std::nullopt;
 
-  auto genericParams = typeDecl->getGenericParams();
-  if (!genericParams)
+  if (!typeDecl->isGeneric())
     return std::nullopt;
 
-  return genericParams->getParams().back()->getDepth();
+  return typeDecl->getGenericSignature()->getMaxDepth();
 }
 
 ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)

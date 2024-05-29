@@ -359,6 +359,10 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   llvm::SetVector<ObjCMethodConflict> ObjCMethodConflicts;
 
+  /// Categories (extensions with explicit @objc names) declared in this
+  /// source file. They need to be checked for conflicts after type checking.
+  llvm::TinyPtrVector<ExtensionDecl *> ObjCCategories;
+
   /// List of attributes added by access notes, used to emit remarks for valid
   /// ones.
   llvm::DenseMap<ValueDecl *, std::vector<DeclAttribute *>>
@@ -431,6 +435,10 @@ public:
   void setImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import);
 
+  /// True if the highest access level of the declarations referencing
+  /// this import in signature or inlinable code is internal or less.
+  bool isMaxAccessLevelUsingImportInternal(AttributedImport<ImportedModule> import) const;
+
   /// Return the highest access level of the declarations referencing
   /// this import in signature or inlinable code.
   AccessLevel
@@ -456,6 +464,9 @@ public:
   /// Does this source file have any imports with \c flag?
   /// If not, we can fast-path module checks.
   bool hasImportsWithFlag(ImportFlags flag) const;
+
+  /// Returns the import flags that are active on imports of \p module.
+  ImportFlags getImportFlags(const ModuleDecl *module) const;
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;

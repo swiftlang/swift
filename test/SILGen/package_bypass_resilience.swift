@@ -43,8 +43,73 @@
 // RUN:   -experimental-skip-non-exportable-decls \
 // RUN:   -experimental-allow-non-resilient-access \
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
-// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-EXP
-// CHECK-DIAG-EXP: warning: ignoring -experimental-skip-non-exportable-decls (overriden by -experimental-allow-non-resilient-access)
+// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-1
+// CHECK-DIAG-1: warning: ignoring -experimental-skip-non-exportable-decls (overriden by -experimental-allow-non-resilient-access)
+// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+
+/// Override -experimental-skip-non-inlinable-function-bodies-without-types with warning
+// RUN: rm -rf %t/Utils.swiftmodule
+// RUN: %target-swift-frontend %t/Utils.swift \
+// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -package-name mypkg \
+// RUN:   -enable-library-evolution \
+// RUN:   -experimental-skip-non-inlinable-function-bodies-without-types \
+// RUN:   -experimental-allow-non-resilient-access \
+// RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
+// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-2
+// CHECK-DIAG-2: warning: ignoring -experimental-skip-non-inlinable-function-bodies-without-types (overriden by -experimental-allow-non-resilient-access)
+// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+
+/// Override -experimental-skip-non-inlinable-function-bodies with warning
+// RUN: rm -rf %t/Utils.swiftmodule
+// RUN: %target-swift-frontend %t/Utils.swift \
+// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -package-name mypkg \
+// RUN:   -enable-library-evolution \
+// RUN:   -experimental-skip-non-inlinable-function-bodies \
+// RUN:   -experimental-allow-non-resilient-access \
+// RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
+// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-3
+// CHECK-DIAG-3: warning: ignoring -experimental-skip-non-inlinable-function-bodies (overriden by -experimental-allow-non-resilient-access)
+// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+
+/// Override -experimental-skip-all-function-bodies with warning
+// RUN: rm -rf %t/Utils.swiftmodule
+// RUN: %target-swift-frontend %t/Utils.swift \
+// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -package-name mypkg \
+// RUN:   -enable-library-evolution \
+// RUN:   -experimental-skip-all-function-bodies \
+// RUN:   -experimental-allow-non-resilient-access \
+// RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
+// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-4
+// CHECK-DIAG-4: warning: ignoring -experimental-skip-all-function-bodies (overriden by -experimental-allow-non-resilient-access)
+// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+
+/// Override -experimental-lazy-typecheck with warning
+// RUN: rm -rf %t/Utils.swiftmodule
+// RUN: %target-swift-frontend %t/Utils.swift \
+// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -package-name mypkg \
+// RUN:   -enable-library-evolution \
+// RUN:   -experimental-lazy-typecheck \
+// RUN:   -experimental-allow-non-resilient-access \
+// RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
+// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-5
+// CHECK-DIAG-5: warning: ignoring -experimental-lazy-typecheck (overriden by -experimental-allow-non-resilient-access)
+// RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
+
+/// Override -tbd-is-installapi with warning
+// RUN: rm -rf %t/Utils.swiftmodule
+// RUN: %target-swift-frontend %t/Utils.swift \
+// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -package-name mypkg \
+// RUN:   -enable-library-evolution \
+// RUN:   -tbd-is-installapi \
+// RUN:   -experimental-allow-non-resilient-access \
+// RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule \
+// RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-TBD
+// CHECK-DIAG-TBD: warning: ignoring -tbd-is-installapi (overriden by -experimental-allow-non-resilient-access)
 // RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-ON
 
 /// Build Utils interface files.

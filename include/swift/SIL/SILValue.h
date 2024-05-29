@@ -590,6 +590,8 @@ public:
 
   bool isGuaranteedForwarding() const;
 
+  bool isBeginApplyToken() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -1073,7 +1075,10 @@ public:
     removeFromCurrent();
     TheValue = newValue;
     insertIntoCurrent();
+    verify();
   }
+
+  void verify() const;
 
   /// Swap the given operand with the current one.
   void swap(Operand &Op) {

@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
 // a concrete move-only type
 struct MO: ~Copyable {

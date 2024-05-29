@@ -2205,9 +2205,11 @@ public enum OSVersion : CustomStringConvertible {
   case iOS(major: Int, minor: Int, bugFix: Int)
   case tvOS(major: Int, minor: Int, bugFix: Int)
   case watchOS(major: Int, minor: Int, bugFix: Int)
+  case visionOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
   case tvOSSimulator
   case watchOSSimulator
+  case visionOSSimulator
   case linux
   case freeBSD
   case openBSD
@@ -2228,12 +2230,16 @@ public enum OSVersion : CustomStringConvertible {
       return "TVOS \(major).\(minor).\(bugFix)"
     case .watchOS(let major, let minor, let bugFix):
       return "watchOS \(major).\(minor).\(bugFix)"
+    case .visionOS(let major, let minor, let bugFix):
+      return "visionOS \(major).\(minor).\(bugFix)"
     case .iOSSimulator:
       return "iOSSimulator"
     case .tvOSSimulator:
       return "TVOSSimulator"
     case .watchOSSimulator:
       return "watchOSSimulator"
+    case .visionOSSimulator:
+      return "visionOSSimulator"
     case .linux:
       return "Linux"
     case .freeBSD:
@@ -2282,6 +2288,8 @@ func _getOSVersion() -> OSVersion {
   return .tvOSSimulator
 #elseif os(watchOS) && targetEnvironment(simulator)
   return .watchOSSimulator
+#elseif os(visionOS) && targetEnvironment(simulator)
+  return .visionOSSimulator
 #elseif os(Linux)
   return .linux
 #elseif os(FreeBSD)
@@ -2311,6 +2319,8 @@ func _getOSVersion() -> OSVersion {
   return .tvOS(major: major, minor: minor, bugFix: bugFix)
   #elseif os(watchOS)
   return .watchOS(major: major, minor: minor, bugFix: bugFix)
+  #elseif os(visionOS)
+  return .visionOS(major: major, minor: minor, bugFix: bugFix)
   #else
   fatalError("could not determine OS version")
   #endif
@@ -2372,6 +2382,16 @@ public enum TestRunPredicate : CustomStringConvertible {
   case watchOSBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
 
   case watchOSSimulatorAny(/*reason:*/ String)
+
+  case visionOSAny(/*reason:*/ String)
+  case visionOSMajor(Int, reason: String)
+  case visionOSMajorRange(ClosedRange<Int>, reason: String)
+  case visionOSMinor(Int, Int, reason: String)
+  case visionOSMinorRange(Int, ClosedRange<Int>, reason: String)
+  case visionOSBugFix(Int, Int, Int, reason: String)
+  case visionOSBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
+
+  case visionOSSimulatorAny(/*reason:*/ String)
 
   case linuxAny(reason: String)
 
@@ -2466,6 +2486,24 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .watchOSSimulatorAny(let reason):
       return "watchOSSimulatorAny(*, reason: \(reason))"
+
+    case .visionOSAny(let reason):
+      return "visionOS(*, reason: \(reason))"
+    case .visionOSMajor(let major, let reason):
+      return "visionOS(\(major).*, reason: \(reason))"
+    case .visionOSMajorRange(let range, let reason):
+      return "visionOS([\(range)], reason: \(reason))"
+    case .visionOSMinor(let major, let minor, let reason):
+      return "visionOS(\(major).\(minor), reason: \(reason))"
+    case .visionOSMinorRange(let major, let minorRange, let reason):
+      return "visionOS(\(major).[\(minorRange)], reason: \(reason))"
+    case .visionOSBugFix(let major, let minor, let bugFix, let reason):
+      return "visionOS(\(major).\(minor).\(bugFix), reason: \(reason))"
+    case .visionOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+      return "visionOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+
+    case .visionOSSimulatorAny(let reason):
+      return "visionOSSimulatorAny(*, reason: \(reason))"
 
     case .linuxAny(reason: let reason):
       return "linuxAny(*, reason: \(reason))"
@@ -2740,6 +2778,70 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .watchOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .watchOSSimulator:
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSAny:
+      switch _getRunningOSVersion() {
+      case .visionOS:
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSMajor(let major, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, _, _):
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
+    case .visionOSMinor(let major, let minor, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, minor, _):
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSMinorRange(let major, let minorRange, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, let runningMinor, _):
+        return minorRange.contains(runningMinor)
+      default:
+        return false
+      }
+
+    case .visionOSBugFix(let major, let minor, let bugFix, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, minor, bugFix):
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSBugFixRange(let major, let minor, let bugFixRange, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, minor, let runningBugFix):
+        return bugFixRange.contains(runningBugFix)
+      default:
+        return false
+      }
+
+    case .visionOSSimulatorAny:
+      switch _getRunningOSVersion() {
+      case .visionOSSimulator:
         return true
       default:
         return false

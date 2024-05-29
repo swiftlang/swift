@@ -672,8 +672,4 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
 
 /// A namespace for Unicode utilities.
 @frozen
-public enum Unicode {}
-
-@available(*, unavailable)
-extension Unicode : _BitwiseCopyable {}
-
+public enum Unicode : ~BitwiseCopyable {}

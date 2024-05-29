@@ -98,13 +98,6 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
-  # Prior to 5.9, we have to use the experimental flag for C++ interop.
-  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-    set(cxx_interop_flag "-enable-experimental-cxx-interop")
-  else()
-    set(cxx_interop_flag "-cxx-interoperability-mode=default")
-  endif()
-
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
@@ -114,6 +107,13 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
 
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    list(APPEND swift_compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
+  else()
+    list(APPEND swift_compile_options "-cxx-interoperability-mode=default")
+  endif()
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
       list(APPEND swift_compile_options
@@ -121,6 +121,11 @@ function(add_swift_compiler_modules_library name)
         "-Xfrontend" "${SWIFT_MIN_RUNTIME_VERSION}")
     endif()
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
+
+    # We cannot use Unsafe*Pointer when importing C++ move-only types until the
+    # host libraries are updated to Swift 6.0, because that importing strategy
+    # requires _Pointer have its Pointee: ~Copyable. (rdar://128013193)
+    list(APPEND swift_compile_options "-Xfrontend" "-cxx-interop-use-opaque-pointer-for-moveonly")
   endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -129,7 +134,9 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
-  if(NOT LLVM_ENABLE_ASSERTIONS)
+  if(LLVM_ENABLE_ASSERTIONS)
+    list(APPEND swift_compile_options "-Xcc" "-UNDEBUG")
+  else()
     list(APPEND swift_compile_options "-Xcc" "-DNDEBUG")
   endif()
 
@@ -166,7 +173,17 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-  list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND swift_compile_options "-static")
+    list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+
+    # Workaround a crash in the LoadableByAddress pass
+    # https://github.com/apple/swift/issues/73254
+    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
+  else()
+    list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+  endif()
 
   set(all_obj_files)
   set(all_module_targets)
@@ -192,11 +209,20 @@ function(add_swift_compiler_modules_library name)
       endforeach()
     endif()
 
-    set(module_obj_file "${build_dir}/${module}.o")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      # swift-driver when non-optimizing in not Mach-O  platforms adds an extra
+      # job wrapmodule that uses the {module-name}.o as output, which clashes
+      # with the name chosen here. Use a different name in those cases.
+      set(module_obj_file "${build_dir}/${module}.object.o")
+      set(output_obj_files "${module_obj_file}" "${build_dir}/${module}.o")
+    else()
+      set(module_obj_file "${build_dir}/${module}.o")
+      set(output_obj_files "${module_obj_file}")
+    endif()
     set(module_file "${build_dir}/${module}.swiftmodule")
     list(APPEND all_module_files ${module_file})
 
-    set(all_obj_files ${all_obj_files} ${module_obj_file})
+    list(APPEND all_obj_files ${output_obj_files})
     set(c_include_paths
       # LLVM modules and headers.
       "${LLVM_MAIN_INCLUDE_DIR}"
@@ -225,7 +251,7 @@ function(add_swift_compiler_modules_library name)
         ${c_include_paths_args}
         # Generated swift modules.
         "-I" "${build_dir}"
-      OUTPUT ${module_obj_file}
+      OUTPUT ${output_obj_files}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
         importedHeaderDependencies
@@ -248,6 +274,9 @@ function(add_swift_compiler_modules_library name)
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   # Downstream linking should include the swiftmodule in debug builds to allow lldb to
   # work correctly. Only do this on Darwin since neither gold (currently used by default
@@ -304,7 +333,7 @@ else()
 
   elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
 
-    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
+    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0 copy-legacy-layouts)
     set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
     if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       list(APPEND b0_deps swiftCore-bootstrapping0)

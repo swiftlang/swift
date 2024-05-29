@@ -3,7 +3,6 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
@@ -22,8 +21,7 @@ struct BV : ~Escapable {
 
   public var isEmpty: Bool { i == 0 }
 
-  @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ i: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
   }
@@ -39,8 +37,7 @@ struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeRawPointer
   let i: Int
   
-  @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ i: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
   }

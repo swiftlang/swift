@@ -44,6 +44,46 @@ class OuterClass {
   protocol InnerProtocol : OuterClass { }
 }
 
+// Name lookup circularity tests.
+
+protocol SomeBaseProtocol {}
+
+struct ConformanceOnDecl: ConformanceOnDecl.P {
+    protocol P: SomeBaseProtocol {}
+}
+struct ConformanceOnDecl_2: ConformanceOnDecl_2.P {
+    protocol P where Self: SomeBaseProtocol {}
+}
+struct ConformanceOnDecl_3: Self.P {
+    protocol P: SomeBaseProtocol {}
+}
+struct ConformanceOnDecl_4: ConformanceOnDecl_4.Q {
+    protocol P: SomeBaseProtocol {}
+    protocol Q: P {}
+}
+
+
+struct ConformanceInExtension {
+    protocol P: SomeBaseProtocol {}
+}
+extension ConformanceInExtension: ConformanceInExtension.P {}
+
+struct ConformanceInExtension_2 {
+    protocol P where Self: SomeBaseProtocol {}
+}
+extension ConformanceInExtension_2: ConformanceInExtension_2.P {}
+
+struct ConformanceInExtension_3 {
+    protocol P: SomeBaseProtocol {}
+}
+extension ConformanceInExtension_3: Self.P {}
+
+struct ConformanceInExtension_4 {
+    protocol P: SomeBaseProtocol {}
+    protocol Q: P {}
+}
+extension ConformanceInExtension_4: ConformanceInExtension_4.Q {}
+
 // Protocols can be nested in actors.
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)

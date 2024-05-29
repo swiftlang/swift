@@ -1875,9 +1875,9 @@ public:
   bool isLet() const { return Bits.Data.Constant; }
 
   std::optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType = {},
-      std::optional<SILLocation> DeclLoc = {},
-      const SILDebugScope *DeclScope = nullptr,
+  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType,
+      std::optional<SILLocation> DeclLoc,
+      const SILDebugScope *DeclScope,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return std::nullopt;
@@ -2083,8 +2083,22 @@ public:
   /// VarDecl.
   void setIsFromVarDecl() { sharedUInt8().AllocStackInst.fromVarDecl = true; }
 
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc().strippedForDebugVariable();
+  }
+
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location, scope, and element type. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     // If we used to have debug info attached but our debug info is now
     // invalidated, just bail.
     if (sharedUInt8().AllocStackInst.hasInvalidatedVarInfo) {
@@ -2096,11 +2110,18 @@ public:
     const SILDebugScope *VarDeclScope = nullptr;
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    else if (complete)
+      AuxVarType = getElementType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -2502,8 +2523,13 @@ public:
   SILType getAddressType() const;
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+    if (complete)
+      return VarInfo.get(getDecl(), getTrailingObjects<char>(),
+                         getAddressType().getObjectType(),
+                         getLoc().strippedForDebugVariable(),
+                         getDebugScope());
+    return VarInfo.get(getDecl(), getTrailingObjects<char>(), {}, {}, nullptr);
   };
 
   void setUsesMoveableValueDebugInfo() {
@@ -3163,6 +3189,7 @@ public:
 
 class EndApplyInst;
 class AbortApplyInst;
+class EndBorrowInst;
 
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
@@ -3216,10 +3243,13 @@ public:
 
   void getCoroutineEndPoints(
       SmallVectorImpl<EndApplyInst *> &endApplyInsts,
-      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const;
+      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
+      SmallVectorImpl<EndBorrowInst *> *endBorrowInsts = nullptr) const;
 
-  void getCoroutineEndPoints(SmallVectorImpl<Operand *> &endApplyInsts,
-                             SmallVectorImpl<Operand *> &abortApplyInsts) const;
+  void getCoroutineEndPoints(
+      SmallVectorImpl<Operand *> &endApplyInsts,
+      SmallVectorImpl<Operand *> &abortApplyInsts,
+      SmallVectorImpl<Operand *> *endBorrowInsts = nullptr) const;
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
@@ -4539,8 +4569,6 @@ public:
   }
 };
 
-class EndBorrowInst;
-
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
@@ -4641,6 +4669,37 @@ public:
   /// Useful for matching common SILGen patterns that emit one borrow per use,
   /// and simplifying pass logic.
   Operand *getSingleNonEndingUse() const;
+};
+
+/// BorrowedFromInst - Establishes borrow relations.
+class BorrowedFromInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::BorrowedFromInst, BorrowedFromInst,
+                             OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  /// Because of the storage requirements of BorrowedFromInst, object
+  /// creation goes through 'create()'.
+  BorrowedFromInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> operands);
+
+  /// Construct a BorrowedFromInst.
+  static BorrowedFromInst *create(SILDebugLocation DebugLoc, SILValue borrowedValue,
+                                  ArrayRef<SILValue> enclosingValues, SILModule &M);
+
+public:
+
+  SILValue getBorrowedValue() {
+    return getAllOperands()[0].get();
+  }
+
+  /// The elements referenced by this StructInst.
+  ArrayRef<Operand> getEnclosingValueOperands() const {
+    return getAllOperands().drop_front();
+  }
+
+  /// The elements referenced by this StructInst.
+  OperandValueArrayRef getEnclosingValues() const {
+    return OperandValueArrayRef(getEnclosingValueOperands());
+  }
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
@@ -5341,18 +5400,45 @@ public:
   /// or null if we don't have one.
   VarDecl *getDecl() const;
 
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc().strippedForDebugVariable();
+  }
+
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  ///
+  /// \note The type is not included because it can change during a pass.
+  /// Passes must make sure to not lose the type information.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
+
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    // TODO: passes break if we set the type here, as the type of the operand
+    // can be changed during a pass.
+    // else if (complete)
+    //   AuxVarType = getOperand()->getType().getObjectType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -5794,6 +5880,10 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
   }
 
   static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILModule &Mod,
+                            ValueOwnershipKind forwardingOwnershipKind);
+
+  static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                             SILType Ty, SILFunction &F,
                             ValueOwnershipKind forwardingOwnershipKind);
 };
@@ -5878,6 +5968,10 @@ class UncheckedRefCastInst final
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, ValueOwnershipKind forwardingOwnershipKind);
+
+  static UncheckedRefCastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
@@ -11136,6 +11230,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::DropDeinitInst:
+  case SILInstructionKind::BorrowedFromInst:
     return true;
   default:
     return false;

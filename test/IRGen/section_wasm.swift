@@ -7,7 +7,7 @@
 // ASM-NOT: .section{{.*}}__TEXT,__mysection
 // ASM: .section        ".text.$s7section3fooyyF"
 // ASM: $s7section3fooyyF:
-// ASM: .section        ".text.$s7section8MyStructV3fooyyF","",@
+// ASM: .section        ".text.$s7section8MyStructV3fooyyF","R",@
 // ASM: $s7section8MyStructV3fooyyF:
 
 // Wasm places one-time init token on .bss section before each "__TEXT,__mysection"

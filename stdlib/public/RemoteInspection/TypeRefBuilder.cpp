@@ -921,7 +921,7 @@ void TypeRefBuilder::ReflectionTypeDescriptorFinder::
         }
         const uint8_t *p = descriptor->getPayloadSpareBits();
         for (unsigned i = 0; i < maskBytes; i++) {
-          stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
+          stream << std::hex << std::setw(2) << std::setfill('0') << (int)p[i];
         }
         stream << std::dec << "\n";
       }

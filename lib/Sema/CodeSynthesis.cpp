@@ -541,9 +541,7 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
   if (genericParams == nullptr)
     return nullptr;
 
-  unsigned depth = 0;
-  if (auto classSig = classDecl->getGenericSignature())
-    depth = classSig.getGenericParams().back()->getDepth() + 1;
+  unsigned depth = classDecl->getGenericSignature().getNextDepth();
 
   SmallVector<GenericTypeParamDecl *, 4> newParams;
   for (auto *param : genericParams->getParams()) {

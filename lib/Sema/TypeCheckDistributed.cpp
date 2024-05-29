@@ -49,7 +49,8 @@ DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
   auto DistributedModule = C.getLoadedModule(C.Id_Distributed);
   if (!DistributedModule) {
     decl->diagnose(diag::distributed_decl_needs_explicit_distributed_import,
-                   decl);
+                   decl)
+        .fixItAddImport("Distributed");
     return false;
   }
 

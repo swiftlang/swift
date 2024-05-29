@@ -36,6 +36,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -173,6 +174,10 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
     return false;
 
   if (isa<DebugValueInst>(inst))
+    return false;
+
+  // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
+  if (isa<BorrowedFromInst>(inst))
     return false;
 
   // These invalidate enums so "write" memory, but that is not an essential
@@ -554,7 +559,7 @@ TermInst *swift::addArgumentsToBranch(ArrayRef<SILValue> vals,
 }
 
 SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
-  if (hasPrivateVisibility(linkage) && !f->isSerialized()) {
+  if (hasPrivateVisibility(linkage) && f->isNotSerialized()) {
     // Specializations of private symbols should remain so, unless
     // they were serialized, which can only happen when specializing
     // definitions from a standard library built with -sil-serialize-all.
@@ -586,7 +591,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// handle all cases recognized by SILFunctionType::isABICompatibleWith (see
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
-swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
+swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
+                                    SILLocation loc,
                                     SILValue value, SILType srcTy,
                                     SILType destTy,
                                     ArrayRef<SILInstruction *> usePoints) {
@@ -669,7 +675,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -683,7 +689,9 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
-    return {phi, true};
+    updateBorrowedFromPhis(pm, { phi });
+
+    return {lookThroughBorrowedFromUser(phi), true};
   }
 
   // Src is not optional, but dest is optional.
@@ -697,7 +705,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     SILValue wrappedValue =
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
-    return castValueToABICompatibleType(builder, loc, wrappedValue,
+    return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
                                         wrappedValue->getType(), destTy,
                                         usePoints);
   }
@@ -711,7 +719,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
       // Cast the value if necessary.
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
-          builder, loc, element, srcTy.getTupleElementType(idx),
+          builder, pm, loc, element, srcTy.getTupleElementType(idx),
           destTy.getTupleElementType(idx), usePoints);
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
@@ -1818,6 +1826,36 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+/// Create a new debug value from a store and a debug variable.
+static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
+                                    SILInstruction *SI,
+                                    SILValue original) {
+  auto VarInfo = DefiningInst.getVarInfo();
+  if (!VarInfo)
+    return;
+  // Fix the op_deref.
+  if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
+    VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
+  else if (isa<CopyAddrInst>(SI) && !VarInfo->DIExpr.startsWithDeref())
+    VarInfo->DIExpr.prependElements({
+      SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  // Note: The instruction should logically be in the SI's scope.
+  // However, LLVM does not support variables and stores in different scopes,
+  // so we use the variable's scope.
+  SILBuilder(SI, DefiningInst->getDebugScope())
+    .createDebugValue(SI->getLoc(), original, *VarInfo);
+}
+
+void swift::salvageStoreDebugInfo(SILInstruction *SI,
+                                  SILValue SrcVal, SILValue DestVal) {
+  if (auto *ASI = dyn_cast_or_null<AllocStackInst>(
+          DestVal.getDefiningInstruction())) {
+    transferStoreDebugValue(ASI, SI, SrcVal);
+    for (Operand *U : getDebugUses(ASI))
+      transferStoreDebugValue(U->getUser(), SI, SrcVal);
+  }
+}
+
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
 //
 // TODO: whenever a debug_value is inserted at a new location, check that no
@@ -1829,18 +1867,13 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     if (SILValue DestVal = SI->getDest())
-      if (auto *ASI = dyn_cast_or_null<AllocStackInst>(
-              DestVal.getDefiningInstruction())) {
-        if (auto VarInfo = ASI->getVarInfo()) {
-          // Always propagate destination location for incoming arguments (as
-          // their location must be unique) as well as when store source
-          // location is compiler-generated.
-          bool UseDestLoc = VarInfo->ArgNo || SI->getLoc().isAutoGenerated();
-          SILBuilder(SI, ASI->getDebugScope())
-            .createDebugValue(UseDestLoc ? ASI->getLoc() : SI->getLoc(),
-                              SI->getSrc(), *VarInfo);
-        }
-      }
+      salvageStoreDebugInfo(SI, SI->getSrc(), DestVal);
+  }
+  if (auto *SI = dyn_cast<StoreBorrowInst>(I)) {
+    if (SILValue DestVal = SI->getDest())
+      salvageStoreDebugInfo(SI, SI->getSrc(), DestVal);
+    for (Operand *U : getDebugUses(SI))
+      transferStoreDebugValue(U->getUser(), SI, SI->getSrc());
   }
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
@@ -1922,6 +1955,25 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
         }
       }
+  }
+
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
+    APInt value = IL->getValue();
+    const SILDIExprElement ExprElements[2] = {
+      SILDIExprElement::createOperator(value.isNegative() ?
+        SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
+      SILDIExprElement::createConstInt(value.getLimitedValue()),
+    };
+    for (Operand *U : getDebugUses(IL)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      VarInfo->DIExpr.prependElements(ExprElements);
+      // Create a new debug_value, with undef, and the correct const int
+      SILBuilder(DbgInst, DbgInst->getDebugScope())
+        .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
+    }
   }
 }
 
@@ -2047,4 +2099,270 @@ bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
     }
   }
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//          MARK: Find Initialization Value Of Temporary Alloc Stack
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct AddressWalkerState {
+  bool foundError = false;
+  InstructionSet writes;
+  AddressWalkerState(SILFunction *fn) : writes(fn) {}
+};
+} // namespace
+
+static SILValue
+findRootValueForNonTupleTempAllocation(AllocationInst *allocInst,
+                                       AddressWalkerState &state) {
+  // These are instructions which we are ok with looking through when
+  // identifying our allocation. It must always refer to the entire allocation.
+  auto isAlloc = [&](SILValue value) -> bool {
+    if (auto *ieai = dyn_cast<InitExistentialAddrInst>(value))
+      value = ieai->getOperand();
+    return value == SILValue(allocInst);
+  };
+
+  // Walk from our allocation to one of our writes. Then make sure that the
+  // write writes to our entire value.
+  for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
+    // See if we have a full tuple value.
+
+    if (!state.writes.contains(&inst))
+      continue;
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+      if (isAlloc(copyAddr->getDest()) && copyAddr->isInitializationOfDest()) {
+        return copyAddr->getSrc();
+      }
+    }
+
+    if (auto *si = dyn_cast<StoreInst>(&inst)) {
+      if (isAlloc(si->getDest()) &&
+          si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        return si->getSrc();
+      }
+    }
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(&inst)) {
+      if (isAlloc(sbi->getDest()))
+        return sbi->getSrc();
+    }
+
+    // If we do not identify the write... return SILValue(). We weren't able
+    // to understand the write.
+    break;
+  }
+
+  return SILValue();
+}
+
+static SILValue findRootValueForTupleTempAllocation(AllocationInst *allocInst,
+                                                    AddressWalkerState &state) {
+  SmallVector<SILValue, 8> tupleValues;
+
+  for (unsigned i : range(allocInst->getType().getNumTupleElements())) {
+    (void)i;
+    tupleValues.push_back(nullptr);
+  }
+
+  unsigned numEltsLeft = tupleValues.size();
+
+  // If we have an empty tuple, just return SILValue() for now.
+  //
+  // TODO: What does this pattern look like out of SILGen?
+  if (!numEltsLeft)
+    return SILValue();
+
+  // Walk from our allocation to one of our writes. Then make sure that the
+  // write writes to our entire value.
+  DestructureTupleInst *foundDestructure = nullptr;
+  SILValue foundRootAddress;
+  for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
+    if (!state.writes.contains(&inst))
+      continue;
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+      if (copyAddr->isInitializationOfDest()) {
+        if (auto *tei = dyn_cast<TupleElementAddrInst>(copyAddr->getDest())) {
+          if (tei->getOperand() == allocInst) {
+            unsigned i = tei->getFieldIndex();
+            if (auto *otherTei = dyn_cast_or_null<TupleElementAddrInst>(
+                    copyAddr->getSrc()->getDefiningInstruction())) {
+              // If we already were processing destructures, then we have a mix
+              // of struct/destructures... we do not support that, so bail.
+              if (foundDestructure)
+                return SILValue();
+
+              // Otherwise, update our root address. If we already had a root
+              // address and it doesn't match our tuple_element_addr's operand,
+              // bail. There is some sort of mix/match of tuple addresses that
+              // we do not support. We are looking for a specific SILGen
+              // pattern.
+              if (!foundRootAddress) {
+                foundRootAddress = otherTei->getOperand();
+              } else if (foundRootAddress != otherTei->getOperand()) {
+                return SILValue();
+              }
+
+              if (i != otherTei->getFieldIndex())
+                return SILValue();
+              if (tupleValues[i])
+                return SILValue();
+              tupleValues[i] = otherTei;
+
+              // If we have completely covered the tuple, break.
+              --numEltsLeft;
+              if (!numEltsLeft)
+                break;
+
+              // Otherwise, continue so we keep processing.
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    if (auto *si = dyn_cast<StoreInst>(&inst)) {
+      if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        // Check if we are updating the entire tuple value.
+        if (si->getDest() == allocInst) {
+          // If we already found a root address (meaning we were processing
+          // tuple_elt_addr), bail. We have some sort of unhandled mix of
+          // copy_addr and store.
+          if (foundRootAddress)
+            return SILValue();
+
+          // If we already found a destructure, return SILValue(). We are
+          // initializing twice.
+          if (foundDestructure)
+            return SILValue();
+
+          // We are looking for a pattern where we construct a tuple from
+          // destructured parts.
+          if (auto *ti = dyn_cast<TupleInst>(si->getSrc())) {
+            for (auto p : llvm::enumerate(ti->getOperandValues())) {
+              SILValue value = lookThroughOwnershipInsts(p.value());
+              if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                      value->getDefiningInstruction())) {
+                // We should always go through the same dti.
+                if (foundDestructure && foundDestructure != dti)
+                  return SILValue();
+                if (!foundDestructure)
+                  foundDestructure = dti;
+
+                // If we have a mixmatch of indices, we cannot look through.
+                if (p.index() != dti->getIndexOfResult(value))
+                  return SILValue();
+                if (tupleValues[p.index()])
+                  return SILValue();
+                tupleValues[p.index()] = value;
+
+                // If we have completely covered the tuple, break.
+                --numEltsLeft;
+                if (!numEltsLeft)
+                  break;
+              }
+            }
+
+            // If we haven't completely covered the tuple, return SILValue(). We
+            // should completely cover the tuple.
+            if (numEltsLeft)
+              return SILValue();
+
+            // Otherwise, break since we are done.
+            break;
+          }
+        }
+
+        // If we store to a tuple_element_addr, update for a single value.
+        if (auto *tei = dyn_cast<TupleElementAddrInst>(si->getDest())) {
+          if (tei->getOperand() == allocInst) {
+            unsigned i = tei->getFieldIndex();
+            if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+                    si->getSrc()->getDefiningInstruction())) {
+              // If we already found a root address (meaning we were processing
+              // tuple_elt_addr), bail. We have some sort of unhandled mix of
+              // copy_addr and store [init].
+              if (foundRootAddress)
+                return SILValue();
+              if (!foundDestructure) {
+                foundDestructure = dti;
+              } else if (foundDestructure != dti) {
+                return SILValue();
+              }
+
+              if (i != dti->getIndexOfResult(si->getSrc()))
+                return SILValue();
+              if (tupleValues[i])
+                return SILValue();
+              tupleValues[i] = si->getSrc();
+
+              // If we have completely covered the tuple, break.
+              --numEltsLeft;
+              if (!numEltsLeft)
+                break;
+
+              // Otherwise, continue so we keep processing.
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    // Found a write that we did not understand... bail.
+    break;
+  }
+
+  // Now check if we have a complete tuple with all elements coming from the
+  // same destructure_tuple. In such a case, we can look through the
+  // destructure_tuple.
+  if (numEltsLeft)
+    return SILValue();
+
+  if (foundDestructure)
+    return foundDestructure->getOperand();
+  if (foundRootAddress)
+    return foundRootAddress;
+
+  return SILValue();
+}
+
+SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
+  // If we are from a VarDecl, bail.
+  if (asi->isFromVarDecl())
+    return SILValue();
+
+  struct AddressWalker final : public TransitiveAddressWalker<AddressWalker> {
+    AddressWalkerState &state;
+
+    AddressWalker(AddressWalkerState &state) : state(state) {}
+
+    bool visitUse(Operand *use) {
+      if (use->getUser()->mayWriteToMemory())
+        state.writes.insert(use->getUser());
+      return true;
+    }
+
+    TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+        return TransitiveUseVisitation::OnlyUser;
+      return TransitiveUseVisitation::OnlyUses;
+    }
+
+    void onError(Operand *use) { state.foundError = true; }
+  };
+
+  AddressWalkerState state(asi->getFunction());
+  AddressWalker walker(state);
+  if (std::move(walker).walk(asi) == AddressUseKind::Unknown ||
+      state.foundError)
+    return SILValue();
+
+  if (asi->getType().is<TupleType>())
+    return findRootValueForTupleTempAllocation(asi, state);
+  return findRootValueForNonTupleTempAllocation(asi, state);
 }

@@ -33,6 +33,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
@@ -150,11 +151,23 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   ptrdiff_t numReplacements = 0;
   ptrdiff_t *genericReplacements = nullptr;
   ptrdiff_t numGenericReplacements = 0;
+
+  // Parse 'macro' decl in swift_ASTGen_checkMacroDefinition.
+  // NOTE: We don't use source->getExportedSourceFile() because it parses the
+  // entire source buffer, which we don't want. Usually 'macro' decl is not in
+  // the same file as the expansion, so we only want to parse only the decl.
+  // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
+  auto &SM = ctx.SourceMgr;
+  StringRef sourceFileText =
+      SM.getEntireTextForBuffer(*sourceFile->getBufferID());
+  StringRef macroDeclText =
+      SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
+          SM, macro->getSourceRangeIncludingAttrs()));
+
   auto checkResult = swift_ASTGen_checkMacroDefinition(
-      &ctx.Diags, sourceFile->getExportedSourceFile(),
-      macro->getLoc().getOpaquePointerValue(), &externalMacroName,
-      &replacements, &numReplacements,
-      &genericReplacements, &numGenericReplacements);
+      &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
+      &replacements, &numReplacements, &genericReplacements,
+      &numGenericReplacements);
 
   // Clean up after the call.
   SWIFT_DEFER {
@@ -290,7 +303,9 @@ initializeExecutablePlugin(ASTContext &ctx,
   if (!libraryPath.empty()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
-    auto fs = ctx.SourceMgr.getFileSystem();
+    auto fs = ctx.ClangImporterOpts.HasClangIncludeTreeRoot
+                  ? llvm::vfs::getRealFileSystem()
+                  : ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
     }
@@ -724,12 +739,12 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
   };
 
   for (auto item : expansionBuffer->getTopLevelItems()) {
+    auto &ctx = expansionBuffer->getASTContext();
     auto *decl = item.dyn_cast<Decl *>();
     if (!decl) {
       if (role != MacroRole::CodeItem &&
           role != MacroRole::Preamble &&
           role != MacroRole::Body) {
-        auto &ctx = expansionBuffer->getASTContext();
         ctx.Diags.diagnose(item.getStartLoc(),
                            diag::expected_macro_expansion_decls);
       }
@@ -738,8 +753,18 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
     }
 
     // Certain macro roles can generate special declarations.
-    if ((isa<AccessorDecl>(decl) && role == MacroRole::Accessor) ||
-        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance)) {
+    if (isa<AccessorDecl>(decl) && role == MacroRole::Accessor) {
+      auto *var = dyn_cast<VarDecl>(attachedTo);
+      if (var && var->isLet()) {
+        ctx.Diags.diagnose(var->getLoc(),
+                           diag::let_accessor_expansion)
+          .warnUntilSwiftVersion(6);
+      }
+
+      continue;
+    }
+
+    if (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance) {
       continue;
     }
 
@@ -1352,6 +1377,22 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getDeclContext()->getParentSourceFile();
   } else {
     dc = attachedTo->getInnermostDeclContext();
+  }
+
+  // FIXME: compatibility hack for the transition from property wrapper
+  // to macro for TaskLocal.
+  //
+  // VarDecls with `@_projectedValueProperty` have already had the property
+  // wrapper transform applied. This only impacts swiftinterfaces, and if
+  // a swiftinterface was produced against a Concurrency library that does
+  // not declare TaskLocal as a macro, we need to ignore the macro to avoid
+  // producing duplicate declarations. This is only needed temporarily until
+  // all swiftinterfaces have been built against the Concurrency library
+  // containing the new macro declaration.
+  if (auto *var = dyn_cast<VarDecl>(attachedTo)) {
+    if (var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()) {
+      return nullptr;
+    }
   }
 
   ASTContext &ctx = dc->getASTContext();

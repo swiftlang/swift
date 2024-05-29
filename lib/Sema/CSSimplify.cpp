@@ -1572,8 +1572,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
 
   auto genericSig = callee->getInnermostDeclContext()
       ->getGenericSignatureOfContext().getCanonicalSignature();
-  if (genericParam->getDepth() <
-          genericSig.getGenericParams().back()->getDepth())
+  if (genericParam->getDepth() < genericSig->getMaxDepth())
     return std::nullopt;
 
   // If the existential argument conforms to all of protocol requirements on
@@ -5617,6 +5616,23 @@ bool ConstraintSystem::repairFailures(
           return true;
         }
       }
+    }
+  }
+
+  // If there is a conversion associated with an existential member access
+  // along the path, the problem is that the constraint system does not support
+  // the (formally sane) upcast required to access the member.
+  if (llvm::find_if(path, [](const LocatorPathElt &elt) -> bool {
+        return elt.is<LocatorPathElt::ExistentialMemberAccessConversion>();
+      }) != path.end()) {
+    if (auto overload = findSelectedOverloadFor(castToExpr(anchor))) {
+      auto &choice = overload->choice;
+      conversionsOrFixes.push_back(AllowMemberRefOnExistential::create(
+          *this, choice.getBaseType(), choice.getDecl(),
+          DeclNameRef(choice.getDecl()->getName()),
+          getConstraintLocator(locator)));
+
+      return true;
     }
   }
 
@@ -10256,13 +10272,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                 if (req.getKind() != RequirementKind::Conformance)
                   return false;
 
-                if (auto protocolTy =
-                        req.getSecondType()->template getAs<ProtocolType>()) {
-                  return req.getFirstType()->hasTypeVariable() &&
-                         protocolTy->getDecl()->isSpecificProtocol(
-                             KnownProtocolKind::Sendable);
-                }
-                return false;
+                return (req.getFirstType()->hasTypeVariable() &&
+                        req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::Sendable));
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
@@ -15157,7 +15169,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowConcreteTypeSpecialization:
   case FixKind::IgnoreGenericSpecializationArityMismatch:
-  case FixKind::IgnoreKeyPathSubscriptIndexMismatch: {
+  case FixKind::IgnoreKeyPathSubscriptIndexMismatch:
+  case FixKind::AllowMemberRefOnExistential: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreThrownErrorMismatch: {
@@ -15380,7 +15393,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
-  case FixKind::AllowMemberRefOnExistential:
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:

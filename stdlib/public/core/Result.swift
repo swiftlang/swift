@@ -48,8 +48,25 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new success value if this instance represents a success.
-  @inlinable
-  public func map<NewSuccess>(
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original map
+                       // (rdar://125016028)
+  public func map<NewSuccess: ~Copyable>(
+    _ transform: (Success) -> NewSuccess
+  ) -> Result<NewSuccess, Failure> {
+    switch self {
+    case let .success(success):
+      return .success(transform(success))
+    case let .failure(failure):
+      return .failure(failure)
+    }
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO3mapyAByqd__q_Gqd__xXElF")
+  @usableFromInline
+  internal func __abi_map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -82,7 +99,7 @@ extension Result where Success: ~Copyable {
     _ transform: (borrowing Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
-    case .success(_borrowing success):
+    case .success(borrowing success):
       return .success(transform(success))
     case let .failure(failure):
       return .failure(failure)
@@ -154,7 +171,7 @@ extension Result {
   /// produces another `Result` type.
   ///
   /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an result type.
+  /// `flatMap` with a transformation that returns a result type.
   ///
   ///     func getNextInteger() -> Result<Int, Error> {
   ///         .success(4)
@@ -173,8 +190,25 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.failure`.
-  @inlinable
-  public func flatMap<NewSuccess>(
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload // FIXME: Workaround for source compat issue with
+                       // functions that used to shadow the original flatMap
+                       // (rdar://125016028)
+  public func flatMap<NewSuccess: ~Copyable>(
+    _ transform: (Success) -> Result<NewSuccess, Failure>
+  ) -> Result<NewSuccess, Failure> {
+    switch self {
+    case let .success(success):
+      return transform(success)
+    case let .failure(failure):
+      return .failure(failure)
+    }
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO7flatMapyAByqd__q_GADxXElF")
+  @usableFromInline
+  internal func __abi_flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -207,7 +241,7 @@ extension Result where Success: ~Copyable {
     _ transform: (borrowing Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
-    case .success(_borrowing success):
+    case .success(borrowing success):
       return transform(success)
     case let .failure(failure):
       return .failure(failure)
@@ -215,7 +249,7 @@ extension Result where Success: ~Copyable {
   }
 }
 
-extension Result {
+extension Result where Success: ~Copyable {
   /// Returns a new result, mapping any failure value using the given
   /// transformation and unwrapping the produced result.
   ///
@@ -223,8 +257,24 @@ extension Result {
   ///   instance.
   /// - Returns: A `Result` instance, either from the closure or the previous
   ///   `.success`.
-  @inlinable
-  public func flatMapError<NewFailure>(
+  @_alwaysEmitIntoClient
+  public consuming func flatMapError<NewFailure>(
+    _ transform: (Failure) -> Result<Success, NewFailure>
+  ) -> Result<Success, NewFailure> {
+    switch consume self {
+    case let .success(success):
+      return .success(success)
+    case let .failure(failure):
+      return transform(failure)
+    }
+  }
+}
+
+extension Result {
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO12flatMapErroryAByxqd__GADq_XEs0D0Rd__lF")
+  @usableFromInline
+  internal func __abi_flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
     switch self {

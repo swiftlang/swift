@@ -233,6 +233,8 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
+
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
@@ -402,6 +404,9 @@ public:
   /// Whether the Swift Backtracing support library should be implicitly
   /// imported.
   bool shouldImportSwiftBacktracing() const;
+
+  /// Whether the CXX module should be implicitly imported.
+  bool shouldImportCxx() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -658,6 +663,9 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftBacktracing() const;
 
+  /// Whether the Cxx library can be imported
+  bool canImportCxx() const;
+
   /// Whether the CxxShim library can be imported
   /// i.e. if it can be found.
   bool canImportCxxShim() const;
@@ -688,6 +696,10 @@ public:
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
+
+  /// The fast setup function for cache replay.
+  bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
+                      ArrayRef<const char *> Args = {});
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 

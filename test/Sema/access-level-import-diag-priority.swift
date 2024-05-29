@@ -46,23 +46,29 @@ private import PrivateLib // expected-note 1 {{struct 'PrivateImportType' import
 
 /// Simple ordering
 public func publicFuncUsesPrivate(_ a: PublicImportType, b: PackageImportType, c: InternalImportType, d: FileprivateImportType, e: PrivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
+// expected-note @-1 {{struct 'FileprivateImportType' is imported by this file as 'fileprivate' from 'FileprivateLib'}}
     var _: PrivateImportType
 }
 public func publicFuncUsesFileprivate(_ a: PublicImportType, b: PackageImportType, c: InternalImportType, d: FileprivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
+// expected-note @-1 {{struct 'FileprivateImportType' is imported by this file as 'fileprivate' from 'FileprivateLib'}}
     var _: PrivateImportType
 }
 public func publicFuncUsesInternal(_ a: PublicImportType, b: PackageImportType, c: InternalImportType) { // expected-error {{function cannot be declared public because its parameter uses an internal type}}
+// expected-note @-1 {{struct 'InternalImportType' is imported by this file as 'internal' from 'InternalLib'}}
     var _: PrivateImportType
 }
 public func publicFuncUsesPackage(_ a: PublicImportType, b: PackageImportType) { // expected-error {{function cannot be declared public because its parameter uses a package type}}
+// expected-note @-1 {{struct 'PackageImportType' is imported by this file as 'package' from 'PackageLib'}}
     var _: PrivateImportType
 }
 
 /// Disordered
 public func publicFuncUsesPrivateScambled(_ a: PublicImportType, b: PackageImportType, e: PrivateImportType, c: InternalImportType, d: FileprivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a private type}}
+// expected-note @-1 {{struct 'PrivateImportType' is imported by this file as 'private' from 'PrivateLib'}}
     var _: PrivateImportType
 }
 public func publicFuncUsesPrivateScambled(_ a: PublicImportType, d: FileprivateImportType, b: PackageImportType, c: InternalImportType) { // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
+// expected-note @-1 {{struct 'FileprivateImportType' is imported by this file as 'fileprivate' from 'FileprivateLib'}}
     var _: PrivateImportType
 }
 
@@ -98,3 +104,4 @@ public func localVsImportedType3(a: LocalType, b: FileprivateImportType) {} // e
 
 /// Only this one points to the imported type.
 public func localVsImportedType4(a: FileprivateImportType, b: LocalType) {} // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
+// expected-note @-1 {{struct 'FileprivateImportType' is imported by this file as 'fileprivate' from 'FileprivateLib'}}

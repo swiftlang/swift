@@ -62,6 +62,10 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     self.count = count
   }
 
+  static public var empty: OperandArray {
+    OperandArray(base: OptionalBridgedOperand(bridged: nil), count: 0)
+  }
+
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return count }
   
@@ -148,6 +152,10 @@ extension Sequence where Element == Operand {
 
   public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
+  }
+
+  public func ignore(user: Instruction) -> LazyFilterSequence<Self> {
+    self.lazy.filter { !($0.instruction == user) }
   }
 
   public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {

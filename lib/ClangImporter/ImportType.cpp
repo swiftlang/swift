@@ -201,6 +201,13 @@ namespace {
                                     : ImportHint::OtherPointer};
   }
 
+  static bool
+  isDirectUseOfForeignReferenceType(clang::QualType clangPointeeType,
+                                    Type swiftPointeeType) {
+     return swiftPointeeType && swiftPointeeType->isForeignReferenceType() &&
+               !clangPointeeType->isPointerType();
+   }
+
   class SwiftTypeConverter :
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
@@ -494,9 +501,10 @@ namespace {
           pointeeQualType, ImportTypeKind::Value, addImportDiagnostic,
           AllowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
 
-      // If this is imported as a reference type, ignore the pointer.
-      if (pointeeType && pointeeType->isForeignReferenceType())
-         return {pointeeType, ImportHint::OtherPointer};
+      // If this is imported as a reference type, ignore the innermost pointer.
+      // (`T *` becomes `T`, but `T **` becomes `UnsafeMutablePointer<T>`.)
+      if (isDirectUseOfForeignReferenceType(pointeeQualType, pointeeType))
+        return {pointeeType, ImportHint::OtherPointer};
 
       // If the pointed-to type is unrepresentable in Swift, or its C
       // alignment is greater than the maximum Swift alignment, import as
@@ -507,6 +515,19 @@ namespace {
 
       if (pointeeQualType->isFunctionType()) {
         return importFunctionPointerLikeType(*type, pointeeType);
+      }
+
+      // FIXME: this is a workaround for rdar://128013193
+      if (pointeeType && pointeeType->getAnyNominal() &&
+          pointeeType->getAnyNominal()
+              ->getAttrs()
+              .hasAttribute<MoveOnlyAttr>() &&
+          Impl.SwiftContext.LangOpts.CxxInteropUseOpaquePointerForMoveOnly) {
+        auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+        if (!opaquePointerDecl)
+          return Type();
+        return {opaquePointerDecl->getDeclaredInterfaceType(),
+                ImportHint::OtherPointer};
       }
 
       PointerTypeKind pointerKind;
@@ -572,7 +593,7 @@ namespace {
       if (!pointeeType)
         return Type();
 
-      if (pointeeType->isForeignReferenceType())
+      if (isDirectUseOfForeignReferenceType(pointeeQualType, pointeeType))
         return {pointeeType, ImportHint::None};
 
       if (pointeeQualType->isFunctionType()) {
@@ -2511,6 +2532,15 @@ ClangImporter::Implementation::importParameterType(
     swiftParamTy = importedType.getType();
   }
 
+  // `isInOut` is set above if we stripped off a mutable `&` before importing
+  // the type. Normally, we want to use an `inout` parameter in this situation.
+  // However, if the parameter belongs to a foreign reference type *and* the
+  // reference we stripped out was directly to that type (rather than to a
+  // pointer to that type), the foreign reference type should "eat" the
+  // indirection of the `&`, so we *don't* want to use an `inout` parameter.
+  if (isInOut && isDirectUseOfForeignReferenceType(paramTy, swiftParamTy))
+    isInOut = false;
+
   return ImportParameterTypeResult{swiftParamTy, isInOut,
                                    isParamTypeImplicitlyUnwrapped};
 }
@@ -2584,16 +2614,26 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
           Feature::TransferringArgsAndResults)) {
     if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "transferring") {
-        paramInfo->setTransferring();
+        paramInfo->setSending();
+      }
+    }
+  }
+
+  // If TransferringArgsAndResults are enabled and we have a transferring
+  // argument, set that the param was transferring.
+  if (paramInfo->getASTContext().LangOpts.hasFeature(
+          Feature::SendingArgsAndResults)) {
+    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+      if (attr->getAttribute() == "sending") {
+        paramInfo->setSending();
       }
     }
   }
 
   // Foreign references are already references so they don't need to be passed
   // as inout.
-  paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()
-                              ? ParamSpecifier::InOut
-                              : ParamSpecifier::Default);
+  paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
+                                  : ParamSpecifier::Default);
   paramInfo->setInterfaceType(swiftParamTy);
   impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
 
@@ -2603,13 +2643,12 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // (https://github.com/apple/swift/issues/70124)
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isCxxInteropCompatVersionAtLeast(6) &&
       impl->isDefaultArgSafeToImport(param)) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {
       paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
-      paramInfo->setDefaultExpr(defaultArgExpr, /*isTypeChecked*/ true);
+      paramInfo->setTypeCheckedDefaultExpr(defaultArgExpr);
       paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
     }
   }

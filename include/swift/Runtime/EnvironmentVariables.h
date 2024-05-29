@@ -53,6 +53,10 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration();
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
 
+// Wrapper around SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride();
+
 } // end namespace environment
 } // end namespace runtime
 } // end namespace swift

@@ -153,6 +153,7 @@ extension BridgedTestArguments {
 public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
+    getAccessBaseTest,
     argumentConventionsTest,
     borrowIntroducersTest,
     enclosingValuesTest,
@@ -164,7 +165,10 @@ public func registerOptimizerTests() {
     lifetimeDependenceUseTest,
     linearLivenessTest,
     parseTestSpecificationTest,
-    variableIntroducerTest
+    variableIntroducerTest,
+    gatherCallSitesTest,
+    specializedFunctionSignatureAndBodyTest,
+    rewrittenCallerBodyTest
   )
 
   // Finally register the thunk they all call through.
@@ -197,7 +201,6 @@ private func functionTestThunk(
   let invocation = castToInvocation(fromOpaquePointer: erasedInvocation)
   let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
   invocation(function.function, arguments.native, context)
-  fflush(stdout)
 }
 
 /// Bitcast a thin test closure to void *.

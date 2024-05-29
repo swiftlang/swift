@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null -parse-as-library -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null -parse-as-library -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -30,6 +30,31 @@ var booleanFlag: Bool { false }
 @MainActor var mainActorIsolatedGlobal = NonSendableKlass()
 @CustomActor var customActorIsolatedGlobal = NonSendableKlass()
 
+@MainActor
+class NonSendableGlobalActorIsolatedKlass {}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedKlass: Sendable {}
+
+@MainActor
+struct NonSendableGlobalActorIsolatedStruct {
+  var k = NonSendableKlass()
+}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedStruct: Sendable {}
+
+@MainActor
+enum NonSendableGlobalActorIsolatedEnum {
+  case first
+  case second(NonSendableKlass)
+  case third(SendableKlass)
+}
+
+@available(*, unavailable)
+extension NonSendableGlobalActorIsolatedEnum: Sendable {}
+
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -53,14 +78,14 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
 @CustomActor func useCustomActor1() async {
   let x = firstList
 
-  await transferToMainActor(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
+  await transferToMainActor(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainActor' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedList<Int>' into main actor-isolated context may introduce data races}}
 
   let y = secondList.listHead!.next!
 
-  await transferToMainActor(y) // expected-tns-warning {{transferring 'y' may cause a data race}}
-  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'y' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
+  await transferToMainActor(y) // expected-tns-warning {{sending 'y' risks causing data races}}
+  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'y' to main actor-isolated global function 'transferToMainActor' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
@@ -71,8 +96,8 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
     x = secondList.listHead!.next!
   }
 
-  await transferToMainActor(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
+  await transferToMainActor(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMainActor' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
@@ -97,11 +122,12 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
 @CustomActor func useCustomActor5() async {
   let x = NonSendableLinkedListNode<Int>()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'CustomActor'-isolated context may introduce data races}}
+  // This is ok since the nonisolated function cannot transfer x, so once we
+  // return x will be isolated again.
+  await transferToNonIsolated(x)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
-  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x)
 }
 
 private struct StructContainingValue { // expected-complete-note 2{{}}
@@ -113,19 +139,20 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue()
   x = StructContainingValue()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
-  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
+  // This is ok since the nonisolated function cannot transfer x meaning after
+  // we return we know that x will be disconnected upon return as well.
+  await transferToNonIsolated(x)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
-  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x)
 }
 
 @CustomActor func useCustomActor7() async {
   var x = StructContainingValue()
   x.x = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  await transferToNonIsolated(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x)
@@ -135,12 +162,12 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
   x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring disconnected 'x' to nonisolated callee could cause races in between callee nonisolated and local global actor 'CustomActor'-isolated uses}}
+  // This is safe since the nonisolated function cannot transfer x further.
+  await transferToNonIsolated(x)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
-  // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
-  useValue(x) // expected-tns-note {{use here could race}}
+  useValue(x)
 }
 
 @CustomActor func useCustomActor9() async {
@@ -148,8 +175,8 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 
   x.1 = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a data race}}
-  // expected-tns-note @-1 {{transferring global actor 'CustomActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  await transferToNonIsolated(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
@@ -169,7 +196,7 @@ struct Clock {
 // We used to crash when inferring the type for the diagnostic below.
 @MainActor func testIndirectParametersHandledCorrectly() async {
   let c = Clock()
-  let _: Int = await c.measure { // expected-tns-warning {{main actor-isolated value of type '() async -> Int' transferred to nonisolated context}}
+  let _: Int = await c.measure { // expected-tns-warning {{sending main actor-isolated value of type '() async -> Int' with later accesses to nonisolated context risks causing data races}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() async -> Int' outside of main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     try! await c.sleep()
@@ -182,9 +209,9 @@ struct Clock {
   let _ = { @MainActor in
     // TODO: The type checker seems to think that the isolation here is
     // nonisolated instead of custom actor isolated.
-    print(ns) // expected-tns-warning {{transferring 'ns' may cause a data race}}
+    print(ns) // expected-tns-warning {{sending 'ns' risks causing data races}}
     // expected-tns-note @-1 {{global actor 'CustomActor'-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in an isolated closure}}
+    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
   }
 
   useValue(ns)
@@ -232,8 +259,8 @@ struct Clock {
 
   let erased: () -> Void = closure
 
-  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -241,8 +268,8 @@ struct Clock {
 @MainActor func synchronousActorIsolatedFunctionError() async {
   let erased: () -> Void = mainActorFunction
 
-  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -250,8 +277,8 @@ struct Clock {
 @MainActor func synchronousActorIsolatedGenericFunctionError<T>(_ t: T) async {
   let erased: (T) -> Void = useValueMainActor
 
-  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(T) -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -264,8 +291,8 @@ struct Clock {
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -278,8 +305,8 @@ struct Clock {
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-tns-warning {{transferring 'erased' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'erased' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -289,8 +316,8 @@ struct Clock {
     print(mainActorIsolatedGlobal)
   }
   // Regions: [{(closure), @MainActor}]
-  await transferToCustomActor(closure) // expected-tns-warning {{transferring 'closure' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'closure' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+  await transferToCustomActor(closure) // expected-tns-warning {{sending 'closure' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'closure' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -299,8 +326,8 @@ struct Clock {
   let closure = {
     mainActorFunction()
   }
-  await transferToCustomActor(closure) // expected-tns-warning {{transferring 'closure' may cause a data race}}
-  // expected-tns-note @-1 {{transferring main actor-isolated 'closure' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+  await transferToCustomActor(closure) // expected-tns-warning {{sending 'closure' risks causing data races}}
+  // expected-tns-note @-1 {{sending main actor-isolated 'closure' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }

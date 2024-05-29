@@ -1,6 +1,7 @@
 
 include(AddSwift)
 include(SwiftSource)
+include(CompatibilityLibs)
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
@@ -31,11 +32,13 @@ endfunction()
 #   DEPLOYMENT_VERSION_IOS version
 #   DEPLOYMENT_VERSION_TVOS version
 #   DEPLOYMENT_VERSION_WATCHOS version
+#   DEPLOYMENT_VERSION_XROS version
 #
 # )
 function(_add_target_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
     MACCATALYST_BUILD_FLAVOR
   )
   cmake_parse_arguments(CFLAGS
@@ -63,6 +66,8 @@ function(_add_target_variant_c_compile_link_flags)
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_TVOS})
     elseif("${CFLAGS_SDK}" STREQUAL "WATCHOS" OR "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS})
+    elseif("${CFLAGS_SDK}" STREQUAL "XROS" OR "${CFLAGS_SDK}" STREQUAL "XROS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_XROS})
     endif()
 
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
@@ -115,6 +120,12 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result "--sysroot=${_sysroot}")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "LINUX_STATIC")
+    list(APPEND result "-isystem" "${SWIFT_MUSL_PATH}/${CFLAGS_ARCH}/usr/include/c++/v1")
+    list(APPEND result "-DSWIFT_LIBC_IS_MUSL")
+  endif()
+
+
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     # Make sure the Android NDK lld is used.
     swift_android_tools_path(${CFLAGS_ARCH} tools_path)
@@ -154,6 +165,7 @@ endfunction()
 function(_add_target_variant_c_compile_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
     RESULT_VAR_NAME ENABLE_LTO
     MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
@@ -189,6 +201,7 @@ function(_add_target_variant_c_compile_flags)
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${CFLAGS_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${CFLAGS_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
@@ -461,6 +474,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE")
   endif()
 
+  if(SWIFT_USE_OS_TRACE_LAZY_INIT)
+    list(APPEND result "-DSWIFT_USE_OS_TRACE_LAZY_INIT")
+  endif()
+
   list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -469,6 +486,7 @@ endfunction()
 function(_add_target_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+  DEPLOYMENT_VERSION_XROS
   RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
   MACCATALYST_BUILD_FLAVOR
   )
@@ -497,6 +515,7 @@ function(_add_target_variant_link_flags)
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${LFLAGS_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${LFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${LFLAGS_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
@@ -504,6 +523,8 @@ function(_add_target_variant_link_flags)
     if("${LFLAGS_ARCH}" MATCHES "armv5|armv6|armv7|i686")
       list(APPEND link_libraries "atomic")
     endif()
+  elseif("${LFLAGS_SDK}" STREQUAL "LINUX_STATIC")
+    list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
@@ -783,6 +804,7 @@ function(add_swift_target_library_single target name)
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
+        DEPLOYMENT_VERSION_XROS
         INSTALL_IN_COMPONENT
         DARWIN_INSTALL_NAME_DIR
         SDK
@@ -881,6 +903,7 @@ function(add_swift_target_library_single target name)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+       "${SWIFTLIB_SINGLE_SDK}" STREQUAL "XROS" OR
        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
@@ -1342,10 +1365,14 @@ function(add_swift_target_library_single target name)
   endif()
 
   if(target_static)
-    _list_add_string_suffix(
-        "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
-        "-static"
-        target_static_depends)
+    set(target_static_depends)
+    foreach(dep ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
+      if (NOT "${dep}" MATCHES "^(icucore|dispatch|BlocksRuntime)($|-.*)$")
+        list(APPEND target_static_depends "${dep}-static")
+      endif()
+    endforeach()
+
+
     # FIXME: should this be target_link_libraries?
     add_dependencies_multiple_targets(
         TARGETS "${target_static}"
@@ -1403,6 +1430,7 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
@@ -1425,6 +1453,7 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
@@ -1488,6 +1517,7 @@ function(add_swift_target_library_single target name)
         "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
     endif()
   endif()
+
   target_compile_options(${target} PRIVATE
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
@@ -1503,6 +1533,7 @@ function(add_swift_target_library_single target name)
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
       if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
          "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+         "${SWIFTLIB_SINGLE_SDK}" STREQUAL "XROS" OR
          "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
@@ -1659,6 +1690,7 @@ endfunction()
 #     DEPLOYMENT_VERSION_IOS version
 #     DEPLOYMENT_VERSION_TVOS version
 #     DEPLOYMENT_VERSION_WATCHOS version
+#     DEPLOYMENT_VERSION_XROS version
 #     MACCATALYST_BUILD_FLAVOR flavor
 #     BACK_DEPLOYMENT_LIBRARY version
 #     source1 [source2 source3 ...])
@@ -1700,6 +1732,9 @@ endfunction()
 #
 # SWIFT_MODULE_DEPENDS_WATCHOS
 #   Swift modules this library depends on when built for watchOS.
+#
+# SWIFT_MODULE_DEPENDS_XROS
+#   Swift modules this library depends on when built for xrOS.
 #
 # SWIFT_MODULE_DEPENDS_FREESTANDING
 #   Swift modules this library depends on when built for Freestanding.
@@ -1777,6 +1812,9 @@ endfunction()
 # DEPLOYMENT_VERSION_WATCHOS
 #   The minimum deployment version to build for if this is an WATCHOS library.
 #
+# DEPLOYMENT_VERSION_XROS
+#   The minimum deployment version to build for if this is an XROS library.
+#
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
@@ -1806,6 +1844,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
+        DEPLOYMENT_VERSION_XROS
         INSTALL_IN_COMPONENT
         INSTALL_BINARY_SWIFTMODULE
         DARWIN_INSTALL_NAME_DIR
@@ -1838,6 +1877,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_OSX
         SWIFT_COMPILE_FLAGS_TVOS
         SWIFT_COMPILE_FLAGS_WATCHOS
+        SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_CYGWIN
@@ -1847,10 +1887,12 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_HAIKU
         SWIFT_MODULE_DEPENDS_IOS
         SWIFT_MODULE_DEPENDS_LINUX
+        SWIFT_MODULE_DEPENDS_LINUX_STATIC
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WATCHOS
+        SWIFT_MODULE_DEPENDS_XROS
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS
@@ -1891,6 +1933,20 @@ function(add_swift_target_library name)
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
   list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
+
+  # Support adding a "NOT" on the front to mean all SDKs except the following
+  list(LENGTH SWIFTLIB_TARGET_SDKS number_of_target_sdks)
+  if(number_of_target_sdks GREATER_EQUAL "1")
+    list(GET SWIFTLIB_TARGET_SDKS 0 first_sdk)
+    if("${first_sdk}" STREQUAL "NOT")
+        list(REMOVE_AT SWIFTLIB_TARGET_SDKS 0)
+        list_subtract("${SWIFT_SDKS}" "${SWIFTLIB_TARGET_SDKS}"
+        "SWIFTLIB_TARGET_SDKS")
+    endif()
+  endif()
+
+  list_intersect(
+    "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTLIB_TARGET_SDKS)
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
@@ -2026,6 +2082,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "WATCHOS" OR sdk STREQUAL "WATCHOS_SIMULATOR")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
+    elseif("${sdk}" STREQUAL "XROS" OR "${sdk}" STREQUAL "XROS_SIMULATOR")
+        list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_XROS})
     elseif(sdk STREQUAL "FREESTANDING")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREESTANDING})
@@ -2038,6 +2097,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "LINUX_STATIC")
+      list(APPEND swiftlib_module_depends_flattened
+          ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
@@ -2077,6 +2139,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "WATCHOS" OR sdk STREQUAL "WATCHOS_SIMULATOR")
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+    elseif("${sdk}" STREQUAL "XROS" OR "${sdk}" STREQUAL "XROS_SIMULATOR")
+        list(APPEND swiftlib_swift_compile_flags_all
+            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_XROS})
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
@@ -2290,12 +2355,21 @@ function(add_swift_target_library name)
         set(back_deployment_library_option)
       endif()
 
+      # If the SDK is static only, always build static instead of dynamic
+      if(SWIFT_SDK_${sdk}_STATIC_ONLY AND SWIFTLIB_SHARED)
+        set(shared_keyword)
+        set(static_keyword STATIC)
+      else()
+        set(shared_keyword ${SWIFTLIB_SHARED_keyword})
+        set(static_keyword ${SWIFTLIB_STATIC_keyword})
+      endif()
+
       # Add this library variant.
       add_swift_target_library_single(
         ${variant_name}
         ${name}
-        ${SWIFTLIB_SHARED_keyword}
-        ${SWIFTLIB_STATIC_keyword}
+        ${shared_keyword}
+        ${static_keyword}
         ${SWIFTLIB_NO_LINK_NAME_keyword}
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
@@ -2326,6 +2400,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+        DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
         MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
         ${back_deployment_library_option}
         ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
@@ -2354,9 +2429,9 @@ function(add_swift_target_library name)
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
         # Add dependencies on the (not-yet-created) custom lipo target.
         foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-          if (NOT "${DEP}" STREQUAL "icucore" AND
-              NOT "${DEP}" STREQUAL "dispatch" AND
-              NOT "${DEP}" STREQUAL "BlocksRuntime")
+          if (NOT "${DEP}" MATCHES "^icucore($|-.*)$" AND
+              NOT "${DEP}" MATCHES "^dispatch($|-.*)$" AND
+              NOT "${DEP}" MATCHES "^BlocksRuntime($|-.*)$")
             add_dependencies(${VARIANT_NAME}
               "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
           endif()
@@ -2365,9 +2440,9 @@ function(add_swift_target_library name)
         if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
           # Add dependencies on the (not-yet-created) custom lipo target.
           foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-            if (NOT "${DEP}" STREQUAL "icucore" AND
-                NOT "${DEP}" STREQUAL "dispatch" AND
-                NOT "${DEP}" STREQUAL "BlocksRuntime")
+            if (NOT "${DEP}" MATCHES "^icucore($|-.*)$" AND
+                NOT "${DEP}" MATCHES "^dispatch($|-.*)$" AND
+                NOT "${DEP}" MATCHES "^BlocksRuntime($|-.*)$")
               add_dependencies("${VARIANT_NAME}-static"
                 "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
             endif()
@@ -2413,7 +2488,7 @@ function(add_swift_target_library name)
 
     if(NOT SWIFTLIB_OBJECT_LIBRARY)
       # Determine the name of the universal library.
-      if(SWIFTLIB_SHARED)
+      if(SWIFTLIB_SHARED AND NOT SWIFT_SDK_${sdk}_STATIC_ONLY)
         if("${sdk}" STREQUAL "WINDOWS")
           set(UNIVERSAL_LIBRARY_NAME
             "${SWIFTLIB_DIR}/${library_subdir}/${name}.dll")
@@ -2425,12 +2500,18 @@ function(add_swift_target_library name)
             "${SWIFTLIB_DIR}/${library_subdir}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
         endif()
       else()
+        if(SWIFT_SDK_${sdk}_STATIC_ONLY)
+          set(lib_dir "${SWIFTSTATICLIB_DIR}")
+        else()
+          set(lib_dir "${SWIFTLIB_DIR}")
+        endif()
+
         if("${sdk}" STREQUAL "WINDOWS")
           set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTLIB_DIR}/${library_subdir}/${name}.lib")
+            "${lib_dir}/${library_subdir}/${name}.lib")
         else()
           set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTLIB_DIR}/${library_subdir}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+            "${lib_dir}/${library_subdir}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         endif()
       endif()
 
@@ -2462,7 +2543,8 @@ function(add_swift_target_library name)
 
       precondition(resource_dir_sdk_subdir)
 
-      if(SWIFTLIB_SHARED OR SWIFTLIB_INSTALL_WITH_SHARED)
+      if((SWIFTLIB_SHARED AND NOT SWIFT_SDK_${sdk}_STATIC_ONLY)
+          OR SWIFTLIB_INSTALL_WITH_SHARED)
         set(resource_dir "swift")
         set(file_permissions
             OWNER_READ OWNER_WRITE OWNER_EXECUTE
@@ -2724,6 +2806,15 @@ function(_add_swift_target_executable_single name)
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
+  # Darwin may need the compatibility libraries
+  set(compatibility_libs)
+  if(SWIFTEXE_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    get_compatibility_libs(
+      "${SWIFTEXE_SINGLE_SDK}"
+      "${SWIFTEXE_SINGLE_ARCHITECTURE}"
+      compatibility_libs)
+  endif()
+
   # ELF and COFF need swiftrt
   if(("${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF")
@@ -2737,6 +2828,7 @@ function(_add_swift_target_executable_single name)
       TARGETS "${name}"
       DEPENDS
         ${dependency_target}
+        ${compatibility_libs}
         ${LLVM_COMMON_DEPENDS}
         ${SWIFTEXE_SINGLE_DEPENDS})
   llvm_update_compile_flags("${name}")
@@ -2838,6 +2930,7 @@ function(add_swift_target_executable name)
     SWIFT_MODULE_DEPENDS_HAIKU
     SWIFT_MODULE_DEPENDS_IOS
     SWIFT_MODULE_DEPENDS_LINUX
+    SWIFT_MODULE_DEPENDS_LINUX_STATIC
     SWIFT_MODULE_DEPENDS_OSX
     SWIFT_MODULE_DEPENDS_TVOS
     SWIFT_MODULE_DEPENDS_WASI
@@ -2894,6 +2987,17 @@ function(add_swift_target_executable name)
   endif()
   list_replace(SWIFTEXE_TARGET_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
 
+  # Support adding a "NOT" on the front to mean all SDKs except the following
+  list(LENGTH SWIFTEXE_TARGET_TARGET_SDKS number_of_target_sdks)
+  if(number_of_target_sdks GREATER_EQUAL "1")
+    list(GET SWIFTEXE_TARGET_TARGET_SDKS 0 first_sdk)
+    if("${first_sdk}" STREQUAL "NOT")
+        list(REMOVE_AT SWIFTEXE_TARGET_TARGET_SDKS 0)
+        list_subtract("${SWIFT_SDKS}" "${SWIFTEXE_TARGET_TARGET_SDKS}"
+        "SWIFTEXE_TARGET_TARGET_SDKS")
+    endif()
+  endif()
+
   list_intersect(
     "${SWIFTEXE_TARGET_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTEXE_TARGET_TARGET_SDKS)
 
@@ -2935,6 +3039,9 @@ function(add_swift_target_executable name)
     elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "LINUX_STATIC")
+      list(APPEND swiftexe_module_depends_flattened
+        ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_CYGWIN})

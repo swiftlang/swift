@@ -13,7 +13,7 @@
 import SwiftShims
 
 // Macros are disabled when Swift is built without swift-syntax.
-#if $Macros && hasAttribute(attached)
+#if $Macros && $DebugDescriptionMacro && hasAttribute(attached)
 
 /// Converts description definitions to a debugger Type Summary.
 ///
@@ -65,10 +65,10 @@ import SwiftShims
 ///   logic and computed properties are not supported.
 /// * Overloaded string interpolation cannot be used.
 @attached(memberAttribute)
-public macro _DebugDescription() =
+public macro DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
 
-/// Internal-only macro. See `@_DebugDescription`.
+/// Internal-only macro. See `@DebugDescription`.
 @attached(peer, names: named(_lldb_summary))
 public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
   #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
@@ -238,7 +238,13 @@ public enum _DebuggerSupport {
       print("\(name) : ", terminator: "", to: &target)
     }
 
-    if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
+    if isRoot, let value = value as? String {
+      // We don't want to use string's debug desciprtion for 'po' because it
+      // escapes the string and prints it raw (e.g. prints "\n" instead of
+      // actually printing a newline), but only if its the root value. Otherwise,
+      // continue using the debug description.
+      print(value, terminator: "", to: &target)
+    } else if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
       print(str, terminator: "", to: &target)
     }
   

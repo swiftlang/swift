@@ -21,6 +21,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return StringRef(bridged: bridged.getName())
   }
 
+  public var location: Location {
+    return Location(bridged: bridged.getLocation())
+  }
+
   final public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
@@ -31,6 +35,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     hasher.combine(ObjectIdentifier(self))
   }
 
+  public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
+
+  public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
+
+  public var specializationLevel: Int { bridged.specializationLevel() }
+  
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
@@ -57,6 +67,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
     entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
+  }
+
+  public func argument(at index: Int) -> FunctionArgument {
+    entryBlock.arguments[index] as! FunctionArgument
   }
 
   /// All instructions of all blocks.
@@ -128,7 +142,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noThunk, thunk, reabstractionThunk, signatureOptimizedThunk
   }
 
-  var thunkKind: ThunkKind {
+  public var thunkKind: ThunkKind {
     switch bridged.isThunk() {
     case .IsNotThunk:                return .noThunk
     case .IsThunk:                   return .thunk

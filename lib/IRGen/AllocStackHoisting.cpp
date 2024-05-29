@@ -157,9 +157,8 @@ void moveAllocStackToBeginningOfBlock(
   // of the debug_value to the original position.
   if (haveMovedElt) {
     if (auto varInfo = AS->getVarInfo()) {
-      SILBuilderWithScope Builder(AS);
       // SILBuilderWithScope skips over meta instructions when picking a scope.
-      Builder.setCurrentDebugScope(AS->getDebugScope());
+      SILBuilder Builder(AS, AS->getDebugScope());
       auto *DVI = Builder.createDebugValue(AS->getLoc(), AS, *varInfo);
       DVI->setUsesMoveableValueDebugInfo();
       DebugValueToBreakBlocksAt.push_back(DVI);
@@ -198,14 +197,14 @@ void Partition::assignStackLocation(
     if (AssignedLoc == AllocStack) continue;
     eraseDeallocStacks(AllocStack);
     AllocStack->replaceAllUsesWith(AssignedLoc);
-    if (hasAtLeastOneMovedElt) {
-      if (auto VarInfo = AllocStack->getVarInfo()) {
-        SILBuilderWithScope Builder(AllocStack);
-        auto *DVI = Builder.createDebugValue(AllocStack->getLoc(), AssignedLoc,
-                                             *VarInfo);
+    if (auto VarInfo = AllocStack->getVarInfo()) {
+      SILBuilder Builder(AllocStack, AllocStack->getDebugScope());
+      auto *DVI = Builder.createDebugValueAddr(AllocStack->getLoc(),
+                                               AssignedLoc, *VarInfo);
+      if (hasAtLeastOneMovedElt) {
         DVI->setUsesMoveableValueDebugInfo();
-        DebugValueToBreakBlocksAt.push_back(DVI);
       }
+      DebugValueToBreakBlocksAt.push_back(DVI);
     }
     AllocStack->eraseFromParent();
   }

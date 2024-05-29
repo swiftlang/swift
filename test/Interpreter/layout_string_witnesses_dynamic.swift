@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -I %S/Inputs/CTypes -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
@@ -1181,27 +1181,48 @@ func testTupleAlignment() {
 
 testTupleAlignment()
 
+func testWeakRefOptionalNative() {
+    let ptr = allocateInternalGenericPtr(of: TestOptional<WeakNativeWrapper>.self)
+    let ptr2 = allocateInternalGenericPtr(of: TestOptional<WeakNativeWrapper>.self)
+
+    do {
+        let classInstance = SimpleClass(x: 23)
+
+        do {
+            let x = TestOptional.nonEmpty(WeakNativeWrapper(x: classInstance))
+            let y = TestOptional.nonEmpty(WeakNativeWrapper(x: classInstance))
+            testGenericInit(ptr, to: x)
+            testGenericInit(ptr2, to: y)
+        }
+
+        testGenericDestroy(ptr, of: TestOptional<WeakNativeWrapper>.self)
+        testGenericDestroy(ptr2, of: TestOptional<WeakNativeWrapper>.self)
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+    }
+
+    ptr.deallocate()
+}
+
+testWeakRefOptionalNative()
+
 #if os(macOS)
 
 import Foundation
-
-@objc
-final class ObjcClass: NSObject {
-    deinit {
-        print("ObjcClass deinitialized!")
-    }
-}
 
 func testGenericObjc() {
     let ptr = allocateInternalGenericPtr(of: ObjcClass.self)
 
     do {
-        let x = ObjcClass()
+        let x = ObjcClass(x: 23)
         testGenericInit(ptr, to: x)
     }
 
     do {
-        let y = ObjcClass()
+        let y = ObjcClass(x: 32)
         // CHECK-macosx: Before deinit
         print("Before deinit")
 
@@ -1219,5 +1240,35 @@ func testGenericObjc() {
 }
 
 testGenericObjc()
+
+import Darwin
+
+func testWeakRefOptionalObjc() {
+    let ptr = allocateInternalGenericPtr(of: TestOptional<WeakObjcWrapper>.self)
+    let ptr2 = allocateInternalGenericPtr(of: TestOptional<WeakObjcWrapper>.self)
+
+    do {
+        let classInstance = ObjcClass(x: 23)
+
+        do {
+            let x = TestOptional.nonEmpty(WeakObjcWrapper(x: classInstance))
+            let y = TestOptional.nonEmpty(WeakObjcWrapper(x: classInstance))
+            testGenericInit(ptr, to: x)
+            testGenericInit(ptr2, to: y)
+        }
+
+        testGenericDestroy(ptr, of: TestOptional<WeakObjcWrapper>.self)
+        testGenericDestroy(ptr2, of: TestOptional<WeakObjcWrapper>.self)
+
+        // CHECK-macosx: Before deinit
+        print("Before deinit")
+
+        // CHECK-macosx-NEXT: ObjcClass deinitialized!
+    }
+
+    ptr.deallocate()
+}
+
+testWeakRefOptionalObjc()
 
 #endif

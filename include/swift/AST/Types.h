@@ -128,10 +128,9 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains a context-dependent archetype, either a
-    /// \c PrimaryArchetypeType, \c OpenedArchetypeType,
-    /// \c ElementArchetypeType, or \c PackArchetype.
-    HasArchetype         = 0x02,
+    /// This type expression contains a PrimaryArchetypeType
+    /// or PackArchetypeType.
+    HasPrimaryArchetype  = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter     = 0x04,
@@ -171,7 +170,7 @@ public:
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
 
-    /// This type contains an ElementArchetype.
+    /// This type contains an ElementArchetypeType.
     HasElementArchetype = 0x4000,
 
     /// Whether the type is allocated in the constraint solver arena. This can
@@ -183,7 +182,7 @@ public:
     /// Contains a PackType.
     HasPack = 0x10000,
 
-    /// Contains a PackArchetypeType.
+    /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
     HasPackArchetype = 0x20000,
 
     Last_Property = HasPackArchetype
@@ -205,9 +204,10 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain a
-  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
-  bool hasArchetype() const { return Bits & HasArchetype; }
+  /// Does a type with these properties structurally contain a primary
+  /// or pack archetype? These are the archetypes instantiated from a
+  /// primary generic environment.
+  bool hasPrimaryArchetype() const { return Bits & HasPrimaryArchetype; }
 
   /// Does a type with these properties structurally contain an
   /// archetype from an opaque type declaration?
@@ -696,9 +696,23 @@ public:
     return getRecursiveProperties().hasPlaceholder();
   }
 
-  /// Determine whether the type involves a context-dependent archetype.
+  /// Determine whether the type involves a PrimaryArchetypeType *or* a
+  /// PackArchetypeType. These are the archetypes instantiated from a
+  /// primary generic environment.
+  bool hasPrimaryArchetype() const {
+    return getRecursiveProperties().hasPrimaryArchetype();
+  }
+
+  /// Whether the type contains a PackArchetypeType.
+  bool hasPackArchetype() const {
+    return getRecursiveProperties().hasPackArchetype();
+  }
+
+  /// Determine whether the type involves a primary, pack or local archetype.
+  ///
+  /// FIXME: Replace all remaining callers with a more precise check.
   bool hasArchetype() const {
-    return getRecursiveProperties().hasArchetype();
+    return hasPrimaryArchetype() || hasLocalArchetype();
   }
   
   /// Determine whether the type involves an opened existential archetype.
@@ -725,11 +739,6 @@ public:
   /// Whether the type contains a PackType.
   bool hasPack() const {
     return getRecursiveProperties().hasPack();
-  }
-
-  /// Whether the type contains a PackArchetypeType.
-  bool hasPackArchetype() const {
-    return getRecursiveProperties().hasPackArchetype();
   }
 
   /// Whether the type has any flavor of pack.
@@ -2218,7 +2227,7 @@ class ParameterTypeFlags {
     Isolated = 1 << 7,
     CompileTimeConst = 1 << 8,
     ResultDependsOn = 1 << 9,
-    Transferring = 1 << 10,
+    Sending = 1 << 10,
     NumBits = 11
   };
   OptionSet<ParameterFlags> value;
@@ -2235,21 +2244,21 @@ public:
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
                      bool compileTimeConst, bool hasResultDependsOn,
-                     bool isTransferring)
+                     bool isSending)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
               (hasResultDependsOn ? ResultDependsOn : 0) |
-              (isTransferring ? Transferring : 0)) {}
+              (isSending ? Sending : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeConst,
-                    bool hasResultDependsOn, bool isTransferring);
+                    bool hasResultDependsOn, bool isSending);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2262,7 +2271,7 @@ public:
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool hasResultDependsOn() const { return value.contains(ResultDependsOn); }
-  bool isTransferring() const { return value.contains(Transferring); }
+  bool isSending() const { return value.contains(Sending); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2325,10 +2334,10 @@ public:
                                   : value - ParameterTypeFlags::NoDerivative);
   }
 
-  ParameterTypeFlags withTransferring(bool withTransferring) const {
-    return ParameterTypeFlags(withTransferring
-                                  ? value | ParameterTypeFlags::Transferring
-                                  : value - ParameterTypeFlags::Transferring);
+  ParameterTypeFlags withSending(bool withSending) const {
+    return ParameterTypeFlags(withSending
+                                  ? value | ParameterTypeFlags::Sending
+                                  : value - ParameterTypeFlags::Sending);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -3640,9 +3649,7 @@ public:
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
 
-  bool hasTransferringResult() const {
-    return getExtInfo().hasTransferringResult();
-  }
+  bool hasSendingResult() const { return getExtInfo().hasSendingResult(); }
 
   bool hasEffect(EffectKind kind) const;
 
@@ -4212,8 +4219,8 @@ public:
     ///   differentiable with respect to this parameter.
     NotDifferentiable = 0x1,
 
-    /// Set if the given parameter is transferring.
-    Transferring = 0x2,
+    /// Set if the given parameter is sending.
+    Sending = 0x2,
 
     /// Set if the given parameter is isolated.
     Isolated = 0x4,
@@ -4482,10 +4489,10 @@ public:
     ///   differentiable with respect to this result.
     NotDifferentiable = 0x1,
 
-    /// Set if a return type is transferring. This means that the returned value
+    /// Set if a return type is sending. This means that the returned value
     /// must be disconnected and not in any strongly structured regions like an
     /// actor or a task isolated variable.
-    IsTransferring = 0x2,
+    IsSending = 0x2,
   };
 
   using Options = OptionSet<Flag>;
@@ -4934,12 +4941,12 @@ public:
     return getExtInfo().getIsolation();
   }
 
-  /// Return true if all
-  bool hasTransferringResult() const {
-    // For now all functions either have all transferring results or no
-    // transferring results. This is validated with a SILVerifier check.
+  /// Return true if all results are 'sending'.
+  bool hasSendingResult() const {
+    // For now all functions either have all sending results or no
+    // sending results. This is validated with a SILVerifier check.
     return getNumResults() &&
-           getResults().front().hasOption(SILResultInfo::IsTransferring);
+           getResults().front().hasOption(SILResultInfo::IsSending);
   }
 
   /// Return the array of all the yields.
@@ -6614,6 +6621,8 @@ enum class OpaqueSubstitutionKind {
   // Can be done if the underlying type is accessible from the context we
   // substitute into. Private types cannot be accessed from a different TU.
   SubstituteSameModuleMaximalResilience,
+  // Same as previous but with package and above visibility.
+  SubstituteSamePackageMaximalResilience,
   // Substitute in a different module from the opaque defining decl. Can only
   // be done if the underlying type is public.
   SubstituteNonResilientModule
@@ -7762,7 +7771,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool hasResultDependsOn, bool isTransferring) {
+    bool compileTimeConst, bool hasResultDependsOn, bool isSending) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -7774,7 +7783,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
   }
   return {isVariadic,       isAutoClosure,      isNonEphemeral,
           ownership,        isolated,           isNoDerivative,
-          compileTimeConst, hasResultDependsOn, isTransferring};
+          compileTimeConst, hasResultDependsOn, isSending};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

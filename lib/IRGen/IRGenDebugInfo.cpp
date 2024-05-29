@@ -1134,11 +1134,13 @@ private:
   llvm::DICompositeType *createUnsubstitutedGenericStructOrClassType(
       DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type UnsubstitutedType,
       llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
-      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
-      llvm::DIType *DerivedFrom, unsigned RuntimeLang, StringRef UniqueID) {
+      llvm::DINode::DIFlags Flags, llvm::DIType *DerivedFrom,
+      unsigned RuntimeLang, StringRef UniqueID) {
     // FIXME: ideally, we'd like to emit this type with no size and alignment at
     // all (instead of emitting them as 0). Fix this by changing DIBuilder to
     // allow for struct types that have optional size and alignment.
+    unsigned SizeInBits = 0;
+    unsigned AlignInBits = 0;
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createStructForwardDecl(DbgTy, Decl, Scope, File, Line,
                                            SizeInBits, Flags, UniqueID, Name);
@@ -1181,8 +1183,7 @@ private:
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
         UnsubstitutedTy->mapTypeOutOfContext(), {});
     if (DeclTypeMangledName == MangledName) {
-      return createUnsubstitutedVariantType(DbgTy, Decl, MangledName,
-                                            SizeInBits, AlignInBits, Scope,
+      return createUnsubstitutedVariantType(DbgTy, Decl, MangledName, Scope,
                                             File, 0, Flags);
     }
     auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
@@ -1241,9 +1242,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       Mangler.mangleTypeForDebugger(UnsubstitutedTy->mapTypeOutOfContext(), {});
   if (DeclTypeMangledName == MangledName) {
     return createUnsubstitutedGenericStructOrClassType(
-        DbgTy, Decl, UnsubstitutedTy, Scope, File, Line, SizeInBits,
-        AlignInBits, Flags, nullptr, llvm::dwarf::DW_LANG_Swift,
-        DeclTypeMangledName);
+        DbgTy, Decl, UnsubstitutedTy, Scope, File, Line, Flags, nullptr,
+        llvm::dwarf::DW_LANG_Swift, DeclTypeMangledName);
   }
   // Force the creation of the unsubstituted type, don't create it
   // directly so it goes through all the caching/verification logic.
@@ -1336,7 +1336,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
                                            llvm::DIFile *File, unsigned Line,
                                            llvm::DINode::DIFlags Flags) {
     assert(!Decl->getRawType() &&
-           "Attempting to create variant debug info from raw enum!");
+           "Attempting to create variant debug info from raw enum!");;
 
     StringRef Name = Decl->getName().str();
     unsigned SizeInBits = DbgTy.getSizeInBits();
@@ -1408,7 +1408,6 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
   llvm::DICompositeType *
   createUnsubstitutedVariantType(DebugTypeInfo DbgTy, EnumDecl *Decl,
                                  StringRef MangledName,
-                                 unsigned SizeInBits, unsigned AlignInBits,
                                  llvm::DIScope *Scope, llvm::DIFile *File,
                                  unsigned Line, llvm::DINode::DIFlags Flags) {
     assert(!Decl->getRawType() &&
@@ -1417,6 +1416,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     StringRef Name = Decl->getName().str();
     auto NumExtraInhabitants = DbgTy.getNumExtraInhabitants();
 
+    unsigned SizeInBits = 0;
+    unsigned AlignInBits = 0;
     // A variant part should actually be a child to a DW_TAG_structure_type
     // according to the DWARF spec.
     llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
@@ -2091,7 +2092,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        if (EnumTy->isSpecialized())
+        if (EnumTy->isSpecialized() && !Decl->hasRawType())
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
@@ -2271,6 +2272,12 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
         (!SizeInBits && CachedSizeInBits)) {
+      // In some situation a specialized type is emitted with size 0, even if the real 
+      // type has a size.
+      if (DbgTy.getType()->isSpecialized() && SizeInBits && *SizeInBits > 0 &&
+          CachedSizeInBits == 0)
+        return true;
+
       CachedType->dump();
       DbgTy.dump();
       llvm::errs() << "SizeInBits = " << SizeInBits << "\n";
@@ -2958,7 +2965,12 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // Because there's no good way to cross the CU boundary to insert a nested
   // DISubprogram definition in one CU into a type defined in another CU when
   // doing LTO builds.
-  if (llvm::isa<llvm::DICompositeType>(Scope)) {
+  if (llvm::isa<llvm::DICompositeType>(Scope) &&
+      (Rep == SILFunctionTypeRepresentation::Method ||
+       Rep == SILFunctionTypeRepresentation::ObjCMethod ||
+       Rep == SILFunctionTypeRepresentation::WitnessMethod ||
+       Rep == SILFunctionTypeRepresentation::CXXMethod ||
+       Rep == SILFunctionTypeRepresentation::Thin)) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
         /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());
@@ -3133,6 +3145,9 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       return false;
     }
   }
+  if (Operands.size() && Operands.back() != llvm::dwarf::DW_OP_deref) {
+    Operands.push_back(llvm::dwarf::DW_OP_stack_value);
+  }
   return true;
 }
 
@@ -3180,11 +3195,15 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
-  uint16_t DVarCol = 0;
-  if (VarInfo.Loc) {
-    auto DVarLoc = getStartLocation(VarInfo.Loc);
-    DVarLine = DVarLoc.Line;
-    DVarCol = DVarLoc.Column;
+  uint16_t DVarCol = DInstLoc.Column;
+  auto VarInfoLoc = VarInfo.Loc ? VarInfo.Loc : DbgInstLoc;
+  if (VarInfoLoc) {
+    auto VarLoc = VarInfoLoc->strippedForDebugVariable();
+    if (VarLoc != DbgInstLoc) {
+      auto DVarLoc = getStartLocation(VarLoc);
+      DVarLine = DVarLoc.Line;
+      DVarCol = DVarLoc.Column;
+    }
   }
   llvm::DIScope *VarScope = Scope;
   if (ArgNo == 0 && VarInfo.Scope) {
@@ -3392,11 +3411,6 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   auto DL =
       llvm::DILocation::get(IGM.getLLVMContext(), Line, Col, Scope, InlinedAt);
 
-  // An alloca may only be described by exactly one dbg.declare.
-  if (isa<llvm::AllocaInst>(Storage) &&
-      !llvm::FindDbgDeclareUses(Storage).empty())
-    return;
-
   // Fragment DIExpression cannot cover the whole variable
   // or going out-of-bound.
   if (auto Fragment = Expr->getFragmentInfo()) {
@@ -3420,9 +3434,23 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // /always/ emit an llvm.dbg.value of undef.
   // If we have undef, always emit a llvm.dbg.value in the current position.
   if (isa<llvm::UndefValue>(Storage)) {
+    if (Expr->getNumElements() &&
+        (Expr->getElement(0) == llvm::dwarf::DW_OP_consts
+         || Expr->getElement(0) == llvm::dwarf::DW_OP_constu)) {
+      /// Convert `undef, expr op_consts:N:...` to `N, expr ...`
+      Storage = llvm::ConstantInt::get(
+          llvm::IntegerType::getInt64Ty(Builder.getContext()),
+          Expr->getElement(1));
+      Expr = llvm::DIExpression::get(Builder.getContext(),
+                                     Expr->getElements().drop_front(2));
+    }
     DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
     return;
   }
+
+  bool optimized = DS->getParentFunction()->shouldOptimize();
+  if (optimized && (!InCoroContext || !Var->isParameter()))
+    AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
 
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
@@ -3450,7 +3478,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
   }
 
-  if (InCoroContext) {
+  if (InCoroContext && (Var->isParameter() || !optimized)) {
     PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
 
     // If we have a dbg.declare, we are relying on a contract with the coroutine

@@ -52,6 +52,7 @@ public func deadClassInstance() {
 
 // CHECK-LABEL: sil @$s10dead_alloc0A13ManagedBufferyyF :
 // CHECK:       bb0:
+// CHECK-NEXT:    debug_value undef
 // CHECK-NEXT:    tuple
 // CHECK-NEXT:    return
 // CHECK-NEXT:  } // end sil function '$s10dead_alloc0A13ManagedBufferyyF'

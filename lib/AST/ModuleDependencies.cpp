@@ -21,6 +21,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
+#include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -120,16 +121,67 @@ void ModuleDependencyInfo::addOptionalModuleImport(
 }
 
 void ModuleDependencyInfo::addModuleImport(
-    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
-  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
-    storage->moduleImports.push_back(module.str());
+    StringRef module, llvm::StringSet<> *alreadyAddedModules,
+    const SourceManager *sourceManager, SourceLoc sourceLocation) {
+  auto scannerImportLocToDiagnosticLocInfo =
+      [&sourceManager](SourceLoc sourceLocation) {
+        auto lineAndColumnNumbers =
+            sourceManager->getLineAndColumnInBuffer(sourceLocation);
+        return ScannerImportStatementInfo::ImportDiagnosticLocationInfo(
+            sourceManager->getDisplayNameForLoc(sourceLocation).str(),
+            lineAndColumnNumbers.first, lineAndColumnNumbers.second);
+      };
+  bool validSourceLocation = sourceManager && sourceLocation.isValid() &&
+                             sourceManager->isOwning(sourceLocation);
+
+  if (alreadyAddedModules && alreadyAddedModules->contains(module)) {
+    if (validSourceLocation) {
+      // Find a prior import of this module and add import location
+      for (auto &existingImport : storage->moduleImports) {
+        if (existingImport.importIdentifier == module) {
+          existingImport.addImportLocation(
+              scannerImportLocToDiagnosticLocInfo(sourceLocation));
+          break;
+        }
+      }
+    }
+  } else {
+    if (alreadyAddedModules)
+      alreadyAddedModules->insert(module);
+
+    if (validSourceLocation)
+      storage->moduleImports.push_back(ScannerImportStatementInfo(
+          module.str(), scannerImportLocToDiagnosticLocInfo(sourceLocation)));
+    else
+      storage->moduleImports.push_back(
+          ScannerImportStatementInfo(module.str()));
+  }
 }
 
 void ModuleDependencyInfo::addModuleImport(
-    const SourceFile &sf, llvm::StringSet<> &alreadyAddedModules) {
+    ImportPath::Module module, llvm::StringSet<> *alreadyAddedModules,
+    const SourceManager *sourceManager, SourceLoc sourceLocation) {
+  std::string ImportedModuleName = module.front().Item.str().str();
+  auto submodulePath = module.getSubmodulePath();
+  if (submodulePath.size() > 0 && !submodulePath[0].Item.empty()) {
+    auto submoduleComponent = submodulePath[0];
+    // Special case: a submodule named "Foo.Private" can be moved to a top-level
+    // module named "Foo_Private". ClangImporter has special support for this.
+    if (submoduleComponent.Item.str() == "Private")
+      addOptionalModuleImport(ImportedModuleName + "_Private",
+                              alreadyAddedModules);
+  }
+
+  addModuleImport(ImportedModuleName, alreadyAddedModules,
+                  sourceManager, sourceLocation);
+}
+
+void ModuleDependencyInfo::addModuleImports(
+    const SourceFile &sourceFile, llvm::StringSet<> &alreadyAddedModules,
+    const SourceManager *sourceManager) {
   // Add all of the module dependencies.
   SmallVector<Decl *, 32> decls;
-  sf.getTopLevelDecls(decls);
+  sourceFile.getTopLevelDecls(decls);
   for (auto decl : decls) {
     auto importDecl = dyn_cast<ImportDecl>(decl);
     if (!importDecl)
@@ -148,10 +200,12 @@ void ModuleDependencyInfo::addModuleImport(
 
     // Ignore/diagnose tautological imports akin to import resolution
     if (!swift::dependencies::checkImportNotTautological(
-            realPath, importDecl->getLoc(), sf, importDecl->isExported()))
+            realPath, importDecl->getLoc(), sourceFile,
+            importDecl->isExported()))
       continue;
 
-    addModuleImport(realPath, &alreadyAddedModules);
+    addModuleImport(realPath, &alreadyAddedModules,
+                    sourceManager, importDecl->getLoc());
 
     // Additionally, keep track of which dependencies of a Source
     // module are `@Testable`.
@@ -160,7 +214,7 @@ void ModuleDependencyInfo::addModuleImport(
       addTestableImport(realPath);
   }
 
-  auto fileName = sf.getFilename();
+  auto fileName = sourceFile.getFilename();
   if (fileName.empty())
     return;
 
@@ -480,6 +534,58 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
   // Add VFSOverlay file.
   for (auto &Overlay: Opts.VFSOverlayFiles)
     FS->status(Overlay);
+
+  // Add plugin dylibs from the toolchain only by look through the plugin search
+  // directory.
+  auto recordFiles = [&](StringRef Path) {
+    std::error_code EC;
+    for (auto I = FS->dir_begin(Path, EC);
+         !EC && I != llvm::vfs::directory_iterator(); I = I.increment(EC)) {
+      if (I->type() != llvm::sys::fs::file_type::regular_file)
+        continue;
+#if defined(_WIN32)
+      constexpr StringRef libPrefix{};
+      constexpr StringRef libSuffix = ".dll";
+#else
+      constexpr StringRef libPrefix = "lib";
+      constexpr StringRef libSuffix = LTDL_SHLIB_EXT;
+#endif
+      StringRef filename = llvm::sys::path::filename(I->path());
+      if (filename.starts_with(libPrefix) && filename.ends_with(libSuffix))
+        FS->status(I->path());
+    }
+  };
+  for (auto &entry : Opts.PluginSearchOpts) {
+    switch (entry.getKind()) {
+
+    // '-load-plugin-library <library path>'.
+    case PluginSearchOption::Kind::LoadPluginLibrary: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginLibrary>();
+      FS->status(val.LibraryPath);
+      break;
+    }
+
+    // '-load-plugin-executable <executable path>#<module name>, ...'.
+    case PluginSearchOption::Kind::LoadPluginExecutable: {
+      // We don't have executable plugin in toolchain.
+      break;
+    }
+
+    // '-plugin-path <library search path>'.
+    case PluginSearchOption::Kind::PluginPath: {
+      auto &val = entry.get<PluginSearchOption::PluginPath>();
+      recordFiles(val.SearchPath);
+      break;
+    }
+
+    // '-external-plugin-path <library search path>#<server path>'.
+    case PluginSearchOption::Kind::ExternalPluginPath: {
+      auto &val = entry.get<PluginSearchOption::ExternalPluginPath>();
+      recordFiles(val.SearchPath);
+      break;
+    }
+    }
+  }
 }
 
 void SwiftDependencyTracker::startTracking() {

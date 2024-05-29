@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -29,6 +30,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -1905,4 +1907,33 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
   }
 
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+static BridgedUtilities::UpdateBorrowedFromFn updateBorrowedFromFunction;
+static BridgedUtilities::UpdateBorrowedFromPhisFn updateBorrowedFromPhisFunction;
+
+void BridgedUtilities::registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
+                                                   UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn) {
+  updateBorrowedFromFunction = updateBorrowedFromFn;
+  updateBorrowedFromPhisFunction = updateBorrowedFromPhisFn;
+}
+
+void swift::updateBorrowedFrom(SILPassManager *pm, SILFunction *f) {
+  if (updateBorrowedFromFunction)
+    updateBorrowedFromFunction({pm->getSwiftPassInvocation()}, {f});
+}
+
+void swift::updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!updateBorrowedFromPhisFunction)
+    return;
+
+  llvm::SmallVector<BridgedValue, 8> bridgedPhis;
+  for (SILPhiArgument *phi : phis) {
+    bridgedPhis.push_back({phi});
+  }
+  updateBorrowedFromPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
 }

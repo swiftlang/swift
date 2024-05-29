@@ -85,9 +85,19 @@ VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED, bool, true,
          "Enable use of prespecializations library.")
 
 VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH, string, "",
-         "A path to a prespecializations library to use at runtime. In order to"
-         "be used, this library must be loaded into the process by other means"
-         "(such as DYLD_INSERT_LIBRARIES) before Swift tries to use it.")
+         "A path to a prespecializations library to use at runtime. In order "
+         "to be used, this library must be loaded into the process by other "
+         "means (such as DYLD_INSERT_LIBRARIES) before Swift tries to use it.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES, string, "",
+         "A colon-separated list of process names where the prespecializations "
+         "library will be forcibly disabled.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES, string, "",
+         "A colon-separated list of process names where the prespecializations "
+         "library will be forcibly enabled. This overrides the disabled "
+         "processes list in the prespecializations library, as well as the "
+         "list in SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES.")
 
 VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, bool, false,
          "Enable debug logging of prespecializations library use.")
@@ -101,5 +111,17 @@ VARIABLE(SWIFT_BACKTRACE, string, "",
          "A comma-separated list of key=value pairs that controls the "
          "crash catching and backtracing support in the runtime. "
          "See docs/Backtracing.rst in the Swift repository for details.")
+
+VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
+         "Allows for suppressing 'is current executor' equality check crashes. "
+         "As since Swift 6.0 checking for current executor equality, may crash "
+         "and will never return 'false' because we are calling into library "
+         "implemented SerialExecutor.checkIsolation which should crash if the "
+         "isolation is not the expected one. Some old code may rely on the "
+         "non-crashing behavior. This flag enables temporarily restoring the "
+         "legacy 'nocrash' behavior until adopting code has been adjusted. "
+         "Legal values are: "
+         " 'legacy' (Legacy behavior), "
+         " 'swift6' (Swift 6.0+ behavior)")
 
 #undef VARIABLE

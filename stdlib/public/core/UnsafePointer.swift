@@ -394,11 +394,11 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafePointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
@@ -444,16 +444,14 @@ extension UnsafePointer {
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
@@ -1237,11 +1235,11 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
@@ -1332,16 +1330,14 @@ extension UnsafeMutablePointer {
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
@@ -1356,16 +1352,14 @@ extension UnsafeMutablePointer {
   /// - Returns: A mutable pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: WritableKeyPath<Pointee, Property>
   ) -> UnsafeMutablePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))

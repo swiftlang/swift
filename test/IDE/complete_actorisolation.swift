@@ -20,37 +20,37 @@ extension MyActor {
 // IN_SYNCFUNC-DAG: Decl[InstanceMethod]/CurrNominal:   syncFunc()[#Int#];
 // IN_SYNCFUNC-DAG: Decl[InstanceMethod]/CurrNominal:   syncNonSendable({#arg: MyNonSendable#})[#Int#];
 // IN_SYNCFUNC-DAG: Decl[InstanceMethod]/CurrNominal:   syncSendable({#arg: MySendable#})[#Int#];
-// IN_SYNCFUNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: asyncFunc()[' async'][#Int#];
+// IN_SYNCFUNC-DAG: Decl[InstanceMethod]/CurrNominal: asyncFunc()[' async'][#Int#];
 
         let _ = self.#^IN_SYNCFUNC_SELF_DOT^#
 // IN_SYNCFUNC_SELF_DOT-DAG: Decl[InstanceVar]/CurrNominal:      property[#Int#];
 // IN_SYNCFUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   syncFunc()[#Int#];
 // IN_SYNCFUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   syncNonSendable({#arg: MyNonSendable#})[#Int#];
 // IN_SYNCFUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   syncSendable({#arg: MySendable#})[#Int#];
-// IN_SYNCFUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: asyncFunc()[' async'][#Int#];
+// IN_SYNCFUNC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal: asyncFunc()[' async'][#Int#];
 
         let _ = self#^IN_SYNCFUNC_SELF_NODOT^#
 // IN_SYNCFUNC_SELF_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .property[#Int#];
 // IN_SYNCFUNC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .syncFunc()[#Int#];
 // IN_SYNCFUNC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .syncNonSendable({#arg: MyNonSendable#})[#Int#];
 // IN_SYNCFUNC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .syncSendable({#arg: MySendable#})[#Int#];
-// IN_SYNCFUNC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .asyncFunc()[' async'][#Int#];
+// IN_SYNCFUNC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .asyncFunc()[' async'][#Int#];
 // IN_SYNCFUNC_SELF_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): Int#}][#Int#];
 
         let _ = other.#^IN_SYNCFUNC_OTHER_DOT^#
-// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: property[#Int#][' async'];
-// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: syncFunc()[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: syncSendable({#arg: MySendable#})[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: asyncFunc()[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal: property[#Int#][' async'];
+// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: syncFunc()[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: syncSendable({#arg: MySendable#})[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: asyncFunc()[' async'][#Int#];
 
         let _ = other#^IN_SYNCFUNC_OTHER_NODOT^#
-// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: .property[#Int#][' async'];
-// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .syncFunc()[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .syncSendable({#arg: MySendable#})[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .asyncFunc()[' async'][#Int#];
-// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[Subscript]/CurrNominal/NotRecommended: [{#(idx): Int#}][' async'][#Int#];
+// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceVar]/CurrNominal: .property[#Int#][' async'];
+// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .syncFunc()[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .syncSendable({#arg: MySendable#})[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .asyncFunc()[' async'][#Int#];
+// IN_SYNCFUNC_OTHER_NODOT-DAG: Decl[Subscript]/CurrNominal: [{#(idx): Int#}][' async'][#Int#];
     }
     func testAsyncFunc(other: MyActor) async {
         let _ = #^IN_ASYNCFUNC^#
@@ -79,14 +79,14 @@ extension MyActor {
         let _ = other.#^IN_ASYNCFUNC_OTHER_DOT^#
 // IN_ASYNCFUNC_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal:      property[#Int#][' async'];
 // IN_ASYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   syncFunc()[' async'][#Int#];
-// IN_ASYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
+// IN_ASYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   syncSendable({#arg: MySendable#})[' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   asyncFunc()[' async'][#Int#];
 
         let _ = other#^IN_ASYNCFUNC_OTHER_NODOT^#
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .property[#Int#][' async'];
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .syncFunc()[' async'][#Int#];
-// IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: .syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
+// IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal: .syncNonSendable({#arg: MyNonSendable#})[' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .syncSendable({#arg: MySendable#})[' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .asyncFunc()[' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): Int#}][' async'][#Int#];

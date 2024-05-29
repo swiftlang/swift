@@ -901,14 +901,6 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
-static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable),
-                                      _conformsTo(_typeparam(0), _escapable)),
-                            _parameters(_typeparam(0)), _typeparam(0));
-}
-
 static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
   // This is always "(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer"
   return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
@@ -1646,14 +1638,14 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   // TaskOptionRecord*
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
-  // If transferring results are enabled, make async let return a transferring
+  // If sending results are enabled, make async let return a set
   // value.
   //
   // NOTE: If our actual returned function does not return something that is
-  // transferring, we will emit an error in Sema. In the case of SILGen, we just
-  // in such a case want to thunk and not emit an error. So in such a case, we
-  // always make this builtin take a transferring result.
-  bool hasTransferringResult =
+  // sent, we will emit an error in Sema. In the case of SILGen, we just in such
+  // a case want to thunk and not emit an error. So in such a case, we always
+  // make this builtin take a sending result.
+  bool hasSendingResult =
       ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults);
 
   // operation async function pointer: () async throws -> transferring T
@@ -1661,7 +1653,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
                      .withAsync()
                      .withThrows()
                      .withNoEscape()
-                     .withTransferringResult(hasTransferringResult)
+                     .withSendingResult(hasSendingResult)
                      .build();
   builder.addParameter(
       makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -2785,11 +2777,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::EndUnpairedAccess:
     if (!Types.empty()) return nullptr;
     return getEndUnpairedAccessOperation(Context, Id);
-
-  case BuiltinValueKind::Copy:
-    if (!Types.empty())
-      return nullptr;
-    return getCopyOperation(Context, Id);
 
   case BuiltinValueKind::AssumeAlignment:
     if (!Types.empty())

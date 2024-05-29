@@ -5457,6 +5457,10 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
                    false, getFeatureName(Feature::TransferringArgsAndResults));
+      } else {
+        // Now that we have sending, warn users to convert 'transferring' to
+        // 'sendable'.
+        P.diagnose(Tok, diag::transferring_is_now_sendable);
       }
 
       // Do not allow for transferring to be parsed after a specifier has been
@@ -5475,7 +5479,38 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         P.diagnose(Tok, diag::transferring_repeated).fixItRemove(Tok.getLoc());
       }
 
+      // If we have already seen 'sending', emit an error to the user and give a
+      // fixit that removes the transferring.
+      if (SendingLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_and_transferring_used_together)
+            .fixItRemove(Tok.getLoc());
+      }
+
       TransferringLoc = P.consumeToken();
+      continue;
+    }
+
+    // Perform an extra check for 'sending'. Since it is a specifier, we use
+    // the actual parsing logic below.
+    if (Tok.isContextualKeyword("sending")) {
+      if (!P.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
+        P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
+                   false, getFeatureName(Feature::SendingArgsAndResults));
+      }
+
+      // Only allow for 'sending' to be written once.
+      if (SendingLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_repeated).fixItRemove(Tok.getLoc());
+      }
+
+      // If 'transferring' was written before 'sending', suggest the user remove
+      // 'transferring' since 'sendable' is the final form.
+      if (TransferringLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_and_transferring_used_together)
+            .fixItRemove(TransferringLoc);
+      }
+
+      SendingLoc = P.consumeToken();
       continue;
     }
 
@@ -5506,6 +5541,12 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         } else if (Tok.getRawText().equals("consuming")) {
           Specifier = ParamDecl::Specifier::Consuming;
         }
+      }
+
+      // A specifier must come before 'sending'.
+      if (bool(Specifier) && SendingLoc.isValid()) {
+        P.diagnose(Tok, diag::sending_before_parameter_specifier,
+                   getNameForParamSpecifier(Specifier));
       }
     }
     Tok.setKind(tok::contextual_keyword);
@@ -6718,32 +6759,6 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   return DCC.fixupParserResult(ID);
 }
 
-static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
-                              ASTContext &Context,
-                              Decl *decl) {
-  if (parsedTildeCopyable.isInvalid())
-    return;
-
-  if (Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    llvm_unreachable("unexpected use of legacy ~Copyable parsing");
-
-  auto &attrs = decl->getAttrs();
-
-  // Don't add if it's already explicitly written on the decl, but error about
-  // the duplication and point to the `~Copyable`.
-  if (auto attr = attrs.getAttribute<MoveOnlyAttr>()) {
-    const bool sayModifier = false;
-    Context.Diags.diagnose(attr->getLocation(), diag::duplicate_attribute,
-                           sayModifier)
-        .fixItRemove(attr->getRange());
-    Context.Diags.diagnose(parsedTildeCopyable, diag::previous_attribute,
-                           sayModifier);
-    return;
-  }
-
-  attrs.add(new(Context) MoveOnlyAttr(/*IsImplicit=*/true));
-}
-
 /// Parse an inheritance clause.
 ///
 /// \verbatim
@@ -6758,14 +6773,12 @@ static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
 ParserStatus Parser::parseInheritance(
     SmallVectorImpl<InheritedEntry> &Inherited,
     bool allowClassRequirement,
-    bool allowAnyObject,
-    SourceLoc *parseTildeCopyable) {
+    bool allowAnyObject) {
   consumeToken(tok::colon);
 
   SourceLoc classRequirementLoc;
 
   ParserStatus Status;
-  SourceLoc TildeCopyableLoc;
   SourceLoc prevComma;
   bool HasNextType;
   do {
@@ -6817,49 +6830,6 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    if (!EnabledNoncopyableGenerics && Tok.isTilde()) {
-      ErrorTypeRepr *error = nullptr;
-      if (parseTildeCopyable) {
-        const auto &nextTok = peekToken(); // lookahead
-        if (isIdentifier(nextTok, Context.Id_Copyable.str())) {
-          auto tildeLoc = consumeToken();
-          consumeToken(); // the 'Copyable' token
-
-          if (TildeCopyableLoc)
-            Inherited.push_back(InheritedEntry(
-                ErrorTypeRepr::create(Context, tildeLoc,
-                                      diag::already_suppressed_copyable)));
-          else
-            TildeCopyableLoc = tildeLoc;
-
-          continue; // success
-        }
-
-        if (nextTok.is(tok::code_complete)) {
-          consumeToken(); // consume '~'
-          Status.setHasCodeCompletionAndIsError();
-          if (CodeCompletionCallbacks) {
-            CodeCompletionCallbacks->completeWithoutConstraintType();
-          }
-          consumeToken(tok::code_complete);
-        }
-
-        // can't suppress whatever is between '~' and ',' or '{'.
-        error = ErrorTypeRepr::create(Context, consumeToken(),
-                                      diag::only_suppress_copyable);
-      } else {
-        // Otherwise, a suppression isn't allowed here unless noncopyable
-        // generics is enabled, so record a delayed error diagnostic and
-        // eat the token to prevent further parsing errors.
-        error = ErrorTypeRepr::create(Context, consumeToken(),
-                                      diag::cannot_suppress_here);
-      }
-
-      // Record the error parsing ~Copyable, but continue on to parseType.
-      if (error)
-        Inherited.push_back(InheritedEntry(error));
-    }
-
     auto ParsedTypeResult = parseType();
     Status |= ParsedTypeResult;
 
@@ -6867,9 +6837,6 @@ ParserStatus Parser::parseInheritance(
     if (ParsedTypeResult.isNonNull())
       Inherited.push_back(InheritedEntry(ParsedTypeResult.get()));
   } while (HasNextType);
-
-  if (parseTildeCopyable)
-    *parseTildeCopyable = TildeCopyableLoc;
 
   return Status;
 }
@@ -7196,6 +7163,20 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
           TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
     }
     status |= whereStatus;
+  }
+
+  // @implementation requires an explicit @objc attribute, but
+  // @_objcImplementation didn't. Insert one if necessary.
+  auto implAttr = Attributes.getAttribute<ObjCImplementationAttr>();
+  if (implAttr && implAttr->isEarlyAdopter()
+        && !Attributes.hasAttribute<ObjCAttr>()) {
+    ObjCAttr *objcAttr;
+    if (implAttr->CategoryName.empty())
+      objcAttr = ObjCAttr::createUnnamedImplicit(Context);
+    else
+      objcAttr = ObjCAttr::createNullary(Context, implAttr->CategoryName,
+                                         /*isNameImplicit=*/false);
+    Attributes.add(objcAttr);
   }
 
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
@@ -9165,14 +9146,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    SourceLoc parsedTildeCopyable;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false,
-                               &parsedTildeCopyable);
+                               /*allowAnyObject=*/false);
     ED->setInherited(Context.AllocateCopy(Inherited));
-
-    addMoveOnlyAttrIf(parsedTildeCopyable, Context, ED);
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -9431,14 +9408,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    SourceLoc parsedTildeCopyable;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false,
-                               &parsedTildeCopyable);
+                               /*allowAnyObject=*/false);
     SD->setInherited(Context.AllocateCopy(Inherited));
-
-    addMoveOnlyAttrIf(parsedTildeCopyable, Context, SD);
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);

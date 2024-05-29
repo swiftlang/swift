@@ -402,8 +402,10 @@ public:
   getWrapperForModule(const clang::Module *mod,
                       bool returnOverlayIfPossible = false) const override;
 
-  std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
-                                        time_t &fileModTime);
+  std::string
+  getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
+                            time_t &fileModTime,
+                            StringRef pchIncludeTree);
 
   /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads
   /// an Objective-C header file into the replica and emits a PCH file of its
@@ -662,6 +664,11 @@ bool requiresCPlusPlus(const clang::Module *module);
 /// This could be the top-level std module, or any of the libc++ split modules
 /// (std_vector, std_iosfwd, etc).
 bool isCxxStdModule(const clang::Module *module);
+
+/// Returns true if the given module is one of the C++ standard library modules.
+/// This could be the top-level std module, or any of the libc++ split modules
+/// (std_vector, std_iosfwd, etc).
+bool isCxxStdModule(StringRef moduleName, bool IsSystem);
 
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.

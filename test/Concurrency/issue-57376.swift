@@ -1,13 +1,18 @@
 // RUN: %target-swift-frontend -disable-availability-checking -strict-concurrency=targeted %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-and-complete-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete-
 
 // NOTE: We test separately with region isolation and region isolation +
-// transferring args and results since the semantics when transferring args and
+// sending args and results since the semantics when sending args and
 // results are enabled is different since async let in such a case takes a
 // non-Sendable closure whose captures are transferred in while without it, we
 // leave the async let closure as sendable and use sema level checking.
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix tns- -verify-additional-prefix no-transferring-tns-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -verify-additional-prefix tns- -verify-additional-prefix transferring-tns-
+
+// No transferring.
+//
+// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix tns- -verify-additional-prefix no-transferring-tns- -disable-transferring-args-and-results-with-region-based-isolation -disable-sending-args-and-results-with-region-based-isolation
+
+// With transferring.
+//
+// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix transferring-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -34,7 +39,7 @@ func testAsyncSequence1Sendable<Seq: AsyncSequence>(_ seq: Seq) async throws whe
 
 func testAsyncSequenceTypedPattern<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int { // expected-targeted-and-complete-note {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{54-54=, Sendable}}
   // expected-no-transferring-tns-note @-1 {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{54-54=, Sendable}}
-  async let result: Int = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be transferred}}
+  async let result: Int = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be sent}}
   // expected-targeted-and-complete-warning @-1 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   // expected-no-transferring-tns-warning @-2 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   let _ = try! await result
@@ -42,14 +47,14 @@ func testAsyncSequenceTypedPattern<Seq: AsyncSequence>(_ seq: Seq) async throws 
 
 func testAsyncSequenceTypedPattern1<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int { // expected-targeted-and-complete-note {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{55-55=, Sendable}}
   // expected-no-transferring-tns-note @-1 {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{55-55=, Sendable}}
-  async let _: Int = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be transferred}}
+  async let _: Int = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be sent}}
   // expected-targeted-and-complete-warning @-1 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   // expected-no-transferring-tns-warning @-2 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
 }
 
 func testAsyncSequence<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int { // expected-targeted-and-complete-note {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{42-42=, Sendable}}
   // expected-no-transferring-tns-note @-1 {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{42-42=, Sendable}}
-  async let result = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be transferred}}
+  async let result = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be sent}}
   // expected-targeted-and-complete-warning @-1 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   // expected-no-transferring-tns-warning @-2 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   let _ = try! await result
@@ -57,14 +62,14 @@ func testAsyncSequence<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.El
 
 func testAsyncSequence1<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int { // expected-targeted-and-complete-note {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{43-43=, Sendable}}
   // expected-no-transferring-tns-note @-1 {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{43-43=, Sendable}}
-  async let _ = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be transferred}}
+  async let _ = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{task or actor isolated value cannot be sent}}
   // expected-targeted-and-complete-warning @-1 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   // expected-no-transferring-tns-warning @-2 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
 }
 
 func testAsyncSequence3<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int { // expected-targeted-and-complete-note {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
   // expected-no-transferring-tns-note @-1 {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
-  async let result = seq // expected-transferring-tns-warning {{task or actor isolated value cannot be transferred}}
+  async let result = seq // expected-transferring-tns-warning {{task or actor isolated value cannot be sent}}
   // expected-targeted-and-complete-warning @-1 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   // expected-no-transferring-tns-warning @-2 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   let _ = await result
@@ -72,7 +77,7 @@ func testAsyncSequence3<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, 
 
 func testAsyncSequence4<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int { // expected-targeted-and-complete-note {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
   // expected-no-transferring-tns-note @-1 {{consider making generic parameter 'Seq' conform to the 'Sendable' protocol}} {{28-28=: Sendable}}
-  async let _ = seq // expected-transferring-tns-warning {{task or actor isolated value cannot be transferred}}
+  async let _ = seq // expected-transferring-tns-warning {{task or actor isolated value cannot be sent}}
   // expected-targeted-and-complete-warning @-1 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
   // expected-no-transferring-tns-warning @-2 {{capture of 'seq' with non-sendable type 'Seq' in 'async let' binding}}
 }

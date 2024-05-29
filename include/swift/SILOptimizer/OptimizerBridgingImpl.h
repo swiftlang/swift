@@ -19,11 +19,12 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_IMPL_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_IMPL_H
 
-#include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
@@ -438,11 +439,26 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
       inst.unbridged(), invocation->getFunction(), invocation->getTransform());
 }
 
+BridgedPassContext BridgedPassContext::initializeNestedPassContext(BridgedFunction newFunction) const {
+  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) }; 
+}
+
+void BridgedPassContext::deinitializedNestedPassContext() const {
+  invocation->deinitializeNestedSwiftPassInvocation();
+}
+
 void BridgedPassContext::SSAUpdater_initialize(
     BridgedFunction function, BridgedType type,
     BridgedValue::Ownership ownership) const {
   invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
                                    BridgedValue::castToOwnership(ownership));
+}
+
+void BridgedPassContext::addFunctionToPassManagerWorklist(
+    BridgedFunction newFunction, BridgedFunction oldFunction) const {
+  swift::SILPassManager *pm = invocation->getPassManager();
+  pm->addFunctionToWorklist(newFunction.getFunction(),
+                            oldFunction.getFunction());
 }
 
 void BridgedPassContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {

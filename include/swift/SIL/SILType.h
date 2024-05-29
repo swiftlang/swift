@@ -461,13 +461,19 @@ public:
   }
 
   /// Returns true if the referenced type is expressed in terms of one
-  /// or more opened existential types.
+  /// or more opened existential archetypes.
   bool hasOpenedExistential() const {
     return getASTType()->hasOpenedExistential();
   }
 
   TypeTraitResult canBeClass() const {
     return getASTType()->canBeClass();
+  }
+
+  /// Returns true if the referenced type is expressed in terms of one
+  /// or more element archetypes.
+  bool hasElementArchetype() const {
+    return getASTType()->hasElementArchetype();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
@@ -555,6 +561,13 @@ public:
     // Handle whatever AST types are known to hold functions. Namely tuples.
     return ty->isNoEscape();
   }
+  
+  bool isThickFunction() const {
+    if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
+      return fTy->getRepresentation() == SILFunctionType::Representation::Thick;
+    }
+    return false;
+  }
 
   bool isAsyncFunction() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
@@ -563,8 +576,13 @@ public:
     return false;
   }
 
-  /// True if the type involves any archetypes.
+  /// True if the type involves any primary or local archetypes.
   bool hasArchetype() const { return getASTType()->hasArchetype(); }
+
+  /// True if the type involves any primary archetypes.
+  bool hasPrimaryArchetype() const {
+    return getASTType()->hasPrimaryArchetype();
+  }
 
   /// True if the type involves any opaque archetypes.
   bool hasOpaqueArchetype() const {
@@ -917,7 +935,15 @@ public:
 
   bool isMarkedAsImmortal() const;
 
+  /// Returns true if this type is an actor type. Returns false if this is any
+  /// other type. This includes distributed actors. To check for distributed
+  /// actors and actors, use isAnyActor().
   bool isActor() const { return getASTType()->isActorType(); }
+
+  bool isDistributedActor() const { return getASTType()->isDistributedActor(); }
+
+  /// Returns true if this type is an actor or a distributed actor.
+  bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
   bool isSendable(SILFunction *fn) const;

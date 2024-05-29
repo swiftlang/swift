@@ -93,12 +93,19 @@ KNOWN_SETTINGS=(
     android-deploy-device-path                    ""                "Path on an Android device to which built Swift stdlib products will be deployed"
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
 
+    ## Linux Options
+    musl-path                                     "/usr/local/musl" "The path to the Musl headers and libraries"
+    linux-archs                                   ""                "The Linux target architecture(s)"
+    linux-static-archs                            ""                "The fully static Linux target architecture(s)"
+    build-linux-static                            ""                "set to build Swift stdlibs for statically linked Linux"
+
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
     darwin-deployment-version-ios                 "11.0"            "minimum deployment target version for iOS"
     darwin-deployment-version-osx                 "10.13"           "minimum deployment target version for OS X"
     darwin-deployment-version-tvos                "11.0"            "minimum deployment target version for tvOS"
     darwin-deployment-version-watchos             "4.0"             "minimum deployment target version for watchOS"
+    darwin-deployment-version-xros                "1.0"             "minimum deployment target version for xrOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
     darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
     darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
@@ -129,6 +136,7 @@ KNOWN_SETTINGS=(
     ## Skip Build ...
     skip-build                                    ""                "set to configure as usual while skipping the build step"
     skip-build-android                            ""                "set to skip building Swift stdlibs for Android"
+    skip-build-linux                              ""                "set to skip building Swift stdlibs for Linux"
     skip-build-wasm                               ""                "set to skip building Swift stdlibs for WebAssembly"
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
@@ -378,24 +386,6 @@ function true_false() {
     esac
 }
 
-function to_bootstrapping_mode() {
-    case "$1" in
-        false | FALSE | 0)
-            echo "OFF"
-            ;;
-        true | TRUE | 1 | "")
-            if [[ "$(uname -s)" == "Darwin" ]] ; then
-              echo "BOOTSTRAPPING-WITH-HOSTLIBS"
-            else
-              echo "BOOTSTRAPPING"
-            fi
-            ;;
-        *)
-            echo `toupper $1`
-            ;;
-    esac
-}
-
 function to_varname() {
     # Uses `tr` because it is orders of magnitude faster than ${1//-/_} on long
     # strings, which happens when translating KNOWN_SETTINGS.
@@ -484,6 +474,8 @@ function verify_host_is_supported() {
       | linux-powerpc64le       \
       | linux-riscv64           \
       | linux-s390x             \
+      | linux-static-aarch64    \
+      | linux-static-x86_64     \
       | macosx-x86_64           \
       | macosx-arm64            \
       | macosx-arm64e           \
@@ -499,6 +491,9 @@ function verify_host_is_supported() {
       | watchsimulator-arm64    \
       | watchos-armv7k          \
       | watchos-arm64_32        \
+      | xrsimulator-arm64  \
+      | xros-arm64         \
+      | xros-arm64e        \
       | wasi-wasm32             \
       | android-armv7           \
       | android-aarch64         \
@@ -586,7 +581,9 @@ function set_build_options_for_host() {
         appletvos-*         | \
         appletvsimulator-*  | \
         watchos-*           | \
-        watchsimulator-*)
+        watchsimulator-*    | \
+        xros-*              | \
+        xrsimulator-*)
             swift_cmake_options+=(
               -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
@@ -709,6 +706,27 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     cmake_osx_deployment_target=""
                     ;;
+                xrsimulator-arm64)
+                    SWIFT_HOST_TRIPLE="arm64-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}-simulator"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS_SIMULATOR"
+                    cmake_osx_deployment_target=""
+                    ;;
+                xros-arm64)
+                    SWIFT_HOST_TRIPLE="arm64-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                xros-arm64e)
+                    SWIFT_HOST_TRIPLE="arm64e-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="XROS"
+                    cmake_osx_deployment_target=""
+                    ;;
             esac
 
             if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
@@ -734,6 +752,7 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_XROS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
@@ -766,11 +785,21 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                -DSWIFT_DARWIN_DEPLOYMENT_VERSION_XROS="${DARWIN_DEPLOYMENT_VERSION_XROS}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
                 # This is needed to make sure to avoid using the wrong architecture
                 # in the compiler checks CMake performs
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
+
+            # Avoid building the embedded stdlib and other embedded libraries when cross-compiling.
+            # Those are already provided by the local host build, and are identical and only cause
+            # trouble when lipo-ing if they are produced in cross-compile builds too.
+            if [[ $(is_cross_tools_host "${host}") ]] ; then
+                swift_cmake_options+=(
+                    -DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB:BOOL=FALSE
+                )
+            fi
 
             lldb_cmake_options+=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
@@ -1090,7 +1119,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* | linux-static-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1365,6 +1394,12 @@ function common_cross_c_flags() {
         watchos-*)
             echo -n " -arch ${arch} -target ${arch}-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
+        xrsimulator-*)
+            echo -n " -arch ${arch}  -target ${arch}-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}-simulator"
+            ;;
+        xros-*)
+            echo -n " -arch ${arch}  -target ${arch}-apple-xros${DARWIN_DEPLOYMENT_VERSION_XROS}"
+            ;;
     esac
 
     local build_type=$2
@@ -1392,6 +1427,24 @@ function swift_c_flags() {
     if [[ $(is_cmake_release_build_type "${SWIFT_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
+
+    local host=$1
+
+    case $host in
+        linux-static-*)
+            echo -n " -D_GNU_SOURCE -DHAVE_DECL_PROGRAM_INVOCATION_SHORT_NAME"
+            ;;
+    esac
+}
+
+function maybe_lfts() {
+    local host=$1
+
+    case $host in
+        linux-static-*)
+            echo -n "-lfts"
+            ;;
+    esac
 }
 
 function common_swift_flags() {
@@ -1593,6 +1646,13 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
+    if [[ "${BOOTSTRAPPING}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DBOOTSTRAPPING_MODE:STRING=`toupper ${BOOTSTRAPPING}`
+        )
+    fi
+
     if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
         CLANG_BIN="${NATIVE_CLANG_TOOLS_PATH}"
         if [[ ! -f "${CLANG_BIN}/clang" ]] ; then
@@ -1601,6 +1661,11 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
     else
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
+    fi
+
+    if [[ -f "${CLANG_BIN}/clang" ]]; then
+      export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
+      export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
     fi
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
@@ -1671,6 +1736,21 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
+                    )
+                fi
+
+                if [[ ! "${SKIP_BUILD_LINUX}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_SDK_LINUX_ARCHITECTURES:STRING="${LINUX_ARCHS}"
+                    )
+                fi
+
+                if [[ "${BUILD_LINUX_STATIC}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_MUSL_PATH:STRING="${MUSL_PATH}"
+                        -DSWIFT_SDK_LINUX_STATIC_ARCHITECTURES:STRING="${LINUX_STATIC_ARCHS}"
                     )
                 fi
 
@@ -1750,7 +1830,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
-                    -DBOOTSTRAPPING_MODE:STRING=$(to_bootstrapping_mode "${BOOTSTRAPPING}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
@@ -2457,6 +2536,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DENABLE_TESTING:BOOL=NO
 
                   -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
+                  -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) $(maybe_lfts ${host})"
                 )
 
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
@@ -2500,9 +2580,11 @@ for host in "${ALL_HOSTS[@]}"; do
                   cmake_options=(
                     -DENABLE_SWIFT=YES
                     ${cmake_options[@]}
+                    
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
+                    -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_Swift_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
@@ -2651,6 +2733,11 @@ for host in "${ALL_HOSTS[@]}"; do
         CLANG_BIN="${NATIVE_CLANG_TOOLS_PATH}"
     else
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
+    fi
+
+    if [[ -f "${CLANG_BIN}/clang" ]]; then
+      export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
+      export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
     fi
 
     if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
@@ -2999,6 +3086,23 @@ for host in "${ALL_HOSTS[@]}"; do
         continue
     fi
 
+    # Have to set the clang path or the driver will try to link with the wrong
+    # clang
+    if [[ "${NATIVE_CLANG_TOOLS_PATH}" ]] ; then
+        CLANG_BIN="${NATIVE_CLANG_TOOLS_PATH}"
+        if [[ ! -f "${CLANG_BIN}/clang" ]] ; then
+            echo "error: clang does not exist at the specified native tools path: ${CLANG_BIN}/clang"
+            exit 1
+        fi
+    else
+        CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
+    fi
+
+    if [[ -f "${CLANG_BIN}/clang" ]]; then
+      export SWIFT_DRIVER_CLANG_EXEC="${CLANG_BIN}/clang"
+      export SWIFT_DRIVER_CLANGXX_EXEC="${CLANG_BIN}/clang++"
+    fi
+
     # Set the build options for this host
     set_build_options_for_host $host
 
@@ -3043,7 +3147,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|openbsd-*|cygwin-*|haiku-*|android-*) ;;
+                  linux-*|freebsd-*|openbsd-*|cygwin-*|haiku-*|android-*|linux-static-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1
@@ -3241,10 +3345,11 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
-            # `host_install_destdir`. Avoid touching clang builtins .a files.
+            # `host_install_destdir`. Avoid touching .a clang builtins and embedded libraries.
             find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
               grep_that_allows_no_matches -v "/clang/lib/darwin/" | \
+              grep_that_allows_no_matches -v "/lib/swift/embedded/" | \
               xargs -t -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
             # Codesign dylibs and executables in usr/bin after strip tool

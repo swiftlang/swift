@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 struct Payload: ~Copyable {
     var x: Int
@@ -32,25 +31,7 @@ func test(borrowing foo: borrowing Foo) {
         eat(x)
         nibble(x)
 
-    // `_borrowing` match variables impose the no-implicit-copy constraint
-    // like `borrowing` parameters do.
-    case .copyablePayload(_borrowing x) // expected-error{{'x' is borrowed and cannot be consumed}}
-      where hungryCondition(x): // expected-note{{consumed here}}
-        eat(x) // expected-note{{consumed here}}
-        nibble(x)
-
-    case .copyablePayload(_borrowing x) // expected-error{{'x' is borrowed and cannot be consumed}}
-      where condition(x):
-        eat(x) // expected-note{{consumed here}}
-        nibble(x)
-
-    // Explicit copies are OK.
-    case .copyablePayload(_borrowing x)
-      where hungryCondition(copy x):
-        eat(copy x)
-        nibble(x)
-
-    case .copyablePayload(_borrowing x):
+    case .copyablePayload(let x):
         nibble(x)
     }
 }

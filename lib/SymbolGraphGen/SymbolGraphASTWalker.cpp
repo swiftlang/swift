@@ -43,9 +43,14 @@ bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool isClangE
 
 } // anonymous namespace
 
+SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
+                                           const SymbolGraphOptions &Options)
+    : Options(Options), M(M), MainGraph(*this, M, std::nullopt, Ctx) {}
+
 SymbolGraphASTWalker::SymbolGraphASTWalker(
-    ModuleDecl &M, const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
-    const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+    ModuleDecl &M,
+    const SmallPtrSet<const ModuleDecl *, 4> ExportedImportedModules,
+    const llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
         QualifiedExportedImports,
     const SymbolGraphOptions &Options)
     : Options(Options), M(M), ExportedImportedModules(ExportedImportedModules),

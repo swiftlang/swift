@@ -262,7 +262,11 @@ public:
   /// scopes. To avoid a verification error later in the pipeline, drop all
   /// variables without a proper source location.
   bool shouldDropVariable(SILDebugVariable Var, SILLocation Loc) {
-    return !Var.ArgNo && Loc.isSynthesizedAST();
+    if (Var.ArgNo)
+      return false;
+    if (Var.Loc)
+      return Var.Loc->isSynthesizedAST();
+    return Loc.isSynthesizedAST();
   }
 
 
@@ -419,6 +423,9 @@ public:
 #else
     (void)skipVarDeclAssert;
 #endif
+    // Don't apply location overrides on variables.
+    if (Var && !Var->Loc)
+      Var->Loc = Loc.strippedForDebugVariable();
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical,
@@ -837,6 +844,12 @@ public:
                                       hasPointerEscape, fromVarDecl, fixed));
   }
 
+  BorrowedFromInst *createBorrowedFrom(SILLocation Loc, SILValue borrowedValue,
+                                       ArrayRef<SILValue> enclosingValues) {
+    return insert(BorrowedFromInst::create(getSILDebugLocation(Loc), borrowedValue,
+                                           enclosingValues, getModule()));
+  }
+
   /// Convenience function for creating a load_borrow on non-trivial values and
   /// load [trivial] on trivial values. Becomes load unqualified in non-ossa
   /// functions.
@@ -1072,7 +1085,7 @@ public:
   }
 
   /// Create a debug_value according to the type of \p src
-  SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
+  DebugValueInst *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
     if (src->getType().isAddress())
       return createDebugValueAddr(Loc, src, Var);
@@ -1238,6 +1251,10 @@ public:
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty,
                            ValueOwnershipKind forwardingOwnershipKind) {
     assert(Ty.isObject());
+    if (isInsertingIntoGlobal()) {
+      return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                       getModule(), forwardingOwnershipKind));
+    }
     return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
                                      getFunction(), forwardingOwnershipKind));
   }
@@ -1266,6 +1283,11 @@ public:
   UncheckedRefCastInst *
   createUncheckedRefCast(SILLocation Loc, SILValue Op, SILType Ty,
                          ValueOwnershipKind forwardingOwnershipKind) {
+    if (isInsertingIntoGlobal()) {
+      return insert(UncheckedRefCastInst::create(
+          getSILDebugLocation(Loc), Op, Ty, getModule(),
+          forwardingOwnershipKind));
+    }
     return insert(UncheckedRefCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(),
         forwardingOwnershipKind));

@@ -73,8 +73,8 @@ bool swift_ASTGen_checkDefaultArgumentMacroExpression(
     const void *_Nonnull macroSourceLocation);
 
 ptrdiff_t swift_ASTGen_checkMacroDefinition(
-    void *_Nonnull diagEngine, void *_Nonnull sourceFile,
-    const void *_Nonnull macroSourceLocation,
+    void *_Nonnull diagEngine, BridgedStringRef sourceFileBuffer,
+    BridgedStringRef macroDeclText,
     BridgedStringRef *_Nonnull expansionSourceOutPtr,
     ptrdiff_t *_Nullable *_Nonnull replacementsPtr,
     ptrdiff_t *_Nonnull numReplacements,

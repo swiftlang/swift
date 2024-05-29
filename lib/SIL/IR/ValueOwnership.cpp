@@ -72,6 +72,7 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
+CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, FunctionExtractIsolation)
 CONSTANT_OWNERSHIP_INST(None, GlobalValue)
@@ -490,6 +491,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, FRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, FSub)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFSub)
+CONSTANT_OWNERSHIP_BUILTIN(None, Freeze)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_EQ)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_NE)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_SGE)
@@ -628,7 +630,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
-CONSTANT_OWNERSHIP_BUILTIN(None, Copy)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
@@ -651,8 +652,21 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
-UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_NONE_DEPENDING_ON_RESULT
+
+#define OWNED_OR_NONE_DEPENDING_ON_RESULT(ID)                                  \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    if (BI->getType().isTrivial(*BI->getFunction())) {                         \
+      return OwnershipKind::None;                                              \
+    }                                                                          \
+    return OwnershipKind::Owned;                                               \
+  }
+// A zeroInitializer may initialize an imported struct with __unsafe_unretained
+// fields. The initialized value is immediately consumed by an assignment, so it
+// must be owned.
+OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
+#undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)
 #define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY) \

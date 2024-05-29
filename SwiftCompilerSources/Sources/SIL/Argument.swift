@@ -69,6 +69,15 @@ final public class FunctionArgument : Argument {
   public var resultDependence: LifetimeDependenceConvention? {
     parentFunction.argumentConventions[resultDependsOn: index]
   }
+
+  /// Copies the following flags from `arg`:
+  /// 1. noImplicitCopy
+  /// 2. lifetimeAnnotation
+  /// 3. closureCapture
+  /// 4. parameterPack
+  public func copyFlags(from arg: FunctionArgument) {
+    bridged.copyFlags(arg.bridged)
+  }
 }
 
 public struct Phi {
@@ -139,12 +148,30 @@ public struct Phi {
     value.ownership == .owned || value.isReborrow
   }
 
+  public var borrowedFrom: BorrowedFromInst? {
+    for use in value.uses {
+      if let bfi = use.forwardingBorrowedFromUser {
+        return bfi
+      }
+    }
+    return nil
+  }
+
   public static func ==(lhs: Phi, rhs: Phi) -> Bool {
     lhs.value === rhs.value
   }
 
   public func hash(into hasher: inout Hasher) {
     value.hash(into: &hasher)
+  }
+}
+
+extension Operand {
+  public var forwardingBorrowedFromUser: BorrowedFromInst? {
+    if let bfi = instruction as? BorrowedFromInst, index == 0 {
+      return bfi
+    }
+    return nil
   }
 }
 
@@ -423,6 +450,17 @@ public enum ArgumentConvention : CustomStringConvertible {
     case .indirectIn, .directOwned, .directUnowned,
          .indirectInout, .indirectInoutAliasable, .indirectOut,
          .packOut, .packInout, .packOwned:
+      return false
+    }
+  }
+
+  public var isConsumed: Bool {
+    switch self {
+    case .indirectIn, .directOwned, .packOwned:
+      return true
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed,
+          .indirectInout, .indirectInoutAliasable, .indirectOut,
+          .packOut, .packInout, .directUnowned:
       return false
     }
   }

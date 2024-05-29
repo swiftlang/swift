@@ -40,41 +40,7 @@ public:
     clonedEntryBlock = fun.createBasicBlock();
   }
 
-  SILType remapType(SILType Ty) {
-    if (!Ty.getASTType()->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return Ty;
-
-    return getBuilder().getTypeLowering(Ty).getLoweredType().getCategoryType(
-        Ty.getCategory());
-  }
-
-  CanType remapASTType(CanType ty) {
-    if (!ty->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return ty;
-
-    return substOpaqueTypesWithUnderlyingTypes(
-        ty,
-        TypeExpansionContext(getBuilder().getFunction()),
-        /*allowLoweredTypes=*/false);
-  }
-
-  ProtocolConformanceRef remapConformance(Type ty,
-                                          ProtocolConformanceRef conf) {
-    auto context = getBuilder().getTypeExpansionContext();
-    auto conformance = conf;
-    if (ty->hasOpaqueArchetype() &&
-        context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conformance =
-          substOpaqueTypesWithUnderlyingTypes(conformance, ty, context);
-    }
-    return conformance;
-  }
+  bool shouldSubstOpaqueArchetypes() const { return true; }
 
   void replace();
 };
@@ -222,6 +188,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
@@ -459,8 +426,8 @@ class SerializeSILPass : public SILModuleTransform {
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
     for (auto &F : M) {
-      bool wasSerialized = F.isSerialized() != IsNotSerialized;
-      F.setSerialized(IsNotSerialized);
+      bool wasSerialized = !F.isNotSerialized();
+      F.setSerializedKind(IsNotSerialized);
 
       // We are removing [serialized] from the function. This will change how
       // opaque archetypes are lowered in SIL - they might lower to their
@@ -492,15 +459,15 @@ class SerializeSILPass : public SILModuleTransform {
     }
 
     for (auto &WT : M.getWitnessTables()) {
-      WT.setSerialized(IsNotSerialized);
+      WT.setSerializedKind(IsNotSerialized);
     }
 
     for (auto &VT : M.getVTables()) {
-      VT->setSerialized(IsNotSerialized);
+      VT->setSerializedKind(IsNotSerialized);
     }
 
     for (auto &Deinit : M.getMoveOnlyDeinits()) {
-      Deinit->setSerialized(IsNotSerialized);
+      Deinit->setSerializedKind(IsNotSerialized);
     }
   }
 

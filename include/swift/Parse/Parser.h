@@ -158,11 +158,6 @@ public:
   // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
   bool IsForASTGen = false;
 
-  // A cached answer to
-  //     Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-  // to ensure there's no parsing performance regression.
-  bool EnabledNoncopyableGenerics;
-
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;
@@ -1211,6 +1206,9 @@ public:
     if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
         Tok.isContextualKeyword("transferring"))
       return true;
+    if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
+        Tok.isContextualKeyword("sending"))
+      return true;
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
         (Tok.isContextualKeyword("_resultDependsOn") ||
          isLifetimeDependenceToken()))
@@ -1261,6 +1259,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc ResultDependsOnLoc;
     SourceLoc TransferringLoc;
+    SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
 
@@ -1303,13 +1302,9 @@ public:
   ///
   /// \param allowClassRequirement whether to permit parsing of 'class'
   /// \param allowAnyObject whether to permit parsing of 'AnyObject'
-  /// \param parseTildeCopyable if non-null, permits parsing of `~Copyable`
-  ///   and writes out a valid source location if it was parsed. If null, then a
-  ///   parsing error will be emitted upon the appearance of `~` in the clause.
   ParserStatus parseInheritance(SmallVectorImpl<InheritedEntry> &Inherited,
                                 bool allowClassRequirement,
-                                bool allowAnyObject,
-                                SourceLoc *parseTildeCopyable = nullptr);
+                                bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              llvm::function_ref<void(Decl *)> handler);
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
@@ -1582,15 +1577,15 @@ public:
     /// The location of the 'transferring' keyword if present.
     SourceLoc TransferringLoc;
 
+    /// The location of the 'sending' keyword if present.
+    SourceLoc SendingLoc;
+
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
 
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
 
-    /// True if this parameter inherits a default argument via '= super'
-    bool hasInheritedDefaultArg = false;
-    
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
 

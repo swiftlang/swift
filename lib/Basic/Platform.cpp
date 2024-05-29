@@ -37,6 +37,10 @@ bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
       triple.getEnvironment() == llvm::Triple::MacABI;
 }
 
+bool swift::tripleIsVisionSimulator(const llvm::Triple &triple) {
+  return triple.isXROS() && triple.isSimulatorEnvironment();
+}
+
 bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::IOS:
@@ -99,6 +103,9 @@ swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isWatchOS())
     return llvm::VersionTuple(2, 0);
 
+  if (triple.isXROS())
+    return llvm::VersionTuple(1, 0);
+
   return std::nullopt;
 }
 
@@ -121,6 +128,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
     // watchOS versions before 5.2 don't have Swift in the OS.
     // watchOS versions before 8.0 don't have _Concurrency in the OS.
     return triple.isOSVersionLT(8, 0);
+  }
+
+  if (triple.isXROS()) {
+    return triple.isOSVersionLT(1, 0);
   }
 
   // Other platforms don't have Swift installed as part of the OS by default.
@@ -150,6 +161,12 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return DarwinPlatformKind::MacOS;
 
+  if (triple.isXROS()) {
+    if (tripleIsVisionSimulator(triple))
+      return DarwinPlatformKind::VisionOSSimulator;
+    return DarwinPlatformKind::VisionOS;
+  }
+
   llvm_unreachable("Unsupported Darwin platform");
 }
 
@@ -169,6 +186,10 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
     return "watchos";
   case DarwinPlatformKind::WatchOSSimulator:
     return "watchsimulator";
+  case DarwinPlatformKind::VisionOS:
+    return "xros";
+  case DarwinPlatformKind::VisionOSSimulator:
+    return "xrsimulator";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -180,7 +201,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
-  case llvm::Triple::XROS:
   case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
@@ -208,9 +228,20 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
+  case llvm::Triple::XROS:
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
   case llvm::Triple::Linux:
-    return triple.isAndroid() ? "android" : "linux";
+    if (triple.isAndroid())
+      return "android";
+    else if (triple.isMusl()) {
+      // The triple for linux-static is <arch>-swift-linux-musl, to distinguish
+      // it from a "normal" musl set-up (ala Alpine).
+      if (triple.getVendor() == llvm::Triple::Swift)
+        return "linux-static";
+      else
+        return "musl";
+    } else
+      return "linux";
   case llvm::Triple::FreeBSD:
     return "freebsd";
   case llvm::Triple::OpenBSD:
@@ -512,6 +543,9 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     } else if (Major <= 9) {
       return floorFor64bits(llvm::VersionTuple(5, 7));
     }
+  }
+  else if (Triple.isXROS()) {
+    return std::nullopt;
   }
 
   return std::nullopt;

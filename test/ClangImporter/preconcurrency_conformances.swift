@@ -1,9 +1,14 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-experimental-feature DynamicActorIsolation -emit-silgen %s | %FileCheck %s
+// RUN: %empty-directory(%t/src)
+// RUN: split-file %s %t/src
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -emit-silgen -module-name preconcurrency_conformances %t/src/checks.swift | %FileCheck %t/src/checks.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -swift-version 6 -disable-dynamic-actor-isolation -emit-silgen -module-name preconcurrency_conformances %t/src/checks_disabled.swift | %FileCheck %t/src/checks_disabled.swift
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
+//--- checks.swift
 import Foundation
 
 actor MyActor {
@@ -130,3 +135,77 @@ class Sub : Super {
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
 // CHECK: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK-NEXT: {{.*}} = apply [[PRECONDITION]]({{.*}}, [[EXEC]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+//--- checks_disabled.swift
+import Foundation
+
+actor MyActor {
+}
+
+@globalActor
+struct GlobalActor {
+  static let shared: MyActor = MyActor()
+}
+
+@objc protocol P {
+  var data: String? { get set }
+
+  init()
+  func test() -> String?
+}
+
+@MainActor
+final class K : @preconcurrency P {
+  var data: String? {
+    get { nil }
+    set {}
+  }
+
+  init() {}
+  @GlobalActor func test() -> String? { nil }
+}
+
+// @objc K.data.getter
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances1KC4dataSSSgvgTo : $@convention(objc_method) (K) -> @autoreleased Optional<NSString>
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+// @objc K.data.setter
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances1KC4dataSSSgvsTo : $@convention(objc_method) (Optional<NSString>, K) -> ()
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+// @objc K.init()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances1KCACycfcTo : $@convention(objc_method) (@owned K) -> @owned K
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+// @objc K.test()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances1KC4testSSSgyFTo : $@convention(objc_method) (K) -> @autoreleased Optional<NSString>
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+@MainActor
+class TestObjCMethod {
+  @objc func testImplicit() -> Int { 42 }
+
+  @GlobalActor
+  @objc func testExplicit() {}
+}
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances14TestObjCMethodC12testImplicitSiyFTo : $@convention(objc_method) (TestObjCMethod) -> Int
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances14TestObjCMethodC12testExplicityyFTo : $@convention(objc_method) (TestObjCMethod) -> ()
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+@objcMembers
+class Super {
+  @MainActor func test() {}
+}
+
+class Sub : Super {
+  override func test() {}
+}
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances5SuperC4testyyFTo : $@convention(objc_method) (Super) -> ()
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances3SubC4testyyFTo : $@convention(objc_method) (Sub) -> ()
+// CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()

@@ -392,10 +392,11 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-SerializedModuleLoaderBase::BinaryModuleImports
+llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
 SerializedModuleLoaderBase::getImportsOfModule(
     const ModuleFileSharedCore &loadedModuleFile,
-    ModuleLoadingBehavior transitiveBehavior, StringRef packageName) {
+    ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
+    bool isTestableImport) {
   llvm::StringSet<> importedModuleNames;
   std::string importedHeader = "";
   for (const auto &dependency : loadedModuleFile.getDependencies()) {
@@ -410,8 +411,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
         loadedModuleFile.getTransitiveLoadingBehavior(
             dependency,
             /*debuggerMode*/ false,
-            /*isPartialModule*/ false, packageName,
-            loadedModuleFile.isTestable());
+            /*isPartialModule*/ false, packageName, isTestableImport);
     if (dependencyTransitiveBehavior > transitiveBehavior)
       continue;
 
@@ -421,6 +421,13 @@ SerializedModuleLoaderBase::getImportsOfModule(
     auto dotPos = moduleName.find('.');
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
+
+    // Reverse rewrite of user-specified C++ standard
+    // library module name to one used in the modulemap.
+    // TODO: If we are going to do this for more than this module,
+    // we will need a centralized system for doing module import name remap.
+    if (moduleName == Ctx.Id_CxxStdlib.str())
+      moduleName = "std";
 
     importedModuleNames.insert(moduleName);
   }
@@ -455,10 +462,9 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
 
-    if (loadedModuleFile->isTestable() && !isTestableImport) {
-      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
-        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_testable,
-                           modulePath.str());
+    if (isTestableImport && !loadedModuleFile->isTestable()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_not_testable,
+                         modulePath.str());
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
   }
@@ -471,34 +477,33 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
   //       optional.
   auto binaryModuleImports =
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Required,
-                         Ctx.LangOpts.PackageName);
+                         Ctx.LangOpts.PackageName, isTestableImport);
 
   // Lookup optional imports of this module also
   auto binaryModuleOptionalImports =
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
-                         Ctx.LangOpts.PackageName);
+                         Ctx.LangOpts.PackageName, isTestableImport);
 
-  auto importedModuleSet = binaryModuleImports.moduleImports;
-  std::vector<std::string> importedModuleNames;
-  importedModuleNames.reserve(importedModuleSet.size());
-  llvm::transform(importedModuleSet.keys(),
-                  std::back_inserter(importedModuleNames),
-                  [](llvm::StringRef N) {
-                     return N.str();
-                  });
+  auto importedModuleSet = binaryModuleImports->moduleImports;
+  std::vector<ScannerImportStatementInfo> moduleImports;
+  moduleImports.reserve(importedModuleSet.size());
+  llvm::transform(
+      importedModuleSet.keys(), std::back_inserter(moduleImports),
+      [](llvm::StringRef N) { return ScannerImportStatementInfo(N.str()); });
 
-  auto importedHeader = binaryModuleImports.headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports.moduleImports;
-  std::vector<std::string> importedOptionalModuleNames;
+  auto importedHeader = binaryModuleImports->headerImport;
+  auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
+  std::vector<ScannerImportStatementInfo> optionalModuleImports;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
-      importedOptionalModuleNames.push_back(optionalImportedModule.str());
+      optionalModuleImports.push_back(
+          ScannerImportStatementInfo(optionalImportedModule.str()));
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-       modulePath.str(), moduleDocPath, sourceInfoPath,
-       importedModuleNames, importedOptionalModuleNames,
-       importedHeader, isFramework, /*module-cache-key*/ "");
+      modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
+      optionalModuleImports, importedHeader, isFramework,
+      /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }
@@ -852,6 +857,8 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
       osName = swift::prettyPlatformString(PlatformKind::tvOS);
     } else if (triple.isiOS()) {
       osName = swift::prettyPlatformString(PlatformKind::iOS);
+    }  else if (triple.isXROS()) {
+      osName = swift::prettyPlatformString(PlatformKind::visionOS);
     } else {
       assert(!triple.isOSDarwin() && "unknown Apple OS");
       // Fallback to the LLVM triple name. This isn't great (it won't be
@@ -923,6 +930,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setIsBuiltFromInterface();
     if (loadedModuleFile->allowNonResilientAccess())
       M.setAllowNonResilientAccess();
+    if (loadedModuleFile->serializePackageEnabled())
+      M.setSerializePackageEnabled();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
@@ -1021,7 +1030,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasCxxInteroperability() &&
       M.getResilienceStrategy() != ResilienceStrategy::Resilient &&
       !Ctx.LangOpts.EnableCXXInterop &&
-      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule) {
+      Ctx.LangOpts.RequireCxxInteropToImportCxxInteropModule &&
+      M.getName().str() != CXX_MODULE_NAME) {
     auto loc = diagLoc.value_or(SourceLoc());
     Ctx.Diags.diagnose(loc, diag::need_cxx_interop_to_import_module,
                        M.getName());

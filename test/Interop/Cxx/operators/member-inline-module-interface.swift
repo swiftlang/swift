@@ -1,3 +1,4 @@
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
@@ -208,6 +209,13 @@
 // CHECK: struct DerivedFromNonTrivialArrayByVal {
 // CHECK:   subscript(x: Int32) -> NonTrivial { get }
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
+// CHECK: }
+
+// CHECK: struct SubscriptUnnamedParameter {
+// CHECK:   subscript(__index: Int32) -> Int32 { get }
+// CHECK: }
+// CHECK: struct SubscriptUnnamedParameterReadWrite {
+// CHECK:   subscript(__index: Int32) -> Int32
 // CHECK: }
 
 // CHECK: struct Iterator {

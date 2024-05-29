@@ -33,7 +33,8 @@ struct Foo<L : Hashable> : myProto {
 // CHECK-NEXT:     "line": 22,
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractOpaqueGenericTypealias.myProto",
-// CHECK-NEXT:       "Swift.Sendable"
+// CHECK-NEXT:       "Swift.Sendable",
+// CHECK-NEXT:       "Swift.BitwiseCopyable"
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "associatedTypeAliases": [
 // CHECK-NEXT:       {

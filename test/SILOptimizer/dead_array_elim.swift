@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
@@ -62,9 +62,7 @@ func testDeadArrayElimWithAddressOnlyValues<T>(x: T, y: T) {
 // RLE needs to handle the new init pattern - rdar://117751668
 // TODO-LABEL: sil hidden {{.*}}@$s15dead_array_elim31testDeadArrayAfterOptimizationsySiSSF
 // TODO:      bb0(%0 : $String):
-// TODO-NEXT:   debug_value
 // TODO-NEXT:   integer_literal $Builtin.Int{{[0-9]+}}, 21
-// TODO-NEXT:   debug_value
 // TODO-NEXT:   struct $Int
 // TODO-NEXT:   return
 // TODO:      } // end sil function '$s15dead_array_elim31testDeadArrayAfterOptimizationsySiSSF'
@@ -85,7 +83,6 @@ func testDeadArrayAfterOptimizations(_ stringParameter: String) -> Int {
 // CHECK-LABEL: sil hidden @$s15dead_array_elim15testNestedArraySiyF
 // CHECK:      bb0:
 // CHECK-NEXT:   integer_literal $Builtin.Int{{[0-9]+}}, 3
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $Int
 // CHECK-NEXT:   return
 // CHECK:      } // end sil function '$s15dead_array_elim15testNestedArraySiyF'

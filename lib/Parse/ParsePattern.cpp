@@ -37,30 +37,13 @@ void Parser::DefaultArgumentInfo::setFunctionContext(
   }
 }
 
-static ParserStatus parseDefaultArgument(
-    Parser &P, Parser::DefaultArgumentInfo *defaultArgs, unsigned argIndex,
-    Expr *&init, bool &hasInheritedDefaultArg,
-    Parser::ParameterContextKind paramContext) {
+static ParserStatus
+parseDefaultArgument(Parser &P, Parser::DefaultArgumentInfo *defaultArgs,
+                     unsigned argIndex, Expr *&init,
+                     Parser::ParameterContextKind paramContext) {
   assert(P.Tok.is(tok::equal) ||
        (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
   SourceLoc equalLoc = P.consumeToken();
-
-  if (P.SF.Kind == SourceFileKind::Interface) {
-    // Swift module interfaces don't synthesize inherited initializers and
-    // instead include them explicitly in subclasses. Since the
-    // \c DefaultArgumentKind of these initializers is \c Inherited, this is
-    // represented textually as `= super` in the interface.
-
-    // If we're in a module interface and the default argument is exactly
-    // `super` (i.e. the token after that is `,` or `)` which end a parameter)
-    // report an inherited default argument to the caller and return.
-    if (P.Tok.is(tok::kw_super) && P.peekToken().isAny(tok::comma, tok::r_paren)) {
-      hasInheritedDefaultArg = true;
-      P.consumeToken(tok::kw_super);
-      defaultArgs->HasDefaultArgument = true;
-      return ParserStatus();
-    }
-  }
 
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
@@ -143,6 +126,8 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("borrowing") &&
         (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
          !Tok.isContextualKeyword("transferring")) &&
+        (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
+         !Tok.isContextualKeyword("sending")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
         (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
          !Tok.isContextualKeyword("_resultDependsOn")))
@@ -289,7 +274,40 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             continue;
           }
 
+          diagnose(Tok, diag::transferring_is_now_sendable)
+              .fixItReplace(Tok.getLoc(), "sending");
+
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::sending_and_transferring_used_together)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
           param.TransferringLoc = consumeToken();
+          continue;
+        }
+
+        if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
+            Tok.isContextualKeyword("sending")) {
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
+                   Tok.getText())
+              .warnUntilSwiftVersion(6);
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::parameter_specifier_repeated)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
+          if (param.TransferringLoc.isValid()) {
+            diagnose(Tok, diag::sending_and_transferring_used_together)
+                .fixItRemove(param.TransferringLoc);
+            consumeToken();
+            continue;
+          }
+
+          param.SendingLoc = consumeToken();
           continue;
         }
 
@@ -311,6 +329,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
+          }
+
+          if (param.SendingLoc.isValid()) {
+            diagnose(Tok, diag::sending_before_parameter_specifier,
+                     getNameForParamSpecifier(param.SpecifierKind));
           }
 
           hasSpecifier = true;
@@ -483,9 +506,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             .fixItReplace(EqualLoc, "=");
       }
 
-      status |= parseDefaultArgument(
-          *this, defaultArgs, defaultArgIndex, param.DefaultArg,
-          param.hasInheritedDefaultArg, paramContext);
+      status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
+                                     param.DefaultArg, paramContext);
     }
 
     // If we haven't made progress, don't add the parameter.
@@ -547,10 +569,9 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(paramInfo.SpecifierLoc,
-                                     argNameLoc, argName,
-                                     paramNameLoc, paramName,
-                                     parser.CurDeclContext);
+    auto param = ParamDecl::createParsed(
+        ctx, paramInfo.SpecifierLoc, argNameLoc, argName, paramNameLoc,
+        paramName, paramInfo.DefaultArg, parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
 
     bool parsingEnumElt
@@ -600,7 +621,12 @@ mapParsedParameters(Parser &parser,
       if (paramInfo.TransferringLoc.isValid()) {
         type = new (parser.Context)
             TransferringTypeRepr(type, paramInfo.TransferringLoc);
-        param->setTransferring();
+        param->setSending();
+      }
+
+      if (paramInfo.SendingLoc.isValid()) {
+        type = new (parser.Context) SendingTypeRepr(type, paramInfo.SendingLoc);
+        param->setSending();
       }
 
       param->setTypeRepr(type);
@@ -631,7 +657,9 @@ mapParsedParameters(Parser &parser,
             else if (isa<ResultDependsOnTypeRepr>(STR))
               param->setResultDependsOn(true);
             else if (isa<TransferringTypeRepr>(STR))
-              param->setTransferring(true);
+              param->setSending(true);
+            else if (isa<SendingTypeRepr>(STR))
+              param->setSending(true);
             unwrappedType = STR->getBase();
             continue;
           }
@@ -713,8 +741,7 @@ mapParsedParameters(Parser &parser,
                            param.FirstName, param.FirstNameLoc);
     }
 
-    assert (((!param.DefaultArg &&
-              !param.hasInheritedDefaultArg) ||
+    assert ((!param.DefaultArg ||
              paramContext == Parser::ParameterContextKind::Function ||
              paramContext == Parser::ParameterContextKind::Operator ||
              paramContext == Parser::ParameterContextKind::Initializer ||
@@ -722,14 +749,6 @@ mapParsedParameters(Parser &parser,
              paramContext == Parser::ParameterContextKind::Subscript ||
              paramContext == Parser::ParameterContextKind::Macro) &&
             "Default arguments are only permitted on the first param clause");
-
-    if (param.DefaultArg) {
-      DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
-      result->setDefaultArgumentKind(kind);
-      result->setDefaultExpr(param.DefaultArg, /*isTypeChecked*/ false);
-    } else if (param.hasInheritedDefaultArg) {
-      result->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
-    }
 
     elements.push_back(result);
 
@@ -1351,38 +1370,41 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   
   // The `borrowing` modifier is a contextual keyword, so it's only accepted
   // directly applied to a binding name, as in `case .foo(borrowing x)`.
-  if (Context.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if (Tok.isContextualKeyword("_borrowing")
-        && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
-                             tok::code_complete)
-        && !peekToken().isAtStartOfLine()) {
-      Tok.setKind(tok::contextual_keyword);
-      SourceLoc borrowingLoc = consumeToken();
-      
-      // If we have `case borrowing x.`, `x(`, `x[`, or `x<` then this looks
-      // like an attempt to include a subexpression under a `borrowing`
-      // binding, which isn't yet supported.
-      if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
-                            tok::l_square)
-          || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
+  if ((Tok.isContextualKeyword("_borrowing")
+       || Tok.isContextualKeyword("borrowing"))
+      && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                           tok::code_complete)
+      && !peekToken().isAtStartOfLine()) {
+    diagnose(Tok.getLoc(),
+             diag::borrowing_syntax_change)
+      .fixItReplace(Tok.getLoc(), "let");
 
-        // Diagnose the unsupported production.
-        diagnose(Tok.getLoc(),
-                 diag::borrowing_subpattern_unsupported);
-        
-        // Recover by parsing as if it was supported.
-        return parseMatchingPattern(isExprBasic);
-      }
-      Identifier name;
-      SourceLoc nameLoc = consumeIdentifier(name,
-                                            /*diagnoseDollarPrefix*/ false);
-      auto namedPattern = createBindingFromPattern(nameLoc, name,
-                                             VarDecl::Introducer::Borrowing);
-      auto bindPattern = new (Context) BindingPattern(
-        borrowingLoc, VarDecl::Introducer::Borrowing, namedPattern);
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc borrowingLoc = consumeToken();
+    
+    // If we have `case borrowing x.`, `x(`, `x[`, or `x<` then this looks
+    // like an attempt to include a subexpression under a `borrowing`
+    // binding, which isn't yet supported.
+    if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
+                          tok::l_square)
+        || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
+
+      // Diagnose the unsupported production.
+      diagnose(Tok.getLoc(),
+               diag::borrowing_subpattern_unsupported);
       
-      return makeParserResult(bindPattern);
+      // Recover by parsing as if it was supported.
+      return parseMatchingPattern(isExprBasic);
     }
+    Identifier name;
+    SourceLoc nameLoc = consumeIdentifier(name,
+                                          /*diagnoseDollarPrefix*/ false);
+    auto namedPattern = createBindingFromPattern(nameLoc, name,
+                                           VarDecl::Introducer::Borrowing);
+    auto bindPattern = new (Context) BindingPattern(
+      borrowingLoc, VarDecl::Introducer::Borrowing, namedPattern);
+    
+    return makeParserResult(bindPattern);
   }
 
   // matching-pattern ::= 'is' type
@@ -1463,13 +1485,12 @@ Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  if (Context.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-    if (Tok.isContextualKeyword("_borrowing")
-        && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
-                             tok::code_complete)
-        && !peekToken().isAtStartOfLine()) {
-      return true;
-    }
+  if ((Tok.isContextualKeyword("_borrowing")
+       || Tok.isContextualKeyword("borrowing"))
+      && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                           tok::code_complete)
+      && !peekToken().isAtStartOfLine()) {
+    return true;
   }
 
   return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is) ||

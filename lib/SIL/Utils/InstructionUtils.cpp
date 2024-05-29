@@ -506,6 +506,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ProjectExistentialBoxInst:
@@ -780,9 +781,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     switch (cast<StoreInst>(inst)->getOwnershipQualifier()) {
       case StoreOwnershipQualifier::Unqualified:
       case StoreOwnershipQualifier::Trivial:
-        return RuntimeEffect::NoEffect;
       case StoreOwnershipQualifier::Init:
-        return RuntimeEffect::RefCounting;
+        return RuntimeEffect::NoEffect;
       case StoreOwnershipQualifier::Assign:
         return RuntimeEffect::Releasing;
     }

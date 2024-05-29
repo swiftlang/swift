@@ -1,8 +1,10 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
 //
 // REQUIRES: executable_test
-// REQUIRES: rdar95738946
 // XFAIL: OS=windows-msvc
+
+// Temporarily disable on arm64e (rdar://128681577)
+// UNSUPPORTED: CPU=arm64e
 
 import StdlibUnittest
 import WitnessTable
@@ -27,7 +29,13 @@ public struct List<NodeType: ListNode> : Sequence, IteratorProtocol
   }
 }
 
+@available(SwiftStdlib 5.8, *)
 extension CxxLinkedList : ListNode { }
+
+@available(SwiftStdlib 5.8, *)
+extension MyCxxSequence : Sequence, IteratorProtocol { }
+
+if #available(SwiftStdlib 5.8, *) {
 
 var WitnessTableTestSuite = TestSuite("Use foreign reference in a generic context")
 
@@ -42,8 +50,6 @@ WitnessTableTestSuite.test("As generic argument to List") {
   expectEqual(count, 4)
 }
 
-extension CxxSequence : Sequence, IteratorProtocol { }
-
 WitnessTableTestSuite.test("As a Sequence") {
   let list = makeSequence()
   var count = 0
@@ -52,6 +58,8 @@ WitnessTableTestSuite.test("As a Sequence") {
     count += 1
   }
   expectEqual(count, 3)
+}
+
 }
 
 runAllTests()

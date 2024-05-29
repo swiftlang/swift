@@ -1035,15 +1035,6 @@ bool LinkInfo::isUsed(IRLinkage IRL) {
 ///
 /// This value must have a definition by the time the module is finalized.
 void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-
-  // As of reviews.llvm.org/D97448 "ELF: Create unique SHF_GNU_RETAIN sections
-  // for llvm.used global objects" LLVM creates separate sections for globals in
-  // llvm.used on ELF.  Therefore we use llvm.compiler.used on ELF instead.
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF) {
-    addCompilerUsedGlobal(global);
-    return;
-  }
-
   LLVMUsed.push_back(global);
 }
 
@@ -2850,6 +2841,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Mark as llvm.used if @_used, set section if @_section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
+    else if (var->shouldBePreservedForDebugger() && forDefinition) 
+      addUsedGlobal(gvar);
     if (auto *sectionAttr = var->getSectionAttr())
       gvar->setSection(sectionAttr->Name);
   }
@@ -3476,7 +3469,12 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::FunctionType *ctorFnType =
       cast<llvm::FunctionType>(clangFunc->getValueType());
 
-  if (assumedFnType == ctorFnType) {
+  // Only need a thunk if either:
+  // 1. The calling conventions do not match, and we need to pass arguments
+  //    differently.
+  // 2. This is a default constructor, and we need to zero the backing memory of
+  //    the struct.
+  if (assumedFnType == ctorFnType && !ctor->isDefaultConstructor()) {
     return ctorAddress;
   }
 
@@ -3510,14 +3508,34 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
       Args.push_back(i);
   }
 
-  clang::CodeGen::ImplicitCXXConstructorArgs implicitArgs =
-      clang::CodeGen::getImplicitCXXConstructorArgs(IGM.ClangCodeGen->CGM(),
-                                                    ctor);
-  for (size_t i = 0; i < implicitArgs.Prefix.size(); ++i) {
-    Args.insert(Args.begin() + 1 + i, implicitArgs.Prefix[i]);
+  if (assumedFnType != ctorFnType) {
+    clang::CodeGen::ImplicitCXXConstructorArgs implicitArgs =
+        clang::CodeGen::getImplicitCXXConstructorArgs(IGM.ClangCodeGen->CGM(),
+                                                      ctor);
+    for (size_t i = 0; i < implicitArgs.Prefix.size(); ++i) {
+      Args.insert(Args.begin() + 1 + i, implicitArgs.Prefix[i]);
+    }
+    for (const auto &arg : implicitArgs.Suffix) {
+      Args.push_back(arg);
+    }
   }
-  for (const auto &arg : implicitArgs.Suffix) {
-    Args.push_back(arg);
+
+  if (ctor->isDefaultConstructor()) {
+    assert(Args.size() > 0 && "expected at least 1 argument (result address) "
+                              "for default constructor");
+
+    // Zero out the backing memory of the struct.
+    // This makes default initializers for C++ structs behave consistently with
+    // the synthesized empty initializers for C structs. When C++ interop is
+    // enabled in a project, all imported C structs are treated as C++ structs,
+    // which sometimes means that Clang will synthesize a default constructor
+    // for the C++ struct that does not zero out trivial fields of a struct.
+    auto cxxRecord = ctor->getParent();
+    clang::ASTContext &ctx = cxxRecord->getASTContext();
+    auto typeSize = ctx.getTypeSizeInChars(ctx.getRecordType(cxxRecord));
+    subIGF.Builder.CreateMemSet(Args[0],
+                                llvm::ConstantInt::get(subIGF.IGM.Int8Ty, 0),
+                                typeSize.getQuantity(), llvm::MaybeAlign());
   }
 
   auto *call =
@@ -3694,7 +3712,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   // Also mark as llvm.used any functions that should be kept for the debugger.
   // Only definitions should be kept.
-  if (f->shouldBePreservedForDebugger() && !fn->isDeclaration())
+  if (f->shouldBePreservedForDebugger() && forDefinition)
     addUsedGlobal(fn);
 
   // If `hasCReferences` is true, then the function is either marked with
@@ -5835,7 +5853,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
 static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
   if (ext->isObjCImplementation()) {
-    assert(ext->getCategoryNameForObjCImplementation() != Identifier());
+    assert(!ext->getObjCCategoryName().empty());
     return true;
   }
 
@@ -5879,8 +5897,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == Identifier()) {
+  if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty()) {
     // This is the @_objcImplementation for the class--generate its class
     // metadata.
     emitClassDecl(origClass);

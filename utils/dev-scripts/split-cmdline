@@ -69,7 +69,7 @@ def main():
                 first = True
                 continue
 
-            if " " in arg:
+            if " " in arg or ";" in arg:
                 print('"' + arg + '"', end="")
             else:
                 print(arg, end="")

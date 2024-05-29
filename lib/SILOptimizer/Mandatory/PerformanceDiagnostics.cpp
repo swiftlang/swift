@@ -458,7 +458,7 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
 }
 
 static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
-  // Only diagnose metatype and value_metatype instructions, for now.
+  // Only diagnose metatype, value_metatype instructions, ...
   if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
     auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
     if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
@@ -468,6 +468,9 @@ static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
       // Class metadata are supported in embedded Swift
       return instTy->getClassOrBoundGenericClass() ? true : false;
     }
+  // ... and alloc_ref_dynamic, for now.
+  } else if (isa<AllocRefDynamicInst>(inst)) {
+    return false;
   }
 
   return true;
@@ -521,6 +524,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       }
       if (isa<KeyPathInst>(inst)) {
         diagnose(loc, diag::embedded_swift_keypath);
+        return true;
+      }
+      if (isa<CheckedCastAddrBranchInst>(inst) || isa<UnconditionalCheckedCastAddrInst>(inst)) {
+        diagnose(loc, diag::embedded_swift_dynamic_cast);
         return true;
       }
       if (!allowedMetadataUseInEmbeddedSwift(inst)) {

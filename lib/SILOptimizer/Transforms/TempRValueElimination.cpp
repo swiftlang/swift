@@ -403,12 +403,12 @@ bool TempRValueOptPass::extendAccessScopes(
       // Is this the end of an access scope of the copy-source?
       if (!aa->isNoAlias(copySrc, endAccess->getSource()) &&
 
-          // There cannot be any aliasing modifying accesses within the liferange
-          // of the temporary, because we would have cought this in
+          // There cannot be any aliasing modifying accesses within the
+          // liverange of the temporary, because we would have cought this in
           // `getLastUseWhileSourceIsNotModified`.
-          // But there are cases where `AliasAnalysis::isNoAlias` is less precise
-          // than `AliasAnalysis::mayWriteToMemory`. Therefore, just ignore any
-          // non-read accesses.
+          // But there are cases where `AliasAnalysis::isNoAlias` is less
+          // precise than `AliasAnalysis::mayWriteToMemory`. Therefore, just
+          // ignore any non-read accesses.
           endAccess->getBeginAccess()->getAccessKind() == SILAccessKind::Read) {
 
         // Don't move instructions beyond the block's terminator.
@@ -964,7 +964,8 @@ void TempRValueOptPass::run() {
   // Call the utlity to complete ossa lifetime.
   OSSALifetimeCompletion completion(function, da->get(function));
   for (auto it : valuesToComplete) {
-    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
+    completion.completeOSSALifetime(it,
+                                    OSSALifetimeCompletion::Boundary::Liveness);
   }
 }
 

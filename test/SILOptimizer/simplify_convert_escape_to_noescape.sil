@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_in_compiler
 
+// https://github.com/apple/swift/issues/73253
+// UNSUPPORTED: OS=windows-msvc
+
 sil_stage canonical
 
 import Builtin

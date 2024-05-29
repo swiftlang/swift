@@ -236,7 +236,7 @@ bb3:
   br bb2(%15 : $Builtin.Int64)
 }
 
-// CHECK-LABEL: sil @insert_release_in_liferange_exit_block
+// CHECK-LABEL: sil @insert_release_in_liverange_exit_block
 // CHECK: bb0(%0 : $A):
 // CHECK:   retain_value %0
 // CHECK: bb1:
@@ -249,7 +249,7 @@ bb3:
 // CHECK: bb3:
 // CHECK-NOT: %0
 // CHECK:   return
-sil @insert_release_in_liferange_exit_block : $@convention(thin) (@guaranteed A) -> () {
+sil @insert_release_in_liverange_exit_block : $@convention(thin) (@guaranteed A) -> () {
 bb0(%0 : $A):
   strong_retain %0 : $A
   %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()

@@ -369,18 +369,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///         print(error)
   ///     }
   ///
-  @_alwaysEmitIntoClient
+  @preconcurrency
   public init(
     unfolding produce: @escaping @Sendable () async throws -> Element?
-  ) where Failure == Error {
-    self.init(
-      unfolding: produce as () async throws -> Element?
-    )
-  }
-
-  @usableFromInline
-  internal init(
-    unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
     let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
       = .create(produce)

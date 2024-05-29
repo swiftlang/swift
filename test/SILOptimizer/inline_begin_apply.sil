@@ -690,3 +690,118 @@ bb_unwind:
   unwind
 
 }
+
+sil [ossa] [transparent] @simplest_in_guaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed () {
+entry:
+  %tuple = tuple ()
+  %addr = alloc_stack $()
+  store %tuple to [trivial] %addr : $*()
+  yield %addr : $*(), resume resume_block, unwind unwind_block
+
+resume_block:
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+
+unwind_block:
+  dealloc_stack %addr : $*()
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @ends_1 : {{.*}} {
+// CHECK:         [[VOID:%[^,]+]] = tuple ()
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $()
+// CHECK:         store [[VOID]] to [trivial] [[ADDR]]
+// CHECK:         cond_br undef, [[GOOD:bb[0-9]+]], [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BAD]]:
+// CHECK:         cond_br undef, [[NORMAL_BAD:bb[0-9]+]], [[REALLY_BAD:bb[0-9]+]]
+// CHECK:       [[NORMAL_BAD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[REALLY_BAD]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'ends_1'
+sil [ossa] @ends_1 : $@convention(thin) () -> () {
+entry:
+  %simplest = function_ref @simplest_in_guaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  (%_, %token) = begin_apply %simplest() : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  cond_br undef, good, bad
+
+good:
+  end_apply %token as $()
+  br exit
+
+bad:
+  cond_br undef, normal_bad, really_bad
+
+normal_bad:
+  abort_apply %token
+  br exit
+
+really_bad:
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Test handling for multiple end_borrows of a token.
+// CHECK-LABEL: sil [ossa] @ends_2 : {{.*}} {
+// CHECK:         [[VOID:%[^,]+]] = tuple ()
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $()
+// CHECK:         store [[VOID]] to [trivial] [[ADDR]] : $*()
+// CHECK:         cond_br undef, [[GOOD:bb[0-9]+]], [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BAD]]:
+// CHECK:         cond_br undef, [[NORMAL_BAD:bb[0-9]+]], [[REALLY_BAD:bb[0-9]+]]
+// CHECK:       [[NORMAL_BAD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[REALLY_BAD]]:
+// CHECK:         cond_br undef, [[BAD_NEWS_BUNNIES:bb[0-9]+]], [[BAD_NEWS_BEARS:bb[0-9]+]]
+// CHECK:       [[BAD_NEWS_BUNNIES]]:
+// CHECK:         unreachable
+// CHECK:       [[BAD_NEWS_BEARS]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'ends_2'
+sil [ossa] @ends_2 : $@convention(thin) () -> () {
+entry:
+  %simplest = function_ref @simplest_in_guaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  (%_, %token) = begin_apply %simplest() : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  cond_br undef, good, bad
+
+good:
+  end_apply %token as $()
+  br exit
+
+bad:
+  cond_br undef, normal_bad, really_bad
+
+normal_bad:
+  abort_apply %token
+  br exit
+
+really_bad:
+  cond_br undef, bad_news_bunnies, bad_news_bears
+
+bad_news_bunnies:
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+
+bad_news_bears:
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}

@@ -264,6 +264,10 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   case swift::PlatformKind::macCatalyst:
   case swift::PlatformKind::macCatalystApplicationExtension:
     return LinkerPlatformId::macCatalyst;
+  case swift::PlatformKind::visionOS:
+  case swift::PlatformKind::visionOSApplicationExtension:
+    return isSimulator ? LinkerPlatformId::xrOS_sim:
+                         LinkerPlatformId::xrOS;
   }
   llvm_unreachable("invalid platform kind");
 }
@@ -762,22 +766,27 @@ private:
   llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
 
   apigen::APIAvailability getAvailability(const Decl *decl) {
-    bool unavailable = false;
+    std::optional<bool> unavailable;
     std::string introduced, obsoleted;
+    bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
     for (auto *attr : decl->getAttrs()) {
       if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->isUnconditionallyUnavailable())
-          unavailable = true;
-        if (ava->Platform == platform) {
-          if (ava->Introduced)
-            introduced = ava->Introduced->getAsString();
-          if (ava->Obsoleted)
-            obsoleted = ava->Obsoleted->getAsString();
+        if (ava->Platform == PlatformKind::none) {
+          hasFallbackUnavailability = ava->isUnconditionallyUnavailable();
+          continue;
         }
+        if (ava->Platform != platform)
+          continue;
+        unavailable = ava->isUnconditionallyUnavailable();
+        if (ava->Introduced)
+          introduced = ava->Introduced->getAsString();
+        if (ava->Obsoleted)
+          obsoleted = ava->Obsoleted->getAsString();
       }
     }
-    return {introduced, obsoleted, unavailable};
+    return {introduced, obsoleted,
+            unavailable.value_or(hasFallbackUnavailability)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {
@@ -820,6 +829,10 @@ private:
   void buildCategoryName(const ExtensionDecl *ext, const ClassDecl *cls,
                          SmallVectorImpl<char> &s) {
     llvm::raw_svector_ostream os(s);
+    if (!ext->getObjCCategoryName().empty()) {
+      os << ext->getObjCCategoryName();
+      return;
+    }
     ModuleDecl *module = ext->getParentModule();
     os << module->getName();
     unsigned categoryCount = CategoryCounts[{cls, module}]++;

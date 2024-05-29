@@ -307,7 +307,8 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
     for (auto UI : BAI->getTokenResult()->getUses()) {
       auto User = UI->getUser();
-      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User));
+      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User) ||
+             isa<EndBorrowInst>(User));
       if (!L->contains(User))
         return false;
     }

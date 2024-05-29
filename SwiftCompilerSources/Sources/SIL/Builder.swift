@@ -19,6 +19,7 @@ public struct Builder {
   public enum InsertionPoint {
     case before(Instruction)
     case atEndOf(BasicBlock)
+    case atStartOf(Function)
     case staticInitializer(GlobalVariable)
   }
 
@@ -34,6 +35,9 @@ public struct Builder {
                             loc: location.bridged)
     case .atEndOf(let block):
       return BridgedBuilder(insertAt: .endOfBlock, insertionObj: block.bridged.obj,
+                            loc: location.bridged)
+    case .atStartOf(let function):
+      return BridgedBuilder(insertAt: .startOfFunction, insertionObj: function.bridged.obj,
                             loc: location.bridged)
     case .staticInitializer(let global):
       return BridgedBuilder(insertAt: .intoGlobal, insertionObj: global.bridged.obj,
@@ -148,6 +152,18 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createRetainValue(operand: Value) -> RetainValueInst {
+    let retain = bridged.createRetainValue(operand.bridged)
+    return notifyNew(retain.getAs(RetainValueInst.self))
+  }
+
+  @discardableResult
+  public func createReleaseValue(operand: Value) -> ReleaseValueInst {
+    let release = bridged.createReleaseValue(operand.bridged)
+    return notifyNew(release.getAs(ReleaseValueInst.self))
+  }
+
+  @discardableResult
   public func createStrongRetain(operand: Value) -> StrongRetainInst {
     let retain = bridged.createStrongRetain(operand.bridged)
     return notifyNew(retain.getAs(StrongRetainInst.self))
@@ -182,6 +198,13 @@ public struct Builder {
 
   public func createBeginBorrow(of value: Value) -> BeginBorrowInst {
     return notifyNew(bridged.createBeginBorrow(value.bridged).getAs(BeginBorrowInst.self))
+  }
+
+  public func createBorrowedFrom(borrowedValue: Value, enclosingValues: [Value]) -> BorrowedFromInst {
+    let bfi = enclosingValues.withBridgedValues { valuesRef in
+      return bridged.createBorrowedFrom(borrowedValue.bridged, valuesRef)
+    }
+    return notifyNew(bfi.getAs(BorrowedFromInst.self))
   }
 
   @discardableResult
@@ -281,6 +304,20 @@ public struct Builder {
   public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {
     let tttf = bridged.createThinToThickFunction(thinFunction.bridged, resultType.bridged)
     return notifyNew(tttf.getAs(ThinToThickFunctionInst.self))
+  }
+
+  public func createPartialApply(
+    function: Value,
+    substitutionMap: SubstitutionMap, 
+    capturedArguments: [Value], 
+    calleeConvention: ArgumentConvention, 
+    hasUnknownResultIsolation: Bool, 
+    isOnStack: Bool
+  ) -> PartialApplyInst {
+    return capturedArguments.withBridgedValues { capturedArgsRef in
+      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged, substitutionMap.bridged, hasUnknownResultIsolation, isOnStack)
+      return notifyNew(pai.getAs(PartialApplyInst.self))
+    }
   }
 
   @discardableResult
@@ -426,5 +463,15 @@ public struct Builder {
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))
+  }
+
+  public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {
+    let convertFunction = bridged.createConvertFunction(originalFunction.bridged, resultType.bridged, withoutActuallyEscaping)
+    return notifyNew(convertFunction.getAs(ConvertFunctionInst.self))
+  }
+
+  public func createConvertEscapeToNoEscape(originalFunction: Value, resultType: Type, isLifetimeGuaranteed: Bool) -> ConvertEscapeToNoEscapeInst {
+    let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
+    return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
 }

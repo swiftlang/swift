@@ -47,9 +47,7 @@ Func withUnsafeMutableBytes(of:_:) is now without @rethrows
 Func withoutActuallyEscaping(_:do:) has generic signature change from <ClosureType, ResultType> to <ClosureType, ResultType, Failure where Failure : Swift.Error>
 Func withoutActuallyEscaping(_:do:) is now without @rethrows
 
-Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift._BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
-Protocol SIMDStorage has generic signature change from <Self.Scalar : Swift.Decodable, Self.Scalar : Swift.Encodable, Self.Scalar : Swift.Hashable> to <Self : Swift._BitwiseCopyable, Self.Scalar : Swift.Decodable, Self.Scalar : Swift.Encodable, Self.Scalar : Swift.Hashable>
-
+Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 
 Protocol AdditiveArithmetic has added inherited protocol Copyable
 Protocol AdditiveArithmetic has added inherited protocol Escapable
@@ -150,6 +148,7 @@ Protocol RawRepresentable has added inherited protocol Copyable
 Protocol RawRepresentable has added inherited protocol Escapable
 Protocol SIMD has added inherited protocol Copyable
 Protocol SIMD has added inherited protocol Escapable
+Protocol SIMDScalar has added inherited protocol BitwiseCopyable
 Protocol SIMDScalar has added inherited protocol Copyable
 Protocol SIMDScalar has added inherited protocol Escapable
 Protocol SIMDStorage has added inherited protocol Copyable
@@ -264,7 +263,6 @@ Func UnsafeBufferPointer.index(_:offsetBy:) has generic signature change from <E
 Func UnsafeBufferPointer.index(_:offsetBy:limitedBy:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeBufferPointer.index(after:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeBufferPointer.index(before:) has generic signature change from <Element> to <Element where Element : ~Copyable>
-Func UnsafeBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, Result where T : ~Copyable, Result : ~Copyable>
 Func UnsafeMutableBufferPointer.allocate(capacity:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeMutableBufferPointer.deallocate() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeMutableBufferPointer.distance(from:to:) has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -275,7 +273,6 @@ Func UnsafeMutableBufferPointer.index(_:offsetBy:limitedBy:) has generic signatu
 Func UnsafeMutableBufferPointer.index(after:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeMutableBufferPointer.index(before:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeMutableBufferPointer.swapAt(_:_:) has generic signature change from <Element> to <Element where Element : ~Copyable>
-Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, Result where T : ~Copyable, Result : ~Copyable>
 Func UnsafeMutablePointer.allocate(capacity:) has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Func UnsafeMutablePointer.deallocate() has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Func UnsafeMutablePointer.deinitialize(count:) has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
@@ -283,18 +280,15 @@ Func UnsafeMutablePointer.initialize(to:) has generic signature change from <Poi
 Func UnsafeMutablePointer.initialize(to:) has parameter 0 changing from Default to Owned
 Func UnsafeMutablePointer.move() has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Func UnsafeMutablePointer.moveInitialize(from:count:) has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
-Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, Result where T : ~Copyable, Result : ~Copyable>
 Func UnsafeMutableRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafePointer.deallocate() has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
-Func UnsafePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, Result where T : ~Copyable, Result : ~Copyable>
 Func UnsafeRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
-Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, Result where T : ~Copyable, Result : ~Copyable>
 Func withExtendedLifetime(_:_:) has parameter 0 changing from Default to Shared
 Func withUnsafeBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
 Func withUnsafeBytes(of:_:) has parameter 0 changing from Default to Shared
@@ -318,3 +312,34 @@ TypeAlias UnsafePointer.Distance has generic signature change from <Pointee> to 
 TypeAlias UnsafePointer.Pointee has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 TypeAlias UnsafePointer.Stride has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
+Accessor UnsafeBufferPointer.debugDescription.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeMutableBufferPointer.debugDescription.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, R : ~Copyable>
+Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) is now without @rethrows
+Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, R : ~Copyable>
+Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) is now without @rethrows
+Func ManagedBuffer.withUnsafeMutablePointers(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, R : ~Copyable>
+Func ManagedBuffer.withUnsafeMutablePointers(_:) is now without @rethrows
+Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, R : ~Copyable>
+Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) is now without @rethrows
+Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, R : ~Copyable>
+Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) is now without @rethrows
+Func ManagedBufferPointer.withUnsafeMutablePointers(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, R : ~Copyable>
+Func ManagedBufferPointer.withUnsafeMutablePointers(_:) is now without @rethrows
+Func Optional.flatMap(_:) has generic signature change from <Wrapped, U> to <Wrapped, E, U where E : Swift.Error, U : ~Copyable>
+Func Optional.flatMap(_:) is now without @rethrows
+Func Optional.map(_:) has generic signature change from <Wrapped, U> to <Wrapped, E, U where E : Swift.Error, U : ~Copyable>
+Func Optional.map(_:) is now without @rethrows
+Func Result.flatMap(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
+Func Result.flatMapError(_:) has self access kind changing from NonMutating to Consuming
+Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
+Func UnsafeBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func UnsafeBufferPointer.withMemoryRebound(to:_:) is now without @rethrows
+Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) is now without @rethrows
+Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) is now without @rethrows
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) is now without @rethrows
+Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, Result where Result : ~Copyable>
+Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, Result where T : ~Copyable, Result : ~Copyable>

@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:  -enable-experimental-feature NoncopyableGenerics \
 // RUN:  -enable-experimental-feature NonescapableTypes
 
 // The restriction is that we don't permit suppression requirements on

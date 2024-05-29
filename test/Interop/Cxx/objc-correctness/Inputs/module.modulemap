@@ -38,3 +38,9 @@ module NSTextCheckingResult {
 module MockPOSIX {
   header "POSIX.h"
 }
+
+module ID {
+  header "id.h"
+  requires objc
+  requires cplusplus
+}

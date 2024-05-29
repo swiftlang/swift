@@ -112,3 +112,28 @@ public func borrowsNoncopyable<T: ~Copyable>(_ t: borrowing T) {}
 
 @_disallowFeatureSuppression(NoncopyableGenerics)
 public func suppressesNoncopyableGenerics<T: ~Copyable>(_ t: borrowing T) {}
+
+// coverage for rdar://127389991
+@_disallowFeatureSuppression(NoncopyableGenerics)
+public struct LoudlyNC<T: ~Copyable> {}
+public func _indexHumongousDonuts<TTT, T>(_ aggregate: UnsafePointer<TTT>, _ index: Int) -> T {
+    return UnsafeRawPointer(aggregate).load(
+    fromByteOffset: index * MemoryLayout<T>.stride, as: T.self)
+}
+public func referToLoud(_ t: LoudlyNC<String>) {}
+@_disallowFeatureSuppression(NoncopyableGenerics) public func referToLoudProperGuarding(_ t: LoudlyNC<String>) {}
+public struct NoCopyPls: ~Copyable {}
+public func substCopyable(_ t: String?) {}
+public func substGenericCopyable<T>(_ t: T?) {}
+public func substNC(_ t: borrowing NoCopyPls?) {}
+public func substGenericNC<T: ~Copyable>(_ t: borrowing T?) {}
+
+// coverage for rdar://126090425
+protocol P : ~Copyable {} // NOTE: it's important that this is NOT public.
+protocol Q: ~Copyable {}  // NOTE: it's important that this is NOT public.
+public protocol Publik: ~Copyable {}
+public struct Concrete : (P & ~Copyable) {}
+public struct Generic<T: Publik & ~Copyable> : (P & ~Copyable) {}
+public struct VeryNested: (P & (Q & ~Copyable & Publik) & (P & ~Copyable)) {}
+public struct Twice: P & ~Copyable, Q & ~Copyable {}
+public struct RegularTwice: ~Copyable, ~Copyable {}

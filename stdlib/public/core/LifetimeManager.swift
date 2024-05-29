@@ -19,11 +19,21 @@
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@inlinable
-@_preInverseGenerics
+@_alwaysEmitIntoClient
 public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
   _ x: borrowing T,
-  _ body: () throws -> Result
+  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
+) rethrows -> Result {
+  defer { _fixLifetime(x) }
+  return try body()
+}
+
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF")
+@usableFromInline
+internal func __abi_withExtendedLifetime<T, Result>(
+  _ x: T,
+  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -38,10 +48,19 @@ public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@inlinable
-public func withExtendedLifetime<T, Result>(
-  // FIXME(NCG): This should have T, Result as ~Copyable, but then the closure would need to take a borrow
-  _ x: T, _ body: (T) throws -> Result
+@_alwaysEmitIntoClient
+public func withExtendedLifetime<T, Result: ~Copyable>(
+  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
+) rethrows -> Result {
+  defer { _fixLifetime(x) }
+  return try body(x)
+}
+
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss20withExtendedLifetimeyq_x_q_xKXEtKr0_lF")
+@usableFromInline
+internal func __abi_withExtendedLifetime<T, Result>(
+  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
@@ -223,7 +242,6 @@ public func _withUnprotectedUnsafePointer<
 #endif
 }
 
-#if !$Embedded
 extension String {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.
@@ -245,33 +263,12 @@ extension String {
     return try _guts.withCString(body)
   }
 }
-#endif
 
-/// Takes in a value at +0 and performs a Builtin.copy upon it.
-///
-/// IMPLEMENTATION NOTES: During transparent inlining, Builtin.copy becomes the
-/// explicit_copy_value instruction if we are inlining into a context where the
-/// specialized type is loadable. If the transparent function is called in a
-/// context where the inlined function specializes such that the specialized
-/// type is still not loadable, the compiler aborts (a). Once we have opaque
-/// values, this restriction will be lifted since after that address only types
-/// at SILGen time will be loadable objects.
-///
-/// (a). This is implemented by requiring that Builtin.copy only be called
-/// within a function marked with the semantic tag "lifetimemanagement.copy"
-/// which conveniently is only the function we are defining here: _copy.
-///
-/// NOTE: We mark this _alwaysEmitIntoClient to ensure that we are not creating
-/// new ABI that the stdlib must maintain if a user calls this ignoring the '_'
-/// implying it is stdlib SPI.
+@available(*, deprecated, message: "Use the copy operator")
 @_alwaysEmitIntoClient
 @inlinable
 @_transparent
 @_semantics("lifetimemanagement.copy")
 public func _copy<T>(_ value: T) -> T {
-  #if $BuiltinCopy
-    Builtin.copy(value)
-  #else
-    value
-  #endif
+  copy value
 }

@@ -55,13 +55,16 @@
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/CAS/CASOptions.h"
+#include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/IncludeTreePPActions.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
@@ -80,7 +83,11 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/CAS/CASReference.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CrashRecoveryContext.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileCollector.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Memory.h"
@@ -612,6 +619,13 @@ void importer::getNormalInvocationArguments(
     if (clangSupportsPragmaAttributeWithSwiftAttr())
       invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS=1");
 
+    if (triple.isXROS()) {
+      // FIXME: This is a gnarly hack until some macros get adjusted in the SDK.
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-DOS_OBJECT_HAVE_OBJC_SUPPORT=1",
+      });
+    }
+
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
     auto V = version::getCurrentCompilerVersion();
@@ -632,7 +646,7 @@ void importer::getNormalInvocationArguments(
     // using Glibc or a libc that respects that flag. This will cause some
     // source breakage however (specifically with strerror_r()) on Linux
     // without a workaround.
-    if (triple.isOSFuchsia() || triple.isAndroid()) {
+    if (triple.isOSFuchsia() || triple.isAndroid() || triple.isMusl()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
       invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -665,6 +679,8 @@ void importer::getNormalInvocationArguments(
   // is supported.
   if (LangOpts.hasFeature(Feature::TransferringArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_TRANSFERRING=1");
+  if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
+    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
 
   if (searchPathOpts.getSDKPath().empty()) {
     invocationArgStrs.push_back("-Xclang");
@@ -826,6 +842,9 @@ importer::addCommonInvocationArguments(
       invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
              (triple.isiOS() || triple.isWatchOS()))
+      invocationArgStrs.push_back("-mcpu=apple-a12");
+    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
+             triple.isXROS())
       invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.getArch() == llvm::Triple::aarch64 ||
              triple.getArch() == llvm::Triple::aarch64_32 ||
@@ -1669,11 +1688,24 @@ bool ClangImporter::Implementation::importHeader(
 
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
-  for (auto group : allParsedDecls)
-    for (auto *D : group)
-      if (auto named = dyn_cast<clang::NamedDecl>(D))
-        addEntryToLookupTable(*BridgingHeaderLookupTable, named,
+
+  std::function<void(clang::Decl *)> visit = [&](clang::Decl *decl) {
+    // Iterate into extern "C" {} type declarations.
+    if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
+      for (auto *decl : linkageDecl->noload_decls()) {
+        visit(decl);
+      }
+    }
+    if (auto named = dyn_cast<clang::NamedDecl>(decl)) {
+      addEntryToLookupTable(*BridgingHeaderLookupTable, named,
                               getNameImporter());
+    }
+  };
+  for (auto group : allParsedDecls) {
+    for (auto *D : group) {
+      visit(D);
+    }
+  }
 
   pp.EndSourceFile();
   bumpGeneration();
@@ -1710,8 +1742,13 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  // Prefer importing the header directly if the header content matches by
+  // checking size and mod time. This allows correct import if some no-modular
+  // headers are already imported into clang importer. If mod time is zero, then
+  // the module should be built from CAS and there is no mod time to verify.
   if (headerFile && (*headerFile)->getSize() == expectedSize &&
-      (*headerFile)->getModificationTime() == expectedModTime) {
+      (expectedModTime == 0 ||
+       (*headerFile)->getModificationTime() == expectedModTime)) {
     return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
@@ -1766,16 +1803,46 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                            std::move(sourceBuffer), implicitImport);
 }
 
-std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
-                                                     off_t &fileSize,
-                                                     time_t &fileModTime) {
+static llvm::Expected<llvm::cas::ObjectRef>
+setupIncludeTreeInput(clang::CompilerInvocation &invocation,
+                      StringRef headerPath, StringRef pchIncludeTree) {
+  auto DB = invocation.getCASOpts().getOrCreateDatabases();
+  if (!DB)
+    return DB.takeError();
+  auto CAS = DB->first;
+  auto ID = CAS->parseID(pchIncludeTree);
+  if (!ID)
+    return ID.takeError();
+  auto includeTreeRef = CAS->getReference(*ID);
+  if (!includeTreeRef)
+    return llvm::cas::ObjectStore::createUnknownObjectError(*ID);
+
+  invocation.getFrontendOpts().Inputs.push_back(clang::FrontendInputFile(
+      *includeTreeRef, headerPath, clang::Language::ObjC));
+
+  return *includeTreeRef;
+}
+
+std::string ClangImporter::getBridgingHeaderContents(
+    StringRef headerPath, off_t &fileSize, time_t &fileModTime,
+    StringRef pchIncludeTree) {
   auto invocation =
       std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
 
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
-  invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::Language::ObjC));
+
+  std::optional<llvm::cas::ObjectRef> includeTreeRef;
+  if (pchIncludeTree.empty())
+    invocation->getFrontendOpts().Inputs.push_back(
+        clang::FrontendInputFile(headerPath, clang::Language::ObjC));
+  else if (auto err =
+               setupIncludeTreeInput(*invocation, headerPath, pchIncludeTree)
+                   .moveInto(includeTreeRef)) {
+    Impl.diagnose({}, diag::err_rewrite_bridging_header,
+                  toString(std::move(err)));
+    return "";
+  }
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
@@ -1796,18 +1863,36 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
     // write to an in-memory buffer.
     class RewriteIncludesAction : public clang::PreprocessorFrontendAction {
       raw_ostream &OS;
+      std::optional<llvm::cas::ObjectRef> includeTreeRef;
 
       void ExecuteAction() override {
         clang::CompilerInstance &compiler = getCompilerInstance();
+        // If the input is include tree, setup the IncludeTreePPAction.
+        if (includeTreeRef) {
+          auto IncludeTreeRoot = clang::cas::IncludeTreeRoot::get(
+              compiler.getOrCreateObjectStore(), *includeTreeRef);
+          if (!IncludeTreeRoot)
+            llvm::report_fatal_error(IncludeTreeRoot.takeError());
+          auto PPCachedAct =
+              clang::createPPActionsFromIncludeTree(*IncludeTreeRoot);
+          if (!PPCachedAct)
+            llvm::report_fatal_error(PPCachedAct.takeError());
+          compiler.getPreprocessor().setPPCachedActions(
+              std::move(*PPCachedAct));
+        }
+
         clang::RewriteIncludesInInput(compiler.getPreprocessor(), &OS,
                                       compiler.getPreprocessorOutputOpts());
       }
+
     public:
-      explicit RewriteIncludesAction(raw_ostream &os) : OS(os) {}
+      explicit RewriteIncludesAction(
+          raw_ostream &os, std::optional<llvm::cas::ObjectRef> includeTree)
+          : OS(os), includeTreeRef(includeTree) {}
     };
 
     llvm::raw_string_ostream os(result);
-    RewriteIncludesAction action(os);
+    RewriteIncludesAction action(os, includeTreeRef);
     rewriteInstance.ExecuteAction(action);
   });
 
@@ -2399,6 +2484,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
       "'async'";
     break;
 
+  case PlatformKind::visionOS:
+  case PlatformKind::visionOSApplicationExtension:
+    break;
+
   case PlatformKind::OpenBSD:
     deprecatedAsUnavailableMessage = "";
     break;
@@ -2439,6 +2528,12 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
     return name == "watchos";
   case PlatformKind::watchOSApplicationExtension:
     return name == "watchos" || name == "watchos_app_extension";
+
+  case PlatformKind::visionOS:
+    return name == "xros" || name == "visionos";
+  case PlatformKind::visionOSApplicationExtension:
+    return name == "xros" || name == "xros_app_extension" ||
+           name == "visionos" || name == "visionos_app_extension";
 
   case PlatformKind::OpenBSD:
     return name == "openbsd";
@@ -2506,6 +2601,11 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
     // No deprecation filter on watchOS
     return false;
 
+  case PlatformKind::visionOS:
+  case PlatformKind::visionOSApplicationExtension:
+    // No deprecation filter on xrOS
+    return false;
+
   case PlatformKind::OpenBSD:
     // No deprecation filter on OpenBSD
     return false;
@@ -2528,6 +2628,7 @@ ClangImporter::Implementation::Implementation(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
+      UseClangIncludeTree(ctx.ClangImporterOpts.UseClangIncludeTree),
       importSymbolicCXXDecls(
           ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)),
       IsReadingBridgingPCH(false),
@@ -5642,6 +5743,8 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
 
 static ValueDecl *
 cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
+  ASTContext &context = decl->getASTContext();
+
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
     // TODO: function templates are specialized during type checking so to
     // support these we need to tell Swift to type check the synthesized bodies.
@@ -5659,7 +5762,6 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
         return nullptr;
     }
 
-    ASTContext &context = decl->getASTContext();
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(),
         fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
@@ -5695,6 +5797,13 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   }
 
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto oldContext = var->getDeclContext();
+    auto oldTypeDecl = oldContext->getSelfNominalTypeDecl();
+    // FIXME: this is a workaround for rdar://128013193
+    if (oldTypeDecl->getAttrs().hasAttribute<MoveOnlyAttr>() &&
+        context.LangOpts.CxxInteropUseOpaquePointerForMoveOnly)
+      return nullptr;
+
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
                                                     sizeof(VarDecl), false);
     auto out =
@@ -5868,26 +5977,6 @@ struct OrderDecls {
 };
 }
 
-Identifier ExtensionDecl::getObjCCategoryName() const {
-  // Could it be an imported category?
-  if (!hasClangNode())
-    // Nope, not imported.
-    return Identifier();
-
-  auto category = dyn_cast<clang::ObjCCategoryDecl>(getClangDecl());
-  if (!category)
-    // Nope, not a category.
-    return Identifier();
-
-  // We'll look for an implementation with this category name.
-  auto clangCategoryName = category->getName();
-  if (clangCategoryName.empty())
-    // Class extension (has an empty name).
-    return Identifier();
-  
-  return getASTContext().getIdentifier(clangCategoryName);
-}
-
 static ObjCInterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
                 llvm::TinyPtrVector<Decl *> &impls,
@@ -5901,16 +5990,35 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
       auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
-      attr->setCategoryNameInvalid();
+      attr->setInvalid();
 
-      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
-                     categoryName, diagnoseOn)
-        .fixItRemove(attr->getRangeWithAt());
-      diags.diagnose(impls.front(), diag::previous_objc_implementation);
+      // @objc @implementations for categories are diagnosed as category
+      // conflicts, so we're only concerned with main class bodies and
+      // non-category implementations here.
+      if (categoryName.empty() || !isa<ExtensionDecl>(impls.front())) {
+        diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
+                       diagnoseOn)
+          .fixItRemove(attr->getRangeWithAt());
+        diags.diagnose(impls.front(), diag::previous_objc_implementation);
+      }
     }
   }
 
   return ObjCInterfaceAndImplementation(interfaces, impls.front());
+}
+
+static bool isImplValid(ExtensionDecl *ext) {
+  auto attr = ext->getAttrs().getAttribute<ObjCImplementationAttr>();
+
+  if (!attr)
+    return false;
+
+  // Clients using the stable syntax shouldn't have a category name on the attr.
+  // This is diagnosed in AttributeChecker::visitObjCImplementationAttr().
+  if (!attr->isEarlyAdopter() && !attr->CategoryName.empty())
+    return false;
+  
+  return !attr->isCategoryNameInvalid();
 }
 
 static ObjCInterfaceAndImplementation
@@ -5927,16 +6035,11 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   Identifier categoryName;
 
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->hasClangNode()) {
-      // This is either an interface, or it's not objcImpl at all.
-      categoryName = ext->getObjCCategoryName();
-    } else {
-      // This is either the implementation, or it's not objcImpl at all.
-      if (auto name = ext->getCategoryNameForObjCImplementation())
-        categoryName = *name;
-      else
-        return {};
-    }
+    assert(ext);
+    if (!ext->hasClangNode() && !isImplValid(ext))
+      return {};
+
+    categoryName = ext->getObjCCategoryName();
   } else {
     // Must be an imported class. Look for its main implementation.
     assert(isa_and_nonnull<ClassDecl>(dc));
@@ -5950,7 +6053,8 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   llvm::TinyPtrVector<Decl *> implDecls;
   for (ExtensionDecl *ext : classDecl->getExtensions()) {
     if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == categoryName)
+          && ext->getObjCCategoryName() == categoryName
+          && isImplValid(ext))
       implDecls.push_back(ext);
   }
 
@@ -6056,15 +6160,15 @@ evaluate(Evaluator &evaluator, Decl *decl) const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ObjCInterfaceAndImplementation &pair) {
-  if (!pair) {
+  if (pair.empty()) {
     out << "no clang interface or @_objcImplementation";
     return;
   }
 
-  out << "clang interface ";
-  simple_display(out, pair.interfaceDecls);
-  out << " with @_objcImplementation ";
+  out << "@implementation ";
   simple_display(out, pair.implementationDecl);
+  out << " matches clang interfaces ";
+  simple_display(out, pair.interfaceDecls);
 }
 
 SourceLoc
@@ -6080,7 +6184,8 @@ llvm::TinyPtrVector<Decl *> Decl::getAllImplementedObjCDecls() const {
     return {};
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {}).interfaceDecls;
+  auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return result.interfaceDecls;
 }
 
 DeclContext *DeclContext::getImplementedObjCContext() const {
@@ -6096,8 +6201,8 @@ Decl *Decl::getObjCImplementationDecl() const {
     return nullptr;
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {})
-             .implementationDecl;
+  auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return result.implementationDecl;
 }
 
 llvm::TinyPtrVector<Decl *>
@@ -7785,14 +7890,20 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
 }
 
 bool importer::isCxxStdModule(const clang::Module *module) {
-  if (module->getTopLevelModuleName() == "std")
+  return isCxxStdModule(module->getTopLevelModuleName(),
+                        module->getTopLevelModule()->IsSystem);
+}
+
+bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
+  if (moduleName == "std")
     return true;
   // In recent libc++ versions the module is split into multiple top-level
   // modules (std_vector, std_utility, etc).
-  if (module->getTopLevelModule()->IsSystem &&
-      module->getTopLevelModuleName().starts_with("std_"))
+  if (IsSystem && moduleName.starts_with("std_")) {
+    if (moduleName == "std_errno_h")
+      return false;
     return true;
-
+  }
   return false;
 }
 

@@ -124,6 +124,11 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
   // ObjectFilePCHContainer and contain -gmodules debug info.
   commandLineArgs.push_back("-gmodules");
 
+  // To use -gmodules we need to have a real path for the PCH; this option has
+  // no effect if caching is disabled.
+  commandLineArgs.push_back("-Xclang");
+  commandLineArgs.push_back("-finclude-tree-preserve-pch-path");
+
   return commandLineArgs;
 }
 
@@ -234,6 +239,7 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // invocation, not swift invocation.
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
     depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
+    depsInvocation.getFrontendOpts().OutputFile.clear();
 
     // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
     // from clang scanner and pass to swift.
@@ -284,7 +290,7 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     auto dependencies = ModuleDependencyInfo::forClangModule(
         pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, capturedPCMArgs,
-        RootID, IncludeTree, /*module-cache-key*/ "");
+        RootID, IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleImport(moduleName.ModuleName, &alreadyAddedModules);
       // It is safe to assume that all dependencies of a Clang module are Clang modules.
@@ -346,7 +352,7 @@ void ClangImporter::recordBridgingHeaderOptions(
       clang::frontend::ActionKind::GeneratePCH;
   depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
   depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
-  depsInvocation.getFrontendOpts().OutputFile = "";
+  depsInvocation.getFrontendOpts().OutputFile.clear();
 
   llvm::BumpPtrAllocator allocator;
   llvm::StringSaver saver(allocator);
@@ -488,11 +494,8 @@ bool ClangImporter::addHeaderDependencies(
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
         commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
         lookupModuleOutput);
-    if (!dependencies) {
-      // FIXME: Route this to a normal diagnostic.
-      llvm::logAllUnhandledErrors(dependencies.takeError(), llvm::errs());
+    if (!dependencies)
       return dependencies.takeError();
-    }
 
     // Record module dependencies for each new module we found.
     auto bridgedDeps = bridgeClangModuleDependencies(
@@ -522,8 +525,15 @@ bool ClangImporter::addHeaderDependencies(
       !targetModule.getBridgingHeader()->empty()) {
     auto clangModuleDependencies =
         scanHeaderDependencies(*targetModule.getBridgingHeader());
-    if (!clangModuleDependencies)
+    if (!clangModuleDependencies) {
+      // FIXME: Route this to a normal diagnostic.
+      llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
+                                  llvm::errs());
+      Impl.SwiftContext.Diags.diagnose(
+          SourceLoc(), diag::clang_dependency_scan_error,
+          "failed to scan bridging header dependencies");
       return true;
+    }
     if (auto TreeID = clangModuleDependencies->IncludeTreeID)
       targetModule.addBridgingHeaderIncludeTree(*TreeID);
     recordBridgingHeaderOptions(targetModule, *clangModuleDependencies);

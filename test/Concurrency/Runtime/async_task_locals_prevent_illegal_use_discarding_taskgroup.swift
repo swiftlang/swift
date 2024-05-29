@@ -1,4 +1,4 @@
-// RUN: %target-fail-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) 2>&1 | %FileCheck %s
+// RUN: %target-fail-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) 2>&1 | %FileCheck %s
 //
 // // TODO: could not figure out how to use 'not --crash' it never is used with target-run-simple-swift
 // This test is intended to *crash*, so we're using target-fail-simple-swift

@@ -27,12 +27,14 @@ func funcTestTransferringResult() async {
   // Just to show that without the transferring param, we generate diagnostics.
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
-  await transferToMain(x2) // expected-error {{transferring value of non-Sendable type 'NonSendableCStruct' from nonisolated context to main actor-isolated context}}
-  useValue(y2) // expected-note {{use here could race}}
+  await transferToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
+  // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestTransferringArg() async {
   let x = NonSendableCStruct()
-  transferUserDefinedIntoGlobalFunction(x) // expected-error {{value of non-Sendable type 'NonSendableCStruct' accessed after being transferred; later accesses could race}}
-  useValue(x) // expected-note {{use here could race}}
+  transferUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }

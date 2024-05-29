@@ -91,7 +91,7 @@ func TestSwiftObjectNSObjectAssertNoErrors()
 // Verify that Obj-C isEqual: provides same answer as Swift ==
 func TestEquatableEquals<T: Equatable & AnyObject>(_ e1: T, _ e2: T) {
   if e1 == e2 {
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
     // Legacy behavior: Equatable Swift does not imply == in ObjC
     TestSwiftObjectNSObjectNotEquals(e1, e2)
 #else
@@ -109,7 +109,7 @@ func TestNonEquatableEquals(_ e1: AnyObject, _ e2: AnyObject) {
 // Verify that Obj-C hashValue matches Swift hashValue for Hashable types
 func TestHashable(_ h: H)
 {
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
   // Legacy behavior: Hash value is identity in ObjC
   TestSwiftObjectNSObjectDefaultHashValue(h)
 #else
@@ -121,7 +121,7 @@ func TestHashable(_ h: H)
 // Test Obj-C hashValue for Swift types that are Equatable but not Hashable
 func TestEquatableHash(_ e: AnyObject)
 {
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
   // Legacy behavior: Equatable in Swift => ObjC hashes with identity
   TestSwiftObjectNSObjectDefaultHashValue(e)
   fakeEquatableWarning(e)

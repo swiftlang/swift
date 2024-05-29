@@ -3912,8 +3912,21 @@ public:
           std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>>
           &foundIsolationCrossings);
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const {
+    assert(Captures.hasBeenComputed());
+    return Captures;
+  }
+
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    assert(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
   /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }
@@ -4380,7 +4393,7 @@ struct CaptureListEntry {
   explicit CaptureListEntry(PatternBindingDecl *PBD);
 
   VarDecl *getVar() const;
-  bool isSimpleSelfCapture() const;
+  bool isSimpleSelfCapture(bool excludeWeakCaptures = true) const;
 };
 
 /// CaptureListExpr - This expression represents the capture list on an explicit

@@ -15,6 +15,7 @@ from . import earlyswiftdriver
 from . import libcxx
 from . import llvm
 from . import product
+from . import staticswiftlinux
 from ..cmake import CMakeOptions
 
 
@@ -83,6 +84,11 @@ class Swift(product.Product):
 
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
+
+        self.cmake_options.extend(
+            self._enable_experimental_parser_validation)
+
+        self._handle_swift_debuginfo_non_lto_args()
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -238,9 +244,27 @@ updated without updating swift.py?")
         return [('SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL',
                  self.args.swift_tools_ld64_lto_codegen_only_for_supporting_targets)]
 
+    @property
+    def _enable_experimental_parser_validation(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL',
+                 self.args.enable_experimental_parser_validation)]
+
+    def _handle_swift_debuginfo_non_lto_args(self):
+        if ('swift_debuginfo_non_lto_args' not in self.args
+                or self.args.swift_debuginfo_non_lto_args is None):
+            # Ensure the final value of the variable is determined
+            # by the build-script invocation, and not by any value present
+            # in CMakeCache.txt (e.g. as a result of previous incremental builds)
+            self.cmake_options.undefine('SWIFT_DEBUGINFO_NON_LTO_ARGS')
+        else:
+            self.cmake_options.extend(
+                [('SWIFT_DEBUGINFO_NON_LTO_ARGS:STRING',
+                 ";".join(self.args.swift_debuginfo_non_lto_args))])
+
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
+                staticswiftlinux.StaticSwiftLinuxConfig,
                 libcxx.LibCXX]

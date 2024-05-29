@@ -714,6 +714,9 @@ static bool iswatchOS(ASTContext &ctx) {
 }
 
 static bool isRelaxedIBAction(ASTContext &ctx) {
+  if (ctx.LangOpts.Target.isXROS())
+    return true;
+
   return isiOS(ctx) || iswatchOS(ctx);
 }
 
@@ -1435,6 +1438,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                                     attr->getLParenLoc(), firstNameLoc,
                                     objcName->getSelectorPieces()[0],
                                     attr->getRParenLoc()));
+      } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+        assert(Ext->getSelfClassDecl());
+        // This is an extension with an explicit, and otherwise valid, category
+        // name. Schedule it to be checked for name conflicts later.
+        if (auto *SF = Ext->getParentSourceFile())
+          SF->ObjCCategories.push_back(Ext);
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
       SourceLoc diagLoc = attr->getLParenLoc();
@@ -1527,7 +1536,9 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
 
 static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
                                          Feature requiredFeature) {
-  if (D->getASTContext().LangOpts.hasFeature(requiredFeature))
+  auto &ctx = D->getASTContext();
+
+  if (ctx.LangOpts.hasFeature(requiredFeature))
     return true;
 
   // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
@@ -1538,17 +1549,72 @@ static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
 
   // Either you're using Feature::ObjCImplementation without the early adopter
   // syntax, or you're using Feature::CImplementation. Either way, no go.
-  swift::diagnoseAndRemoveAttr(D, attr, diag::requires_experimental_feature,
-                               attr->getAttrName(), attr->isDeclModifier(),
-                               getFeatureName(requiredFeature));
+  ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
+                     attr->getAttrName(), attr->isDeclModifier(),
+                     getFeatureName(requiredFeature));
   return false;
+}
+
+static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
+  // attr->getRange() covers the attr name and argument list; adjust it to
+  // exclude the first token.
+  auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
+                                             attr->getRange().Start);
+  if (attr->getRange().contains(newStart)) {
+    return SourceRange(newStart, attr->getRange().End);
+  }
+  return SourceRange();
 }
 
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
+  DeclAttribute * langAttr =
+    D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
+  if (!langAttr)
+    langAttr = D->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+
+  if (!langAttr) {
+    diagnose(attr->getLocation(), diag::attr_implementation_requires_language);
+
+    // If this is an extension, suggest '@objc'.
+    if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+      auto diag = diagnose(attr->getLocation(),
+                           diag::make_decl_objc_for_implementation,
+                           D->getDescriptiveKind());
+
+      ObjCSelector correctSelector(Ctx, 0, {attr->CategoryName});
+      fixDeclarationObjCName(diag, ED, ObjCSelector(), correctSelector);
+    }
+
+    return;
+  }
+
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
     if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
       return;
+
+    auto objcLangAttr = dyn_cast<ObjCAttr>(langAttr);
+    assert(objcLangAttr && "extension with @_cdecl or another lang attr???");
+
+    // Only early adopters should specify the category name on the attribute;
+    // the stabilized syntax uses @objc(CustomName) for that.
+    if (!attr->isEarlyAdopter() && !attr->CategoryName.empty()) {
+      auto diag = diagnose(attr->getLocation(),
+                           diag::attr_implementation_category_goes_on_objc_attr);
+
+      ObjCSelector correctSelector(Ctx, 0, {attr->CategoryName});
+      auto argListRange = getArgListRange(Ctx, attr);
+      if (argListRange.isValid()) {
+        diag.fixItRemove(argListRange);
+        fixDeclarationObjCName(diag, ED, objcLangAttr->getName(),
+                               correctSelector);
+      }
+      objcLangAttr->setName(correctSelector, /*implicit=*/false);
+
+      attr->setCategoryNameInvalid();
+
+      return;
+    }
 
     if (ED->isConstrainedExtension())
       diagnoseAndRemoveAttr(attr,
@@ -1556,11 +1622,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
 
     auto CD = dyn_cast<ClassDecl>(ED->getExtendedNominal());
     if (!CD) {
-      diagnoseAndRemoveAttr(attr,
-                            diag::attr_objc_implementation_must_extend_class,
-                            ED->getExtendedNominal());
-      ED->getExtendedNominal()->diagnose(diag::decl_declared_here,
-                                         ED->getExtendedNominal());
+      // This will be diagnosed as diag::objc_extension_not_class.
+      attr->setInvalid();
       return;
     }
 
@@ -1572,37 +1635,49 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
 
     if (!CD->hasSuperclass()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_objc_implementation_must_have_super,
-                            CD);
+      diagnoseAndRemoveAttr(attr,
+                            diag::attr_objc_implementation_must_have_super, CD);
       CD->diagnose(diag::decl_declared_here, CD);
       return;
     }
 
     if (CD->isTypeErasedGenericClass()) {
-      diagnoseAndRemoveAttr(attr, diag::objc_implementation_cannot_have_generics,
-                            CD);
+      diagnoseAndRemoveAttr(attr,
+                            diag::objc_implementation_cannot_have_generics, CD);
       CD->diagnose(diag::decl_declared_here, CD);
+      return;
     }
 
     if (!attr->isCategoryNameInvalid() && !ED->getImplementedObjCDecl()) {
       diagnose(attr->getLocation(),
                diag::attr_objc_implementation_category_not_found,
-               attr->CategoryName, CD);
+               ED->getObjCCategoryName(), CD);
 
-      // attr->getRange() covers the attr name and argument list; adjust it to
-      // exclude the first token.
-      auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
-                                                 attr->getRange().Start);
-      if (attr->getRange().contains(newStart)) {
-        auto argListRange = SourceRange(newStart, attr->getRange().End);
+      SourceRange argListRange;
+      if (attr->CategoryName.empty())
+        argListRange = getArgListRange(Ctx, langAttr);
+      else
+        argListRange = getArgListRange(Ctx, attr);
+      if (argListRange.isValid()) {
         diagnose(attr->getLocation(),
                  diag::attr_objc_implementation_fixit_remove_category_name)
             .fixItRemove(argListRange);
       }
 
-      attr->setCategoryNameInvalid();
+      attr->setInvalid();
 
       return;
+    }
+
+    // While it's possible that @objc @implementation would function with
+    // pre-stable runtimes, this isn't a configuration that's been tested or
+    // supported.
+    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (!deploymentAvailability.isContainedIn(Ctx.getSwift50Availability())) {
+      diagnose(attr->getLocation(),
+               diag::attr_objc_implementation_raise_minimum_deployment_target,
+               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+               Ctx.getSwift50Availability().getOSVersion().getLowerEndpoint());
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -1614,12 +1689,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
           diagnose(attr->getLocation(),
                    diag::attr_objc_implementation_no_category_for_func, AFD);
 
-      // attr->getRange() covers the attr name and argument list; adjust it to
-      // exclude the first token.
-      auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
-                                                 attr->getRange().Start);
-      if (attr->getRange().contains(newStart)) {
-        auto argListRange = SourceRange(newStart, attr->getRange().End);
+      auto argListRange = getArgListRange(Ctx, attr);
+      if (argListRange.isValid()) {
         diagnostic.fixItRemove(argListRange);
       }
 
@@ -2059,6 +2130,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // an iOS attribute while building for macCatalyst.
   if (attr->Platform == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
       return;
     }
@@ -3177,7 +3255,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getFormalAccess() < AccessLevel::Public &&
+  if (VD->getFormalAccess() < AccessLevel::Package &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
                           VD->getName(), VD->getFormalAccess());
@@ -3236,7 +3314,8 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
     return;
   }
 
-  // @inlinable can only be applied to public or internal declarations.
+  // @inlinable can only be applied to public, package, or
+  // internal declarations.
   auto access = VD->getFormalAccess();
   if (access < AccessLevel::Internal) {
     diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
@@ -3938,12 +4017,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    if (!ED->getModuleContext()->isResilient()) {
-      attr->setInvalid();
-      return;
-    }
-
-    if (ED->getFormalAccess() < AccessLevel::Public &&
+    if (ED->getFormalAccess() < AccessLevel::Package &&
         !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
       diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
       return;
@@ -3952,7 +4026,9 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getFormalAccess() < AccessLevel::Public &&
+  // @frozen attribute is allowed for public, package, or
+  // usableFromInline decls.
+  if (VD->getFormalAccess() < AccessLevel::Package &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
                           VD->getName(), VD->getFormalAccess());
@@ -4594,6 +4670,11 @@ void AttributeChecker::checkBackDeployedAttrs(
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
 
+        llvm::VersionTuple ignoredVersion;
+
+        AvailabilityInference::updateBeforePlatformForFallback(
+            Attr, Ctx, platformString, ignoredVersion);
+
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                  platformString);
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
@@ -4612,6 +4693,11 @@ void AttributeChecker::checkBackDeployedAttrs(
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr->Introduced.value();
       StringRef introPlatformString = availableAttr->prettyPlatformString();
+
+      AvailabilityInference::updateBeforePlatformForFallback(
+          Attr, Ctx, beforePlatformString, beforeVersion);
+      AvailabilityInference::updateIntroducedPlatformForFallback(
+          availableAttr, Ctx, introPlatformString, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
@@ -6904,10 +6990,13 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   // Prevent Sendable Attr from being added to methods of non-sendable types
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
     if (auto selfDecl = funcDecl->getImplicitSelfDecl()) {
-      if (!selfDecl->getTypeInContext()->isSendableType()) {
-        diagnose(attr->getLocation(), diag::nonsendable_instance_method)
-        .warnUntilSwiftVersion(6);
-      }
+      diagnoseIfAnyNonSendableTypes(
+          selfDecl->getTypeInContext(),
+          SendableCheckContext(funcDecl),
+          Type(),
+          SourceLoc(),
+          attr->getLocation(),
+          diag::nonsendable_instance_method);
     }
   }
 }
@@ -6931,13 +7020,16 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
       // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable variables.
       auto type = var->getTypeInContext();
-      if (!attr->isUnsafe() && !type->hasError() &&
-          !type->isSendableType()) {
-        Ctx.Diags.diagnose(attr->getLocation(),
-                           diag::nonisolated_non_sendable,
-                           type)
-          .warnUntilSwiftVersion(6);
-        return;
+      if (!attr->isUnsafe() && !type->hasError()) {
+        bool diagnosed = diagnoseIfAnyNonSendableTypes(
+            type,
+            SendableCheckContext(dc),
+            Type(),
+            SourceLoc(),
+            attr->getLocation(),
+            diag::nonisolated_non_sendable);
+        if (diagnosed)
+          return;
       }
 
       if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {

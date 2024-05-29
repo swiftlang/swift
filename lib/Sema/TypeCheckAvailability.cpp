@@ -44,10 +44,12 @@ using namespace swift;
 
 ExportContext::ExportContext(
     DeclContext *DC, AvailabilityContext runningOSVersion,
-    FragileFunctionKind kind, bool spi, bool exported, bool implicit,
-    bool deprecated, std::optional<PlatformKind> unavailablePlatformKind)
+    FragileFunctionKind kind, bool spi, bool isPackage,
+    bool exported, bool implicit, bool deprecated,
+    std::optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
+  IsPackage = isPackage;
   Exported = exported;
   Implicit = implicit;
   Deprecated = deprecated;
@@ -72,7 +74,7 @@ bool swift::isExported(const ValueDecl *VD) {
   AccessScope accessScope =
       VD->getFormalAccessScope(nullptr,
                                /*treatUsableFromInlineAsPublic*/true);
-  if (accessScope.isPublic())
+  if (accessScope.isPublicOrPackage())
     return true;
 
   // Is this a stored property in a @frozen struct or class?
@@ -83,13 +85,13 @@ bool swift::isExported(const ValueDecl *VD) {
   return false;
 }
 
-static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+static bool hasConformancesToPublicOrPackageProtocols(const ExtensionDecl *ED) {
   auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
   for (const ProtocolDecl *PD : protocols) {
     AccessScope scope =
         PD->getFormalAccessScope(/*useDC*/ nullptr,
                                  /*treatUsableFromInlineAsPublic*/ true);
-    if (scope.isPublic())
+    if (scope.isPublicOrPackage())
       return true;
   }
 
@@ -111,7 +113,7 @@ bool swift::isExported(const ExtensionDecl *ED) {
 
   // If the extension declares a conformance to a public protocol then the
   // extension is exported.
-  if (hasConformancesToPublicProtocols(ED))
+  if (hasConformancesToPublicOrPackageProtocols(ED))
     return true;
 
   return false;
@@ -184,12 +186,19 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
 }
 
 static void
-computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
-                         bool *deprecated,
+computeExportContextBits(ASTContext &Ctx, Decl *D, 
+                         bool *spi, bool *isPackage,
+                         bool *implicit, bool *deprecated,
                          std::optional<PlatformKind> *unavailablePlatformKind) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
+
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    *isPackage = VD->getFormalAccessScope(nullptr, true).isPackage();
+  } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    *isPackage = ED->getDefaultAccessLevel() == AccessLevel::Package;
+  }
 
   // Defer bodies are desugared to an implicit closure expression. We need to
   // dilute the meaning of "implicit" to make sure we're still checking
@@ -208,8 +217,8 @@ computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
       if (auto *VD = PBD->getAnchoringVarDecl(i))
-        computeExportContextBits(Ctx, VD, spi, implicit, deprecated,
-                                 unavailablePlatformKind);
+        computeExportContextBits(Ctx, VD, spi, isPackage, implicit,
+                                 deprecated, unavailablePlatformKind);
     }
   }
 }
@@ -224,23 +233,25 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(), DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
+  bool isPackage = false;
   bool implicit = false;
   bool deprecated = false;
   std::optional<PlatformKind> unavailablePlatformKind;
-  computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
-                           &unavailablePlatformKind);
+  computeExportContextBits(Ctx, D, &spi, &isPackage, &implicit,
+                           &deprecated, &unavailablePlatformKind);
+
   forEachOuterDecl(D->getDeclContext(),
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated,
-                                              &unavailablePlatformKind);
+                                              &spi, &isPackage, &implicit,
+                                              &deprecated, &unavailablePlatformKind);
                    });
 
   bool exported = ::isExported(D);
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated,
-                       unavailablePlatformKind);
+                       spi, isPackage, exported, implicit,
+                       deprecated, unavailablePlatformKind);
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
@@ -255,19 +266,20 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
+  bool isPackage = false;
   std::optional<PlatformKind> unavailablePlatformKind;
   forEachOuterDecl(DC,
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated,
-                                              &unavailablePlatformKind);
+                                              &spi, &isPackage, &implicit,
+                                              &deprecated, &unavailablePlatformKind);
                    });
 
   bool exported = false;
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated,
-                       unavailablePlatformKind);
+                       spi, isPackage, exported, implicit,
+                       deprecated, unavailablePlatformKind);
 }
 
 ExportContext ExportContext::forConformance(DeclContext *DC,
@@ -276,7 +288,7 @@ ExportContext ExportContext::forConformance(DeclContext *DC,
   auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
 
   where.Exported &= proto->getFormalAccessScope(
-      DC, /*usableFromInlineAsPublic*/true).isPublic();
+      DC, /*usableFromInlineAsPublic*/true).isPublicOrPackage();
 
   return where;
 }
@@ -383,6 +395,18 @@ static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
   }
 
   return false;
+}
+
+// Utility function to help determine if noasync diagnostics are still
+// appropriate even if a `DeclContext` returns `false` from `isAsyncContext()`.
+static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
+  if (auto *D = DC->getAsDecl())
+    if (auto *FD = dyn_cast<FuncDecl>(D))
+      if (FD->isDeferBody())
+        // If this is a defer body, we should delegate to its parent.
+        return shouldTreatDeclContextAsAsyncForDiagnostics(DC->getParent());
+
+  return DC->isAsyncContext();
 }
 
 namespace {
@@ -1212,7 +1236,7 @@ private:
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
       if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts,
-                           forTargetVariant)) {
+                           forTargetVariant, /* ForRuntimeQuery */ true)) {
         if (!BestSpec ||
             inheritsAvailabilityFromPlatform(VersionSpec->getPlatform(),
                                              BestSpec->getPlatform())) {
@@ -1841,26 +1865,15 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // parsing.
   const Decl *ConcDecl = concreteSyntaxDeclForAvailableAttribute(D);
 
-  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
-  SourceLoc InsertLoc;
-
   // To avoid exposing the pattern binding declaration to the user, get the
-  // descriptive kind from one of the VarDecls. We get the Fix-It location
-  // from the PatternBindingDecl unless the VarDecl has attributes,
-  // in which case we get the start location of the VarDecl attributes.
-  DeclAttributes AttrsForLoc;
+  // descriptive kind from one of the VarDecls.
+  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
   if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
     KindForDiagnostic = D->getDescriptiveKind();
-    AttrsForLoc = D->getAttrs();
-  } else {
-    InsertLoc = ConcDecl->getAttrs().getStartLoc(/*forModifiers=*/false);
   }
 
-  InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
-  if (InsertLoc.isInvalid()) {
-    InsertLoc = ConcDecl->getStartLoc();
-  }
-
+  SourceLoc InsertLoc =
+      ConcDecl->getAttributeInsertionLoc(/*forModifier=*/false);
   if (InsertLoc.isInvalid())
     return;
 
@@ -2676,6 +2689,11 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     return;
   }
 
+  llvm::VersionTuple RemappedDeprecatedVersion;
+  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+      Attr, Context, Platform, RemappedDeprecatedVersion))
+    DeprecatedVersion = RemappedDeprecatedVersion;
+
   SmallString<32> newNameBuf;
   std::optional<ReplacementDeclKind> replacementDeclKind =
       describeRename(Context, Attr, /*decl*/ nullptr, newNameBuf);
@@ -2744,6 +2762,11 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   llvm::VersionTuple deprecatedVersion;
   if (attr->Deprecated)
     deprecatedVersion = attr->Deprecated.value();
+
+  llvm::VersionTuple remappedDeprecatedVersion;
+  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+      attr, ctx, platform, remappedDeprecatedVersion))
+    deprecatedVersion = remappedDeprecatedVersion;
 
   if (attr->Message.empty()) {
     ctx.Diags.diagnose(
@@ -2888,7 +2911,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   diags.diagnose(loc, diag::conformance_availability_unavailable,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
-      .limitBehavior(behavior)
+      .limitBehaviorUntilSwiftVersion(behavior, 6)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
@@ -3247,10 +3270,12 @@ bool swift::diagnoseExplicitUnavailability(
     // Skip the note emitted below.
     return true;
   } else {
+    auto unavailableDiagnosticPlatform = platform;
+    AvailabilityInference::updatePlatformStringForFallback(Attr, ctx, unavailableDiagnosticPlatform);
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D, platform.empty(),
-                  platform, EncodedMessage.Message)
+                  unavailableDiagnosticPlatform, EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
   }
@@ -3442,6 +3467,11 @@ public:
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
                                         /*useConformanceAvailabilityErrorsOpt=*/true);
       }
+    }
+
+    if (auto UTO = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
+      diagnoseSubstitutionMapAvailability(
+          UTO->getLoc(), UTO->substitutions, Where);
     }
 
     if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
@@ -3752,17 +3782,20 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
 static bool
 diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &Where) {
-  // If we are in a synchronous context, don't check it
-  if (!Where.getDeclContext()->isAsyncContext())
+  // If we are not in an (effective) async context, don't check it
+  if (!shouldTreatDeclContextAsAsyncForDiagnostics(Where.getDeclContext()))
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
 
-  if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
-      SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-      ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
-      asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
+  // Only suggest async alternatives if the DeclContext is truly async
+  if (Where.getDeclContext()->isAsyncContext()) {
+    if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
+        SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+        ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
+        asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
+      }
     }
   }
 
@@ -4454,7 +4487,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    auto hasProtocols = hasConformancesToPublicProtocols(extension);
+    auto hasProtocols = hasConformancesToPublicOrPackageProtocols(extension);
 
     if (!hasMembers && !hasProtocols) return;
 
@@ -4477,10 +4510,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
     auto suggestPlatform = ctx.LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
-      auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
-      if (InsertLoc.isInvalid())
-        InsertLoc = decl->getStartLoc();
-
+      auto InsertLoc = decl->getAttributeInsertionLoc(/*forModifiers=*/false);
       if (InsertLoc.isInvalid())
         return;
 

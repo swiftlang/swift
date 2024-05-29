@@ -1478,9 +1478,8 @@ bool SILInstruction::mayTrap() const {
 }
 
 bool SILInstruction::isMetaInstruction() const {
-  // Every instruction that implements getVarInfo() should be in this list.
+  // Every instruction that doesn't generate code should be in this list.
   switch (getKind()) {
-  case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DebugValueInst:
     return true;
