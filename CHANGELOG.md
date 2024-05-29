@@ -5,6 +5,44 @@
 
 ## Swift 6.0
 
+* [SE-0418][]:
+
+  The compiler would now automatically employ `Sendable` on functions
+  and key path literal expressions that cannot capture non-Sendable values.
+
+  This includes partially-applied and unapplied instance methods of `Sendable`
+  types, as well as non-local functions. Additionally, it is now disallowed
+  to utilize `@Sendable` on instance methods of non-Sendable types.
+
+  Let's use the following type to illustrate the new inference rules:
+
+  ```swift
+  public struct User {
+    var name: String
+
+    func getAge() -> Int { ... }
+  }
+  ```
+
+  Key path `\User.name` would be inferred as `WritableKeyPath<User, String> & Sendable`
+  because it doesn't capture any non-Sendable values.
+
+  The same applies to keypath-as-function conversions:
+
+  ```swift
+  let _: @Sendable (User) -> String = \User.name // Ok
+  ```
+
+  A function value produced by an un-applied reference to `getAge`
+  would be marked as `@Sendable` because `User` is a `Sendable` struct:
+
+  ```swift
+  let _ = User.getAge // Inferred as `@Sendable (User) -> @Sendable () -> Int`
+
+  let user = User(...)
+  user.getAge // Inferred as `@Sendable () -> Int`
+  ```
+
 * [SE-0432][]:
   Noncopyable enums can be pattern-matched with switches without consuming the
   value you switch over:
@@ -10327,6 +10365,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
 [SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
 [SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
+[SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
