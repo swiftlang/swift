@@ -312,6 +312,12 @@ Added: _$sScf13checkIsolatedyyFTj
 // method descriptor for Swift.SerialExecutor.checkIsolated() -> ()
 Added: _$sScf13checkIsolatedyyFTq
 
+// Added Hashable conformance to UnownedTaskExecutor
+Added: _$ss19UnownedTaskExecutorV4hash4intoys6HasherVz_tF
+Added: _$ss19UnownedTaskExecutorV9hashValueSivg
+Added: _$ss19UnownedTaskExecutorV9hashValueSivpMV
+Added: _$ss19UnownedTaskExecutorVSHsMc
+
 // #isolated adoption in TaskLocal.withValue
 // Swift.TaskLocal.withValueImpl<A>(_: __owned A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
 Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEScA_pSgYiSSSutYaKlF

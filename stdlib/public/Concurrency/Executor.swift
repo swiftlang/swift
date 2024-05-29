@@ -348,6 +348,17 @@ extension UnownedTaskExecutor: Equatable {
   }
 }
 
+@_unavailableInEmbedded
+@available(SwiftStdlib 6.0, *)
+extension UnownedTaskExecutor: Hashable {
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    let (ident, impl) = unsafeBitCast(self.executor, to: (Int, Int).self)
+    hasher.combine(ident)
+    hasher.combine(impl)
+  }
+}
+
 /// Returns either `true` or will CRASH if called from a different executor
 /// than the passed `executor`.
 ///
