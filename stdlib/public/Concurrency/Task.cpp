@@ -741,8 +741,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
       if (taskLocalHeadLinkType ==
           swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
         swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
             nullptr, 0, true, 0);
+#endif
+        // TODO(ktoso): If we were to keep this crash mode; offer a better failure for embedded swift
         abort();
       }
     }
