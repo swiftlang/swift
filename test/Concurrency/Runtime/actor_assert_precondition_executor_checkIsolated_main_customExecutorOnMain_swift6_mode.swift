@@ -15,6 +15,12 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
+// Disable this test on simulators
+// UNSUPPORTED: DARWIN_SIMULATOR=watchos
+// UNSUPPORTED: DARWIN_SIMULATOR=ios
+// UNSUPPORTED: DARWIN_SIMULATOR=tvos
+// UNSUPPORTED: single_threaded_concurrency
+
 import Dispatch
 
 @available(SwiftStdlib 6.0, *)
