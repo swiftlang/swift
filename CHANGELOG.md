@@ -5,6 +5,46 @@
 
 ## Swift 6.0
 
+* [SE-0423][]:
+  You can now use `@preconcurrency` attribute to replace static actor isolation
+  checking with dynamic checks for witnesses of synchronous nonisolated protocol
+  requirements when the witness is isolated. This is common when Swift programs
+  need to interoperate with frameworks written in C/C++/Objective-C whose
+  implementations cannot participate in static data race safety.
+
+  ```swift
+  public protocol ViewDelegateProtocol {
+    func respondToUIEvent()
+  }
+  ```
+
+  It's now possible for a `@MainActor`-isolated type to conform to
+  `ViewDelegateProtocol` by marking conformance declaration as `@preconcurrency`:
+
+  ```swift
+  @MainActor
+  class MyViewController: ViewDelegateProtocol {
+    func respondToUIEvent() {
+      // implementation...
+    }
+  }
+  ```
+
+  The compiler would emit dynamic checks into the `respondToUIEvent()` witness
+  to make sure that it's always executed in `@MainActor` isolated context.
+
+  Additionally, the compiler would emit dynamic actor isolation checks for:
+
+  - `@objc` thunks of synchronous actor-isolated members of classes.
+
+  - Synchronous actor-isolated function values passed to APIs that
+    erase actor isolation and haven't yet adopted strict concurrency checking.
+
+  - Call-sites of synchronous actor-isolated functions imported from Swift 6 libraries.
+
+  The dynamic actor isolation checks can be disabled using the flag
+  `-disable-dynamic-actor-isolation`.
+
 * [SE-0418][]:
 
   The compiler would now automatically employ `Sendable` on functions
@@ -10366,6 +10406,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
 [SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
