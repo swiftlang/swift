@@ -732,24 +732,25 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   AsyncTask *currentTask = swift_task_getCurrent();
   AsyncTask *parent = jobFlags.task_isChildTask() ? currentTask : nullptr;
 
+  /// FIXME: this is the fail path
   if (group) {
     assert(parent && "a task created in a group must be a child task");
-
-    // Prevent task-local misuse;
-    // We must not allow an addTask {} wrapped immediately with a withValue {}
-    auto ParentLocal = parent->_private().Local;
-    if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
-      if (taskLocalHeadLinkType ==
-          swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
-#if !SWIFT_CONCURRENCY_EMBEDDED
-        swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
-            nullptr, 0, true, 0);
-#endif
-        // TODO(ktoso): If we were to keep this crash mode; offer a better failure for embedded swift
-        abort();
-      }
-    }
-
+//
+//    // Prevent task-local misuse;
+//    // We must not allow an addTask {} wrapped immediately with a withValue {}
+//    auto ParentLocal = parent->_private().Local;
+//    if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
+//      if (taskLocalHeadLinkType ==
+//          swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
+//#if !SWIFT_CONCURRENCY_EMBEDDED
+//        swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
+//            nullptr, 0, true, 0);
+//#endif
+//        // TODO(ktoso): If we were to keep this crash mode; offer a better failure for embedded swift
+//        abort();
+//      }
+//    }
+//
     // Add to the task group, if requested.
     if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
       assert(group && "Missing group");
@@ -998,12 +999,44 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // In a task group we would not have allowed the `add` to create a child anymore,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
-    if (swift_task_isCancelled(parent) ||
-        (group && group->isCancelled()))
+    if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
       swift_task_cancel(task);
 
-    // Initialize task locals with a link to the parent task.
-    task->_private().Local.initializeLinkParent(task, parent);
+    // Initialize task locals storage
+    bool taskLocalStorageInitialized = false;
+
+    // Inside a task group, we may have to perform some defensive copying,
+    // check if doing so is necessary, and initialize storage using partial
+    // defensive copies if necessary.
+    if (group) {
+      assert(parent && "a task created in a group must be a child task");
+      // We are a child task in a task group; and it may happen that we are calling
+      // addTask specifically in such shape:
+      //
+      //     $local.withValue(theValue) { addTask {} }
+      //
+      // If this is the case, we MUST copy `theValue` (and any other such directly
+      // wrapping the addTask value bindings), because those values will be popped
+      // when withValue returns - breaking our structured concurrency guarantees
+      // that we rely on for the "link directly to parent's task local Item".
+      //
+      // Values set outside the task group are not subject to this problem, as
+      // their structural lifetime guarantee is upheld by the group scope
+      // out-living any addTask created tasks.
+      auto ParentLocal = parent->_private().Local;
+      if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
+        if (taskLocalHeadLinkType ==
+            swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
+          swift_task_localsOnlyCurrentCopyTo(task);
+          taskLocalStorageInitialized = true;
+        }
+      }
+    }
+
+    if (!taskLocalStorageInitialized) {
+      // just initialize the storage normally
+      task->_private().Local.initializeLinkParent(task, parent);
+    }
   }
 
   // Configure the initial context.
@@ -1065,7 +1098,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 #endif
     swift_retain(task);
     task->flagAsAndEnqueueOnExecutor(
-        serialExecutor); // FIXME: pass the task executor explicitly?
+        serialExecutor);
   }
 
   return {task, initialContext};

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) 2>&1 | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -17,8 +17,6 @@ enum TL {
 func bindAroundGroupAddTask() async {
   await TL.$number.withValue(1111) { // ok
     await withTaskGroup(of: Int.self) { group in
-      // CHECK-NOT: error: task-local: detected illegal
-
       TL.$number.withValue(2222) { // this is OK, there's no addTask being wrapped
         print("Survived, inside withValue, value: \(TL.number)") // CHECK: Survived, inside withValue, value: 2222
       }

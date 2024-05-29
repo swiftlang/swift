@@ -36,6 +36,21 @@
 
 using namespace swift;
 
+#if 0
+#define SWIFT_TASK_LOCAL_DEBUG_LOG_ENABLED 1
+#define SWIFT_TASK_LOCAL_DEBUG_LOG(key, fmt, ...)                       \
+fprintf(stderr, "[%s:%d][task:%p key:%p] (%s) " fmt "\n",               \
+      __FILE__, __LINE__,                                               \
+      swift_task_getCurrent(),                                          \
+      key,                                                              \
+      __FUNCTION__,                                                     \
+      __VA_ARGS__)
+
+#else
+#define SWIFT_TASK_LOCAL_DEBUG_LOG_ENABLED 0
+#define SWIFT_TASK_LOCAL_DEBUG_LOG(key, fmt, ...) (void)0
+#endif
+
 // =============================================================================
 
 /// An extremely silly class which exists to make pointer
@@ -69,6 +84,7 @@ SWIFT_CC(swift)
 static void swift_task_localValuePushImpl(const HeapObject *key,
                                               /* +1 */ OpaqueValue *value,
                                               const Metadata *valueType) {
+  SWIFT_TASK_LOCAL_DEBUG_LOG(key, "push value: %p", value);
   if (AsyncTask *task = swift_task_getCurrent()) {
     task->localValuePush(key, value, valueType);
     return;
@@ -93,15 +109,20 @@ SWIFT_CC(swift)
 static OpaqueValue* swift_task_localValueGetImpl(const HeapObject *key) {
   if (AsyncTask *task = swift_task_getCurrent()) {
     // we're in the context of a task and can use the task's storage
-    return task->localValueGet(key);
+    auto value = task->localValueGet(key);
+    SWIFT_TASK_LOCAL_DEBUG_LOG(key, "got value: %p", value);
+    return value;
   }
 
   // no AsyncTask available so we must check the fallback
   if (auto Local = FallbackTaskLocalStorage::get()) {
-    return Local->getValue(/*task*/nullptr, key);
+    auto value = Local->getValue(/*task*/nullptr, key);
+    SWIFT_TASK_LOCAL_DEBUG_LOG(key, "got value: %p", value);
+    return value;
   }
 
   // no value found in task-local or fallback thread-local storage.
+  SWIFT_TASK_LOCAL_DEBUG_LOG(key, "got no value: %d", 0);
   return nullptr;
 }
 
@@ -127,7 +148,7 @@ static void swift_task_localValuePopImpl() {
 }
 
 SWIFT_CC(swift)
-static void swift_task_localsCopyToImpl(AsyncTask *task) {
+static void swift_task_localsCopyToImpl(AsyncTask *target) {
   TaskLocal::Storage *Local = nullptr;
 
   if (AsyncTask *task = swift_task_getCurrent()) {
@@ -139,7 +160,23 @@ static void swift_task_localsCopyToImpl(AsyncTask *task) {
     return;
   }
 
-  Local->copyTo(task);
+  Local->copyTo(target);
+}
+
+SWIFT_CC(swift)
+static void swift_task_localsOnlyCurrentCopyToImpl(AsyncTask *target) {
+  TaskLocal::Storage *Local = nullptr;
+
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    Local = &task->_private().Local;
+  } else if (auto *storage = FallbackTaskLocalStorage::get()) {
+    Local = storage;
+  } else {
+    // bail out, there are no values to copy
+    return;
+  }
+
+  Local->copyToOnlyOnlyFromCurrent(target);
 }
 
 // =============================================================================
@@ -228,14 +265,15 @@ TaskLocal::Item::createLinkInTaskGroup(AsyncTask *task,
 }
 
 
-void TaskLocal::Item::copyTo(AsyncTask *target) {
+TaskLocal::Item*
+TaskLocal::Item::copyTo(AsyncTask *target) {
   assert(target && "TaskLocal item attempt to copy to null target task!");
 
   // 'parent' pointers are signified by null valueType.
   // We must not copy parent pointers, but rather perform a deep copy of all values,
   // as such, we skip parent pointers here entirely.
   if (isParentPointer())
-    return;
+    return nullptr;
 
   auto item = Item::createLink(target, key, valueType);
   valueType->vw_initializeWithCopy(item->getStoragePtr(), getStoragePtr());
@@ -244,6 +282,8 @@ void TaskLocal::Item::copyTo(AsyncTask *target) {
   /// so right now we can safely copy the value into the task without additional
   /// synchronization.
   target->_private().Local.head = item;
+
+  return item;
 }
 
 // =============================================================================
@@ -339,13 +379,22 @@ void TaskLocal::Storage::destroy(AsyncTask *task) {
   auto item = head;
   head = nullptr;
   TaskLocal::Item *next;
+  bool previousWasIsNextCreatedInTaskGroupBody = false;
   while (item) {
     auto linkType = item->getNextLinkType();
     switch (linkType) {
+    case TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody: {
+      next = item->getNext();
+      item->destroy(task);
+      previousWasIsNextCreatedInTaskGroupBody = true;
+      item = next;
+      break;
+    }
     case TaskLocal::NextLinkType::IsNext:
-    case TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody:
         next = item->getNext();
-        item->destroy(task);
+        if (!previousWasIsNextCreatedInTaskGroupBody) {
+          item->destroy(task);
+        }
         item = next;
         break;
 
@@ -369,7 +418,7 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
   assert(swift_task_getCurrent() == task &&
          "must only be pushing task locals onto current task");
 
-  // We're in a task group body.
+  // Why it matters to detect if we're pushing a value in a task group body:
   // We specifically need to prevent this pattern:
   //
   //    $number.withValue(0xBAADF00D) { // push
@@ -379,18 +428,21 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
   // because the end of the withValue scope would pop the value,
   // and thus if the child task didn't copy the value, it'd refer to a bad
   // memory location at this point.
+  bool inTaskGroupBody = swift_task_hasTaskGroupStatusRecord();
 
   TaskLocal::Item* item = Item::createLink(
       task, key, valueType,
-      /*inTaskGroupBody=*/swift_task_hasTaskGroupStatusRecord());
-
+      inTaskGroupBody);
 
   valueType->vw_initializeWithTake(item->getStoragePtr(), value);
   head = item;
+  SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "Created link item:%p", item);
 }
 
 bool TaskLocal::Storage::popValue(AsyncTask *task) {
   assert(head && "attempted to pop value off empty task-local stack");
+  SWIFT_TASK_LOCAL_DEBUG_LOG(head->key, "pop local item:%p, value:%p", head, head->getStoragePtr());
+
   auto old = head;
   head = head->getNext();
   old->destroy(task);
@@ -442,6 +494,53 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
     // i.e. if we've already seen an item for this key, we can skip it.
     if (copied.emplace(item->key).second) {
       item->copyTo(target);
+    }
+
+    item = item->getNext();
+  }
+}
+
+void TaskLocal::Storage::copyToOnlyOnlyFromCurrent(AsyncTask *target) {
+  assert(target && "task must not be null when copying values into it");
+  assert(!(target->_private().Local.head) &&
+      "Task must not have any task-local values bound before copying into it");
+
+  // Set of keys for which we already have copied to the new task.
+  // We only ever need to copy the *first* encounter of any given key,
+  // because it is the most "specific"/"recent" binding and any other binding
+  // of a key does not matter for the target task as it will never be able to
+  // observe it.
+  std::set<const HeapObject*> copied = {};
+
+  auto item = head;
+  TaskLocal::Item *lastCopiedItem = nullptr;
+  while (item) {
+    // we only have to copy an item if it is the most recent binding of a key.
+    // i.e. if we've already seen an item for this key, we can skip it.
+    if (copied.emplace(item->key).second) {
+
+      if (!item->isNextCreatedInTaskGroupBody() && lastCopiedItem) {
+        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next item is not within body, item value [%p]", item->getStoragePtr());
+        // The next item is not the "risky one" so we can directly link to it,
+        // as we would have within normal child task relationships. E.g. this is
+        // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
+        // binding, so we re-link our current head to point at this item.
+        lastCopiedItem->relinkNext(item);
+        break;
+      }
+
+      lastCopiedItem = item->copyTo(target);
+      SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "copy value [%p] to target:%p, item:%p, copied:%p",
+                                 item->getStoragePtr(), target, item, lastCopiedItem);
+
+      // If we didn't copy an item, e.g. because it was a pointer to parent,
+      // break out of the loop and keep pointing at parent still.
+      if (lastCopiedItem == nullptr) {
+        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next is %p", 0);
+        break;
+      }
+    } else {
+      SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "skip copy, already copied most recent value, value was [%p]", item->getStoragePtr());
     }
 
     item = item->getNext();

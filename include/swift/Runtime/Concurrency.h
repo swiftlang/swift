@@ -663,10 +663,14 @@ void swift_task_localValuePop();
 /// Its Swift signature is
 ///
 /// \code
-/// func _taskLocalValueGet<Key>(AsyncTask* task)
+/// func swift_task_localsCopyTo<Key>(AsyncTask* task)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
+
+// FIXME no need for runtime API
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localsOnlyCurrentCopyTo(AsyncTask* target);
 
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.

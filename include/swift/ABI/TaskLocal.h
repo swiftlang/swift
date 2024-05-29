@@ -125,6 +125,21 @@ public:
       return reinterpret_cast<Item *>(next & ~statusMask);
     }
 
+    void relinkNext(Item* nextOverride) {
+      assert(!getNext() &&
+               "Can only relink task local item that was not pointing at anything yet");
+      assert(nextOverride->isNextLinkPointer() ||
+             nextOverride->isParentPointer() &&
+                 "Currently relinking is only done within a task group to "
+                 "avoid within-taskgroup next pointers; attempted to point at "
+                 "task local declared within task group body though!");
+
+      next = reinterpret_cast<uintptr_t>(nextOverride) |
+             static_cast<uintptr_t>((nextOverride->isNextLinkPointer()
+                                         ? NextLinkType::IsNextCreatedInTaskGroupBody
+                                         : NextLinkType::IsParent));
+    }
+
     NextLinkType getNextLinkType() const {
       return static_cast<NextLinkType>(next & statusMask);
     }
@@ -134,7 +149,7 @@ public:
              NextLinkType::IsNext;
     }
 
-    bool IsNextCreatedInTaskGroupBody() const {
+    bool isNextCreatedInTaskGroupBody() const {
       return static_cast<NextLinkType>(next & statusMask) ==
              NextLinkType::IsNextCreatedInTaskGroupBody;
     }
@@ -151,7 +166,7 @@ public:
         reinterpret_cast<char *>(this) + storageOffset(valueType));
     }
 
-    void copyTo(AsyncTask *task);
+    TaskLocal::Item* copyTo(AsyncTask *task);
 
     /// Compute the offset of the storage from the base of the item.
     static size_t storageOffset(const Metadata *valueType) {
@@ -237,6 +252,8 @@ public:
     /// to observe the `A` value, because it semantically will never observe a
     /// "pop" of the `B` value - it was spawned from a scope where only B was observable.
     void copyTo(AsyncTask *target);
+
+    void copyToOnlyOnlyFromCurrent(AsyncTask *target);
 
     /// Destroy and deallocate all items stored by this specific task.
     ///
