@@ -1442,7 +1442,8 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   //
   // This condition variable can be allocated on the stack of the blocking
   // thread - with the address of it published to the resuming thread via the
-  // context.
+  // context.  We do this in a new scope.
+  do {
   ConditionVariable Cond;
 
   context->Cond = &Cond;
@@ -1495,7 +1496,10 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   // Since the condition variable is stack allocated, we don't need to do
-  // anything here to clean up
+  // anything here to clean up.  But we do have to end the scope that we
+  // created the condition variable in so that it'll be destroyed before
+  // we try to tail-call.
+  } while (false);
 #else
   // Restore the running state of the task and resume it.
   task->flagAsRunning();
