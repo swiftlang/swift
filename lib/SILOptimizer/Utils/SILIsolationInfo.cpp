@@ -349,6 +349,28 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
 
     if (auto *isolatedOp = fas.getIsolatedArgumentOperandOrNullPtr()) {
+      // First pattern match from global actors being passed as isolated
+      // parameters. This gives us better type information. If we can pattern
+      // match... we should!
+      if (auto *ei = dyn_cast<EnumInst>(isolatedOp->get())) {
+        if (ei->getElement()->getParentEnum()->isOptionalDecl() &&
+            ei->hasOperand()) {
+          if (auto *ieri = dyn_cast<InitExistentialRefInst>(ei->getOperand())) {
+            CanType selfASTType = ieri->getFormalConcreteType();
+
+            if (auto *nomDecl = selfASTType->getAnyActor()) {
+              // The SILValue() parameter doesn't matter until we have isolation
+              // history.
+              if (nomDecl->isGlobalActor())
+                return SILIsolationInfo::getGlobalActorIsolated(SILValue(),
+                                                                nomDecl);
+            }
+          }
+        }
+      }
+
+      // If we did not find an AST type, just see if we can find a value by
+      // looking through all optional types. This is conservatively correct.
       CanType selfASTType = isolatedOp->get()->getType().getASTType();
       selfASTType =
           selfASTType->lookThroughAllOptionalTypes()->getCanonicalType();
