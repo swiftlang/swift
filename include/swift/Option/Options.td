@@ -193,6 +193,12 @@ def no_strict_implicit_module_context :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
+def compiler_assertions :
+  Flag<["-"], "compiler-assertions">,
+  Group<internal_debug_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
+  HelpText<"Enable internal self-checks while compiling">;
+
 def validate_clang_modules_once :
   Flag<["-"], "validate-clang-modules-once">,
   Flags<[FrontendOption]>,

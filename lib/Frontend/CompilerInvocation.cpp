@@ -15,6 +15,7 @@
 
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
@@ -326,6 +327,13 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
                                            DiagnosticEngine &diags) {
   return ModuleAliasesConverter::computeModuleAliases(args, FrontendOpts, diags);
+}
+
+static void ParseAssertionArgs(ArgList &args) {
+  using namespace options;
+  if (args.hasArg(OPT_compiler_assertions)) {
+    CONDITIONAL_ASSERT_Global_enable_flag = 1;
+  }
 }
 
 static bool ParseFrontendArgs(
@@ -3474,6 +3482,8 @@ bool CompilerInvocation::parseArgs(
   if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
+
+  ParseAssertionArgs(ParsedArgs);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
