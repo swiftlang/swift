@@ -962,7 +962,9 @@ the memory of the annotated type:
   implemented in C as always requiring a fixed address. However, you can provide
   `movesAsLike` to the `like:` version of this attribute to enforce that moving
   the value will defer its move semantics to the type it's like. This makes it
-  suitable for storing such values that are not bitwise-movable.
+  suitable for storing such values that are not bitwise-movable. Note that the
+  raw storage for this variant must always be properly initialized after
+  initialization because foreign moves will assume an initialized state.
 
 Using the `@_rawLayout` attribute will suppress the annotated type from
 being implicitly `Sendable`. If the type is safe to access across threads, it
