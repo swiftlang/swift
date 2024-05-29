@@ -18,6 +18,7 @@
 // REQUIRES: OS=macosx
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: embedded_stdlib
 
 @inline(never)
 func log(_ s: StaticString) {
