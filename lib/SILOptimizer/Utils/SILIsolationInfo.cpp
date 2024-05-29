@@ -348,21 +348,17 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         return info;
     }
 
-    if (fas.hasSelfArgument()) {
-      auto &selfOp = fas.getSelfArgumentOperand();
-      CanType selfASTType = selfOp.get()->getType().getASTType();
+    if (auto *isolatedOp = fas.getIsolatedArgumentOperandOrNullPtr()) {
+      CanType selfASTType = isolatedOp->get()->getType().getASTType();
       selfASTType =
           selfASTType->lookThroughAllOptionalTypes()->getCanonicalType();
 
-      if (fas.getArgumentParameterInfo(selfOp).hasOption(
-              SILParameterInfo::Isolated)) {
-        if (auto *nomDecl = selfASTType->getAnyActor()) {
-          // TODO: We really should be doing this based off of an Operand. Then
-          // we would get the SILValue() for the first element. Today this can
-          // only mess up isolation history.
-          return SILIsolationInfo::getActorInstanceIsolated(
-              SILValue(), selfOp.get(), nomDecl);
-        }
+      if (auto *nomDecl = selfASTType->getAnyActor()) {
+        // TODO: We really should be doing this based off of an Operand. Then
+        // we would get the SILValue() for the first element. Today this can
+        // only mess up isolation history.
+        return SILIsolationInfo::getActorInstanceIsolated(
+            SILValue(), isolatedOp->get(), nomDecl);
       }
     }
 
