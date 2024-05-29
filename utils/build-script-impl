@@ -3345,10 +3345,11 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
-            # `host_install_destdir`. Avoid touching clang builtins .a files.
+            # `host_install_destdir`. Avoid touching .a clang builtins and embedded libraries.
             find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
               grep_that_allows_no_matches -v "/clang/lib/darwin/" | \
+              grep_that_allows_no_matches -v "/lib/swift/embedded/" | \
               xargs -t -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
             # Codesign dylibs and executables in usr/bin after strip tool
