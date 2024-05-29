@@ -316,7 +316,12 @@ Added: _$sScf13checkIsolatedyyFTj
 // method descriptor for Swift.SerialExecutor.checkIsolated() -> ()
 Added: _$sScf13checkIsolatedyyFTq
 
-// #isolated adoption in multiple APis
+// Added Hashable conformance to UnownedTaskExecutor
+Added: _$ss19UnownedTaskExecutorV9hashValueSivg
+Added: _$ss19UnownedTaskExecutorV9hashValueSivpMV
+Added: _$ss19UnownedTaskExecutorVSHsMc
+
+// #isolated adoption in multiple APIs
 // withTaskCancellationHandler gains #isolated
 Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF
 Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlFTu
