@@ -15,8 +15,11 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
-// Temporarily disable for now rdar://128862814
-// REQUIRES: rdar128862814
+// Disable this test on simulators
+// UNSUPPORTED: DARWIN_SIMULATOR=watchos
+// UNSUPPORTED: DARWIN_SIMULATOR=ios
+// UNSUPPORTED: DARWIN_SIMULATOR=tvos
+// UNSUPPORTED: single_threaded_concurrency
 
 import Dispatch
 
