@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -1940,6 +1941,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   if (Args.hasArg(options::OPT_help_hidden)) {
     printHelp(true);
     return false;
+  }
+
+  if (Args.hasArg(options::OPT_compiler_assertions)) {
+    CONDITIONAL_ASSERT_Global_enable_flag = 1;
   }
 
   if (Args.hasArg(options::OPT_version)) {
