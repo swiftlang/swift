@@ -616,6 +616,9 @@ SILValue createEmptyAndUndefValue(SILType ty, SILInstruction *insertionPoint,
 /// Check if a struct or its fields can have unreferenceable storage.
 bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                 SILFunction *func);
+
+SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
+
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
