@@ -2185,9 +2185,8 @@ public:
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
 
-  /// Mapping from active opaque value expressions to their values.
-  llvm::SmallDenseMap<OpaqueValueExpr *, ManagedValue>
-    OpaqueValues;
+  /// Mapping from OpaqueValueExpr/PackElementExpr to their values.
+  llvm::SmallDenseMap<Expr *, ManagedValue> OpaqueValues;
 
   /// A mapping from opaque value expressions to the open-existential
   /// expression that determines them, used while lowering lvalues.
