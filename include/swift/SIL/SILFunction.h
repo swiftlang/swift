@@ -362,7 +362,7 @@ private:
   unsigned Transparent : 1;
 
   /// The function's serialized attribute.
-  bool Serialized : 1;
+  unsigned SerializedKind : 2;
 
   /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
@@ -502,7 +502,7 @@ private:
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-              IsSerialized_t isSerialized, ProfileCounter entryCount,
+              SerializedKind_t serializedKind, ProfileCounter entryCount,
               IsThunk_t isThunk, SubclassScope classSubclassScope,
               Inline_t inlineStrategy, EffectsKind E,
               const SILDebugScope *debugScope,
@@ -515,7 +515,7 @@ private:
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, IsSerialized_t isSerialized,
+         IsTransparent_t isTrans, SerializedKind_t serializedKind,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
          IsDistributed_t isDistributed,
          IsRuntimeAccessible_t isRuntimeAccessible,
@@ -528,7 +528,7 @@ private:
 
   void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
             GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-            IsTransparent_t isTrans, IsSerialized_t isSerialized,
+            IsTransparent_t isTrans, SerializedKind_t serializedKind,
             ProfileCounter entryCount, IsThunk_t isThunk,
             SubclassScope classSubclassScope, Inline_t inlineStrategy,
             EffectsKind E, const SILDebugScope *DebugScope,
@@ -780,11 +780,7 @@ public:
     return getLoweredFunctionType()->getRepresentation();
   }
 
-  ResilienceExpansion getResilienceExpansion() const {
-    return (isSerialized()
-            ? ResilienceExpansion::Minimal
-            : ResilienceExpansion::Maximal);
-  }
+  ResilienceExpansion getResilienceExpansion() const;
 
   // Returns the type expansion context to be used inside this function.
   TypeExpansionContext getTypeExpansionContext() const {
@@ -875,13 +871,32 @@ public:
   /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
-  /// Returns true if this function can be inlined into a fragile function
-  /// body.
-  bool hasValidLinkageForFragileInline() const { return isSerialized(); }
+///   Checks if this (callee) function body can be inlined into the caller
+///   by comparing their `SerializedKind_t` values.
+///
+///   If both callee and caller are `not_serialized`, the callee can be inlined
+///   into the caller during SIL inlining passes even if it (and the caller)
+///   might contain private symbols. If this callee is `serialized_for_pkg`,
+///   it can only be referenced by a serialized caller but not inlined into
+///   it.
+///
+///  ```
+///   canInlineInto:                                 Caller
+///                              | not_serialized | serialized_for_pkg | serialized
+///          not_serialized      |      ok        |       no           |    no
+///  Callee  serialized_for_pkg  |      ok        |       ok           |    no
+///          serialized          |      ok        |       ok           |    ok
+///
+///  ```
+///
+/// \p callerSerializedKind The caller's SerializedKind.
+  bool canBeInlinedIntoCaller(SerializedKind_t callerSerializedKind) const;
 
   /// Returns true if this function can be referenced from a fragile function
   /// body.
-  bool hasValidLinkageForFragileRef() const;
+  /// \p callerSerializedKind The caller's SerializedKind. Used to be passed to
+  ///                         \c canBeInlinedIntoCaller.
+  bool hasValidLinkageForFragileRef(SerializedKind_t callerSerializedKind) const;
 
   /// Get's the effective linkage which is used to derive the llvm linkage.
   /// Usually this is the same as getLinkage(), except in one case: if this
@@ -1135,11 +1150,21 @@ public:
     assert(!Transparent || !IsDynamicReplaceable);
   }
 
+  bool isSerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized;
+  }
+  bool isAnySerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized ||
+           SerializedKind_t(SerializedKind) == IsSerializedForPackage;
+  }
+
   /// Get this function's serialized attribute.
-  IsSerialized_t isSerialized() const { return IsSerialized_t(Serialized); }
-  void setSerialized(IsSerialized_t isSerialized) {
-    Serialized = isSerialized;
-    assert(this->isSerialized() == isSerialized &&
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(SerializedKind);
+  }
+  void setSerializedKind(SerializedKind_t serializedKind) {
+    SerializedKind = serializedKind;
+    assert(this->getSerializedKind() == serializedKind &&
            "too few bits for Serialized storage");
   }
 

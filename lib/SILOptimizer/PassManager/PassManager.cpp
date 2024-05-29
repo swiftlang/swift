@@ -1711,8 +1711,8 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   // FIXME: hard assumption on what pass is requesting this.
   auto P = Demangle::SpecializationPass::AsyncDemotion;
 
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, F->isSerialized(),
-                                                         F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(
+      P, F->getSerializedKind(), F);
   Mangler.setRemovedEffect(EffectKind::Async);
   return Mangler.mangle();
 }
@@ -1721,7 +1721,9 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Null
                                                           SwiftInt numDeadArgs,
                                                           BridgedFunction function) const {
   SILFunction *f = function.getFunction();
-  Mangle::FunctionSignatureSpecializationMangler Mangler(Demangle::SpecializationPass::FunctionSignatureOpts,                                                        f->isSerialized(), f);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(
+      Demangle::SpecializationPass::FunctionSignatureOpts,
+      f->getSerializedKind(), f);
   for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
     Mangler.setArgumentDead((unsigned)idx);
   }
@@ -1821,11 +1823,12 @@ createEmptyFunction(BridgedStringRef name,
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
 
   SILFunction *newF = functionBuilder.createFunction(
-    fromFn->getLinkage(), name.unbridged(), newTy, nullptr, fromFn->getLocation(), fromFn->isBare(),
-    fromFn->isTransparent(), fromFn->isSerialized(), IsNotDynamic, IsNotDistributed,
-    IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
-    fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(), fromFn->getEffectsKind(),
-    nullptr, fromFn->getDebugScope());
+      fromFn->getLinkage(), name.unbridged(), newTy, nullptr,
+      fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
+      fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
+      fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
+      fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
 
   return {newF};
 }

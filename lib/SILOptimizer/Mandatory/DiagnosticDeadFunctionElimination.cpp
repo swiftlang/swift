@@ -72,7 +72,7 @@ struct DiagnosticDeadFunctionEliminator : SILFunctionTransform {
     // ODR shootouts.
     if (fn->getLinkage() == SILLinkage::Shared) {
       fn->setLinkage(SILLinkage::Private);
-      fn->setSerialized(IsNotSerialized);
+      fn->setSerializedKind(IsNotSerialized);
     }
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

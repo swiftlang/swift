@@ -153,13 +153,38 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
 
 namespace {
 
-/// When resilience is bypassed, direct access is legal, but the decls are still
-/// resilient.
+/// When resilience is bypassed for debugging or package serialization is enabled,
+/// direct access is legal, but the decls are still resilient.
 template <typename DeclType>
-bool checkResilience(DeclType *D, ModuleDecl *M,
-                     ResilienceExpansion expansion) {
-  return !D->getModuleContext()->getBypassResilience() &&
-         D->isResilient(M, expansion);
+bool checkResilience(DeclType *D, ModuleDecl *accessingModule,
+                     ResilienceExpansion expansion,
+                     SerializedKind_t serializedKind) {
+  auto declModule = D->getModuleContext();
+
+  // For DEBUGGING: this check looks up
+  // `bypass-resilience-checks`, which is
+  // an old flag used for debugging, and
+  // has nothing to do with optimizations.
+  if (declModule->getBypassResilience())
+    return false;
+
+  // If the SIL function containing the decl D is
+  // [serialized_for_package], package-cmo had been
+  // enabled in its defining module, so direct access
+  // from a client module should be allowed.
+  if (accessingModule != declModule &&
+      expansion == ResilienceExpansion::Maximal &&
+      serializedKind == IsSerializedForPackage)
+      return false;
+
+  return D->isResilient(accessingModule, expansion);
+}
+
+template <typename DeclType>
+bool checkResilience(DeclType *D, const SILFunction &f) {
+  return checkResilience(D, f.getModule().getSwiftModule(),
+                         f.getResilienceExpansion(),
+                         f.getSerializedKind());
 }
 
 bool checkTypeABIAccessible(SILFunction const &F, SILType ty) {
@@ -193,6 +218,7 @@ namespace {
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
                             TypeExpansionContext typeExpansionContext,
+                            SerializedKind_t serializedKind,
                             llvm::function_ref<void(bool, StringRef)> require,
                             CanType &baseTy,
                             CanType leafTy,
@@ -300,7 +326,8 @@ void verifyKeyPathComponent(SILModule &M,
             "property decl should be a member of the base with the same type "
             "as the component");
     require(property->hasStorage(), "property must be stored");
-    require(!checkResilience(property, M.getSwiftModule(), expansion),
+    require(!checkResilience(property, M.getSwiftModule(),
+                             expansion, serializedKind),
             "cannot access storage of resilient property");
     auto propertyTy =
         loweredBaseTy.getFieldType(property, M, typeExpansionContext);
@@ -333,7 +360,8 @@ void verifyKeyPathComponent(SILModule &M,
     {
       auto getter = component.getComputedPropertyGetter();
       if (expansion == ResilienceExpansion::Minimal) {
-        require(getter->hasValidLinkageForFragileRef(),
+        require(serializedKind != IsNotSerialized &&
+                getter->hasValidLinkageForFragileRef(serializedKind),
                 "Key path in serialized function should not reference "
                 "less visible getters");
       }
@@ -379,7 +407,8 @@ void verifyKeyPathComponent(SILModule &M,
       
       auto setter = component.getComputedPropertySetter();
       if (expansion == ResilienceExpansion::Minimal) {
-        require(setter->hasValidLinkageForFragileRef(),
+        require(serializedKind != IsNotSerialized &&
+                setter->hasValidLinkageForFragileRef(serializedKind),
                 "Key path in serialized function should not reference "
                 "less visible setters");
       }
@@ -2449,9 +2478,9 @@ public:
 
     // A direct reference to a non-public or shared but not fragile function
     // from a fragile function is an error.
-    if (F.isSerialized()) {
+    if (F.isAnySerialized()) {
       require((SingleFunction && RefF->isExternalDeclaration()) ||
-              RefF->hasValidLinkageForFragileRef(),
+              RefF->hasValidLinkageForFragileRef(F.getSerializedKind()),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -2474,8 +2503,7 @@ public:
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
     SILGlobalVariable *RefG = AGI->getReferencedGlobal();
     if (auto *VD = RefG->getDecl()) {
-      require(!checkResilience(VD, F.getModule().getSwiftModule(),
-                               F.getResilienceExpansion()),
+      require(!checkResilience(VD, F),
               "cannot access storage of resilient global");
     }
     if (F.isSerialized()) {
@@ -2495,10 +2523,10 @@ public:
         RefG->getLoweredTypeInContext(F.getTypeExpansionContext()),
         "global_addr/value must be the type of the variable it references");
     if (auto *VD = RefG->getDecl()) {
-      require(!checkResilience(VD, F.getModule().getSwiftModule(),
-                               F.getResilienceExpansion()),
+      require(!checkResilience(VD, F),
               "cannot access storage of resilient global");
     }
+    // pcmo TODO: replace this with F.canInlineCalleeBody(RefG)
     if (F.isSerialized()) {
       // If it has a package linkage at this point, package CMO must
       // have been enabled, so opt in for visibility.
@@ -3420,8 +3448,7 @@ public:
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
             "using StructInst");
-    require(!checkResilience(structDecl, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(structDecl, F),
             "cannot access storage of resilient struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
@@ -3657,8 +3684,7 @@ public:
     auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
     require(cd, "Operand of dealloc_ref must be of class type");
 
-    require(!checkResilience(cd, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(cd, F),
             "cannot directly deallocate resilient class");
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
@@ -3785,8 +3811,7 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!checkResilience(sd, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
     require(!EI->getField()->isStatic(),
             "cannot get address of static property with struct_element_addr");
@@ -3841,8 +3866,7 @@ public:
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "struct_element_addr operand must be struct address");
-    require(!checkResilience(sd, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
     require(EI->getType().isAddress(),
             "result of struct_element_addr must be address");
@@ -3883,8 +3907,7 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
-    require(!checkResilience(cd, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
 
     require(EI->getField()->getDeclContext() ==
@@ -3909,8 +3932,7 @@ public:
     SILType operandTy = RTAI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_tail_addr operand must be a class instance");
-    require(!checkResilience(cd, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
     require(cd, "ref_tail_addr operand must be a class instance");
     checkAddressWalkerCanVisitAllTransitiveUses(RTAI);
@@ -3920,8 +3942,7 @@ public:
     SILType operandTy = DSI->getOperand()->getType();
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!checkResilience(sd, F.getModule().getSwiftModule(),
-                             F.getResilienceExpansion()),
+    require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
     if (F.hasOwnership()) {
       // Make sure that all of our destructure results ownership kinds are
@@ -5738,7 +5759,9 @@ public:
           break;
         }
       
-        verifyKeyPathComponent(F.getModule(), F.getTypeExpansionContext(),
+        verifyKeyPathComponent(F.getModule(),
+                               F.getTypeExpansionContext(),
+                               F.getSerializedKind(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
           baseTy,
           leafTy,
@@ -7041,7 +7064,7 @@ public:
     SILModule &mod = F->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    require(!F->isSerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
+    require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
             "cannot have a serialized function after the module has been serialized");
 
     switch (F->getLinkage()) {
@@ -7055,23 +7078,25 @@ public:
     case SILLinkage::PackageNonABI:
       require(F->isDefinition(),
               "alwaysEmitIntoClient function must have a body");
-      require(F->isSerialized() || mod.isSerialized(),
+      require(F->isAnySerialized() || mod.isSerialized(),
               "alwaysEmitIntoClient function must be serialized");
       break;
     case SILLinkage::Hidden:
     case SILLinkage::Private:
       require(F->isDefinition() || F->hasForeignBody(),
               "internal/private function must have a body");
-      require(!F->isSerialized() || embedded,
+      require(!F->isAnySerialized() || embedded,
               "internal/private function cannot be serialized or serializable");
       break;
     case SILLinkage::PublicExternal:
-      require(F->isExternalDeclaration() || F->isSerialized() ||
+      require(F->isExternalDeclaration() ||
+              F->isAnySerialized() ||
               mod.isSerialized(),
             "public-external function definition must be serialized");
       break;
     case SILLinkage::PackageExternal:
-      require(F->isExternalDeclaration() || F->isSerialized() ||
+      require(F->isExternalDeclaration() ||
+              F->isAnySerialized() ||
               mod.isSerialized(),
               "package-external function definition must be serialized");
       break;
@@ -7246,6 +7271,7 @@ void SILProperty::verify(const SILModule &M) const {
             ResilienceExpansion::Maximal);
     verifyKeyPathComponent(const_cast<SILModule&>(M),
                            typeExpansionContext,
+                           getSerializedKind(),
                            require,
                            baseTy,
                            leafTy,
@@ -7407,8 +7433,8 @@ void SILWitnessTable::verify(const SILModule &M) const {
       if (F) {
         // If a SILWitnessTable is going to be serialized, it must only
         // reference public or serializable functions.
-        if (isSerialized()) {
-          assert(F->hasValidLinkageForFragileRef() &&
+        if (isAnySerialized()) {
+          assert(F->hasValidLinkageForFragileRef(getSerializedKind()) &&
                  "Fragile witness tables should not reference "
                  "less visible functions.");
         }
@@ -7434,7 +7460,7 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
 
 #if 0
     // FIXME: For now, all default witnesses are private.
-    assert(F->hasValidLinkageForFragileRef() &&
+    assert(F->hasValidLinkageForFragileRef(IsSerialized) &&
            "Default witness tables should not reference "
            "less visible functions.");
 #endif

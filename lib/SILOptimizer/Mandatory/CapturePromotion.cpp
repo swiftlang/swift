@@ -292,7 +292,7 @@ public:
   friend class SILCloner<ClosureCloner>;
 
   ClosureCloner(SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-                IsSerialized_t serialized, StringRef clonedName,
+                SerializedKind_t serialized, StringRef clonedName,
                 IndicesSet &promotableIndices, ResilienceExpansion expansion);
 
   void populateCloned();
@@ -307,7 +307,7 @@ public:
 
 private:
   static SILFunction *initCloned(SILOptFunctionBuilder &funcBuilder,
-                                 SILFunction *orig, IsSerialized_t serialized,
+                                 SILFunction *orig, SerializedKind_t serialized,
                                  StringRef clonedName,
                                  IndicesSet &promotableIndices,
                                  ResilienceExpansion expansion);
@@ -334,7 +334,7 @@ private:
 } // end anonymous namespace
 
 ClosureCloner::ClosureCloner(SILOptFunctionBuilder &funcBuilder,
-                             SILFunction *orig, IsSerialized_t serialized,
+                             SILFunction *orig, SerializedKind_t serialized,
                              StringRef clonedName,
                              IndicesSet &promotableIndices,
                              ResilienceExpansion resilienceExpansion)
@@ -410,7 +410,8 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
   }
 }
 
-static std::string getSpecializedName(SILFunction *f, IsSerialized_t serialized,
+static std::string getSpecializedName(SILFunction *f,
+                                      SerializedKind_t serialized,
                                       IndicesSet &promotableIndices) {
   auto p = Demangle::SpecializationPass::CapturePromotion;
   Mangle::FunctionSignatureSpecializationMangler mangler(p, serialized, f);
@@ -436,7 +437,7 @@ static std::string getSpecializedName(SILFunction *f, IsSerialized_t serialized,
 /// the address value.
 SILFunction *
 ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
-                          SILFunction *orig, IsSerialized_t serialized,
+                          SILFunction *orig, SerializedKind_t serialized,
                           StringRef clonedName, IndicesSet &promotableIndices,
                           ResilienceExpansion resilienceExpansion) {
   SILModule &mod = orig->getModule();
@@ -546,20 +547,17 @@ SILFunction *ClosureCloner::constructClonedFunction(
   // Create the Cloned Name for the function.
   SILFunction *origF = fri->getReferencedFunction();
 
-  IsSerialized_t isSerialized = IsNotSerialized;
-  if (f->isSerialized())
-    isSerialized = IsSerialized_t::IsSerialized;
-
-  auto clonedName = getSpecializedName(origF, isSerialized, promotableIndices);
+  SerializedKind_t serializedKind = f->getSerializedKind();
+  auto clonedName = getSpecializedName(origF, serializedKind, promotableIndices);
 
   // If we already have such a cloned function in the module then just use it.
   if (auto *prevF = f->getModule().lookUpFunction(clonedName)) {
-    assert(prevF->isSerialized() == isSerialized);
+    assert(prevF->getSerializedKind() == serializedKind);
     return prevF;
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(funcBuilder, origF, isSerialized, clonedName,
+  ClosureCloner cloner(funcBuilder, origF, serializedKind, clonedName,
                        promotableIndices, resilienceExpansion);
   cloner.populateCloned();
   return cloner.getCloned();
