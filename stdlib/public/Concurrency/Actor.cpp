@@ -345,25 +345,40 @@ bool __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #endif
 }
 
+// Shimming call to Swift runtime because Swift Embedded does not have
+// these symbols defined.
+const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
+  // Potentially, override the platform detected mode, primarily used in tests.
+#if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  return swift::runtime::environment::
+      concurrencyIsCurrentExecutorLegacyModeOverride();
+#else
+  return nullptr;
+#endif
+}
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "ConstantConditionsOC"
 // Done this way because of the interaction with the initial value of
 // 'unexpectedExecutorLogLevel'
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
   bool legacyMode = __swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
   // Potentially, override the platform detected mode, primarily used in tests.
-#if SWIFT_STDLIB_HAS_ENVIRON
-  if (const char *modeStr = runtime::environment::
-        concurrencyIsCurrentExecutorLegacyModeOverride()) {
-    if (strcmp(modeStr, "nocrash") == 0 || strcmp(modeStr, "legacy") == 0) {
+  if (const char *modeStr =
+          __swift_runtime_env_useLegacyNonCrashingExecutorChecks()) {
+    if (strcmp(modeStr, "nocrash") == 0 ||
+        strcmp(modeStr, "legacy") == 0) {
       return true;
-    } else if (strcmp(modeStr, "crash") == 0 || strcmp(modeStr, "swift6") == 0) {
+    } else if (strcmp(modeStr, "crash") == 0 ||
+               strcmp(modeStr, "swift6") == 0) {
       return false; // don't use the legacy mode
     } // else, just use the platform detected mode
   } // no override, use the default mode
-#endif // SWIFT_STDLIB_HAS_ENVIRON
 
   return legacyMode;
 }
+#pragma clang diagnostic pop
 
 // Check override of executor checking mode.
 static void checkIsCurrentExecutorMode(void *context) {
