@@ -200,8 +200,8 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst: {
-    auto convention = ApplySite(user).getArgumentConvention(*addressUse);
-    if (!convention.isGuaranteedConvention())
+    auto convention = ApplySite(user).getArgumentParameterInfo(*addressUse);
+    if (!convention.isGuaranteed())
       return false;
 
     loadInsts.insert(user);
