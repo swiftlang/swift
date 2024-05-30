@@ -15,22 +15,32 @@
 
 namespace swift {
 
+namespace detail {
+
+template <ptrdiff_t size>
+struct LayoutPadding {
+  char padding[size];
+};
+template <>
+struct LayoutPadding<0> {};
+
 template <class Header, class Footer, size_t TotalSize>
-struct HeaderFooterLayoutPadding {
-private:
+struct HeaderFooterLayoutPaddingSize {
   enum : ptrdiff_t {
     maxFooterOffset = TotalSize - (ptrdiff_t)sizeof(Footer),
     footerAlignment = (ptrdiff_t)alignof(Footer),
     footerOffset = maxFooterOffset - (maxFooterOffset % footerAlignment),
-    size = footerOffset - (ptrdiff_t)sizeof(Header)
+    value = footerOffset - (ptrdiff_t)sizeof(Header)
   };
-  char padding[size];
 };
+
+} // namespace detail
 
 template <class Header, class Footer, size_t TotalSize>
 struct HeaderFooterLayout
     : Header,
-      HeaderFooterLayoutPadding<Header, Footer, TotalSize>,
+      detail::LayoutPadding<detail::HeaderFooterLayoutPaddingSize<
+          Header, Footer, TotalSize>::value>,
       Footer {};
 
 } // namespace swift
