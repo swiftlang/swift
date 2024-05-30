@@ -5,6 +5,44 @@
 
 ## Swift 6.0
 
+* [SE-0432][]:
+  Noncopyable enums can be pattern-matched with switches without consuming the
+  value you switch over:
+
+  ```swift
+  enum Lunch: ~Copyable {
+    case soup
+    case salad
+    case sandwich
+  }
+  
+  func isSoup(_ lunch: borrowing Lunch) -> Bool {
+    switch lunch {
+      case .soup: true
+      default: false
+    }
+  }
+  ```
+
+
+* [SE-0429][]:
+  The noncopyable fields of certain types can now be consumed individually:
+
+  ```swift
+  struct Token: ~Copyable {}
+
+  struct Authentication: ~Copyable {
+    let id: Token
+    let name: String
+
+    mutating func exchange(_ new: consuming Token) -> Token {
+      let old = self.id  // <- partial consumption of 'self'
+      self = .init(id: new, name: self.name)
+      return old
+    } 
+  }
+  ```
+
 * [SE-0427][]:
   You can now suppress `Copyable` on protocols, generic parameters, 
   and existentials:
@@ -10287,6 +10325,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
+[SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
+[SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
