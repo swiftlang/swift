@@ -27,6 +27,7 @@ target_sources(swiftSILOptimizer PRIVATE
   PerformanceInlinerUtils.cpp
   ShrinkBorrowScope.cpp
   SILInliner.cpp
+  SILIsolationInfo.cpp
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp

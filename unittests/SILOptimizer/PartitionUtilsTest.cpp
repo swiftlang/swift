@@ -47,7 +47,7 @@ struct MockedPartitionOpEvaluator final
 
   // Just say that we always have a disconnected value.
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
-    return SILIsolationInfo::getDisconnected();
+    return SILIsolationInfo::getDisconnected(false /*isUnsafeNonIsolated*/);
   }
 
   bool shouldTryToSquelchErrors() const { return false; }
@@ -89,7 +89,7 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
 
   // Just say that we always have a disconnected value.
   SILIsolationInfo getIsolationRegionInfo(Element elt) const {
-    return SILIsolationInfo::getDisconnected();
+    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
   }
 
   bool shouldTryToSquelchErrors() const { return false; }
