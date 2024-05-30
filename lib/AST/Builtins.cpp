@@ -422,13 +422,10 @@ enum class BuiltinThrowsKind : uint8_t {
 }
 
 /// Build a builtin function declaration.
-static FuncDecl *
-getBuiltinGenericFunction(Identifier Id,
-                          ArrayRef<AnyFunctionType::Param> ArgParamTypes,
-                          Type ResType,
-                          GenericParamList *GenericParams,
-                          GenericSignature Sig,
-                          bool Async, BuiltinThrowsKind Throws) {
+static FuncDecl *getBuiltinGenericFunction(
+    Identifier Id, ArrayRef<AnyFunctionType::Param> ArgParamTypes, Type ResType,
+    GenericParamList *GenericParams, GenericSignature Sig, bool Async,
+    BuiltinThrowsKind Throws, bool SendingResult) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -460,6 +457,7 @@ getBuiltinGenericFunction(Identifier Id,
       Throws != BuiltinThrowsKind::None, /*thrownType=*/Type(),
       GenericParams, paramList, ResType, DC);
 
+  func->setSendingResult(SendingResult);
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
   if (Throws == BuiltinThrowsKind::Rethrows)
@@ -681,6 +679,7 @@ namespace {
     Type InterfaceResult;
     bool Async = false;
     BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
+    bool SendingResult = false;
 
     // Accumulate params and requirements here, so that we can call
     // `buildGenericSignature()` when `build()` is called.
@@ -745,16 +744,17 @@ namespace {
       Throws = BuiltinThrowsKind::Rethrows;
     }
 
+    void setSendingResult() { SendingResult = true; }
+
     FuncDecl *build(Identifier name) {
       auto GenericSig = buildGenericSignature(
           Context, GenericSignature(),
           std::move(genericParamTypes),
           std::move(addedRequirements),
           /*allowInverses=*/false);
-      return getBuiltinGenericFunction(name, InterfaceParams,
-                                       InterfaceResult,
-                                       TheGenericParamList, GenericSig,
-                                       Async, Throws);
+      return getBuiltinGenericFunction(name, InterfaceParams, InterfaceResult,
+                                       TheGenericParamList, GenericSig, Async,
+                                       Throws, SendingResult);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -2081,6 +2081,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   builder.setAsync();
   if (throws)
     builder.setThrows();
+  builder.setSendingResult();
 
   return builder.build(id);
 }
