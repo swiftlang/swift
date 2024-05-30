@@ -13,7 +13,17 @@
 #ifndef SWIFT_BASIC_HEADER_FOOTER_LAYOUT_H
 #define SWIFT_BASIC_HEADER_FOOTER_LAYOUT_H
 
+#include <cstddef>
+
 namespace swift {
+
+template <class T>
+class size_without_trailing_padding {
+  struct ExtraByte { char _size_without_trailing_padding_probe; };
+  struct Probe: T, ExtraByte {};
+public:
+  enum { value = offsetof(Probe, _size_without_trailing_padding_probe) };
+};
 
 namespace detail {
 
@@ -27,10 +37,10 @@ struct LayoutPadding<0> {};
 template <class Header, class Footer, size_t TotalSize>
 struct HeaderFooterLayoutPaddingSize {
   enum : ptrdiff_t {
-    maxFooterOffset = TotalSize - (ptrdiff_t)sizeof(Footer),
+    maxFooterOffset = TotalSize - (ptrdiff_t)size_without_trailing_padding<Footer>::value,
     footerAlignment = (ptrdiff_t)alignof(Footer),
     footerOffset = maxFooterOffset - (maxFooterOffset % footerAlignment),
-    value = footerOffset - (ptrdiff_t)sizeof(Header)
+    value = footerOffset - (ptrdiff_t)size_without_trailing_padding<Header>::value
   };
 };
 
