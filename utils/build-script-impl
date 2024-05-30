@@ -3398,6 +3398,7 @@ function build_and_test_installable_package() {
           COMPATIBILITY_VERSION=2
           COMPATIBILITY_VERSION_DISPLAY_STRING="Xcode 8.0"
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
+          TOOLCHAIN_PLUGIN_PATH_DESCRIPTOR='$(TOOLCHAIN_DIR)/usr/lib/swift/host/plugins'
 
           SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME="YES"
           if [[ "${DARWIN_TOOLCHAIN_REQUIRE_USE_OS_RUNTIME}" -eq "1" ]]; then
@@ -3432,6 +3433,7 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DEVELOPMENT_TOOLCHAIN string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME string '${SWIFT_USE_DEVELOPMENT_TOOLCHAIN_RUNTIME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:OTHER_SWIFT_FLAGS string '\$(inherited) -plugin-path ${TOOLCHAIN_PLUGIN_PATH_DESCRIPTOR}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
           call chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
