@@ -1105,8 +1105,7 @@ actor A: Actor { // ok
 @available(SwiftStdlib 5.1, *)
 class C: Actor, UnsafeSendable {
   // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}}
-  // expected-error@-2{{non-actor type 'C' cannot conform to the 'AnyActor' protocol}}
-  // expected-warning@-3{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }

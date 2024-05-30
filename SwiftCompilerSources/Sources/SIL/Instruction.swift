@@ -418,7 +418,16 @@ public protocol DebugVariableInstruction : VarDeclInstruction {
   var debugVariable: DebugVariable { get }
 }
 
-final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction {
+/// A meta instruction is an instruction whose location is not interesting as
+/// it is impossible to set a breakpoint on it.
+/// That could be because the instruction does not generate code (such as
+/// `debug_value`), or because the generated code would be in the prologue
+/// (`alloc_stack`).
+/// When we are moving code onto an unknown instruction (such as the start of a
+/// basic block), we want to ignore any meta instruction that might be there.
+public protocol MetaInstruction: Instruction {}
+
+final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction, MetaInstruction {
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.DebugValue_getDecl())
   }
@@ -1127,7 +1136,7 @@ final public class InitBlockStorageHeaderInst: SingleValueInstruction {}
 
 public protocol Allocation : SingleValueInstruction { }
 
-final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
+final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction, MetaInstruction {
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
 
   public var varDecl: VarDecl? {

@@ -6108,19 +6108,6 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         }
         break;
       }
-      case KnownProtocolKind::AnyActor: {
-        if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-          if (!classDecl->isExplicitActor() &&
-              !classDecl->isExplicitDistributedActor()) {
-            dc->getSelfNominalTypeDecl()
-                ->diagnose(diag::actor_protocol_illegal_inheritance,
-                           dc->getSelfNominalTypeDecl()->getName(),
-                           proto->getName())
-                .fixItReplace(nominal->getStartLoc(), "actor");
-          }
-        }
-        break;
-      }
       case KnownProtocolKind::UnsafeSendable: {
         hasDeprecatedUnsafeSendable = true;
         break;
