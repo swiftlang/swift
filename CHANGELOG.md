@@ -49,6 +49,16 @@ And the module structure to support such applications looks like this:
                                                         └──────────────────────────────────────────────┘
 ```
 
+* [SE-0424][]:
+  Serial executor gain a new customization point `checkIsolation()`, which can be
+  implemented by custom executor implementations in order to provide a last resort  
+  check before the isolation asserting APIs such as `Actor.assumeIsolated` or
+  `assertIsolated` fail and crash.
+
+  This specifically enables Dispatch to implement more sophisticated isolation
+  checking, and now even an actor which is "on a queue which is targeting 
+  another specific queue" can be properly detected using these APIs.
+
 * [SE-0423][]:
   You can now use `@preconcurrency` attribute to replace static actor isolation
   checking with dynamic checks for witnesses of synchronous nonisolated protocol
@@ -10497,6 +10507,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
 [SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
 [SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
+[SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
