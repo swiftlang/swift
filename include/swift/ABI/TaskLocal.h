@@ -130,8 +130,6 @@ public:
     }
 
     void relinkNext(Item* nextOverride) {
-      fprintf(stderr, "[%s:%d](%s) try relink item:%p\n", __FILE_NAME__, __LINE__, __FUNCTION__, this);
-      fprintf(stderr, "[%s:%d](%s) try relink to target:%p\n", __FILE_NAME__, __LINE__, __FUNCTION__, nextOverride);
       assert(!getNext() &&
                "Can only relink task local item that was not pointing at anything yet");
       assert(nextOverride->isNextLinkPointer() ||

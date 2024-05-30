@@ -18,6 +18,19 @@ enum TL {
 // ==== ------------------------------------------------------------------------
 
 func test() async {
+  // no outer task locals
+  await withTaskGroup(of: Void.self) { group in
+    TL.$two.withValue(2222) {
+      // should not have any effect on reads below
+    }
+    await TL.$two.withValue(22) {
+      group.addTask { // will have to copy the `22`
+        print("Survived, one: \(TL.one) @ \(#fileID):\(#line)") // CHECK: Survived, one: 1
+        print("Survived, two: \(TL.two) @ \(#fileID):\(#line)") // CHECK: Survived, two: 22
+      }
+    }
+  }
+
   await TL.$one.withValue(11) {
     await TL.$one.withValue(1111) {
       await withTaskGroup(of: Void.self) { group in

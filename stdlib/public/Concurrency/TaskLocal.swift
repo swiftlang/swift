@@ -362,8 +362,9 @@ func _taskLocalsCopy(
 
 // ==== Checks -----------------------------------------------------------------
 
-@available(SwiftStdlib 5.1, *)
 @usableFromInline
+@available(SwiftStdlib 5.1, *)
+@available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
     file.withCString { _fileStart in
@@ -373,8 +374,9 @@ func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) 
   }
 }
 
-@available(SwiftStdlib 5.1, *)
 @usableFromInline
+@available(SwiftStdlib 5.1, *)
+@available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 @_silgen_name("swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup")
 func _reportIllegalTaskLocalBindingWithinWithTaskGroup(
   _ _filenameStart: UnsafePointer<Int8>,

@@ -668,9 +668,17 @@ void swift_task_localValuePop();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
 
-// FIXME no need for runtime API
+/// Some task local bindings must be copied defensively when a child task is
+/// created in a task group. See task creation (swift_task_create_common) for
+/// a detailed discussion how and when this is used.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_task_localsCopyToTaskGroupChildTaskDefensively<Key>(AsyncTask* task)
+/// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_localsOnlyCurrentCopyTo(AsyncTask* target);
+void swift_task_localsCopyToTaskGroupChildTaskDefensively(AsyncTask* target);
 
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.

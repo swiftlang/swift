@@ -164,7 +164,7 @@ static void swift_task_localsCopyToImpl(AsyncTask *target) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_localsOnlyCurrentCopyToImpl(AsyncTask *target) {
+static void swift_task_localsCopyToTaskGroupChildTaskDefensivelyImpl(AsyncTask *target) {
   TaskLocal::Storage *Local = nullptr;
 
   if (AsyncTask *task = swift_task_getCurrent()) {
@@ -289,6 +289,9 @@ TaskLocal::Item::copyTo(AsyncTask *target) {
 // =============================================================================
 // ==== checks -----------------------------------------------------------------
 
+/// UNUSED: This is effectively not used anymore by new runtimes because we will
+/// defensively copy in this situation since Swift 6, rather than crash as a
+/// means of defence.
 SWIFT_CC(swift)
 static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
     const unsigned char *_unused_file, uintptr_t _unused_fileLength,
@@ -521,7 +524,6 @@ void TaskLocal::Storage::copyToOnlyOnlyFromCurrent(AsyncTask *target) {
     if (copied.emplace(item->key).second) {
 
       if (!item->isNextLinkPointerCreatedInTaskGroupBody() && copiedHead) {
-        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next item is not within body, item:%p", item);
         // The next item is not the "risky one" so we can directly link to it,
         // as we would have within normal child task relationships. E.g. this is
         // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
@@ -532,18 +534,12 @@ void TaskLocal::Storage::copyToOnlyOnlyFromCurrent(AsyncTask *target) {
 
       auto copy = item->copyTo(target);
       if (!copiedHead) {
-        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "store copied head item:%p",
-                                   copiedHead);
         copiedHead = copy;
       }
-
-      SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "copy value [%p] to target:%p, item:%p, copied:%p",
-                                 item->getStoragePtr(), target, item, copiedHead);
 
       // If we didn't copy an item, e.g. because it was a pointer to parent,
       // break out of the loop and keep pointing at parent still.
       if (!copy) {
-        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next is %p", 0);
         break;
       }
     } else {

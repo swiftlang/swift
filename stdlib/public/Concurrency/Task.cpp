@@ -735,22 +735,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   /// FIXME: this is the fail path
   if (group) {
     assert(parent && "a task created in a group must be a child task");
-//
-//    // Prevent task-local misuse;
-//    // We must not allow an addTask {} wrapped immediately with a withValue {}
-//    auto ParentLocal = parent->_private().Local;
-//    if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
-//      if (taskLocalHeadLinkType ==
-//          swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
-//#if !SWIFT_CONCURRENCY_EMBEDDED
-//        swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
-//            nullptr, 0, true, 0);
-//#endif
-//        // TODO(ktoso): If we were to keep this crash mode; offer a better failure for embedded swift
-//        abort();
-//      }
-//    }
-//
     // Add to the task group, if requested.
     if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
       assert(group && "Missing group");
@@ -1024,10 +1008,17 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       // their structural lifetime guarantee is upheld by the group scope
       // out-living any addTask created tasks.
       auto ParentLocal = parent->_private().Local;
+      // If we were going to copy ALL values anyway, we don't need to
+      // perform this defensive partial copying. In practice, we currently
+      // do not have child tasks which force copying, but we could.
+      assert(!taskCreateFlags.copyTaskLocals() &&
+             "Currently we don't have child tasks which force copying task "
+             "locals; unexpected attempt to combine the two!");
+
       if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
         if (taskLocalHeadLinkType ==
             swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
-          swift_task_localsOnlyCurrentCopyTo(task);
+          swift_task_localsCopyToTaskGroupChildTaskDefensively(task);
           taskLocalStorageInitialized = true;
         }
       }
