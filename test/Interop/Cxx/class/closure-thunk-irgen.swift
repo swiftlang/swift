@@ -23,9 +23,9 @@ public func testClosureToBlock() {
 // CHECK: define internal void @"$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_To"(ptr %[[V0:.*]])
 // CHECK: %[[V1:.*]] = alloca %{{.*}}, align 8
 // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 8, ptr %[[V1]])
-// CHECK-NEXT: %[[V2]] = call {{void|ptr}} @_ZN10NonTrivialC1ERKS_(ptr %[[V1]], ptr %[[V0]])
+// CHECK-NEXT: call {{void|ptr}} @_ZN10NonTrivialC1ERKS_(ptr %[[V1]], ptr %[[V0]])
 // CHECK-NEXT: call swiftcc void @"$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_"(ptr noalias dereferenceable(8) %[[V1]])
-// CHECK-NEXT: %[[V3]] = call {{void|ptr}} @_ZN10NonTrivialD1Ev(ptr %[[V1]])
+// CHECK-NEXT: call {{void|ptr}} @_ZN10NonTrivialD1Ev(ptr %[[V1]])
 // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 8, ptr %[[V1]])
 // CHECK-NEXT: ret void
 
