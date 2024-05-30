@@ -5,6 +5,33 @@
 
 ## Swift 6.0
 
+* [SE-0431][]:
+  You can now require a function value to carry its actor isolation
+  dynamically in a way that can be directly read by clients:
+
+  ```swift
+  func apply<R>(count: Int,
+                operation: @isolated(any) async () -> R) async -> [R]
+      where R: Sendable {
+    // implementation
+  }
+  ```
+
+  The isolation can read with the `.isolation` property, which has type
+  `(any Actor)?`:
+
+  ```swift
+  let iso = operation.isolation
+  ```
+
+  This capability has been adopted by the task-creation APIs in the
+  standard library.  As a result, creating a task with an actor-isolated
+  function will now synchronously enqueue the task on the actor, which
+  can be used for transitive event-ordering guarantees if the actor
+  guarantees that jobs will be run in the order they are enqueued, as
+  `@MainActor` does.  If the function is not explicitly isolated, Swift
+  still retains the right to optimize enqueues for functions that actually
+  start by doing work with different isolation from their formal isolation.
 
 * [SE-0423][]:
   You can now use `@preconcurrency` attribute to replace static actor isolation
@@ -45,6 +72,21 @@
 
   The dynamic actor isolation checks can be disabled using the flag
   `-disable-dynamic-actor-isolation`.
+
+* [SE-0420][]:
+  `async` functions can now explicitly inherit the isolation of their caller
+  by declaring an `isolated` parameter with the default value of `#isolation`:
+
+  ```swift
+  func poll(isolation: isolated (any Actor)? = #isolation) async -> [Item] {
+    // implementation
+  }
+  ```
+
+  When the caller is actor-isolated, this allows it to pass isolated state
+  to the function, which would otherwise have concurrency problems.  The
+  function may also be able to eliminate unwanted scheduling changes, such
+  as when it can quickly return in a fast path without needing to suspend.
 
 * [SE-0418][]:
 
@@ -10405,15 +10447,19 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
 [SE-0408]: https://github.com/apple/swift-evolution/blob/main/proposals/0408-pack-iteration.md
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
-[SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
-[SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
-[SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
 [SE-0414]: https://github.com/apple/swift-evolution/blob/main/proposals/0414-region-based-isolation.md
-[SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
+[SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0420]: https://github.com/apple/swift-evolution/blob/main/proposals/0420-inheritance-of-actor-isolation.md
+[SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
+[SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
+[SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
+[SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
+[SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
+[SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
