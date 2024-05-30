@@ -91,3 +91,23 @@ public struct TestInStruct {
   // CHECK-NEXT: #endif
   public func testKlassArgAndResult(_ x: NonSendableKlass, _ y: sending NonSendableKlass, z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
 }
+
+// Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
+// to make sure we do not fail if we fail to parse sending in the if block.
+
+// CHECK: #if compiler(>=5.3) && $OptionalIsolatedParameters && $ExpressionMacroDefaultArguments
+// CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults
+// CHECK-NEXT: @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+// CHECK-NEXT: @backDeployed(before: macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999)
+// CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation:
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@backDeployed(before: macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999)
+@inlinable public func withCheckedContinuation<T>(
+  isolation: isolated (any _Concurrency.Actor)? = #isolation,
+  function: String = #function,
+  _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void
+) async -> sending T {
+  return await withUnsafeContinuation {
+    body(CheckedContinuation(continuation: $0, function: function))
+  }
+}

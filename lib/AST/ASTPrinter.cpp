@@ -3295,10 +3295,13 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // features, or else just print the body.
   if (features.hasAnySuppressible()) {
     auto generator = features.generateSuppressibleFeatures();
+
+    // NOTE: We emit the compiler check here as well since that also implicitly
+    // ensures that we ignore parsing errors in the if block. It is harmless
+    // otherwise.
     printWithSuppressibleFeatureChecks(printer, options,
-                             /*first*/ true,
-                    /*compiler check*/ !hasRequiredFeatures,
-                                       generator,
+                                       /*first*/ true,
+                                       /*compiler check*/ true, generator,
                                        printBody);
   } else {
     printBody();
