@@ -200,8 +200,9 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst: {
-    auto convention = ApplySite(user).getArgumentParameterInfo(*addressUse);
-    if (!convention.isGuaranteed())
+    auto site = ApplySite(user);
+    if (site.getArgumentConvention(*addressUse).isIndirectOutParameter() ||
+        !site.getArgumentParameterInfo(*addressUse).isGuaranteed())
       return false;
 
     loadInsts.insert(user);
