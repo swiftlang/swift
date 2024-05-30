@@ -1074,6 +1074,13 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       return;
 
     auto otherAccessLevel = otherImport->getAccessLevel();
+
+    // Only report ambiguities with non-public imports as bare imports are
+    // public when this diagnostic is active. Do not report ambiguities
+    // between implicitly vs explicitly public.
+    if (otherAccessLevel == AccessLevel::Public)
+      return;
+
     auto &diags = mod->getDiags();
     {
       InFlightDiagnostic error =
