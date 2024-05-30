@@ -531,3 +531,19 @@ sil @dont_canonicalize_undef : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil @undef_for_load_of_empty_type_from_nontrivial_aggregate : {{.*}} {
+// CHECK:         [[EMPTY:%[^,]+]] = tuple ()
+// CHECK:         [[AGGREGATE:%[^,]+]] = tuple (undef : $Builtin.BridgeObject, [[EMPTY]] : $())
+// CHECK:         tuple_extract [[AGGREGATE]] : $(Builtin.BridgeObject, ()), 1
+// CHECK-LABEL: } // end sil function 'undef_for_load_of_empty_type_from_nontrivial_aggregate'
+sil @undef_for_load_of_empty_type_from_nontrivial_aggregate : $@convention(thin) () -> () {
+bb0:
+  %11 = alloc_stack $(Builtin.BridgeObject, ())
+  %12 = tuple_element_addr %11 : $*(Builtin.BridgeObject, ()), 1
+  %13 = load %12 : $*()
+  %empty = tuple ()
+  %14 = tuple (%empty : $(), %13 : $())
+  dealloc_stack %11 : $*(Builtin.BridgeObject, ())
+  return undef : $()
+}
