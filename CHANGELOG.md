@@ -5,6 +5,50 @@
 
 ## Swift 6.0
 
+* [SE-0430][]:
+
+  Region Based Isolation is now extended to enable the application of an
+  explicit `sending` annotation to function parameters and results. A function
+  parameter or result that is annotated with `sending` is required to be
+  disconnected at the function boundary and thus possesses the capability of
+  being safely sent across an isolation domain or merged into an actor-isolated
+  region in the function's body or the function's caller respectively. Example:
+  
+  ```swift
+  func parameterWithoutSending(_ x: NonSendableType) async {
+    // Error! Cannot send a task-isolated value to the main actor!
+    await transferToMainActor(x)
+  }
+  
+  func parameterWithSending(_ x: sending NonSendableType) async {
+    // Ok since `x` is `sending` and thus disconnected.
+    await transferToMainActor(x)
+  }
+  ```
+
+* [SE-0414][]:
+
+  The compiler is now capable of determining whether or not a value that does
+  not conform to the `Sendable` protocol can safely be sent over an isolation
+  boundary. This is done by introducing the concept of *isolation regions* that
+  allows the compiler to reason conservatively if two values can affect each
+  other. Through the usage of isolation regions, the compiler can now prove that
+  sending a value that does not conform to the `Sendable` protocol over an
+  isolation boundary cannot result in races because the value (and any other
+  value that might reference it) is not used in the caller after the point of
+  sending allowing code like the following to compile:
+  
+  ```swift
+  actor MyActor {
+      init(_ x: NonSendableType) { ... }
+  }
+  
+  func useValue() {
+    let x = NonSendableType()
+    let a = await MyActor(x) // Error without Region Based Isolation!
+  }
+  ```
+
 * [SE-0427][]:
   You can now suppress `Copyable` on protocols, generic parameters, 
   and existentials:
@@ -10287,6 +10331,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
+[SE-0414]: https://github.com/apple/swift-evolution/blob/main/proposals/0414-region-based-isolation.md
+[SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
