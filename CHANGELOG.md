@@ -5,6 +5,22 @@
 
 ## Swift 6.0
 
+* Swift 6 comes with a new language mode that prevents the risk of data races
+  at compile time. This guarantee is accomplished through _data isolation_; the
+  compiler will validate that data passed over a boundary between concurrently
+  executing code is either safe to reference concurrently, or mutually
+  exclusive access to the value is enforced.
+
+  The data-race safety checks were previously available in Swift 5.10 through
+  the `-strict-concurrency=complete` compiler flag. Complete concurrency
+  checking in Swift 5.10 was overly restrictive, and Swift 6 removes many
+  false-positive data-race warnings through better `Sendable` inference,
+  new analysis that proves mutually exclusive access when passing values with
+  non-`Sendable` type over isolation boundaries, and more.
+
+  You can enable the Swift 6 language mode using the `-swift-version 6`
+  compiler flag.
+
 * [SE-0423][]:
   You can now use `@preconcurrency` attribute to replace static actor isolation
   checking with dynamic checks for witnesses of synchronous nonisolated protocol
