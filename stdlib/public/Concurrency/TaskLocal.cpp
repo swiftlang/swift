@@ -294,11 +294,13 @@ TaskLocal::Item::copyTo(AsyncTask *target) {
 /// means of defence.
 SWIFT_CC(swift)
 static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
-    const unsigned char *_unused_file, uintptr_t _unused_fileLength,
-    bool _unused_fileIsASCII, uintptr_t _unused_line) {
+    const unsigned char *file, uintptr_t fileLength,
+    bool fileIsASCII, uintptr_t line) {
 
-  char const *message =
-      "error: task-local: detected illegal task-local value binding.\n"
+  char *message;
+  swift_asprintf(
+      &message,
+      "error: task-local: detected illegal task-local value binding at %.*s:%d.\n"
       "Task-local values must only be set in a structured-context, such as: "
       "around any (synchronous or asynchronous function invocation), "
       "around an 'async let' declaration, or around a 'with(Throwing)TaskGroup(...){ ... }' "
@@ -332,7 +334,9 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "        }\n"
       "\n"
       "        group.addTask { ... }\n"
-      "    }\n";
+      "    }\n",
+      (int)fileLength, file,
+      (int)line);
 
   if (_swift_shouldReportFatalErrorsToDebugger()) {
     RuntimeErrorDetails details = {
@@ -360,6 +364,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
 
+  free(message);
   abort();
 }
 
@@ -382,30 +387,22 @@ void TaskLocal::Storage::destroy(AsyncTask *task) {
   auto item = head;
   head = nullptr;
   TaskLocal::Item *next;
-  bool previousWasIsNextCreatedInTaskGroupBody = false;
   while (item) {
     auto linkType = item->getNextLinkType();
     switch (linkType) {
-    case TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody: {
+    case TaskLocal::NextLinkType::IsNext: {
       next = item->getNext();
       item->destroy(task);
-      previousWasIsNextCreatedInTaskGroupBody = true;
       item = next;
       break;
     }
-    case TaskLocal::NextLinkType::IsNext:
-        next = item->getNext();
-        if (!previousWasIsNextCreatedInTaskGroupBody) {
-          item->destroy(task);
-        }
-        item = next;
-        break;
-
-      case TaskLocal::NextLinkType::IsParent:
-        // we're done here; as we must not proceed into the parent owned values.
-        // we do have to destroy the item pointing at the parent/edge itself though.
-        item->destroy(task);
-        return;
+    case TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody:
+    case TaskLocal::NextLinkType::IsParent: {
+      // we're done here; as we must not proceed into the parent owned values.
+      // we do have to destroy the item pointing at the parent/edge itself though.
+      item->destroy(task);
+      return;
+    }
     }
   }
 }

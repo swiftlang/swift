@@ -243,6 +243,7 @@ public:
     /// can be safely disposed of.
     bool popValue(AsyncTask *task);
 
+    /// Peek at the head item and get its type.
     std::optional<NextLinkType> peekHeadLinkType() const;
 
     /// Copy all task-local bindings to the target task.

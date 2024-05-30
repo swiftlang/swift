@@ -732,7 +732,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   AsyncTask *currentTask = swift_task_getCurrent();
   AsyncTask *parent = jobFlags.task_isChildTask() ? currentTask : nullptr;
 
-  /// FIXME: this is the fail path
   if (group) {
     assert(parent && "a task created in a group must be a child task");
     // Add to the task group, if requested.

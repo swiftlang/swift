@@ -76,7 +76,20 @@ func test() async {
           }
         }
         await group.next()
+        print("--")
+      }
 
+      await TL.$one.withValue(11) {
+        await Task {
+          async let x = await withTaskGroup(of: Void.self) { group in
+            TL.$two.withValue(22) {
+              group.addTask { // will have to copy the `2222`
+                print("Survived, one: \(TL.one) @ \(#fileID):\(#line)") // CHECK: Survived, one: 11
+                print("Survived, two: \(TL.two) @ \(#fileID):\(#line)") // CHECK: Survived, two: 22
+              }
+            }
+          }
+        }.value
       }
 
       print("Survived, done") // CHECK: Survived, done
