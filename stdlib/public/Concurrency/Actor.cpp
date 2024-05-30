@@ -999,6 +999,8 @@ static_assert(sizeof(ActiveActorStatus) == ACTIVE_ACTOR_STATUS_SIZE,
 
 class DefaultActorImplHeader : public HeapObject {
 protected:
+  // TODO (rokhinip): Make this a flagset
+  bool isDistributedRemoteActor;
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   // If actors are locks, we don't need to maintain any extra bookkeeping in the
   // ActiveActorStatus since all threads which are contending will block
@@ -1006,8 +1008,6 @@ protected:
   // escalation logic
   Mutex drainLock;
 #else
-  // TODO (rokhinip): Make this a flagset
-  bool isDistributedRemoteActor;
   // Note: There is some padding that is added here by the compiler in order to
   // enforce alignment. This is space that is available for us to use in
   // the future
