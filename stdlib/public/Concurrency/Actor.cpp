@@ -1097,12 +1097,6 @@ enum {
 class DefaultActorImpl
     : public HeaderFooterLayout<DefaultActorImplHeader, DefaultActorImplFooter,
                                 DefaultActorSize> {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-private-field"
-  /// Dummy variable, used to compute sizeWithoutTrailingPadding()
-  /// Must not be accessed
-  char const bytesPastTheEnd[1];
-#pragma clang diagnostic pop
 public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
@@ -1172,13 +1166,6 @@ public:
   }
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 
-  static constexpr size_t sizeWithoutTrailingPadding() {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-    return offsetof(DefaultActorImpl, bytesPastTheEnd);
-#pragma clang diagnostic pop
-  }
-
 private:
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1233,7 +1220,7 @@ public:
 
 } /// end anonymous namespace
 
-static_assert(DefaultActorImpl::sizeWithoutTrailingPadding() ==
+static_assert(size_without_trailing_padding<DefaultActorImpl>::value <=
                       DefaultActorSize &&
                   alignof(DefaultActorImpl) <= alignof(DefaultActor),
               "DefaultActorImpl doesn't fit in DefaultActor");
