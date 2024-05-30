@@ -5,6 +5,60 @@
 
 ## Swift 6.0
 
+* [SE-0428][]:
+  Distributed actors now have the ability to support complete split server / 
+  client systems, thanks to the new `@Resolvable` macro and runtime changes.
+
+  It is now possible to share an "API module" between a client and server 
+  application, declare a resolvable distributed actor protocol with the expected 
+  API contract and perform calls on it, without knowing the specific type the 
+  server is implementing those actors as. 
+
+  Declaring such protocol looks like this:
+
+```swift
+import Distributed 
+
+@Resolvable
+protocol Greeter where ActorSystem: DistributedActorSystem<any Codable> {
+  distributed func greet(name: String) -> String
+}
+```
+
+And the module structure to support such applications looks like this:
+
+```
+                         ┌────────────────────────────────────────┐
+                         │                API Module              │
+                         │========================================│
+                         │ @Resolvable                            │
+                         │ protocol Greeter: DistributedActor {   │
+                 ┌───────┤   distributed func greet(name: String) ├───────┐
+                 │       │ }                                      │       │
+                 │       └────────────────────────────────────────┘       │
+                 │                                                        │
+                 ▼                                                        ▼   
+┌────────────────────────────────────────────────┐      ┌──────────────────────────────────────────────┐
+│             Client Module                      │      │               Server Module                  │
+│================================================│      │==============================================│
+│ let g = try $Greeter.resolve(...) /*new*/      │      │ distributed actor EnglishGreeter: Greeter {  │
+│ try await greeter.hello(name: ...)             │      │   distributed func greet(name: String) {     │
+└────────────────────────────────────────────────┘      │     "Greeting in english, for \(name)!"      │
+/* Client cannot know about EnglishGreeter type */      │   }                                          │      
+                                                        │ }                                            │
+                                                        └──────────────────────────────────────────────┘
+```
+
+* [SE-0424][]:
+  Serial executor gain a new customization point `checkIsolation()`, which can be
+  implemented by custom executor implementations in order to provide a last resort  
+  check before the isolation asserting APIs such as `Actor.assumeIsolated` or
+  `assertIsolated` fail and crash.
+
+  This specifically enables Dispatch to implement more sophisticated isolation
+  checking, and now even an actor which is "on a queue which is targeting 
+  another specific queue" can be properly detected using these APIs.
+
 * [SE-0430][]:
 
   Region Based Isolation is now extended to enable the application of an
@@ -10332,6 +10386,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [SE-0427]: https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md
 [SE-0414]: https://github.com/apple/swift-evolution/blob/main/proposals/0414-region-based-isolation.md
+[SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
+[SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
