@@ -1334,6 +1334,13 @@ namespace {
             B.addPlaceholderWithSize(IGM.Int16Ty));
       }
 
+      // The conditional invertible protocol set is alone as a 16 bit slot, so
+      // an even amount of conditional invertible protocols will cause an uneven
+      // alignment.
+      if ((numProtocols & 1) == 0) {
+        B.addInt16(0);
+      }
+
       // Emit the generic requirements for the conditional conformance
       // to each invertible protocol.
       auto nominal = cast<NominalTypeDecl>(Type);
