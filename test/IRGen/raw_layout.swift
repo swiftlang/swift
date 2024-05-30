@@ -262,11 +262,11 @@ entry(%0 : $*Cell<T>):
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
 // CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
 // CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
-// CHECK: invoke void @_Z{{.*}}_(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
+// CHECK: {{invoke void|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
 
 // ConcreteMoveAsLike assignWithTake
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
 // CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
 // CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
-// CHECK: invoke void @_Z{{.*}}_(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
+// CHECK: {{invoke void|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
