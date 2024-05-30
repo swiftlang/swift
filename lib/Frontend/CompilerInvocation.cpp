@@ -533,6 +533,40 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
   diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
+void LangOptions::setCxxInteropFromArgs(ArgList &Args,
+                                        swift::DiagnosticEngine &Diags) {
+  if (Arg *A = Args.getLastArg(options::OPT_cxx_interoperability_mode)) {
+    if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+      Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
+    }
+
+    auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
+    EnableCXXInterop |=
+        (interopCompatMode.first == CxxCompatMode::enabled);
+    if (EnableCXXInterop) {
+      cxxInteropCompatVersion = interopCompatMode.second;
+      // The default is tied to the current language version.
+      if (cxxInteropCompatVersion.empty())
+        cxxInteropCompatVersion =
+            EffectiveLanguageVersion.asMajorVersion();
+    }
+
+    if (interopCompatMode.first == CxxCompatMode::invalid)
+      diagnoseCxxInteropCompatMode(A, Args, Diags);
+  }
+
+  if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+    Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
+    Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
+    EnableCXXInterop |= true;
+    // Using the deprecated option only forces the 'swift-5.9' compat
+    // mode.
+    if (cxxInteropCompatVersion.empty())
+      cxxInteropCompatVersion =
+          validateCxxInteropCompatibilityMode("swift-5.9").second;
+  }
+}
+
 static std::optional<swift::StrictConcurrency>
 parseStrictConcurrency(StringRef value) {
   return llvm::StringSwitch<std::optional<swift::StrictConcurrency>>(value)
@@ -1263,37 +1297,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
-
-  if (Arg *A = Args.getLastArg(OPT_cxx_interoperability_mode)) {
-    if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
-      Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
-    }
-    
-    auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
-    Opts.EnableCXXInterop |=
-        (interopCompatMode.first == CxxCompatMode::enabled);
-    if (Opts.EnableCXXInterop) {
-      Opts.cxxInteropCompatVersion = interopCompatMode.second;
-      // The default is tied to the current language version.
-      if (Opts.cxxInteropCompatVersion.empty())
-        Opts.cxxInteropCompatVersion =
-            Opts.EffectiveLanguageVersion.asMajorVersion();
-    }
-
-    if (interopCompatMode.first == CxxCompatMode::invalid)
-      diagnoseCxxInteropCompatMode(A, Args, Diags);
-  }
-
-  if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
-    Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
-    Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
-    Opts.EnableCXXInterop |= true;
-    // Using the deprecated option only forces the 'swift-5.9' compat
-    // mode.
-    if (Opts.cxxInteropCompatVersion.empty())
-      Opts.cxxInteropCompatVersion =
-          validateCxxInteropCompatibilityMode("swift-5.9").second;
-  }
+  
+  Opts.setCxxInteropFromArgs(Args, Diags);
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
