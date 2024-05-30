@@ -436,7 +436,8 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
 
   valueType->vw_initializeWithTake(item->getStoragePtr(), value);
   head = item;
-  SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "Created link item:%p", item);
+  SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "Created link item:%p, in group body:%d",
+                             item, inTaskGroupBody);
 }
 
 bool TaskLocal::Storage::popValue(AsyncTask *task) {
@@ -513,29 +514,35 @@ void TaskLocal::Storage::copyToOnlyOnlyFromCurrent(AsyncTask *target) {
   std::set<const HeapObject*> copied = {};
 
   auto item = head;
-  TaskLocal::Item *lastCopiedItem = nullptr;
+  TaskLocal::Item *copiedHead = nullptr;
   while (item) {
     // we only have to copy an item if it is the most recent binding of a key.
     // i.e. if we've already seen an item for this key, we can skip it.
     if (copied.emplace(item->key).second) {
 
-      if (!item->isNextCreatedInTaskGroupBody() && lastCopiedItem) {
-        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next item is not within body, item value [%p]", item->getStoragePtr());
+      if (!item->isNextLinkPointerCreatedInTaskGroupBody() && copiedHead) {
+        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next item is not within body, item:%p", item);
         // The next item is not the "risky one" so we can directly link to it,
         // as we would have within normal child task relationships. E.g. this is
         // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
         // binding, so we re-link our current head to point at this item.
-        lastCopiedItem->relinkNext(item);
+        copiedHead->relinkNext(item);
         break;
       }
 
-      lastCopiedItem = item->copyTo(target);
+      auto copy = item->copyTo(target);
+      if (!copiedHead) {
+        SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "store copied head item:%p",
+                                   copiedHead);
+        copiedHead = copy;
+      }
+
       SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "copy value [%p] to target:%p, item:%p, copied:%p",
-                                 item->getStoragePtr(), target, item, lastCopiedItem);
+                                 item->getStoragePtr(), target, item, copiedHead);
 
       // If we didn't copy an item, e.g. because it was a pointer to parent,
       // break out of the loop and keep pointing at parent still.
-      if (lastCopiedItem == nullptr) {
+      if (!copy) {
         SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "break out, next is %p", 0);
         break;
       }

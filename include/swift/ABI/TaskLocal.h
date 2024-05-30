@@ -47,6 +47,10 @@ public:
     /// The task local binding was created inside the body of a `withTaskGroup`,
     /// and therefore must either copy it, or crash when a child task is created
     /// using 'group.addTask' and it would refer to this task local.
+    ///
+    /// Items of this kind must be copied by a group child task for access
+    /// safety reasons, as otherwise the pop would happen before the child task
+    /// has completed.
     IsNextCreatedInTaskGroupBody = 0b10,
   };
 
@@ -126,6 +130,8 @@ public:
     }
 
     void relinkNext(Item* nextOverride) {
+      fprintf(stderr, "[%s:%d](%s) try relink item:%p\n", __FILE_NAME__, __LINE__, __FUNCTION__, this);
+      fprintf(stderr, "[%s:%d](%s) try relink to target:%p\n", __FILE_NAME__, __LINE__, __FUNCTION__, nextOverride);
       assert(!getNext() &&
                "Can only relink task local item that was not pointing at anything yet");
       assert(nextOverride->isNextLinkPointer() ||
@@ -149,7 +155,7 @@ public:
              NextLinkType::IsNext;
     }
 
-    bool isNextCreatedInTaskGroupBody() const {
+    bool isNextLinkPointerCreatedInTaskGroupBody() const {
       return static_cast<NextLinkType>(next & statusMask) ==
              NextLinkType::IsNextCreatedInTaskGroupBody;
     }
