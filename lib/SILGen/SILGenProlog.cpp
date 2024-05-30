@@ -1540,18 +1540,19 @@ uint16_t SILGenFunction::emitBasicProlog(
     B.createDebugValue(loc, undef.getValue(), dbgVar);
   }
 
-  for (auto &i : *B.getInsertionBB()) {
-    auto *alloc = dyn_cast<AllocStackInst>(&i);
-    if (!alloc)
-      continue;
-    auto varInfo = alloc->getVarInfo();
-    if (!varInfo || varInfo->ArgNo)
-      continue;
-    // The allocation has a varinfo but no argument number, which should not
-    // happen in the prolog. Unfortunately, some copies can generate wrong
-    // debug info, so we have to fix it here, by invalidating it.
-    alloc->invalidateVarInfo();
-  }
+  for (auto &bb : B.getFunction())
+    for (auto &i : bb) {
+      auto *alloc = dyn_cast<AllocStackInst>(&i);
+      if (!alloc)
+        continue;
+      auto varInfo = alloc->getVarInfo();
+      if (!varInfo || varInfo->ArgNo)
+        continue;
+      // The allocation has a varinfo but no argument number, which should not
+      // happen in the prolog. Unfortunately, some copies can generate wrong
+      // debug info, so we have to fix it here, by invalidating it.
+      alloc->invalidateVarInfo();
+    }
 
   return ArgNo;
 }
