@@ -1006,13 +1006,13 @@ protected:
   // escalation logic
   Mutex drainLock;
 #else
+  // TODO (rokhinip): Make this a flagset
+  bool isDistributedRemoteActor;
   // Note: There is some padding that is added here by the compiler in order to
   // enforce alignment. This is space that is available for us to use in
   // the future
   alignas(sizeof(ActiveActorStatus)) char StatusStorage[sizeof(ActiveActorStatus)];
 #endif
-  // TODO (rokhinip): Make this a flagset
-  bool isDistributedRemoteActor;
 };
 
 // All the fields accessed under the actor's lock should be moved
@@ -1034,6 +1034,14 @@ protected:
   //
   PriorityQueue prioritizedJobs;
 #endif
+};
+
+// We can't use sizeof(DefaultActor) since the alignment requirement on the
+// default actor means that we have some padding added when calculating
+// sizeof(DefaultActor). However that padding isn't available for us to use
+// in DefaultActorImpl.
+enum {
+  DefaultActorSize = sizeof(void *) * NumWords_DefaultActor + sizeof(HeapObject)
 };
 
 /// The default actor implementation.
@@ -1088,8 +1096,13 @@ protected:
 /// are (1), (3), (5), (6).
 class DefaultActorImpl
     : public HeaderFooterLayout<DefaultActorImplHeader, DefaultActorImplFooter,
-                                sizeof(HeapObject) +
-                                    sizeof(void *) * NumWords_DefaultActor> {
+                                DefaultActorSize> {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  /// Dummy variable, used to compute sizeWithoutTrailingPadding()
+  /// Must not be accessed
+  char const bytesPastTheEnd[1];
+#pragma clang diagnostic pop
 public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
@@ -1159,6 +1172,13 @@ public:
   }
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 
+  static constexpr size_t sizeWithoutTrailingPadding() {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+    return offsetof(DefaultActorImpl, bytesPastTheEnd);
+#pragma clang diagnostic pop
+  }
+
 private:
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1213,12 +1233,9 @@ public:
 
 } /// end anonymous namespace
 
-// We can't use sizeof(DefaultActor) since the alignment requirement on the
-// default actor means that we have some padding added when calculating
-// sizeof(DefaultActor). However that padding isn't available for us to use
-// in DefaultActorImpl.
-static_assert(sizeof(DefaultActorImpl) <= ((sizeof(void *) * NumWords_DefaultActor) + sizeof(HeapObject)) &&
-              alignof(DefaultActorImpl) <= alignof(DefaultActor),
+static_assert(DefaultActorImpl::sizeWithoutTrailingPadding() ==
+                      DefaultActorSize &&
+                  alignof(DefaultActorImpl) <= alignof(DefaultActor),
               "DefaultActorImpl doesn't fit in DefaultActor");
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 static_assert(DefaultActorImpl::offsetOfActiveActorStatus() % ACTIVE_ACTOR_STATUS_SIZE == 0,
