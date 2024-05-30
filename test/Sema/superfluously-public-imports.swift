@@ -123,10 +123,8 @@ public struct Extended {
 
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
-import UnusedImport // expected-error {{ambiguous implicit access level for import of 'UnusedImport'; it is imported as 'public' elsewhere}}
-// expected-note @-1 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
+import UnusedImport
 public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
-// expected-note @-1 {{imported 'public' here}}
 
 //--- Client.swift
 public import DepUsedFromInlinableCode
