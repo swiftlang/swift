@@ -517,14 +517,14 @@ BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 /// applyTranspose
 BUILTIN_SIL_OPERATION(ApplyTranspose, "applyTranspose", Special)
 
-/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> T
+/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> sending T
 ///
 /// Unsafely capture the current continuation and pass it to the given
 /// function value. Returns a value of type T when the continuation is
 /// resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 
-/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> T
+/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> sending T
 ///
 /// Unsafely capture the current continuation and pass it to the given
 /// function value. Returns a value of type T or throws an error when
