@@ -356,6 +356,7 @@ func isolated_generic_bad_2<T: Equatable>(_ t: isolated T) {}
 // expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
 func isolated_generic_bad_3<T: AnyActor>(_ t: isolated T) {}
 // expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
+// expected-warning@-2 {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
 func isolated_generic_bad_4<T>(_ t: isolated Array<T>) {}
 // expected-error@-1 {{'isolated' parameter type 'Array<T>' does not conform to 'Actor' or 'DistributedActor'}}
@@ -475,7 +476,7 @@ nonisolated func fromNonisolated(ns: NotSendable) async -> NotSendable {
   await pass(value: ns, isolation: nil)
 }
 
-func invalidIsolatedClosureParam<A: AnyActor> (
+func invalidIsolatedClosureParam<A: AnyActor> ( // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
   _: (isolated A) async throws -> Void // expected-error {{'isolated' parameter type 'A' does not conform to 'Actor' or 'DistributedActor'}}
 ) {}
 

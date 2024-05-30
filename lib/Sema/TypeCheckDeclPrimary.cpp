@@ -317,7 +317,7 @@ static void checkInheritanceClause(
         continue;
 
       // AnyObject is not allowed except on protocols.
-      if (layout.hasExplicitAnyObject) {
+      if (layout.hasExplicitAnyObject && !isa<ClassDecl>(decl)) {
         decl->diagnose(diag::inheritance_from_anyobject);
         continue;
       }
