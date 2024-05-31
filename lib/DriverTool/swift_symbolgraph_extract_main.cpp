@@ -196,6 +196,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Default(AccessLevel::Public);
   }
 
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);
+
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
     llvm::outs() << InstanceSetupError << '\n';

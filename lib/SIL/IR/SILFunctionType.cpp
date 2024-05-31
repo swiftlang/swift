@@ -2007,9 +2007,32 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       continue;
     }
 
-    auto *varDecl = cast<VarDecl>(capture.getDecl());
+    auto options = SILParameterInfo::Options();
 
-    auto type = varDecl->getTypeInContext();
+    Type type;
+    VarDecl *varDecl = nullptr;
+    if (auto *expr = capture.getPackElement()) {
+      type = expr->getType();
+    } else {
+      varDecl = cast<VarDecl>(capture.getDecl());
+      type = varDecl->getTypeInContext();
+
+      // If we're capturing a parameter pack, wrap it in a tuple.
+      if (type->is<PackExpansionType>()) {
+        assert(!cast<ParamDecl>(varDecl)->supportsMutation() &&
+               "Cannot capture a pack as an lvalue");
+
+        SmallVector<TupleTypeElt, 1> elts;
+        elts.push_back(type);
+        type = TupleType::get(elts, TC.Context);
+      }
+
+      if (isolatedParam == varDecl) {
+        options |= SILParameterInfo::Isolated;
+        isolatedParam = nullptr;
+      }
+    }
+
     assert(!type->hasLocalArchetype() ||
            (genericSig && origGenericSig &&
             !genericSig->isEqual(origGenericSig)));
@@ -2017,23 +2040,6 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     auto canType = type->getReducedType(
         genericSig ? genericSig : origGenericSig);
-
-    auto options = SILParameterInfo::Options();
-    if (isolatedParam == varDecl) {
-      options |= SILParameterInfo::Isolated;
-      isolatedParam = nullptr;
-    }
-
-    // If we're capturing a parameter pack, wrap it in a tuple.
-    if (isa<PackExpansionType>(canType)) {
-      assert(!cast<ParamDecl>(varDecl)->supportsMutation() &&
-             "Cannot capture a pack as an lvalue");
-
-      SmallVector<TupleTypeElt, 1> elts;
-      elts.push_back(canType);
-      canType = CanTupleType(TupleType::get(elts, TC.Context));
-    }
-
     auto &loweredTL =
         TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
                            expansion);
@@ -2055,6 +2061,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       break;
     }
     case CaptureKind::Box: {
+      assert(varDecl);
+
       // The type in the box is lowered in the minimal context.
       auto minimalLoweredTy =
           TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
@@ -2072,6 +2080,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       break;
     }
     case CaptureKind::ImmutableBox: {
+      assert(varDecl);
+
       // The type in the box is lowered in the minimal context.
       auto minimalLoweredTy =
           TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
