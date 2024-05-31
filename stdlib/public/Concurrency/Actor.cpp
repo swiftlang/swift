@@ -357,8 +357,6 @@ const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
 #endif
 }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "ConstantConditionsOC"
 // Done this way because of the interaction with the initial value of
 // 'unexpectedExecutorLogLevel'
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
@@ -378,7 +376,6 @@ bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 
   return legacyMode;
 }
-#pragma clang diagnostic pop
 
 // Check override of executor checking mode.
 static void checkIsCurrentExecutorMode(void *context) {
