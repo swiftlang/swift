@@ -2330,7 +2330,9 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   // First, claim all the indirect results.
   ArrayRef<SILArgument *> args = emitEntryPointIndirectReturn(
       *emission, IGF, entry, funcTy, [&](SILType directResultType) -> bool {
-        return FI.getReturnInfo().isIndirect();
+        // Indirect at the IR level but direct at the SIL level.
+        return FI.getReturnInfo().isIndirect() &&
+               !funcTy->hasIndirectFormalResults();
       });
 
   unsigned nextArgTyIdx = 0;
