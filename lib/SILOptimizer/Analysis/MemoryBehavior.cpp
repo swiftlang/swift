@@ -445,7 +445,7 @@ static SILValue getBeginScopeInst(SILValue V) {
     // guaranteed argument.
     SILValue root = findOwnershipReferenceAggregate(object);
     if (auto *funcArg = dyn_cast<SILFunctionArgument>(root)) {
-      if (funcArg->getArgumentConvention().isGuaranteedConvention())
+      if (funcArg->getArgumentConvention().isGuaranteedConventionInCallee())
         return funcArg;
     }
   }
@@ -529,7 +529,7 @@ bool AliasAnalysis::isInImmutableScope(SILInstruction *inst, SILValue V) {
   if (auto *funcArg = dyn_cast<SILFunctionArgument>(beginScope)) {
     // The immutable scope (= an guaranteed argument) spans over the whole
     // function. We don't need to do any scope computation in this case.
-    assert(funcArg->getArgumentConvention().isGuaranteedConvention());
+    assert(funcArg->getArgumentConvention().isGuaranteedConventionInCallee());
     return true;
   }
 

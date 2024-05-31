@@ -1031,7 +1031,7 @@ struct ConcreteArgumentCopy {
     assert(!paramInfo.isIndirectMutating()
            && "A mutated opened existential value can't be replaced");
 
-    if (!paramInfo.isConsumed())
+    if (!paramInfo.isConsumedInCaller())
       return std::nullopt;
 
     SILValue origArg = apply.getArgument(argIdx);
