@@ -5,6 +5,76 @@
 
 ## Swift 6.0
 
+* Swift 6 comes with a new language mode that prevents the risk of data races
+  at compile time. This guarantee is accomplished through _data isolation_; the
+  compiler will validate that data passed over a boundary between concurrently
+  executing code is either safe to reference concurrently, or mutually
+  exclusive access to the value is enforced.
+
+  The data-race safety checks were previously available in Swift 5.10 through
+  the `-strict-concurrency=complete` compiler flag. Complete concurrency
+  checking in Swift 5.10 was overly restrictive, and Swift 6 removes many
+  false-positive data-race warnings through better `Sendable` inference,
+  new analysis that proves mutually exclusive access when passing values with
+  non-`Sendable` type over isolation boundaries, and more.
+
+  You can enable the Swift 6 language mode using the `-swift-version 6`
+  compiler flag.
+
+* [SE-0428][]:
+  Distributed actors now have the ability to support complete split server / 
+  client systems, thanks to the new `@Resolvable` macro and runtime changes.
+
+  It is now possible to share an "API module" between a client and server 
+  application, declare a resolvable distributed actor protocol with the expected 
+  API contract and perform calls on it, without knowing the specific type the 
+  server is implementing those actors as. 
+
+  Declaring such protocol looks like this:
+
+```swift
+import Distributed 
+
+@Resolvable
+protocol Greeter where ActorSystem: DistributedActorSystem<any Codable> {
+  distributed func greet(name: String) -> String
+}
+```
+
+And the module structure to support such applications looks like this:
+
+```
+                         ┌────────────────────────────────────────┐
+                         │                API Module              │
+                         │========================================│
+                         │ @Resolvable                            │
+                         │ protocol Greeter: DistributedActor {   │
+                 ┌───────┤   distributed func greet(name: String) ├───────┐
+                 │       │ }                                      │       │
+                 │       └────────────────────────────────────────┘       │
+                 │                                                        │
+                 ▼                                                        ▼   
+┌────────────────────────────────────────────────┐      ┌──────────────────────────────────────────────┐
+│             Client Module                      │      │               Server Module                  │
+│================================================│      │==============================================│
+│ let g = try $Greeter.resolve(...) /*new*/      │      │ distributed actor EnglishGreeter: Greeter {  │
+│ try await greeter.hello(name: ...)             │      │   distributed func greet(name: String) {     │
+└────────────────────────────────────────────────┘      │     "Greeting in english, for \(name)!"      │
+/* Client cannot know about EnglishGreeter type */      │   }                                          │      
+                                                        │ }                                            │
+                                                        └──────────────────────────────────────────────┘
+```
+
+* [SE-0424][]:
+  Serial executor gains a new customization point `checkIsolation()`, which can be
+  implemented by custom executor implementations in order to provide a last resort  
+  check before the isolation asserting APIs such as `Actor.assumeIsolated` or
+  `assertIsolated` fail and crash.
+
+  This specifically enables Dispatch to implement more sophisticated isolation
+  checking, and now even an actor which is "on a queue which is targeting 
+  another specific queue" can be properly detected using these APIs.
+
 * [SE-0431][]:
   You can now require a function value to carry its actor isolation
   dynamically in a way that can be directly read by clients:
@@ -10497,6 +10567,10 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0429]: https://github.com/apple/swift-evolution/blob/main/proposals/0429-partial-consumption.md
 [SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
+[SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
+[SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
+[SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
