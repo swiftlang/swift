@@ -378,6 +378,12 @@ OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
                     (AsyncTask *target),
                     (target))
 
+OVERRIDE_TASK_LOCAL(task_localsCopyToTaskGroupChildTaskDefensively, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::,
+                    (AsyncTask *target),
+                    (target))
+
 OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, , )

@@ -284,6 +284,9 @@ Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixy
 // async function pointer to Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: () async throws(B) -> A) async throws(B) -> A
 Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEtYaq_YKs5ErrorR_r0_lFTu
 
+// === Task groups can now handle (copy) task locals set directly around an addTask
+Added: _swift_task_localsCopyToTaskGroupChildTaskDefensively
+
 // === Add #isolation to next() and waitForAll() in task groups
 // Swift.TaskGroup.awaitAllRemainingTasks(isolation: isolated Swift.Actor?) async -> ()
 Added: _$sScG22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaF
@@ -319,3 +322,4 @@ Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__y
 // Swift.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
+
