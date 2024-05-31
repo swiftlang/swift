@@ -669,7 +669,7 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
       return true;
   }
 
-  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
+  if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
     // First check for param decl results.
     if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
           return usesFeatureSendingArgsAndResults(pd);
