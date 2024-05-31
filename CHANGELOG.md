@@ -75,6 +75,20 @@ And the module structure to support such applications looks like this:
   checking, and now even an actor which is "on a queue which is targeting 
   another specific queue" can be properly detected using these APIs.
 
+* Closures can now appear in pack expansion expressions, which allows you to
+  construct a parameter pack of closures where each closure captures the
+  corresponding element of some other parameter pack. For example:
+
+  ```swift
+  struct Manager<each T> {
+    let fn: (repeat () -> (each T))
+
+    init(_ t: repeat each T) {
+      fn = (repeat { each t })
+    }
+  }
+  ```
+
 * [SE-0431][]:
   You can now require a function value to carry its actor isolation
   dynamically in a way that can be directly read by clients:
