@@ -4219,7 +4219,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::MapVector<ValueDecl*,CapturedValue> captures;
+
+  // FIXME: CapturedValue should just be a hash key
+  llvm::MapVector<VarDecl *, CapturedValue> varCaptures;
+  llvm::MapVector<PackElementExpr *, CapturedValue> packElementCaptures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
@@ -4235,6 +4238,27 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
+
+  auto recordCapture = [&](CapturedValue capture) {
+    if (auto *expr = capture.getPackElement()) {
+      auto existing = packElementCaptures.find(expr);
+      if (existing != packElementCaptures.end()) {
+        existing->second = existing->second.mergeFlags(capture.getFlags());
+      } else {
+        packElementCaptures.insert(std::pair<PackElementExpr *, CapturedValue>(
+          expr, capture));
+      }
+    } else {
+      VarDecl *value = cast<VarDecl>(capture.getDecl());
+      auto existing = varCaptures.find(value);
+      if (existing != varCaptures.end()) {
+        existing->second = existing->second.mergeFlags(capture.getFlags());
+      } else {
+        varCaptures.insert(std::pair<VarDecl *, CapturedValue>(
+          value, capture));
+      }
+    }
+  };
 
   collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
     assert(captureInfo.hasBeenComputed());
@@ -4252,9 +4276,15 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       genericEnv.insert(env);
     }
 
-    SmallVector<CapturedValue, 4> localCaptures;
-    captureInfo.getLocalCaptures(localCaptures);
-    for (auto capture : localCaptures) {
+    for (auto capture : captureInfo.getCaptures()) {
+      if (capture.isPackElement()) {
+        recordCapture(capture);
+        continue;
+      }
+
+      if (!capture.isLocalCapture())
+        continue;
+
       // If the capture is of another local function, grab its transitive
       // captures instead.
       if (auto capturedFn = getAnyFunctionRefFromCapture(capture)) {
@@ -4386,13 +4416,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       }
 
       // Collect non-function captures.
-      ValueDecl *value = capture.getDecl();
-      auto existing = captures.find(value);
-      if (existing != captures.end()) {
-        existing->second = existing->second.mergeFlags(capture);
-      } else {
-        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
-      }
+      recordCapture(capture);
     }
   };
 
@@ -4449,7 +4473,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   collectConstantCaptures(fn);
 
   SmallVector<CapturedValue, 4> resultingCaptures;
-  for (auto capturePair : captures) {
+  for (auto capturePair : varCaptures) {
+    resultingCaptures.push_back(capturePair.second);
+  }
+  for (auto capturePair : packElementCaptures) {
     resultingCaptures.push_back(capturePair.second);
   }
 
@@ -4468,7 +4495,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     resultingCaptures.push_back(*selfCapture);
   }
 
-  // Cache the uniqued set of transitive captures.
+  // Cache the result.
   CaptureInfo info(Context, resultingCaptures,
                    capturesDynamicSelf, capturesOpaqueValue,
                    capturesGenericParams, genericEnv.getArrayRef());
