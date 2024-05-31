@@ -341,3 +341,13 @@ do {
     }
   }
 }
+
+// https://github.com/apple/swift/issues/73207
+do {
+  func test(_ levels: [Range<Int>]) {
+    for (i, leaves): (Int, Range<Int>) in levels[8 ..< 15].enumerated() { // Ok
+      _ = i
+      _ = leaves
+    }
+  }
+}

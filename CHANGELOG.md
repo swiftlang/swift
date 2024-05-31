@@ -59,6 +59,84 @@ And the module structure to support such applications looks like this:
   checking, and now even an actor which is "on a queue which is targeting 
   another specific queue" can be properly detected using these APIs.
 
+* [SE-0423][]:
+  You can now use `@preconcurrency` attribute to replace static actor isolation
+  checking with dynamic checks for witnesses of synchronous nonisolated protocol
+  requirements when the witness is isolated. This is common when Swift programs
+  need to interoperate with frameworks written in C/C++/Objective-C whose
+  implementations cannot participate in static data race safety.
+
+  ```swift
+  public protocol ViewDelegateProtocol {
+    func respondToUIEvent()
+  }
+  ```
+
+  It's now possible for a `@MainActor`-isolated type to conform to
+  `ViewDelegateProtocol` by marking conformance declaration as `@preconcurrency`:
+
+  ```swift
+  @MainActor
+  class MyViewController: ViewDelegateProtocol {
+    func respondToUIEvent() {
+      // implementation...
+    }
+  }
+  ```
+
+  The compiler would emit dynamic checks into the `respondToUIEvent()` witness
+  to make sure that it's always executed in `@MainActor` isolated context.
+
+  Additionally, the compiler would emit dynamic actor isolation checks for:
+
+  - `@objc` thunks of synchronous actor-isolated members of classes.
+
+  - Synchronous actor-isolated function values passed to APIs that
+    erase actor isolation and haven't yet adopted strict concurrency checking.
+
+  - Call-sites of synchronous actor-isolated functions imported from Swift 6 libraries.
+
+  The dynamic actor isolation checks can be disabled using the flag
+  `-disable-dynamic-actor-isolation`.
+
+* [SE-0418][]:
+
+  The compiler would now automatically employ `Sendable` on functions
+  and key path literal expressions that cannot capture non-Sendable values.
+
+  This includes partially-applied and unapplied instance methods of `Sendable`
+  types, as well as non-local functions. Additionally, it is now disallowed
+  to utilize `@Sendable` on instance methods of non-Sendable types.
+
+  Let's use the following type to illustrate the new inference rules:
+
+  ```swift
+  public struct User {
+    var name: String
+
+    func getAge() -> Int { ... }
+  }
+  ```
+
+  Key path `\User.name` would be inferred as `WritableKeyPath<User, String> & Sendable`
+  because it doesn't capture any non-Sendable values.
+
+  The same applies to keypath-as-function conversions:
+
+  ```swift
+  let _: @Sendable (User) -> String = \User.name // Ok
+  ```
+
+  A function value produced by an un-applied reference to `getAge`
+  would be marked as `@Sendable` because `User` is a `Sendable` struct:
+
+  ```swift
+  let _ = User.getAge // Inferred as `@Sendable (User) -> @Sendable () -> Int`
+
+  let user = User(...)
+  user.getAge // Inferred as `@Sendable () -> Int`
+  ```
+
 * [SE-0430][]:
 
   Region Based Isolation is now extended to enable the application of an
@@ -10389,6 +10467,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
+[SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
