@@ -6315,8 +6315,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         TypeID typeID;
         uint32_t rawSize;
         uint8_t rawAlign;
+        bool movesAsLike;
         serialization::decls_block::RawLayoutDeclAttrLayout::
-          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign);
+          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign, movesAsLike);
         
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
@@ -6326,6 +6327,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           auto typeRepr = new (ctx) FixedTypeRepr(type.get(), SourceLoc());
           if (rawAlign == 0) {
             Attr = new (ctx) RawLayoutAttr(typeRepr,
+                                           movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;

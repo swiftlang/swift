@@ -125,11 +125,26 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
         MinimumAlign = likeFixedType->getFixedAlignment();
         IsFixedLayout = true;
         IsKnownAlwaysFixedSize = IsFixedSize;
+
+        // @_rawLayout(like: T) has an optional `movesAsLike` which enforces that
+        // a value of this raw layout type should have the same move semantics
+        // as the like its like.
+        if (rawLayout->shouldMoveAsLikeType()) {
+          IsKnownTriviallyDestroyable = likeFixedType->isTriviallyDestroyable(ResilienceExpansion::Maximal);
+          IsKnownBitwiseTakable = likeFixedType->isBitwiseTakable(ResilienceExpansion::Maximal);
+        }
       } else {
         MinimumSize = Size(0);
         MinimumAlign = Alignment(1);
         IsFixedLayout = false;
         IsKnownAlwaysFixedSize = IsNotFixedSize;
+
+        // We don't know our like type, so assume we're not known to be bitwise
+        // takable.
+        if (rawLayout->shouldMoveAsLikeType()) {
+          IsKnownTriviallyDestroyable = IsNotTriviallyDestroyable;
+          IsKnownBitwiseTakable = IsNotBitwiseTakable;
+        }
       }
     } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
       auto elementType = likeArray->first;
