@@ -200,7 +200,9 @@ class RenameRangeCollector : public IndexDataConsumer {
 
 public:
   RenameRangeCollector(const ValueDecl *declToRename)
-      : declToRename(declToRename), stringStorage(new StringScratchSpace()) {}
+      : declToRename(declToRename), stringStorage(new StringScratchSpace()) {
+    assert(declToRename != nullptr);
+  }
 
   RenameRangeCollector(RenameRangeCollector &&collector) = default;
 
@@ -363,6 +365,10 @@ RenameLocs swift::ide::localRenameLocs(SourceFile *SF,
     if (DeclarationScope->isChildContextOf(SF)) {
       RenameScope = DeclarationScope;
     }
+  }
+
+  if (valueDecl == nullptr) {
+    return RenameLocs();
   }
 
   RenameRangeCollector rangeCollector(valueDecl);
