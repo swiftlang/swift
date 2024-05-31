@@ -1614,3 +1614,14 @@ class DerivedWrappedProperty : SomeClass {
   }  // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
 
 }
+
+// rdar://129031705 ([error: ... used before being initialized)
+// Related to treating 'let's as immutable RValues.
+struct S {
+  let rotation: (Int, Int)
+
+  init() {
+    rotation.0 = 0
+    rotation.1 = rotation.0
+  }
+}
