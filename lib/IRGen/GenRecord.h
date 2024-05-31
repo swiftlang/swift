@@ -195,6 +195,25 @@ public:
       return emitAssignWithTakeCall(IGF, T, dest, src);
     }
 
+    if (auto rawLayout = T.getRawLayout()) {
+      // Because we have a rawlayout attribute, we know this has to be a struct.
+      auto structDecl = T.getStructOrBoundGenericStruct();
+
+      if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
+        if (rawLayout->shouldMoveAsLikeType()) {
+          auto astT = T.getASTType();
+          auto subs = astT->getContextSubstitutionMap(IGF.IGM.getSwiftModule(),
+                                                      structDecl);
+          auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
+          auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+
+          likeTypeInfo.assignWithTake(IGF, dest, src, loweredLikeType,
+                                      isOutlined);
+          return;
+        }
+      }
+    }
+
     if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -255,6 +274,24 @@ public:
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitInitializeWithTakeCall(IGF, T, dest, src);
+    }
+
+    if (auto rawLayout = T.getRawLayout()) {
+      // Because we have a rawlayout attribute, we know this has to be a struct.
+      auto structDecl = T.getStructOrBoundGenericStruct();
+
+      if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
+        if (rawLayout->shouldMoveAsLikeType()) {
+          auto astT = T.getASTType();
+          auto subs = astT->getContextSubstitutionMap(IGF.IGM.getSwiftModule(),
+                                                      structDecl);
+          auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
+          auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+
+          likeTypeInfo.initializeWithTake(IGF, dest, src, loweredLikeType,
+                                          isOutlined, zeroizeIfSensitive);
+        }
+      }
     }
 
     if (isOutlined || T.hasParameterizedExistential()) {

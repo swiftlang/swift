@@ -3989,6 +3989,16 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       if (likeType.isNull()) {
         return makeParserSuccess();
       }
+
+      bool movesAsLike = false;
+
+      // @_rawLayout(like: T, movesAsLike)
+      if (consumeIf(tok::comma) && Tok.isAny(tok::identifier) &&
+          !parseSpecificIdentifier("movesAsLike",
+            diag::attr_rawlayout_expected_label, "movesAsLike")) {
+        movesAsLike = true;
+      }
+
       SourceLoc rParenLoc;
       if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
@@ -3996,7 +4006,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
 
-      attr = new (Context) RawLayoutAttr(likeType.get(),
+      attr = new (Context) RawLayoutAttr(likeType.get(), movesAsLike,
                                          AtLoc, SourceRange(Loc, rParenLoc));
     } else if (firstLabel.is("likeArrayOf")) {
       // @_rawLayout(likeArrayOf: T, count: N)
