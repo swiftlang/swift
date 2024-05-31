@@ -9,9 +9,9 @@ import RawLayoutCXX
 
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}16WeirdCXXTypeCellVWV" = {{.*}} %swift.vwtable
 // initializeWithTake
-// CHECK-SAME:  , ptr @"$s10raw_layout16WeirdCXXTypeCellVwtk"
+// CHECK-SAME:  , ptr @"$s10raw_layout16WeirdCXXTypeCellVwtk
 // assignWithTake
-// CHECK-SAME:  , ptr @"$s10raw_layout16WeirdCXXTypeCellVwta"
+// CHECK-SAME:  , ptr @"$s10raw_layout16WeirdCXXTypeCellVwta
 // size
 // CHECK-SAME:  , {{i64|i32}} 1
 // stride
