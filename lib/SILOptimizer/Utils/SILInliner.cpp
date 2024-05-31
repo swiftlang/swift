@@ -499,12 +499,12 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             asi->setIsLexical();
         } else {
           // Insert begin/end borrow for guaranteed arguments.
-          if (paramInfo.isGuaranteed()) {
+          if (paramInfo.isGuaranteedInCaller()) {
             if (SILValue newValue = borrowFunctionArgument(callArg, idx)) {
               callArg = newValue;
               borrowedArgs[idx] = true;
             }
-          } else if (paramInfo.isConsumed()) {
+          } else if (paramInfo.isConsumedInCaller()) {
             if (SILValue newValue = moveFunctionArgument(callArg, idx)) {
               callArg = newValue;
             }
