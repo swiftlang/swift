@@ -248,11 +248,22 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   }
 
   // Access levels from imports are reported with the others access levels.
-  // Except for extensions, we report them here.
-  if (originKind == DisallowedOriginKind::NonPublicImport &&
-      reason != ExportabilityReason::ExtensionWithPublicMembers &&
-      reason != ExportabilityReason::ExtensionWithConditionalConformances)
-    return false;
+  // Except for extensions and protocol conformances, we report them here.
+  if (originKind == DisallowedOriginKind::NonPublicImport) {
+    bool reportHere = [&] {
+      switch (*reason) {
+        case ExportabilityReason::ExtensionWithPublicMembers:
+        case ExportabilityReason::ExtensionWithConditionalConformances:
+          return true;
+        case ExportabilityReason::Inheritance:
+          return isa<ProtocolDecl>(D);
+        default:
+          return false;
+      }
+    }();
+    if (!reportHere)
+      return false;
+  }
 
   if (ctx.LangOpts.EnableModuleApiImportRemarks &&
       import.has_value() && where.isExported() &&

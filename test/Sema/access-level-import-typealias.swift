@@ -24,11 +24,10 @@ public typealias ClazzAlias = Clazz
 public import Aliases
 internal import Original // expected-note 2 {{class 'Clazz' imported as 'internal' from 'Original' here}}
 
-// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported publicly}}
+// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used for a conformance on a public, package or '@usableFromInline' type because 'Original' was not imported publicly}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 
 @inlinable public func inlinableFunc() {
   // expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in an '@inlinable' function because 'Original' was not imported publicly}}
   _ = ClazzAlias.self
 }
-
