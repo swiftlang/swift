@@ -5757,8 +5757,9 @@ public:
   /// Determine whether references to this storage declaration may appear
   /// on the left-hand side of an assignment, as the operand of a
   /// `&` or 'inout' operator, or as a component in a writable key path.
-  bool isSettable(const DeclContext *useDC) const {
-    switch (mutability(useDC)) {
+  bool isSettable(const DeclContext *useDC,
+                  const DeclRefExpr *base = nullptr) const {
+    switch (mutability(useDC, base)) {
       case StorageMutability::Immutable:
         return false;
       case StorageMutability::Mutable:
@@ -5769,9 +5770,8 @@ public:
 
   /// Determine the mutability of this storage declaration when
   /// accessed from a given declaration context.
-  StorageMutability mutability(
-      const DeclContext *useDC,
-      std::optional<const DeclRefExpr *> base = std::nullopt) const;
+  StorageMutability mutability(const DeclContext *useDC,
+                               const DeclRefExpr *base = nullptr) const;
 
   /// Determine the mutability of this storage declaration when
   /// accessed from a given declaration context in Swift.
@@ -5781,7 +5781,7 @@ public:
   /// writes in Swift.
   StorageMutability mutabilityInSwift(
       const DeclContext *useDC,
-      std::optional<const DeclRefExpr *> base = std::nullopt) const;
+      const DeclRefExpr *base = nullptr) const;
 
   /// Determine whether references to this storage declaration in Swift may
   /// appear on the left-hand side of an assignment, as the operand of a
@@ -5790,8 +5790,9 @@ public:
   /// This method is equivalent to \c isSettable with the exception of
   /// 'optional' storage requirements, which lack support for direct writes
   /// in Swift.
-  bool isSettableInSwift(const DeclContext *useDC) const {
-    switch (mutabilityInSwift(useDC)) {
+  bool isSettableInSwift(const DeclContext *useDC,
+                         const DeclRefExpr *base = nullptr) const {
+    switch (mutabilityInSwift(useDC, base)) {
       case StorageMutability::Immutable:
         return false;
       case StorageMutability::Mutable:
@@ -6113,9 +6114,8 @@ public:
 
   /// Determine the mutability of this variable declaration when
   /// accessed from a given declaration context.
-  StorageMutability mutability(
-      const DeclContext *useDC,
-      std::optional<const DeclRefExpr *> base = std::nullopt) const;
+  StorageMutability mutability(const DeclContext *useDC,
+                               const DeclRefExpr *base = nullptr) const;
 
   /// Return the parent pattern binding that may provide an initializer for this
   /// VarDecl.  This returns null if there is none associated with the VarDecl.
