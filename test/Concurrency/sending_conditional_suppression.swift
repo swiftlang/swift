@@ -90,6 +90,69 @@ public struct TestInStruct {
   // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   public func testKlassArgAndResult(_ x: NonSendableKlass, _ y: sending NonSendableKlass, z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: public func testFunctionArg(_ x: () -> sending test.NonSendableKlass)
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: public func testFunctionArg(_ x: () -> test.NonSendableKlass)
+  // CHECK-NEXT: #endif  
+  public func testFunctionArg(_ x: () -> sending NonSendableKlass) { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: public func testFunctionResult() -> (() -> sending test.NonSendableKlass)
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: public func testFunctionResult() -> (() -> test.NonSendableKlass)
+  // CHECK-NEXT: #endif  
+  public func testFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineKlassArg(_ x: sending test.NonSendableKlass)
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineKlassArg(_ x: test.NonSendableKlass)
+  // CHECK-NEXT: #endif
+  @usableFromInline func testUsableFromInlineKlassArg(_ x: sending NonSendableKlass) { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineKlassResult() -> sending test.NonSendableKlass
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineKlassResult() -> test.NonSendableKlass
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  func testUsableFromInlineKlassResult() -> sending NonSendableKlass { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineKlassArgAndResult(_ x: test.NonSendableKlass, _ y: sending test.NonSendableKlass, z: test.NonSendableKlass) -> sending test.NonSendableKlass
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineKlassArgAndResult(_ x: test.NonSendableKlass, _ y: test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  func testUsableFromInlineKlassArgAndResult(_ x: NonSendableKlass, _ y: sending NonSendableKlass, z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionArg(_ x: () -> sending test.NonSendableKlass)
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionArg(_ x: () -> test.NonSendableKlass)
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  func testUsableFromInlineFunctionArg(_ x: () -> sending NonSendableKlass) { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> (() -> sending test.NonSendableKlass)
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> (() -> test.NonSendableKlass)
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  func testUsableFromInlineFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
 }
 
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
