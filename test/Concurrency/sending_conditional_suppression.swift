@@ -192,10 +192,10 @@ public struct TestInStruct {
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal init(_ x: Int, transformWithResult: @escaping () async throws -> sending test.NonSendableKlass) { fatalError() }
+  // CHECK-NEXT: internal init(_ x: Swift.Int, transformWithResult: @escaping () async throws -> sending test.NonSendableKlass)
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal init(_ x: Int, transformWithResult: @escaping () async throws -> test.NonSendableKlass) { fatalError() }
+  // CHECK-NEXT: internal init(_ x: Swift.Int, transformWithResult: @escaping () async throws -> test.NonSendableKlass)
   // CHECK-NEXT: #endif
   @usableFromInline
   internal init(_ x: Int, transformWithResult: @escaping () async throws -> sending NonSendableKlass) { fatalError() }
@@ -204,19 +204,38 @@ public struct TestInStruct {
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
 // to make sure we do not fail if we fail to parse sending in the if block.
 
-// CHECK: #if compiler(>=5.3) && $OptionalIsolatedParameters && $ExpressionMacroDefaultArguments
-// CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults
-// CHECK-NEXT: @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
-// CHECK-NEXT: @backDeployed(before: macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999)
-// CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation:
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
-@backDeployed(before: macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999)
+// CHECK-LABEL: #if compiler(>=5.3) && $OptionalIsolatedParameters && $ExpressionMacroDefaultArguments // Suppression Count: 24
+// CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
+// CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> sending T {
+// CHECK-NEXT:   fatalError()
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> T {
+// CHECK-NEXT:   fatalError()
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
 @inlinable public func withCheckedContinuation<T>(
   isolation: isolated (any _Concurrency.Actor)? = #isolation,
   function: String = #function,
   _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void
 ) async -> sending T {
-  return await withUnsafeContinuation {
-    body(CheckedContinuation(continuation: $0, function: function))
-  }
+  fatalError()
 }
+
+// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 26
+// CHECK-NEXT: public var publicGlobal: (sending test.NonSendableKlass) -> ()
+// CHECK-NEXT: #else
+// CHECK-NEXT: public var publicGlobal: (test.NonSendableKlass) -> ()
+// CHECK-NEXT: #endif
+public var publicGlobal: (sending NonSendableKlass) -> () = { x in fatalError() }
+
+// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 27
+// CHECK-NEXT: @usableFromInline
+// CHECK-NEXT: internal var usableFromInlineGlobal: (sending test.NonSendableKlass) -> ()
+// CHECK-NEXT: #else
+// CHECK-NEXT: @usableFromInline
+// CHECK-NEXT: internal var usableFromInlineGlobal: (test.NonSendableKlass) -> ()
+// CHECK-NEXT: #endif
+@usableFromInline
+internal var usableFromInlineGlobal: (sending NonSendableKlass) -> () = { x in fatalError() }
