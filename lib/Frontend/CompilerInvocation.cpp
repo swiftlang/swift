@@ -1572,6 +1572,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
+  } else if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.UseCheckedAsyncObjCBridging = true;
   }
 
   Opts.DisableDynamicActorIsolation |=
