@@ -298,10 +298,6 @@ Added: _$sScg4next9isolationxSgScA_pSgYi_tYaKFTu
 Added: _$sScg22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaF
 Added: _$sScg22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaFTu
 
-// next() default implementation in terms of next(isolation:)
-Added: _$sScIsE4next7ElementQzSgyYa7FailureQzYKF
-Added: _$sScIsE4next7ElementQzSgyYa7FailureQzYKFTu
-
 // === SerialExecutor.checkIsolated()
 Added: _swift_task_checkIsolated
 Added: _swift_task_checkIsolated_hook
