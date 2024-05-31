@@ -95,14 +95,14 @@ public struct TestInStruct {
   // CHECK-NEXT: public func testFunctionArg(_ x: () -> sending test.NonSendableKlass)
   // CHECK-NEXT: #else
   // CHECK-NEXT: public func testFunctionArg(_ x: () -> test.NonSendableKlass)
-  // CHECK-NEXT: #endif  
+  // CHECK-NEXT: #endif
   public func testFunctionArg(_ x: () -> sending NonSendableKlass) { fatalError() }
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public func testFunctionResult() -> (() -> sending test.NonSendableKlass)
   // CHECK-NEXT: #else
   // CHECK-NEXT: public func testFunctionResult() -> (() -> test.NonSendableKlass)
-  // CHECK-NEXT: #endif  
+  // CHECK-NEXT: #endif
   public func testFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
@@ -187,6 +187,16 @@ public struct TestInStruct {
   // CHECK-NEXT: #endif
   @usableFromInline
   let internalLetFieldFunctionArg: (sending NonSendableKlass) -> ()
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal init(_ x: Int, transformWithResult: @escaping () async throws -> sending test.NonSendableKlass) { fatalError() }
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal init(_ x: Int, transformWithResult: @escaping () async throws -> test.NonSendableKlass) { fatalError() }
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  internal init(_ x: Int, transformWithResult: @escaping () async throws -> sending NonSendableKlass) { fatalError() }
 }
 
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
