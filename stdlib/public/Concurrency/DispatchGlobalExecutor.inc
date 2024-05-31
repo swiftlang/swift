@@ -93,18 +93,16 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
 
   // Always fall back to plain dispatch_async_f for back-deployed concurrency.
 #if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
-  if (runtime::environment::concurrencyEnableJobDispatchIntegration())
 #if SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE
-    if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
-      func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
+  if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
+    func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
 #elif defined(_WIN32)
-    func = reinterpret_cast<dispatchEnqueueFuncType>(
-        GetProcAddress(LoadLibraryW(L"dispatch.dll"),
-        "dispatch_async_swift_job"));
+  func = reinterpret_cast<dispatchEnqueueFuncType>(
+      GetProcAddress(LoadLibraryW(L"dispatch.dll"),
+      "dispatch_async_swift_job"));
 #else
-    func = reinterpret_cast<dispatchEnqueueFuncType>(
-        dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
-
+  func = reinterpret_cast<dispatchEnqueueFuncType>(
+      dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
 #endif
 #endif
 

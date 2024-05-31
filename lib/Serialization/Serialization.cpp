@@ -1807,8 +1807,6 @@ void Serializer::writeLocalNormalProtocolConformance(
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
-//  fprintf(stderr, "[%s:%d](%s) NormalProtocolConformanceLayout::emitRecord >>>>>>>\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//  conformance->dump();
   NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                               addDeclRef(protocol),
                                               ownerID.getOpaqueValue(),
@@ -1845,74 +1843,6 @@ Serializer::addConformanceRef(ProtocolConformanceRef ref) {
 
   if (ref.isConcrete()) {
     auto conformance = ref.getConcrete();
-
-    // NOTE:
-    // we come here from:
-    //        frame #4: 0x00000001023df6a4 swift-frontend`swift::serialization::Serializer::addConformanceRef(this=0x000000016fdf3fd0, ref=ProtocolConformanceRef @ 0x000000016fdec640) at Serialization.cpp:1852:11
-    //        frame #5: 0x00000001023e13fc swift-frontend`swift::serialization::Serializer::addConformanceRefs(this=0x000000016fdf3fd0, conformances=ArrayRef<swift::ProtocolConformanceRef> @ 0x000000016fdec6b0) at Serialization.cpp:1987:23
-    //        frame #6: 0x000000010250c298 swift-frontend`(anonymous namespace)::SILSerializer::writeSILInstruction(this=0x000000016fdf3480, SI=0x00006000035768a0) at SerializeSIL.cpp:1023:29
-    //      * frame #7: 0x0000000102533ec8 swift-frontend`(anonymous namespace)::SILSerializer::writeSILBasicBlock(this=0x000000016fdf3480, BB=0x000000015b25c348) at SerializeSIL.cpp:674:5
-    //        frame #8: 0x0000000102503264 swift-frontend`(anonymous namespace)::SILSerializer::writeSILFunction(this=0x000000016fdf3480, F=0x000000015b25be50, DeclOnly=false) at SerializeSIL.cpp:621:5
-    //        frame #9: 0x0000000102501398 swift-frontend`(anonymous namespace)::SILSerializer::processWorklists(this=0x000000016fdf3480) at SerializeSIL.cpp:402:7
-    //        frame #10: 0x00000001024fd50c swift-frontend`(anonymous namespace)::SILSerializer::writeSILBlock(this=0x000000016fdf3480, SILMod=0x00000001588d3600) at SerializeSIL.cpp:3296:5
-    //        frame #11: 0x00000001024fb04c swift-frontend`(anonymous namespace)::SILSerializer::writeSILModule(this=0x000000016fdf3480, SILMod=0x00000001588d3600) at SerializeSIL.cpp:3341:3
-    //        frame #12: 0x00000001024faf98 swift-frontend`swift::serialization::Serializer::writeSIL(this=0x000000016fdf3fd0, SILMod=0x00000001588d3600, serializeAllSIL=false) at SerializeSIL.cpp:3350:10
-    //        frame #13: 0x00000001023f02f4 swift-frontend`swift::serialization::Serializer::writeToStream(os=0x00000001386f2718, DC=swift::ModuleOrSourceFile @ 0x000000016fdf5a40, SILMod=0x00000001588d3600, options=0x000000016fdf60d8, DepGraph=0x0000000000000000) at Serialization.cpp:6912:7
-    //        frame #14: 0x00000001023f09d4 swift-frontend`swift::serialization::writeToStream(os=0x00000001386f2718, DC=swift::ModuleOrSourceFile @ 0x000000016fdf5aa0, M=0x00000001588d3600, options=0x000000016fdf60d8, DepGraph=0x0000000000000000) at Serialization.cpp:6978:3
-    //        frame #15: 0x0000000100ad4778 swift-frontend`swift::serialize(llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::SerializationOptions const&, swift::symbolgraphgen::SymbolGraphOptions const&, swift::SILModule const*, swift::fine_grained_dependencies::SourceFileDepGraph const*)::$_3::operator()(this=0x000000016fdf5f10, out=0x00000001386f2718) const at Serialization.cpp:151:9
-    //        frame #16: 0x0000000100ad46c8 swift-frontend`bool llvm::function_ref<bool (llvm::raw_pwrite_stream&)>::callback_fn<swift::serialize(llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::SerializationOptions const&, swift::symbolgraphgen::SymbolGraphOptions const&, swift::SILModule const*, swift::fine_grained_dependencies::SourceFileDepGraph const*)::$_3>(callable=6171877136, params=0x00000001386f2718) at STLFunctionalExtras.h:45:12
-    //        frame #17: 0x00000001000e2a38 swift-frontend`llvm::function_ref<bool (llvm::raw_pwrite_stream&)>::operator()(this=0x000000016fdf5d50, params=0x00000001386f2718) const at STLFunctionalExtras.h:68:12
-    //        frame #18: 0x00000001000e1bfc swift-frontend`swift::withOutputPath(diags=0x0000000159042250, Backend=0x00006000006389e0, outputPath=(Data = "/Users/ktoso/code/swift-project/build/Ninja-DebugAssert/swift-macosx-arm64/test-macosx-arm64/Distributed/Runtime/Output/distributed_actor_to_actor.swift.tmp/FakeDistributedActorSystems.swiftmodule", Length = 196), action=function_ref<bool (llvm::raw_pwrite_stream &)> @ 0x000000016fdf5d50) at FileSystem.h:43:17
-    //        frame #19: 0x0000000100ad3de4 swift-frontend`swift::serialize(DC=swift::ModuleOrSourceFile @ 0x000000016fdf5ff0, options=0x000000016fdf60d8, symbolGraphOptions=0x0000000159041398, M=0x00000001588d3600, DG=0x0000000000000000) at Serialization.cpp:146:19
-    //        frame #20: 0x00000001003817bc swift-frontend`performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33::operator()(this=0x00006000011111c8) const at FrontendTool.cpp:1834:7
-    //        frame #21: 0x0000000100381538 swift-frontend`decltype(std::declval<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33&>()()) std::__1::__invoke[abi:v160006]<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33&>(__f=0x00006000011111c8) at invoke.h:394:23
-    //        frame #22: 0x00000001003814f0 swift-frontend`void std::__1::__invoke_void_return_wrapper<void, true>::__call<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33&>(__args=0x00006000011111c8) at invoke.h:487:9
-    //        frame #23: 0x00000001003814cc swift-frontend`std::__1::__function::__alloc_func<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33, std::__1::allocator<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33>, void ()>::operator()[abi:v160006](this=0x00006000011111c8) at function.h:185:16
-    //        frame #24: 0x00000001003805a4 swift-frontend`std::__1::__function::__func<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33, std::__1::allocator<performCompileStepsPostSILGen(swift::CompilerInstance&, std::__1::unique_ptr<swift::SILModule, std::__1::default_delete<swift::SILModule>>, llvm::PointerUnion<swift::ModuleDecl*, swift::SourceFile*>, swift::PrimarySpecificPaths const&, int&, swift::FrontendObserver*)::$_33>, void ()>::operator()(this=0x00006000011111c0) at function.h:356:12
-    //        frame #25: 0x00000001004124d4 swift-frontend`std::__1::__function::__value_func<void ()>::operator()[abi:v160006](this=0x00000001588d3a00) const at function.h:510:16
-    //        frame #26: 0x0000000100412484 swift-frontend`std::__1::function<void ()>::operator()(this=0x00000001588d3a00) const at function.h:1156:12
-    //        frame #27: 0x0000000102684a78 swift-frontend`swift::SILModule::serialize(this=0x00000001588d3600) at SILModule.cpp:854:3
-    //        frame #28: 0x0000000101eefcc4 swift-frontend`SerializeSILPass::run(this=0x0000600000a7fcf0) at SerializeSILPass.cpp:533:7
-    //        frame #29: 0x0000000101c0a038 swift-frontend`swift::SILPassManager::runModulePass(this=0x000000016fdf67d8, TransIdx=0) at PassManager.cpp:883:8
-    //        frame #30: 0x0000000101c0d6a4 swift-frontend`swift::SILPassManager::execute(this=0x000000016fdf67d8) at PassManager.cpp:988:7
-    //        frame #31: 0x0000000101c06658 swift-frontend`swift::SILPassManager::executePassPipelinePlan(this=0x000000016fdf67d8, Plan=0x000000016fdf7460) at PassManager.cpp:953:5
-    //        frame #32: 0x0000000101c0644c swift-frontend`swift::ExecuteSILPipelineRequest::evaluate(this=0x000000016fdf73d8, evaluator=0x000000015901e878, desc=SILPipelineExecutionDescriptor @ 0x000000016fdf7210) const at PassManager.cpp:398:6
-    //        frame #33: 0x0000000101c77e48 swift-frontend`std::__1::tuple<> swift::SimpleRequest<swift::ExecuteSILPipelineRequest, std::__1::tuple<> (swift::SILPipelineExecutionDescriptor), (swift::RequestFlags)1>::callDerived<0ul>(this=0x000000016fdf73d8, evaluator=0x000000015901e878, (null)=std::__1::index_sequence<0UL> @ 0x000000016fdf724f) const at SimpleRequest.h:272:24
-    //        frame #34: 0x0000000101c77dac swift-frontend`swift::SimpleRequest<swift::ExecuteSILPipelineRequest, std::__1::tuple<> (swift::SILPipelineExecutionDescriptor), (swift::RequestFlags)1>::evaluateRequest(request=0x000000016fdf73d8, evaluator=0x000000015901e878) at SimpleRequest.h:295:20
-    //        frame #35: 0x0000000101c3c310 swift-frontend`swift::ExecuteSILPipelineRequest::OutputType swift::Evaluator::getResultUncached<swift::ExecuteSILPipelineRequest, swift::ExecuteSILPipelineRequest::OutputType swift::evaluateOrFatal<swift::ExecuteSILPipelineRequest>(swift::Evaluator&, swift::ExecuteSILPipelineRequest)::'lambda'()>(this=0x000000015901e878, request=0x000000016fdf73d8, defaultValueFn=(unnamed class) @ 0x000000016fdf7336) at Evaluator.h:322:19
-    //        frame #36: 0x0000000101c3c238 swift-frontend`swift::ExecuteSILPipelineRequest::OutputType swift::Evaluator::operator()<swift::ExecuteSILPipelineRequest, swift::ExecuteSILPipelineRequest::OutputType swift::evaluateOrFatal<swift::ExecuteSILPipelineRequest>(swift::Evaluator&, swift::ExecuteSILPipelineRequest)::'lambda'(), (void*)0>(this=0x000000015901e878, request=0x000000016fdf73d8, defaultValueFn=(unnamed class) @ 0x000000016fdf737f) at Evaluator.h:237:12
-    //        frame #37: 0x0000000101c0674c swift-frontend`swift::ExecuteSILPipelineRequest::OutputType swift::evaluateOrFatal<swift::ExecuteSILPipelineRequest>(eval=0x000000015901e878, req=ExecuteSILPipelineRequest @ 0x000000016fdf73d8) at Evaluator.h:423:10
-    //        frame #38: 0x0000000101c06720 swift-frontend`swift::executePassPipelinePlan(SM=0x00000001588d3600, plan=0x000000016fdf7460, isMandatory=true, IRMod=0x0000000000000000) at PassManager.cpp:408:9
-    //        frame #39: 0x0000000101c5c04c swift-frontend`swift::runSILPassesForOnone(Module=0x00000001588d3600) at Passes.cpp:152:3
-    //        frame #40: 0x0000000100a5ae3c swift-frontend`performSILOptimizations(Invocation=0x0000000159040800, SM=0x00000001588d3600) at Frontend.cpp:1723:5
-    //        frame #41: 0x0000000100a5ac68 swift-frontend`swift::CompilerInstance::performSILProcessing(this=0x0000000159040800, silModule=0x00000001588d3600) at Frontend.cpp:1765:3
-    //        frame #42: 0x0000000100377aec swift-frontend`performCompileStepsPostSILGen(Instance=0x0000000159040800, SM=swift::SILModule @ 0x00000001588d3600, MSF=swift::ModuleOrSourceFile @ 0x000000016fdf7940, PSPs=0x000000016fdf7fb8, ReturnValue=0x000000016fdf92fc, observer=0x0000000000000000) at FrontendTool.cpp:1843:16
-    //        frame #43: 0x000000010037726c swift-frontend`swift::performCompileStepsPostSema(Instance=0x0000000159040800, ReturnValue=0x000000016fdf92fc, observer=0x0000000000000000) at FrontendTool.cpp:886:12
-    //        frame #44: 0x00000001003a73f0 swift-frontend`performAction(swift::CompilerInstance&, int&, swift::FrontendObserver*)::$_29::operator()(this=0x000000016fdf8d20, Instance=0x0000000159040800) const at FrontendTool.cpp:1451:18
-    //        frame #45: 0x00000001003a7354 swift-frontend`bool llvm::function_ref<bool (swift::CompilerInstance&)>::callback_fn<performAction(swift::CompilerInstance&, int&, swift::FrontendObserver*)::$_29>(callable=6171888928, params=0x0000000159040800) at STLFunctionalExtras.h:45:12
-    //        frame #46: 0x00000001003a6704 swift-frontend`llvm::function_ref<bool (swift::CompilerInstance&)>::operator()(this=0x000000016fdf8c58, params=0x0000000159040800) const at STLFunctionalExtras.h:68:12
-    //        frame #47: 0x00000001003a55c4 swift-frontend`withSemanticAnalysis(Instance=0x0000000159040800, observer=0x0000000000000000, cont=function_ref<bool (swift::CompilerInstance &)> @ 0x000000016fdf8c58, runDespiteErrors=false) at FrontendTool.cpp:1311:10
-    //        frame #48: 0x00000001003a01cc swift-frontend`performAction(Instance=0x0000000159040800, ReturnValue=0x000000016fdf92fc, observer=0x0000000000000000) at FrontendTool.cpp:1447:12
-    //        frame #49: 0x0000000100379fac swift-frontend`performCompile(Instance=0x0000000159040800, ReturnValue=0x000000016fdf92fc, observer=0x0000000000000000) at FrontendTool.cpp:1522:19
-
-//    if (conformance->getKind() == ProtocolConformanceKind::Specialized) {
-//      if (auto specialized = dyn_cast<SpecializedProtocolConformance>(conformance)) {
-//        bool isConformanceOfProtocol =
-//            specialized->getDeclContext()->getSelfProtocolDecl() != nullptr;
-//        if (isConformanceOfProtocol) {
-//          fprintf(stderr, "[%s:%d](%s) SPECIALIZED\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//          fprintf(stderr, "[%s:%d](%s) SKIP IT? %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//                isConformanceOfProtocol);
-//          conformance->dump();
-//          if (auto p = specialized->getDeclContext()->getSelfProtocolDecl()) {
-//            fprintf(stderr, "[%s:%d](%s) proto = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//            p->dump();
-//          }
-//          return 99999999;
-//        }
-//      }
-//    }
-
     auto rawID = ConformancesToSerialize.addRef(conformance);
     return ((rawID << SerializedProtocolConformanceKind::Shift) |
             SerializedProtocolConformanceKind::Concrete);
@@ -1937,17 +1867,7 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
     if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
-      // TODO: would like to avoid writing the DA-A conformance but it never comes in here
-      //       - an idea here was to add some "is serializable" to the protocol conformance, but that doesn't matter it seems
-      //         since we never get to here anyway
-//      if (!normal->isConformanceOfProtocol()) {
-//        fprintf(stderr, "[%s:%d](%s) DONT SKIP\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        normal->dump();
         writeLocalNormalProtocolConformance(normal);
-//      } else {
-//        fprintf(stderr, "[%s:%d](%s) SKIP SERIALIZING\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        normal->dump();
-//      }
     } else {
       // A conformance in a different module file.
       unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceXrefLayout::Code];
@@ -2041,13 +1961,7 @@ Serializer::addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances) {
 
   SmallVector<ProtocolConformanceID, 4> results;
   for (auto conformance : conformances) {
-//    fprintf(stderr, "[%s:%d](%s) add conformance ref -----------\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    conformance.dump();
-//    fprintf(stderr, "[%s:%d](%s) add conformance ref -----------\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
-
     auto id = addConformanceRef(conformance);
-//    if (id != 99999999) // FIXME: horrible hack
       results.push_back(id);
   }
   return results;
@@ -2060,28 +1974,6 @@ Serializer::addConformanceRefs(ArrayRef<ProtocolConformance*> conformances) {
 
   SmallVector<ProtocolConformanceID, 4> results;
   for (auto conformance : conformances) {
-//    fprintf(stderr, "[%s:%d](%s) add conformance ref -----------\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    conformance->dump();
-//    fprintf(stderr, "[%s:%d](%s) add conformance ref -----------\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//
-//
-//    if (conformance->getKind() == ProtocolConformanceKind::Normal) {
-//      auto normal = cast<NormalProtocolConformance>(conformance);
-//      if (normal->isConformanceOfProtocol()) {
-//        normal->dump();
-//        fprintf(stderr, "[%s:%d](%s) SKIP DURING ADD SKIP SKIP SKIP SKIP SKIP SKIP SKIP SKIP\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        continue;
-//      }
-//    } else if (conformance->getKind() == ProtocolConformanceKind::Specialized) {
-//      fprintf(stderr, "[%s:%d](%s) SPECIALIZED\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      auto specialized = cast<SpecializedProtocolConformance>(conformance);
-//      specialized->dump();
-//      if (specialized->getDeclContext()->getSelfProtocolDecl() != nullptr) {
-//        fprintf(stderr, "[%s:%d](%s) SKIP DURING ADD SKIP SKIP SKIP SKIP SKIP SKIP SKIP SKIP\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//        continue;
-//      }
-//    }
-
     results.push_back(addConformanceRef(conformance));
   }
   return results;
@@ -3458,7 +3350,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       
       RawLayoutDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-        typeID, rawSize, rawAlign);
+        typeID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
     }
     }
   }
@@ -3534,17 +3426,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                          SmallVectorImpl<TypeID> &data) {
     size_t count = 0;
     for (auto conformance : declContext->getLocalConformances(lookupKind)) {
-//      fprintf(stderr, "[%s:%d](%s) ADD CONFOMANCE CHECK IF SKIP\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      conformance->dump();
-
-//      if (conformance->getKind() == ProtocolConformanceKind::Normal) {
-//        auto normal = cast<NormalProtocolConformance>(conformance);
-//        if (normal->isConformanceOfProtocol()) {
-//          fprintf(stderr, "[%s:%d](%s) SKIP IP SKIP IP SKIP IP SKIP IP SKIP IP !!!!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//          continue;
-//        }
-//      }
-
       if (S.shouldSkipDecl(conformance->getProtocol()))
         continue;
 

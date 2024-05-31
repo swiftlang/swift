@@ -7019,10 +7019,10 @@ public:
         auto genericSig = FTy->getInvocationGenericSignature();
         auto &ctx = F.getASTContext();
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
-        auto *anyActorProtocol = ctx.getProtocol(KnownProtocolKind::AnyActor);
+        auto *distributedProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
         require(argType->isAnyActorType() ||
-                    genericSig->requiresProtocol(argType, actorProtocol) ||
-                    genericSig->requiresProtocol(argType, anyActorProtocol),
+                genericSig->requiresProtocol(argType, actorProtocol) ||
+                genericSig->requiresProtocol(argType, distributedProtocol),
                 "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;

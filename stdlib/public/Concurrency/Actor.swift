@@ -26,16 +26,17 @@ import Swift
 /// While both local and distributed actors are conceptually "actors", there are
 /// some important isolation model differences between the two, which make it
 /// impossible for one to refine the other.
-@_marker
 @available(SwiftStdlib 5.1, *)
-public protocol AnyActor: AnyObject, Sendable {}
+@available(*, deprecated, message: "Use 'any Actor' with 'DistributedActor.asLocalActor' instead")
+@available(swift, obsoleted: 6.0, message: "Use 'any Actor' with 'DistributedActor.asLocalActor' instead")
+public typealias AnyActor = AnyObject & Sendable
 
 /// Common protocol to which all actors conform.
 ///
 /// The `Actor` protocol generalizes over all `actor` types. Actor types
 /// implicitly conform to this protocol.
 @available(SwiftStdlib 5.1, *)
-public protocol Actor: AnyActor {
+public protocol Actor: AnyObject, Sendable {
 
   /// Retrieve the executor for this actor as an optimized, unowned
   /// reference.
