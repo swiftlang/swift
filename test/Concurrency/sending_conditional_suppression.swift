@@ -153,6 +153,40 @@ public struct TestInStruct {
   // CHECK-NEXT: #endif
   @usableFromInline
   func testUsableFromInlineFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: public var publicVarFieldFunctionArg: (sending test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: public var publicVarFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #endif
+  public var publicVarFieldFunctionArg: (sending NonSendableKlass) -> ()
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal var internalVarFieldFunctionArg: (sending test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal var internalVarFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  var internalVarFieldFunctionArg: (sending NonSendableKlass) -> ()
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: public let publicLetFieldFunctionArg: (sending test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: public let publicLetFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #endif
+  public let publicLetFieldFunctionArg: (sending NonSendableKlass) -> ()
+
+  // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal let internalLetFieldFunctionArg: (sending test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal let internalLetFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: #endif
+  @usableFromInline
+  let internalLetFieldFunctionArg: (sending NonSendableKlass) -> ()
 }
 
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
