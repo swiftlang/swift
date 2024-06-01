@@ -2082,6 +2082,10 @@ namespace {
     llvm::function_ref<Type(Expr *)> getType;
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation;
+    /// Whether to check if the closure captures an `isolated` parameter.
+    /// This is needed as a workaround during code completion, which doesn't
+    /// have types applied to the AST and thus doesn't have captures computed.
+    bool checkIsolatedCapture;
 
     SourceLoc requiredIsolationLoc;
 
@@ -2578,9 +2582,11 @@ namespace {
         const DeclContext *dc,
         llvm::function_ref<Type(Expr *)> getType = __Expr_getType,
         llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
-            getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation)
+            getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation,
+        bool checkIsolatedCapture = true)
         : ctx(dc->getASTContext()), getType(getType),
-          getClosureActorIsolation(getClosureActorIsolation) {
+          getClosureActorIsolation(getClosureActorIsolation),
+          checkIsolatedCapture(checkIsolatedCapture) {
       contextStack.push_back(dc);
     }
 
@@ -4193,9 +4199,16 @@ namespace {
       }
 
       case ActorIsolation::ActorInstance: {
-        if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
-          return ActorIsolation::forActorInstanceCapture(param)
-            .withPreconcurrency(preconcurrency);
+        if (checkIsolatedCapture) {
+          if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
+            return ActorIsolation::forActorInstanceCapture(param)
+                .withPreconcurrency(preconcurrency);
+        } else {
+          // If we don't have capture information during code completion, assume
+          // that the closure captures the `isolated` parameter from the parent
+          // context.
+          return parentIsolation;
+        }
 
         return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
@@ -4325,7 +4338,8 @@ ActorIsolation swift::determineClosureActorIsolation(
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
   ActorIsolationChecker checker(closure->getParent(), getType,
-                                getClosureActorIsolation);
+                                getClosureActorIsolation,
+                                /*checkIsolatedCapture=*/false);
   return checker.determineClosureIsolation(closure);
 }
 
