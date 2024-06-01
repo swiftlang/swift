@@ -82,3 +82,25 @@ extension SendingProtocol {
   // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingResult() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(method) <Self where Self : SendingProtocol> (@in_guaranteed Self) -> @sil_sending @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
   func sendingArgWithFunctionSendingResult() -> sending (sending NonSendableKlass) -> () { fatalError() }
 }
+
+// Make sure we only do not mangle in __shared if we are borrowed by default and
+// have sending.
+//
+// CHECK: sil hidden [ossa] @sending_mangling.sendingArgWithShared(sending_mangling.NonSendableKlass) -> () : $@convention(thin) (@sil_sending @guaranteed NonSendableKlass) -> () {
+func sendingArgWithShared(_ x: __shared sending NonSendableKlass) {}
+
+// CHECK: sil hidden [ossa] @sending_mangling.argWithShared(__shared sending_mangling.NonSendableKlass) -> () : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
+func argWithShared(_ x: __shared NonSendableKlass) {}
+
+struct ConstructorSharedTest {
+  // Inits take their value at +1, so we need to mangle in shared even if we do
+  // not mangle in sending itself.
+  //
+  // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.init(__shared sending_mangling.NonSendableKlass) -> sending_mangling.ConstructorSharedTest : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, @thin ConstructorSharedTest.Type) -> ConstructorSharedTest {
+  init(_ x: __shared sending NonSendableKlass) {}
+
+  // This is a func which takes its parameter at +0 so we should suppress both.
+  //
+  // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.functionSupressed(sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, ConstructorSharedTest) -> () {
+  func functionSupressed(_ x: __shared sending NonSendableKlass) {}
+}

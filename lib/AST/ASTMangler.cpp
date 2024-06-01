@@ -3147,6 +3147,8 @@ static ParameterTypeFlags
 getParameterFlagsForMangling(ParameterTypeFlags flags,
                              ParamSpecifier defaultSpecifier,
                              bool isInRecursion = true) {
+  bool initiallySending = flags.isSending();
+
   // If we have been recursed into, then remove sending from our flags.
   if (!isInRecursion) {
     flags = flags.withSending(false);
@@ -3158,12 +3160,10 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
   case ParamSpecifier::Default:
   // If the legacy `__shared` or `__owned` modifier was provided, mangle as-is,
   // because we need to maintain compatibility with their existing behavior.
-  case ParamSpecifier::LegacyShared:
   case ParamSpecifier::LegacyOwned:
   // `inout` should already be specified in the flags.
   case ParamSpecifier::InOut:
     return flags;
-
   case ParamSpecifier::ImplicitlyCopyableConsuming:
   case ParamSpecifier::Consuming:
   case ParamSpecifier::Borrowing:
@@ -3171,6 +3171,16 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
     if (specifier == defaultSpecifier) {
       flags = flags.withOwnershipSpecifier(ParamSpecifier::Default);
     }
+    return flags;
+  case ParamSpecifier::LegacyShared:
+    // If we were originally sending and by default we are borrowing, suppress
+    // this and set ownership specifier to default so we do not mangle in
+    // __shared.
+    //
+    // This is a work around in the short term since shared borrow is not
+    // supported.
+    if (initiallySending && ParamSpecifier::Borrowing == defaultSpecifier)
+      return flags.withOwnershipSpecifier(ParamSpecifier::Default);
     return flags;
   }
 }
