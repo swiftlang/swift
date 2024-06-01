@@ -608,9 +608,8 @@ func test_that_expansions_are_bound_early() {
 do {
   func test<T>(x: T) {}
 
-  // rdar://110711746 to make this valid
   func caller1<each T>(x: repeat each T) {
-    _ = (repeat { test(x: each x) }()) // expected-error {{pack reference 'each T' can only appear in pack expansion}}
+    _ = (repeat { test(x: each x) }())
   }
 
   func caller2<each T>(x: repeat each T) {
@@ -739,4 +738,33 @@ do {
     // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
     // expected-warning@-2 {{immutable value 'y' was never used; consider replacing with '_' or removing it}}
   }
+}
+
+// Closures wrapped in a pack expansion
+do {
+  func takesClosure<T>(_ fn: () -> T) -> T { return fn() }
+
+  func testClosure<each T>(_ t: repeat each T) -> (repeat each T) {
+    (repeat takesClosure { each t }) // Ok
+  }
+
+  func testMultiStmtClosure<each T>(_ t: repeat each T) -> (repeat each T) {
+     (repeat takesClosure {
+       let v = each t
+       return v
+    }) // Ok
+  }
+
+  func takesAutoclosure<T>(_ fn: @autoclosure () -> T) -> T { return fn() }
+
+  func f2<each T>(_ t: repeat each T) -> (repeat each T) {
+    (repeat takesAutoclosure(each t)) // Ok
+  }
+}
+
+// Crash-on-invalid - rdar://110711746
+func butt<T>(x: T) {}
+
+func rump<each T>(x: repeat each T) {
+  let x = (repeat { butt(each x) }()) // expected-error {{missing argument label 'x:' in call}}
 }
