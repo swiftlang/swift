@@ -2633,6 +2633,12 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
       isFirst = false;
       if (!P.consumeIf(tok::comma))
         break;
+
+      if (P.Tok.is(tok::kw_case)) {
+        P.diagnose(P.Tok, diag::extra_case_keyword)
+          .fixItRemove(SourceRange(P.Tok.getLoc()));
+        P.consumeToken(tok::kw_case);
+      }
     }
   }
 
