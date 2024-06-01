@@ -1260,9 +1260,16 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     auto propertyTy = property->getInterfaceType();
     auto parentPropertyTy = getSuperMemberDeclType(baseDecl);
 
+    // If @preconcurrency, strip concurrency from decl before matching
+    if (baseDecl->preconcurrency() && !baseDecl->isObjC()){
+        attempt = OverrideCheckingAttempt::MismatchedSendability;
+        propertyTy = propertyTy->stripConcurrency(true, true);
+        parentPropertyTy = parentPropertyTy->stripConcurrency(true, true);
+    }
     CanType parentPropertyCanTy =
       parentPropertyTy->getReducedType(
         decl->getInnermostDeclContext()->getGenericSignatureOfContext());
+
     if (!propertyTy->matches(parentPropertyCanTy,
                              TypeMatchFlags::AllowOverride)) {
       diags.diagnose(property, diag::override_property_type_mismatch,
@@ -1282,6 +1289,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
     // The overridden property must not be mutable.
     if (cast<AbstractStorageDecl>(baseDecl)->supportsMutation() &&
+        attempt != OverrideCheckingAttempt::MismatchedSendability &&
         !IsSilentDifference) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
