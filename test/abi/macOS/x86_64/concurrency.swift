@@ -284,7 +284,6 @@ Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixy
 // async function pointer to Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: () async throws(B) -> A) async throws(B) -> A
 Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEtYaq_YKs5ErrorR_r0_lFTu
 
-// === Add #isolation to next() and waitForAll() in task groups
 // Swift.TaskGroup.awaitAllRemainingTasks(isolation: isolated Swift.Actor?) async -> ()
 Added: _$sScG22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaF
 Added: _$sScG22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaFTu
@@ -297,10 +296,6 @@ Added: _$sScg4next9isolationxSgScA_pSgYi_tYaKFTu
 // Swift.ThrowingTaskGroup.awaitAllRemainingTasks(isolation: isolated Swift.Actor?) async -> ()
 Added: _$sScg22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaF
 Added: _$sScg22awaitAllRemainingTasks9isolationyScA_pSgYi_tYaFTu
-
-// next() default implementation in terms of next(isolation:)
-Added: _$sScIsE4next7ElementQzSgyYa7FailureQzYKF
-Added: _$sScIsE4next7ElementQzSgyYa7FailureQzYKFTu
 
 // === SerialExecutor.checkIsolated()
 Added: _swift_task_checkIsolated

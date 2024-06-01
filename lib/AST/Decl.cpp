@@ -3091,36 +3091,6 @@ bool AbstractStorageDecl::isSetterMutating() const {
     IsSetterMutatingRequest{const_cast<AbstractStorageDecl *>(this)}, {});
 }
 
-StorageMutability 
-AbstractStorageDecl::mutability(const DeclContext *useDC,
-                                std::optional<const DeclRefExpr *> base ) const {
-  if (auto vd = dyn_cast<VarDecl>(this))
-    return vd->mutability(useDC, base);
-
-  auto sd = cast<SubscriptDecl>(this);
-  return sd->supportsMutation() ? StorageMutability::Mutable
-                                : StorageMutability::Immutable;
-}
-
-/// Determine the mutability of this storage declaration when
-/// accessed from a given declaration context in Swift.
-///
-/// This method differs only from 'mutability()' in its handling of
-/// 'optional' storage requirements, which lack support for direct
-/// writes in Swift.
-StorageMutability
-AbstractStorageDecl::mutabilityInSwift(
-    const DeclContext *useDC,
-    std::optional<const DeclRefExpr *> base
-) const {
-  // TODO: Writing to an optional storage requirement is not supported in Swift.
-  if (getAttrs().hasAttribute<OptionalAttr>()) {
-    return StorageMutability::Immutable;
-  }
-
-  return mutability(useDC, base);
-}
-
 OpaqueReadOwnership AbstractStorageDecl::getOpaqueReadOwnership() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -7291,42 +7261,32 @@ Type VarDecl::getTypeInContext() const {
   return getDeclContext()->mapTypeIntoContext(getInterfaceType());
 }
 
-/// Translate an "is mutable" bit into a StorageMutability value.
-static StorageMutability storageIsMutable(bool isMutable) {
-  return isMutable ? StorageMutability::Mutable
-                   : StorageMutability::Immutable;
-}
-
 /// Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
-StorageMutability
-VarDecl::mutability(const DeclContext *UseDC,
-                    std::optional<const DeclRefExpr *> base) const {
+bool VarDecl::isSettable(const DeclContext *UseDC,
+                         const DeclRefExpr *base) const {
   // Parameters are settable or not depending on their ownership convention.
   if (auto *PD = dyn_cast<ParamDecl>(this))
-    return storageIsMutable(!PD->isImmutableInFunctionBody());
+    return !PD->isImmutableInFunctionBody();
 
   // If this is a 'var' decl, then we're settable if we have storage or a
   // setter.
   if (!isLet()) {
     if (hasInitAccessor()) {
       if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
-        // If we're referencing 'self.', it's initializable.
-        if (!base ||
-            (*base && ctor->getImplicitSelfDecl() == (*base)->getDecl()))
-          return StorageMutability::Initializable;
-
-        return storageIsMutable(supportsMutation());
+        if (base && ctor->getImplicitSelfDecl() != base->getDecl())
+          return supportsMutation();
+        return true;
       }
     }
 
-    return storageIsMutable(supportsMutation());
+    return supportsMutation();
   }
 
   // Static 'let's are always immutable.
   if (isStatic()) {
-    return StorageMutability::Immutable;
+    return false;
   }
 
   //
@@ -7336,11 +7296,11 @@ VarDecl::mutability(const DeclContext *UseDC,
 
   // Debugger expression 'let's are initialized through a side-channel.
   if (isDebuggerVar())
-    return StorageMutability::Immutable;
+    return false;
 
   // 'let's are only ever settable from a specific DeclContext.
   if (UseDC == nullptr)
-    return StorageMutability::Immutable;
+    return false;
 
   // 'let' properties in structs/classes are only ever settable in their
   // designated initializer(s) or by init accessors.
@@ -7352,65 +7312,61 @@ VarDecl::mutability(const DeclContext *UseDC,
       // Check whether this property is part of `initializes` list,
       // and allow assignment/mutation if so. DI would be responsible
       // for checking for re-assignment.
-      if (accessor->isInitAccessor() &&
+      return accessor->isInitAccessor() &&
              llvm::is_contained(accessor->getInitializedProperties(),
-                                const_cast<VarDecl *>(this)))
-        return StorageMutability::Initializable;
-
-      return StorageMutability::Immutable;
+                                const_cast<VarDecl *>(this));
     }
 
     auto *CD = dyn_cast<ConstructorDecl>(UseDC);
-    if (!CD) return StorageMutability::Immutable;
-
+    if (!CD) return false;
+    
     auto *CDC = CD->getDeclContext();
 
     // 'let' properties are not valid inside protocols.
     if (CDC->getExtendedProtocolDecl())
-      return StorageMutability::Immutable;
+      return false;
 
     // If this init is defined inside of the same type (or in an extension
     // thereof) as the let property, then it is mutable.
     if (CDC->getSelfNominalTypeDecl() !=
         getDeclContext()->getSelfNominalTypeDecl())
-      return StorageMutability::Immutable;
+      return false;
+
+    if (base && CD->getImplicitSelfDecl() != base->getDecl())
+      return false;
 
     // If this is a convenience initializer (i.e. one that calls
     // self.init), then let properties are never mutable in it.  They are
     // only mutable in designated initializers.
     auto initKindAndExpr = CD->getDelegatingOrChainedInitKind();
     if (initKindAndExpr.initKind == BodyInitKind::Delegating)
-      return StorageMutability::Immutable;
+      return false;
 
-    // If we were given a base and it is 'self', it's initializable.
-    if (!base || (*base && CD->getImplicitSelfDecl() == (*base)->getDecl()))
-      return StorageMutability::Initializable;
-
-    return StorageMutability::Immutable;
+    return true;
   }
 
   // If the 'let' has a value bound to it but has no PBD, then it is
   // already initializedand not settable.
   if (getParentPatternBinding() == nullptr)
-    return StorageMutability::Immutable;
+    return false;
 
   // If the 'let' has an explicitly written initializer with a pattern binding,
   // then it isn't settable.
   if (isParentInitialized())
-    return StorageMutability::Immutable;
+    return false;
 
   // Normal lets (e.g. globals) are only mutable in the context of the
   // declaration.  To handle top-level code properly, we look through
   // the TopLevelCode decl on the use (if present) since the vardecl may be
   // one level up.
   if (getDeclContext() == UseDC)
-    return StorageMutability::Initializable;
+    return true;
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
       getDeclContext() == UseDC->getParent())
-    return StorageMutability::Initializable;
+    return true;
 
-  return StorageMutability::Immutable;
+  return false;
 }
 
 bool VarDecl::isLazilyInitializedGlobal() const {

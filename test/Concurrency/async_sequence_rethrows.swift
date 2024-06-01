@@ -75,13 +75,3 @@ enum MyError: Error {
 func getASequence() -> any AsyncSequence<Data, MyError> {
     return ErrorSequence<Data, _>(throwError: MyError.foo) // ERROR: Cannot convert return expression of type 'any Error' to return type 'MyError'
 }
-
-// Test the default implementation of next() in terms of next(isolation:).
-struct AsyncIteratorWithOnlyNextIsolation: AsyncIteratorProtocol {
-  public mutating func next(isolation: (any Actor)?) throws(MyError) -> Int? { 0 }
-}
-
-// Test the default implementation of next(isolation:) in terms of next().
-struct AsyncIteratorWithOnlyNext: AsyncIteratorProtocol {
-  public mutating func next() throws(MyError) -> Int? { 0 }
-}
