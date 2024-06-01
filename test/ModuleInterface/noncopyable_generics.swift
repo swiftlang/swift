@@ -250,7 +250,11 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: public enum Maybe<Value> : ~Swift.Copyable where Value : ~Copyable {
+// CHECK-NEXT: extension Swiftskell.Pair : Swift.Copyable {
+// CHECK: #endif
+
+// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-NEXT: public enum Maybe<Wrapped> : ~Swift.Copyable where Wrapped : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
@@ -258,11 +262,11 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show where Value : Swiftskell.Show, Value : ~Copyable {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show where Wrapped : Swiftskell.Show, Wrapped : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Value : Swiftskell.Eq, Value : ~Copyable {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Wrapped : Swiftskell.Eq, Wrapped : ~Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
