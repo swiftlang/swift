@@ -446,7 +446,8 @@ protected:
                                      GenericSignature sig,
                                      ModuleDecl *fromModule);
   void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig,
-                              const ValueDecl *forDecl = nullptr);
+                              const ValueDecl *forDecl = nullptr,
+                              bool isInRecursion = true);
   void appendOpaqueTypeArchetype(ArchetypeType *archetype,
                                  OpaqueTypeDecl *opaqueDecl,
                                  SubstitutionMap subs,
@@ -522,25 +523,29 @@ protected:
     FunctionMangling,
   };
 
-  void appendFunction(AnyFunctionType *fn, GenericSignature sig,
-                    FunctionManglingKind functionMangling = NoFunctionMangling,
-                    const ValueDecl *forDecl = nullptr);
+  void
+  appendFunction(AnyFunctionType *fn, GenericSignature sig,
+                 FunctionManglingKind functionMangling = NoFunctionMangling,
+                 const ValueDecl *forDecl = nullptr,
+                 bool isRecursedInto = true);
   void appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
                           bool isAutoClosure = false,
-                          const ValueDecl *forDecl = nullptr);
+                          const ValueDecl *forDecl = nullptr,
+                          bool isRecursedInto = true);
   void appendClangType(AnyFunctionType *fn);
   template <typename FnType>
   void appendClangType(FnType *fn, llvm::raw_svector_ostream &os);
 
-  void appendFunctionSignature(AnyFunctionType *fn,
-                               GenericSignature sig,
+  void appendFunctionSignature(AnyFunctionType *fn, GenericSignature sig,
                                const ValueDecl *forDecl,
-                               FunctionManglingKind functionMangling);
+                               FunctionManglingKind functionMangling,
+                               bool isRecursedInto = true);
 
   void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
                                LifetimeDependenceInfo lifetimeDependenceInfo,
                                GenericSignature sig,
-                               const ValueDecl *forDecl = nullptr);
+                               const ValueDecl *forDecl = nullptr,
+                               bool isRecursedInto = true);
   void appendFunctionResultType(Type resultType,
                                 GenericSignature sig,
                                 const ValueDecl *forDecl = nullptr);
