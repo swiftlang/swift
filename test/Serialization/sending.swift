@@ -49,9 +49,8 @@ func main() {
   }
 }
 
-
-// CHECK: sil @$s17transferring_test0B12TransferringyS2SnYuYTF : $@convention(thin) (@sil_sending @owned String) -> @sil_sending @owned String
-// CHECK: sil @$s17transferring_test0B7SendingyS2SnYuYTF : $@convention(thin) (@sil_sending @owned String) -> @sil_sending @owned String
+// CHECK: sil @$s17transferring_test0B12TransferringyS2SnF : $@convention(thin) (@sil_sending @owned String) -> @sil_sending @owned String
+// CHECK: sil @$s17transferring_test0B7SendingyS2SnF : $@convention(thin) (@sil_sending @owned String) -> @sil_sending @owned String
 // CHECK: sil @$s17transferring_test0B16TransferringFuncyyySSnYuXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@sil_sending @owned String) -> ()) -> ()
 // CHECK: sil @$s17transferring_test0B11SendingFuncyyySSnYuXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@sil_sending @owned String) -> ()) -> ()
 // CHECK: sil @$s17transferring_test0B22TransferringResultFuncyySSyYTXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @sil_sending @owned String) -> ()
