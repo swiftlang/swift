@@ -2039,7 +2039,8 @@ getResultDifferentiability(SILResultInfo::Options options) {
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
                                         GenericSignature outerGenericSig,
-                                        const ValueDecl *forDecl) {
+                                        const ValueDecl *forDecl,
+                                        bool isInRecursion) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
@@ -2164,7 +2165,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   }
 
   // Mangle if we have a transferring result.
-  if (fn->hasSendingResult())
+  if (isInRecursion && fn->hasSendingResult())
     OpArgs.push_back('T');
 
   // Mangle the results.
@@ -2947,7 +2948,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
 
 void ASTMangler::appendFunction(AnyFunctionType *fn, GenericSignature sig,
                                 FunctionManglingKind functionMangling,
-                                const ValueDecl *forDecl) {
+                                const ValueDecl *forDecl, bool isRecursedInto) {
   // Append parameter labels right before the signature/type.
   auto parameters = fn->getParams();
   auto firstLabel = std::find_if(
@@ -2967,15 +2968,16 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, GenericSignature sig,
   }
 
   if (functionMangling != NoFunctionMangling) {
-    appendFunctionSignature(fn, sig, forDecl, functionMangling);
+    appendFunctionSignature(fn, sig, forDecl, functionMangling, isRecursedInto);
   } else {
-    appendFunctionType(fn, sig, /*autoclosure*/ false, forDecl);
+    appendFunctionType(fn, sig, /*autoclosure*/ false, forDecl, isRecursedInto);
   }
 }
 
 void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
                                     bool isAutoClosure,
-                                    const ValueDecl *forDecl) {
+                                    const ValueDecl *forDecl,
+                                    bool isRecursedInto) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
@@ -3047,10 +3049,11 @@ void ASTMangler::appendClangType(AnyFunctionType *fn) {
 void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                                          GenericSignature sig,
                                          const ValueDecl *forDecl,
-                                         FunctionManglingKind functionMangling) {
+                                         FunctionManglingKind functionMangling,
+                                         bool isRecursedInto) {
   appendFunctionResultType(fn->getResult(), sig, forDecl);
   appendFunctionInputType(fn->getParams(), fn->getLifetimeDependenceInfo(), sig,
-                          forDecl);
+                          forDecl, isRecursedInto);
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3096,7 +3099,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     break;
   }
 
-  if (fn->hasSendingResult()) {
+  if (isRecursedInto && fn->hasSendingResult()) {
     appendOperator("YT");
   }
 
@@ -3142,7 +3145,13 @@ getDefaultOwnership(const ValueDecl *forDecl) {
 
 static ParameterTypeFlags
 getParameterFlagsForMangling(ParameterTypeFlags flags,
-                             ParamSpecifier defaultSpecifier) {
+                             ParamSpecifier defaultSpecifier,
+                             bool isInRecursion = true) {
+  // If we have been recursed into, then remove sending from our flags.
+  if (!isInRecursion) {
+    flags = flags.withSending(false);
+  }
+
   switch (auto specifier = flags.getOwnershipSpecifier()) {
   // If no parameter specifier was provided, mangle as-is, because we are by
   // definition using the default convention.
@@ -3169,7 +3178,7 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
 void ASTMangler::appendFunctionInputType(
     ArrayRef<AnyFunctionType::Param> params,
     LifetimeDependenceInfo lifetimeDependenceInfo, GenericSignature sig,
-    const ValueDecl *forDecl) {
+    const ValueDecl *forDecl, bool isRecursedInto) {
   auto defaultSpecifier = getDefaultOwnership(forDecl);
   
   switch (params.size()) {
@@ -3192,7 +3201,7 @@ void ASTMangler::appendFunctionInputType(
       appendParameterTypeListElement(
           Identifier(), type,
           getParameterFlagsForMangling(param.getParameterFlags(),
-                                       defaultSpecifier),
+                                       defaultSpecifier, isRecursedInto),
           lifetimeDependenceInfo.getLifetimeDependenceOnParam(/*paramIndex*/ 0),
           sig, nullptr);
       break;
@@ -3214,7 +3223,7 @@ void ASTMangler::appendFunctionInputType(
       appendParameterTypeListElement(
           Identifier(), param.getPlainType(),
           getParameterFlagsForMangling(param.getParameterFlags(),
-                                       defaultSpecifier),
+                                       defaultSpecifier, isRecursedInto),
           lifetimeDependenceInfo.getLifetimeDependenceOnParam(paramIndex), sig,
           nullptr);
       appendListSeparator(isFirstParam);
@@ -3878,7 +3887,8 @@ void ASTMangler::appendDeclType(const ValueDecl *decl,
               : decl->getDeclContext()->getGenericSignatureOfContext());
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    appendFunction(FuncTy, sig, functionMangling, decl);
+    appendFunction(FuncTy, sig, functionMangling, decl,
+                   false /*is recursed into*/);
   } else {
     appendType(type, sig, decl);
   }
