@@ -3797,10 +3797,12 @@ namespace {
 
 class ObjCSelectorFamilyConventions : public Conventions {
   ObjCSelectorFamily Family;
+  bool pseudogeneric;
 
 public:
-  ObjCSelectorFamilyConventions(ObjCSelectorFamily family)
-    : Conventions(ConventionsKind::ObjCSelectorFamily), Family(family) {}
+  ObjCSelectorFamilyConventions(ObjCSelectorFamily family, bool pseudogeneric)
+      : Conventions(ConventionsKind::ObjCSelectorFamily), Family(family),
+        pseudogeneric(pseudogeneric) {}
 
   ParameterConvention getIndirectParameter(unsigned index,
                                            const AbstractionPattern &type,
@@ -3840,8 +3842,9 @@ public:
     // Get the underlying AST type, potentially stripping off one level of
     // optionality while we do it.
     CanType type = tl.getLoweredType().unwrapOptionalType().getASTType();
-    if (type->hasRetainablePointerRepresentation()
-        || (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()))
+    if (type->hasRetainablePointerRepresentation() ||
+        (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()) ||
+        (isa<GenericTypeParamType>(type) && pseudogeneric))
       return ResultConvention::Autoreleased;
 
     return ResultConvention::Unowned;
@@ -3871,10 +3874,14 @@ static CanSILFunctionType getSILFunctionTypeForObjCSelectorFamily(
     TypeConverter &TC, ObjCSelectorFamily family, CanAnyFunctionType origType,
     CanAnyFunctionType substInterfaceType, SILExtInfoBuilder extInfoBuilder,
     const ForeignInfo &foreignInfo, std::optional<SILDeclRef> constant) {
+  CanGenericSignature genericSig = substInterfaceType.getOptGenericSignature();
+  bool pseudogeneric =
+      genericSig && constant ? isPseudogeneric(*constant) : false;
   return getSILFunctionType(
       TC, TypeExpansionContext::minimal(), AbstractionPattern(origType),
-      substInterfaceType, extInfoBuilder, ObjCSelectorFamilyConventions(family),
-      foreignInfo, constant, constant,
+      substInterfaceType, extInfoBuilder,
+      ObjCSelectorFamilyConventions(family, pseudogeneric), foreignInfo,
+      constant, constant,
       /*requirement subs*/ std::nullopt, ProtocolConformanceRef());
 }
 
