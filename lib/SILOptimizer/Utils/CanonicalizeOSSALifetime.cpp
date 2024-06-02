@@ -1257,7 +1257,7 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
       auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
       DominanceInfo *domTree = dominanceAnalysis->get(&function);
       auto *calleeAnalysis = test.template getAnalysis<BasicCalleeAnalysis>();
-      auto pruneDebug = arguments.takeBool();
+      auto pruneDebug = PruneDebugInsts_t(arguments.takeBool());
       auto maximizeLifetimes = arguments.takeBool();
       auto respectAccessScopes = arguments.takeBool();
       InstructionDeleter deleter;

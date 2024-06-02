@@ -425,7 +425,7 @@ namespace {
 
 class CopyPropagation : public SILFunctionTransform {
   /// If true, debug_value instructions should be pruned.
-  bool pruneDebug;
+  PruneDebugInsts_t pruneDebug;
   /// If true, all values will be canonicalized.
   bool canonicalizeAll;
   /// If true, then borrow scopes will be canonicalized, allowing copies of
@@ -433,7 +433,7 @@ class CopyPropagation : public SILFunctionTransform {
   bool canonicalizeBorrows;
 
 public:
-  CopyPropagation(bool pruneDebug, bool canonicalizeAll,
+  CopyPropagation(PruneDebugInsts_t pruneDebug, bool canonicalizeAll,
                   bool canonicalizeBorrows)
       : pruneDebug(pruneDebug), canonicalizeAll(canonicalizeAll),
         canonicalizeBorrows(canonicalizeBorrows) {}
@@ -645,11 +645,11 @@ void CopyPropagation::run() {
 // MandatoryCopyPropagation is not currently enabled in the -Onone pipeline
 // because it may negatively affect the debugging experience.
 SILTransform *swift::createMandatoryCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
+  return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ false);
 }
 
 SILTransform *swift::createCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
+  return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ EnableRewriteBorrows);
 }
