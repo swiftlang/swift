@@ -701,8 +701,11 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       auto *fnExpr = applyExpr->getFn();
 
       // Handle special cases for applies of non-function types.
-      if (auto *loc = getSpecialFnCalleeLoc(getType(fnExpr)))
-        return loc;
+      if (hasType(fnExpr)) {
+        if (auto *loc = getSpecialFnCalleeLoc(getType(fnExpr))) {
+          return loc;
+        }
+      }
 
       // Otherwise fall through and look for locators anchored on the function
       // expr. For CallExprs, this can look through things like parens and
