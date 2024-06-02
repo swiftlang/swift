@@ -1654,7 +1654,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   // a case want to thunk and not emit an error. So in such a case, we always
   // make this builtin take a sending result.
   bool hasSendingResult =
-      ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults);
+      ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
 
   // operation async function pointer: () async throws -> transferring T
   auto extInfo = ASTExtInfoBuilder()

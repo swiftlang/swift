@@ -197,6 +197,8 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferre
 SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
 LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
 LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
+LANGUAGE_FEATURE(TransferringArgsAndResults, 430, "Transferring args and results")
+SUPPRESSIBLE_LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and results")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -215,8 +217,6 @@ UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 UPCOMING_FEATURE(BorrowingSwitch, 432, 6)
-UPCOMING_FEATURE(TransferringArgsAndResults, 430, 6)
-SUPPRESSIBLE_UPCOMING_FEATURE(SendingArgsAndResults, 430, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)

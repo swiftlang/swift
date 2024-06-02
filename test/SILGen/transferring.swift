@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults -strict-concurrency=complete %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -disable-availability-checking -strict-concurrency=complete %s | %FileCheck %s
 
 class NonSendable {}
 
