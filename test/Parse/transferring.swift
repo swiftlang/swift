@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -strict-concurrency=complete
 
 // REQUIRES: asserts
 

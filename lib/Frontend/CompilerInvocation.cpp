@@ -1112,34 +1112,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
-  // Enable TransferringArgsAndResults/SendingArgsAndResults whenever
-  // RegionIsolation is enabled.
-  if (Opts.hasFeature(Feature::RegionBasedIsolation)) {
-    bool enableTransferringArgsAndResults = true;
-    bool enableSendingArgsAndResults = true;
-#ifndef NDEBUG
-    enableTransferringArgsAndResults = !Args.hasArg(
-        OPT_disable_transferring_args_and_results_with_region_isolation);
-    enableSendingArgsAndResults = !Args.hasArg(
-        OPT_disable_sending_args_and_results_with_region_isolation);
-#endif
-    if (enableTransferringArgsAndResults)
-      Opts.enableFeature(Feature::TransferringArgsAndResults);
-    if (enableSendingArgsAndResults)
-      Opts.enableFeature(Feature::SendingArgsAndResults);
-  }
-
-  // Enable SendingArgsAndResults whenever TransferringArgsAndResults is
-  // enabled.
-  //
-  // The reason that we are doing this is we want to phase out transferring in
-  // favor of sending and this ensures that if we output 'sending' instead of
-  // 'transferring' (for instance when emitting suppressed APIs), we know that
-  // the compiler will be able to handle sending as well.
-  if (Opts.hasFeature(Feature::TransferringArgsAndResults)) {
-    Opts.enableFeature(Feature::SendingArgsAndResults);
-  }
-
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
