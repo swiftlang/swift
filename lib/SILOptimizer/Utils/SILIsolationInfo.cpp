@@ -221,6 +221,15 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
 
   // Otherwise, lets see if we had a same block indirect result.
   if (state.sameBlockIndirectResultUses) {
+    // Check if this indirect result has a sending result. In such a case, we
+    // always return disconnected.
+    if (auto fas =
+            FullApplySite::isa(state.sameBlockIndirectResultUses->getUser())) {
+      if (fas.getSubstCalleeType()->hasSendingResult())
+        return SILIsolationInfo::getDisconnected(
+            false /*is unsafe non isolated*/);
+    }
+
     // If we do not have any writes in between the alloc stack and the
     // initializer, then we have a good target. Otherwise, we just return
     // AssignFresh.
@@ -338,6 +347,11 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
   // At this point, we know that we have a single indirect result use that
   // dominates all writes and other indirect result uses. We can say that our
   // alloc_stack temporary is that indirect result use's isolation.
+  if (auto fas = FullApplySite::isa(targetOperand->getUser())) {
+    if (fas.getSubstCalleeType()->hasSendingResult())
+      return SILIsolationInfo::getDisconnected(
+          false /*is unsafe non isolated*/);
+  }
   return SILIsolationInfo::get(targetOperand->getUser());
 }
 
@@ -348,21 +362,39 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         return info;
     }
 
-    if (fas.hasSelfArgument()) {
-      auto &selfOp = fas.getSelfArgumentOperand();
-      CanType selfASTType = selfOp.get()->getType().getASTType();
+    if (auto *isolatedOp = fas.getIsolatedArgumentOperandOrNullPtr()) {
+      // First pattern match from global actors being passed as isolated
+      // parameters. This gives us better type information. If we can pattern
+      // match... we should!
+      if (auto *ei = dyn_cast<EnumInst>(isolatedOp->get())) {
+        if (ei->getElement()->getParentEnum()->isOptionalDecl() &&
+            ei->hasOperand()) {
+          if (auto *ieri = dyn_cast<InitExistentialRefInst>(ei->getOperand())) {
+            CanType selfASTType = ieri->getFormalConcreteType();
+
+            if (auto *nomDecl = selfASTType->getAnyActor()) {
+              // The SILValue() parameter doesn't matter until we have isolation
+              // history.
+              if (nomDecl->isGlobalActor())
+                return SILIsolationInfo::getGlobalActorIsolated(SILValue(),
+                                                                nomDecl);
+            }
+          }
+        }
+      }
+
+      // If we did not find an AST type, just see if we can find a value by
+      // looking through all optional types. This is conservatively correct.
+      CanType selfASTType = isolatedOp->get()->getType().getASTType();
       selfASTType =
           selfASTType->lookThroughAllOptionalTypes()->getCanonicalType();
 
-      if (fas.getArgumentParameterInfo(selfOp).hasOption(
-              SILParameterInfo::Isolated)) {
-        if (auto *nomDecl = selfASTType->getAnyActor()) {
-          // TODO: We really should be doing this based off of an Operand. Then
-          // we would get the SILValue() for the first element. Today this can
-          // only mess up isolation history.
-          return SILIsolationInfo::getActorInstanceIsolated(
-              SILValue(), selfOp.get(), nomDecl);
-        }
+      if (auto *nomDecl = selfASTType->getAnyActor()) {
+        // TODO: We really should be doing this based off of an Operand. Then
+        // we would get the SILValue() for the first element. Today this can
+        // only mess up isolation history.
+        return SILIsolationInfo::getActorInstanceIsolated(
+            SILValue(), isolatedOp->get(), nomDecl);
       }
     }
 

@@ -1970,6 +1970,13 @@ public:
         }
       }
     }
+
+    // Make sure that our subst and orig callee type agree on having sending
+    // results or not.
+    require(site.getOrigCalleeType()->hasSendingResult() ==
+                site.getSubstCalleeType()->hasSendingResult(),
+            "Callee's orig and subst callee type must have the same sending "
+            "result");
   }
 
   void checkApplyInst(ApplyInst *AI) {
