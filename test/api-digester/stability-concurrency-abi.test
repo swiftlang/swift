@@ -92,6 +92,11 @@ Func withCheckedContinuation(function:_:) has mangled name changing from '_Concu
 // AsyncStream.init(unfolding:onCancel:) uses @_silgen_name to preserve mangling after adding @preconcurrency.
 Constructor AsyncStream.init(unfolding:onCancel:) has mangled name changing from 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<@Sendable () -> ()>) -> Swift.AsyncStream<A>' to 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<() -> ()>) -> Swift.AsyncStream<A>'
 
+// We did not change the mangling, we did change from Default to Shared. Both
+// took their arg at +0, so there is no actual ABI difference.
+Func AsyncStream.Continuation.yield(with:) has parameter 0 changing from Default to Shared
+Func AsyncThrowingStream.Continuation.yield(with:) has parameter 0 changing from Default to Shared
+
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
 Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 

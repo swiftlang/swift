@@ -47,6 +47,12 @@ using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
 
+static llvm::cl::opt<bool> AbortOnUnknownPatternMatchError(
+    "sil-region-isolation-assert-on-unknown-pattern",
+    llvm::cl::desc("Abort if SIL region isolation detects an unknown pattern. "
+                   "Intended only to be used when debugging the compiler!"),
+    llvm::cl::init(false), llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -1191,6 +1197,10 @@ struct PartitionOpBuilder {
   }
 
   void addUnknownPatternError(SILValue value) {
+    if (AbortOnUnknownPatternMatchError) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
     currentInstPartitionOps.emplace_back(
         PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
   }
@@ -1510,12 +1520,12 @@ private:
   std::optional<std::pair<TrackableValue, bool>>
   initializeTrackedValue(SILValue value, SILIsolationInfo info) const {
     auto trackedValuePair = valueMap.initializeTrackableValue(value, info);
-    if (trackedValuePair.first.isNonSendable()) {
-      assert(trackedValuePair.second);
-      return trackedValuePair;
-    }
-    assert(trackedValuePair.second);
-    return {};
+
+    // If we have a Sendable value return none.
+    if (!trackedValuePair.first.isNonSendable())
+      return {};
+
+    return trackedValuePair;
   }
 
   TrackableValue
@@ -1564,27 +1574,52 @@ public:
   /// Require all non-sendable sources, merge their regions, and assign the
   /// resulting region to all non-sendable targets, or assign non-sendable
   /// targets to a fresh region if there are no non-sendable sources.
+  ///
+  /// \arg isolationInfo An isolation info that can be specified as the true
+  /// base isolation of results. Otherwise, results are assumed to have a
+  /// element isolation of disconnected. NOTE: The results will still be in the
+  /// region of the non-Sendable arguments so at the region level they will have
+  /// the same value.
   template <typename TargetRange, typename SourceRange>
-  void translateSILMultiAssign(const TargetRange &resultValues,
-                               const SourceRange &sourceValues,
-                               SILIsolationInfo isolationInfo = {}) {
+  void
+  translateSILMultiAssign(const TargetRange &resultValues,
+                          const SourceRange &sourceValues,
+                          SILIsolationInfo resultIsolationInfoOverride = {}) {
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
+
+    std::optional<SILDynamicMergedIsolationInfo> mergedInfo;
+    if (resultIsolationInfoOverride) {
+      mergedInfo = resultIsolationInfoOverride;
+    } else {
+      mergedInfo = SILIsolationInfo::getDisconnected(false);
+    }
 
     for (SILValue src : sourceValues) {
       if (auto value = tryToTrackValue(src)) {
         assignOperands.push_back(value->getRepresentative().getValue());
+        mergedInfo = mergedInfo->merge(value->getIsolationRegionInfo());
+
+        // If we fail to merge, then we have an incompatibility in between some
+        // of our arguments (consider isolated to different actors) or with the
+        // isolationInfo we specified. Emit an unknown patten error.
+        if (!mergedInfo) {
+          builder.addUnknownPatternError(src);
+          continue;
+        }
       }
     }
 
     for (SILValue result : resultValues) {
-      if (isolationInfo) {
+      // If we had isolation info explicitly passed in... use our
+      // mergedInfo. Otherwise, we want to infer.
+      if (resultIsolationInfoOverride) {
         // We only get back result if it is non-Sendable.
         if (auto nonSendableValue =
-                initializeTrackedValue(result, isolationInfo)) {
+                initializeTrackedValue(result, resultIsolationInfoOverride)) {
+          // If we did not insert, emit an unknown patten error.
           if (!nonSendableValue->second) {
             builder.addUnknownPatternError(result);
-            continue;
           }
           assignResults.push_back(
               nonSendableValue->first.getRepresentative().getValue());
@@ -1611,8 +1646,13 @@ public:
       // non-Sendable operands and we are supposed to mark value as actor
       // derived, introduce a fake element so we just propagate the actor
       // region.
-      if (assignOperands.size() && isolationInfo) {
-        builder.addActorIntroducingInst(assignOperands.back(), isolationInfo);
+      //
+      // NOTE: Here we check if we have mergedInfo rather than isolationInfo
+      // since we want to do this regardless of whether or not we passed in a
+      // specific isolation info unlike earlier when processing actual results.
+      if (assignOperands.size() && resultIsolationInfoOverride) {
+        builder.addActorIntroducingInst(assignOperands.back(),
+                                        resultIsolationInfoOverride);
       }
 
       return;
@@ -1818,8 +1858,7 @@ public:
 
     // If we do not have a special builtin, just do a multi-assign. Builtins do
     // not cross async boundaries.
-    return translateSILMultiAssign(bi->getResults(), bi->getOperandValues(),
-                                   {});
+    return translateSILMultiAssign(bi->getResults(), bi->getOperandValues());
   }
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
@@ -1864,11 +1903,16 @@ public:
       }
     }
 
-    // Add our callee to non-transferring parameters. This ensures that if it is
-    // actor isolated, that propagates into our results. This is especially
-    // important since our callee could be dynamically isolated and we cannot
-    // know that until we perform dataflow.
-    nonTransferringParameters.push_back(fas.getCallee());
+    // Require our callee operand if it is non-Sendable.
+    //
+    // DISCUSSION: Even though we do not include our callee operand in the same
+    // region as our operands/results, we still need to require that it is live
+    // at the point of application. Otherwise, we will not emit errors if the
+    // closure before this function application is already in the same region as
+    // a transferred value. In such a case, the function application must error.
+    if (auto value = tryToTrackValue(fas.getCallee())) {
+      builder.addRequire(value->getRepresentative().getValue());
+    }
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
@@ -1882,10 +1926,10 @@ public:
                                      isolationInfo);
     }
 
-    // If our result is transferring, then pass in empty as our results and then
-    // perform assign fresh.
+    // If our result is transferring, then pass in empty as our results, no
+    // override isolation, then perform assign fresh.
     ArrayRef<SILValue> empty;
-    translateSILMultiAssign(empty, nonTransferringParameters, isolationInfo);
+    translateSILMultiAssign(empty, nonTransferringParameters, {});
     for (SILValue result : applyResults) {
       if (auto value = tryToTrackValue(result)) {
         builder.addAssignFresh(value->getRepresentative().getValue());
@@ -2769,18 +2813,14 @@ PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
 
   // Ok at this point we know that our value is a non-Sendable temporary.
   auto isolationInfo = SILIsolationInfo::get(asi);
-  if (!bool(isolationInfo)) {
-    return TranslationSemantics::AssignFresh;
-  }
-
-  if (isolationInfo.isDisconnected()) {
+  if (!bool(isolationInfo) || isolationInfo.isDisconnected()) {
     return TranslationSemantics::AssignFresh;
   }
 
   // Ok, we can handle this and have a valid isolation. Initialize the value.
   auto v = initializeTrackedValue(asi, isolationInfo);
-  if (!v)
-    return TranslationSemantics::AssignFresh;
+  assert(v && "Only return none if we have a sendable value, but we checked "
+              "that earlier!");
 
   // If we already had a value for this alloc_stack (which we shouldn't
   // ever)... emit an unknown pattern error.
@@ -2789,7 +2829,9 @@ PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
     return TranslationSemantics::Special;
   }
 
-  translateSILAssignFresh(v->first.getRepresentative().getValue());
+  // NOTE: To prevent an additional reinitialization by the canned AssignFresh
+  // code, we do our own assign fresh and return special.
+  builder.addAssignFresh(v->first.getRepresentative().getValue());
   return TranslationSemantics::Special;
 }
 

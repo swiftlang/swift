@@ -5464,14 +5464,9 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     // Perform an extra check for transferring. Since it is a specifier, we use
     // the actual parsing logic below.
     if (Tok.isContextualKeyword("transferring")) {
-      if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::TransferringArgsAndResults));
-      } else {
-        // Now that we have sending, warn users to convert 'transferring' to
-        // 'sendable'.
-        P.diagnose(Tok, diag::transferring_is_now_sendable);
-      }
+      // Now that we have sending, warn users to convert 'transferring' to
+      // 'sendable'.
+      P.diagnose(Tok, diag::transferring_is_now_sendable);
 
       // Do not allow for transferring to be parsed after a specifier has been
       // parsed.
