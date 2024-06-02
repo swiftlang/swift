@@ -867,7 +867,16 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (!Decl->isInvalid())
+  bool shouldVerify = true;
+  if (Decl->isInvalid()) {
+    shouldVerify = false;
+  }
+  if (auto contextDecl = Decl->getDeclContext()->getAsDecl()) {
+    if (contextDecl->isInvalid()) {
+      shouldVerify = false;
+    }
+  }
+  if (shouldVerify)
     verify(Storage.str());
   return finalize();
 }
