@@ -2211,7 +2211,8 @@ ERROR(sending_and_transferring_used_together,none,
 WARNING(transferring_is_now_sendable,none,
         "'transferring' has been renamed to 'sending' and the 'transferring' spelling will be removed shortly",
         ())
-
+ERROR(sending_cannot_be_used_with_borrowing,none,
+      "'%0' cannot be used together with 'borrowing'", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
