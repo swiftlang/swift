@@ -49,7 +49,7 @@ struct OSSACanonicalizer {
   OSSACanonicalizer(SILFunction *fn, DominanceInfo *domTree,
                     InstructionDeleter &deleter)
       : canonicalizer(DontPruneDebugInsts,
-                      !fn->shouldOptimize() /*maximizeLifetime*/, fn,
+                      MaximizeLifetime_t(!fn->shouldOptimize()), fn,
                       nullptr /*accessBlockAnalysis*/, domTree,
                       nullptr /*calleeAnalysis*/, deleter) {}
 

@@ -352,7 +352,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   DominanceInfo *domTree = DA->get(&Builder.getFunction());
   CanonicalizeOSSALifetime canonicalizer(
       DontPruneDebugInsts,
-      !parentTransform->getFunction()->shouldOptimize() /*maximize lifetime*/,
+      MaximizeLifetime_t(!parentTransform->getFunction()->shouldOptimize()),
       parentTransform->getFunction(), NLABA, domTree, CA, deleter);
   CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
                                               deleter);
