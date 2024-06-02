@@ -2070,7 +2070,7 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
     }
   }
   CanonicalizeOSSALifetime canonicalizer(
-      PruneDebugInsts, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
+      PruneDebugInsts, MaximizeLifetime_t(!f.shouldOptimize()), &f,
       accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())

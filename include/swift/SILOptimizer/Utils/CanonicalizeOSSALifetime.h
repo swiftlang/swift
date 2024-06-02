@@ -185,6 +185,11 @@ enum PruneDebugInsts_t : bool {
   PruneDebugInsts = true,
 };
 
+enum MaximizeLifetime_t : bool {
+  DontMaximizeLifetime = false,
+  MaximizeLifetime = true,
+};
+
 /// Canonicalize OSSA lifetimes.
 ///
 /// Allows the allocation of analysis state to be reused across calls to
@@ -230,7 +235,7 @@ private:
 
   /// If true, lifetimes will not be shortened except when necessary to avoid
   /// copies.
-  bool maximizeLifetime;
+  const MaximizeLifetime_t maximizeLifetime;
 
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
@@ -318,7 +323,8 @@ public:
   };
 
   CanonicalizeOSSALifetime(PruneDebugInsts_t pruneDebugMode,
-                           bool maximizeLifetime, SILFunction *function,
+                           MaximizeLifetime_t maximizeLifetime,
+                           SILFunction *function,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                            DominanceInfo *domTree,
                            BasicCalleeAnalysis *calleeAnalysis,
