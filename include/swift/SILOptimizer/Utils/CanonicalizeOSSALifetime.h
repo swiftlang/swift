@@ -180,6 +180,11 @@ public:
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
 };
 
+enum PruneDebugInsts_t : bool {
+  DontPruneDebugInsts = false,
+  PruneDebugInsts = true,
+};
+
 /// Canonicalize OSSA lifetimes.
 ///
 /// Allows the allocation of analysis state to be reused across calls to
@@ -221,7 +226,7 @@ public:
 private:
   /// If true, then debug_value instructions outside of non-debug
   /// liveness may be pruned during canonicalization.
-  bool pruneDebugMode;
+  const PruneDebugInsts_t pruneDebugMode;
 
   /// If true, lifetimes will not be shortened except when necessary to avoid
   /// copies.
@@ -312,8 +317,8 @@ public:
     }
   };
 
-  CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
-                           SILFunction *function,
+  CanonicalizeOSSALifetime(PruneDebugInsts_t pruneDebugMode,
+                           bool maximizeLifetime, SILFunction *function,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                            DominanceInfo *domTree,
                            BasicCalleeAnalysis *calleeAnalysis,
