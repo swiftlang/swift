@@ -171,7 +171,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
     loc = ACE;
     kind = Kind::Func;
     if (ACE->getASTContext().LangOpts.hasFeature(
-            Feature::TransferringArgsAndResults)) {
+            Feature::RegionBasedIsolation)) {
+      assert(ACE->getASTContext().LangOpts.hasFeature(
+                 Feature::SendingArgsAndResults) &&
+             "Sending args and results should always be enabled");
       if (auto *autoClosure = dyn_cast<AutoClosureExpr>(ACE)) {
         isAsyncLetClosure =
             autoClosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet;

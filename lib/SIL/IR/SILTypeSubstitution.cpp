@@ -298,7 +298,8 @@ public:
   }
 
   SILResultInfo substInterface(SILResultInfo orig) {
-    return SILResultInfo(visit(orig.getInterfaceType()), orig.getConvention());
+    return SILResultInfo(visit(orig.getInterfaceType()), orig.getConvention(),
+                         orig.getOptions());
   }
 
   SILYieldInfo substInterface(SILYieldInfo orig) {
