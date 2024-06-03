@@ -481,3 +481,13 @@ func checkOpaqueType() -> some Sendable {
   UnavailableSendable()
   // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
 }
+
+// rdar://129024926
+
+@available(SwiftStdlib 5.1, *)
+@MainActor class MainActorSuper<T: Sendable> {}
+
+@available(SwiftStdlib 5.1, *)
+class MainActorSub: MainActorSuper<MainActorSub.Nested> {
+  struct Nested {}  // no cycle
+}
