@@ -119,8 +119,8 @@ bb0(%0 : $*C, %instance : @owned $C):
 // CHECK-LABEL: sil [ossa] @store_arg_to_out_addr_with_barrier : $@convention(thin) (@owned C) -> @out C {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*C, [[INSTANCE:%[^,]+]] :
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
-// CHECK:         [[REGISTER_3:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         store [[REGISTER_3]] to [init] [[ADDR]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         store [[COPY]] to [init] [[ADDR]]
 // CHECK:         apply [[BARRIER]]()
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'store_arg_to_out_addr_with_barrier'
