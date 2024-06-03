@@ -459,6 +459,10 @@ private:
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
+  void visitExtendedUnconsumedBoundary(
+      ArrayRef<SILInstruction *> ends,
+      llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
+          visitor);
 
   void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
 

@@ -573,8 +573,10 @@ void CanonicalizeOSSALifetime::findOriginalBoundary(
 ///   with consumedAtExitBlocks, liveness should be extended to its original
 ///   extent.
 ///   [Extend liveness down to the boundary between green blocks and uncolored.]
-void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
-    PrunedLivenessBoundary const &boundary) {
+void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
+    ArrayRef<SILInstruction *> ends,
+    llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
+        visitor) {
   auto currentDef = getCurrentDef();
 
   // First, collect the blocks that were _originally_ live.  We can't use
@@ -622,7 +624,7 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
     // consumes. These are just the instructions on the boundary which aren't
     // destroys.
     BasicBlockWorklist worklist(currentDef->getFunction());
-    for (auto *instruction : boundary.lastUsers) {
+    for (auto *instruction : ends) {
       if (destroys.contains(instruction))
         continue;
       if (liveness->isInterestingUser(instruction)
@@ -651,7 +653,7 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
       predecessor->getTerminator()->visitPriorInstructions([&](auto *inst) {
-        liveness->extendToNonUse(inst);
+        visitor(inst, PrunedLiveness::LifetimeEnding::NonUse());
         return true;
       });
     }
@@ -665,8 +667,16 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
     // hoisting it would avoid a copy.
     if (consumedAtExitBlocks.contains(block))
       continue;
-    liveness->updateForUse(destroy, /*lifetimeEnding*/ true);
+    visitor(destroy, PrunedLiveness::LifetimeEnding::Ending());
   }
+}
+
+void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
+    PrunedLivenessBoundary const &boundary) {
+  visitExtendedUnconsumedBoundary(
+      boundary.lastUsers, [&](auto *instruction, auto lifetimeEnding) {
+        liveness->updateForUse(instruction, lifetimeEnding);
+      });
 }
 
 //===----------------------------------------------------------------------===//
