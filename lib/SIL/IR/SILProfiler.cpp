@@ -258,9 +258,12 @@ bool shouldSkipExpr(Expr *E) {
 /// Whether the children of a decl that isn't explicitly handled should be
 /// walked.
 static bool shouldWalkIntoUnhandledDecl(const Decl *D) {
-  // We want to walk into the initializer for a pattern binding decl. This
-  // allows us to map LazyInitializerExprs.
-  return isa<PatternBindingDecl>(D);
+  // We want to walk into initializers for bindings, and the expansions of
+  // MacroExpansionDecls, which will be nested within MacroExpansionExprs in
+  // local contexts. We won't record any regions within the macro expansion,
+  // but still need to walk to get accurate counter information in case e.g
+  // there's a throwing function call in the expansion.
+  return isa<PatternBindingDecl>(D) || isa<MacroExpansionDecl>(D);
 }
 
 /// Whether the expression \c E could potentially throw an error.

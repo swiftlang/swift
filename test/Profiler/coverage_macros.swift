@@ -31,6 +31,9 @@ macro id<T>(_: T) -> T = #externalMacro(module: "MacroDefinition", type: "TupleM
 @attached(body)
 macro BodyMacroWithControlFlow() = #externalMacro(module: "MacroDefinition", type: "BodyMacroWithControlFlow")
 
+@freestanding(declaration, names: arbitrary)
+macro declMacroWithControlFlow() = #externalMacro(module: "MacroDefinition", type: "DeclMacroWithControlFlow")
+
 // This needs to be matched up here due to the sorting of the SIL; just make
 // sure the counter '2' is for the initialization.
 // CHECK-LABEL: sil hidden [lazy_getter] [noinline] @$s15coverage_macros2S1V2z3SiSgvg : $@convention(method) (@inout S1) -> Optional<Int>
@@ -144,4 +147,11 @@ func test6() throws
 func test7() throws {
   guard .random() else { return }
   print("hello")
+}
+
+// CHECK-LABEL: sil_coverage_map{{.*}}s15coverage_macros5test8yyKF
+func test8() throws {             // CHECK-NEXT: [[@LINE]]:21   -> [[@LINE+4]]:2 : 0
+  guard .random() else { return } // CHECK-NEXT: [[@LINE]]:24   -> [[@LINE]]:34  : 1
+                                  // CHECK-NEXT: [[@LINE-1]]:34 -> [[@LINE+2]]:2 : (0 - 1)
+  #declMacroWithControlFlow       // CHECK-NEXT: [[@LINE]]:28   -> [[@LINE+1]]:2 : ((0 - 1) - 3)
 }

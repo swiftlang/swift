@@ -2218,6 +2218,15 @@ public struct SingleMemberStubMacro: DeclarationMacro {
   }
 }
 
+public struct DeclMacroWithControlFlow: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["let _ = .random() ? try throwingFn() : 0"]
+  }
+}
+
 public struct GenerateStubsForProtocolRequirementsMacro: PeerMacro, ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
