@@ -810,6 +810,7 @@ struct PGOMapping : public ASTWalker {
 struct CoverageMapping : public ASTWalker {
 private:
   const SourceManager &SM;
+  SourceFile *SF;
 
   /// The SIL function being profiled.
   SILDeclRef Constant;
@@ -1111,9 +1112,10 @@ private:
 
 public:
   CoverageMapping(
-      const SourceManager &SM, SILDeclRef Constant,
+      SourceFile *SF, SILDeclRef Constant,
       const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters)
-      : SM(SM), Constant(Constant), ConcreteCounters(ConcreteCounters) {}
+    : SM(SF->getASTContext().SourceMgr), SF(SF), Constant(Constant),
+      ConcreteCounters(ConcreteCounters) {}
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
     // We want to walk lazy initializers present in the synthesized getter for
@@ -1135,7 +1137,7 @@ public:
   /// source regions.
   SILCoverageMap *emitSourceRegions(SILModule &M, StringRef Name,
                                     StringRef PGOFuncName, uint64_t Hash,
-                                    SourceFile *SF, StringRef Filename) {
+                                    StringRef Filename) {
     if (SourceRegions.empty())
       return nullptr;
 
@@ -1610,7 +1612,6 @@ static void walkNode(NodeToProfile Node, ASTWalker &Walker) {
 }
 
 void SILProfiler::assignRegionCounters() {
-  const auto &SM = M.getASTContext().SourceMgr;
   auto *DC = forDecl.getInnermostDeclContext();
   auto *SF = DC->getParentSourceFile();
   assert(SF && "Not within a SourceFile?");
@@ -1647,10 +1648,10 @@ void SILProfiler::assignRegionCounters() {
   PGOFuncHash = 0x0;
 
   if (EmitCoverageMapping) {
-    CoverageMapping Coverage(SM, forDecl, RegionCounterMap);
+    CoverageMapping Coverage(SF, forDecl, RegionCounterMap);
     walkNode(Root, Coverage);
     CovMap = Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName,
-                                        PGOFuncHash, SF, CurrentFileName);
+                                        PGOFuncHash, CurrentFileName);
   }
 
   if (llvm::IndexedInstrProfReader *IPR = M.getPGOReader()) {
