@@ -64,7 +64,7 @@ struct OSSACanonicalizer {
     CanonicalizeOSSALifetime::LivenessState canonicalizerState;
 
     LivenessState(OSSACanonicalizer &parent, SILValue def)
-        : parent(parent), canonicalizerState(parent.canonicalizer, def) {}
+        : parent(parent), canonicalizerState(parent.canonicalizer, def, {}) {}
 
     ~LivenessState() { parent.clear(); }
   };

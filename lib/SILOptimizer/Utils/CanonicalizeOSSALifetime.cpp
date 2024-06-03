@@ -278,14 +278,29 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
         });
       });
 
+  ArrayRef<SILInstruction *> ends = {};
+  SmallVector<SILInstruction *, 8> lexicalEnds;
+  if (currentLexicalLifetimeEnds.size() > 0) {
+    visitExtendedUnconsumedBoundary(
+        currentLexicalLifetimeEnds,
+        [&lexicalEnds](auto *instruction, auto lifetimeEnding) {
+          instruction->visitSubsequentInstructions([&](auto *next) {
+            lexicalEnds.push_back(next);
+            return true;
+          });
+        });
+    ends = lexicalEnds;
+  } else {
+    ends = outsideDestroys;
+  }
+
   auto *def = getCurrentDef()->getDefiningInstruction();
   using InitialBlocks = ArrayRef<SILBasicBlock *>;
   auto *defBlock = getCurrentDef()->getParentBlock();
   auto initialBlocks = defBlock ? InitialBlocks(defBlock) : InitialBlocks();
   ReachableBarriers barriers;
-  findBarriersBackward(outsideDestroys, initialBlocks,
-                       *getCurrentDef()->getFunction(), barriers,
-                       [&](auto *inst) {
+  findBarriersBackward(ends, initialBlocks, *getCurrentDef()->getFunction(),
+                       barriers, [&](auto *inst) {
                          if (inst == def)
                            return true;
                          if (!isDeinitBarrier(inst, calleeAnalysis))
@@ -569,10 +584,16 @@ void CanonicalizeOSSALifetime::findOriginalBoundary(
 ///   extent.
 ///   [Extend liveness down to the boundary between green blocks and uncolored.]
 void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
-    ArrayRef<SILInstruction *> ends,
+    ArrayRef<SILInstruction *> consumes,
     llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
         visitor) {
   auto currentDef = getCurrentDef();
+
+#ifndef NDEBUG
+  for (auto *consume : consumes) {
+    assert(!liveness->isWithinBoundary(consume));
+  }
+#endif
 
   // First, collect the blocks that were _originally_ live.  We can't use
   // liveness here because it doesn't include blocks that occur before a
@@ -619,7 +640,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
     // consumes. These are just the instructions on the boundary which aren't
     // destroys.
     BasicBlockWorklist worklist(currentDef->getFunction());
-    for (auto *instruction : ends) {
+    for (auto *instruction : consumes) {
       if (destroys.contains(instruction))
         continue;
       if (liveness->isInterestingUser(instruction)
@@ -1223,8 +1244,9 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
 }
 
 /// Canonicalize a single extended owned lifetime.
-bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
-  LivenessState livenessState(*this, def);
+bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(
+    SILValue def, ArrayRef<SILInstruction *> lexicalLifetimeEnds) {
+  LivenessState livenessState(*this, def, lexicalLifetimeEnds);
 
   // Don't canonicalize the lifetimes of values of move-only type.  According to
   // language rules, they are fixed.
@@ -1252,6 +1274,7 @@ namespace swift::test {
 //         access scopes which they previously enclosed but can't be hoisted
 //         before
 // - SILValue: value to canonicalize
+// - [SILInstruction]: the lexicalLifetimeEnds to recognize
 // Dumps:
 // - function after value canonicalization
 static FunctionTest CanonicalizeOSSALifetimeTest(
@@ -1271,7 +1294,11 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
           respectAccessScopes ? accessBlockAnalysis : nullptr, domTree,
           calleeAnalysis, deleter);
       auto value = arguments.takeValue();
-      canonicalizer.canonicalizeValueLifetime(value);
+      SmallVector<SILInstruction *, 4> lexicalLifetimeEnds;
+      while (arguments.hasUntaken()) {
+        lexicalLifetimeEnds.push_back(arguments.takeInstruction());
+      }
+      canonicalizer.canonicalizeValueLifetime(value, lexicalLifetimeEnds);
       function.print(llvm::outs());
     });
 } // end namespace swift::test
