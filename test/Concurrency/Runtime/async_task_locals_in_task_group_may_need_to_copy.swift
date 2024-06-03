@@ -13,6 +13,8 @@ enum TL {
   static var two: Int = 2
   @TaskLocal
   static var three: Int = 3
+  @TaskLocal
+  static var four: Int = 4
 }
 
 // ==== ------------------------------------------------------------------------
@@ -96,6 +98,7 @@ func test() async {
     print("--")
   }
 
+  // Multiple nested task groups *in the same task*
   await TL.$one.withValue(11) {
     await withTaskGroup(of: Void.self) { group in
       await TL.$three.withValue(33) {
@@ -109,10 +112,52 @@ func test() async {
           }
         }
       }
-
-      print("Survived, done") // CHECK: Survived, done
+      print("--")
     }
   }
+
+  // Multiple "nested" task groups, however in different child tasks
+  await withTaskGroup(of: Void.self) { outer in
+    // Child task inside  'outer':
+    await TL.$one.withValue(11) { // DOES NOT have to be copied by the 'inner.addTask' (!)
+      outer.addTask {
+        await TL.$two.withValue(2222) {
+          await withTaskGroup(of: Void.self) { inner in
+            TL.$three.withValue(3333) { // MUST be copied by 'inner.addTask'
+              inner.addTask {
+                print("Survived, one: \(TL.one) @ \(#fileID):\(#line)") // CHECK: Survived, one: 11
+                print("Survived, two: \(TL.two) @ \(#fileID):\(#line)") // CHECK: Survived, two: 2222
+                print("Survived, three: \(TL.three) @ \(#fileID):\(#line)") // CHECK: Survived, three: 3333
+              }
+            }
+          }
+        }
+        print("--")
+      }
+    }
+  }
+
+  // Multiple "safe" task locals around a withTaskGroup, check if relinking works ok then
+  await TL.$one.withValue(11) {
+    await TL.$two.withValue(22) {
+      await TL.$three.withValue(33) {
+        await withTaskGroup(of: Void.self) { group in
+          await TL.$four.withValue(44) { // must copy
+            group.addTask {
+              print("Survived, one: \(TL.one) @ \(#fileID):\(#line)") // CHECK: Survived, one: 11
+              print("Survived, two: \(TL.two) @ \(#fileID):\(#line)") // CHECK: Survived, two: 22
+              print("Survived, three: \(TL.three) @ \(#fileID):\(#line)") // CHECK: Survived, three: 33
+              print("Survived, four: \(TL.four) @ \(#fileID):\(#line)") // CHECK: Survived, four: 44
+            }
+          }
+        }
+      }
+    }
+    print("--")
+  }
+
+
+  print("Survived, done") // CHECK: Survived, done
 }
 
 @main struct Main {

@@ -129,11 +129,11 @@ public:
       return reinterpret_cast<Item *>(next & ~statusMask);
     }
 
-    void relinkNext(Item* nextOverride) {
+    void relinkTaskGroupLocalHeadToSafeNext(Item* nextOverride) {
       assert(!getNext() &&
                "Can only relink task local item that was not pointing at anything yet");
-      assert(nextOverride->isNextLinkPointer() ||
-             nextOverride->isParentPointer() &&
+      assert((nextOverride->isNextLinkPointer() ||
+              nextOverride->isParentPointer()) &&
                  "Currently relinking is only done within a task group to "
                  "avoid within-taskgroup next pointers; attempted to point at "
                  "task local declared within task group body though!");
@@ -230,6 +230,10 @@ public:
 
   public:
 
+    /// Get the "current" task local storage from either the passed in
+    /// task, or fall back to the *thread* local stored storage.
+    static Storage* getCurrent(AsyncTask *task);
+
     void initializeLinkParent(AsyncTask *task, AsyncTask *parent);
 
     void pushValue(AsyncTask *task,
@@ -258,7 +262,9 @@ public:
     /// "pop" of the `B` value - it was spawned from a scope where only B was observable.
     void copyTo(AsyncTask *target);
 
-    void copyToOnlyOnlyFromCurrent(AsyncTask *target);
+    // FIXME(concurrency): We currently copy from "all" task groups we encounter
+    // however in practice we only
+    void copyToOnlyOnlyFromCurrentGroup(AsyncTask *target);
 
     /// Destroy and deallocate all items stored by this specific task.
     ///
