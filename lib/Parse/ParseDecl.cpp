@@ -5510,6 +5510,14 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
             .fixItRemove(TransferringLoc);
       }
 
+      // If we already saw a specifier, check if we have borrowing. In such a
+      // case, emit an error.
+      if (SpecifierLoc.isValid() &&
+          Specifier == ParamDecl::Specifier::Borrowing) {
+        P.diagnose(Tok, diag::sending_cannot_be_used_with_borrowing,
+                   "sending");
+      }
+
       SendingLoc = P.consumeToken();
       continue;
     }
@@ -5547,6 +5555,13 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (bool(Specifier) && SendingLoc.isValid()) {
         P.diagnose(Tok, diag::sending_before_parameter_specifier,
                    getNameForParamSpecifier(Specifier));
+      }
+
+      // We cannot use transferring with borrowing.
+      if (TransferringLoc.isValid() &&
+          Specifier == ParamDecl::Specifier::Borrowing) {
+        P.diagnose(TransferringLoc, diag::sending_cannot_be_used_with_borrowing,
+                   "transferring");
       }
     }
     Tok.setKind(tok::contextual_keyword);
