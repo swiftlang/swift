@@ -148,9 +148,9 @@ struct BadBuffer: ~Copyable {
 
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}19CellThatMovesAsLikeVWV" = {{.*}} %swift.vwtable
 // initializeWithTake
-// CHECK-SAME:  , ptr @"$s10raw_layout19CellThatMovesAsLikeVwtk"
+// CHECK-SAME:  , ptr @"$s10raw_layout19CellThatMovesAsLikeVwtk
 // assignWithTake
-// CHECK-SAME:  , ptr @"$s10raw_layout19CellThatMovesAsLikeVwta"
+// CHECK-SAME:  , ptr @"$s10raw_layout19CellThatMovesAsLikeVwta
 // size
 // CHECK-SAME:  , {{i64|i32}} 0
 // stride
@@ -162,9 +162,9 @@ struct CellThatMovesAsLike<T>: ~Copyable {}
 
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}18ConcreteMoveAsLikeVWV" = {{.*}} %swift.vwtable
 // initializeWithTake
-// CHECK-SAME:  , ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk"
+// CHECK-SAME:  , ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk
 // assignWithTake
-// CHECK-SAME:  , ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta"
+// CHECK-SAME:  , ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta
 // size
 // CHECK-SAME:  , {{i64|i32}} 1
 // stride
