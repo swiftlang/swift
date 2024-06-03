@@ -643,8 +643,7 @@ UNINTERESTING_FEATURE(GroupActorErrors)
 
 UNINTERESTING_FEATURE(TransferringArgsAndResults)
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
-  auto functionTypeUsesSending = [](Decl *decl) {
-    return usesTypeMatching(decl, [](Type type) {
+  auto isFunctionTypeWithSending = [](Type type) {
       auto fnType = type->getAs<AnyFunctionType>();
       if (!fnType)
         return false;
@@ -656,7 +655,9 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
                           [](AnyFunctionType::Param param) {
                             return param.getParameterFlags().isSending();
                           });
-    });
+  };
+  auto declUsesFunctionTypesThatUseSending = [&](Decl *decl) {
+    return usesTypeMatching(decl, isFunctionTypeWithSending);
   };
 
   if (auto *pd = dyn_cast<ParamDecl>(decl)) {
@@ -664,18 +665,28 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
       return true;
     }
 
-    if (functionTypeUsesSending(pd))
+    if (declUsesFunctionTypesThatUseSending(pd))
       return true;
   }
 
-  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
+  if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
     // First check for param decl results.
     if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
           return usesFeatureSendingArgsAndResults(pd);
         }))
       return true;
-    if (functionTypeUsesSending(decl))
+    if (declUsesFunctionTypesThatUseSending(decl))
       return true;
+  }
+
+  // Check if we have a pattern binding decl for a function that has sending
+  // parameters and results.
+  if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    for (auto index : range(pbd->getNumPatternEntries())) {
+      auto *pattern = pbd->getPattern(index);
+      if (pattern->hasType() && isFunctionTypeWithSending(pattern->getType()))
+        return true;
+    }
   }
 
   return false;
