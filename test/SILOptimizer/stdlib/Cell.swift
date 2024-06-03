@@ -20,6 +20,9 @@ public struct Cell<T: ~Copyable>: ~Copyable {
   // CHECK:       bb0({{%.*}} : $*Cell<T>, [[VALUE:%.*]] : $*T, {{%.*}} : $@thin Cell<T>.Type):
   // CHECK:         {{%.*}} = builtin "zeroInitializer"<Cell<T>>([[SELF:%.*]] : $*Cell<T>) : $()
   // CHECK-NEXT:    [[RAW_LAYOUT_ADDR:%.*]] = builtin "addressOfRawLayout"<Cell<T>>([[SELF]] : $*Cell<T>) : $Builtin.RawPointer
+  // CHECK-NEXT:    [[POINTER:%.*]] = struct $UnsafeMutablePointer<T> ([[RAW_LAYOUT_ADDR]] : $Builtin.RawPointer)
+  //                Calling 'UnsafeMutablePointer<T>.initialize(to:)'
+  // CHECK:         {{%.*}} = apply {{%.*}}<T>([[VALUE]], [[POINTER]])
   // CHECK-LABEL: } // end sil function '$s4CellAAVAARi_zrlEyAByxGxcfC'
   @_transparent
   public init(_ value: consuming T) {
