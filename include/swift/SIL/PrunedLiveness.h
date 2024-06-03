@@ -613,9 +613,10 @@ protected:
                                            ValueSet &visited,
                                            SILValue value);
 
-  void updateForUse(SILInstruction *user, LifetimeEnding lifetimeEnding);
-
 public:
+  /// Add \p inst to liveness which uses the def as indicated by \p usage.
+  void updateForUse(SILInstruction *inst, LifetimeEnding usage);
+
   /// For flexibility, \p lifetimeEnding is provided by the
   /// caller. PrunedLiveness makes no assumptions about the def-use
   /// relationships that generate liveness. For example, use->isLifetimeEnding()
