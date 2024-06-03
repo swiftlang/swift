@@ -114,11 +114,22 @@ static bool shouldProfile(SILDeclRef Constant) {
     }
   }
 
-  // Do not profile AST nodes in unavailable contexts.
   if (auto *D = DC->getInnermostDeclarationDeclContext()) {
+    // Do not profile AST nodes in unavailable contexts.
     if (D->getSemanticUnavailableAttr()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: unavailable context\n");
       return false;
+    }
+
+    // Do not profile functions that have had their bodies replaced (e.g
+    // function body macros).
+    // TODO: If/when preamble macros become an official feature, we'll
+    // need to be more nuanced here.
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (AFD->getOriginalBodySourceRange() != AFD->getBodySourceRange()) {
+        LLVM_DEBUG(llvm::dbgs() << "Skipping function: body replaced\n");
+        return false;
+      }
     }
   }
 

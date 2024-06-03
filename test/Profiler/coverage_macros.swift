@@ -28,6 +28,9 @@ macro fnCall<T>(_: () throws -> T, _: () throws -> T) -> (T, T) = #externalMacro
 @freestanding(expression)
 macro id<T>(_: T) -> T = #externalMacro(module: "MacroDefinition", type: "TupleMacro")
 
+@attached(body)
+macro BodyMacroWithControlFlow() = #externalMacro(module: "MacroDefinition", type: "BodyMacroWithControlFlow")
+
 // This needs to be matched up here due to the sorting of the SIL; just make
 // sure the counter '2' is for the initialization.
 // CHECK-LABEL: sil hidden [lazy_getter] [noinline] @$s15coverage_macros2S1V2z3SiSgvg : $@convention(method) (@inout S1) -> Optional<Int>
@@ -129,4 +132,16 @@ func test5() throws -> (Int, Int, Int) {        // CHECK-NEXT: [[@LINE]]:40 -> [
   let z = #id(.random() ? try throwingFn()
                         : try throwingFn())     // CHECK-NEXT: [[@LINE]]:44 -> [[@LINE+1]]:19 : ((((0 - 2) - 4) - 6) - 7)
   return (x, y, z)                              // CHECK-NEXT: }
+}
+
+// Not profiled.
+@BodyMacroWithControlFlow
+func test6() throws
+
+
+// Not profiled.
+@BodyMacroWithControlFlow
+func test7() throws {
+  guard .random() else { return }
+  print("hello")
 }

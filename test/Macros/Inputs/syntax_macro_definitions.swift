@@ -2351,6 +2351,20 @@ public struct RemoteBodyMacro: BodyMacro {
 }
 
 @_spi(ExperimentalLanguageFeature)
+public struct BodyMacroWithControlFlow: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    [
+      "guard .random() else { return }",
+      "_ = try throwingFn()"
+    ]
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
