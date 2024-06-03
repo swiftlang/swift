@@ -1216,7 +1216,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     ClangImporter *importer, const ClangImporterOptions &importerOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-    std::vector<std::string> &CC1Args) {
+    const std::vector<std::string> &CC1Args) {
   std::vector<const char *> invocationArgs;
   invocationArgs.reserve(CC1Args.size());
   llvm::for_each(CC1Args, [&](const std::string &Arg) {
