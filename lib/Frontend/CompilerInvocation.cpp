@@ -25,6 +25,7 @@
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -2117,6 +2118,21 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   for (auto *A : Args.filtered(OPT_swift_module_cross_import))
     Opts.CrossImportInfo[A->getValue(0)].push_back(A->getValue(1));
+
+  for (auto &Name : Args.getAllArgValues(OPT_module_can_import))
+    Opts.CanImportModuleInfo.push_back({Name, {}, {}});
+
+  for (auto *A: Args.filtered(OPT_module_can_import_version)) {
+    llvm::VersionTuple Version, UnderlyingVersion;
+    if (Version.tryParse(A->getValue(1)))
+      Diags.diagnose(SourceLoc(), diag::invalid_can_import_module_version,
+                     A->getValue(1));
+    if (UnderlyingVersion.tryParse(A->getValue(2)))
+      Diags.diagnose(SourceLoc(), diag::invalid_can_import_module_version,
+                     A->getValue(2));
+    Opts.CanImportModuleInfo.push_back(
+        {A->getValue(0), Version, UnderlyingVersion});
+  }
 
   Opts.DisableCrossImportOverlaySearch |=
       Args.hasArg(OPT_disable_cross_import_overlay_search);
