@@ -4433,6 +4433,11 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
 /// Infer isolation from witnessed protocol requirements.
 static std::optional<ActorIsolation>
 getIsolationFromWitnessedRequirements(ValueDecl *value) {
+  // Associated types cannot have isolation, so there's no such inference for
+  // type witnesses.
+  if (isa<TypeDecl>(value))
+    return std::nullopt;
+
   auto dc = value->getDeclContext();
   auto idc = dyn_cast_or_null<IterableDeclContext>(dc->getAsDecl());
   if (!idc)
