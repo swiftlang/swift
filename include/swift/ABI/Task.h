@@ -419,7 +419,7 @@ public:
 
   /// Get the preferred task executor reference if there is one set for this
   /// task.
-  TaskExecutorRef getPreferredTaskExecutor();
+  TaskExecutorRef getPreferredTaskExecutor(bool assumeHasRecord = false);
 
   /// WARNING: Only to be used during task creation, in other situations prefer
   /// to use `swift_task_pushTaskExecutorPreference` and

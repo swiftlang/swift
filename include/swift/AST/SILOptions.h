@@ -152,7 +152,7 @@ public:
   bool VerifyAll = false;
 
   /// If true, no SIL verification is done at all.
-  bool VerifyNone = false;
+  bool VerifyNone = false; // FIXME: !!!!
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;

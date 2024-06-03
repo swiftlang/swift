@@ -87,13 +87,47 @@ class InitialTaskExecutorPreferenceTaskOptionRecord : public TaskOptionRecord {
 
 public:
   InitialTaskExecutorPreferenceTaskOptionRecord(TaskExecutorRef executor)
-      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutor),
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutorUnowned),
         Executor(executor) {}
 
   TaskExecutorRef getExecutorRef() const { return Executor; }
 
   static bool classof(const TaskOptionRecord *record) {
-    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutor;
+    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutorUnowned;
+  }
+};
+
+/// This is quite similar to `InitialTaskExecutorPreferenceTaskOptionRecord`
+/// however it takes a "raw" TaskExecutor existential in the form of an Identity
+/// and WitnessTable - rather than the specific UnownedTaskExecutor which already
+/// may have specific "flags" set on it.
+///
+/// In order to use the executor in the runtime, we need to call into the type's
+/// `asUnownedTaskExecutor` which is done by
+/// `getExecutorRefFromUnownedTaskExecutor`.
+class InitialTaskExecutorOwnedPreferenceTaskOptionRecord
+    : public TaskOptionRecord {
+
+  // These look similar to TaskExecutorRef but are NOT the same!
+  // A TaskExecutorRef is obtained through calling user defined
+  // `asUnownedTaskExecutor` which is what we need to do on these to get a real executor ref.
+  HeapObject *Identity;
+  const TaskExecutorWitnessTable *WitnessTable;
+
+public:
+  InitialTaskExecutorOwnedPreferenceTaskOptionRecord(
+      HeapObject *executor, uintptr_t witnessTable)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutorOwned),
+        Identity(executor) {
+    WitnessTable = reinterpret_cast<const TaskExecutorWitnessTable*>(witnessTable);
+  }
+
+  /// Invokes Swift implemented `asUnownedTaskExecutor` in order to obtain an
+  /// `TaskExecutorRef` which is properly populated with any flags it might need.
+  TaskExecutorRef getExecutorRefFromUnownedTaskExecutor() const;
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutorOwned;
   }
 };
 

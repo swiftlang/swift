@@ -332,6 +332,10 @@ constexpr SpecifiedParamSynthesizer<G> _owned(G sub) {
   return {ParamSpecifier::LegacyOwned, sub};
 }
 template <class G>
+constexpr SpecifiedParamSynthesizer<G> _consuming(G sub) {
+  return {ParamSpecifier::Consuming, sub};
+}
+template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
   return {ParamSpecifier::InOut, sub};
 }

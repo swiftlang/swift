@@ -192,6 +192,38 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   }
 }
 
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _task_taskExecutor_getTaskExecutorRef(
+    HeapObject *executor, const Metadata *selfType,
+    const TaskExecutorWitnessTable *wtable);
+#pragma clang diagnostic pop
+
+TaskExecutorRef
+InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTaskExecutor() const {
+  fprintf(stderr, "[%s:%d](%s) we must call into the SerialExecutor::asUnownedTaskExecutor()\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d](%s) the executor Identity  = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          Identity);
+  fprintf(stderr, "[%s:%d](%s) the executor WitnessT  = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          WitnessTable);
+
+  TaskExecutorRef executorRef = _task_taskExecutor_getTaskExecutorRef(
+      Identity,
+      /*selfType=*/swift_getObjectType(Identity),
+      /*wtable=*/WitnessTable);
+
+  fprintf(stderr, "[%s:%d](%s) got executor ref:    ident = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          executorRef.getIdentity());
+  fprintf(stderr, "[%s:%d](%s) got executor ref: raw impl = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          executorRef.getRawImplementation());
+    return executorRef;
+}
+
+
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
@@ -663,9 +695,19 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
                           ->getExecutorRef();
       break;
 
-    case TaskOptionRecordKind::InitialTaskExecutor:
+    case TaskOptionRecordKind::InitialTaskExecutorUnowned:
+      fprintf(stderr, "[%s:%d](%s) TASK EXECUTOR UNOWNED GET THE RECORD...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
+      break;
+
+    case TaskOptionRecordKind::InitialTaskExecutorOwned:
+      taskExecutor = cast<InitialTaskExecutorOwnedPreferenceTaskOptionRecord>(option)
+                         ->getExecutorRefFromUnownedTaskExecutor();
+      fprintf(stderr, "[%s:%d](%s) EMIT OWNED: %p | %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+              taskExecutor.getIdentity(),
+              taskExecutor.getRawImplementation());
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
