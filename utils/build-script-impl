@@ -1245,10 +1245,13 @@ STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-foundation"
+FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR="${WORKSPACE}/swift-foundation-icu"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
+SWIFT_COLLECTIONS_SOURCE_DIR="${WORKSPACE}/swift-collections"
 SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-experimental-string-processing"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
@@ -2530,6 +2533,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
                   -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
+
+                  -DSwiftSyntax_DIR=$(build_directory ${host} swift)/cmake/modules
+
+                  -D_SwiftFoundation_SourceDIR=${FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR}
+                  -D_SwiftFoundationICU_SourceDIR=${FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR}
+                  -D_SwiftCollections_SourceDIR=${SWIFT_COLLECTIONS_SOURCE_DIR}
 
                   # NOTE(compnerd) we disable tests because XCTest is not ready
                   # yet, but we will reconfigure when the time comes.
