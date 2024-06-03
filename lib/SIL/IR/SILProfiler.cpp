@@ -468,6 +468,10 @@ private:
   /// The region's ending location.
   std::optional<SourceLoc> EndLoc;
 
+  /// Whether the region is within a macro expansion. Such regions do not
+  /// get recorded, but are needed to track the counters within the expansion.
+  bool IsInMacroExpansion = false;
+
   SourceMappingRegion(Kind RegionKind, std::optional<CounterExpr> Counter,
                       std::optional<SourceLoc> StartLoc)
       : RegionKind(RegionKind), Counter(Counter), StartLoc(StartLoc) {
@@ -515,6 +519,14 @@ public:
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;
   SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
+
+  bool isInMacroExpansion() const {
+    return IsInMacroExpansion;
+  }
+
+  void setIsInMacroExpansion() {
+    IsInMacroExpansion = true;
+  }
 
   /// Whether this region is for scoping only.
   bool isForScopingOnly() const { return RegionKind == Kind::ScopingOnly; }
@@ -837,6 +849,12 @@ private:
 
   Stmt *ImplicitTopLevelBody = nullptr;
 
+  /// The number of parent MacroExpansionExprs.
+  unsigned MacroDepth = 0;
+
+  /// Whether the current walk is within a macro expansion.
+  bool isInMacroExpansion() const { return MacroDepth > 0; }
+
   /// Return true if \c Ref has an associated counter.
   bool hasCounter(ProfileCounterRef Ref) { return CounterExprs.count(Ref); }
 
@@ -993,6 +1011,10 @@ private:
 
   /// Push a region onto the stack.
   void pushRegion(SourceMappingRegion Region) {
+    // Note on the region whether we're currently in a macro expansion.
+    if (isInMacroExpansion())
+      Region.setIsInMacroExpansion();
+
     LLVM_DEBUG({
       llvm::dbgs() << "Pushed region: ";
       Region.print(llvm::dbgs(), SM);
@@ -1026,6 +1048,11 @@ private:
       Region.print(llvm::dbgs(), SM);
       llvm::dbgs() << "\n";
     });
+
+    // Don't record regions in macro expansions, they don't have source
+    // locations that can be meaningfully mapped to source code.
+    if (Region.isInMacroExpansion())
+      return;
 
     // Don't bother recording regions that are only present for scoping.
     if (Region.isForScopingOnly())
@@ -1141,16 +1168,29 @@ public:
     if (SourceRegions.empty())
       return nullptr;
 
-    using MappedRegion = SILCoverageMap::MappedRegion;
+    auto FileSourceRange = SM.getRangeForBuffer(*SF->getBufferID());
+    auto isLocInFile = [&](SourceLoc Loc) {
+      return FileSourceRange.contains(Loc) || FileSourceRange.getEnd() == Loc;
+    };
 
+    using MappedRegion = SILCoverageMap::MappedRegion;
     std::vector<MappedRegion> Regions;
     SourceRange OuterRange;
     for (const auto &Region : SourceRegions) {
       assert(Region.hasStartLoc() && "invalid region");
       assert(Region.hasEndLoc() && "incomplete region");
 
-      // Build up the outer range from the union of all coverage regions.
       SourceRange Range(Region.getStartLoc(), Region.getEndLoc());
+
+      // Make sure we haven't ended up with any source locations outside the
+      // SourceFile (e.g for generated code such as macros), asserting in an
+      // asserts build, dropping in a non-asserts build.
+      if (!isLocInFile(Range.Start) || !isLocInFile(Range.End)) {
+        assert(false && "range outside of file");
+        continue;
+      }
+
+      // Build up the outer range from the union of all coverage regions.
       if (!OuterRange) {
         OuterRange = Range;
       } else {
@@ -1522,10 +1562,14 @@ public:
 
     if (hasCounter(E)) {
       pushRegion(SourceMappingRegion::forNode(E, SM));
-    } else if (isa<OptionalTryExpr>(E)) {
+    } else if (isa<OptionalTryExpr>(E) || isa<MacroExpansionExpr>(E)) {
       // If we have a `try?`, that doesn't already have a counter, record it
       // as a scoping-only region. We need it to scope child error branches,
       // but don't need it in the resulting set of regions.
+      //
+      // If we have a macro expansion, also push a scoping-only region. We'll
+      // discard any regions recorded within the macro, but will adjust for any
+      // control flow that may have happened within the macro.
       assignCounter(E, getCurrentCounter());
       pushRegion(SourceMappingRegion::scopingOnly(E, SM));
     }
@@ -1560,6 +1604,10 @@ public:
       // Already visited the children.
       return Action::SkipChildren(TE);
     }
+
+    if (isa<MacroExpansionExpr>(E))
+      MacroDepth += 1;
+
     return shouldWalkIntoExpr(E, Parent, Constant);
   }
 
@@ -1574,6 +1622,11 @@ public:
       replaceCount(
           CounterExpr::Sub(getCurrentCounter(), ThrowCount, CounterBuilder),
           Lexer::getLocForEndOfToken(SM, E->getEndLoc()));
+    }
+
+    if (isa<MacroExpansionExpr>(E)) {
+      assert(isInMacroExpansion());
+      MacroDepth -= 1;
     }
 
     if (hasCounter(E))

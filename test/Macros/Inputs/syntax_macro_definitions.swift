@@ -212,6 +212,25 @@ public class NestedDeclInExprMacro: ExpressionMacro {
   }
 }
 
+public class NullaryFunctionCallMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    let calls = macro.arguments.compactMap(\.expression).map { "\($0)()" }
+    return "(\(raw: calls.joined(separator: ", ")))"
+  }
+}
+
+public class TupleMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return "(\(raw: macro.arguments.map { "\($0)" }.joined()))"
+  }
+}
+
 enum CustomError: Error, CustomStringConvertible {
   case message(String)
 
