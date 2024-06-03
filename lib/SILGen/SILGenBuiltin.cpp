@@ -1539,6 +1539,9 @@ enum class CreateTaskOptions {
 
   /// The builtin has a non-optional TaskExecutor argument.
   TaskExecutor = 0x8,
+
+  /// The builtin has a non-optional consuming TaskExecutor argument.
+  TaskExecutorConsuming = 0x10, // FIXME does this make sense....?
 };
 
 /// Emit SIL for the various createAsyncTask builtins.
@@ -1595,13 +1598,25 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
-  ManagedValue taskExecutor = [&] {
+  ManagedValue taskExecutorDeprecated = [&] {
     if (options & CreateTaskOptions::OptionalEverything) {
       return nextArg().getAsSingleValue(SGF);
     } else if (options & CreateTaskOptions::TaskExecutor) {
       return emitOptionalSome(nextArg());
     } else {
       return emitOptionalNone(ctx.TheExecutorType);
+    }
+  }();
+  ManagedValue taskExecutorConsuming = [&] {
+    if (options & CreateTaskOptions::OptionalEverything) {
+      return nextArg().getAsSingleValue(SGF);
+    } else if (options & CreateTaskOptions::TaskExecutorConsuming) { // TODO: do we even need this branch, we're not using the flag
+      return emitOptionalSome(nextArg());
+    } else {
+      auto theTaskExecutorType =
+          ctx.getProtocol(KnownProtocolKind::TaskExecutor)
+              ->getDeclaredInterfaceType();
+      return emitOptionalNone(theTaskExecutorType->getCanonicalType());
     }
   }();
 
@@ -1659,7 +1674,8 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     flags.getUnmanagedValue(),
     initialExecutor.getUnmanagedValue(),
     taskGroup.getUnmanagedValue(),
-    taskExecutor.getUnmanagedValue(),
+    taskExecutorDeprecated.getUnmanagedValue(),
+    taskExecutorConsuming.forward(SGF),
     functionValue.forward(SGF)
   };
 

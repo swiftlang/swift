@@ -708,8 +708,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftTaskOptionRecordTy, // Base option record
     SwiftExecutorTy,         // Executor
   });
-  SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
+  SwiftInitialTaskExecutorUnownedPreferenceTaskOptionRecordTy =
       createStructType(*this, "swift.task_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
+  });
+  SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy =
+      createStructType(*this, "swift.task_executor_owned_task_option", {
     SwiftTaskOptionRecordTy, // Base option record
     SwiftExecutorTy,         // Executor
   });

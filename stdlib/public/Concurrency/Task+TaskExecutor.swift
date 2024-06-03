@@ -221,7 +221,7 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    executorPreference taskExecutor: (any TaskExecutor)?,
+    executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
@@ -237,12 +237,11 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
 
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
     self._task = task
     #else
     fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor")
@@ -282,7 +281,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    executorPreference taskExecutor: (any TaskExecutor)?,
+    executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) {
@@ -298,11 +297,11 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
+
     self._task = task
     #else
     fatalError("Unsupported Swift compiler, missing support for $BuiltinCreateAsyncTaskWithExecutor")
@@ -356,11 +355,11 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      // initialTaskExecutor: executorBuiltin, deprecated
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
 
     return Task(task)
     #else
@@ -416,10 +415,17 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
+//    let executorBuiltin: Builtin.Executor =
+//        taskExecutor.asUnownedTaskExecutor().executor
+
+// LEGACY:
+//    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+//      flags, executorBuiltin, operation)
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      // initialTaskExecutor: executorBuiltin, deprecated
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
 
     return Task(task)
     #else

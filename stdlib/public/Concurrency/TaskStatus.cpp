@@ -464,8 +464,8 @@ void swift::removeStatusRecordWhere(
      llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> updateStatus) {
   assert(condition && "condition is required");
-  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
-                       record, task);
+  SWIFT_TASK_DEBUG_LOG("remove status record where(), from task = %p",
+                       task);
 
   if (oldStatus.isStatusRecordLocked() &&
         waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus)) {
@@ -595,7 +595,7 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
 
-TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
+TaskExecutorRef AsyncTask::getPreferredTaskExecutor(bool assumeHasRecord) {
   // We first check the executor preference status flag, in order to avoid
   // having to scan through the records of the task checking if there was
   // such record.
@@ -669,7 +669,7 @@ static void swift_task_popTaskExecutorPreferenceImpl(
     TaskExecutorPreferenceStatusRecord *record) {
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task executor "
                        "preference record %p from task:%p",
-                       allocation, swift_task_getCurrent());
+                       record, swift_task_getCurrent());
   // We keep count of how many records there are because if there is more than
   // one, it means the task status flag should still be "has task preference".
   int preferenceRecordsCount = 0;
@@ -733,10 +733,14 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
                        this);
   assert(this->hasInitialTaskExecutorPreferenceRecord());
 
+  HeapObject *executorIdentity = nullptr;
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto r : status.records()) {
       if (r->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto record = cast<TaskExecutorPreferenceStatusRecord>(r);
+
+        executorIdentity = record->getPreferredExecutor().getIdentity();
+
         removeStatusRecordLocked(status, record);
         _swift_task_dealloc_specific(this, record);
         return;
@@ -748,6 +752,13 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
     assert(false && "dropInitialTaskExecutorPreferenceRecord must be "
                     "guaranteed to drop the last preference");
   });
+
+  // Release the "initial" preferred task executor, because it was specifically
+  // set in a Task initializer, which retained it.
+  //
+  // This should not be done for withTaskExecutorPreference executors,
+  // however in that case, we would not enter this function here to clean up.
+  swift_release(executorIdentity);
 }
 
 /**************************************************************************/
