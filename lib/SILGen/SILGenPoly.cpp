@@ -1968,7 +1968,7 @@ private:
     auto convention = innerSlot.getConvention();
     assert(!isPackParameter(convention));
     assert(innerSlot.shouldProduceAddress(SGF) == innerValue.getType().isAddress());
-    if (innerValue.hasCleanup() && !isConsumedParameter(convention)) {
+    if (innerValue.hasCleanup() && !isConsumedParameterInCaller(convention)) {
       return innerValue.borrow(SGF, Loc);
     }
     return innerValue;
@@ -2005,7 +2005,7 @@ private:
 
     // Easy case: we want to pass exactly this value.
     if (outer.getType() == innerParam.getType()) {
-      if (isConsumedParameter(innerParam.getConvention()) &&
+      if (isConsumedParameterInCaller(innerParam.getConvention()) &&
           !outer.isPlusOne(SGF)) {
         outer = outer.copyUnmanaged(SGF, Loc);
       }
@@ -2750,12 +2750,12 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
     arg = applyTrivialConversions(SGF, loc, arg,
                                   SILType::getPrimitiveObjectType(argSubstTy));
 
-    if (argTy.isConsumed()) {
+    if (argTy.isConsumedInCaller()) {
       forwardedArgs.push_back(arg.ensurePlusOne(SGF, loc).forward(SGF));
       continue;
     }
 
-    if (isGuaranteedParameter(argTy.getConvention())) {
+    if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       forwardedArgs.push_back(
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
       continue;
@@ -3890,7 +3890,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
     // Note that we need to force *trivial* packs/tuples to be copied, in
     // case the inner context wants to mutate the memory, even though we might
     // have ownership of that memory (e.g. if it's a consuming parameter).
-    needsInnerTemporary = (isConsumedParameter(innerConvention) &&
+    needsInnerTemporary = (isConsumedParameterInCaller(innerConvention) &&
                            !outerTupleOrPackMV.isPlusOne(SGF));
   }
 
@@ -3918,7 +3918,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
   // This doesn't apply if we're translating into a tuple because we
   // always need to copy/move into the tuple.
   if (!innerIsTuple && !needsInnerTemporary &&
-      !isConsumedParameter(innerConvention)) {
+      !isConsumedParameterInCaller(innerConvention)) {
     outerTupleOrPackMV =
       ManagedValue::forBorrowedAddressRValue(outerTupleOrPackMV.getValue());
   }
@@ -3928,7 +3928,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
   SILValue outerTupleOrPackAddr = outerTupleOrPackMV.forward(SGF);
 
   bool innerIsOwned = (innerIsTuple || needsInnerTemporary ||
-                       isConsumedParameter(innerConvention));
+                       isConsumedParameterInCaller(innerConvention));
 
   // Perform a pack loop to translate the components and set the element
   // addresses for this pack expansion in the inner pack (if it's a pack).
@@ -4043,7 +4043,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
     // We only associate this cleanup with what we return from this function
     // if we're generating an owned value; otherwise we just leave it active
     // so that we destroy the values later.
-    if (isConsumedParameter(innerConvention)) {
+    if (isConsumedParameterInCaller(innerConvention)) {
       return ManagedValue::forOwnedAddressRValue(innerTupleOrPackAddr,
                                                  innerExpansionCleanup);
     }

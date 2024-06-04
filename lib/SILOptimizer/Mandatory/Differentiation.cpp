@@ -312,7 +312,7 @@ static void copyParameterArgumentsForApply(
     auto argConv = applySite.getArgumentConvention(argOperand);
     auto collectNewArg = [&](SILValue newArg) {
       copiedArgs.push_back(newArg);
-      if (argConv.isGuaranteedConvention() &&
+      if (argConv.isGuaranteedConventionInCaller() &&
           argConv != SILArgumentConvention::Indirect_InoutAliasable)
         newArgsToDestroy.push_back(newArg);
     };

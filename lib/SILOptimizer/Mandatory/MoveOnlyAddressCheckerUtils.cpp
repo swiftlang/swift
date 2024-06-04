@@ -2566,7 +2566,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   }
 
   if (auto *yi = dyn_cast<YieldInst>(user)) {
-    if (yi->getYieldInfoForOperand(*op).isGuaranteed()) {
+    if (yi->getYieldInfoForOperand(*op).isGuaranteedInCaller()) {
       LLVM_DEBUG(llvm::dbgs() << "coroutine yield\n");
       SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
       TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);

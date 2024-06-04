@@ -2612,7 +2612,7 @@ void LoadableByAddress::recreateSingleApply(
         } else if (newValue->getType().isTrivial(*F)) {
           ownership = LoadOwnershipQualifier::Trivial;
         } else {
-          assert(oldYields[i].isConsumed() &&
+          assert(oldYields[i].isConsumedInCaller() &&
                  "borrowed yields not yet supported here");
           ownership = LoadOwnershipQualifier::Take;
         }

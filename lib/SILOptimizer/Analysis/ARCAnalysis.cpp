@@ -496,7 +496,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // Ptr. If we fail, return true.
   auto Params = FType->getParameters();
   for (unsigned i : indices(Params)) {    
-    if (!Params[i].isGuaranteed())
+    if (!Params[i].isGuaranteedInCaller())
       continue;
     SILValue Op = FAS.getArgumentsWithoutIndirectResults()[i];
     if (!AA->isNoAlias(Op, Ptr))

@@ -806,7 +806,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
     SILValue arg = *paramArgIter;
     if (builder.hasOwnership() && arg->getType().isObject() &&
         arg->getOwnershipKind() == OwnershipKind::Owned &&
-        param.isGuaranteed()) {
+        param.isGuaranteedInCaller()) {
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
@@ -1089,7 +1089,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
           applySite.getKind() != ApplySiteKind::PartialApplyInst &&
           arg->getType().isObject() &&
           arg->getOwnershipKind() == OwnershipKind::Owned &&
-          paramInfo.isGuaranteedConvention()) {
+          paramInfo.isGuaranteedConventionInCaller()) {
         SILBuilderWithScope borrowBuilder(applySite.getInstruction(),
                                           argBuilder);
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);

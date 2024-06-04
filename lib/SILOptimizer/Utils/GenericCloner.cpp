@@ -143,7 +143,7 @@ void GenericCloner::populateCloned() {
           // Store the new direct parameter to an alloc_stack.
           createAllocStack();
           SILValue addr;
-          if (NewArg->getArgumentConvention().isGuaranteedConvention() &&
+          if (NewArg->getArgumentConvention().isGuaranteedConventionInCallee() &&
               NewArg->getFunction()->hasOwnership()) {
             auto *sbi = getBuilder().createStoreBorrow(Loc, NewArg, ASI);
             StoreBorrowsToCleanup.push_back(sbi);
