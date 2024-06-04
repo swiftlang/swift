@@ -273,6 +273,20 @@ add_custom_target(musl_modulemap DEPENDS ${musl_modulemap_target_list})
 set_property(TARGET musl_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay musl_modulemap)
 
+# Add a system 'math' module overlay, that only applies only to platforms that
+# have a top level '_math' module.
+add_swift_target_library(swift_math ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    Math.swift
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS "ANDROID"
+    INSTALL_IN_COMPONENT sdk-overlay
+    DEPENDS android_modulemap)
+
 add_swift_target_library(swiftAndroid ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Android.swift
     ${swift_platform_sources}
