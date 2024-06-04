@@ -50,4 +50,11 @@ do {
 
   print((AnyObject & Sendable & Marker).self)
   // CHECK: AnyObject
+
+  func generic<T>(_: T.Type) {
+    print((D<T> & Sendable).self)
+  }
+
+  generic(Int.self)
+  // CHECK: D<Int>
 }
