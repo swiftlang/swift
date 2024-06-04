@@ -3946,9 +3946,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                           conventionAttr->getConventionName());
         } else {
           isolation = FunctionTypeIsolation::forErased();
-
-          // @isolated(any) implies @Sendable, unconditionally for now.
-          sendable = true;
         }
         break;
       }

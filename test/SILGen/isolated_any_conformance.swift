@@ -7,7 +7,7 @@
 // introduced a protocol for different task group types.
 
 struct A<T> {
-  func enqueue(operation: @escaping @isolated(any) () async -> T) {}
+  func enqueue(operation: @escaping @isolated(any) @Sendable () async -> T) {}
 }
 
 protocol Enqueuer {

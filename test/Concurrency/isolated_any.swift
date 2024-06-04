@@ -75,7 +75,7 @@ func testConvertIsolatedAnyToMainActor(fn: @Sendable @isolated(any) () -> ()) {
   requireSendableGlobalActor(fn)
 }
 
-func extractFunctionIsolation(_ fn: @isolated(any) @escaping () async -> Void) {
+func extractFunctionIsolation(_ fn: @isolated(any) @Sendable @escaping () async -> Void) {
   let _: (any Actor)? = extractIsolation(fn)
 
   let myActor = A()
@@ -85,14 +85,48 @@ func extractFunctionIsolation(_ fn: @isolated(any) @escaping () async -> Void) {
 }
 
 func extractFunctionIsolationExpr(
-  _ fn1: @isolated(any) @escaping () async -> Void,
-  _ fn2: @isolated(any) @escaping (Int, String) -> Bool
+  _ fn1: @isolated(any) @Sendable @escaping () async -> Void,
+  _ fn2: @isolated(any) @Sendable @escaping (Int, String) -> Bool
 ) {
   let _: (any Actor)? = fn1.isolation
   let _: (any Actor)? = fn2.isolation
 
   // Only `@isolated(any)` functions have `.isolation`
   let myActor = A()
+  let _: (any Actor)? = myActor.actorFunction.isolation // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.asyncActorFunction.isolation // expected-error {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.asyncThrowsActorFunction.isolation // expected-error {{value of type '@Sendable () async throws -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.actorFunctionWithArgs.isolation // expected-error {{value of type '@Sendable (Int) async -> String' has no member 'isolation'}}
+
   let _: (any Actor)? = globalNonisolatedFunction.isolation // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = globalMainActorFunction.isolation // expected-error {{value of type '@MainActor @Sendable () -> ()' has no member 'isolation'}}
+}
+
+func requireDotIsolation(_ fn: (any Actor)?) -> (any Actor)? { return fn }
+
+func testDotIsolation() {
+  let _ : (any Actor)? = requireDotIsolation(globalMainActorFunction.isolation) // expected-error {{value of type '@MainActor @Sendable () -> ()' has no member 'isolation'}}
+  let _ : (any Actor)? = requireDotIsolation(globalNonisolatedFunction.isolation) // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
+}
+
+func testFunctionIsolationExpr1(_ fn: (@isolated(any) () -> Void)?) -> (any Actor)? {
+  return fn?.isolation
+}
+
+func testFunctionIsolationExpr2(_ fn: Optional<(@isolated(any) () -> Void)>) -> Optional<any Actor> {
+  return fn?.isolation
+}
+
+func testFunctionIsolationExprTuple(
+  _ fn1: (@isolated(any) @Sendable () -> Void)?,
+  _ fn2: (@isolated(any) @Sendable () -> Void)?
+) -> ((any Actor)?, (any Actor)?)
+{
+  return (fn1?.isolation, fn2?.isolation)
+}
+
+func nonSendableIsolatedAny(
+  _ fn: @escaping @isolated(any) () -> Void // expected-note {{parameter 'fn' is implicitly non-sendable}}
+) {
+  let _: @Sendable () -> Void = fn  // expected-warning {{using non-sendable parameter 'fn' in a context expecting a @Sendable closure}}
 }
