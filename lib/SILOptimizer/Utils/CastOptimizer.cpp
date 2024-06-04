@@ -530,8 +530,8 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     bridgedFunc->setParentModule(
         resultDecl->getDeclContext()->getParentModule());
 
-  if (dynamicCast.getFunction()->isSerialized() &&
-      !bridgedFunc->hasValidLinkageForFragileRef())
+  if (dynamicCast.getFunction()->isAnySerialized() &&
+      !bridgedFunc->hasValidLinkageForFragileRef(dynamicCast.getFunction()->getSerializedKind()))
     return std::nullopt;
 
   if (bridgedFunc->getLoweredFunctionType()

@@ -719,11 +719,11 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
     return false;
   }
 
-  // pcmo TODO: check for tri-state serialized kind
-  if (applySite.getFunction()->isSerialized()) {
+  if (applySite.getFunction()->isAnySerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
-    if (!f->hasValidLinkageForFragileRef())
+    if (!f->hasValidLinkageForFragileRef(
+      applySite.getFunction()->getSerializedKind()))
       return false;
   }
 
@@ -1168,13 +1168,11 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   if (!f)
     return false;
 
-  // pcmo TODO: check for tri-state serialized kind
-  if (applySite.getFunction()->isSerialized()) {
-    // function_ref inside fragile function cannot reference a private or
-    // hidden symbol.
-    if (!f->hasValidLinkageForFragileRef())
-      return false;
-  }
+  // function_ref inside fragile function cannot reference a private or
+  // hidden symbol.
+  if (applySite.getFunction()->isAnySerialized() &&
+      !f->hasValidLinkageForFragileRef(applySite.getFunction()->getSerializedKind()))
+    return false;
 
   // devirtualizeWitnessMethod below does not support this case. It currently
   // assumes it can try_apply call the target.
