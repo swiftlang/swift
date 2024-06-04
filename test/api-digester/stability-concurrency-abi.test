@@ -58,10 +58,8 @@ Func _asyncLet_get(_:_:) has mangled name changing from '_Concurrency._asyncLet_
 Func _asyncLet_get(_:_:) has return type change from Builtin.RawPointer to ()
 Func _asyncLet_get_throwing(_:_:) has mangled name changing from '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> Builtin.RawPointer' to '_Concurrency._asyncLet_get_throwing(Builtin.RawPointer, Builtin.RawPointer) async throws -> ()'
 Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer to ()
-Protocol Actor has added inherited protocol AnyActor
 Protocol Actor has added inherited protocol Copyable
 Protocol Actor has added inherited protocol Escapable
-Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
 Protocol AsyncIteratorProtocol has generic signature change from to <Self.Failure : Swift.Error>
 Protocol AsyncIteratorProtocol has added inherited protocol Copyable
 Protocol AsyncIteratorProtocol has added inherited protocol Escapable
