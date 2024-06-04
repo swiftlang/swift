@@ -878,7 +878,6 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   }
 
   // Anything else that is not public is not serializable.
-  // pcmo TODO: should check if package-cmo is enabled?
   if (d->getEffectiveAccess() < AccessLevel::Public)
     return IsNotSerialized;
 

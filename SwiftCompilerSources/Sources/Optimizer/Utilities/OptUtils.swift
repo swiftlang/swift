@@ -655,9 +655,8 @@ extension FullApplySite {
       return false
     }
     // Cannot inline a non-inlinable function it an inlinable function.
-    if parentFunction.isSerialized,
-       let calleeFunction = referencedFunction,
-       !calleeFunction.isSerialized {
+    if let calleeFunction = referencedFunction,
+       !calleeFunction.canBeInlinedIntoCaller(parentFunction.serializedKind) {
       return false
     }
 
