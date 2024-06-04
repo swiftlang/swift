@@ -22,9 +22,57 @@ protocol ProtocolWithMixedReqs {
   func nonSendingParamAndSendingResult(_ x: NonSendableKlass) -> sending NonSendableKlass // expected-note 4{{}}
 }
 
-/////////////////
-// MARK: Tests //
-/////////////////
+/////////////////////////////////
+// MARK: Normal Function Tests //
+/////////////////////////////////
+
+func functionWithSendingResult() -> sending NonSendableKlass { fatalError() }
+func functionWithoutSendingResult() -> NonSendableKlass { fatalError() }
+func functionWithSendingParameter(_ x: sending NonSendableKlass)  { fatalError() }
+func functionWithoutSendingParameter(_ x: NonSendableKlass)  { fatalError() }
+
+func takeFnWithSendingResult(_ fn: () -> sending NonSendableKlass) {}
+func takeFnWithoutSendingResult(_ fn: () -> NonSendableKlass) {}
+func takeFnWithSendingParam(_ fn: (sending NonSendableKlass) -> ()) {}
+func takeFnWithoutSendingParam(_ fn: (NonSendableKlass) -> ()) {}
+
+func testFunctionMatching() {
+  let _: (NonSendableKlass) -> () = functionWithSendingParameter
+  // expected-error @-1 {{cannot convert value of type '@Sendable (sending NonSendableKlass) -> ()' to specified type '(NonSendableKlass) -> ()'}}
+  let _: (sending NonSendableKlass) -> () = functionWithSendingParameter
+
+  let _: (NonSendableKlass) -> () = functionWithoutSendingParameter
+  let _: (sending NonSendableKlass) -> () = functionWithoutSendingParameter
+
+  takeFnWithSendingParam(functionWithSendingParameter)
+  takeFnWithoutSendingParam(functionWithSendingParameter)
+  // expected-error @-1 {{@Sendable (sending NonSendableKlass) -> ()' to expected argument type '(NonSendableKlass) -> ()}}
+  takeFnWithSendingParam(functionWithoutSendingParameter)
+  takeFnWithoutSendingParam(functionWithoutSendingParameter)
+}
+
+func testReturnValueMatching() {
+  let _: () -> NonSendableKlass = functionWithSendingResult
+  let _: () -> sending NonSendableKlass = functionWithSendingResult
+  let _: () -> NonSendableKlass = functionWithoutSendingResult
+  let _: () -> sending NonSendableKlass = functionWithoutSendingResult
+  // expected-error @-1 {{cannot convert value of type '@Sendable () -> NonSendableKlass' to specified type '() -> sending NonSendableKlass'}}
+
+  takeFnWithSendingResult(functionWithSendingResult)
+  takeFnWithSendingResult(functionWithoutSendingResult)
+  // expected-error @-1 {{cannot convert value of type '@Sendable () -> NonSendableKlass' to expected argument type '() -> sending NonSendableKlass'}}
+  let x: () -> NonSendableKlass = { fatalError() }
+  takeFnWithSendingResult(x)
+  // expected-error @-1 {{cannot convert value of type '() -> NonSendableKlass' to expected argument type '() -> sending NonSendableKlass'}}
+
+  takeFnWithoutSendingResult(functionWithSendingResult)
+  takeFnWithoutSendingResult(functionWithoutSendingResult)
+  takeFnWithoutSendingResult(x)
+}
+
+//////////////////////////
+// MARK: Protocol Tests //
+//////////////////////////
 
 struct MatchSuccess : ProtocolWithSendingReqs, ProtocolWithMixedReqs {
   func sendingResult() -> sending NonSendableKlass { fatalError() }

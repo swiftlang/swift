@@ -3235,6 +3235,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
+  // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
+  if (func1->hasSendingResult() != func2->hasSendingResult() &&
+      (!func1->hasSendingResult() || kind < ConstraintKind::Subtype)) {
+    return getTypeMatchFailure(locator);
+  }
+
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
 
@@ -3662,6 +3668,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // discarded.
       if (func1->isDifferentiable() && func2->isDifferentiable() &&
           func1Param.isNoDerivative() && !func2Param.isNoDerivative()) {
+        return getTypeMatchFailure(argumentLocator);
+      }
+
+      // Do not allow for functions that expect a sending parameter to match
+      // with a function that expects a non-sending parameter.
+      if (func1Param.getParameterFlags().isSending() &&
+          !func2Param.getParameterFlags().isSending()) {
         return getTypeMatchFailure(argumentLocator);
       }
 
