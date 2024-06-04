@@ -106,6 +106,10 @@ extension _NativeDictionary {
     // If the capacity is 0, then our storage is the empty singleton. Those are
     // read only, so we shouldn't attempt to write to them.
     if capacity == 0 {
+      let c = initializer(
+        UnsafeMutableBufferPointer(start: nil, count: 0), 
+        UnsafeMutableBufferPointer(start: nil, count: 0))
+      _precondition(c == 0)
       return
     }
 
