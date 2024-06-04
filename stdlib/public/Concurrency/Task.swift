@@ -167,21 +167,14 @@ extension Task {
   ///
   /// - Returns: The task's result.
   public var value: Success {
+    // FIXME: This seems wrong that abi test is not freaking out here?
+    //        At the same time, adding a silgen_name compat accessor with old signature results in duplicate definitions -- is mangling of typed throws not done properly on return position?
     get async throws(Failure) {
       do {
-        return try await __abi_value
+        return try await _taskFutureGetThrowing(_task)
       } catch {
         throw error as! Failure
       }
-    }
-  }
-
-  @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$sScT5valuexvg")
-  @usableFromInline
-  internal var __abi_value: Success {
-    get async throws {
-      return try await _taskFutureGetThrowing(_task)
     }
   }
 
@@ -200,7 +193,7 @@ extension Task {
   public var result: Result<Success, Failure> {
     get async {
       do {
-        return .success(try await __abi_value)
+        return .success(try await value)
       } catch {
         return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
       }
