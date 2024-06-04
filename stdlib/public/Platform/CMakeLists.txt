@@ -273,6 +273,20 @@ add_custom_target(musl_modulemap DEPENDS ${musl_modulemap_target_list})
 set_property(TARGET musl_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay musl_modulemap)
 
+# Add a system 'math' module overlay, that only applies only to platforms that
+# have a top level '_math' module.
+add_swift_target_library(swift_math ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    Math.swift
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS "ANDROID"
+    INSTALL_IN_COMPONENT sdk-overlay
+    DEPENDS android_modulemap)
+
 add_swift_target_library(swiftAndroid ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Android.swift
     ${swift_platform_sources}
@@ -353,8 +367,7 @@ foreach(sdk ${SWIFT_SDKS})
     # If this SDK is a target for a non-native host, except if it's for Android
     # with its own native sysroot, create a native modulemap without a sysroot
     # prefix. This is the one we'll install instead.
-    if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/" AND
-       NOT (sdk STREQUAL "ANDROID" AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
+    if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/")
       set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
 
       handle_gyb_source_single(glibc_modulemap_native_target
@@ -416,7 +429,7 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
       OUTPUT ${module_dir}/${android_modulemap_source} ${module_dir_static}/${android_modulemap_source}
       COMMENT "Copying Android modulemap to resource directories")
     add_custom_command_target(
-      copy_android_ndk_neader_resource
+      copy_android_ndk_header_resource
       COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
       COMMAND
@@ -428,7 +441,7 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
       OUTPUT ${module_dir}/${android_ndk_header_source} ${module_dir_static}/${android_ndk_header_source}
       COMMENT "Copying Android NDK header to resource directories")
     add_custom_command_target(
-      copy_android_bionic_neader_resource
+      copy_android_bionic_header_resource
       COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
       COMMAND
@@ -441,11 +454,11 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
       COMMENT "Copying Android NDK header to resource directories")
 
     add_dependencies(sdk-overlay ${copy_android_modulemap_resource}
-                                 ${copy_android_ndk_neader_resource}
-                                 ${copy_android_bionic_neader_resource})
+                                 ${copy_android_ndk_header_resource}
+                                 ${copy_android_bionic_header_resource})
     list(APPEND android_modulemap_target_list ${copy_android_modulemap_resource}
-                                              ${copy_android_ndk_neader_resource}
-                                              ${copy_android_bionic_neader_resource})
+                                              ${copy_android_ndk_header_resource}
+                                              ${copy_android_bionic_header_resource})
 
     swift_install_in_component(FILES "${android_modulemap_source}"
                                      "${android_ndk_header_source}"
