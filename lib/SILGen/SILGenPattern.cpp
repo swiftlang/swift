@@ -457,7 +457,8 @@ public:
   void emitDestructiveCaseBlocks();
 
   JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
-  void emitSharedCaseBlocks(llvm::function_ref<void(CaseStmt *)> bodyEmitter);
+  void emitSharedCaseBlocks(ValueOwnership ownership,
+                            llvm::function_ref<void(CaseStmt *)> bodyEmitter);
 
   void emitCaseBody(CaseStmt *caseBlock);
 
@@ -2790,8 +2791,13 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
     // TODO: handle fallthroughs and multiple cases bindings
     // In those cases we'd need to forward bindings through the shared case
     // destination blocks.
-    assert(!stmt->hasFallthroughDest()
-           && stmt->getCaseLabelItems().size() == 1);
+    if (stmt->hasFallthroughDest()
+        || stmt->getCaseLabelItems().size() != 1) {
+      // This should already have been diagnosed as unsupported, so just emit
+      // an unreachable here.
+      SGF.B.createUnreachable(stmt);
+      continue;
+    }
 
     // Bind variables from the pattern.
     if (stmt->hasCaseBodyVariables()) {
@@ -2899,7 +2905,21 @@ emitAddressOnlyInitialization(VarDecl *dest, SILValue value) {
 
 /// Emit all the shared case statements.
 void PatternMatchEmission::emitSharedCaseBlocks(
+    ValueOwnership ownership,
     llvm::function_ref<void(CaseStmt *)> bodyEmitter) {
+  if (ownership >= ValueOwnership::Shared
+      && !SharedCases.empty()) {
+    SGF.SGM.diagnose(SharedCases.front().first,
+                     diag::noncopyable_shared_case_block_unimplemented);
+    
+    for (auto &entry : SharedCases) {
+      SILBasicBlock *caseBB = entry.second.first;
+      SGF.B.setInsertionPoint(caseBB);
+      SGF.B.createUnreachable(entry.first);
+    }
+    
+    return;
+  }
   for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
     SILBasicBlock *caseBB = entry.second.first;
@@ -3742,7 +3762,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   }
 
   // Then emit the case blocks shared by multiple pattern cases.
-  emission.emitSharedCaseBlocks(
+  emission.emitSharedCaseBlocks(ownership,
       [&](CaseStmt *caseStmt) { emission.emitCaseBody(caseStmt); });
 
   // Bookkeeping.
@@ -4015,7 +4035,8 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   stmtScope.pop();
 
   // Then emit the case blocks shared by multiple pattern cases.
-  emission.emitSharedCaseBlocks([&](CaseStmt *caseStmt) {
+  emission.emitSharedCaseBlocks(ValueOwnership::Default,
+  [&](CaseStmt *caseStmt) {
     emitStmt(caseStmt->getBody());
 
     // If we fell out of the catch clause, branch to the fallthrough dest.

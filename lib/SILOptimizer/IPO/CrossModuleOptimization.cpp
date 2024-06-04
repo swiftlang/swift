@@ -385,8 +385,7 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  if (function->isSerialized() ||
-      isSerializedWithRightKind(M, function)) {
+  if (function->isAnySerialized()) {
     canSerializeFlags[function] = true;
     return true;
   }
@@ -696,13 +695,6 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                                 const FunctionFlags &canSerializeFlags) {
-  // This means the function is @inlinable (or similar)
-  // so should have [serialized] attribute.
-  if (function->isSerialized())
-    return;
-
-  // If not, check whether it was serialized with
-  // this optimization.
   if (isSerializedWithRightKind(M, function))
     return;
 

@@ -5464,14 +5464,9 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     // Perform an extra check for transferring. Since it is a specifier, we use
     // the actual parsing logic below.
     if (Tok.isContextualKeyword("transferring")) {
-      if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::TransferringArgsAndResults));
-      } else {
-        // Now that we have sending, warn users to convert 'transferring' to
-        // 'sendable'.
-        P.diagnose(Tok, diag::transferring_is_now_sendable);
-      }
+      // Now that we have sending, warn users to convert 'transferring' to
+      // 'sendable'.
+      P.diagnose(Tok, diag::transferring_is_now_sendable);
 
       // Do not allow for transferring to be parsed after a specifier has been
       // parsed.
@@ -5520,6 +5515,14 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
             .fixItRemove(TransferringLoc);
       }
 
+      // If we already saw a specifier, check if we have borrowing. In such a
+      // case, emit an error.
+      if (SpecifierLoc.isValid() &&
+          Specifier == ParamDecl::Specifier::Borrowing) {
+        P.diagnose(Tok, diag::sending_cannot_be_used_with_borrowing,
+                   "sending");
+      }
+
       SendingLoc = P.consumeToken();
       continue;
     }
@@ -5557,6 +5560,13 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (bool(Specifier) && SendingLoc.isValid()) {
         P.diagnose(Tok, diag::sending_before_parameter_specifier,
                    getNameForParamSpecifier(Specifier));
+      }
+
+      // We cannot use transferring with borrowing.
+      if (TransferringLoc.isValid() &&
+          Specifier == ParamDecl::Specifier::Borrowing) {
+        P.diagnose(TransferringLoc, diag::sending_cannot_be_used_with_borrowing,
+                   "transferring");
       }
     }
     Tok.setKind(tok::contextual_keyword);

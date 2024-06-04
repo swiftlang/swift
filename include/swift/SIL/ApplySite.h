@@ -470,6 +470,21 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Return the sil_isolated operand if we have one.
+  Operand *getIsolatedArgumentOperandOrNullPtr() {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Return a list of applied arguments without self.
   OperandValueArrayRef getArgumentsWithoutSelf() const {
     switch (ApplySiteKind(Inst->getKind())) {

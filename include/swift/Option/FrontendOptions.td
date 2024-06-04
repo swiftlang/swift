@@ -224,6 +224,14 @@ def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
   MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
   HelpText<"Specify the cross import module">;
 
+def module_can_import: Separate<["-"], "module-can-import">,
+  MetaVarName<"<moduleName>">,
+  HelpText<"Specify canImport module name">;
+
+def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
+  MetaVarName<"<moduleName> <version> <underlyingVersion>">,
+  HelpText<"Specify canImport module and versions">;
+
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 

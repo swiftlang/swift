@@ -3140,12 +3140,10 @@ void swift::trySpecializeApplyOfGeneric(
   // callee either.
   bool needSetLinkage = false;
   if (isMandatory) {
-    // pcmo TODO: remove F->isSerialiezd() and pass its kind to
-    // canBeInlinedIntoCaller instead.
-    if (F->isSerialized() && !RefF->canBeInlinedIntoCaller())
+    if (!RefF->canBeInlinedIntoCaller(F->getSerializedKind()))
       needSetLinkage = true;
   } else {
-    if (F->isSerialized() && !RefF->canBeInlinedIntoCaller())
+    if (!RefF->canBeInlinedIntoCaller(F->getSerializedKind()))
         return;
 
     if (shouldNotSpecialize(RefF, F))
@@ -3265,22 +3263,22 @@ void swift::trySpecializeApplyOfGeneric(
     return;
   }
 
-  // pcmo TODO: remove F->isSerialiezd() and pass its kind to
-  // canBeInlinedIntoCaller instead.
   if (needSetLinkage) {
-    assert(F->isSerialized() && !RefF->canBeInlinedIntoCaller());
+    assert(F->isAnySerialized() &&
+           !RefF->canBeInlinedIntoCaller(F->getSerializedKind()));
     // If called from a serialized function we cannot make the specialized function
     // shared and non-serialized. The only other option is to keep the original
     // function's linkage. It's not great, because it can prevent dead code
     // elimination - usually the original function is a public function.
     SpecializedF->setLinkage(RefF->getLinkage());
     SpecializedF->setSerializedKind(IsNotSerialized);
-  } else if (F->isSerialized() && !SpecializedF->canBeInlinedIntoCaller()) {
+  } else if (F->isAnySerialized() &&
+             !SpecializedF->canBeInlinedIntoCaller(F->getSerializedKind())) {
     // If the specialized function already exists as a "IsNotSerialized" function,
-    // but now it's called from a "IsSerialized" function, we need to mark it as
-    // IsSerialized.
-    SpecializedF->setSerializedKind(IsSerialized);
-    assert(SpecializedF->canBeInlinedIntoCaller());
+    // but now it's called from a serialized function, we need to mark it the
+    // same as its SerializedKind.
+    SpecializedF->setSerializedKind(F->getSerializedKind());
+    assert(SpecializedF->canBeInlinedIntoCaller(F->getSerializedKind()));
     
     // ... including all referenced shared functions.
     FuncBuilder.getModule().linkFunction(SpecializedF.getFunction(),

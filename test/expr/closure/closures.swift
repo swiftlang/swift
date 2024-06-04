@@ -756,6 +756,8 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
     }
 }
 
+func takesEscapingWithAllowedImplicitSelf(@_implicitSelfCapture _ fn: @escaping () -> Void) {}
+
 public class TestImplicitSelfForWeakSelfCapture {
   static let staticOptional: TestImplicitSelfForWeakSelfCapture? = nil
   func method() { }
@@ -817,7 +819,13 @@ public class TestImplicitSelfForWeakSelfCapture {
         method()
       }
     }
-    
+
+    takesEscapingWithAllowedImplicitSelf { [weak self] in
+      method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      guard let self = self else { return }
+      method()
+    }
+
     doVoidStuff { [weak self] in
       let `self`: TestImplicitSelfForWeakSelfCapture? = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional
       guard let self = self else { return }

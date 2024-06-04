@@ -262,8 +262,8 @@ extension UnsafePointer where Pointee: ~Copyable {
   /// This pointer must be a pointer to the start of a previously allocated
   /// memory block. The memory must not be initialized or `Pointee` must be a
   /// trivial type.
+  @inlinable
   @_preInverseGenerics
-  @_transparent
   public func deallocate() {
     // Passing zero alignment to the runtime forces "aligned
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
@@ -777,8 +777,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Pointee`.
+  @inlinable
   @_preInverseGenerics
-  @_transparent
   public static func allocate(
     capacity count: Int
   ) -> UnsafeMutablePointer<Pointee> {
@@ -810,8 +810,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// This pointer must be a pointer to the start of a previously allocated
   /// memory block. The memory must not be initialized or `Pointee` must be a
   /// trivial type.
+  @inlinable
   @_preInverseGenerics
-  @_transparent
   public func deallocate() {
     // Passing zero alignment to the runtime forces "aligned
     // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
@@ -898,7 +898,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// - Parameters:
   ///   - value: The instance to initialize this pointer's pointee to.
   @_alwaysEmitIntoClient
-  @_transparent
   public func initialize(to value: consuming Pointee) {
     Builtin.initialize(value, self._rawValue)
   }
@@ -929,8 +928,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// `move()`, the memory is uninitialized.
   ///
   /// - Returns: The instance referenced by this pointer.
+  @inlinable
   @_preInverseGenerics
-  @_transparent
   public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
@@ -1163,9 +1162,9 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   not be negative.
   /// - Returns: A raw pointer to the same address as this pointer. The memory
   ///   referenced by the returned raw pointer is still bound to `Pointee`.
-  @discardableResult
+  @inlinable
   @_preInverseGenerics
-  @_transparent
+  @discardableResult
   public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
     // Note: When count is statically known to be 1 the compiler will optimize

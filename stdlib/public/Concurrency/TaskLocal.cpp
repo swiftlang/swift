@@ -149,38 +149,24 @@ static void swift_task_localValuePopImpl() {
 
 SWIFT_CC(swift)
 static void swift_task_localsCopyToImpl(AsyncTask *target) {
-  TaskLocal::Storage *Local = nullptr;
-
-  if (AsyncTask *task = swift_task_getCurrent()) {
-    Local = &task->_private().Local;
-  } else if (auto *storage = FallbackTaskLocalStorage::get()) {
-    Local = storage;
-  } else {
-    // bail out, there are no values to copy
-    return;
+  if (auto Current = TaskLocal::Storage::getCurrent(swift_task_getCurrent())) {
+    Current->copyTo(target);
   }
-
-  Local->copyTo(target);
-}
-
-SWIFT_CC(swift)
-static void swift_task_localsCopyToTaskGroupChildTaskDefensivelyImpl(AsyncTask *target) {
-  TaskLocal::Storage *Local = nullptr;
-
-  if (AsyncTask *task = swift_task_getCurrent()) {
-    Local = &task->_private().Local;
-  } else if (auto *storage = FallbackTaskLocalStorage::get()) {
-    Local = storage;
-  } else {
-    // bail out, there are no values to copy
-    return;
-  }
-
-  Local->copyToOnlyOnlyFromCurrent(target);
 }
 
 // =============================================================================
 // ==== Initialization ---------------------------------------------------------
+
+TaskLocal::Storage*
+TaskLocal::Storage::getCurrent(AsyncTask *current) {
+  if (current) {
+    return &current->_private().Local;
+  } else if (auto *storage = FallbackTaskLocalStorage::get()) {
+    return storage;
+  }
+
+  return nullptr;
+}
 
 void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
                                               AsyncTask* parent) {
@@ -501,7 +487,9 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
   }
 }
 
-void TaskLocal::Storage::copyToOnlyOnlyFromCurrent(AsyncTask *target) {
+// TODO(concurrency): This can be optimized to copy only from the CURRENT group,
+//  but we need to detect this, e.g. by more flags in the items made from a group?
+void TaskLocal::Storage::copyToOnlyOnlyFromCurrentGroup(AsyncTask *target) {
   assert(target && "task must not be null when copying values into it");
   assert(!(target->_private().Local.head) &&
       "Task must not have any task-local values bound before copying into it");
@@ -525,7 +513,7 @@ void TaskLocal::Storage::copyToOnlyOnlyFromCurrent(AsyncTask *target) {
         // as we would have within normal child task relationships. E.g. this is
         // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
         // binding, so we re-link our current head to point at this item.
-        copiedHead->relinkNext(item);
+        copiedHead->relinkTaskGroupLocalHeadToSafeNext(item);
         break;
       }
 

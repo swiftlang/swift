@@ -25,6 +25,7 @@
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -1112,34 +1113,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
-  // Enable TransferringArgsAndResults/SendingArgsAndResults whenever
-  // RegionIsolation is enabled.
-  if (Opts.hasFeature(Feature::RegionBasedIsolation)) {
-    bool enableTransferringArgsAndResults = true;
-    bool enableSendingArgsAndResults = true;
-#ifndef NDEBUG
-    enableTransferringArgsAndResults = !Args.hasArg(
-        OPT_disable_transferring_args_and_results_with_region_isolation);
-    enableSendingArgsAndResults = !Args.hasArg(
-        OPT_disable_sending_args_and_results_with_region_isolation);
-#endif
-    if (enableTransferringArgsAndResults)
-      Opts.enableFeature(Feature::TransferringArgsAndResults);
-    if (enableSendingArgsAndResults)
-      Opts.enableFeature(Feature::SendingArgsAndResults);
-  }
-
-  // Enable SendingArgsAndResults whenever TransferringArgsAndResults is
-  // enabled.
-  //
-  // The reason that we are doing this is we want to phase out transferring in
-  // favor of sending and this ensures that if we output 'sending' instead of
-  // 'transferring' (for instance when emitting suppressed APIs), we know that
-  // the compiler will be able to handle sending as well.
-  if (Opts.hasFeature(Feature::TransferringArgsAndResults)) {
-    Opts.enableFeature(Feature::SendingArgsAndResults);
-  }
-
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
@@ -1572,6 +1545,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
+  } else if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.UseCheckedAsyncObjCBridging = true;
   }
 
   Opts.DisableDynamicActorIsolation |=
@@ -2143,6 +2118,21 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   for (auto *A : Args.filtered(OPT_swift_module_cross_import))
     Opts.CrossImportInfo[A->getValue(0)].push_back(A->getValue(1));
+
+  for (auto &Name : Args.getAllArgValues(OPT_module_can_import))
+    Opts.CanImportModuleInfo.push_back({Name, {}, {}});
+
+  for (auto *A: Args.filtered(OPT_module_can_import_version)) {
+    llvm::VersionTuple Version, UnderlyingVersion;
+    if (Version.tryParse(A->getValue(1)))
+      Diags.diagnose(SourceLoc(), diag::invalid_can_import_module_version,
+                     A->getValue(1));
+    if (UnderlyingVersion.tryParse(A->getValue(2)))
+      Diags.diagnose(SourceLoc(), diag::invalid_can_import_module_version,
+                     A->getValue(2));
+    Opts.CanImportModuleInfo.push_back(
+        {A->getValue(0), Version, UnderlyingVersion});
+  }
 
   Opts.DisableCrossImportOverlaySearch |=
       Args.hasArg(OPT_disable_cross_import_overlay_search);

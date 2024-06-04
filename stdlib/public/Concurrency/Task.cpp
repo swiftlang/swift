@@ -1017,7 +1017,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
         if (taskLocalHeadLinkType ==
             swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
-          swift_task_localsCopyToTaskGroupChildTaskDefensively(task);
+          ParentLocal.copyToOnlyOnlyFromCurrentGroup(task);
           taskLocalStorageInitialized = true;
         }
       }

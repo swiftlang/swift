@@ -2144,6 +2144,13 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
+    
+  // Ignore sanitizer markers.
+  if (auto bu = dyn_cast<BuiltinInst>(user)) {
+    if (bu->getBuiltinKind() == BuiltinValueKind::TSanInoutAccess) {
+      return true;
+    }
+  }
 
   // This visitor looks through store_borrow instructions but does visit the
   // end_borrow of the store_borrow. If we see such an end_borrow, register the
