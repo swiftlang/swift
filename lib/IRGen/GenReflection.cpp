@@ -372,6 +372,7 @@ getTypeRefByFunction(IRGenModule &IGM,
             Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
             MetadataState::Complete, subs);
 
+        substT = substT.getReferenceStorageReferent(); // FIXME: shot in the dark here
         auto ret = IGF.emitTypeMetadataRef(substT);
         IGF.Builder.CreateRet(ret);
       }
