@@ -37,6 +37,13 @@ final actor FinalMyActor {
   func useKlass(_ x: NonSendableKlass) {}
 }
 
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
 func useInOut<T>(_ x: inout T) {}
 @discardableResult
 func useValue<T>(_ x: T) -> T { x }
@@ -52,6 +59,7 @@ func useMainActorValueNoReturn<T>(_ x: T) -> () { fatalError() }
 @MainActor func returnValueFromMain<T>() async -> T { fatalError() }
 @MainActor func transferToMain<T>(_ t: T) async {}
 @MainActor func transferToMainInt<T>(_ t: T) async -> Int { 5 }
+@CustomActor func transferToCustomInt<T>(_ t: T) async -> Int { 5 }
 @MainActor func transferToMainIntOpt<T>(_ t: T) async -> Int? { 5 }
 
 func transferToNonIsolated<T>(_ t: T) async {}
@@ -68,15 +76,6 @@ struct TwoFieldKlassBox {
   var k1 = NonSendableKlass()
   var k2 = NonSendableKlass()
 }
-
-actor CustomActorInstance {}
-
-@globalActor
-struct CustomActor {
-  static let shared = CustomActorInstance()
-}
-
-@CustomActor func transferToCustomInt<T>(_ t: T) async -> Int { 5 }
 
 /////////////////////////////////////
 // MARK: Async Let Let Actor Tests //
@@ -294,14 +293,13 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr3() async {
   let _ = await y
 }
 
-// Make sure that we emit an error for transferToMainInt in the async val
-// function itself.
+// Make sure that we do not emit an error for transferToMainInt in the async val
+// function itself since we are sending the value to the same main actor
+// isolated use and transferring it into one async let variable.
 func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr4() async {
   let x = NonSendableKlass()
 
-  async let y = useValue(transferToMainInt(x) + transferToMainInt(x)) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMainInt' risks causing data races between main actor-isolated and local nonisolated uses}}
-  // expected-note @-2:67 {{access can happen concurrently}}
+  async let y = useValue(transferToMainInt(x) + transferToMainInt(x))
 
   let _ = await y
 }
@@ -314,7 +312,7 @@ func asyncLet_Let_ActorIsolated_CallBuriedInOtherExpr5() async {
   async let y = useValue(transferToMainInt(x) + transferToCustomInt(x))
   // expected-warning @-1 {{sending 'x' risks causing data races}}
   // expected-note @-2 {{sending 'x' to main actor-isolated global function 'transferToMainInt' risks causing data races between main actor-isolated and local nonisolated uses}}
-  // expected-note @-3:69 {{access can happen concurrently}}
+  // expected-note @-3:49 {{access can happen concurrently}}
 
   let _ = await y
 }
