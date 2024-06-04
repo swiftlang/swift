@@ -81,6 +81,8 @@ class C_56501 {
   }
 }
 
+func takesEscapingWithAllowedImplicitSelf(@_implicitSelfCapture _ fn: @escaping () -> Void) {}
+
 public final class TestImplicitSelfForWeakSelfCapture: Sendable {
   static let staticOptional: TestImplicitSelfForWeakSelfCapture? = .init()
   func method() { }
@@ -128,6 +130,12 @@ public final class TestImplicitSelfForWeakSelfCapture: Sendable {
       if let self = self {
         method()
       }
+    }
+
+    takesEscapingWithAllowedImplicitSelf { [weak self] in
+      method() // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note {{reference 'self?.' explicitly}}
+      guard let self = self else { return }
+      method()
     }
 
     doVoidStuff { [weak self] in

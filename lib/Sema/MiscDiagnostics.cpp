@@ -2422,6 +2422,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return true;
       }
 
+      // Implicit self was also permitted for weak self captures in closures
+      // passed to @_implicitSelfCapture parameters in Swift 5.7.
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (CE->allowsImplicitSelfCapture())
+          return true;
+      }
+
       // Invalid captures like `[weak self = somethingElse]`
       // were permitted in Swift 5.8, so we must only warn.
       if (!isSimpleSelfCapture(weakSelfDecl)) {
