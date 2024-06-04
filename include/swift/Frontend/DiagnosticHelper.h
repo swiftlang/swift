@@ -18,6 +18,7 @@
 #define SWIFT_FRONTEND_DIAGNOSTIC_HELPER_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class CompilerInstance;
@@ -30,7 +31,10 @@ private:
 
 public:
   /// Create a DiagnosticHelper class to emit diagnostics from frontend actions.
+  /// OS is the stream to print diagnostics. useQuasiPID determines if using
+  /// real PID when priting parseable output.
   static DiagnosticHelper create(CompilerInstance &instance,
+                                 llvm::raw_pwrite_stream &OS = llvm::errs(),
                                  bool useQuasiPID = false);
 
   /// Initialized all DiagConsumers and add to the CompilerInstance.
@@ -57,7 +61,8 @@ public:
   ~DiagnosticHelper();
 
 private:
-  DiagnosticHelper(CompilerInstance &instance, bool useQuasiPID);
+  DiagnosticHelper(CompilerInstance &instance, llvm::raw_pwrite_stream &OS,
+                   bool useQuasiPID);
 };
 
 } // namespace swift
