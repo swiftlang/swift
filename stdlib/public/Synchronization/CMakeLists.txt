@@ -64,7 +64,6 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-enable-builtin-module"
   "-enable-experimental-feature" "RawLayout"
   "-enable-experimental-feature" "StaticExclusiveOnly"
-  "-enable-experimental-feature" "TransferringArgsAndResults"
   "-enable-experimental-feature" "Extern"
 )
 

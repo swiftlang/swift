@@ -15,7 +15,7 @@ import Builtin
 @available(SwiftStdlib 6.0, *)
 @frozen
 @usableFromInline
-@_rawLayout(like: Value)
+@_rawLayout(like: Value, movesAsLike)
 internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient

@@ -47,7 +47,7 @@ public struct Mutex<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public init(_ initialValue: transferring consuming Value) {
+  public init(_ initialValue: consuming sending Value) {
     value = _Cell(initialValue)
   }
 }
@@ -85,8 +85,8 @@ extension Mutex where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLock<Result: ~Copyable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> transferring Result
-  ) throws(E) -> transferring Result {
+    _ body: @Sendable (inout Value) throws(E) -> sending Result
+  ) throws(E) -> sending Result {
     handle._lock()
 
     defer {
@@ -132,8 +132,8 @@ extension Mutex where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> transferring Result
-  ) throws(E) -> transferring Result? {
+    _ body: @Sendable (inout Value) throws(E) -> sending Result
+  ) throws(E) -> sending Result? {
     guard handle._tryLock() else {
       return nil
     }
