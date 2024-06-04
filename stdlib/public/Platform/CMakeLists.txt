@@ -430,7 +430,7 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
       OUTPUT ${module_dir}/${android_modulemap_source} ${module_dir_static}/${android_modulemap_source}
       COMMENT "Copying Android modulemap to resource directories")
     add_custom_command_target(
-      copy_android_ndk_neader_resource
+      copy_android_ndk_header_resource
       COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
       COMMAND
@@ -442,7 +442,7 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
       OUTPUT ${module_dir}/${android_ndk_header_source} ${module_dir_static}/${android_ndk_header_source}
       COMMENT "Copying Android NDK header to resource directories")
     add_custom_command_target(
-      copy_android_bionic_neader_resource
+      copy_android_bionic_header_resource
       COMMAND
         "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
       COMMAND
@@ -455,11 +455,11 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
       COMMENT "Copying Android NDK header to resource directories")
 
     add_dependencies(sdk-overlay ${copy_android_modulemap_resource}
-                                 ${copy_android_ndk_neader_resource}
-                                 ${copy_android_bionic_neader_resource})
+                                 ${copy_android_ndk_header_resource}
+                                 ${copy_android_bionic_header_resource})
     list(APPEND android_modulemap_target_list ${copy_android_modulemap_resource}
-                                              ${copy_android_ndk_neader_resource}
-                                              ${copy_android_bionic_neader_resource})
+                                              ${copy_android_ndk_header_resource}
+                                              ${copy_android_bionic_header_resource})
 
     swift_install_in_component(FILES "${android_modulemap_source}"
                                      "${android_ndk_header_source}"
