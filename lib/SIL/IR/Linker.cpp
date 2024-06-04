@@ -105,7 +105,6 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
           F->hasValidLinkageForFragileRef(callerSerializedKind) ||
          hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
          "called function has wrong linkage for serialized function");
-                                         
   if (!F->isExternalDeclaration()) {
     // The function is already in the module, so no need to de-serialized it.
     // But check if we need to set the IsSerialized flag.
