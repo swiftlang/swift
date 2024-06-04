@@ -514,3 +514,9 @@ extension Yapping { // expected-note {{'where T: Copyable' is implicit here}}
 func testYap(_ y: Yapping<NC>) {
   y.yap() // expected-error {{referencing instance method 'yap()' on 'Yapping' requires that 'NC' conform to 'Copyable'}}
 }
+
+protocol Veggie: ~Copyable {}
+func generalized(_ x: Any.Type) {}
+func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
+  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
+}
