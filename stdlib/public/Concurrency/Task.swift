@@ -127,9 +127,11 @@ import Swift
 /// await Actor().start()
 /// ```
 ///
-/// Note that there is nothing, other than the Task's use of `self` retaining the actor,
-/// And that the start method immediately returns, without waiting for the unstructured `Task` to finish.
-/// So once the task is completed and its closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
+/// Note that the actor is only retained by the start() method's use of `self`,
+/// and that the start method immediately returns, without waiting for the
+/// unstructured `Task` to finish. Once the task is completed and its closure is
+/// destroyed, the strong reference to the actor is also released allowing the
+/// actor to deinitialize as expected.
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
