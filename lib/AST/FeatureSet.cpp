@@ -622,14 +622,6 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
       decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return true;
   }
-  auto *fd = dyn_cast<FuncDecl>(decl);
-  if (fd && fd->getAttrs().getAttribute(DeclAttrKind::ResultDependsOnSelf)) {
-    return true;
-  }
-  auto *pd = dyn_cast<ParamDecl>(decl);
-  if (pd && pd->hasResultDependsOn()) {
-    return true;
-  }
   return false;
 }
 

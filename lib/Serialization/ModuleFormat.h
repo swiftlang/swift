@@ -1268,7 +1268,6 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>,              // _resultDependsOn
                      BCFixed<1>               // transferring
                      >;
 

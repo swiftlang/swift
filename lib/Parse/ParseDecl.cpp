@@ -2901,13 +2901,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     DiscardAttribute = true;
   }
 
-  if (DK == DeclAttrKind::ResultDependsOnSelf &&
-      !Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnose(Loc, diag::requires_experimental_feature, AttrName, true,
-             getFeatureName(Feature::NonescapableTypes));
-    DiscardAttribute = true;
-  }
-
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
@@ -5449,15 +5442,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("_const")) {
       Tok.setKind(tok::contextual_keyword);
       ConstLoc = P.consumeToken();
-      continue;
-    }
-
-    if (Tok.isContextualKeyword("_resultDependsOn")) {
-      if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, "resultDependsOn",
-                   false, getFeatureName(Feature::NonescapableTypes));
-      }
-      ResultDependsOnLoc = P.consumeToken();
       continue;
     }
 
