@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-upcoming-feature SendingArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s | %target-sil-opt -enable-upcoming-feature SendingArgsAndResults -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete | %FileCheck %s
+// RUN: %target-sil-opt -strict-concurrency=complete %s | %target-sil-opt -strict-concurrency=complete | %FileCheck %s
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 
 sil_stage raw
 

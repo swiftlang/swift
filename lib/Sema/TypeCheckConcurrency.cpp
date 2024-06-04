@@ -2537,9 +2537,13 @@ namespace {
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
             // Defer diagnosing checking of non-Sendable types that are passed
             // into async let to SIL level region based isolation if we have
-            // transferring and region based isolation enabled.
-            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation) ||
-                !ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
+            // region based isolation enabled.
+            //
+            // We purposely do not do this for SendingArgsAndResults since that
+            // just triggers the actual ability to represent
+            // 'sending'. RegionBasedIsolation is what determines if we get the
+            // differing semantics.
+            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
               diagnoseNonSendableTypes(
                   type, getDeclContext(),
                   /*inDerivedConformance*/Type(), capture.getLoc(),
@@ -3600,8 +3604,11 @@ namespace {
 
       // Check for sendability of the result type if we do not have a
       // transferring result.
-      if ((!ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
+      if ((!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation) ||
            !fnType->hasSendingResult())) {
+        assert(ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
+               "SendingArgsAndResults should be enabled if RegionIsolation is "
+               "enabled");
         // See if we are a autoclosure that has a direct callee that has the
         // same non-transferred type value returned. If so, do not emit an
         // error... we are going to emit an error on the call expr and do not

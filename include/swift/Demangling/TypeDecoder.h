@@ -177,6 +177,14 @@ public:
     return {};
   }
 
+  static OptionsType getSending() {
+    OptionsType result;
+
+    result |= ImplParameterInfoFlags::Sending;
+
+    return result;
+  }
+
   ImplFunctionParam(BuiltType type, ImplParameterConvention convention,
                     OptionsType options)
       : Type(type), Convention(convention), Options(options) {}
@@ -245,6 +253,12 @@ public:
     }
 
     return {};
+  }
+
+  static OptionsType getSending() {
+    OptionsType result;
+    result |= ImplResultInfoFlags::IsSending;
+    return result;
   }
 
   ImplFunctionResult(BuiltType type, ImplResultConvention convention,
@@ -1571,8 +1585,9 @@ private:
     if (depth > TypeDecoder::MaxDepth)
       return true;
 
-    // Children: `convention, differentiability?, type`
-    if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
+    // Children: `convention, differentiability?, sending?, type`
+    if (node->getNumChildren() != 2 && node->getNumChildren() != 3 &&
+        node->getNumChildren() != 4)
       return true;
 
     auto *conventionNode = node->getChild(0);
@@ -1590,7 +1605,7 @@ private:
       return true;
 
     typename T::OptionsType options;
-    if (node->getNumChildren() == 3) {
+    if (node->getNumChildren() == 3 || node->getNumChildren() == 4) {
       auto diffKindNode = node->getChild(1);
       if (diffKindNode->getKind() !=
           Node::Kind::ImplParameterResultDifferentiability)
@@ -1600,6 +1615,13 @@ private:
       if (!optDiffOptions)
         return true;
       options |= *optDiffOptions;
+    }
+
+    if (node->getNumChildren() == 4) {
+      auto sendingKindNode = node->getChild(2);
+      if (sendingKindNode->getKind() != Node::Kind::ImplParameterSending)
+        return true;
+      options |= T::getSending();
     }
 
     results.emplace_back(result.getType(), *convention, options);
