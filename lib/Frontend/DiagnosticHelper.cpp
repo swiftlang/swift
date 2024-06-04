@@ -16,6 +16,7 @@
 
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/SourceManager.h"
@@ -24,6 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
+#include "llvm/Support/raw_ostream.h"
 
 #if __has_include(<unistd.h>)
 #include <unistd.h>
@@ -38,7 +40,8 @@ class LLVM_LIBRARY_VISIBILITY DiagnosticHelper::Implementation {
   friend class DiagnosticHelper;
 
 public:
-  Implementation(CompilerInstance &instance, bool useQuasiPID);
+  Implementation(CompilerInstance &instance, llvm::raw_pwrite_stream &OS,
+                 bool useQuasiPID);
 
   void initDiagConsumers(CompilerInvocation &invocation);
 
@@ -59,6 +62,7 @@ private:
   const sys::TaskProcessInformation procInfo;
 
   CompilerInstance &instance;
+  llvm::raw_pwrite_stream &errOS;
 
   // potentially created diagnostic consumers.
   PrintingDiagnosticConsumer PDC;
@@ -226,9 +230,10 @@ createJSONFixItDiagnosticConsumerIfNeeded(
 }
 
 DiagnosticHelper::Implementation::Implementation(CompilerInstance &instance,
+                                                 llvm::raw_pwrite_stream &OS,
                                                  bool useQuasiPID)
     : OSPid(useQuasiPID ? QUASI_PID_START : getpid()), procInfo(OSPid),
-      instance(instance) {
+      instance(instance), errOS(OS), PDC(OS) {
   instance.addDiagnosticConsumer(&PDC);
 }
 
@@ -396,7 +401,7 @@ void DiagnosticHelper::Implementation::beginMessage(
         [&](const InputFile &Input, unsigned idx) -> bool {
           ArrayRef<InputFile> Inputs(Input);
           emitBeganMessage(
-              llvm::errs(), mapFrontendInvocationToAction(invocation),
+              errOS, mapFrontendInvocationToAction(invocation),
               constructDetailedTaskDescription(invocation, Inputs, args),
               pid - idx, procInfo);
           return false;
@@ -405,7 +410,7 @@ void DiagnosticHelper::Implementation::beginMessage(
     // If no primary inputs are present, we are in WMO or EmitModule.
     bool isEmitModule = invocation.getFrontendOptions().RequestedAction ==
                         FrontendOptions::ActionType::EmitModuleOnly;
-    emitBeganMessage(llvm::errs(), mapFrontendInvocationToAction(invocation),
+    emitBeganMessage(errOS, mapFrontendInvocationToAction(invocation),
                      constructDetailedTaskDescription(
                          invocation, IO.getAllInputs(), args, isEmitModule),
                      OSPid, procInfo);
@@ -438,7 +443,7 @@ void DiagnosticHelper::Implementation::endMessage(int retCode) {
       std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
                 std::ostream_iterator<std::string>(JoinedDiags, Delim));
 
-      emitFinishedMessage(llvm::errs(),
+      emitFinishedMessage(errOS,
                           mapFrontendInvocationToAction(invocation),
                           JoinedDiags.str(), retCode, pid - idx, procInfo);
       return false;
@@ -455,7 +460,7 @@ void DiagnosticHelper::Implementation::endMessage(int retCode) {
     std::ostringstream JoinedDiags;
     std::copy(AllDiagnostics.begin(), AllDiagnostics.end(),
               std::ostream_iterator<std::string>(JoinedDiags, Delim));
-    emitFinishedMessage(llvm::errs(), mapFrontendInvocationToAction(invocation),
+    emitFinishedMessage(errOS, mapFrontendInvocationToAction(invocation),
                         JoinedDiags.str(), retCode, OSPid, procInfo);
   }
 
@@ -492,12 +497,15 @@ void DiagnosticHelper::Implementation::diagnoseFatalError(const char *reason,
 }
 
 DiagnosticHelper DiagnosticHelper::create(CompilerInstance &instance,
+                                          llvm::raw_pwrite_stream &OS,
                                           bool useQuasiPID) {
-  return DiagnosticHelper(instance, useQuasiPID);
+  return DiagnosticHelper(instance, OS, useQuasiPID);
 }
 
-DiagnosticHelper::DiagnosticHelper(CompilerInstance &instance, bool useQuasiPID)
-    : Impl(*new Implementation(instance, useQuasiPID)) {}
+DiagnosticHelper::DiagnosticHelper(CompilerInstance &instance,
+                                   llvm::raw_pwrite_stream &OS,
+                                   bool useQuasiPID)
+    : Impl(*new Implementation(instance, OS, useQuasiPID)) {}
 
 DiagnosticHelper::~DiagnosticHelper() { delete &Impl; }
 
