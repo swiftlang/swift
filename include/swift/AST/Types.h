@@ -4126,14 +4126,16 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
   }
   llvm_unreachable("covered switch isn't covered?!");
 }
-inline bool isConsumedParameter(ParameterConvention conv) {
+
+template <bool InCallee>
+bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Pack_Owned:
     return true;
-
+  case ParameterConvention::Indirect_In_CXX:
+    return !InCallee;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Direct_Unowned:
@@ -4146,19 +4148,28 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+inline bool isConsumedParameterInCallee(ParameterConvention conv) {
+  return isConsumedParameter<true>(conv);
+}
+
+inline bool isConsumedParameterInCaller(ParameterConvention conv) {
+  return isConsumedParameter<false>(conv);
+}
+
 /// Returns true if conv is a guaranteed parameter. This may look unnecessary
 /// but this will allow code to generalize to handle Indirect_Guaranteed
 /// parameters when they are added.
-inline bool isGuaranteedParameter(ParameterConvention conv) {
+template <bool InCallee>
+bool isGuaranteedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Pack_Guaranteed:
     return true;
-
+  case ParameterConvention::Indirect_In_CXX:
+    return InCallee;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
@@ -4167,6 +4178,14 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
     return false;
   }
   llvm_unreachable("bad convention kind");
+}
+
+inline bool isGuaranteedParameterInCallee(ParameterConvention conv) {
+  return isGuaranteedParameter<true>(conv);
+}
+
+inline bool isGuaranteedParameterInCaller(ParameterConvention conv) {
+  return isGuaranteedParameter<false>(conv);
 }
 
 inline bool isMutatingParameter(ParameterConvention conv) {
@@ -4302,14 +4321,22 @@ public:
 
   /// True if this parameter is consumed by the callee, either
   /// indirectly or directly.
-  bool isConsumed() const {
-    return isConsumedParameter(getConvention());
+  bool isConsumedInCallee() const {
+    return isConsumedParameterInCallee(getConvention());
+  }
+
+  bool isConsumedInCaller() const {
+    return isConsumedParameterInCaller(getConvention());
   }
 
   /// Returns true if this parameter is guaranteed, either indirectly or
   /// directly.
-  bool isGuaranteed() const {
-    return isGuaranteedParameter(getConvention());
+  bool isGuaranteedInCallee() const {
+    return isGuaranteedParameterInCallee(getConvention());
+  }
+
+  bool isGuaranteedInCaller() const {
+    return isGuaranteedParameterInCaller(getConvention());
   }
 
   bool hasOption(Flag flag) const { return options.contains(flag); }

@@ -902,7 +902,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
     // Finally change ownership if we need to. We do not need to care about the
     // case of a +1 parameter being passed to a +0 function since +1 parameters
     // can be "instantaneously" borrowed at the call site.
-    if (blockTy->getParameters()[i].isConsumed()) {
+    if (blockTy->getParameters()[i].isConsumedInCaller()) {
       mv = mv.ensurePlusOne(SGF, loc);
     }
     args.push_back(mv);
@@ -1403,7 +1403,7 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       foreignAsyncSlot = SGF.B.createCopyBlock(loc, arg);
       // If the argument is consumed, we're still responsible for releasing the
       // original.
-      if (inputs[i].isConsumed())
+      if (inputs[i].isConsumedInCallee())
         SGF.emitManagedRValueWithCleanup(arg);
       continue;
     }
@@ -1413,12 +1413,12 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto copy = SGF.B.createCopyBlock(loc, arg);
       // If the argument is consumed, we're still responsible for releasing the
       // original.
-      if (inputs[i].isConsumed())
+      if (inputs[i].isConsumedInCallee())
         SGF.emitManagedRValueWithCleanup(arg);
       arg = copy;
     }
     // Convert the argument to +1 if necessary.
-    else if (!SILArgumentConvention(inputs[i].getConvention()).isOwnedConvention()) {
+    else if (!inputs[i].isConsumedInCallee()) {
       arg = emitObjCUnconsumedArgument(SGF, loc, arg);
     }
 
@@ -1459,9 +1459,9 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       native = SGF.emitManagedBufferWithCleanup(buf);
     }
 
-    if (nativeInputs[i].isConsumed()) {
+    if (nativeInputs[i].isConsumedInCaller()) {
       argValue = native.forward(SGF);
-    } else if (nativeInputs[i].isGuaranteed()) {
+    } else if (nativeInputs[i].isGuaranteedInCaller()) {
       argValue = native.borrow(SGF, loc).getUnmanagedValue();
     } else {
       argValue = native.getValue();
@@ -1502,10 +1502,10 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
       auto argCopy = B.createCopyBlock(loc, arg);
       // If the argument is consumed, we're still responsible for releasing the
       // original.
-      if (input.isConsumed())
+      if (input.isConsumedInCallee())
         emitManagedRValueWithCleanup(arg);
       arg = argCopy;
-    } else if (!input.isConsumed()) {
+    } else if (!input.isConsumedInCallee()) {
       arg = emitObjCUnconsumedArgument(*this, loc, arg);
     }
     auto managedArg = emitManagedRValueWithCleanup(arg);

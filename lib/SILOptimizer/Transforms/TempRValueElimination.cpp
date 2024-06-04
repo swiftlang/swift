@@ -200,9 +200,8 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst: {
-    auto site = ApplySite(user);
-    if (site.getArgumentConvention(*addressUse).isIndirectOutParameter() ||
-        !site.getArgumentParameterInfo(*addressUse).isGuaranteed())
+    auto convention = ApplySite(user).getArgumentConvention(*addressUse);
+    if (!convention.isGuaranteedConventionInCaller())
       return false;
 
     loadInsts.insert(user);
@@ -222,7 +221,7 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   case SILInstructionKind::YieldInst: {
     auto *yield = cast<YieldInst>(user);
     auto convention = yield->getArgumentConventionForOperand(*addressUse);
-    if (!convention.isGuaranteedConvention())
+    if (!convention.isGuaranteedConventionInCaller())
       return false;
 
     loadInsts.insert(user);

@@ -650,7 +650,7 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       if (addrType.isTrivial(*pass.function)) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Trivial);
-      } else if (param.isConsumed()) {
+      } else if (param.isConsumedInCallee()) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Take);
       } else {
@@ -2269,7 +2269,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // Allocate temporary storage for a loadable operand.
   AllocStackInst *allocInst =
       argBuilder.createAllocStack(callLoc, argValue->getType());
-  if (apply.getCaptureConvention(*operand).isOwnedConvention()) {
+  if (apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
     apply.insertAfterApplication([&](SILBuilder &callBuilder) {
@@ -2648,7 +2648,7 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     if (oldResult.getType().isAddressOnly(*pass.function)) {
       auto info = newCall->getSubstCalleeConv().getYieldInfoForOperandIndex(i);
       assert(info.isFormalIndirect());
-      if (info.isConsumed()) {
+      if (info.isConsumedInCaller()) {
         // Because it is legal to have uses of an owned value produced by a
         // begin_apply after a coroutine's range, AddressLowering must move the
         // value into local storage so that such out-of-coroutine-range uses can
@@ -2661,7 +2661,7 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
         storage.storageAddress = destAddr;
         storage.markRewritten();
         resultBuilder.createCopyAddr(callLoc, &newResult, destAddr,
-                                     info.isConsumed() ? IsTake : IsNotTake,
+                                     info.isConsumedInCaller() ? IsTake : IsNotTake,
                                      IsInitialization);
       } else {
         // [in_guaranteed_begin_apply_results] Because OSSA ensures that all
