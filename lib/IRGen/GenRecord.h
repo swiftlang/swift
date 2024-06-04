@@ -289,7 +289,7 @@ public:
           auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
 
           likeTypeInfo.initializeWithTake(IGF, dest, src, loweredLikeType,
-                                          isOutlined, zeroizeIfSensitive);
+                                          isOutlined);
         }
       }
     }
