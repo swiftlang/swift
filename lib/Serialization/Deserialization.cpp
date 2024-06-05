@@ -554,19 +554,7 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
 }
 
 Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
-  // Currently, the only case in which this function can fail (return an error)
-  // is when reading a pattern for a single variable declaration.
-
   using namespace decls_block;
-
-  auto readPatternUnchecked = [this](DeclContext *owningDC) -> Pattern * {
-    Expected<Pattern *> deserialized = readPattern(owningDC);
-    if (!deserialized) {
-      fatal(deserialized.takeError());
-    }
-    assert(deserialized.get());
-    return deserialized.get();
-  };
 
   SmallVector<uint64_t, 8> scratch;
 
@@ -588,7 +576,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
-    Pattern *subPattern = readPatternUnchecked(owningDC);
+    Pattern *subPattern;
+    UNWRAP(readPattern(owningDC), subPattern);
 
     auto result = ParenPattern::createImplicit(getContext(), subPattern);
 
@@ -621,12 +610,15 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
-      Pattern *subPattern = readPatternUnchecked(owningDC);
+      Pattern *subPattern;
+      UNWRAP(readPattern(owningDC), subPattern);
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
     auto result = TuplePattern::createImplicit(getContext(), elements);
-    recordPatternType(result, getType(tupleTypeID));
+    Type tupleType;
+    UNWRAP(getTypeChecked(tupleTypeID), tupleType);
+    recordPatternType(result, tupleType);
     restoreOffset.reset();
     return result;
   }
@@ -685,7 +677,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     unsigned rawIntroducer;
     BindingPatternLayout::readRecord(scratch, rawIntroducer);
 
-    Pattern *subPattern = readPatternUnchecked(owningDC);
+    Pattern *subPattern;
+    UNWRAP(readPattern(owningDC), subPattern);
 
     auto introducer = getActualVarDeclIntroducer(
         (serialization::VarDeclIntroducer) rawIntroducer);
