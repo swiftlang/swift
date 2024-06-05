@@ -19,13 +19,13 @@ func testExplicitCasts() {
 func testCalls() {
   let method = MethodSir()
   let foo = NC()
-  testBorrowing(foo) // expected-warning {{implicit conversion to 'NC?' is consuming}}
-                     // expected-note@-1 {{add 'consume' to silence this warning}} {{17-17=consume }}
+  testBorrowing(foo) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                     // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
   testBorrowing(consume foo)
   testBorrowing(foo as NC?)
 
-  method.borrow(foo) // expected-warning {{implicit conversion to 'NC?' is consuming}}
-                     // expected-note@-1 {{add 'consume' to silence this warning}} {{17-17=consume }}
+  method.borrow(foo) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                     // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
   method.borrow(consume foo)
 
   testConsuming(foo)
@@ -59,8 +59,8 @@ func delay(_ f: @autoclosure () -> NC?) -> NC? { f() }
 
 func testDelay() {
   let nc = NC()
-  let _ = delay(nc) // expected-warning {{implicit conversion to 'NC?' is consuming}}
-                    // expected-note@-1 {{add 'consume' to silence this warning}} {{17-17=consume }}
+  let _ = delay(nc) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                    // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
 }
 
 struct PropCity {
@@ -74,14 +74,14 @@ struct PropCity {
   func chk(_ t: borrowing NC!) {}
   func chkWithDefaultArg(_ oath: borrowing NC? = NC()) {}
   func test(_ nc: consuming NC) {
-    chk(nc) // expected-warning {{implicit conversion to 'NC?' is consuming}}
-            // expected-note@-1 {{add 'consume' to silence this warning}} {{9-9=consume }}
+    chk(nc) // expected-error {{implicit conversion to 'NC?' is consuming}}
+            // expected-note@-1 {{add 'consume' to make consumption explicit}} {{9-9=consume }}
 
     chk(consume nc)
 
     chkWithDefaultArg()
-    chkWithDefaultArg(nc) // expected-warning {{implicit conversion to 'NC?' is consuming}}
-                          // expected-note@-1 {{add 'consume' to silence this warning}} {{23-23=consume }}
+    chkWithDefaultArg(nc) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                          // expected-note@-1 {{add 'consume' to make consumption explicit}} {{23-23=consume }}
   }
 }
 
@@ -93,16 +93,16 @@ func restockConsume(_ x: consuming any Veggie & ~Copyable) {}
 
 func checkExistential() {
   let carrot = Carrot()
-  restockBorrow(carrot) // expected-warning {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
-                        // expected-note@-1 {{add 'consume' to silence this warning}} {{17-17=consume }}
+  restockBorrow(carrot) // expected-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
+                        // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
   restockBorrow(consume carrot)
 
   restockConsume(carrot)
 }
 
 func genericErasure<T: Veggie & ~Copyable>(_ veg: consuming T) {
-  restockBorrow(veg) // expected-warning {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
-                     // expected-note@-1 {{add 'consume' to silence this warning}} {{17-17=consume }}
+  restockBorrow(veg) // expected-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
+                     // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
   restockBorrow(consume veg)
   restockBorrow(veg as any Veggie & ~Copyable)
   restockConsume(veg)
@@ -115,12 +115,11 @@ extension Veggie where Self: ~Copyable {
 }
 extension Carrot {
   consuming func check() {
-    inspect(self) // expected-warning {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
-                  // expected-note@-1 {{add 'consume' to silence this warning}} {{13-13=consume }}
+    inspect(self) // expected-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
+                  // expected-note@-1 {{add 'consume' to make consumption explicit}} {{13-13=consume }}
     inspect(consume self)
     inspect(self as any Veggie & ~Copyable)
 
     let _: any Veggie & ~Copyable = self
   }
 }
-

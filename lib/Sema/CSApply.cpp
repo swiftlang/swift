@@ -5590,7 +5590,7 @@ namespace {
                       cs.getType(coercion));
         ctx.Diags
             .diagnose(coercion->getLoc(),
-                      diag::add_consume_to_silence_warning)
+                      diag::add_consume_to_silence)
             .fixItInsert(coercion->getStartLoc(), "consume ");
       }
     }
