@@ -273,7 +273,7 @@ add_custom_target(musl_modulemap DEPENDS ${musl_modulemap_target_list})
 set_property(TARGET musl_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay musl_modulemap)
 
-# Add a system 'math' module overlay, that only applies only to platforms that
+# Add a system 'math' module overlay, which applies only to platforms that
 # have a top level '_math' module.
 add_swift_target_library(swift_math ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Math.swift
@@ -364,9 +364,8 @@ foreach(sdk ${SWIFT_SDKS})
         ${copy_glibc_modulemap_header_static})
     endif()
 
-    # If this SDK is a target for a non-native host, except if it's for Android
-    # with its own native sysroot, create a native modulemap without a sysroot
-    # prefix. This is the one we'll install instead.
+    # If this SDK is a target for a non-native host, create a native modulemap
+    # without a sysroot prefix. This is the one we'll install instead.
     if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/")
       set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
 
