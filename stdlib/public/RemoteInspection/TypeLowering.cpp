@@ -251,7 +251,7 @@ BuiltinTypeInfo::BuiltinTypeInfo(unsigned Size, unsigned Alignment,
 
 // Builtin.Int<N> is mangled as 'Bi' N '_'
 // Returns 0 if this isn't an Int
-static unsigned isIntType(std::string name) {
+static unsigned intTypeBitSize(std::string name) {
   llvm::StringRef nameRef(name);
   if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
@@ -272,8 +272,22 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
     *extraInhabitantIndex = -1;
     return true;
   }
-  unsigned intSize = isIntType(Name);
-  if (intSize > 0 && intSize < 64 && getSize() <= 8 && intSize < getSize() * 8) {
+  // If it has extra inhabitants, it could be an integer type with extra
+  // inhabitants (such as a bool) or a pointer.
+  unsigned intSize = intTypeBitSize(Name);
+  if (intSize > 0) {
+    // This is an integer type
+
+    // If extra inhabitants are impossible, return early...
+    // (assert in debug builds)
+    assert(intSize < getSize() * 8
+	   && "Standard-sized int cannot have extra inhabitants");
+    if (intSize > 64 || getSize() > 8 || intSize >= getSize() * 8) {
+      *extraInhabitantIndex = -1;
+      return true;
+    }
+
+    // Compute range of extra inhabitants
     uint64_t maxValidValue =  (((uint64_t)1) << intSize) - 1;
     uint64_t maxAvailableValue = (((uint64_t)1) << (getSize() * 8)) - 1;
     uint64_t computedExtraInhabitants = maxAvailableValue - maxValidValue;
@@ -281,14 +295,13 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
       computedExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
     }
     assert(getNumExtraInhabitants() == computedExtraInhabitants &&
-           "Unexpected number of extra inhabitants in an odd-sized integer");
-
-    uint64_t rawValue;
-    if (!reader.readInteger(address, getSize(), &rawValue))
-      return false;
+	   "Unexpected number of extra inhabitants in an odd-sized integer");
 
     // Example:  maxValidValue is 1 for a 1-bit bool, so any larger value
     // is an extra inhabitant.
+    uint64_t rawValue;
+    if (!reader.readInteger(address, getSize(), &rawValue))
+      return false;
     if (maxValidValue < rawValue) {
       *extraInhabitantIndex = rawValue - maxValidValue - 1;
     } else {
@@ -307,7 +320,7 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
 }
 
 BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
-  unsigned intSize = isIntType(Name);
+  unsigned intSize = intTypeBitSize(Name);
   if (intSize > 0) {
     // Odd-sized integers export spare bits
     // In particular: bool fields are Int1 and export 7 spare bits
