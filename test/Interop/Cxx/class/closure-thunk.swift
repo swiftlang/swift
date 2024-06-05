@@ -22,8 +22,8 @@ public func testClosureToFuncPtr() {
 
 // CHECK: sil private [thunk] [ossa] @$s4main36testClosureToFuncPtrReturnNonTrivialyyFSo0hI0VycfU_To : $@convention(c) () -> @out NonTrivial {
 // CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
-// CHECK: %[[V1:.*]] = function_ref @$s4main36testClosureToFuncPtrReturnNonTrivialyyFSo0hI0VycfU_ : $@convention(thin) () -> @out NonTrivial // user: %[[V2]]
-// CHECK: %[[V2:.*]] = apply %[[V1]](%[[V0]]) : $@convention(thin) () -> @out NonTrivial // user: %[[V3]]
+// CHECK: %[[V1:.*]] = function_ref @$s4main36testClosureToFuncPtrReturnNonTrivialyyFSo0hI0VycfU_ : $@convention(thin) () -> @out NonTrivial
+// CHECK: %[[V2:.*]] = apply %[[V1]](%[[V0]]) : $@convention(thin) () -> @out NonTrivial
 // CHECK: return %[[V2]] : $()
 
 public func testClosureToFuncPtrReturnNonTrivial() {
