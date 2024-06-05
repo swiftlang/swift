@@ -184,6 +184,10 @@ public:
   /// opaque return type reprs.
   bool hasOpaque();
 
+  /// Returns a Boolean value indicating whether this written type is
+  /// parenthesized, that is, matches the following grammar: `'(' type ')'`.
+  bool isParenType() const;
+
   /// Retrieve the type repr without any parentheses around it.
   ///
   /// The use of this function must be restricted to contexts where
