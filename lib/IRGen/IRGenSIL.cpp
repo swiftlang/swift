@@ -3586,10 +3586,6 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
 
 static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
                                        swift::BuiltinInst *i) {
-  fprintf(stderr, "[%s:%d](%s) emitBuiltinCreateAsyncTask -> \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  i->dump();
-  i->dumpInContext();
-
   assert(i->getOperandValues().size() == 6 &&
          "createAsyncTask needs 6 operands");
   auto flags = IGF.getLoweredSingletonExplosion(i->getOperand(0));

@@ -686,15 +686,17 @@ struct InitialTaskExecutorOwnedRecordTraits {
         ->getCanonicalType();
   }
 
-  // FIXME: this isn't quite right I guess; the taskExecutor is a pointer to the class so we need to get the identity and type...
   void initialize(IRGenFunction &IGF, Address recordAddr,
                   Explosion &taskExecutor) const {
     auto executorRecord =
       IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
+
+    // This relies on the fact that the HeapObject is directly followed by a
+    // pointer to the witness table.
     IGF.Builder.CreateStore(taskExecutor.claimNext(),
-      IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
+        IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
     IGF.Builder.CreateStore(taskExecutor.claimNext(),
-      IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
+        IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
   }
 };
 

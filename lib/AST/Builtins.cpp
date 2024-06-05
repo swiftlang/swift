@@ -1534,7 +1534,7 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
-  auto f = getBuiltinFunction(
+  return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
         _label("flags", _swiftInt),
@@ -1545,22 +1545,6 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _typeparam(0), _parameters()))),
       _tuple(_nativeObject, _rawPointer));
-
-  fprintf(stderr, "[%s:%d](%s) the function: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  f->dump();
-//  (func_decl implicit "createTask(flags:initialSerialExecutor:taskGroup:initialTaskExecutor:initialTaskExecutorConsuming:operation:)" "<T>" access=public
-//   (parameter_list
-//    0 int - (parameter <anonymous @ 0x13820f638> apiName="flags" interface type="Int")
-//    1 ptr - (parameter <anonymous @ 0x13820f6f0> apiName="initialSerialExecutor" interface type="Builtin.Executor?" default_arg=nil
-//       (expression=nil_literal_expr implicit type="<null>" initializer="**NULL**"))
-//    2 ptr - (parameter <anonymous @ 0x13820f808> apiName="taskGroup" interface type="Builtin.RawPointer?" default_arg=nil
-//       (expression=nil_literal_expr implicit type="<null>" initializer="**NULL**"))
-//    3 int - (parameter <anonymous @ 0x13820f900> apiName="initialTaskExecutor" interface type="Builtin.Executor?" default_arg=nil
-//       (expression=nil_literal_expr implicit type="<null>" initializer="**NULL**"))
-//    4 int - (parameter <anonymous @ 0x13820fa18> apiName="initialTaskExecutorConsuming" interface type="TaskExecutor?" consuming default_arg=nil
-//       (expression=nil_literal_expr implicit type="<null>" initializer="**NULL**"))
-//    5  func - (parameter <anonymous @ 0x13820fb60> apiName="operation" interface type="@Sendable () async throws -> T")))
-  return f;
 }
 
 static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
@@ -1570,8 +1554,8 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
         _label("flags", _swiftInt),
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
-        /*deprecated*/_label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        /*deprecated*/_label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_taskExecutor)), _nil)),
+        /* deprecated */_label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_taskExecutor)), _nil)),
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _void, _parameters()))),
       _tuple(_nativeObject, _rawPointer));
@@ -1584,14 +1568,12 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
   unsigned numGenericParams = isDiscarding ? 0 : 1;
   BuiltinFunctionBuilder builder(ctx, numGenericParams);
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
-
   if (inGroup) {
     builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
   }
 
   if (withTaskExecutor) {
-    builder.addParameter(
-        makeConcrete(ctx.TheExecutorType)); // executor
+    builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows()
                                     .withSendable(true).build();
