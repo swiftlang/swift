@@ -23,7 +23,7 @@ internal func _swift_stdlib_wait(
 @_extern(c, "llvm.wasm32.memory.atomic.notify")
 internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32)
 
-extension Atomic where Value == UInt32 {
+extension Atomic where Value == _MutexHandle.State {
   internal borrowing func _wait(expected: _MutexHandle.State) {
     _swift_stdlib_wait(
       on: .init(_rawAddress),
