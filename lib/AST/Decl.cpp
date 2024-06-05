@@ -7404,6 +7404,11 @@ VarDecl::mutability(const DeclContext *UseDC,
   if (!isLet()) {
     if (hasInitAccessor()) {
       if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
+        // If we're referencing 'self.', it's mutable.
+        if (!base ||
+            (*base && ctor->getImplicitSelfDecl() == (*base)->getDecl()))
+          return StorageMutability::Mutable;
+
         return storageIsMutable(supportsMutation());
       }
     }
