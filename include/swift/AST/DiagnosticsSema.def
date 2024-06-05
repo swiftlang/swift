@@ -7811,33 +7811,15 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics, none,
-      "noncopyable type %0 cannot be used with generics yet",
-      (Type))
 ERROR(noncopyable_generics_variadic, none,
       "noncopyable type %0 cannot be used within a variadic type yet",
       (Type))
-ERROR(noncopyable_generics_specific, none,
-      "noncopyable type %0 cannot be used with generic type %1 yet",
-      (Type, Type))
-ERROR(noncopyable_generics_erasure, none,
-      "noncopyable type %0 cannot be erased to copyable existential type %1",
-      (Type, Type))
-ERROR(noncopyable_generics_metatype_cast, none,
-      "metatype %0 cannot be cast to %1 because %2 is noncopyable",
-      (Type, Type, Type))
-ERROR(noncopyable_generics_generic_param, none,
-      "noncopyable type %0 cannot be substituted for copyable %1 %2 in %3",
-      (Type, DescriptiveDeclKind, Type, DeclName))
-ERROR(noncopyable_generics_generic_param_metatype, none,
-      "metatype %4 of noncopyable type %0 cannot be substituted for copyable %1 %2 in %3",
-      (Type, DescriptiveDeclKind, Type, DeclName, Type))
-NOTE(noncopyable_generics_implicit_copyable, none,
-      "%0 %1 has an implicit Copyable requirement",
-      (DescriptiveDeclKind, Type))
-ERROR(noncopyable_element_of_pack_not_supported,none,
-      "parameter pack containing noncopyable element %0 is not supported",
-      (Type))
+NOTE(noncopyable_generics_implicit_conformance_req, none,
+     "'where %noformat0: %noformat1' is implicit here",
+     (Type, Type))
+NOTE(noncopyable_generics_implicit_composition, none,
+     "'%noformat0 & %noformat1' is implicit here",
+     (Type, Type))
 ERROR(noncopyable_effectful_getter,none,
       "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noncopyable_enums_do_not_support_indirect,none,
