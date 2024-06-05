@@ -1987,6 +1987,15 @@ public:
     default: Kind = EnumKind::MultiPayloadEnum; break;
     }
 
+    // Sanity:  Ignore any enum that claims to have a size more than 1MiB
+    // This avoids allocating lots of memory for spare bit mask calculations
+    // when clients try to interpret random chunks of memory as type descriptions.
+    if (Size > (1024ULL * 1024)) {
+      unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+      return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
+	Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
+    }
+
     if (Cases.size() == 1) {
       if (EffectivePayloadCases == 0) {
         // Zero-sized enum with only one empty case
