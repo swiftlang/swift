@@ -1735,3 +1735,26 @@ func sendableGlobalActorIsolated() {
   }
   print(x) // expected-tns-note {{access can happen concurrently}}
 }
+
+extension MyActor {
+  func testNonSendableCaptures(sc: NonSendableKlass) {
+    Task {
+      _ = self
+      _ = sc
+
+      Task { [sc,self] in
+        _ = self
+        _ = sc
+
+        Task { // expected-tns-warning {{value of non-Sendable type '@isolated(any) @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' accessed after being transferred}}
+          _ = sc
+        }
+
+        Task { // expected-tns-note {{access can happen concurrently}}
+          _ = sc
+        }
+      }
+    }
+  }
+}
+
