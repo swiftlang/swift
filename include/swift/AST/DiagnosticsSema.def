@@ -7830,6 +7830,10 @@ ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
+ERROR(consume_expression_needed_for_cast,none,
+      "implicit conversion to %0 is consuming", (Type))
+NOTE(add_consume_to_silence,none,
+     "add 'consume' to make consumption explicit", ())
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(consume_expression_partial_copyable,none,
