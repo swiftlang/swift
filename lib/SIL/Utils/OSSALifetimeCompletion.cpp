@@ -144,23 +144,26 @@ public:
       : value(value), allowLeaks(allowLeaks), starts(value->getFunction()),
         region(value->getFunction()) {}
 
+  using Visit = llvm::function_ref<void(SILInstruction *,
+                                        OSSALifetimeCompletion::LifetimeEnd)>;
+
+  struct Result;
+
+  /// Do all three steps at once.
+  void visit(const SSAPrunedLiveness &liveness, Result &result, Visit visit);
+
+private:
   /// Region discovery.
   ///
   /// Forward CFG walk from non-lifetime-ending boundary to unreachable
   /// instructions.
   void computeRegion(const SSAPrunedLiveness &liveness);
 
-  struct Result;
-
   /// Iterative dataflow to determine availability for each block in `region`.
   void propagateAvailablity(Result &result);
 
   /// Visit the terminators of blocks on the boundary of availability.
-  void visitAvailabilityBoundary(
-      Result const &result,
-      llvm::function_ref<void(SILInstruction *,
-                              OSSALifetimeCompletion::LifetimeEnd)>
-          visit);
+  void visitAvailabilityBoundary(Result const &result, Visit visit);
 
   struct State {
     enum Value : uint8_t {
@@ -177,6 +180,7 @@ public:
     }
   };
 
+public:
   struct Result {
     BasicBlockBitfield states;
 
@@ -204,6 +208,15 @@ public:
     }
   };
 };
+
+void AvailabilityBoundaryVisitor::visit(const SSAPrunedLiveness &liveness,
+                                        Result &result, Visit visit) {
+  computeRegion(liveness);
+
+  propagateAvailablity(result);
+
+  visitAvailabilityBoundary(result, visit);
+}
 
 void AvailabilityBoundaryVisitor::computeRegion(
     const SSAPrunedLiveness &liveness) {
@@ -344,14 +357,8 @@ void OSSALifetimeCompletion::visitAvailabilityBoundary(
     llvm::function_ref<void(SILInstruction *, LifetimeEnd end)> visit) {
 
   AvailabilityBoundaryVisitor visitor(value, allowLeaks);
-
-  visitor.computeRegion(liveness);
-
   AvailabilityBoundaryVisitor::Result result(value->getFunction());
-
-  visitor.propagateAvailablity(result);
-
-  visitor.visitAvailabilityBoundary(result, visit);
+  visitor.visit(liveness, result, visit);
 }
 
 static bool endLifetimeAtAvailabilityBoundary(
