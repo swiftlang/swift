@@ -186,6 +186,9 @@ IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
   // mangled name.
   configureForSymbolicMangling();
 
+  llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
+      AllowMarkerProtocols, false);
+
   // We don't make the substitution adjustments above because they're
   // target-specific and so would break the goal of getting a unique
   // string.
