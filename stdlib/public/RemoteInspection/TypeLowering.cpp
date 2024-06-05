@@ -315,6 +315,7 @@ BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) cons
     mask.keepOnlyMostSignificantBits(getSize() * 8 - intSize);
     return mask;
   } else if (
+    Name == "ypXp" || // Any.Type
     Name == "yyXf" // 'yyXf' =  @thin () -> Void function
   ) {
     // Builtin types that expose pointer spare bits
@@ -578,7 +579,9 @@ public:
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
-    return BitMask::zeroMask(getSize());
+    auto mask = BitMask(getSize(), maskForCount(getNumCases()));
+    mask.complement();
+    return mask;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -648,7 +651,17 @@ public:
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
-    return BitMask::zeroMask(getSize());
+    FieldInfo PayloadCase = getCases()[0];
+    size_t payloadSize = PayloadCase.TI.getSize();
+    if (getSize() <= payloadSize) {
+      return BitMask::zeroMask(getSize());
+    }
+    size_t tagSize = getSize() - payloadSize;
+    auto mask = BitMask::oneMask(getSize());
+    mask.keepOnlyMostSignificantBits(tagSize * 8); // Clear payload bits
+    auto tagMaskUsedBits = BitMask(getSize(), maskForCount(getNumCases()));
+    mask.andNotMask(tagMaskUsedBits, payloadSize); // Clear used tag bits
+    return mask;
   }
 
   // Think of a single-payload enum as being encoded in "pages".
@@ -2046,11 +2059,10 @@ public:
     //
 
     // Do we have a fixed layout?
-    // TODO: Test whether a missing FixedDescriptor is actually relevant.
     auto FixedDescriptor = TC.getBuilder().getBuiltinTypeDescriptor(TR);
     if (!FixedDescriptor || GenericPayloadCases > 0) {
       // This is a "dynamic multi-payload enum".  For example,
-      // this occurs with:
+      // this occurs with generics such as:
       // ```
       // class ClassWithEnum<T> {
       //   enum E {
@@ -2060,6 +2072,12 @@ public:
       //   var e: E?
       // }
       // ```
+      // and when we have a resilient inner enum, such as:
+      // ```
+      // enum E2 {
+      //   case y(E1_resilient)
+      //   case z(Int)
+      // }
       auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
                                         EffectivePayloadCases);
       Size += tagCounts.numTagBytes;
@@ -2091,7 +2109,6 @@ public:
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
     if (Stride == 0)
       Stride = 1;
-    auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
     // Compute the spare bit mask and determine if we have any address-only fields
     auto localSpareBitMask = BitMask::oneMask(Size);
@@ -2103,44 +2120,11 @@ public:
       }
     }
 
-    // See if we have MPE bit mask information from the compiler...
-    // TODO: drop this?
-
-    // Uncomment the following line to dump the MPE section every time we come through here...
-    //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
-
-    auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumDescriptor(TR);
-    if (MPEDescriptor && MPEDescriptor->usesPayloadSpareBits()) {
-      // We found compiler-provided spare bit data...
-      auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
-      auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
-      auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
-      BitMask compilerSpareBitMask(PayloadSize, SpareBitMask,
-                            PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
-      
-      if (compilerSpareBitMask.isZero() || hasAddrOnly) {
-        // If there are no spare bits, use the "simple" tag-only implementation.
-        return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
-          Size, Alignment, Stride, NumExtraInhabitants,
-          BitwiseTakable, Cases, EffectivePayloadCases);
-      }
-
-#if 0  // TODO: This should be !defined(NDEBUG)
-      // Verify that compiler provided and local spare bit info agree...
-      // TODO: If we could make this actually work, then we wouldn't need the
-      // bulky compiler-provided info, would we?
-      assert(localSpareBitMask == compilerSpareBitMask);
-#endif
-
-      // Use compiler-provided spare bit information
-      return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, compilerSpareBitMask,
-        EffectivePayloadCases);
-    }
-
     if (localSpareBitMask.isZero() || hasAddrOnly) {
-      // Simple case that does not use spare bits
+      // Simple tag-only layout does not use spare bits.
+      // Either:
+      // * There are no spare bits, or
+      // * We can't copy it to strip spare bits.
       return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
         BitwiseTakable, Cases, EffectivePayloadCases);
