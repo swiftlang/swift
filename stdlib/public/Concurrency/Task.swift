@@ -166,15 +166,24 @@ extension Task {
   /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
+  @_alwaysEmitIntoClient
   public var value: Success {
-    // FIXME: This seems wrong that abi test is not freaking out here?
-    //        At the same time, adding a silgen_name compat accessor with old signature results in duplicate definitions -- is mangling of typed throws not done properly on return position?
+    @_silgen_name("$sScT7valueTTxvg") // "_t" suffix for the typed throws version
     get async throws(Failure) {
       do {
         return try await _taskFutureGetThrowing(_task)
       } catch {
         throw error as! Failure
       }
+    }
+  }
+
+  // Legacy non-typed throws computed property
+  @usableFromInline
+  internal var __abi_value: Success {
+    @_silgen_name("$sScT5valuexvg")
+    get async throws {
+      return try await _taskFutureGetThrowing(_task)
     }
   }
 
@@ -195,7 +204,7 @@ extension Task {
       do {
         return .success(try await value)
       } catch {
-        return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
+        return .failure(error)
       }
     }
   }

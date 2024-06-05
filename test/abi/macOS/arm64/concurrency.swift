@@ -270,6 +270,10 @@ Added: _swift_task_getPreferredTaskExecutor
 Added: _swift_task_popTaskExecutorPreference
 Added: _swift_task_pushTaskExecutorPreference
 
+// Typed throws Task<Success, Failure>
+// property descriptor for Swift.Task.__abi_value : A
+Added: _$sScT11__abi_valuexvpMV
+
 // Adopt #isolation in with...Continuation APIs
 // Swift.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Actor?, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A
 Added: _$ss31withCheckedThrowingContinuation9isolation8function_xScA_pSgYi_SSyScCyxs5Error_pGXEtYaKlF
@@ -322,4 +326,3 @@ Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__y
 // Swift.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
-
