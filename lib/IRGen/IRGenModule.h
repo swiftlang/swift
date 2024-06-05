@@ -989,6 +989,7 @@ public:
   };
 
   std::string GetObjCSectionName(StringRef Section, StringRef MachOAttributes);
+  std::string GetLinkerSectionName(StringRef Section, StringRef MachOAttributes);
   void SetCStringLiteralSection(llvm::GlobalVariable *GV, ObjCLabelType Type);
 
   void addAsyncCoroIDMapping(llvm::GlobalVariable *asyncFunctionPointer,

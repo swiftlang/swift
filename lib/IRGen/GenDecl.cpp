@@ -1167,14 +1167,40 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
   llvm_unreachable("unexpected object file format");
 }
 
+std::string IRGenModule::GetLinkerSectionName(StringRef Section,
+                                              StringRef MachOAttributes) {
+  assert(Section.substr(0, 2) == "__" && "expected the name to begin with __");
+
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
+  case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("must know the object file format");
+  case llvm::Triple::MachO:
+    return MachOAttributes.empty()
+               ? ("__LD," + Section).str()
+               : ("__LD," + Section + "," + MachOAttributes).str();
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    return Section.substr(2).str();
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    return ("." + Section.substr(2) + "$B").str();
+  }
+
+  llvm_unreachable("unexpected object file format");
+}
+
+
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
     if (IRGen.Opts.EmitGenericRODatas) {
       emitGlobalList(
           *this, GenericRODatas, "generic_ro_datas",
-          GetObjCSectionName("__swift_rodatas", "regular"),
+          GetLinkerSectionName("__swift_rodatas", "regular"),
           llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ true);
+          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ false);
     }
 
     // Objective-C class references go in a variable with a meaningless
