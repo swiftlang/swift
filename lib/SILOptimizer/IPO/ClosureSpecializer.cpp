@@ -1310,10 +1310,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // Don't specialize non-fragile callees if the caller is fragile;
         // the specialized callee will have shared linkage, and thus cannot
         // be referenced from the fragile caller.
-        // pcmo TODO: remove F->isSerialiezd() and pass its kind to
-        // canBeInlinedIntoCaller instead.
-        if (Caller->isSerialized() &&
-            !ApplyCallee->canBeInlinedIntoCaller())
+        if (!ApplyCallee->canBeInlinedIntoCaller(Caller->getSerializedKind()))
           continue;
 
         // If the callee uses a dynamic Self, we cannot specialize it,

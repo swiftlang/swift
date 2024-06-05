@@ -271,7 +271,8 @@ static llvm::Error resolveExplicitModuleInputs(
         auto optionalBridgingHeaderDepModuleInfo = cache.findKnownDependency(
             {bridgingHeaderDepName, ModuleDependencyKind::Clang});
         const auto bridgingHeaderDepModuleDetails =
-            optionalBridgingHeaderDepModuleInfo.getAsClangModule();
+          optionalBridgingHeaderDepModuleInfo.getAsClangModule();
+	commandLine.push_back("-Xcc");
         commandLine.push_back(
             "-fmodule-map-file=" +
             remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));

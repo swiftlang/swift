@@ -438,17 +438,17 @@ struct TransferredNonTransferrableInfo {
   ///
   /// This is equal to the merge of the IsolationRegionInfo from all elements in
   /// nonTransferrable's region when the error was diagnosed.
-  SILIsolationInfo isolationRegionInfo;
+  SILDynamicMergedIsolationInfo isolationRegionInfo;
 
-  TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILValue nonTransferrableValue,
-                                  SILIsolationInfo isolationRegionInfo)
+  TransferredNonTransferrableInfo(
+      Operand *transferredOperand, SILValue nonTransferrableValue,
+      SILDynamicMergedIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableValue),
         isolationRegionInfo(isolationRegionInfo) {}
-  TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILInstruction *nonTransferrableInst,
-                                  SILIsolationInfo isolationRegionInfo)
+  TransferredNonTransferrableInfo(
+      Operand *transferredOperand, SILInstruction *nonTransferrableInst,
+      SILDynamicMergedIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableInst),
         isolationRegionInfo(isolationRegionInfo) {}
@@ -794,7 +794,7 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
             VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
       diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
-          state.isolationInfo, std::get<2>(p));
+          state.isolationInfo.getIsolationInfo(), std::get<2>(p));
       continue;
     }
 
@@ -975,7 +975,8 @@ void UseAfterTransferDiagnosticInferrer::infer() {
             VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
       auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
-          baseLoc, rootValueAndName->first, state.isolationInfo,
+          baseLoc, rootValueAndName->first,
+          state.isolationInfo.getIsolationInfo(),
           *sourceApply->getIsolationCrossing());
     }
 
@@ -1003,7 +1004,8 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   auto captureInfo =
       autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
   auto *captureDecl = captureInfo.getDecl();
-  AutoClosureWalker walker(*this, captureDecl, state.isolationInfo);
+  AutoClosureWalker walker(*this, captureDecl,
+                           state.isolationInfo.getIsolationInfo());
   autoClosureExpr->walk(walker);
 }
 
@@ -1109,7 +1111,7 @@ public:
   }
 
   /// Return the isolation region info for \p getNonTransferrableValue().
-  SILIsolationInfo getIsolationRegionInfo() const {
+  SILDynamicMergedIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
   }
 
@@ -1536,10 +1538,9 @@ struct DiagnosticEvaluator final
                                            partitionOp.getSourceInst());
   }
 
-  void
-  handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                 Element transferredVal,
-                                 SILIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &partitionOp, Element transferredVal,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1556,11 +1557,10 @@ struct DiagnosticEvaluator final
         partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
   }
 
-  void
-  handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                 Element transferredVal,
-                                 Element actualNonTransferrableValue,
-                                 SILIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &partitionOp, Element transferredVal,
+      Element actualNonTransferrableValue,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1600,6 +1600,11 @@ struct DiagnosticEvaluator final
     }
   }
 
+  void handleUnknownCodePattern(const PartitionOp &op) const {
+    diagnoseError(op.getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern);
+  }
+
   bool isActorDerived(Element element) const {
     return info->getValueMap().getIsolationRegion(element).isActorIsolated();
   }
@@ -1614,6 +1619,17 @@ struct DiagnosticEvaluator final
 
   SILIsolationInfo getIsolationRegionInfo(Element element) const {
     return info->getValueMap().getIsolationRegion(element);
+  }
+
+  std::optional<Element> getElement(SILValue value) const {
+    return info->getValueMap().getTrackableValue(value).getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .getRepresentative()
+        .maybeGetValue();
   }
 
   bool isClosureCaptured(Element element, Operand *op) const {

@@ -295,7 +295,16 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   }
 }
 
-// Does this instruction terminate a SIL-level scope?
+bool swift::isBeginScopeMarker(SILInstruction *user) {
+  switch (user->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::BeginBorrowInst:
+    return true;
+  }
+}
+
 bool swift::isEndOfScopeMarker(SILInstruction *user) {
   switch (user->getKind()) {
   default:

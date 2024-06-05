@@ -110,6 +110,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
                                                'swift-experimental-string-processing'))
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL', 'TRUE')
 
         self.add_extra_cmake_options()
 

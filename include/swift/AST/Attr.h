@@ -2536,6 +2536,8 @@ class RawLayoutAttr final : public DeclAttribute {
   unsigned SizeOrCount;
   /// If `LikeType` is null, the alignment in bytes to use for the raw storage.
   unsigned Alignment;
+  /// If a value of this raw layout type should move like its `LikeType`.
+  bool MovesAsLike = false;
   /// The resolved like type.
   mutable Type CachedResolvedLikeType = Type();
 
@@ -2543,10 +2545,12 @@ class RawLayoutAttr final : public DeclAttribute {
 
 public:
   /// Construct a `@_rawLayout(like: T)` attribute.
-  RawLayoutAttr(TypeRepr *LikeType, SourceLoc AtLoc, SourceRange Range)
+  RawLayoutAttr(TypeRepr *LikeType, bool movesAsLike, SourceLoc AtLoc,
+                SourceRange Range)
       : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
                       /*implicit*/ false),
-        LikeType(LikeType), SizeOrCount(0), Alignment(~0u) {}
+        LikeType(LikeType), SizeOrCount(0), Alignment(~0u),
+        MovesAsLike(movesAsLike) {}
 
   /// Construct a `@_rawLayout(likeArrayOf: T, count: N)` attribute.
   RawLayoutAttr(TypeRepr *LikeType, unsigned Count, SourceLoc AtLoc,
@@ -2616,6 +2620,11 @@ public:
     if (Alignment == ~0u)
       return std::nullopt;
     return std::make_pair(getResolvedLikeType(sd), SizeOrCount);
+  }
+
+  /// Whether a value of this raw layout should move like its `LikeType`.
+  bool shouldMoveAsLikeType() const {
+    return MovesAsLike;
   }
 
   static bool classof(const DeclAttribute *DA) {

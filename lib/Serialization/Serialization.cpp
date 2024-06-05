@@ -1742,6 +1742,7 @@ void Serializer::writeASTBlockEntity(const SILLayout *layout) {
                         data);
 }
 
+// TODO: DON'T serialize the special conformance for DA-as_A
 void Serializer::writeLocalNormalProtocolConformance(
                                     NormalProtocolConformance *conformance) {
   using namespace decls_block;
@@ -1866,7 +1867,7 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
     if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
-      writeLocalNormalProtocolConformance(normal);
+        writeLocalNormalProtocolConformance(normal);
     } else {
       // A conformance in a different module file.
       unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceXrefLayout::Code];
@@ -1959,8 +1960,10 @@ Serializer::addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances) {
   using namespace decls_block;
 
   SmallVector<ProtocolConformanceID, 4> results;
-  for (auto conformance : conformances)
-    results.push_back(addConformanceRef(conformance));
+  for (auto conformance : conformances) {
+    auto id = addConformanceRef(conformance);
+      results.push_back(id);
+  }
   return results;
 }
 
@@ -1968,9 +1971,11 @@ SmallVector<ProtocolConformanceID, 4>
 Serializer::addConformanceRefs(ArrayRef<ProtocolConformance*> conformances) {
   using namespace decls_block;
 
+
   SmallVector<ProtocolConformanceID, 4> results;
-  for (auto conformance : conformances)
+  for (auto conformance : conformances) {
     results.push_back(addConformanceRef(conformance));
+  }
   return results;
 }
 
@@ -3345,7 +3350,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       
       RawLayoutDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-        typeID, rawSize, rawAlign);
+        typeID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
     }
     }
   }

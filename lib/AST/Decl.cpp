@@ -7404,10 +7404,10 @@ VarDecl::mutability(const DeclContext *UseDC,
   if (!isLet()) {
     if (hasInitAccessor()) {
       if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
-        // If we're referencing 'self.', it's initializable.
+        // If we're referencing 'self.', it's mutable.
         if (!base ||
             (*base && ctor->getImplicitSelfDecl() == (*base)->getDecl()))
-          return StorageMutability::Initializable;
+          return StorageMutability::Mutable;
 
         return storageIsMutable(supportsMutation());
       }
@@ -7475,8 +7475,14 @@ VarDecl::mutability(const DeclContext *UseDC,
       return StorageMutability::Immutable;
 
     // If we were given a base and it is 'self', it's initializable.
-    if (!base || (*base && CD->getImplicitSelfDecl() == (*base)->getDecl()))
+    if (!base || (*base && CD->getImplicitSelfDecl() == (*base)->getDecl())) {
+      // Treat values of tuple type as mutable in these contexts, because
+      // SILGen wants to see them as lvalues.
+      if (getInterfaceType()->is<TupleType>())
+        return StorageMutability::Mutable;
+
       return StorageMutability::Initializable;
+    }
 
     return StorageMutability::Immutable;
   }

@@ -147,11 +147,14 @@
 ///
 ///     struct MyStructure: @unchecked Sendable { ... }
 @available(*, deprecated, message: "Use @unchecked Sendable instead")
+@available(swift, obsoleted: 6.0, message: "Use @unchecked Sendable instead")
 @_marker public protocol UnsafeSendable: Sendable { }
 
 // Historical names
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias ConcurrentValue = Sendable
 
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias UnsafeConcurrentValue = UnsafeSendable

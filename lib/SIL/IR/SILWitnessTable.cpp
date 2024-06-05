@@ -184,9 +184,7 @@ SerializedKind_t SILWitnessTable::conformanceSerializedKind(
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
   if (nominal->getEffectiveAccess() >= accessLevelToCheck)
-    return optInPackage &&
-           conformance->getDeclContext()->getParentModule()->isResilient() ?
-           IsSerializedForPackage : IsSerialized;
+    return IsSerialized;
 
   return IsNotSerialized;
 }

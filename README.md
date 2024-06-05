@@ -9,7 +9,6 @@
 | | **Architecture** | **Build** |
 |---|:---:|:---:|
 | **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-macos/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-macos)|
-| **Ubuntu 18.04** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-18_04)|
 | **Ubuntu 20.04** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|
 | **Ubuntu 20.04** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04-aarch64)|
 | **Ubuntu 22.04** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04)|
@@ -18,6 +17,12 @@
 | **Amazon Linux 2** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|
 | **Amazon Linux 2** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64)|
 | **Universal Base Image 9** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubi-9/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubi-9)|
+| **Debian 12** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-debian-12/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-debian-12)|
+| **Debian 12** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-debian-12-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-debian-12-aarch64)|
+| **Fedora 39** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-fedora-39/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-fedora-39)|
+| **Fedora 39** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-fedora-39-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-fedora-39-aarch64)|
+| **Windows 10** | x86_64 |[![Build Status](https://ci-external.swift.org/job/swift-main-windows-toolchain/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/swift-main-windows-toolchain)|
+| **Windows 10** | ARM64 |[![Build Status](https://ci-external.swift.org/job/swift-main-windows-toolchain-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/swift-main-windows-toolchain-arm64)|
 
 **Cross-Compilation Targets**
 

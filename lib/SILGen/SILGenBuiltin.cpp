@@ -23,6 +23,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -1994,16 +1995,9 @@ void SILGenModule::noteMemberRefExpr(MemberRefExpr *e) {
   // distributed actors, make sure we have the conformance needed
   // for a builtin.
   ASTContext &ctx = var->getASTContext();
-  if (var->getName() == ctx.Id_asLocalActor &&
-      var->getDeclContext()->getSelfProtocolDecl() &&
-      var->getDeclContext()->getSelfProtocolDecl()
-          ->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-    auto conformance =
-        getDistributedActorAsActorConformance(
-          e->getMember().getSubstitutions());
-    useConformance(conformance);
+  if (isDistributedActorAsLocalActorComputedProperty(var)) {
+    useConformance(getDistributedActorAsActorConformanceRef(ctx));
   }
-
 }
 
 static ManagedValue emitBuiltinDistributedActorAsAnyActor(

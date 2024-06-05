@@ -9043,8 +9043,11 @@ static Expr *wrapAsyncLetInitializer(
   bool throws = TypeChecker::canThrow(cs.getASTContext(), initializer)
                   .has_value();
   bool hasSendingeResult = isSendingInitializer(initializer);
-  bool isSendable = !cs.getASTContext().LangOpts.hasFeature(
-      Feature::TransferringArgsAndResults);
+  bool isSendable =
+      !cs.getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation);
+  assert((isSendable || cs.getASTContext().LangOpts.hasFeature(
+                            Feature::SendingArgsAndResults)) &&
+         "Region Isolation should imply SendingArgsAndResults");
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
                      .withThrows(throws, /*FIXME:*/ Type())

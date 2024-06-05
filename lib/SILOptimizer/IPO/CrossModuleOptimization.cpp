@@ -67,12 +67,14 @@ class CrossModuleOptimization {
   bool everything;
 
   typedef llvm::DenseMap<SILFunction *, bool> FunctionFlags;
+  FunctionFlags canSerializeFlags;
 
 public:
   CrossModuleOptimization(SILModule &M, bool conservative, bool everything)
     : M(M), conservative(conservative), everything(everything) { }
 
-  void serializeFunctionsInModule(ArrayRef<SILFunction *> functions);
+  void trySerializeFunctions(ArrayRef<SILFunction *> functions);
+  void serializeFunctionsInModule(SILPassManager *manager);
   void serializeTablesInModule();
 
 private:
@@ -187,6 +189,10 @@ static bool isPackageOrPublic(AccessLevel accessLevel, SILOptions options) {
   return accessLevel == AccessLevel::Public;
 }
 
+static bool isPackageCMOEnabled(ModuleDecl *mod) {
+  return mod->isResilient() && mod->serializePackageEnabled();
+}
+
 /// Checks wither this function is [serialized_for_package] due to Package CMO
 /// or [serialized] with non-package CMO. The [serialized_for_package] attribute
 /// is used to indicate that a function is serialized because of Package CMO, which
@@ -199,20 +205,21 @@ static bool isPackageOrPublic(AccessLevel accessLevel, SILOptions options) {
 /// is the correct behavior.
 static bool isSerializedWithRightKind(const SILModule &mod,
                                     SILFunction *f) {
-  return mod.getSwiftModule()->serializePackageEnabled() &&
-         mod.getSwiftModule()->isResilient() ?
-         f->isSerializedForPackage() : f->isSerialized();
+  // If Package CMO is enabled in resilient mode, return
+  // true if the function is [serialized] due to @inlinable
+  // (or similar) or [serialized_for_pkg] due to this
+  // optimization.
+  return isPackageCMOEnabled(mod.getSwiftModule()) ? f->isAnySerialized()
+                                                   : f->isSerialized();
 }
 static bool isSerializedWithRightKind(const SILModule &mod,
                                       SILGlobalVariable *g) {
-  return mod.getSwiftModule()->serializePackageEnabled() &&
-         mod.getSwiftModule()->isResilient() ?
-         g->isSerializedForPackage() : g->isSerialized();
+  return isPackageCMOEnabled(mod.getSwiftModule()) ? g->isAnySerialized()
+                                                   : g->isSerialized();
 }
 static SerializedKind_t getRightSerializedKind(const SILModule &mod) {
-  return mod.getSwiftModule()->serializePackageEnabled() &&
-         mod.getSwiftModule()->isResilient() ?
-         IsSerializedForPackage : IsSerialized;
+  return isPackageCMOEnabled(mod.getSwiftModule()) ? IsSerializedForPackage
+                                                   : IsSerialized;
 }
 
 static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
@@ -251,12 +258,8 @@ static bool isReferenceSerializeCandidate(SILGlobalVariable *G,
 }
 
 /// Select functions in the module which should be serialized.
-void CrossModuleOptimization::serializeFunctionsInModule(
+void CrossModuleOptimization::trySerializeFunctions(
     ArrayRef<SILFunction *> functions) {
-  FunctionFlags canSerializeFlags;
-
-  // The passed functions are already ordered bottom-up so the most
-  // nested referenced function is checked first.
   for (SILFunction *F : functions) {
     if (isSerializeCandidate(F, M.getOptions()) || everything) {
       if (canSerializeFunction(F, canSerializeFlags, /*maxDepth*/ 64)) {
@@ -266,31 +269,91 @@ void CrossModuleOptimization::serializeFunctionsInModule(
   }
 }
 
+void CrossModuleOptimization::serializeFunctionsInModule(SILPassManager *manager) {
+  // Reorder SIL funtions in the module bottom up so we can serialize
+  // the most nested referenced functions first and avoid unnecessary
+  // recursive checks.
+  BasicCalleeAnalysis *BCA = manager->getAnalysis<BasicCalleeAnalysis>();
+  BottomUpFunctionOrder BottomUpOrder(M, BCA);
+  auto bottomUpFunctions = BottomUpOrder.getFunctions();
+  trySerializeFunctions(bottomUpFunctions);
+}
+
 void CrossModuleOptimization::serializeTablesInModule() {
   if (!M.getSwiftModule()->serializePackageEnabled())
     return;
 
   for (const auto &vt : M.getVTables()) {
-    if (vt->isNotSerialized() &&
+    if (vt->getSerializedKind() != getRightSerializedKind(M) &&
         vt->getClass()->getEffectiveAccess() >= AccessLevel::Package) {
-      vt->setSerializedKind(getRightSerializedKind(M));
+      // This checks if a vtable entry is not serialized and attempts to
+      // serialize (and its references) if they have the right visibility.
+      // This should not be necessary but is added to ensure all applicable
+      // symbols are serialized. Whether serialized or not is cached so
+      // this check shouldn't be expensive.
+      auto unserializedClassMethodRange = llvm::make_filter_range(
+          vt->getEntries(), [&](const SILVTableEntry &entry) {
+            return entry.getImplementation()->getSerializedKind() !=
+                   getRightSerializedKind(M);
+          });
+      std::vector<SILFunction *> classMethodsToSerialize;
+      llvm::transform(unserializedClassMethodRange,
+                      std::back_inserter(classMethodsToSerialize),
+                      [&](const SILVTableEntry &entry) {
+                        return entry.getImplementation();
+                      });
+      trySerializeFunctions(classMethodsToSerialize);
+
+      bool containsInternal =
+          llvm::any_of(vt->getEntries(), [&](const SILVTableEntry &entry) {
+            // If the entry is internal, vtable should not be serialized.
+            // However, if the entry is not serialized but has the right
+            // visibility, it can still be referenced, thus the vtable
+            // should serialized.
+            return !entry.getImplementation()->hasValidLinkageForFragileRef(
+                getRightSerializedKind(M));
+          });
+      if (!containsInternal)
+        vt->setSerializedKind(getRightSerializedKind(M));
     }
   }
 
+  // Witness thunks are not serialized, so serialize them here.
   for (auto &wt : M.getWitnessTables()) {
-    if (wt.isNotSerialized() && 
+    if (wt.getSerializedKind() != getRightSerializedKind(M) &&
         hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true)) {
-      for (auto &entry : wt.getEntries()) {
-        // Witness thunks are not serialized, so serialize them here.
-        if (entry.getKind() == SILWitnessTable::Method &&
-            entry.getMethodWitness().Witness->isNotSerialized() &&
-            isSerializeCandidate(entry.getMethodWitness().Witness,
-                                 M.getOptions())) {
-          entry.getMethodWitness().Witness->setSerializedKind(getRightSerializedKind(M));
-        }
-      }
-      // Then serialize the witness table itself.
-      wt.setSerializedKind(getRightSerializedKind(M));
+      // This checks if a wtable entry is not serialized and attempts to
+      // serialize (and its references) if they have the right visibility.
+      // This should not be necessary but is added to ensure all applicable
+      // symbols are serialized. Whether serialized or not is cached so
+      // this check shouldn't be expensive.
+      auto unserializedWTMethodRange = llvm::make_filter_range(
+          wt.getEntries(), [&](const SILWitnessTable::Entry &entry) {
+            return entry.getKind() == SILWitnessTable::Method &&
+                   entry.getMethodWitness().Witness->getSerializedKind() !=
+                       getRightSerializedKind(M);
+          });
+      std::vector<SILFunction *> wtMethodsToSerialize;
+      llvm::transform(unserializedWTMethodRange,
+                      std::back_inserter(wtMethodsToSerialize),
+                      [&](const SILWitnessTable::Entry &entry) {
+                        return entry.getMethodWitness().Witness;
+                      });
+      trySerializeFunctions(wtMethodsToSerialize);
+
+      bool containsInternal = llvm::any_of(
+          wt.getEntries(), [&](const SILWitnessTable::Entry &entry) {
+            // If the entry is internal, wtable should not be serialized.
+            // However, if the entry is not serialized but has the right
+            // visibility, it can still be referenced, thus the vtable
+            // should serialized.
+            return entry.getKind() == SILWitnessTable::Method &&
+                   !entry.getMethodWitness()
+                        .Witness->hasValidLinkageForFragileRef(
+                            getRightSerializedKind(M));
+          });
+      if (!containsInternal)
+        wt.setSerializedKind(getRightSerializedKind(M));
     }
   }
 }
@@ -322,8 +385,7 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  if (function->isSerialized() ||
-      isSerializedWithRightKind(M, function)) {
+  if (function->isAnySerialized()) {
     canSerializeFlags[function] = true;
     return true;
   }
@@ -437,11 +499,29 @@ bool CrossModuleOptimization::canSerializeInstruction(
         [&](SILDeclRef method) {
           if (method.isForeign)
             canUse = false;
+          else if (isPackageCMOEnabled(method.getModuleContext())) {
+            // If the referenced keypath is internal, do not
+            // serialize.
+            auto methodScope = method.getDecl()->getFormalAccessScope(
+                nullptr,
+                /*treatUsableFromInlineAsPublic*/ true);
+            canUse = methodScope.isPublicOrPackage();
+          }
         });
     return canUse;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
-    return !MI->getMember().isForeign;
+    // If a class_method or witness_method is internal,
+    // it can't be serialized.
+    auto member = MI->getMember();
+    auto canUse = !member.isForeign;
+    if (canUse && isPackageCMOEnabled(member.getModuleContext())) {
+      auto methodScope = member.getDecl()->getFormalAccessScope(
+          nullptr,
+          /*treatUsableFromInlineAsPublic*/ true);
+      canUse = methodScope.isPublicOrPackage();
+    }
+    return canUse;
   }
   if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
     // In conservative mode, we don't support class field accesses of non-public
@@ -615,13 +695,6 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                                 const FunctionFlags &canSerializeFlags) {
-  // This means the function is @inlinable (or similar)
-  // so should have [serialized] attribute.
-  if (function->isSerialized())
-    return;
-
-  // If not, check whether it was serialized with
-  // this optimization.
   if (isSerializedWithRightKind(M, function))
     return;
 
@@ -683,7 +756,9 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (canSerializeGlobal(global)) {
       serializeGlobal(global);
     }
-    if (!hasPublicOrPackageVisibility(global->getLinkage(), M.getSwiftModule()->serializePackageEnabled())) {
+    if (!hasPublicOrPackageVisibility(
+            global->getLinkage(),
+            M.getSwiftModule()->serializePackageEnabled())) {
       global->setLinkage(SILLinkage::Public);
     }
     return;
@@ -855,14 +930,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
     }
 
     CrossModuleOptimization CMO(M, conservative, everything);
-
-    // Reorder SIL funtions in the module bottom up so we can serialize
-    // the most nested referenced functions first and avoid unnecessary
-    // recursive checks.
-    BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
-    BottomUpFunctionOrder BottomUpOrder(M, BCA);
-    auto BottomUpFunctions = BottomUpOrder.getFunctions();
-    CMO.serializeFunctionsInModule(BottomUpFunctions);
+    CMO.serializeFunctionsInModule(PM);
 
     // Serialize SIL v-tables and witness-tables if package-cmo is enabled.
     CMO.serializeTablesInModule();

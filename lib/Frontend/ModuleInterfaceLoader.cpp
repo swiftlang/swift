@@ -1908,16 +1908,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     // explicit Swift module build tasks will not rely on them and they may be
     // source-target-context-specific and hinder module sharing across
     // compilation source targets.
-    // If using DirectCC1Scan, the command-line reduction is handled inside
-    // `getSwiftExplicitModuleDirectCC1Args()`, there is no need to inherit
-    // anything here as the ExtraArgs from the invocation are clang driver
-    // options, not cc1 options.
     // Clang module dependecies of this Swift dependency will be distinguished
     // by their context hash for different variants, so would still cause a
     // difference in the Swift compile commands, when different.
-    if (!clangImporterOpts.ClangImporterDirectCC1Scan)
-      inheritedParentContextClangArgs =
-          clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
+    inheritedParentContextClangArgs =
+        clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
     genericSubInvocation.getFrontendOptions()
         .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext ||
@@ -1931,9 +1926,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     inheritedParentContextClangArgs = clangImporterOpts.ExtraArgs;
   }
   subClangImporterOpts.ExtraArgs = inheritedParentContextClangArgs;
-  for (auto arg : subClangImporterOpts.ExtraArgs) {
-    GenericArgs.push_back("-Xcc");
-    GenericArgs.push_back(ArgSaver.save(arg));
+  // If using DirectCC1Scan, the command-line reduction is handled inside
+  // `getSwiftExplicitModuleDirectCC1Args()`, there is no need to inherit
+  // anything here as the ExtraArgs from the invocation are clang driver
+  // options, not cc1 options.
+  if (!clangImporterOpts.ClangImporterDirectCC1Scan) {
+    for (auto arg : subClangImporterOpts.ExtraArgs) {
+      GenericArgs.push_back("-Xcc");
+      GenericArgs.push_back(ArgSaver.save(arg));
+    }
   }
 
   subClangImporterOpts.EnableClangSPI = clangImporterOpts.EnableClangSPI;

@@ -24,6 +24,7 @@
 namespace swift {
 
 class RegionAnalysisFunctionInfo;
+class RegionAnalysisValueMap;
 
 namespace regionanalysisimpl {
 
@@ -121,9 +122,11 @@ using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 } // namespace regionanalysisimpl
 
 class regionanalysisimpl::TrackableValueState {
+  friend RegionAnalysisValueMap;
+
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
-  SILIsolationInfo regionInfo = SILIsolationInfo::getDisconnected();
+  std::optional<SILIsolationInfo> regionInfo = {};
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -140,19 +143,27 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
+  SILIsolationInfo getIsolationRegionInfo() const {
+    if (!regionInfo) {
+      return SILIsolationInfo::getDisconnected(false);
+    }
+
+    return *regionInfo;
+  }
+
   SILIsolationInfo::Kind getIsolationRegionInfoKind() const {
-    return regionInfo.getKind();
+    return getIsolationRegionInfo().getKind();
   }
 
   ActorIsolation getActorIsolation() const {
-    return regionInfo.getActorIsolation();
+    return getIsolationRegionInfo().getActorIsolation();
   }
 
-  void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
-    regionInfo = regionInfo.merge(newRegionInfo);
+  void setDisconnectedNonisolatedUnsafe() {
+    auto oldRegionInfo = getIsolationRegionInfo();
+    assert(oldRegionInfo.isDisconnected());
+    regionInfo = oldRegionInfo.withUnsafeNonIsolated();
   }
-
-  SILIsolationInfo getIsolationRegionInfo() const { return regionInfo; }
 
   Element getID() const { return Element(id); }
 
@@ -165,11 +176,22 @@ public:
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().printForDiagnostics(os);
+    getIsolationRegionInfo().printForOneLineLogging(os);
     os << "].";
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+private:
+  bool hasIsolationRegionInfo() const { return bool(regionInfo); }
+
+  /// Set the isolation region info for this TrackableValueState. Private so it
+  /// can only be used by RegionAnalysisValueMap::getTrackableValue.
+  void setIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
+    assert(!regionInfo.has_value() &&
+           "Can only call setIsolationRegionInfo once!\n");
+    regionInfo = newRegionInfo;
+  }
 };
 
 /// The representative value of the equivalence class that makes up a tracked
@@ -358,9 +380,17 @@ private:
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
-  bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   Element lookupValueID(SILValue value);
+
+  /// Initialize a TrackableValue with a SILIsolationInfo that we already know
+  /// instead of inferring.
+  ///
+  /// If we successfully initialize \p value with \p info, returns
+  /// {TrackableValue(), true}. If we already had a TrackableValue, we return
+  /// {TrackableValue(), false}.
+  std::pair<TrackableValue, bool>
+  initializeTrackableValue(SILValue value, SILIsolationInfo info) const;
 };
 
 class RegionAnalysisFunctionInfo {
