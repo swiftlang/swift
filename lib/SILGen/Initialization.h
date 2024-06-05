@@ -185,7 +185,7 @@ public:
   /// of last resort: it is generally better to split tuples or evaluate
   /// in-place when the initialization supports that.
   ///
-  /// If this is an *copy* of the rvalue into this initialization then isInit is
+  /// If this is a *copy* of the rvalue into this initialization then isInit is
   /// false.  If it is an *initialization* of the memory in the initialization,
   /// then isInit is true.
   virtual void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
