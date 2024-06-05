@@ -2425,7 +2425,9 @@ AssociatedTypeInference::computeFailureTypeWitness(
   // it.
   for (const auto &witness : valueWitnesses) {
     if (isAsyncIteratorProtocolNext(witness.first)) {
-      if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness.second)) {
+      // We use a dyn_cast_or_null since we can get a nullptr here if we fail to
+      // match a witness. In such a case, we should just fail here.
+      if (auto witnessFunc = dyn_cast_or_null<AbstractFunctionDecl>(witness.second)) {
         auto thrownError = witnessFunc->getEffectiveThrownErrorType();
 
         // If it doesn't throw, Failure == Never.
