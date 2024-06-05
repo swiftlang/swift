@@ -218,14 +218,19 @@ struct MyGlobalActor {
 // expected-note @-2 {{var declared here}}
 // expected-note @-3 {{mutation of this var is only permitted within the actor}}
 // expected-complete-tns-error @-4 {{top-level code variables cannot have a global actor}}
-// expected-complete-tns-note @-5 4{{mutation of this var is only permitted within the actor}}
+// expected-complete-tns-note @-5 3{{mutation of this var is only permitted within the actor}}
 
 
 if #available(SwiftStdlib 5.1, *) {
+  // We used to emit an error here when we compiled with region isolation since
+  // Task.detached took a non-isolated @Sendable closure so it would be invalid
+  // to access number from it inout... but now since Task.detached takes a
+  // sendable closure, due to it being at the global scope, the closure passed
+  // into detached becomes MainActor isolated meaning that we do not get this
+  // specific error anymore.
   let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
   // expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
   // expected-minimal-targeted-error @-2 {{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a non-isolated context}}
-  // expected-complete-tns-error @-3 {{main actor-isolated var 'number' can not be used 'inout' from a non-isolated context}}
 }
 
 // attempt to pass global state owned by the global actor to another async function

@@ -609,7 +609,7 @@ extension Task where Failure == Never {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
     fatalError("Unavailable in task-to-thread concurrency model.")
   }
@@ -618,7 +618,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async -> Success
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
@@ -665,7 +665,7 @@ extension Task where Failure == Never {
   @_allowFeatureSuppression(IsolatedAny)
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
@@ -705,7 +705,7 @@ extension Task where Failure == Error {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -714,7 +714,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async throws -> Success
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the task flags for a new task.
@@ -761,7 +761,7 @@ extension Task where Failure == Error {
   @_allowFeatureSuppression(IsolatedAny)
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the task flags for a new task.
@@ -803,7 +803,7 @@ extension Task where Failure == Never {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -812,7 +812,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
@@ -856,7 +856,7 @@ extension Task where Failure == Never {
   @_allowFeatureSuppression(IsolatedAny)
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
@@ -896,7 +896,7 @@ extension Task where Failure == Error {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -905,7 +905,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
@@ -951,7 +951,7 @@ extension Task where Failure == Error {
   @_allowFeatureSuppression(IsolatedAny)
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
@@ -1354,7 +1354,7 @@ extension Task where Failure == Error {
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @usableFromInline
-internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
+internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: sending @escaping () async -> Void) {
 #if compiler(>=5.6)
   Task(operation: body)
 #else
