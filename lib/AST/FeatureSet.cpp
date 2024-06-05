@@ -770,6 +770,8 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
