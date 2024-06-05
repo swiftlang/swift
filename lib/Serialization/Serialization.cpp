@@ -834,11 +834,11 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, MODULE_NAME);
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
-  BLOCK_RECORD(control_block, SDK_VERSION);
   BLOCK_RECORD(control_block, REVISION);
-  BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
+  BLOCK_RECORD(control_block, CHANNEL);
+  BLOCK_RECORD(control_block, SDK_VERSION);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
