@@ -933,10 +933,6 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
   if (&op == &bi->getOperandRef(4)) {
     // The (any TaskExecutor)? (optional) must be consumed by the builtin,
     // as we will keep it alive and later destroy it as the task runs to completion.
-//    fprintf(stderr, "[%s:%d](%s) MAKE DESTROYING CONSUME; bi:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    bi->dump();
-//    fprintf(stderr, "[%s:%d](%s) MAKE DESTROYING CONSUME; op: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    op.dump();
     return OperandOwnership::ForwardingConsume;
   }
 

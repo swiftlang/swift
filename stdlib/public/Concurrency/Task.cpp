@@ -205,21 +205,10 @@ TaskExecutorRef _task_taskExecutor_getTaskExecutorRef(
 
 TaskExecutorRef
 InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTaskExecutor() const {
-  fprintf(stderr, "[%s:%d](%s) we must call into the SerialExecutor::asUnownedTaskExecutor()\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d](%s) the executor Identity  = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          Identity);
-  fprintf(stderr, "[%s:%d](%s) the executor WitnessT  = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          WitnessTable);
-
   TaskExecutorRef executorRef = _task_taskExecutor_getTaskExecutorRef(
       Identity,
       /*selfType=*/swift_getObjectType(Identity),
       /*wtable=*/WitnessTable);
-
-  fprintf(stderr, "[%s:%d](%s) got executor ref:    ident = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          executorRef.getIdentity());
-  fprintf(stderr, "[%s:%d](%s) got executor ref: raw impl = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          executorRef.getRawImplementation());
     return executorRef;
 }
 
@@ -696,8 +685,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       break;
 
     case TaskOptionRecordKind::InitialTaskExecutorUnowned:
-      fprintf(stderr, "[%s:%d](%s) TASK EXECUTOR UNOWNED GET THE RECORD...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
+      taskExecutor = cast<InitialTaskExecutorRefPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
@@ -705,9 +693,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     case TaskOptionRecordKind::InitialTaskExecutorOwned:
       taskExecutor = cast<InitialTaskExecutorOwnedPreferenceTaskOptionRecord>(option)
                          ->getExecutorRefFromUnownedTaskExecutor();
-      fprintf(stderr, "[%s:%d](%s) EMIT OWNED: %p | %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              taskExecutor.getIdentity(),
-              taskExecutor.getRawImplementation());
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
