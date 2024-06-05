@@ -139,7 +139,7 @@ And the module structure to support such applications looks like this:
 
   ```swift
   @MainActor
-  class MyViewController: ViewDelegateProtocol {
+  class MyViewController: @preconcurrency ViewDelegateProtocol {
     func respondToUIEvent() {
       // implementation...
     }
