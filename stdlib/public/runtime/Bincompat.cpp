@@ -255,6 +255,19 @@ bool useLegacySwiftObjCHashing() {
 #endif
 }
 
+// Controls legacy mode for the 'swift_task_isCurrentExecutorImpl' runtime function.
+//
+// In "legacy" / "no crash" mode:
+// * The `swift_task_isCurrentExecutorImpl` cannot crash
+// * This means cases where no "current" executor is present cannot be diagnosed correctly
+//    * The runtime can NOT use 'SerialExecutor/checkIsolated'
+//    * The runtime can NOT use 'dispatch_precondition' which is able ot handle some dispatch and main actor edge cases
+//
+// New behavior in "swift6" "crash" mode:
+// * The 'swift_task_isCurrentExecutorImpl' will CRASH rather than return 'false'
+// * This allows the method to invoke 'SerialExecutor/checkIsolated'
+//   * Which is allowed to call 'dispatch_precondition' and handle "on dispatch queue but not on Swift executor" cases
+//
 // FIXME(concurrency): Once the release is announced, adjust the logic detecting the SDKs
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 #if BINARY_COMPATIBILITY_APPLE

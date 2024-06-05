@@ -194,7 +194,7 @@ public:
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        std::vector<std::string> &CC1Args);
+                        const std::vector<std::string> &CC1Args);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;

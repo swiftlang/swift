@@ -31,7 +31,7 @@ prefix operator .!
 /// elementwise accesses. Computational operations are defined on the `SIMD`
 /// protocol, which refines this protocol, and on the concrete types that
 /// conform to `SIMD`.
-public protocol SIMDStorage : BitwiseCopyable {
+public protocol SIMDStorage {
   /// The type of scalars in the vector space.
   #if $Embedded
   associatedtype Scalar: Hashable
@@ -80,8 +80,7 @@ public protocol SIMDScalar : BitwiseCopyable {
 public protocol SIMD<Scalar>:
   SIMDStorage,
   Hashable,
-  ExpressibleByArrayLiteral,
-  BitwiseCopyable
+  ExpressibleByArrayLiteral
 {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD
@@ -96,8 +95,7 @@ public protocol SIMD<Scalar>:
   Codable,
   Hashable,
   CustomStringConvertible,
-  ExpressibleByArrayLiteral,
-  BitwiseCopyable
+  ExpressibleByArrayLiteral
 {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD

@@ -14,7 +14,7 @@
 // CHECK-NEXT:    end_borrow [[FN_BORROW2]]
 // CHECK-NEXT:    end_borrow [[FN_BORROW1]]
 // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
-func callSync(fn: @isolated(any) () -> ()) async {
+func callSync(fn: @isolated(any) @Sendable () -> ()) async {
   await fn()
 }
 
@@ -26,7 +26,7 @@ func callSync(fn: @isolated(any) () -> ()) async {
 // CHECK-NEXT:    apply [[FN_BORROW2]]()
 // CHECK-NEXT:    end_borrow [[FN_BORROW2]]
 // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
-func callAsync(fn: @isolated(any) () async -> ()) async {
+func callAsync(fn: @isolated(any) @Sendable () async -> ()) async {
   await fn()
 }
 
@@ -40,7 +40,7 @@ func callAsync(fn: @isolated(any) () async -> ()) async {
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> ()
 func convertFromNonIsolated(fn: @escaping @Sendable () async -> ())
-    -> @isolated(any) () async -> () {
+    -> @isolated(any) @Sendable () async -> () {
   return fn
 }
 
@@ -71,7 +71,7 @@ func convertFromNonIsolated(fn: @escaping @Sendable () async -> ())
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> ()
 func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
-    -> @isolated(any) () async -> () {
+    -> @isolated(any) @Sendable () async -> () {
   return fn
 }
 
@@ -90,7 +90,7 @@ func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> Optional<Int>
 func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () async -> Int)
-    -> @isolated(any) () async -> Int? {
+    -> @isolated(any) @Sendable () async -> Int? {
   return fn
 }
 
@@ -107,7 +107,7 @@ func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () 
 // CHECK-NEXT:    [[FN_COPY:%.*]] = copy_value %0 :
 // CHECK-NEXT:    [[FN_CONVERTED:%.*]] = convert_function [[FN_COPY]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> () to $@Sendable @async @callee_guaranteed () -> ()
 // CHECK-NEXT:    return [[FN_CONVERTED]] :
-func convertToNonIsolated(fn: @escaping @isolated(any) () async -> ())
+func convertToNonIsolated(fn: @escaping @isolated(any) @Sendable () async -> ())
     -> @Sendable () async -> () {
   return fn
 }
@@ -129,7 +129,7 @@ func convertToNonIsolated(fn: @escaping @isolated(any) () async -> ())
 // CHECK-NEXT:    [[SOME_INT:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[INT]] : $Int
 // CHECK-NEXT:    return [[SOME_INT]] : $Optional<Int>
 
-func convertToNonIsolatedWithOtherChanges(fn: @escaping @isolated(any) () async -> Int) -> @Sendable () async -> Int? {
+func convertToNonIsolatedWithOtherChanges(fn: @escaping @isolated(any) @Sendable () async -> Int) -> @Sendable () async -> Int? {
   return fn
 }
 
@@ -137,8 +137,8 @@ func convertToNonIsolatedWithOtherChanges(fn: @escaping @isolated(any) () async 
 
 func syncAction() {}
 
-func takeSyncIsolatedAny(fn: @escaping @isolated(any) () -> ()) {}
-func takeInheritingSyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) () -> ()) {}
+func takeSyncIsolatedAny(fn: @escaping @isolated(any) @Sendable () -> ()) {}
+func takeInheritingSyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) @Sendable () -> ()) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A27EraseSyncNonIsolatedClosureyyF
 // CHECK:         // function_ref closure #1
@@ -246,8 +246,8 @@ actor MyActor {
 
 func asyncAction() async {}
 
-func takeAsyncIsolatedAny(fn: @escaping @isolated(any) () async -> ()) {}
-func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) () async -> ()) {}
+func takeAsyncIsolatedAny(fn: @escaping @isolated(any) @Sendable () async -> ()) {}
+func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) @Sendable () async -> ()) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A28EraseAsyncNonIsolatedClosureyyF
 // CHECK:         // function_ref closure #1
@@ -383,7 +383,7 @@ extension MyActor {
   func asyncAction() async {}
 }
 
-func takeInheritingOptionalAsyncIsolatedAny(@_inheritActorContext fn: Optional<@isolated(any) () async -> ()>) {}
+func takeInheritingOptionalAsyncIsolatedAny(@_inheritActorContext fn: Optional<@isolated(any) @Sendable () async -> ()>) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a20EraseInheritingAsyncC19ClosureIntoOptionalyyF
 // CHECK:         // function_ref closure #1
@@ -406,7 +406,7 @@ extension MyActor {
   }
 }
 
-func takeInheritingAsyncIsolatedAny_optionalResult(@_inheritActorContext fn: @escaping @isolated(any) () async -> Int?) {}
+func takeInheritingAsyncIsolatedAny_optionalResult(@_inheritActorContext fn: @escaping @isolated(any) @Sendable () async -> Int?) {}
 
 // Test that we correctly handle isolation erasure from closures even when
 // we can't completely apply the conversion as a peephole.
@@ -526,6 +526,6 @@ func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
 // CHECK-NEXT: end_borrow [[FN_BORROW]] : $@isolated(any) @Sendable @callee_guaranteed () -> ()
 // CHECK-NEXT: destroy_value [[FN]] : $@isolated(any) @Sendable @callee_guaranteed () -> ()
 // CHECK-NEXT: return [[RESULT]] : $Optional<any Actor>
-func extractIsolation(fn: @escaping @isolated(any) () -> Void) -> (any Actor)? {
+func extractIsolation(fn: @escaping @isolated(any) @Sendable () -> Void) -> (any Actor)? {
   fn.isolation
 }

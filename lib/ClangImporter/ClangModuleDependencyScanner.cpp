@@ -239,6 +239,7 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // invocation, not swift invocation.
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
     depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
+    depsInvocation.getFrontendOpts().OutputFile.clear();
 
     // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
     // from clang scanner and pass to swift.
@@ -351,7 +352,7 @@ void ClangImporter::recordBridgingHeaderOptions(
       clang::frontend::ActionKind::GeneratePCH;
   depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
   depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
-  depsInvocation.getFrontendOpts().OutputFile = "";
+  depsInvocation.getFrontendOpts().OutputFile.clear();
 
   llvm::BumpPtrAllocator allocator;
   llvm::StringSaver saver(allocator);

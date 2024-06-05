@@ -158,6 +158,12 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    if (auto *oea =
+            dyn_cast<OpenExistentialAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = oea->getOperand();
+      continue;
+    }
+
     if (auto *teai =
             dyn_cast<TupleElementAddrInst>(projectionDerivedFromRoot)) {
       SILType tupleType = teai->getOperand()->getType();

@@ -7,6 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  AccessUtilsTest.swift
   AddressUtils.swift
   BorrowedFromUpdater.swift
   BorrowUtils.swift

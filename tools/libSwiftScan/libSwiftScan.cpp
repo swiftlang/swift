@@ -154,7 +154,9 @@ swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
     Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
-  auto ScanResult = ScanningTool->getDependencies(Compilation, {});
+  auto ScanResult = ScanningTool->getDependencies(
+      Compilation, {},
+      swift::c_string_utils::get_C_string(invocation->working_directory));
   if (ScanResult.getError())
     return nullptr;
   auto DependencyGraph = std::move(*ScanResult);
@@ -180,8 +182,9 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
   }
 
   // Execute the scan and bridge the result
-  auto BatchScanResult =
-      ScanningTool->getDependencies(Compilation, BatchInput, {});
+  auto BatchScanResult = ScanningTool->getDependencies(
+      Compilation, BatchInput, {},
+      swift::c_string_utils::get_C_string(invocation->working_directory));
   swiftscan_batch_scan_result_t *Result = new swiftscan_batch_scan_result_t;
   auto ResultGraphs = new swiftscan_dependency_graph_t[BatchScanResult.size()];
   for (size_t i = 0; i < BatchScanResult.size(); ++i) {
@@ -209,7 +212,9 @@ swiftscan_import_set_create(swiftscan_scanner_t scanner,
     Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
   // Execute the scan and bridge the result
-  auto PreScanResult = ScanningTool->getImports(Compilation);
+  auto PreScanResult = ScanningTool->getImports(
+      Compilation,
+      swift::c_string_utils::get_C_string(invocation->working_directory));
   if (PreScanResult.getError())
     return nullptr;
   auto ImportSet = std::move(*PreScanResult);

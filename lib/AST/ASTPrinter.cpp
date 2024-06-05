@@ -62,6 +62,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -70,6 +71,15 @@
 #include <queue>
 
 using namespace swift;
+
+#ifndef NDEBUG
+static llvm::cl::opt<bool> NumberSuppressionChecks(
+    "swift-ast-printer-number-suppression-checks",
+    llvm::cl::desc("Used to number suppression checks in swift interface files "
+                   "to make it easier to FileCheck them. Only available with "
+                   "asserts enabled and intended for compiler tests."),
+    llvm::cl::init(false), llvm::cl::Hidden);
+#endif
 
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
@@ -3199,6 +3209,15 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     }
     printer << "$" << getFeatureName(feature);
   }
+
+#ifndef NDEBUG
+  if (NumberSuppressionChecks) {
+    static unsigned totalSuppressionChecks = 0;
+    printer << " // Suppression Count: " << totalSuppressionChecks;
+    ++totalSuppressionChecks;
+  }
+#endif
+
   printer.printNewline();
 }
 
@@ -3289,10 +3308,13 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // features, or else just print the body.
   if (features.hasAnySuppressible()) {
     auto generator = features.generateSuppressibleFeatures();
+
+    // NOTE: We emit the compiler check here as well since that also implicitly
+    // ensures that we ignore parsing errors in the if block. It is harmless
+    // otherwise.
     printWithSuppressibleFeatureChecks(printer, options,
-                             /*first*/ true,
-                    /*compiler check*/ !hasRequiredFeatures,
-                                       generator,
+                                       /*first*/ true,
+                                       /*compiler check*/ true, generator,
                                        printBody);
   } else {
     printBody();

@@ -2615,10 +2615,13 @@ public:
             == ResultConvention::Autoreleased)) {
       if (IGF.IGM.Context.LangOpts.EnableObjCInterop) {
         auto ty = fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-        auto *classTypeInfo = dyn_cast<ClassTypeInfo>(&IGF.IGM.getTypeInfo(ty));
-        if (classTypeInfo && classTypeInfo->getReferenceCounting() == ReferenceCounting::Custom) {
+        // NOTE: We cannot dyn_cast directly to ClassTypeInfo since it does not
+        // implement 'classof', so will succeed for any ReferenceTypeInfo.
+        auto *refTypeInfo = dyn_cast<ReferenceTypeInfo>(&IGF.IGM.getTypeInfo(ty));
+        if (refTypeInfo && 
+            refTypeInfo->getReferenceCountingType() == ReferenceCounting::Custom) {
           Explosion e(result);
-          classTypeInfo->strongCustomRetain(IGF, e, true);
+          refTypeInfo->as<ClassTypeInfo>().strongCustomRetain(IGF, e, true);
         } else {
           result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
         }

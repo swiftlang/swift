@@ -8,7 +8,7 @@ import Swift
 
 struct BufferView : ~Escapable {
   @_hasStorage let ptr: UnsafeRawBufferPointer { get }
-  @_unsafeNonescapableResult @inlinable init(_ ptr: UnsafeRawBufferPointer)
+  @inlinable init(_ ptr: UnsafeRawBufferPointer) -> _scope(ptr) Self
   init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _scope(a) Self
 }
 

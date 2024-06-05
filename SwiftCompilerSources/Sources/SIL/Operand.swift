@@ -62,6 +62,10 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     self.count = count
   }
 
+  static public var empty: OperandArray {
+    OperandArray(base: OptionalBridgedOperand(bridged: nil), count: 0)
+  }
+
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return count }
   

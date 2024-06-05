@@ -263,7 +263,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           continue;
         }
 
-        if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
+        if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
             Tok.isContextualKeyword("transferring")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
                     .warnUntilSwiftVersion(6);

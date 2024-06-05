@@ -32,6 +32,11 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/F_tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/F_tree.casid | %FileCheck %s -check-prefix INCLUDE_TREE_F
 
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F commandLine > %t/F.cmd
+// RUN: %FileCheck %s -check-prefix F_CMD -input-file=%t/F.cmd
+// F_CMD: "-Xcc"
+// F_CMD-NOT: "-o"
+
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps commandLine > %t/deps.cmd
 // RUN: %FileCheck %s -check-prefix MAIN_CMD -input-file=%t/deps.cmd
 

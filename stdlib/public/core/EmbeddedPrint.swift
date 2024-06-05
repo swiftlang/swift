@@ -33,6 +33,36 @@ public func print(_ string: StaticString, terminator: StaticString = "\n") {
   }
 }
 
+@_disfavoredOverload
+public func print(_ string: String, terminator: StaticString = "\n") {
+  var string = string
+  _ = string.withUTF8 { buf in
+    for c in buf {
+      putchar(CInt(c))
+    }
+  }
+  var p = terminator.utf8Start
+  while p.pointee != 0 {
+    putchar(CInt(p.pointee))
+    p += 1
+  }
+}
+
+@_disfavoredOverload
+public func print(_ object: some CustomStringConvertible, terminator: StaticString = "\n") {
+  var string = object.description
+  _ = string.withUTF8 { buf in
+    for c in buf {
+      putchar(CInt(c))
+    }
+  }
+  var p = terminator.utf8Start
+  while p.pointee != 0 {
+    putchar(CInt(p.pointee))
+    p += 1
+  }
+}
+
 func printCharacters(_ buf: UnsafeRawBufferPointer) {
   for c in buf {
     putchar(CInt(c))
@@ -44,29 +74,30 @@ func printCharacters(_ buf: UnsafeBufferPointer<UInt8>) {
 }
 
 extension BinaryInteger {
-  func writeToStdout() {
+  internal func _toStringImpl(
+    _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+    _ bufferLength: UInt,
+    _ radix: Int,
+    _ uppercase: Bool
+  ) -> Int {
     if self == (0 as Self) {
-      print("0", terminator: "")
-      return
+      buffer[0] = UInt8(("0" as Unicode.Scalar).value)
+      return 1
     }
-
-    func _ascii(_ digit: UInt8) -> UInt8 {
-      UInt8(("0" as Unicode.Scalar).value) + digit
+    
+    func _ascii(_ digit: UInt8) -> UTF8.CodeUnit {
+      if digit < 10 {
+        UInt8(("0" as Unicode.Scalar).value) + digit
+      } else {
+        UInt8(("a" as Unicode.Scalar).value) + (digit - 10)
+      }
     }
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
-
-    // Avoid withUnsafeTemporaryAllocation which is not typed-throws ready yet
-    let byteCount = 64
-    let stackBuffer = Builtin.stackAlloc(byteCount._builtinWordValue,
-         1._builtinWordValue, 1._builtinWordValue)
-    let buffer = UnsafeMutableRawBufferPointer(start: .init(stackBuffer),
-        count: byteCount)
-
-    var index = buffer.count - 1
+    
+    var index = Int(bufferLength - 1)
     while value != 0 {
-      let (quotient, remainder) =
-          value.quotientAndRemainder(dividingBy: Magnitude(10))
+      let (quotient, remainder) = value.quotientAndRemainder(dividingBy: Magnitude(radix))
       buffer[index] = _ascii(UInt8(truncatingIfNeeded: remainder))
       index -= 1
       value = quotient
@@ -76,12 +107,27 @@ extension BinaryInteger {
       index -= 1
     }
     let start = index + 1
-    let end = buffer.count - 1
+    let end = Int(bufferLength - 1)
     let count = end - start + 1
+    
+    let intermediate = UnsafeBufferPointer(start: buffer.advanced(by: start), count: count)
+    let destination = UnsafeMutableRawBufferPointer(start: buffer, count: Int(bufferLength))
+    destination.copyMemory(from: UnsafeRawBufferPointer(intermediate))
+    
+    return count
+  }
 
-    let pointerToPrint = buffer.baseAddress?.advanced(by: start)
-        .assumingMemoryBound(to: UInt8.self)
-    printCharacters(UnsafeBufferPointer(start: pointerToPrint, count: count))
+  func writeToStdout() {
+    // Avoid withUnsafeTemporaryAllocation which is not typed-throws ready yet
+    let byteCount = 64
+    let stackBuffer = Builtin.stackAlloc(byteCount._builtinWordValue,
+         1._builtinWordValue, 1._builtinWordValue)
+    let buffer = UnsafeMutableRawBufferPointer(start: .init(stackBuffer),
+        count: byteCount).baseAddress!.assumingMemoryBound(to: UInt8.self)
+
+    let count = _toStringImpl(buffer, 64, 10, false)
+
+    printCharacters(UnsafeBufferPointer(start: buffer, count: count))
 
     Builtin.stackDealloc(stackBuffer)
   }

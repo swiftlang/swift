@@ -397,6 +397,18 @@ static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
   return false;
 }
 
+// Utility function to help determine if noasync diagnostics are still
+// appropriate even if a `DeclContext` returns `false` from `isAsyncContext()`.
+static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
+  if (auto *D = DC->getAsDecl())
+    if (auto *FD = dyn_cast<FuncDecl>(D))
+      if (FD->isDeferBody())
+        // If this is a defer body, we should delegate to its parent.
+        return shouldTreatDeclContextAsAsyncForDiagnostics(DC->getParent());
+
+  return DC->isAsyncContext();
+}
+
 namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
@@ -3770,17 +3782,20 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
 static bool
 diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &Where) {
-  // If we are in a synchronous context, don't check it
-  if (!Where.getDeclContext()->isAsyncContext())
+  // If we are not in an (effective) async context, don't check it
+  if (!shouldTreatDeclContextAsAsyncForDiagnostics(Where.getDeclContext()))
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
 
-  if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
-      SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-      ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
-      asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
+  // Only suggest async alternatives if the DeclContext is truly async
+  if (Where.getDeclContext()->isAsyncContext()) {
+    if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
+        SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+        ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
+        asyncAlt->diagnose(diag::decl_declared_here, asyncAlt);
+      }
     }
   }
 

@@ -305,6 +305,10 @@ public:
   /// The format used for serializing remarks (default: YAML)
   llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
 
+  /// Are there any options that indicate that functions should not be preserved
+  /// for the debugger?
+  bool ShouldFunctionsBePreservedToDebugger = true;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should

@@ -199,35 +199,6 @@ class LLVM(cmake_product.CMakeProduct):
                         elif self.args.verbose_build:
                             print('no file exists at {}'.format(host_lib_path))
 
-    def install_static_linux_config(self, arch, bin_dir):
-        """Install the .cfg files to set the relevant Clang options for the
-        fully static Linux SDK's <arch>-swift-linux-musl triple.
-
-        Doing it this way means it's easier to modify the defaults without
-        having to change the compiler driver."""
-
-        try:
-            os.makedirs(bin_dir)
-        except FileExistsError:
-            pass
-
-        musl_cfg = os.path.join(bin_dir, f'{arch}-swift-linux-musl-clang.cfg')
-        with open(musl_cfg, "wt") as f:
-            f.write(f"""
--target {arch}-swift-linux-musl
--rtlib=compiler-rt
--stdlib=libc++
--fuse-ld=lld
--unwindlib=libunwind
--lc++abi
--static
-            """)
-        for name in (f'{arch}-swift-linux-musl-clang++.cfg', ):
-            try:
-                os.symlink(musl_cfg, os.path.join(bin_dir, name))
-            except FileExistsError:
-                pass
-
     def should_build(self, host_target):
         """should_build() -> Bool
 
@@ -382,10 +353,6 @@ class LLVM(cmake_product.CMakeProduct):
         host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
             host_machine_target))
 
-        # Install config files for linux-static
-        bin_dir = os.path.join(host_build_dir, 'bin')
-        self.install_static_linux_config(arch, bin_dir)
-
         if self.is_cross_compile_target(host_target):
             build_root = os.path.dirname(self.build_dir)
             host_machine_target = targets.StdlibDeploymentTarget.host_target().name
@@ -522,10 +489,6 @@ class LLVM(cmake_product.CMakeProduct):
 
         clang_dest_dir = '{}{}'.format(host_install_destdir,
                                        self.args.install_prefix)
-
-        bin_dir = os.path.join(clang_dest_dir, 'bin')
-        for arch in self.args.linux_static_archs:
-            self.install_static_linux_config(arch, bin_dir)
 
         if self.args.llvm_install_components and system() == 'Darwin':
             self.copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain(

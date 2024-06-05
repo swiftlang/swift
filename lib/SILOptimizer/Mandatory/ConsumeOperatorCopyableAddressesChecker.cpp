@@ -973,7 +973,7 @@ struct ClosureArgumentInOutToOutCloner
 public:
   ClosureArgumentInOutToOutCloner(
       SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-      IsSerialized_t isSerialized,
+      SerializedKind_t serializedKind,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
       const SmallBitVector &argsToConvertIndices, StringRef name);
 
@@ -1057,14 +1057,14 @@ public:
 private:
   static SILFunction *initCloned(
       SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-      IsSerialized_t isSerialized,
+      SerializedKind_t serializedKind,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
       const SmallBitVector &argsToConvertIndices, StringRef cloneName);
 };
 
 } // namespace
 
-static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
+static std::string getClonedName(SILFunction *func, SerializedKind_t serialized,
                                  const SmallBitVector &argsToConvertIndices) {
   auto kind = Demangle::SpecializationPass::MoveDiagnosticInOutToOut;
   Mangle::FunctionSignatureSpecializationMangler Mangler(kind, serialized,
@@ -1078,11 +1078,11 @@ static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
 
 ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
     SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-    IsSerialized_t isSerialized,
+    SerializedKind_t serializedKind,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
     const SmallBitVector &argsToConvertIndices, StringRef name)
     : SILClonerWithScopes<ClosureArgumentInOutToOutCloner>(*initCloned(
-          funcBuilder, orig, isSerialized, postDominatingConsumingUsers,
+          funcBuilder, orig, serializedKind, postDominatingConsumingUsers,
           argsToConvertIndices, name)),
       postDominatingConsumingUsers(postDominatingConsumingUsers), orig(orig),
       argsToConvertIndices(argsToConvertIndices) {
@@ -1095,7 +1095,7 @@ ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
 /// parameters (which are specified by PromotedArgIndices).
 SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
     SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-    IsSerialized_t serialized,
+    SerializedKind_t serialized,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
     const SmallBitVector &argsToConvertIndices, StringRef clonedName) {
   SILModule &mod = orig->getModule();
@@ -1961,14 +1961,15 @@ void ConsumeOperatorCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
   auto *origCallee = oldApplySite.getReferencedFunctionOrNull();
   assert(origCallee);
 
-  auto name = getClonedName(origCallee, origCallee->isSerialized(), bitVector);
+  auto name =
+      getClonedName(origCallee, origCallee->getSerializedKind(), bitVector);
 
   SILFunction *newCallee = nullptr;
   if (auto *fn = origCallee->getModule().lookUpFunction(name)) {
     newCallee = fn;
   } else {
     ClosureArgumentInOutToOutCloner cloner(
-        funcBuilder, origCallee, origCallee->isSerialized(),
+        funcBuilder, origCallee, origCallee->getSerializedKind(),
         postDominatingConsumingUsers, bitVector, name);
     cloner.populateCloned();
     newCallee = cloner.getCloned();

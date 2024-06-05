@@ -1085,7 +1085,7 @@ public:
   }
 
   /// Create a debug_value according to the type of \p src
-  SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
+  DebugValueInst *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
     if (src->getType().isAddress())
       return createDebugValueAddr(Loc, src, Var);

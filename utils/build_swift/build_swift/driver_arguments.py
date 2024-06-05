@@ -729,6 +729,9 @@ def create_argument_parser():
     option(['--install-swiftpm'], toggle_true('install_swiftpm'),
            help='install swiftpm')
 
+    option(['--install-static-linux-config'], toggle_true,
+           help='install static-linux config files for Clang')
+
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
 

@@ -1,18 +1,21 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN:  %target-run %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+
+// TODO: The actual reason is that we do these %env- tricks, which e.g. Windows is confused about
+// REQUIRES: libdispatch
 
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
-// rdar://119743909 fails in optimze tests.
+// rdar://119743909 fails in optimize tests.
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
 

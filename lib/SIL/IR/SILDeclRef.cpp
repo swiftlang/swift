@@ -171,7 +171,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
     loc = ACE;
     kind = Kind::Func;
     if (ACE->getASTContext().LangOpts.hasFeature(
-            Feature::TransferringArgsAndResults)) {
+            Feature::RegionBasedIsolation)) {
+      assert(ACE->getASTContext().LangOpts.hasFeature(
+                 Feature::SendingArgsAndResults) &&
+             "Sending args and results should always be enabled");
       if (auto *autoClosure = dyn_cast<AutoClosureExpr>(ACE)) {
         isAsyncLetClosure =
             autoClosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet;
@@ -531,7 +534,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   auto privateLinkage = [&]() {
     // Private decls may still be serialized if they are e.g in an inlinable
     // function. In such a case, they receive shared linkage.
-    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
+    return isNotSerialized() ? SILLinkage::Private : SILLinkage::Shared;
   };
 
   // Prespecializations are public.
@@ -793,8 +796,16 @@ bool SILDeclRef::isTransparent() const {
   return false;
 }
 
+bool SILDeclRef::isSerialized() const {
+  return getSerializedKind() == IsSerialized;
+}
+
+bool SILDeclRef::isNotSerialized() const {
+  return getSerializedKind() == IsNotSerialized;
+}
+
 /// True if the function should have its body serialized.
-IsSerialized_t SILDeclRef::isSerialized() const {
+SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (auto closure = getAbstractClosureExpr()) {
     // Ask the AST if we're inside an @inlinable context.
     if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {

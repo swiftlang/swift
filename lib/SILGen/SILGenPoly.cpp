@@ -6239,7 +6239,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->isSerialized(),
+      customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),

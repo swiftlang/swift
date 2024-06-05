@@ -174,7 +174,7 @@ export *\n\
   for (auto &command : CommandStrArr) {
     Command.push_back(command.c_str());
   }
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   // TODO: Output/verify dependency graph correctness
@@ -243,8 +243,8 @@ public func overlayFuncA() { }\n"));
     CommandB.push_back(command.c_str());
   }
 
-  auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA);
-  auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB);
+  auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA, {});
+  auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB, {});
   // Ensure that scans that only differ in module name have distinct scanning context hashes
   ASSERT_NE(instanceA->ScanInstance.get()->getInvocation().getModuleScanningHash(),
             instanceB->ScanInstance.get()->getInvocation().getModuleScanningHash());

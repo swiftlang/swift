@@ -75,7 +75,7 @@ func testConvertIsolatedAnyToMainActor(fn: @Sendable @isolated(any) () -> ()) {
   requireSendableGlobalActor(fn)
 }
 
-func extractFunctionIsolation(_ fn: @isolated(any) @escaping () async -> Void) {
+func extractFunctionIsolation(_ fn: @isolated(any) @Sendable @escaping () async -> Void) {
   let _: (any Actor)? = extractIsolation(fn)
 
   let myActor = A()
@@ -85,8 +85,8 @@ func extractFunctionIsolation(_ fn: @isolated(any) @escaping () async -> Void) {
 }
 
 func extractFunctionIsolationExpr(
-  _ fn1: @isolated(any) @escaping () async -> Void,
-  _ fn2: @isolated(any) @escaping (Int, String) -> Bool
+  _ fn1: @isolated(any) @Sendable @escaping () async -> Void,
+  _ fn2: @isolated(any) @Sendable @escaping (Int, String) -> Bool
 ) {
   let _: (any Actor)? = fn1.isolation
   let _: (any Actor)? = fn2.isolation
@@ -118,9 +118,15 @@ func testFunctionIsolationExpr2(_ fn: Optional<(@isolated(any) () -> Void)>) -> 
 }
 
 func testFunctionIsolationExprTuple(
-  _ fn1: (@isolated(any) () -> Void)?,
-  _ fn2: (@isolated(any) () -> Void)?
+  _ fn1: (@isolated(any) @Sendable () -> Void)?,
+  _ fn2: (@isolated(any) @Sendable () -> Void)?
 ) -> ((any Actor)?, (any Actor)?)
 {
   return (fn1?.isolation, fn2?.isolation)
+}
+
+func nonSendableIsolatedAny(
+  _ fn: @escaping @isolated(any) () -> Void // expected-note {{parameter 'fn' is implicitly non-sendable}}
+) {
+  let _: @Sendable () -> Void = fn  // expected-warning {{using non-sendable parameter 'fn' in a context expecting a @Sendable closure}}
 }

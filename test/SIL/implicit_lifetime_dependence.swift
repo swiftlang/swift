@@ -6,8 +6,12 @@
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
+  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) -> dependsOn(ptr) Self {
+    self.ptr = ptr
+    self.c = c
+  }
   @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
+  init(independent ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
@@ -31,8 +35,7 @@ struct BufferView : ~Escapable {
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
   let c: Int
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeMutableRawBufferPointer, _ c: Int) {
+  init(_ ptr: UnsafeMutableRawBufferPointer, _ c: Int) -> dependsOn(ptr) Self {
     self.ptr = ptr
     self.c = c
   }
@@ -54,12 +57,12 @@ func derive(_ x: borrowing BufferView) -> BufferView {
 }
 
 func derive(_ unused: Int, _ x: borrowing BufferView) -> BufferView {
-  return BufferView(x.ptr, x.c)
+  return BufferView(independent: x.ptr, x.c)
 }
 
 // CHECK: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView {
-  return BufferView(x.ptr, x.c)
+  return BufferView(independent: x.ptr, x.c)
 }
 
 func use(_ x: borrowing BufferView) {}
@@ -135,8 +138,7 @@ struct GenericBufferView<Element> : ~Escapable {
                                       count: count)
   }
   // unsafe private API
-  @_unsafeNonescapableResult
-  init(baseAddress: Pointer, count: Int) {
+  init(baseAddress: Pointer, count: Int) -> dependsOn(baseAddress) Self {
     precondition(count >= 0, "Count must not be negative")
     self.baseAddress = baseAddress
     self.count = count

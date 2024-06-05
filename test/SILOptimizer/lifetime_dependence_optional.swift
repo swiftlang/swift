@@ -10,6 +10,7 @@
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
+  // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init(nilLiteral: ())
 }
@@ -29,6 +30,7 @@ extension Nillable: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable { 
 extension Nillable: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 extension Nillable: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
+  // TODO: dependsOn(immortal)
   @_transparent
   @_unsafeNonescapableResult
   public init(nilLiteral: ()) {

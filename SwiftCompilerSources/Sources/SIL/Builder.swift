@@ -152,6 +152,18 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createRetainValue(operand: Value) -> RetainValueInst {
+    let retain = bridged.createRetainValue(operand.bridged)
+    return notifyNew(retain.getAs(RetainValueInst.self))
+  }
+
+  @discardableResult
+  public func createReleaseValue(operand: Value) -> ReleaseValueInst {
+    let release = bridged.createReleaseValue(operand.bridged)
+    return notifyNew(release.getAs(ReleaseValueInst.self))
+  }
+
+  @discardableResult
   public func createStrongRetain(operand: Value) -> StrongRetainInst {
     let retain = bridged.createStrongRetain(operand.bridged)
     return notifyNew(retain.getAs(StrongRetainInst.self))

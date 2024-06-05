@@ -42,6 +42,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self._build(host_target, 'wasm32-wasi')
 
     def _build(self, host_target, target_triple):
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', '/usr')
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
@@ -109,6 +110,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
                                                'swift-experimental-string-processing'))
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL', 'TRUE')
 
         self.add_extra_cmake_options()
 

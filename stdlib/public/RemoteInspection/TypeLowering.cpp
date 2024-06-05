@@ -243,6 +243,12 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
                descriptor.IsBitwiseTakable),
       Name(descriptor.getMangledTypeName()) {}
 
+BuiltinTypeInfo::BuiltinTypeInfo(unsigned Size, unsigned Alignment,
+                                 unsigned Stride, unsigned NumExtraInhabitants,
+                                 bool BitwiseTakable)
+    : TypeInfo(TypeInfoKind::Builtin, Size, Alignment, Stride,
+               NumExtraInhabitants, BitwiseTakable) {}
+
 // Builtin.Int<N> is mangled as 'Bi' N '_'
 // Returns 0 if this isn't an Int
 static unsigned isIntType(std::string name) {
@@ -257,6 +263,7 @@ static unsigned isIntType(std::string name) {
   }
   return 0;
 }
+
 
 bool BuiltinTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
@@ -1520,6 +1527,30 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   return AnyMetatypeTI;
 }
 
+const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
+  if (DefaultActorStorageTI != nullptr)
+    return DefaultActorStorageTI;
+
+  // The default actor storage is an opaque fixed-size buffer. Use the raw
+  // pointer descriptor to find the word size and pointer alignment in the
+  // current platform.
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getRawPointerTypeRef());
+  if (descriptor == nullptr) {
+    DEBUG_LOG(fprintf(stderr, "No TypeInfo for default actor storage type\n"));
+    return nullptr;
+  }
+
+  auto size = descriptor->Size * NumWords_DefaultActor;
+  auto alignment = 2 * descriptor->Alignment;
+
+  DefaultActorStorageTI = makeTypeInfo<BuiltinTypeInfo>(
+      /*Size=*/size, /*Alignment*/ alignment, /*Stride=*/size,
+      /*NumExtraInhabitants*/ 0, /*BitwiseTakable*/ true);
+
+  return DefaultActorStorageTI;
+}
+
 const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
@@ -2144,6 +2175,8 @@ public:
     } else if (B->getMangledName() == "BO") {
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
+    } else if (B->getMangledName() == "BD") {
+      return TC.getDefaultActorStorageTypeInfo();
     }
 
     /// Otherwise, get the fixed layout information from reflection

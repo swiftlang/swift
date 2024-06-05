@@ -81,6 +81,12 @@ static bool seemsUseful(SILInstruction *I) {
   if (isa<DebugValueInst>(I))
     return isa<SILFunctionArgument>(I->getOperand(0))
       || isa<SILUndef>(I->getOperand(0));
+  
+
+  // Don't delete allocation instructions in DCE.
+  if (isa<AllocRefInst>(I) || isa<AllocRefDynamicInst>(I)) {
+    return true;
+  }
 
   return false;
 }

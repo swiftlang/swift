@@ -3411,11 +3411,6 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   auto DL =
       llvm::DILocation::get(IGM.getLLVMContext(), Line, Col, Scope, InlinedAt);
 
-  // An alloca may only be described by exactly one dbg.declare.
-  if (isa<llvm::AllocaInst>(Storage) &&
-      !llvm::FindDbgDeclareUses(Storage).empty())
-    return;
-
   // Fragment DIExpression cannot cover the whole variable
   // or going out-of-bound.
   if (auto Fragment = Expr->getFragmentInfo()) {
@@ -3453,6 +3448,10 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
   }
 
+  bool optimized = DS->getParentFunction()->shouldOptimize();
+  if (optimized && (!InCoroContext || !Var->isParameter()))
+    AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
+
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
   // If we have a single alloca...
@@ -3479,7 +3478,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
   }
 
-  if (InCoroContext) {
+  if (InCoroContext && (Var->isParameter() || !optimized)) {
     PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
 
     // If we have a dbg.declare, we are relying on a contract with the coroutine

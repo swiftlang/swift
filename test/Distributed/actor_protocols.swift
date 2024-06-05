@@ -14,25 +14,22 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 actor A: Actor {} // ok
 
 class C: Actor, UnsafeSendable {
-  // expected-error@-1{{non-actor type 'C' cannot conform to the 'AnyActor' protocol}} {{1-6=actor}}
-  // expected-error@-2{{non-actor type 'C' cannot conform to the 'Actor' protocol}} {{1-6=actor}}
-  // expected-warning@-3{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}} {{1-6=actor}}
+  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
 }
 
 struct S: Actor {
-  // expected-error@-1{{non-class type 'S' cannot conform to class protocol 'AnyActor'}}
-  // expected-error@-2{{non-class type 'S' cannot conform to class protocol 'Actor'}}
+  // expected-error@-1{{non-class type 'S' cannot conform to class protocol 'Actor'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
 }
 
 struct E: Actor {
-  // expected-error@-1{{non-class type 'E' cannot conform to class protocol 'AnyActor'}}
-  // expected-error@-2{{non-class type 'E' cannot conform to class protocol 'Actor'}}
+  // expected-error@-1{{non-class type 'E' cannot conform to class protocol 'Actor'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
@@ -65,8 +62,7 @@ actor A2: DistributedActor {
 }
 
 final class DA2: DistributedActor {
-// expected-error@-1{{non-actor type 'DA2' cannot conform to the 'AnyActor' protocol}}
-// expected-error@-2{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
+// expected-error@-1{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -87,23 +83,22 @@ final class DA2: DistributedActor {
 
 struct S2: DistributedActor {
   // expected-error@-1{{non-class type 'S2' cannot conform to class protocol 'DistributedActor'}}
-  // expected-error@-2{{non-class type 'S2' cannot conform to class protocol 'AnyActor'}}
-  // expected-error@-3{{type 'S2' does not conform to protocol 'Identifiable'}}
+  // expected-error@-2{{type 'S2' does not conform to protocol 'Identifiable'}}
 }
 
 // ==== -----------------------------------------------------------------------
 
-actor A3: AnyActor {} // ok
-distributed actor DA3: AnyActor {} // ok
+actor A3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
+distributed actor DA3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
-class C3: AnyActor, @unchecked Sendable {
-  // expected-error@-1{{non-actor type 'C3' cannot conform to the 'AnyActor' protocol}} {{1-6=actor}}
+class C3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
+  // expected-warning@-1 {{non-final class 'C3' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
 }
 
-struct S3: AnyActor {
-  // expected-error@-1{{non-class type 'S3' cannot conform to class protocol 'AnyActor'}}
+struct S3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
+  // expected-error@-1{{only protocols can inherit from 'AnyObject'}}
 }
 
-enum E3: AnyActor {
-  // expected-error@-1{{non-class type 'E3' cannot conform to class protocol 'AnyActor'}}
+enum E3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
+  // expected-error@-1{{only protocols can inherit from 'AnyObject'}}
 }

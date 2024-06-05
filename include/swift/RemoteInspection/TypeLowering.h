@@ -184,6 +184,8 @@ public:
   explicit BuiltinTypeInfo(TypeRefBuilder &builder,
                            BuiltinTypeDescriptorBase &descriptor);
 
+  explicit BuiltinTypeInfo(unsigned Size, unsigned Alignment, unsigned Stride,
+                           unsigned NumExtraInhabitants, bool BitwiseTakable);
   /// Construct an empty builtin type info.
   BuiltinTypeInfo()
       : TypeInfo(TypeInfoKind::Builtin,
@@ -367,6 +369,7 @@ class TypeConverter {
   const TypeInfo *ThinFunctionTI = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
   const TypeInfo *AnyMetatypeTI = nullptr;
+  const TypeInfo *DefaultActorStorageTI = nullptr;
   const TypeInfo *EmptyTI = nullptr;
 
 public:
@@ -424,6 +427,7 @@ private:
   const TypeInfo *getThinFunctionTypeInfo();
   const TypeInfo *getThickFunctionTypeInfo();
   const TypeInfo *getAnyMetatypeTypeInfo();
+  const TypeInfo *getDefaultActorStorageTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>

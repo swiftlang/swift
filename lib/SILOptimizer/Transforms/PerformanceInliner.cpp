@@ -387,6 +387,70 @@ bool SILPerformanceInliner::isTupleWithAllocsOrPartialApplies(SILValue val) {
   return false;
 }
 
+// Uses a function's mangled name to determine if it is an Autodiff VJP
+// function.
+//
+// TODO: VJPs of differentiable functions with custom silgen names are not
+// recognized as VJPs by this function. However, this is not a hard limitation
+// and can be fixed.
+bool isFunctionAutodiffVJP(SILFunction *callee) {
+  swift::Demangle::Context Ctx;
+  if (auto *Root = Ctx.demangleSymbolAsNode(callee->getName())) {
+    if (auto *node = Root->findByKind(
+            swift::Demangle::Node::Kind::AutoDiffFunctionKind, 3)) {
+      if (node->hasIndex()) {
+        auto index = (char)node->getIndex();
+        auto ADFunctionKind = swift::Demangle::AutoDiffFunctionKind(index);
+        if (ADFunctionKind == swift::Demangle::AutoDiffFunctionKind::VJP) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+bool isProfitableToInlineAutodiffVJP(SILFunction *vjp, SILFunction *caller,
+                                     InlineSelection whatToInline,
+                                     StringRef stageName) {
+  bool isLowLevelFunctionPassPipeline = stageName == "LowLevel,Function";
+  auto isHighLevelFunctionPassPipeline =
+      stageName == "HighLevel,Function+EarlyLoopOpt";
+  auto calleeHasControlFlow = vjp->size() > 1;
+  auto isCallerVJP = isFunctionAutodiffVJP(caller);
+  auto callerHasControlFlow = caller->size() > 1;
+
+  // If the pass is being run as part of the low-level function pass pipeline,
+  // the autodiff closure-spec optimization is done doing its work. Therefore,
+  // all VJPs should be considered for inlining.
+  if (isLowLevelFunctionPassPipeline) {
+    return true;
+  }
+
+  // If callee has control-flow it will definitely not be handled by the
+  // Autodiff closure-spec optimization. Therefore, we should consider it for
+  // inlining.
+  if (calleeHasControlFlow) {
+    return true;
+  }
+
+  // If this is the EarlyPerfInline pass we want to have the Autodiff
+  // closure-spec optimization pass optimize VJPs in isolation before they are
+  // inlined into other VJPs.
+  if (isHighLevelFunctionPassPipeline) {
+    return false;
+  }
+
+  // If this is not the EarlyPerfInline pass, VJPs should only be inlined into
+  // other VJPs that do not contain any control-flow.
+  if (!isCallerVJP || (isCallerVJP && callerHasControlFlow)) {
+    return false;
+  }
+
+  return true;
+}
+
 bool SILPerformanceInliner::isProfitableToInline(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
@@ -394,6 +458,12 @@ bool SILPerformanceInliner::isProfitableToInline(
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
   assert(Callee);
   bool IsGeneric = AI.hasSubstitutions();
+
+  if (isFunctionAutodiffVJP(Callee) &&
+      !isProfitableToInlineAutodiffVJP(Callee, AI.getFunction(), WhatToInline,
+                                       this->pm->getStageName())) {
+    return false;
+  }
 
   // Start with a base benefit.
   int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit

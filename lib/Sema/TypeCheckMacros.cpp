@@ -739,12 +739,12 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
   };
 
   for (auto item : expansionBuffer->getTopLevelItems()) {
+    auto &ctx = expansionBuffer->getASTContext();
     auto *decl = item.dyn_cast<Decl *>();
     if (!decl) {
       if (role != MacroRole::CodeItem &&
           role != MacroRole::Preamble &&
           role != MacroRole::Body) {
-        auto &ctx = expansionBuffer->getASTContext();
         ctx.Diags.diagnose(item.getStartLoc(),
                            diag::expected_macro_expansion_decls);
       }
@@ -753,8 +753,18 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
     }
 
     // Certain macro roles can generate special declarations.
-    if ((isa<AccessorDecl>(decl) && role == MacroRole::Accessor) ||
-        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance)) {
+    if (isa<AccessorDecl>(decl) && role == MacroRole::Accessor) {
+      auto *var = dyn_cast<VarDecl>(attachedTo);
+      if (var && var->isLet()) {
+        ctx.Diags.diagnose(var->getLoc(),
+                           diag::let_accessor_expansion)
+          .warnUntilSwiftVersion(6);
+      }
+
+      continue;
+    }
+
+    if (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance) {
       continue;
     }
 
@@ -1367,6 +1377,22 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getDeclContext()->getParentSourceFile();
   } else {
     dc = attachedTo->getInnermostDeclContext();
+  }
+
+  // FIXME: compatibility hack for the transition from property wrapper
+  // to macro for TaskLocal.
+  //
+  // VarDecls with `@_projectedValueProperty` have already had the property
+  // wrapper transform applied. This only impacts swiftinterfaces, and if
+  // a swiftinterface was produced against a Concurrency library that does
+  // not declare TaskLocal as a macro, we need to ignore the macro to avoid
+  // producing duplicate declarations. This is only needed temporarily until
+  // all swiftinterfaces have been built against the Concurrency library
+  // containing the new macro declaration.
+  if (auto *var = dyn_cast<VarDecl>(attachedTo)) {
+    if (var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()) {
+      return nullptr;
+    }
   }
 
   ASTContext &ctx = dc->getASTContext();

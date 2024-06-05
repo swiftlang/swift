@@ -176,10 +176,15 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
   public mutating func appendInterpolation<T>(_ value: T) {
+    #if !$Embedded
     _print_unlocked(value, &self)
+    #else
+    "(cannot print value in embedded Swift)".write(to: &self)
+    #endif
   }
 
   @_alwaysEmitIntoClient
+  @_unavailableInEmbedded
   public mutating func appendInterpolation(_ value: Any.Type) {
 	  _typeName(value, qualified: false).write(to: &self)
   }

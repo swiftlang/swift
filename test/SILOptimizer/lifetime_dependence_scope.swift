@@ -15,8 +15,7 @@ struct BV : ~Escapable {
 
   public var isEmpty: Bool { c == 0 }
 
-  @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ c: Int) {
+  init(_ p: UnsafeRawPointer, _ c: Int) -> dependsOn(p) Self {
     self.p = p
     self.c = c
   }

@@ -6,7 +6,7 @@
 // will be able to have this behavior, however new apps will not. We use the
 // overrides to test the logic for legacy code remains functional.
 //
-// RUN: env %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=nocrash %target-run %t/a.out 2>&1 | %FileCheck %s
+// RUN: %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -66,14 +66,14 @@ actor MyActor {
 struct Runner {
   static func main() async {
     print("Launching a main-actor task")
-    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection_legacy_warning.swift:30 was not called on the main thread
+    // CHECK: data race detected: @MainActor function at main/data_race_detection_legacy_warning.swift:30 was not called on the main thread
     launchFromMainThread()
     sleep(1)
 
     let actor = MyActor()
     let actorFn = await actor.getTaskOnMyActor()
     print("Launching an actor-instance task")
-    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection_legacy_warning.swift:59 was not called on the same actor
+    // CHECK: data race detected: actor-isolated function at main/data_race_detection_legacy_warning.swift:59 was not called on the same actor
     launchTask(actorFn)
 
     sleep(1)

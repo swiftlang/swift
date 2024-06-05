@@ -279,13 +279,13 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       // FIXME: the logic around visibility in extensions is confusing, and
       // sometimes witness thunks need to be manually made public.
 
-      auto conformanceIsFixed =
-          SILWitnessTable::conformanceIsSerialized(rootConformance);
+      auto conformanceSeializedKind =
+          SILWitnessTable::conformanceSerializedKind(rootConformance);
       auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                       ValueDecl *witnessDecl) {
         auto witnessRef = SILDeclRef(witnessDecl);
         if (Ctx.getOpts().PublicOrPackageSymbolsOnly) {
-          if (!conformanceIsFixed)
+          if (conformanceSeializedKind == IsNotSerialized)
             return;
 
           if (!isa<SelfProtocolConformance>(rootConformance) &&

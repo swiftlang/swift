@@ -1667,6 +1667,14 @@ RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
 
 RValue
 RValueEmitter::visitPackElementExpr(PackElementExpr *E, SGFContext C) {
+  // If this is a captured pack element reference, just emit the parameter value
+  // that was passed to the closure.
+  auto found = SGF.OpaqueValues.find(E);
+  if (found != SGF.OpaqueValues.end())
+    return RValue(SGF, E, SGF.manageOpaqueValue(found->second, E, C));
+
+  // Otherwise, we're going to project the address of an element from the pack
+  // itself.
   FormalEvaluationScope scope(SGF);
 
   LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
@@ -5972,9 +5980,9 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
-  assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
-  auto value = SGF.OpaqueValues[E];
-  return RValue(SGF, E, SGF.manageOpaqueValue(value, E, C));
+  auto found = SGF.OpaqueValues.find(E);
+  assert(found != SGF.OpaqueValues.end());
+  return RValue(SGF, E, SGF.manageOpaqueValue(found->second, E, C));
 }
 
 RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
