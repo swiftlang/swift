@@ -13,7 +13,7 @@ extension ExplicitCond: Copyable {}
 public typealias ExplicitCondAlias<T> = ExplicitCond<T> where T: ~Copyable
 public typealias AlwaysCopyable<T> = ExplicitCond<T>
 
-func checkCopyable<T>(_ t: T) {} // expected-note {{generic parameter 'T' has an implicit Copyable requirement}}
+func checkCopyable<T>(_ t: T) {} // expected-note {{'where T: Copyable' is implicit here}}
 
 func test<C, NC: ~Copyable>(
   _ a1: ExplicitCond<C>, _ b1: borrowing ExplicitCond<NC>,
@@ -69,7 +69,7 @@ class ClassContainment<T: ~Copyable> {
     var storage: T
     init(_ t: consuming T) {
         storage = t
-        checkCopyable(t) // expected-error {{noncopyable type 'T' cannot be substituted for copyable generic parameter 'T' in 'checkCopyable'}}
+        checkCopyable(t) // expected-error {{global function 'checkCopyable' requires that 'T' conform to 'Copyable'}}
     }
 
     deinit {}
@@ -184,14 +184,14 @@ extension NeedsCopyable where Self: ~Copyable {}
 
 protocol NoCopyP: ~Copyable {}
 
-func needsCopyable<T>(_ t: T) {} // expected-note 2{{generic parameter 'T' has an implicit Copyable requirement}}
+func needsCopyable<T>(_ t: T) {} // expected-note 2{{'where T: Copyable' is implicit here}}
 func noCopyable(_ t: borrowing some ~Copyable) {}
 func noCopyableAndP(_ t: borrowing some NoCopyP & ~Copyable) {}
 
 func openingExistentials(_ a: borrowing any NoCopyP & ~Copyable,
                          _ b: any NoCopyP,
                          _ nc: borrowing any ~Copyable) {
-  needsCopyable(a) // expected-error {{noncopyable type 'any NoCopyP & ~Copyable' cannot be substituted for copyable generic parameter 'T' in 'needsCopyable'}}
+  needsCopyable(a) // expected-error {{global function 'needsCopyable' requires that 'T' conform to 'Copyable'}}
   noCopyable(a)
   noCopyableAndP(a)
 
@@ -199,7 +199,7 @@ func openingExistentials(_ a: borrowing any NoCopyP & ~Copyable,
   noCopyable(b)
   noCopyableAndP(b)
 
-  needsCopyable(nc) // expected-error {{noncopyable type 'any ~Copyable' cannot be substituted for copyable generic parameter 'T' in 'needsCopyable'}}
+  needsCopyable(nc) // expected-error {{global function 'needsCopyable' requires that 'T' conform to 'Copyable'}}
   noCopyable(nc)
   noCopyableAndP(nc) // expected-error {{global function 'noCopyableAndP' requires that 'some NoCopyP & ~Copyable' conform to 'NoCopyP'}}
 }
@@ -212,13 +212,10 @@ func testSpecial(_ a: Any) {
 /// MARK: non-Escapable types
 
 func requireEscape<T: ~Copyable>(_ t: borrowing T) {} // expected-note {{generic parameters are always considered '@escaping'}}
-// expected-note@-1 {{where 'T' = 'MutableBuggerView<NC>'}}
-// expected-note@-2 {{where 'T' = 'BuggerView<NC>'}}
-// expected-note@-3 {{where 'T' = 'MutableBuggerView<Int>'}}
-// expected-note@-4 {{where 'T' = 'BuggerView<Int>'}}
+// expected-note@-1 4{{'where T: Escapable' is implicit here}}
 
 func genericNoEscape<T: ~Escapable>(_ t: borrowing T) {} // expected-note {{generic parameters are always considered '@escaping'}}
-// expected-note@-1 2{{generic parameter 'T' has an implicit Copyable requirement}}
+// expected-note@-1 2{{'where T: Copyable' is implicit here}}
 
 func genericNoEscapeOrCopy<T: ~Escapable & ~Copyable>(_ t: borrowing T) {}
 
@@ -238,9 +235,9 @@ func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
                    _ intMutRef: borrowing MutableBuggerView<Int>,
                    _ intRef: BuggerView<Int>) {
 
-  genericNoEscape(mutRef) // expected-error {{noncopyable type 'MutableBuggerView<NC>' cannot be substituted for copyable generic parameter 'T' in 'genericNoEscape'}}
+  genericNoEscape(mutRef) // expected-error {{global function 'genericNoEscape' requires that 'MutableBuggerView<NC>' conform to 'Copyable'}}
   genericNoEscape(ref)
-  genericNoEscape(intMutRef) // expected-error {{noncopyable type 'MutableBuggerView<Int>' cannot be substituted for copyable generic parameter 'T' in 'genericNoEscape'}}
+  genericNoEscape(intMutRef) // expected-error {{global function 'genericNoEscape' requires that 'MutableBuggerView<Int>' conform to 'Copyable'}}
   genericNoEscape(intRef)
 
   genericNoEscapeOrCopy(mutRef)
@@ -508,3 +505,18 @@ public enum List<Element: ~Copyable>: ~Copyable {
   case empty
 }
 extension List: Copyable where Element: Copyable {}
+
+
+struct Yapping<T: ~Copyable> {}
+extension Yapping { // expected-note {{'where T: Copyable' is implicit here}}
+  func yap() {}
+}
+func testYap(_ y: Yapping<NC>) {
+  y.yap() // expected-error {{referencing instance method 'yap()' on 'Yapping' requires that 'NC' conform to 'Copyable'}}
+}
+
+protocol Veggie: ~Copyable {}
+func generalized(_ x: Any.Type) {}
+func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
+  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
+}
