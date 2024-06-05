@@ -26,7 +26,6 @@ set(SWIFT_SYNCHRONIZATION_SOURCES
   ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES}
 
   Cell.swift
-  Mutex/Mutex.swift
 )
 
 set(SWIFT_SYNCHRONIZATION_GYB_SOURCES
@@ -38,24 +37,28 @@ set(SWIFT_SYNCHRONIZATION_GYB_SOURCES
 
 set(SWIFT_SYNCHRONIZATION_DARWIN_SOURCES
   Mutex/DarwinImpl.swift
+  Mutex/Mutex.swift
 )
 
 # Linux sources
 
 set(SWIFT_SYNCHRONIZATION_LINUX_SOURCES
   Mutex/LinuxImpl.swift
+  Mutex/Mutex.swift
   Mutex/SpinLoopHint.swift
 )
 
 # Wasm sources
 
 set(SWIFT_SYNCHRONIZATION_WASM_SOURCES
+  Mutex/Mutex.swift
   Mutex/WasmImpl.swift
 )
 
 # Windows sources
 
 set(SWIFT_SYNCHRONIZATION_WINDOWS_SOURCES
+  Mutex/Mutex.swift
   Mutex/WindowsImpl.swift
 )
 
