@@ -38,6 +38,13 @@ using namespace swift;
 DiagnosticBehavior
 swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   switch(reason) {
+  case ObjCReason::MemberOfObjCImplementationExtension:
+    // If they're using the old syntax, soften to a warning.
+    if (cast<ObjCImplementationAttr>(reason.getAttr())->isEarlyAdopter())
+      return DiagnosticBehavior::Warning;
+
+    LLVM_FALLTHROUGH;
+
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
@@ -51,7 +58,6 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::MemberOfObjCExtension:
-  case ObjCReason::MemberOfObjCImplementationExtension:
     return DiagnosticBehavior::Unspecified;
 
   case ObjCReason::ExplicitlyIBInspectable:
