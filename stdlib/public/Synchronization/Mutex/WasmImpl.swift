@@ -13,19 +13,19 @@
 // Note: All atomic accesses on WASM are sequentially consistent regardless of
 // what ordering we tell LLVM to use.
 
-@_extern(c, "llvm.wasm32.memory.atomic.wait32")
+@_extern(c, "llvm.wasm.memory.atomic.wait32")
 internal func _swift_stdlib_wait(
   on: UnsafePointer<UInt32>,
   expected: UInt32,
   timeout: Int64
 ) -> UInt32
 
-@_extern(c, "llvm.wasm32.memory.atomic.notify")
-internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32)
+@_extern(c, "llvm.wasm.memory.atomic.notify")
+internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32) -> UInt32
 
 extension Atomic where Value == _MutexHandle.State {
   internal borrowing func _wait(expected: _MutexHandle.State) {
-    _swift_stdlib_wait(
+    _ = _swift_stdlib_wait(
       on: .init(_rawAddress),
       expected: expected.rawValue,
 
@@ -36,7 +36,7 @@ extension Atomic where Value == _MutexHandle.State {
 
   internal borrowing func _wake() {
     // Only wake up 1 thread
-    _swift_stdlib_wake(on: .init(_rawAddress), count: 1)
+    _ = _swift_stdlib_wake(on: .init(_rawAddress), count: 1)
   }
 }
 
