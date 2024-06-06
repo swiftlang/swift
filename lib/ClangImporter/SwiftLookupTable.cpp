@@ -833,9 +833,9 @@ ArrayRef<clang::ObjCCategoryDecl *> SwiftLookupTable::categories() {
 
   // Map categories known to the reader.
   for (auto declID : Reader->categories()) {
-    auto category =
-      cast_or_null<clang::ObjCCategoryDecl>(
-        Reader->getASTReader().GetLocalDecl(Reader->getModuleFile(), declID));
+    auto category = cast_or_null<clang::ObjCCategoryDecl>(
+        Reader->getASTReader().GetLocalDecl(Reader->getModuleFile(),
+                                            clang::LocalDeclID(declID)));
     if (category)
       Categories.push_back(category);
 
@@ -930,10 +930,10 @@ static void printStoredContext(SwiftLookupTable::StoredContext context,
   }
 }
 
-static uint32_t getEncodedDeclID(uint64_t entry) {
-  assert(SwiftLookupTable::isSerializationIDEntry(entry)); 
+static clang::LocalDeclID getEncodedDeclID(uint64_t entry) {
+  assert(SwiftLookupTable::isSerializationIDEntry(entry));
   assert(SwiftLookupTable::isDeclEntry(entry));
-  return entry >> 2;
+  return clang::LocalDeclID(entry >> 2);
 }
 
 namespace {
@@ -955,7 +955,7 @@ static void printStoredEntry(const SwiftLookupTable *table, uint64_t entry,
                              llvm::raw_ostream &out) {
   if (SwiftLookupTable::isSerializationIDEntry(entry)) {
     if (SwiftLookupTable::isDeclEntry(entry)) {
-      llvm::errs() << "decl ID #" << getEncodedDeclID(entry);
+      llvm::errs() << "decl ID #" << getEncodedDeclID(entry).get();
     } else {
       LocalMacroIDs macroIDs = getEncodedModuleMacroIDs(entry);
       if (macroIDs.moduleID == 0) {
@@ -1190,7 +1190,7 @@ namespace {
           uint64_t id;
           auto mappedEntry = Table.mapStored(entry, isModule);
           if (auto *decl = mappedEntry.dyn_cast<clang::NamedDecl *>()) {
-            id = (Writer.getDeclID(decl) << 2) | 0x02;
+            id = (Writer.getDeclID(decl).get() << 2) | 0x02;
           } else if (auto *macro = mappedEntry.dyn_cast<clang::MacroInfo *>()) {
             id = static_cast<uint64_t>(Writer.getMacroID(macro)) << 32;
             id |= 0x02 | 0x01;
@@ -1272,7 +1272,7 @@ namespace {
         uint64_t id;
         auto mappedEntry = Table.mapStored(entry, isModule);
         if (auto *decl = mappedEntry.dyn_cast<clang::NamedDecl *>()) {
-          id = (Writer.getDeclID(decl) << 2) | 0x02;
+          id = (Writer.getDeclID(decl).get() << 2) | 0x02;
         } else if (auto *macro = mappedEntry.dyn_cast<clang::MacroInfo *>()) {
           id = static_cast<uint64_t>(Writer.getMacroID(macro)) << 32;
           id |= 0x02 | 0x01;
@@ -1332,7 +1332,7 @@ void SwiftLookupTableWriter::writeExtensionContents(
   if (!table.Categories.empty()) {
     SmallVector<clang::serialization::DeclID, 4> categoryIDs;
     for (auto category : table.Categories) {
-      categoryIDs.push_back(Writer.getDeclID(category));
+      categoryIDs.push_back(Writer.getDeclID(category).get());
     }
 
     StringRef blob(reinterpret_cast<const char *>(categoryIDs.data()),
@@ -1555,7 +1555,7 @@ clang::NamedDecl *SwiftLookupTable::mapStoredDecl(uint64_t &entry) {
 
   // Otherwise, resolve the declaration.
   assert(Reader && "Cannot resolve the declaration without a reader");
-  uint32_t declID = getEncodedDeclID(entry);
+  clang::LocalDeclID declID = getEncodedDeclID(entry);
   auto decl = cast_or_null<clang::NamedDecl>(
                 Reader->getASTReader().GetLocalDecl(Reader->getModuleFile(),
                                                     declID));
