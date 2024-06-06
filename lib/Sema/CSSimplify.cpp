@@ -11810,10 +11810,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
           isolatedParams.insert(paramDecl);
 
-        param =
-            param.withFlags(flags.withInOut(contextualParam->isInOut())
-                                 .withVariadic(contextualParam->isVariadic())
-                                 .withIsolated(contextualParam->isIsolated()));
+        param = param.withFlags(flags.withInOut(contextualParam->isInOut())
+                                    .withVariadic(contextualParam->isVariadic())
+                                    .withIsolated(contextualParam->isIsolated())
+                                    .withSending(contextualParam->isSending()));
       }
     }
 
@@ -11938,6 +11938,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->isSendable())
       closureExtInfo = closureExtInfo.withSendable();
+  }
+
+  // Propagate sending result from the contextual type to the closure.
+  if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
+    if (contextualFnType->hasExtInfo() && contextualFnType->hasSendingResult())
+      closureExtInfo = closureExtInfo.withSendingResult();
   }
 
   // Isolated parameters override any other kind of isolation we might infer.
