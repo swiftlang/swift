@@ -352,6 +352,15 @@ static bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl) {
 }
 
 ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) const {
+  // If the member was not in local context, we're not going to need the
+  // 'self' declaration, so skip all this work to avoid request cycles.
+  if (!baseDC->isLocalContext())
+    return nullptr;
+
+  // If we're only interested in type declarations, we can also skip everything.
+  if (isOriginallyTypeLookup)
+    return nullptr;
+
   // Perform an unqualified lookup for the base decl of this result. This
   // handles cases where self was rebound (e.g. `guard let self = self`)
   // earlier in this closure or some outer closure.
