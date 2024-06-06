@@ -35,6 +35,9 @@ The debug information format for Swift code: dwarf or codeview.
 .PARAMETER AndroidAPILevel
 The API Level to target when building the Android SDKs
 
+.PARAMETER Android
+When set, build android SDKs.
+
 .PARAMETER AndroidSDKs
 An array of architectures for which the Android Swift SDK should be built.
 
@@ -106,7 +109,7 @@ param(
   [string] $CDebugFormat = "dwarf",
   [string] $SwiftDebugFormat = "dwarf",
   [string] $AndroidAPILevel = 28,
-  [string[]] $AndroidSDKs = @("aarch64","armv7","i686","x86_64"),
+  [string[]] $AndroidSDKs = @(),
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $PinnedBuild = "",
@@ -114,6 +117,7 @@ param(
   [string] $PythonVersion = "3.9.10",
   [string] $AndroidNDKVersion = "r26b",
   [string] $WinSDKVersion = "",
+  [switch] $Android = $false,
   [switch] $SkipBuild = $false,
   [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
@@ -177,10 +181,19 @@ if (-not (Test-Path $python)) {
   }
 }
 
+if ($Android -and ($AndroidSDKs.Length -eq 0)) {
+  # Enable all android SDKs by default.
+  $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
+}
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
 if ($AndroidSDKs.Length -eq 1) { $AndroidSDKs = $AndroidSDKs[0].Split(",") }
 if ($WindowsSDKs.Length -eq 1) { $WindowsSDKs = $WindowsSDKs[0].Split(",") }
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
+
+if ($AndroidSDKs.Length -gt 0) {
+  # Always enable android when one of the SDKs is specified.
+  $Android = $true
+}
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
@@ -344,7 +357,7 @@ $AndroidSDKArchs = @($AndroidSDKs | ForEach-Object {
     default { throw "Unknown architecture $_" }
   }
 })
-if ($AndroidSDKArchs.count -gt 0) {
+if ($Android) {
   if ($HostArch -ne $ArchX64) {
     throw "Unsupported host architecture for building android SDKs"
   }
@@ -666,7 +679,7 @@ function Fetch-Dependencies {
     Download-Python $BuildArchName
   }
 
-  if ($AndroidSDKArchs.count -gt 0) {
+  if ($Android) {
     # Only a specific NDK version is supported right now.
     if ($AndroidNDKVersion -ne "r26b") {
       throw "Unsupported Android NDK version"
