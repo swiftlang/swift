@@ -9495,6 +9495,12 @@ bool IsFunctionBodySkippedRequest::evaluate(
       skippingMode == FunctionBodySkipping::NonInlinableWithoutTypes)
     return false;
 
+  // Don't skip functions that follow a top-level guard statement.
+  if (afd->getDeclContext()->isModuleScopeContext() &&
+      isa<FuncDecl>(afd) &&
+      cast<FuncDecl>(afd)->hasTopLevelLocalContextCaptures())
+    return false;
+
   // Skip functions that don't need to be serialized.
   return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
 }

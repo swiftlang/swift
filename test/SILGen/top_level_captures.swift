@@ -5,15 +5,15 @@
 guard let x: Int = nil else { while true { } }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18top_level_captures0C1XyyF : $@convention(thin) (Int) -> () {
-// SKIPPED-FUNC-EMITTED-LABEL-NOT: sil hidden [ossa] @$s18top_level_captures0C1XyyF : $@convention(thin) (Int) -> () {
+// SKIPPED-FUNC-EMITTED-LABEL: sil hidden [ossa] @$s18top_level_captures0C1XyyF : $@convention(thin) (Int) -> () {
 func capturesX() {
   _ = x
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18top_level_captures17transitiveCaptureyyF : $@convention(thin) (Int) -> () {
 // CHECK: [[FUNC:%.*]] = function_ref @$s18top_level_captures0C1XyyF : $@convention(thin) (Int) -> ()
-// SKIPPED-FUNC-EMITTED-LABEL-NOT: sil hidden [ossa] @$s18top_level_captures17transitiveCaptureyyF : $@convention(thin) (Int) -> () {
-// SKIPPED-FUNC-EMITTED-NOT: [[FUNC:%.*]] = function_ref @$s18top_level_captures0C1XyyF : $@convention(thin) (Int) -> ()
+// SKIPPED-FUNC-EMITTED-LABEL: sil hidden [ossa] @$s18top_level_captures17transitiveCaptureyyF : $@convention(thin) (Int) -> () {
+// SKIPPED-FUNC-EMITTED: [[FUNC:%.*]] = function_ref @$s18top_level_captures0C1XyyF : $@convention(thin) (Int) -> ()
 func transitiveCapture() {
   capturesX()
 }
