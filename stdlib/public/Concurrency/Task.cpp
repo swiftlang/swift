@@ -673,6 +673,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Collect the options we know about.
   SerialExecutorRef serialExecutor = SerialExecutorRef::generic();
   TaskExecutorRef taskExecutor = TaskExecutorRef::undefined();
+  bool taskExecutorIsOwned = false;
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
@@ -688,11 +689,13 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       taskExecutor = cast<InitialTaskExecutorRefPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
+      taskExecutorIsOwned = false;
       break;
 
     case TaskOptionRecordKind::InitialTaskExecutorOwned:
       taskExecutor = cast<InitialTaskExecutorOwnedPreferenceTaskOptionRecord>(option)
                          ->getExecutorRefFromUnownedTaskExecutor();
+      taskExecutorIsOwned = true;
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
@@ -1105,7 +1108,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
     // because the group takes a fast-path when attaching the child record.
     assert(jobFlags.task_hasInitialTaskExecutorPreference());
-    task->pushInitialTaskExecutorPreference(taskExecutor);
+    task->pushInitialTaskExecutorPreference(
+        taskExecutor, /*owned=*/taskExecutorIsOwned);
   }
 
   // If we're supposed to enqueue the task, do so now.

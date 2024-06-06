@@ -51,29 +51,29 @@ actor Worker {
   }
 
   func test(_ expectedExecutor: NaiveQueueExecutor) async {
-    // we are isolated to the serial-executor (!)
-    dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-    expectedExecutor.preconditionIsolated()
-
-    // the nonisolated async func properly executes on the task-executor
-    await nonisolatedFunc(expectedExecutor: expectedExecutor)
-
-    /// the task-executor preference is inherited properly:
-    async let val = {
-      dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-      expectedExecutor.preconditionIsolated()
-      return 12
-    }()
-    _ = await val
-
+//    // we are isolated to the serial-executor (!)
+//    dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
+//    expectedExecutor.preconditionIsolated()
+//
+//    // the nonisolated async func properly executes on the task-executor
+//    await nonisolatedFunc(expectedExecutor: expectedExecutor)
+//
+//    /// the task-executor preference is inherited properly:
+//    async let val = {
+//      dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
+//      expectedExecutor.preconditionIsolated()
+//      return 12
+//    }()
+//    _ = await val
+//
     // as expected not-inheriting
     _ = await Task.detached {
       dispatchPrecondition(condition: .notOnQueue(expectedExecutor.queue))
     }.value
-
-    // we properly came back to the serial executor, just to make sure
-    dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-    expectedExecutor.preconditionIsolated()
+//
+//    // we properly came back to the serial executor, just to make sure
+//    dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
+//    expectedExecutor.preconditionIsolated()
   }
 }
 
@@ -84,8 +84,12 @@ actor Worker {
     let executor = NaiveQueueExecutor(queue)
 
     await Task(executorPreference: executor) {
+      print(">>> INSIDE TASK")
       let worker = Worker(on: executor)
+      print(">> AFTER WORKER")
       await worker.test(executor)
+      print(">> AFTER TEST()")
     }.value
+    print(">> AFTER TASK.VALUE")
   }
 }

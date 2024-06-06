@@ -644,7 +644,14 @@ swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
   void *allocation = _swift_task_alloc_specific(
       task, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =
-      ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(
+          taskExecutor,
+          // we don't retain the executor by the task/record, because the "push"
+          // is implemented as a scope which keeps the executor alive by itself
+          // already, so we save the retain/release pair by the task doing it
+          // as well. In contrast, unstructured task creation always retains
+          // the executor.
+          /*retainedExecutor=*/false);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
                        "preference record %p for task:%p",
                        allocation, task);
@@ -703,11 +710,12 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 }
 
 void AsyncTask::pushInitialTaskExecutorPreference(
-    TaskExecutorRef preferredExecutor) {
+    TaskExecutorRef preferredExecutor, bool owned) {
   void *allocation = _swift_task_alloc_specific(
       this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =
-      ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(
+          preferredExecutor, /*ownsExecutor=*/owned);
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task "
                        "preference record %p for task:%p",
                        record, this);
@@ -733,13 +741,19 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
                        this);
   assert(this->hasInitialTaskExecutorPreferenceRecord());
 
-  HeapObject *executorIdentity = nullptr;
+  HeapObject *executorIdentityToRelease = nullptr;
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto r : status.records()) {
       if (r->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto record = cast<TaskExecutorPreferenceStatusRecord>(r);
 
-        executorIdentity = record->getPreferredExecutor().getIdentity();
+        if (record->hasRetainedExecutor()) {
+          // Some tasks own their executor (i.e. take it consuming and guarantee
+          // its lifetime dynamically), while strictly structured tasks like
+          // async let do not retain it
+          executorIdentityToRelease =
+              record->getPreferredExecutor().getIdentity();
+        }
 
         removeStatusRecordLocked(status, record);
         _swift_task_dealloc_specific(this, record);
@@ -758,7 +772,7 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   //
   // This should not be done for withTaskExecutorPreference executors,
   // however in that case, we would not enter this function here to clean up.
-  swift_release(executorIdentity);
+  swift_release(executorIdentityToRelease);
 }
 
 /**************************************************************************/

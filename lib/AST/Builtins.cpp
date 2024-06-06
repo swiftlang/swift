@@ -1533,7 +1533,7 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
         /* deprecated */_label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_taskExecutor)), _nil)),
+        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_existential(_taskExecutor))), _nil)),
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _typeparam(0), _parameters()))),
       _tuple(_nativeObject, _rawPointer));
@@ -1547,7 +1547,7 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
         /* deprecated */_label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_taskExecutor)), _nil)),
+        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_existential(_taskExecutor))), _nil)),
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _void, _parameters()))),
       _tuple(_nativeObject, _rawPointer));
