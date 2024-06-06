@@ -344,6 +344,11 @@ $AndroidSDKArchs = @($AndroidSDKs | ForEach-Object {
     default { throw "Unknown architecture $_" }
   }
 })
+if ($AndroidSDKArchs.count -gt 0) {
+  if ($HostArch -ne $ArchX64) {
+    throw "Unsupported host architecture for building android SDKs"
+  }
+}
 $WindowsSDKArchs = @($WindowsSDKs | ForEach-Object {
   switch ($_) {
     "X64" { $ArchX64 }
@@ -662,6 +667,10 @@ function Fetch-Dependencies {
   }
 
   if ($AndroidSDKArchs.count -gt 0) {
+    # Only a specific NDK version is supported right now.
+    if ($AndroidNDKVersion -ne "r26b") {
+      throw "Unsupported Android NDK version"
+    }
     $NDKURL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
     $NDKHash = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
