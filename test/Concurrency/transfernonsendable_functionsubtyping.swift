@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -verify -c %s
+// RUN: %target-typecheck-verify-swift -swift-version 6 %s
 
 // READ THIS! This file only contains tests that validate that the relevant
 // function subtyping rules for sending work. Please do not put other tests in
@@ -103,3 +103,4 @@ struct FailToMatch4 : ProtocolWithMixedReqs { // expected-error {{}}
   func nonSendingParamAndSendingResult(_ x: sending NonSendableKlass) -> sending NonSendableKlass { fatalError() }
   // expected-note @-1 {{candidate has non-matching type '(sending NonSendableKlass) -> sending NonSendableKlass'}}
 }
+
