@@ -31,7 +31,7 @@
 ///       }
 ///     }
 ///
-@available(unavailable, *, message: "Mutex is not available on this platform")
+@available(*, unavailable, message: "Mutex is not available on this platform")
 @frozen
 @_staticExclusiveOnly
 public struct Mutex<Value: ~Copyable>: ~Copyable {}
