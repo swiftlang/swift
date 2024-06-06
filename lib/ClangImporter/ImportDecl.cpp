@@ -3457,8 +3457,9 @@ namespace {
             // parameters when the function template is instantiated, so do not
             // import the function template if the template parameter has
             // dependent default value.
-            auto defaultArgumentType = templateTypeParam->getDefaultArgument();
-            if (defaultArgumentType->isDependentType())
+            auto &defaultArgument =
+                templateTypeParam->getDefaultArgument().getArgument();
+            if (defaultArgument.isDependent())
               return nullptr;
             continue;
           }
