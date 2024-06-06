@@ -544,6 +544,7 @@ namespace {
 /// and the compiler emits assigns when it reinitializes vars this early in the
 /// pipeline.
 struct ClosureArgDataflowState {
+  ASTContext &C;
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
   MultiDefPrunedLiveness livenessForConsumes;
@@ -551,13 +552,15 @@ struct ClosureArgDataflowState {
 
 public:
   ClosureArgDataflowState(SILFunction *function, UseState &useState)
-      : livenessForConsumes(function), useState(useState) {}
+      : C(function->getASTContext()),
+        livenessForConsumes(function), useState(useState) {}
 
   bool process(
       SILArgument *arg, ClosureOperandState &state,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
 
 private:
+
   /// Perform our liveness dataflow. Returns true if we found any liveness uses
   /// at all. These we will need to error upon.
   bool performLivenessDataflow(const BasicBlockSet &initBlocks,
@@ -719,7 +722,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Found init block during classifyUses at: " << *user);
       livenessForConsumes.initializeDef(user);
       initBlocks.insert(user->getParent());
     }
@@ -727,7 +730,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 
   for (auto *user : useState.livenessUses) {
     if (upwardScanForUseOut(user, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found use block at: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Found use block during classifyUses at: " << *user);
       livenessBlocks.insert(user->getParent());
       livenessWorklist.push_back(user);
     }
@@ -742,7 +745,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
     assert(iter != useState.destroyToIndexMap.end());
 
     if (upwardScanForDestroys(destroy, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block at: " << *destroy);
+      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block during classifyUses at: " << *destroy);
       consumingBlocks.insert(destroy->getParent());
       consumingWorklist.push_back(destroy);
     }
@@ -755,8 +758,17 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
     auto iter = useState.reinitToIndexMap.find(reinit);
     assert(iter != useState.reinitToIndexMap.end());
 
+    // TODO: Reinitialization analysis is currently incomplete and leads
+    // to miscompiles. Treat reinitializations as regular uses for now.
+    if (!C.LangOpts.hasFeature(Feature::ReinitializeConsumeInMultiBlockDefer)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Treating reinit as use block during classifyUses at: " << *reinit);
+      livenessBlocks.insert(reinit->getParent());
+      livenessWorklist.push_back(reinit);
+      continue;
+    }
+
     if (upwardScanForDestroys(reinit, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
+      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block during classifyUses at: " << *reinit);
       consumingBlocks.insert(reinit->getParent());
       consumingWorklist.push_back(reinit);
     }
@@ -823,31 +835,38 @@ bool ClosureArgDataflowState::process(
   // parameter. We are going to change it to be an out parameter and eliminate
   // these when we clone the closure.
   if (performConsumingDataflow(initBlocks, consumingBlocks)) {
+    LLVM_DEBUG(llvm::dbgs() << "found single consuming use!\n");
+    
     // Before we do anything, make sure our argument has at least one single
     // debug_value user. If we have many we can't handle it since something in
     // SILGen is emitting weird code. Our tests will ensure that SILGen does not
     // diverge by mistake. So we are really just being careful.
     if (hasMoreThanOneDebugUse(address)) {
       // Failing b/c more than one debug use!
+      LLVM_DEBUG(llvm::dbgs() << "...but argument has more than one debug use!\n");
       return false;
     }
 
     //!!! FIXME: Why?
-    // auto *frontBlock = &*fn->begin();
-    // livenessForConsumes.initializeDefBlock(frontBlock);
+    //auto *frontBlock = &*fn->begin();
+    //livenessForConsumes.initializeDef(address);
 
-    for (unsigned i : indices(livenessWorklist)) {
-      if (auto *ptr = livenessWorklist[i]) {
+    for (unsigned i : indices(consumingWorklist)) {
+      if (auto *ptr = consumingWorklist[i]) {
+        LLVM_DEBUG(llvm::dbgs() << "liveness for consume: " << *ptr);
         state.pairedConsumingInsts.push_back(ptr);
-        livenessForConsumes.updateForUse(ptr, true /*is lifetime ending*/);
+        //livenessForConsumes.updateForUse(ptr, true /*is lifetime ending*/);
       }
     }
 
     // If our consumes do not have a linear lifetime, bail. We will error on the
     // move being unknown.
     for (auto *ptr : state.pairedConsumingInsts) {
-      if (livenessForConsumes.isWithinBoundary(ptr))
+      /*if (livenessForConsumes.isWithinBoundary(ptr)) {
+        LLVM_DEBUG(llvm::dbgs() << "consuming inst within boundary; bailing: "
+                                << *ptr);
         return false;
+      }*/
       postDominatingConsumingUsers.insert(ptr);
     }
     state.result = DownwardScanResult::ClosureConsume;
@@ -1835,7 +1854,7 @@ void DataflowState::init() {
   // mark this as an "init block".
   for (auto *init : useState.inits) {
     if (upwardScanForInit(init, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found use block at: " << *init);
+      LLVM_DEBUG(llvm::dbgs() << "    Found use block during DataflowState::init at: " << *init);
       initBlocks.insert(init->getParent());
     }
   }
@@ -1843,7 +1862,7 @@ void DataflowState::init() {
   // Then go through all normal uses and do upwardScanForUseOut.
   for (auto *user : useState.livenessUses) {
     if (upwardScanForUseOut(user, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found liveness block at: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Found liveness block during DataflowState::init at: " << *user);
       useBlocks[user->getParent()] = user;
     }
   }
@@ -1860,7 +1879,7 @@ void DataflowState::init() {
     assert(iter != useState.destroyToIndexMap.end());
 
     if (upwardScanForDestroys(destroy, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block at: " << *destroy);
+      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block during DataflowState::init at: " << *destroy);
       destroyBlocks[destroy->getParent()] = destroy;
     }
   }
@@ -1876,7 +1895,7 @@ void DataflowState::init() {
     assert(iter != useState.reinitToIndexMap.end());
 
     if (upwardScanForDestroys(reinit, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
+      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block during DataflowState::init at: " << *reinit);
       reinitBlocks[reinit->getParent()] = reinit;
     }
   }
@@ -1896,14 +1915,14 @@ void DataflowState::init() {
     case DownwardScanResult::ClosureUse:
       if (upwardScanForUseOut(user, useState)) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "    Found closure liveness block at: " << *user);
+                   << "    Found closure liveness block during DataflowState::init at: " << *user);
         closureUseBlocks[user->getParent()] = &state;
       }
       break;
     case DownwardScanResult::ClosureConsume:
       if (upwardScanForDestroys(user, useState)) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "    Found closure consuming block at: " << *user);
+                   << "    Found closure consuming block during DataflowState::init at: " << *user);
         closureConsumeBlocks[user->getParent()] = use;
       }
       break;
@@ -2019,20 +2038,20 @@ void ConsumeOperatorCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
 bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
     Operand *callerOperand, ClosureOperandState &calleeOperandState) {
   auto fas = FullApplySite::isa(callerOperand->getUser());
-  auto *func = fas.getCalleeFunction();
+  auto *callee = fas.getCalleeFunction();
   auto *address =
-      func->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
+      callee->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
 
   LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on caller use: "
                           << *callerOperand->getUser());
-  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << func->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << callee->getName() << '\n');
   LLVM_DEBUG(llvm::dbgs() << "    Callee Argument: " << *address);
   // We emit an end closure dataflow to make it easier when reading debug output
   // to make it easy to see when we have returned to analyzing the caller.
   SWIFT_DEFER {
     LLVM_DEBUG(llvm::dbgs()
                    << "Finished performing closure dataflow on Callee: "
-                   << func->getName() << '\n';);
+                   << callee->getName() << '\n';);
   };
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
@@ -2053,10 +2072,10 @@ bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
   GatherClosureUseVisitor visitor(closureUseState);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(address);
-  if (!visitAccessPathUses(visitor, accessPath, fn))
+  if (!visitAccessPathUses(visitor, accessPath, callee))
     return false;
 
-  ClosureArgDataflowState closureUseDataflowState(fn, closureUseState);
+  ClosureArgDataflowState closureUseDataflowState(callee, closureUseState);
   return closureUseDataflowState.process(address, calleeOperandState,
                                          closureConsumes);
 }
