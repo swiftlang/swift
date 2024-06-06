@@ -1592,7 +1592,8 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
-        SWIFT_ENABLE_SYNCHRONIZATION = "YES";
+        # FIXME: re-enable after https://github.com/apple/swift/issues/74186 is fixed.
+        SWIFT_ENABLE_SYNCHRONIZATION = if (($Platform -eq "Android") -and ($Arch -eq $AndroidARMv7)) { "NO" } else { "YES" };
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
