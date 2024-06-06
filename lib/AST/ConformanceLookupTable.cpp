@@ -306,9 +306,9 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             if (!proto)
               continue;
             auto kp = proto->getKnownProtocolKind();
-            assert(!found.isSuppressed ||
-                   kp.has_value() &&
-                       "suppressed conformance for non-known protocol!?");
+           assert(!found.isSuppressed ||
+                  kp.has_value() &&
+                      "suppressed conformance for non-known protocol!?");
             if (!found.isSuppressed) {
               addProtocol(proto, found.Loc,
                           source.withUncheckedLoc(found.uncheckedLoc)

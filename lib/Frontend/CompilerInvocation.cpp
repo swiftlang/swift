@@ -2995,6 +2995,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
   Opts.DisableFrameworkAutolinking = Args.hasArg(OPT_disable_autolink_frameworks);
   Opts.DisableAllAutolinking = Args.hasArg(OPT_disable_all_autolinking);
+  Opts.DisableForceLoadSymbols = Args.hasArg(OPT_disable_force_load_symbols);
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
