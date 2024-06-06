@@ -22,3 +22,7 @@ set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7 CACHE STRING "")
 
 # NOTE(compnerd) this is lollipop, which seems to still have decent usage.
 set(SWIFT_ANDROID_API_LEVEL 21 CACHE STRING "")
+
+# FIXME: disable Synchronization stdlib module, as the compiler crashes
+# when building for armv7.
+set(SWIFT_ENABLE_SYNCHRONIZATION NO CACHE BOOL "")
