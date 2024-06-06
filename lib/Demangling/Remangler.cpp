@@ -3120,6 +3120,21 @@ ManglingError Remangler::mangle##Name##AttachedMacroExpansion( \
 }
 #include "swift/Basic/MacroRoles.def"
 
+ManglingError Remangler::mangleMacroExpansionLoc(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+
+  auto line = node->getChild(2)->getIndex();
+  auto col = node->getChild(3)->getIndex();
+
+  Buffer << "fMX";
+  mangleIndex(line);
+  mangleIndex(col);
+
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleMacroExpansionUniqueName(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
