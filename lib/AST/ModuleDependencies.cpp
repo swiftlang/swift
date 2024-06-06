@@ -483,7 +483,7 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
 }
 
 bool
-swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath, 
+swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath,
                                                 const SourceLoc importLoc,
                                                 const SourceFile &SF,
                                                 bool isExported) {
@@ -507,6 +507,85 @@ swift::dependencies::checkImportNotTautological(const ImportPath::Module moduleP
                        filename, modulePath.front().Item);
 
   return false;
+}
+
+void
+swift::dependencies::registerCxxInteropLibraries(
+    const llvm::Triple &Target,
+    StringRef mainModuleName,
+    bool hasStaticCxx, bool hasStaticCxxStdlib,
+    std::function<void(const LinkLibrary&)> RegistrationCallback) {
+  if (Target.isOSDarwin())
+    RegistrationCallback(LinkLibrary("c++", LibraryKind::Library));
+  else if (Target.isOSLinux())
+    RegistrationCallback(LinkLibrary("stdc++", LibraryKind::Library));
+
+  // Do not try to link Cxx with itself.
+  if (mainModuleName != "Cxx") {
+    RegistrationCallback(LinkLibrary(Target.isOSWindows() && hasStaticCxx
+                                        ? "libswiftCxx"
+                                        : "swiftCxx",
+                                     LibraryKind::Library));
+  }
+
+  // Do not try to link CxxStdlib with the C++ standard library, Cxx or
+  // itself.
+  if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
+                    [mainModuleName](StringRef Name) {
+                      return mainModuleName == Name;
+                    })) {
+    // Only link with CxxStdlib on platforms where the overlay is available.
+    switch (Target.getOS()) {
+    case llvm::Triple::Linux:
+      if (!Target.isAndroid())
+        RegistrationCallback(LinkLibrary("swiftCxxStdlib",
+                                         LibraryKind::Library));
+      break;
+    case llvm::Triple::Win32: {
+      RegistrationCallback(
+          LinkLibrary(hasStaticCxxStdlib ? "libswiftCxxStdlib" : "swiftCxxStdlib",
+                      LibraryKind::Library));
+      break;
+    }
+    default:
+      if (Target.isOSDarwin())
+        RegistrationCallback(LinkLibrary("swiftCxxStdlib",
+                                         LibraryKind::Library));
+      break;
+    }
+  }
+}
+
+void
+swift::dependencies::registerBackDeployLibraries(
+    const IRGenOptions &IRGenOpts,
+    std::function<void(const LinkLibrary&)> RegistrationCallback) {
+  auto addBackDeployLib = [&](llvm::VersionTuple version,
+                              StringRef libraryName, bool forceLoad) {
+    std::optional<llvm::VersionTuple> compatibilityVersion;
+    if (libraryName == "swiftCompatibilityDynamicReplacements") {
+      compatibilityVersion = IRGenOpts.
+          AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+    } else if (libraryName == "swiftCompatibilityConcurrency") {
+      compatibilityVersion =
+          IRGenOpts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
+    } else {
+      compatibilityVersion = IRGenOpts.
+          AutolinkRuntimeCompatibilityLibraryVersion;
+    }
+
+    if (!compatibilityVersion)
+      return;
+
+    if (*compatibilityVersion > version)
+      return;
+
+    RegistrationCallback({libraryName, LibraryKind::Library, forceLoad});
+  };
+
+#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
+    addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
+  #include "swift/Frontend/BackDeploymentLibs.def"
 }
 
 void SwiftDependencyTracker::addCommonSearchPathDeps(
