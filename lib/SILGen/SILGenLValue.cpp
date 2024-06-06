@@ -3042,9 +3042,6 @@ public:
         case ParamSpecifier::ImplicitlyCopyableConsuming:
           return false;
         }
-        if (pd->hasResultDependsOn()) {
-          return true;
-        }
       }
     }
     return false;

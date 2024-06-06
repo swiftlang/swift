@@ -290,10 +290,6 @@ extension Function {
   public var hasResultDependence: Bool {
     convention.resultDependencies != nil
   }
-
-  public var hasResultDependsOnSelf: Bool {
-    return bridged.hasResultDependsOnSelf()
-  }
 }
 
 public struct ArgumentTypeArray : RandomAccessCollection, FormattedLikeArray {

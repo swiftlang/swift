@@ -2156,10 +2156,9 @@ namespace {
                                               TypeResolutionOptions options);
     NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
                                          TypeResolutionOptions options);
-    NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
-                                                  TypeResolutionOptions options);
-    NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
-                                                 TypeResolutionOptions options);
+    NeverNullType
+    resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
+                                    TypeResolutionOptions options);
     NeverNullType resolveLifetimeDependentReturnTypeRepr(
         LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
@@ -2768,10 +2767,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
-
-  case TypeReprKind::ResultDependsOn:
-    return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
-                                          options);
 
   case TypeReprKind::LifetimeDependentReturn:
     return resolveLifetimeDependentReturnTypeRepr(
@@ -3645,7 +3640,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
-    bool hasResultDependsOn = false;
     bool isSending = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
@@ -3669,10 +3663,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
-          nestedRepr = specifierRepr->getBase();
-          continue;
-        case TypeReprKind::ResultDependsOn:
-          hasResultDependsOn = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3777,8 +3767,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, hasResultDependsOn,
-        isSending);
+        isolated, noDerivative, compileTimeConst, isSending);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -5047,31 +5036,6 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   return ArraySliceType::get(baseTy);
 }
 
-NeverNullType
-TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
-                                             TypeResolutionOptions options) {
-  // _resultDependsOn is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
-
-    decltype(diag::attr_only_on_parameters) diagID;
-    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
-        options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagID = diag::attr_only_valid_on_func_or_init_params;
-    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
-      diagID = diag::attr_not_on_variadic_parameters;
-    } else {
-      diagID = diag::attr_only_on_parameters;
-    }
-
-    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
-    return ErrorType::get(getASTContext());
-  }
-  return resolveType(repr->getBase(), options);
-}
-
 NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
     LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
   if (options.is(TypeResolverContext::TupleElement)) {
@@ -6067,7 +6031,6 @@ private:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
-    case TypeReprKind::ResultDependsOn:
     case TypeReprKind::LifetimeDependentReturn:
       return false;
     }

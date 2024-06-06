@@ -520,11 +520,6 @@ BridgedBasicBlock BridgedArgument::getParent() const {
   return {getArgument()->getParent()};
 }
 
-bool BridgedArgument::hasResultDependsOn() const {
-  auto *fArg = static_cast<swift::SILFunctionArgument*>(getArgument());
-  return fArg->hasResultDependsOn();
-}
-
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
 
 BridgedNullableVarDecl BridgedArgument::getVarDecl() const {
@@ -690,10 +685,6 @@ bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
 
 bool BridgedFunction::hasUnsafeNonEscapableResult() const {
   return getFunction()->hasUnsafeNonEscapableResult();
-}
-
-bool BridgedFunction::hasResultDependsOnSelf() const {
-  return getFunction()->hasResultDependsOnSelf();
 }
 
 BridgedFunction::EffectsKind BridgedFunction::getEffectAttribute() const {

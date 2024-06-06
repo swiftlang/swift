@@ -1118,7 +1118,6 @@ public:
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst ||
-           T->getKind() == TypeReprKind::ResultDependsOn ||
            T->getKind() == TypeReprKind::LifetimeDependentReturn ||
            T->getKind() == TypeReprKind::Transferring ||
            T->getKind() == TypeReprKind::Sending;
@@ -1190,21 +1189,6 @@ public:
     return T->getKind() == TypeReprKind::CompileTimeConst;
   }
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
-};
-
-/// A lifetime dependent type.
-/// \code
-///   x : _resultDependsOn Int
-/// \endcode
-class ResultDependsOnTypeRepr : public SpecifierTypeRepr {
-public:
-  ResultDependsOnTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-      : SpecifierTypeRepr(TypeReprKind::ResultDependsOn, Base, InOutLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::ResultDependsOn;
-  }
-  static bool classof(const ResultDependsOnTypeRepr *T) { return true; }
 };
 
 /// A transferring type.
@@ -1641,7 +1625,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
-  case TypeReprKind::ResultDependsOn:
   case TypeReprKind::LifetimeDependentReturn:
     return true;
   }

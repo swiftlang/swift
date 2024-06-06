@@ -7918,13 +7918,6 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
       "%0 bindings must be bound to an lvalue", (StringRef))
 
 //------------------------------------------------------------------------------
-// MARK: resultDependsOn Errors
-//------------------------------------------------------------------------------
-
-ERROR(result_depends_on_no_result,none,
-      "Incorrect use of %0 with no result", (StringRef))
-
-//------------------------------------------------------------------------------
 // MARK: Pack Iteration Diagnostics
 //------------------------------------------------------------------------------
 
