@@ -1616,7 +1616,6 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     -UseBuiltCompilers C,CXX,Swift `
     -BuildTargets $Targets `
     -Defines @{
-      CMAKE_SYSTEM_NAME = $Platform.ToString();      
       ENABLE_SWIFT = "YES";
     }
 }
@@ -1651,7 +1650,6 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -BuildTargets $Targets `
       -Defines (@{
         FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-        CMAKE_SYSTEM_NAME = $Platform.ToString();
         # Turn off safeseh for lld as it has safeseh enabled by default
         # and fails with an ICU data object file icudt69l_dat.obj. This
         # matters to X86 only.
@@ -1723,7 +1721,6 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -BuildTargets $Targets `
       -Defines (@{
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
-        CMAKE_SYSTEM_NAME = $Platform.ToString();
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
         Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
       } + $TestingDefines)
