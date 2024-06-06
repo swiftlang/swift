@@ -39,6 +39,7 @@ public:
     Type,
     KeyPath,
     FunctionCall,
+    StaticFunctionCall,
     MemberReference,
     InterpolatedString,
     Runtime
@@ -390,6 +391,30 @@ public:
 private:
   std::string Identifier;
   std::optional<std::vector<FunctionParameter>> Parameters;
+};
+
+/// A static function reference representation such as
+/// let foo = MyStruct.bar(item: "")
+/// let foo = MyStruct.bar()
+class StaticFunctionCallValue : public CompileTimeValue {
+public:
+  StaticFunctionCallValue(std::string Label, swift::Type Type,
+                          std::vector<FunctionParameter> Parameters)
+      : CompileTimeValue(ValueKind::StaticFunctionCall), Label(Label),
+        Type(Type), Parameters(Parameters) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::StaticFunctionCall;
+  }
+
+  std::string getLabel() const { return Label; }
+  swift::Type getType() const { return Type; }
+  std::vector<FunctionParameter> getParameters() const { return Parameters; }
+
+private:
+  std::string Label;
+  swift::Type Type;
+  std::vector<FunctionParameter> Parameters;
 };
 
 /// A member reference representation such as
