@@ -373,9 +373,15 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), paramIndex, b);
 }
 
+// This function should only be called with directly returnable
+// result and error types. Errors can only be returned directly if
+// they consists solely of int and ptr values.
 CombinedResultAndErrorType irgen::combineResultAndTypedErrorType(
     const IRGenModule &IGM, const NativeConventionSchema &resultSchema,
     const NativeConventionSchema &errorSchema) {
+  assert(!resultSchema.requiresIndirect());
+  assert(!errorSchema.shouldReturnTypedErrorIndirectly());
+
   CombinedResultAndErrorType result;
   SmallVector<llvm::Type *, 8> elts;
   resultSchema.enumerateComponents(
@@ -403,6 +409,8 @@ CombinedResultAndErrorType irgen::combineResultAndTypedErrorType(
     }
 
     auto *error = *errorIt;
+    assert(error->isIntOrPtrTy() &&
+           "Direct errors must only consist of int or ptr values");
     result.errorValueMapping.push_back(combined.size());
     if (res->getPrimitiveSizeInBits() >= error->getPrimitiveSizeInBits()) {
       combined.push_back(res);
