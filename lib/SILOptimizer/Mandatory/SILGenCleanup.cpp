@@ -118,8 +118,7 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
         if (completion.completeOSSALifetime(
-                result,
-                OSSALifetimeCompletion::Boundary::AvailabilityWithLeaks) ==
+                result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
         }
@@ -128,7 +127,7 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
     for (SILArgument *arg : block->getArguments()) {
       assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
       if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::AvailabilityWithLeaks) ==
+              arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
       }
