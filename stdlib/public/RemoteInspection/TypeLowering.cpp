@@ -251,7 +251,7 @@ BuiltinTypeInfo::BuiltinTypeInfo(unsigned Size, unsigned Alignment,
 
 // Builtin.Int<N> is mangled as 'Bi' N '_'
 // Returns 0 if this isn't an Int
-static unsigned isIntType(std::string name) {
+static unsigned intTypeBitSize(std::string name) {
   llvm::StringRef nameRef(name);
   if (nameRef.starts_with("Bi") && nameRef.endswith("_")) {
     llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
@@ -274,11 +274,12 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
   }
   // If it has extra inhabitants, it could be an integer type with extra
   // inhabitants (such as a bool) or a pointer.
-  unsigned intSize = isIntType(Name);
+  unsigned intSize = intTypeBitSize(Name);
   if (intSize > 0) {
     // This is an integer type
 
-    // If it cannot have extra inhabitants, return early...
+    // If extra inhabitants are impossible, return early...
+    // (assert in debug builds)
     assert(intSize < getSize() * 8
 	   && "Standard-sized int cannot have extra inhabitants");
     if (intSize > 64 || getSize() > 8 || intSize >= getSize() * 8) {
@@ -319,7 +320,7 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
 }
 
 BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
-  unsigned intSize = isIntType(Name);
+  unsigned intSize = intTypeBitSize(Name);
   if (intSize > 0) {
     // Odd-sized integers export spare bits
     // In particular: bool fields are Int1 and export 7 spare bits
@@ -327,6 +328,7 @@ BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) cons
     mask.keepOnlyMostSignificantBits(getSize() * 8 - intSize);
     return mask;
   } else if (
+    Name == "ypXp" || // Any.Type
     Name == "yyXf" // 'yyXf' =  @thin () -> Void function
   ) {
     // Builtin types that expose pointer spare bits
@@ -590,7 +592,9 @@ public:
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
-    return BitMask::zeroMask(getSize());
+    auto mask = BitMask(getSize(), maskForCount(getNumCases()));
+    mask.complement();
+    return mask;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -660,7 +664,17 @@ public:
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
-    return BitMask::zeroMask(getSize());
+    FieldInfo PayloadCase = getCases()[0];
+    size_t payloadSize = PayloadCase.TI.getSize();
+    if (getSize() <= payloadSize) {
+      return BitMask::zeroMask(getSize());
+    }
+    size_t tagSize = getSize() - payloadSize;
+    auto mask = BitMask::oneMask(getSize());
+    mask.keepOnlyMostSignificantBits(tagSize * 8); // Clear payload bits
+    auto tagMaskUsedBits = BitMask(getSize(), maskForCount(getNumCases()));
+    mask.andNotMask(tagMaskUsedBits, payloadSize); // Clear used tag bits
+    return mask;
   }
 
   // Think of a single-payload enum as being encoded in "pages".
@@ -1973,6 +1987,15 @@ public:
     default: Kind = EnumKind::MultiPayloadEnum; break;
     }
 
+    // Sanity:  Ignore any enum that claims to have a size more than 1MiB
+    // This avoids allocating lots of memory for spare bit mask calculations
+    // when clients try to interpret random chunks of memory as type descriptions.
+    if (Size > (1024ULL * 1024)) {
+      unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+      return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
+	Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
+    }
+
     if (Cases.size() == 1) {
       if (EffectivePayloadCases == 0) {
         // Zero-sized enum with only one empty case
@@ -2058,11 +2081,10 @@ public:
     //
 
     // Do we have a fixed layout?
-    // TODO: Test whether a missing FixedDescriptor is actually relevant.
     auto FixedDescriptor = TC.getBuilder().getBuiltinTypeDescriptor(TR);
     if (!FixedDescriptor || GenericPayloadCases > 0) {
       // This is a "dynamic multi-payload enum".  For example,
-      // this occurs with:
+      // this occurs with generics such as:
       // ```
       // class ClassWithEnum<T> {
       //   enum E {
@@ -2072,6 +2094,12 @@ public:
       //   var e: E?
       // }
       // ```
+      // and when we have a resilient inner enum, such as:
+      // ```
+      // enum E2 {
+      //   case y(E1_resilient)
+      //   case z(Int)
+      // }
       auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
                                         EffectivePayloadCases);
       Size += tagCounts.numTagBytes;
@@ -2103,7 +2131,6 @@ public:
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
     if (Stride == 0)
       Stride = 1;
-    auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
     // Compute the spare bit mask and determine if we have any address-only fields
     auto localSpareBitMask = BitMask::oneMask(Size);
@@ -2115,44 +2142,11 @@ public:
       }
     }
 
-    // See if we have MPE bit mask information from the compiler...
-    // TODO: drop this?
-
-    // Uncomment the following line to dump the MPE section every time we come through here...
-    //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
-
-    auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumDescriptor(TR);
-    if (MPEDescriptor && MPEDescriptor->usesPayloadSpareBits()) {
-      // We found compiler-provided spare bit data...
-      auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
-      auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
-      auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
-      BitMask compilerSpareBitMask(PayloadSize, SpareBitMask,
-                            PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
-      
-      if (compilerSpareBitMask.isZero() || hasAddrOnly) {
-        // If there are no spare bits, use the "simple" tag-only implementation.
-        return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
-          Size, Alignment, Stride, NumExtraInhabitants,
-          BitwiseTakable, Cases, EffectivePayloadCases);
-      }
-
-#if 0  // TODO: This should be !defined(NDEBUG)
-      // Verify that compiler provided and local spare bit info agree...
-      // TODO: If we could make this actually work, then we wouldn't need the
-      // bulky compiler-provided info, would we?
-      assert(localSpareBitMask == compilerSpareBitMask);
-#endif
-
-      // Use compiler-provided spare bit information
-      return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, compilerSpareBitMask,
-        EffectivePayloadCases);
-    }
-
     if (localSpareBitMask.isZero() || hasAddrOnly) {
-      // Simple case that does not use spare bits
+      // Simple tag-only layout does not use spare bits.
+      // Either:
+      // * There are no spare bits, or
+      // * We can't copy it to strip spare bits.
       return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
         BitwiseTakable, Cases, EffectivePayloadCases);
