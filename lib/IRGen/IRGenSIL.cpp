@@ -1350,6 +1350,9 @@ public:
   void visitEndLifetimeInst(EndLifetimeInst *i) {
     llvm_unreachable("unimplemented");
   }
+  void visitExtendLifetimeInst(ExtendLifetimeInst *i) {
+    llvm_unreachable("should not exist after ownership lowering!?");
+  }
   void
   visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *i) {
     llvm_unreachable("unimplemented");

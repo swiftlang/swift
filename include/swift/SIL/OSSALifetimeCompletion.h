@@ -120,10 +120,17 @@ public:
     DoNotAllowLeaks = false,
   };
 
-  static void visitUnreachableLifetimeEnds(
+  enum class LifetimeEnd : uint8_t {
+    /// The lifetime ends at the boundary.
+    Boundary,
+    /// The lifetime "ends" in a loop.
+    Loop,
+  };
+
+  static void visitAvailabilityBoundary(
       SILValue value, AllowLeaks_t allowLeaks,
       const SSAPrunedLiveness &liveness,
-      llvm::function_ref<void(SILInstruction *)> visit);
+      llvm::function_ref<void(SILInstruction *, LifetimeEnd end)> visit);
 
 protected:
   bool analyzeAndUpdateLifetime(SILValue value, Boundary boundary);
