@@ -3090,7 +3090,8 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
 
 std::optional<ActorIsolation>
 ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
-                                        ValueDecl *witness) {
+                                        ValueDecl *witness,
+                                        bool &usesPreconcurrency) {
 
   // Determine the isolation of the requirement itself.
   auto requirementIsolation = getActorIsolation(requirement);
@@ -3136,9 +3137,16 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     return std::nullopt;
 
   case ActorReferenceResult::ExitsActorToNonisolated:
-    diagnoseNonSendableTypesInReference(
-        /*base=*/nullptr, getDeclRefInContext(witness),
-        DC, loc, SendableCheckReason::Conformance);
+    if (!isPreconcurrency) {
+      diagnoseNonSendableTypesInReference(
+          /*base=*/nullptr, getDeclRefInContext(witness),
+          DC, loc, SendableCheckReason::Conformance);
+    } else {
+      // We depended on @preconcurrency since we were exiting an isolation
+      // domain.
+      usesPreconcurrency = true;
+    }
+
     return std::nullopt;
   case ActorReferenceResult::EntersActor:
     // Handled below.
@@ -3220,19 +3228,24 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         witness->getAttrs().hasAttribute<NonisolatedAttr>())
       return std::nullopt;
 
-    // Check that the results of the witnessing method are sendable
-    diagnoseNonSendableTypesInReference(
-        /*base=*/nullptr, getDeclRefInContext(witness),
-        DC, loc, SendableCheckReason::Conformance,
-        getActorIsolation(witness), FunctionCheckKind::Results);
-
-    // If this requirement is a function, check that its parameters are Sendable as well
-    if (isa<AbstractFunctionDecl>(requirement)) {
+    if (!isPreconcurrency) {
+      // Check that the results of the witnessing method are sendable
       diagnoseNonSendableTypesInReference(
-          /*base=*/nullptr, getDeclRefInContext(requirement),
-          requirement->getInnermostDeclContext(), requirement->getLoc(),
-          SendableCheckReason::Conformance, getActorIsolation(witness),
-          FunctionCheckKind::Params, loc);
+          /*base=*/nullptr, getDeclRefInContext(witness),
+          DC, loc, SendableCheckReason::Conformance,
+          getActorIsolation(witness), FunctionCheckKind::Results);
+
+      // If this requirement is a function, check that its parameters are Sendable as well
+      if (isa<AbstractFunctionDecl>(requirement)) {
+        diagnoseNonSendableTypesInReference(
+            /*base=*/nullptr, getDeclRefInContext(requirement),
+            requirement->getInnermostDeclContext(), requirement->getLoc(),
+            SendableCheckReason::Conformance, getActorIsolation(witness),
+            FunctionCheckKind::Params, loc);
+      }
+    } else {
+      // We depended on @preconcurrency to suppress Sendable checking.
+      usesPreconcurrency = true;
     }
 
     // If the witness is accessible across actors, we don't need to consider it
@@ -4955,7 +4968,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 }
 
 void ConformanceChecker::resolveValueWitnesses() {
-  bool usesPreconcurrencyConformance = false;
+  bool usesPreconcurrency = false;
 
   for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
@@ -4974,16 +4987,8 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       // Check actor isolation. If we need to enter into the actor's
       // isolation within the witness thunk, record that.
-      if (auto enteringIsolation = checkActorIsolation(requirement, witness)) {
-        // Only @preconcurrency conformances allow entering isolation
-        // when neither requirement nor witness are async by adding a
-        // runtime precondition that witness is always called on the
-        // expected executor.
-        if (Conformance->isPreconcurrency()) {
-          usesPreconcurrencyConformance =
-              !isAsyncDecl(requirement) && !isAsyncDecl(witness);
-        }
-
+      if (auto enteringIsolation = checkActorIsolation(requirement, witness,
+                                                       usesPreconcurrency)) {
         Conformance->overrideWitness(
             requirement,
             Conformance->getWitnessUncached(requirement)
@@ -5134,7 +5139,7 @@ void ConformanceChecker::resolveValueWitnesses() {
     }
   }
 
-  if (Conformance->isPreconcurrency() && !usesPreconcurrencyConformance) {
+  if (Conformance->isPreconcurrency() && !usesPreconcurrency) {
     auto diag = DC->getASTContext().Diags.diagnose(
         Conformance->getLoc(), diag::preconcurrency_conformance_not_used,
         Proto->getDeclaredInterfaceType());
