@@ -1610,13 +1610,13 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
   ManagedValue taskExecutorConsuming = [&] {
     if (options & CreateTaskOptions::OptionalEverything) {
       return nextArg().getAsSingleValue(SGF);
-    } else if (options & CreateTaskOptions::TaskExecutorConsuming) { // TODO: do we even need this branch, we're not using the flag
+    } else if (options & CreateTaskOptions::TaskExecutorConsuming) {
       return emitOptionalSome(nextArg());
     } else {
-      auto theTaskExecutorType =
-          ctx.getProtocol(KnownProtocolKind::TaskExecutor)
-              ->getDeclaredInterfaceType();
-      return emitOptionalNone(theTaskExecutorType->getCanonicalType());
+      auto theTaskExecutorProto = ctx.getProtocol(KnownProtocolKind::TaskExecutor);
+      assert(theTaskExecutorProto && "Could not find TaskExecutor");
+      return emitOptionalNone(theTaskExecutorProto->getDeclaredExistentialType()
+                                  ->getCanonicalType());
     }
   }();
 

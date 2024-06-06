@@ -2352,7 +2352,7 @@ public:
                   "third argument of createAsyncTask");
       requireType(arguments[3]->getType(), _object(_optional(_executor)),
                   "fourth argument of createAsyncTask");
-      requireType(arguments[4]->getType(), _object(_optional(_taskExecutor)),
+      requireType(arguments[4]->getType(), _object(_optional(_existential(_taskExecutor))),
                   "fifth argument of createAsyncTask");
       auto fnType = requireObjectType(SILFunctionType, arguments[5],
                                       "result of createAsyncTask");
