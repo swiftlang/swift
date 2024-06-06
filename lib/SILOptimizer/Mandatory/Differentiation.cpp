@@ -906,6 +906,15 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
       traceMessage.c_str(), witness->getOriginalFunction());
 
   assert(witness->isDefinition());
+  SILFunction *orig = witness->getOriginalFunction();
+
+  // We can generate empty JVP / VJP for functions available externally. These
+  // functions have the same linkage as the original ones sans `external`
+  // flag. Important exception here hidden_external functions as they are
+  // serializable but corresponding hidden ones would be not and the SIL
+  // verifier will fail. Patch `serializeFunctions` for this case.
+  if (orig->getLinkage() == SILLinkage::HiddenExternal)
+    serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.
   if (!witness->getJVP()) {
@@ -914,9 +923,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with unsupported control flow.
     if (context.getASTContext()
             .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
-        (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
-         diagnoseUnsupportedControlFlow(
-             context, witness->getOriginalFunction(), invoker)))
+        (diagnoseNoReturn(context, orig, invoker) ||
+         diagnoseUnsupportedControlFlow(context, orig, invoker)))
       return true;
 
     // Create empty JVP.
@@ -933,10 +941,10 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
-      if (witness->getOriginalFunction()->size() > 1) {
-        context.emitNondifferentiabilityError(
-            witness->getOriginalFunction()->getLocation().getSourceLoc(),
-            invoker, diag::autodiff_jvp_control_flow_not_supported);
+      if (orig->size() > 1) {
+        context.emitNondifferentiabilityError(orig->getLocation().getSourceLoc(),
+                                              invoker,
+                                              diag::autodiff_jvp_control_flow_not_supported);
         return true;
       }
       // Emit JVP function.
@@ -950,7 +958,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
                      "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
                  << "Generated empty JVP for "
-                 << witness->getOriginalFunction()->getName() << ":\n"
+                 << orig->getName() << ":\n"
                  << *jvp);
     }
   }
@@ -960,9 +968,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // Diagnose:
     // - Functions with no return.
     // - Functions with unsupported control flow.
-    if (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
-        diagnoseUnsupportedControlFlow(
-            context, witness->getOriginalFunction(), invoker))
+    if (diagnoseNoReturn(context, orig, invoker) ||
+        diagnoseUnsupportedControlFlow(context, orig, invoker))
       return true;
 
     // Create empty VJP.
