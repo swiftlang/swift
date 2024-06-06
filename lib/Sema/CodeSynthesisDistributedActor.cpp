@@ -692,7 +692,8 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
 
-    paramDecl->setImplicit(true);
+    paramDecl->setImplicit();
+    paramDecl->setSending();
     paramDecl->setSpecifier(funcParam->getSpecifier());
     paramDecl->setInterfaceType(funcParam->getInterfaceType());
 
