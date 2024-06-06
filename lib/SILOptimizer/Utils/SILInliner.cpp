@@ -858,6 +858,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::ExtendLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:

@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILValue.h"
+#include <memory>
 #define DEBUG_TYPE "sil-verifier"
 
 #include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTSynthesis.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -35,6 +37,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -864,7 +867,15 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
-  std::unique_ptr<DeadEndBlocks> DEBlocks;
+  /// TODO: LifetimeCompletion: Remove.
+  std::shared_ptr<DeadEndBlocks> DEBlocks;
+
+  /// Blocks without function exiting paths.
+  ///
+  /// Used to verify extend_lifetime instructions.
+  ///
+  /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
+  std::shared_ptr<DeadEndBlocks> deadEndBlocks;
 
   LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
 
@@ -1060,6 +1071,16 @@ public:
     auto dc = F.getDeclContext();
     if (!dc) dc = F.getParentModule();
     return SynthesisContext(F.getASTContext(), dc);
+  }
+
+  DeadEndBlocks &getDeadEndBlocks() {
+    if (DEBlocks) {
+      deadEndBlocks = DEBlocks;
+    } else {
+      deadEndBlocks =
+          std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+    }
+    return *deadEndBlocks;
   }
 
   template <class S>
@@ -2653,6 +2674,54 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "end_lifetime is only valid in functions with qualified "
             "ownership");
+  }
+
+  void checkExtendLifetimeInst(ExtendLifetimeInst *I) {
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial");
+    require(F.hasOwnership(),
+            "extend_lifetime is only valid in functions with qualified "
+            "ownership");
+    require(getDeadEndBlocks().isDeadEnd(I->getParent()),
+            "extend_lifetime in non-dead-end!?");
+    auto value = I->getOperand();
+    LinearLiveness linearLiveness(value,
+                                  LinearLiveness::DoNotIncludeExtensions);
+    linearLiveness.compute();
+    auto &liveness = linearLiveness.getLiveness();
+    require(!liveness.isWithinBoundary(I),
+            "extend_lifetime use within unextended linear liveness boundary!?");
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    BasicBlockSet boundaryEdgeTargets(value->getFunction());
+    for (auto *edge : boundary.boundaryEdges) {
+      boundaryEdgeTargets.insert(edge);
+    }
+    BasicBlockSet deadDefBlocks(value->getFunction());
+    for (auto *def : boundary.deadDefs) {
+      deadDefBlocks.insert(def->getParentBlock());
+    }
+    BasicBlockSet lastUserBlocks(value->getFunction());
+    for (auto *user : boundary.lastUsers) {
+      lastUserBlocks.insert(user->getParent());
+    }
+    BasicBlockWorklist worklist(value->getFunction());
+    worklist.push(I->getParent());
+    while (auto *block = worklist.pop()) {
+      if (boundaryEdgeTargets.contains(block)) {
+        // The backwards walk reached a boundary edge; this is the correct
+        // behavior being checked for.
+        continue;
+      }
+      require(!lastUserBlocks.contains(block),
+              "extend_lifetime after last user block");
+      require(liveness.getBlockLiveness(block) !=
+                  PrunedLiveBlocks::IsLive::LiveOut,
+              "extend_lifetime in a live-out block");
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predecessor);
+      }
+    }
   }
 
   void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
@@ -7149,7 +7218,7 @@ public:
 
   void verify(bool isCompleteOSSA) {
     if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
-      DEBlocks = std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+      DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
