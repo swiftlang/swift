@@ -890,8 +890,8 @@ ClangTypeConverter::getClangTemplateArguments(
     auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
     // We must have found a defaulted parameter at the end of the list.
     if (templateParam->getIndex() >= genericArgs.size()) {
-      templateArgs.push_back(
-          clang::TemplateArgument(templateParam->getDefaultArgument()));
+      templateArgs.push_back(clang::TemplateArgument(
+          templateParam->getDefaultArgument().getArgument()));
       continue;
     }
 
