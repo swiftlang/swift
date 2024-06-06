@@ -666,7 +666,7 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
 
 static bool parseDeclSILOptional(
     bool *isTransparent, SerializedKind_t *serializedKind, bool *isCanonical,
-    bool *hasOwnershipSSA, bool *hasResultDependsOnSelf, IsThunk_t *isThunk,
+    bool *hasOwnershipSSA, IsThunk_t *isThunk,
     IsDynamicallyReplaceable_t *isDynamic, IsDistributed_t *isDistributed,
     IsRuntimeAccessible_t *isRuntimeAccessible,
     ForceEnableLexicalLifetimes_t *forceEnableLexicalLifetimes,
@@ -719,9 +719,6 @@ static bool parseDeclSILOptional(
       *isCanonical = true;
     else if (hasOwnershipSSA && SP.P.Tok.getText() == "ossa")
       *hasOwnershipSSA = true;
-    else if (hasResultDependsOnSelf &&
-             SP.P.Tok.getText() == "_resultDependsOnSelf")
-      *hasResultDependsOnSelf = true;
     else if (needStackProtection && SP.P.Tok.getText() == "stack_protection")
       *needStackProtection = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
@@ -6983,11 +6980,9 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         bool foundEagerMove = false;
         bool foundReborrow = false;
         bool hasPointerEscape = false;
-        bool hasResultDependsOn = false;
-        while (
-            auto attributeName = parseOptionalAttribute(
-                {"noImplicitCopy", "_lexical", "_eagerMove", "closureCapture",
-                 "reborrow", "pointer_escape", "_resultDependsOn"})) {
+        while (auto attributeName = parseOptionalAttribute(
+                   {"noImplicitCopy", "_lexical", "_eagerMove",
+                    "closureCapture", "reborrow", "pointer_escape"})) {
           if (*attributeName == "noImplicitCopy")
             foundNoImplicitCopy = true;
           else if (*attributeName == "_lexical")
@@ -7000,8 +6995,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             foundReborrow = true;
           else if (*attributeName == "pointer_escape")
             hasPointerEscape = true;
-          else if (*attributeName == "_resultDependsOn")
-            hasResultDependsOn = true;
           else {
             llvm_unreachable("Unexpected attribute!");
           }
@@ -7034,7 +7027,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           fArg->setLifetimeAnnotation(lifetime);
           fArg->setReborrow(foundReborrow);
           fArg->setHasPointerEscape(hasPointerEscape);
-          fArg->setHasResultDependsOn(hasResultDependsOn);
           Arg = fArg;
 
           // Today, we construct the ownership kind straight from the function
@@ -7118,7 +7110,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   bool hasUnsafeNonEscapableResult = false;
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
-  bool hasResultDependsOnSelf = false;
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
@@ -7141,16 +7132,15 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &hasResultDependsOnSelf, &isThunk, &isDynamic, &isDistributed,
-          &isRuntimeAccessible, &forceEnableLexicalLifetimes,
-          &useStackForPackMetadata, &hasUnsafeNonEscapableResult,
-          &isExactSelfClass, &DynamicallyReplacedFunction,
-          &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
-          &inlineStrategy, &optimizationMode, &perfConstr,
-          &isPerformanceConstraint, &markedAsUsed, &section, nullptr,
-          &isWeakImported, &needStackProtection, &availability,
-          &isWithoutActuallyEscapingThunk, &Semantics, &SpecAttrs, &ClangDecl,
-          &MRK, FunctionState, M) ||
+          &isThunk, &isDynamic, &isDistributed, &isRuntimeAccessible,
+          &forceEnableLexicalLifetimes, &useStackForPackMetadata,
+          &hasUnsafeNonEscapableResult, &isExactSelfClass,
+          &DynamicallyReplacedFunction, &AdHocWitnessFunction,
+          &objCReplacementFor, &specialPurpose, &inlineStrategy,
+          &optimizationMode, &perfConstr, &isPerformanceConstraint,
+          &markedAsUsed, &section, nullptr, &isWeakImported,
+          &needStackProtection, &availability, &isWithoutActuallyEscapingThunk,
+          &Semantics, &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_function_name) ||
@@ -7178,7 +7168,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setWasDeserializedCanonical(isCanonical);
     if (!hasOwnershipSSA)
       FunctionState.F->setOwnershipEliminated();
-    FunctionState.F->setHasResultDependsOnSelf(hasResultDependsOnSelf);
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
     FunctionState.F->setIsDistributed(isDistributed);
@@ -7398,7 +7387,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
 
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
-      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
+      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -7456,7 +7445,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7526,7 +7515,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, VTableState, M))
     return true;
 
 
@@ -7644,12 +7633,12 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   SILParser moveOnlyDeinitTableState(parser);
 
   SerializedKind_t Serialized = IsNotSerialized;
-  if (parseDeclSILOptional(
-          nullptr, &Serialized, nullptr, nullptr, nullptr, nullptr, nullptr,
-          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-          nullptr, nullptr, nullptr, nullptr, moveOnlyDeinitTableState, M))
+  if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8136,7 +8125,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

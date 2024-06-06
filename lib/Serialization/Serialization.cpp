@@ -5583,8 +5583,7 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn(),
-          paramFlags.isSending());
+          paramFlags.isCompileTimeConst(), paramFlags.isSending());
     }
   }
 

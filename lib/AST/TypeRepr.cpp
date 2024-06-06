@@ -860,9 +860,6 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");
     break;
-  case TypeReprKind::ResultDependsOn:
-    Printer.printKeyword("_resultDependsOn", Opts, " ");
-    break;
   }
   printTypeRepr(Base, Printer, Opts);
 }

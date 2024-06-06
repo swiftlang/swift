@@ -128,9 +128,7 @@ bool Parser::startsParameterName(bool isClosure) {
          !Tok.isContextualKeyword("transferring")) &&
         (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
          !Tok.isContextualKeyword("sending")) &&
-        !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
-        (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
-         !Tok.isContextualKeyword("_resultDependsOn")))
+        !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat))
       return true;
 
     // Parameter specifiers can be an argument label, but they're also
@@ -612,12 +610,6 @@ mapParsedParameters(Parser &parser,
         param->setCompileTimeConst();
       }
 
-      if (paramInfo.ResultDependsOnLoc.isValid()) {
-        type = new (parser.Context)
-            ResultDependsOnTypeRepr(type, paramInfo.ResultDependsOnLoc);
-        param->setResultDependsOn();
-      }
-
       if (paramInfo.TransferringLoc.isValid()) {
         type = new (parser.Context)
             TransferringTypeRepr(type, paramInfo.TransferringLoc);
@@ -654,8 +646,6 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             else if (isa<CompileTimeConstTypeRepr>(STR))
               param->setCompileTimeConst(true);
-            else if (isa<ResultDependsOnTypeRepr>(STR))
-              param->setResultDependsOn(true);
             else if (isa<TransferringTypeRepr>(STR))
               param->setSending(true);
             else if (isa<SendingTypeRepr>(STR))

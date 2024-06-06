@@ -205,16 +205,8 @@ public:
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitBorrowingAttr(BorrowingAttr *attr) { visitMutationAttr(attr); }
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
-  void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) { visitMutationAttr(attr); }
-  void visitResultDependsOnSelfAttr(ResultDependsOnSelfAttr *attr) {
-    FuncDecl *FD = cast<FuncDecl>(D);
-    if (FD->getDescriptiveKind() != DescriptiveDeclKind::Method) {
-      diagnoseAndRemoveAttr(attr, diag::attr_methods_only, attr);
-    }
-    if (FD->getResultTypeRepr() == nullptr) {
-      diagnoseAndRemoveAttr(attr, diag::result_depends_on_no_result,
-                            attr->getAttrName());
-    }
+  void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) {
+    visitMutationAttr(attr);
   }
   void visitDynamicAttr(DynamicAttr *attr);
 

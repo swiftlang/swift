@@ -464,8 +464,6 @@ private:
   /// lifetime-dependence on an argument.
   unsigned HasUnsafeNonEscapableResult : 1;
 
-  unsigned HasResultDependsOnSelf : 1;
-
   /// True, if this function or a caller (transitively) has a performance
   /// constraint.
   /// If true, optimizations must not introduce new runtime calls or metadata
@@ -758,11 +756,6 @@ public:
     HasUnsafeNonEscapableResult = value;
   }
 
-  bool hasResultDependsOnSelf() const { return HasResultDependsOnSelf; }
-
-  void setHasResultDependsOnSelf(bool flag = true) {
-    HasResultDependsOnSelf = flag;
-  }
   /// Returns true if this is a reabstraction thunk of escaping function type
   /// whose single argument is a potentially non-escaping closure. i.e. the
   /// thunks' function argument may itself have @inout_aliasable parameters.

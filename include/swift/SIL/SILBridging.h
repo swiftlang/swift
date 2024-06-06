@@ -622,7 +622,6 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isGeneric() const;
   BRIDGED_INLINE bool hasSemanticsAttr(BridgedStringRef attrName) const;
   BRIDGED_INLINE bool hasUnsafeNonEscapableResult() const;
-  BRIDGED_INLINE bool hasResultDependsOnSelf() const;
   bool mayBindDynamicSelf() const;
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
@@ -1026,7 +1025,6 @@ struct BridgedArgument {
   BRIDGED_INLINE swift::SILArgument * _Nonnull getArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
   BRIDGED_INLINE bool isReborrow() const;
-  BRIDGED_INLINE bool hasResultDependsOn() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl getVarDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;
 };
