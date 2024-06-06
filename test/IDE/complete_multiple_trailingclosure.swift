@@ -99,6 +99,17 @@ func testOptionalInit() {
 // INIT_OPTIONAL_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 }
 
+func testOptionalInitDot() {
+  // When there's a dot, we don't complete for the closure argument.
+  TestStruct2 {
+    2
+  }
+  .#^INIT_OPTIONAL_DOT^#
+  // INIT_OPTIONAL_DOT:     Begin completions, 2 items
+  // INIT_OPTIONAL_DOT-DAG: Keyword[self]/CurrNominal:          self[#TestStruct2#]; name=self
+  // INIT_OPTIONAL_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   testStructMethod()[#Void#]; name=testStructMethod()
+}
+
 struct TestStruct3 {
   init(fn1: () -> Int, fn2: () -> String, fn3: () -> String) {}
   func testStructMethod() {}
