@@ -2913,6 +2913,18 @@ void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
+/// If an extension adds a conformance for an invertible protocol, then we
+/// should not print inverses for its generic signature, because no conditional
+/// requirements are inferred by default for such an extension.
+static bool isExtensionAddingInvertibleConformance(const ExtensionDecl *ext) {
+  auto conformances = ext->getLocalConformances();
+  for (auto *conf : conformances) {
+    if (conf->getProtocol()->getInvertibleProtocolKind()) {
+      return true;
+    }
+  }
+  return false;
+}
 
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
@@ -3037,9 +3049,21 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       auto baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
+
+      auto genSigFlags = defaultGenericRequirementFlags()
+                       | IncludeOuterInverses;
+
+      // Disable printing inverses if the extension is adding a conformance
+      // for an invertible protocol itself, as we do not infer any requirements
+      // in such an extension. We need to print the whole signature:
+      //     extension S: Copyable where T: Copyable
+      if (isExtensionAddingInvertibleConformance(decl)) {
+        genSigFlags &= ~PrintInverseRequirements;
+        genSigFlags &= ~IncludeOuterInverses;
+      }
+
       printGenericSignature(genericSig,
-                            defaultGenericRequirementFlags()
-                              | IncludeOuterInverses,
+                            genSigFlags,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);

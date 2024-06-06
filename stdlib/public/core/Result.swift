@@ -21,7 +21,7 @@ public enum Result<Success: ~Copyable, Failure: Error> {
   case failure(Failure)
 }
 
-extension Result: Copyable /* where Success: Copyable */ {}
+extension Result: Copyable where Success: Copyable {}
 
 extension Result: Sendable where Success: Sendable & ~Copyable {}
 
