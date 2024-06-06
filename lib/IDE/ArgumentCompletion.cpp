@@ -50,7 +50,8 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     const AnyFunctionType::Param *TypeParam = &ParamsToPass[Idx];
     bool Required = !Res.DeclParamIsOptional[Idx];
 
-    if (Res.FirstTrailingClosureIndex && Idx > *Res.FirstTrailingClosureIndex &&
+    if (Res.FirstTrailingClosureIndex &&
+        Res.ArgIdx > *Res.FirstTrailingClosureIndex &&
         !TypeParam->getPlainType()
              ->lookThroughAllOptionalTypes()
              ->is<AnyFunctionType>()) {
