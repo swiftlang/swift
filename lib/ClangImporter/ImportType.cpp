@@ -3429,7 +3429,9 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   // FIXME: Duplicated from importMethodParamsAndReturnType.
   DeclContext *origDC = importDeclContextOf(property,
                                             property->getDeclContext());
-  assert(origDC);
+  if (!origDC)
+    return {Type(), false};
+
   auto fieldType = isGetter ? clangDecl->getReturnType()
                             : clangDecl->getParamDecl(0)->getType();
 
