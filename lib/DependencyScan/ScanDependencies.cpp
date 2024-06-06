@@ -714,6 +714,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(swiftTextualDeps->textualModuleDetails.extraPCMArgs),
             create_clone(swiftTextualDeps->contextHash.c_str()),
             swiftTextualDeps->isFramework,
+            swiftTextualDeps->isStatic,
             create_clone(swiftTextualDeps->textualModuleDetails
                              .CASFileSystemRootID.c_str()),
             create_clone(swiftTextualDeps->textualModuleDetails
@@ -746,6 +747,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(
                 instance.getInvocation().getModuleScanningHash().c_str()),
             /*isFramework*/ false,
+            /*isStatic*/ false,
             /*CASFS*/
             create_clone(swiftSourceDeps->textualModuleDetails
                              .CASFileSystemRootID.c_str()),
@@ -774,6 +776,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(swiftBinaryDeps->headerModuleDependencies),
             create_set(swiftBinaryDeps->headerSourceFiles),
             swiftBinaryDeps->isFramework,
+            swiftBinaryDeps->isStatic,
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str())};
       } else {
         // Clang module details
@@ -804,6 +807,23 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     bridgeDependencyIDs(directDependencies, bridgedDependencyNames);
     moduleInfo->direct_dependencies = create_set(bridgedDependencyNames);
     moduleInfo->details = getModuleDetails();
+
+    // Create a link libraries set for this module
+    auto &linkLibraries = depInfo.getLinkLibraries();
+    swiftscan_link_library_set_t *linkLibrarySet =
+        new swiftscan_link_library_set_t;
+    linkLibrarySet->count = linkLibraries.size();
+    linkLibrarySet->link_libraries =
+        new swiftscan_link_library_info_t[linkLibrarySet->count];
+    for (size_t i = 0; i < linkLibraries.size(); ++i) {
+      const auto &ll = linkLibraries[i];
+      swiftscan_link_library_info_s *llInfo = new swiftscan_link_library_info_s;
+      llInfo->name = create_clone(ll.getName().str().c_str());
+      llInfo->isFramework = ll.getKind() == LibraryKind::Framework;
+      llInfo->forceLoad = ll.shouldForceLoad();
+      linkLibrarySet->link_libraries[i] = llInfo;
+    }
+    moduleInfo->link_libraries = linkLibrarySet;
   }
 
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
@@ -1406,10 +1426,46 @@ updateDependencyTracker(CompilerInstance &instance,
   }
 }
 
+static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
+                                         ModuleDependenciesCache &cache) {
+  auto langOpts = instance.getInvocation().getLangOptions();
+  auto irGenOpts = instance.getInvocation().getIRGenOptions();
+  auto mainModuleName = instance.getMainModule()->getNameStr();
+  auto mainModuleID = ModuleDependencyID{mainModuleName.str(),
+                                         ModuleDependencyKind::SwiftSource};
+  auto mainModuleDepInfo = cache.findKnownDependency(mainModuleID);
+
+  std::vector<LinkLibrary> linkLibraries;
+  auto addLinkLibrary = [&linkLibraries](const LinkLibrary &ll) {
+    linkLibraries.push_back(ll);
+  };
+
+  if (langOpts.EnableObjCInterop)
+    addLinkLibrary({"objc", LibraryKind::Library});
+
+  if (langOpts.EnableCXXInterop) {
+    auto OptionalCxxDep = cache.findDependency("Cxx");
+    auto OptionalCxxStdLibDep = cache.findDependency("CxxStdlib");
+    bool hasStaticCxx =
+        OptionalCxxDep.has_value() && OptionalCxxDep.value()->isStaticLibrary();
+    bool hasStaticCxxStdlib = OptionalCxxStdLibDep.has_value() &&
+                              OptionalCxxStdLibDep.value()->isStaticLibrary();
+    registerCxxInteropLibraries(langOpts.Target, mainModuleName, hasStaticCxx,
+                                hasStaticCxxStdlib, addLinkLibrary);
+  }
+
+  if (!irGenOpts.UseJIT && !langOpts.hasFeature(Feature::Embedded))
+    registerBackDeployLibraries(irGenOpts, addLinkLibrary);
+
+  mainModuleDepInfo.setLinkLibraries(linkLibraries);
+  cache.updateDependency(mainModuleID, mainModuleDepInfo);
+}
+
 llvm::ErrorOr<swiftscan_dependency_graph_t>
-swift::dependencies::performModuleScan(CompilerInstance &instance,
-                                       DependencyScanDiagnosticCollector *diagnosticCollector,
-                                       ModuleDependenciesCache &cache) {
+swift::dependencies::performModuleScan(
+    CompilerInstance &instance,
+    DependencyScanDiagnosticCollector *diagnosticCollector,
+    ModuleDependenciesCache &cache) {
   auto scanner = ModuleDependencyScanner(
       cache.getScanService(), instance.getInvocation(),
       instance.getSILOptions(), instance.getASTContext(),
@@ -1425,10 +1481,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
                                          ModuleDependencyKind::SwiftSource};
   // We may be re-using an instance of the cache which already contains
   // an entry for this module.
-  if (cache.findDependency(mainModuleName, ModuleDependencyKind::SwiftSource))
-    cache.updateDependency(
-        ModuleDependencyID{mainModuleName.str(), ModuleDependencyKind::SwiftSource},
-        std::move(*mainModuleDepInfo));
+  if (cache.findDependency(mainModuleID))
+    cache.updateDependency(mainModuleID, std::move(*mainModuleDepInfo));
   else
     cache.recordDependency(mainModuleName, std::move(*mainModuleDepInfo));
 
@@ -1451,7 +1505,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
   resolveDependencyCommandLineArguments(instance, cache,
                                         topologicallySortedModuleList);
-
+  resolveImplicitLinkLibraries(instance, cache);
   updateDependencyTracker(instance, cache, allModules);
   return generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                      topologicallySortedModuleList);
@@ -1542,8 +1596,8 @@ swift::dependencies::performBatchModuleScan(
                                       : ModuleDependencyKind::SwiftInterface};
         auto allDependencies = scanner.getModuleDependencies(moduleID, cache);
         batchScanResult.push_back(
-            generateFullDependencyGraph(instance, diagnosticCollector,
-                                        cache, allDependencies));
+            generateFullDependencyGraph(instance, diagnosticCollector, cache,
+                                        allDependencies));
         if (diagnosticCollector)
           diagnosticCollector->reset();
       });

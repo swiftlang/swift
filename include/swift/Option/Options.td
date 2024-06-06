@@ -1376,6 +1376,10 @@ def explain_module_dependency : Separate<["-"], "explain-module-dependency">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Emit remark/notes describing why compilation may depend on a module with a given name.">;
 
+def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
+
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Require inlinable code with no '@available' attribute to back-deploy "

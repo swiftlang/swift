@@ -225,11 +225,28 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         auto sourceFile = new (Ctx) SourceFile(
             *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
         moduleDecl->addAuxiliaryFile(*sourceFile);
-
         std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
+        std::vector<StringRef> compiledCandidatesRefs(compiledCandidates.begin(),
+                                                      compiledCandidates.end());
+
+        // If this interface specified '-autolink-force-load', add it to the
+        // set of linked libraries for this module.
+        std::vector<LinkLibrary> linkLibraries;
+        if (llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end()) {
+          std::string linkName = realModuleName.str().str();
+          auto linkNameArgIt = llvm::find(ArgsRefs, "-module-link-name");
+          if (linkNameArgIt != ArgsRefs.end())
+            linkName = *(linkNameArgIt+1);
+          linkLibraries.push_back({linkName,
+                                   isFramework ? LibraryKind::Framework : LibraryKind::Library,
+                                   true});
+        }
+        bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
+
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-            outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs,
-            PCMArgs, Hash, isFramework, {}, /*module-cache-key*/ "");
+            outputPathBase.str().str(), InPath, compiledCandidatesRefs,
+            ArgsRefs, linkLibraries, PCMArgs, Hash, isFramework, isStatic, {},
+            /*module-cache-key*/ "");
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;

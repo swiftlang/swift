@@ -499,11 +499,21 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       optionalModuleImports.push_back(
           ScannerImportStatementInfo(optionalImportedModule.str()));
 
+  std::vector<LinkLibrary> linkLibraries;
+  {
+    linkLibraries.reserve(loadedModuleFile->getLinkLibraries().size());
+    llvm::copy(loadedModuleFile->getLinkLibraries(),
+               std::back_inserter(linkLibraries));
+    if (loadedModuleFile->isFramework())
+      linkLibraries.push_back(LinkLibrary(loadedModuleFile->getName(),
+                                          LibraryKind::Framework));
+  }
+
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
       modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
-      optionalModuleImports, importedHeader, isFramework,
-      /*module-cache-key*/ "");
+      optionalModuleImports, linkLibraries, importedHeader, isFramework,
+      loadedModuleFile->isStaticLibrary(), /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }

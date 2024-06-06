@@ -1583,7 +1583,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     }
   }
 
-  if (linkLib.shouldForceLoad()) {
+  if (!IRGen.Opts.DisableForceLoadSymbols && linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk = cast<llvm::Function>(
