@@ -9,6 +9,7 @@
 // RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_values_resilient | tee /dev/stderr | %FileCheck %s --dump-input=fail
 
 // REQUIRES: executable_test
+// REQUIRES: objc_interop, OS=macosx
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
