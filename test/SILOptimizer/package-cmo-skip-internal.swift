@@ -42,7 +42,7 @@ let z = usePub(PubKlass())
 
 /// Package CMO does not serialize this function since
 /// it references an internal symbol `baseVarInternal`.
-/// If it were [serialized_for_pkg], it would leak into
+/// If it were [serialized_for_package], it would leak into
 /// client and client won't be able to find the symbol
 /// `baseVarInternal` since its dispatch thunk was not
 /// generated in the first place (due to it being internal). 

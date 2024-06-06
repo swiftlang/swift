@@ -8161,6 +8161,9 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
     return false;
   }
 
+  if (wt->getConformingNominal()->getBaseIdentifier().str().contains("ToggleState"))
+    llvm::dbgs() << "\nIn parseSILWitnessTable: serialized kind: " << (int)isSerialized;
+
   if (!theConformance) {
     P.diagnose(P.Tok, diag::sil_witness_protocol_conformance_not_found);
     return true;

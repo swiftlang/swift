@@ -3036,10 +3036,9 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
     return true;
 
   // See if context is imported in a "regular" way, i.e. not with
-  // @_implementationOnly, `package import` or @_spiOnly.
+  // @_implementationOnly, or @_spiOnly.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::ImplementationOnly,
-    ModuleDecl::ImportFilterKind::PackageOnly,
     ModuleDecl::ImportFilterKind::SPIOnly
   };
   SmallVector<ImportedModule, 4> results;

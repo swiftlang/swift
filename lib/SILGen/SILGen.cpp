@@ -2184,7 +2184,6 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
     silMod->getSILLoader()->getAllForModule(silMod->getSwiftModule()->getName(),
                                             primary);
   }
-
   return silMod;
 }
 

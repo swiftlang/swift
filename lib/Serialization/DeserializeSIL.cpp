@@ -4053,6 +4053,10 @@ void SILDeserializer::readWitnessTableEntries(
       SILFunction *Func = nullptr;
       if (NameID != 0) {
         Func = getFuncForReference(MF->getIdentifierText(NameID));
+        if (Func && Func->getName().contains("ToggleState") && Func->getName().endswith("TW")) {
+          llvm::dbgs() << "\nREAD WT Entry: " << (int)Func->getSerializedKind() << "\n";
+          Func->dump();
+        }
       }
       if (Func || NameID == 0) {
         unsigned NextValueIndex = 0;

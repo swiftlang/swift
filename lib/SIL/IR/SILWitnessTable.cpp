@@ -108,7 +108,7 @@ SILWitnessTable::SILWitnessTable(
     ArrayRef<ConditionalConformance> conditionalConformances)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
       ConditionalConformances(), IsDeclaration(true),
-      SerializedKind(IsNotSerialized) {
+      SerializedKind(SerializedKind) {
   convertToDefinition(entries, conditionalConformances, SerializedKind);
 }
 
@@ -169,21 +169,15 @@ void SILWitnessTable::convertToDefinition(
 
 SerializedKind_t SILWitnessTable::conformanceSerializedKind(
                                                             const RootProtocolConformance *conformance) {
-  // Allow serializing conformance with package or public access level
-  // if package serialization is enabled.
-  auto optInPackage = conformance->getDeclContext()->getParentModule()->serializePackageEnabled();
-  auto accessLevelToCheck =
-  optInPackage ? AccessLevel::Package : AccessLevel::Public;
-
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-  if (normalConformance && normalConformance->isResilient() && !optInPackage)
+  if (normalConformance && normalConformance->isResilient())
     return IsNotSerialized;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToCheck)
+  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
     return IsNotSerialized;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  if (nominal->getEffectiveAccess() >= accessLevelToCheck)
+  if (nominal->getEffectiveAccess() >= AccessLevel::Public)
     return IsSerialized;
 
   return IsNotSerialized;
