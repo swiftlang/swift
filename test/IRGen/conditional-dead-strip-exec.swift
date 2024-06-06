@@ -5,11 +5,17 @@
 
 // RUN: %target-build-swift -Xfrontend -conditional-runtime-records %s -emit-ir -o %t/main.ll
 
-// RUN: %target-clang %t/main.ll -isysroot %sdk -L%swift-lib-dir/swift/%target-sdk-name -flto -o %t/main
-// RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// %target-clang %t/main.ll -isysroot %sdk -L%swift-lib-dir/swift/%target-sdk-name -flto=full -o %t/main-full-lto
+// %target-codesign %t/main-full-lto
+// %target-run %t/main-full-lto | %FileCheck %s
 
-// RUN: %llvm-nm --defined-only %t/main | %FileCheck %s --check-prefix=NM
+// %llvm-nm --defined-only %t/main-full-lto | %FileCheck %s --check-prefix=NM
+
+// RUN: %target-clang %t/main.ll -isysroot %sdk -L%swift-lib-dir/swift/%target-sdk-name -flto=thin -o %t/main-thin-lto
+// RUN: %target-codesign %t/main-thin-lto
+// RUN: %target-run %t/main-thin-lto | %FileCheck %s
+
+// RUN: %llvm-nm --defined-only %t/main-thin-lto | %FileCheck %s --check-prefix=NM
 
 // REQUIRES: executable_test
 
