@@ -3044,6 +3044,13 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
                                            SILValue baseAddress,
                                            SmallBitVector &bv,
                                            ConsumeInfo &consumes) {
+  if (!baseAddress->getUsersOfType<StoreBorrowInst>().empty()) {
+    // If there are _any_ store_borrow users, then all users of the address are
+    // store_borrows (and dealloc_stacks).  Nothing is stored, there's nothing
+    // to destroy.
+    return;
+  }
+
   // If we need all bits...
   if (bv.all()) {
     // And our next instruction is a destroy_addr on the base address, just
