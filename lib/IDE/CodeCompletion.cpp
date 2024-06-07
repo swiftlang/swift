@@ -1484,7 +1484,8 @@ void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
   // closure. In that case, also suggest labels for additional trailing
   // closures.
   if (auto AE = dyn_cast<ApplyExpr>(ParsedExpr)) {
-    if (AE->getArgs()->hasAnyTrailingClosures()) {
+    if (AE->getArgs()->hasAnyTrailingClosures() &&
+        Kind == CompletionKind::PostfixExpr) {
       ASTContext &Ctx = CurDeclContext->getASTContext();
 
       // Modify the call that has the code completion expression as an
