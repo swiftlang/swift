@@ -8,7 +8,7 @@ func f(isolatedTo actor: isolated (any Actor)?) async -> Int { 0 }
 actor A {
   let number: Int
 
-  // CHECK-LABEL: sil hidden [available 10.15] [ossa] @$s4test1ACACyYacfc : $@convention(method) @async (@sil_isolated @owned A) -> @owned A
+  // CHECK-LABEL: sil hidden{{.*}}[ossa] @$s4test1ACACyYacfc : $@convention(method) @async (@sil_isolated @owned A) -> @owned A
   init() async {
     // First use of #isolation.
     // CHECK: [[ISOLATION_1:%.*]] = builtin "flowSensitiveSelfIsolation"<A>
