@@ -8,7 +8,7 @@ func f(isolatedTo actor: isolated (any Actor)?) async -> Int { 0 }
 actor A {
   let number: Int
 
-  // CHECK-LABEL: sil hidden [available 10.15] @$s4test1ACACyYacfc : $@convention(method) @async (@sil_isolated @owned A) -> @owned A
+  // CHECK-LABEL: sil hidden{{.*}}@$s4test1ACACyYacfc : $@convention(method) @async (@sil_isolated @owned A) -> @owned A
   init() async {
     // First use of #isolation, which is replaced by 'nil'.
     // CHECK: [[ISOLATION_1:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
