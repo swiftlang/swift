@@ -1666,10 +1666,13 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     // supported.
     auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(Ctx);
     if (!deploymentAvailability.isContainedIn(Ctx.getSwift50Availability())) {
-      diagnose(attr->getLocation(),
+      auto diag = diagnose(attr->getLocation(),
                diag::attr_objc_implementation_raise_minimum_deployment_target,
                prettyPlatformString(targetPlatform(Ctx.LangOpts)),
                Ctx.getSwift50Availability().getOSVersion().getLowerEndpoint());
+      if (attr->isEarlyAdopter()) {
+        diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
+      }
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
