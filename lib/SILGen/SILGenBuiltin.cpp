@@ -1539,9 +1539,6 @@ enum class CreateTaskOptions {
 
   /// The builtin has a non-optional TaskExecutor argument.
   TaskExecutor = 0x8,
-
-  /// The builtin has a non-optional consuming TaskExecutor argument.
-  TaskExecutorConsuming = 0x10, // FIXME does this make sense....?
 };
 
 /// Emit SIL for the various createAsyncTask builtins.
@@ -1610,8 +1607,6 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
   ManagedValue taskExecutorConsuming = [&] {
     if (options & CreateTaskOptions::OptionalEverything) {
       return nextArg().getAsSingleValue(SGF);
-    } else if (options & CreateTaskOptions::TaskExecutorConsuming) {
-      return emitOptionalSome(nextArg());
     } else {
       auto theTaskExecutorProto = ctx.getProtocol(KnownProtocolKind::TaskExecutor);
       assert(theTaskExecutorProto && "Could not find TaskExecutor");
