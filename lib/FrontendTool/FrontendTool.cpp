@@ -1735,6 +1735,18 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
       createTargetMachine(opts, Instance.getASTContext());
 
   TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
+
+  if (Instance.getInvocation().getCASOptions().EnableCaching &&
+      opts.UseCASBackend)
+    TargetMachine->Options.MCOptions.ResultCallBack =
+        [&](const llvm::cas::CASID &ID) -> llvm::Error {
+      if (auto Err = Instance.getCASOutputBackend().storeMCCASObjectID(
+              OutputFilename, ID))
+        return Err;
+
+      return llvm::Error::success();
+    };
+
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
