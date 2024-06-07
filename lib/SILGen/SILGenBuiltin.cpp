@@ -1607,11 +1607,14 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
   ManagedValue taskExecutorConsuming = [&] {
     if (options & CreateTaskOptions::OptionalEverything) {
       return nextArg().getAsSingleValue(SGF);
-    } else {
-      auto theTaskExecutorProto = ctx.getProtocol(KnownProtocolKind::TaskExecutor);
-      assert(theTaskExecutorProto && "Could not find TaskExecutor");
+    } else if (auto theTaskExecutorProto = ctx.getProtocol(KnownProtocolKind::TaskExecutor)) {
       return emitOptionalNone(theTaskExecutorProto->getDeclaredExistentialType()
                                   ->getCanonicalType());
+    } else {
+      // This builtin executor type here is just a placeholder type for being
+      // able to pass 'nil' for it with SDKs which do not have the TaskExecutor
+      // type.
+      return emitOptionalNone(ctx.TheExecutorType);
     }
   }();
 

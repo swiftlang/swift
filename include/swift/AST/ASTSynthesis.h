@@ -78,8 +78,11 @@ inline Type synthesizeType(SynthesisContext &SC,
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
   case _taskExecutor:
-    return SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)
-      ->getDeclaredInterfaceType();
+    if (auto ty = SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)) {
+      return ty->getDeclaredInterfaceType();
+    } else {
+      return nullptr;
+    }
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();
