@@ -6743,6 +6743,38 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
+  // If we are in an actor initializer that is isolated to, the current context
+  // isolation flow-sensitive: before 'self' has been initialized, it will be
+  // nil. After 'self' has been initialized, it will be 'self'. Introduce a
+  // custom builtin that Definite Initialization will rewrite appropriately.
+  if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
+          SGF.F.getDeclRef().getDecl())) {
+    auto isolation = getActorIsolation(ctor);
+    if (ctor->isDesignatedInit() &&
+        isolation == ActorIsolation::ActorInstance &&
+        isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+      ASTContext &ctx = SGF.getASTContext();
+      auto builtinName = ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::FlowSensitiveSelfIsolation));
+      SILType resultTy = SGF.getLoweredType(E->getType());
+
+      auto injection = cast<InjectIntoOptionalExpr>(E->getActor());
+      auto erasure = cast<ErasureExpr>(injection->getSubExpr());
+      auto conformance = erasure->getConformances()[0];
+      SGF.SGM.useConformance(conformance);
+
+      auto origActorExpr = erasure->getSubExpr();
+      auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+      SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
+          actorProto, origActorExpr->getType(), conformance);
+      auto origActor = SGF.maybeEmitValueOfLocalVarDecl(
+          ctor->getImplicitSelfDecl(), AccessKind::Read).getValue();
+      auto call = SGF.B.createBuiltin(E, builtinName, resultTy, subs, origActor);
+      return RValue(SGF, E,
+                    ManagedValue::forForwardedRValue(SGF, call));
+    }
+  }
+
   return visit(E->getActor(), C);
 }
 
