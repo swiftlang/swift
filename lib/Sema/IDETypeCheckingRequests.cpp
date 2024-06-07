@@ -246,10 +246,14 @@ IsDeclApplicableRequest::evaluate(Evaluator &evaluator,
 bool
 TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                    TypeRelationCheckInput Owner) const {
-  std::optional<constraints::ConstraintKind> CKind;
+  using namespace constraints;
+  std::optional<ConstraintKind> CKind;
   switch (Owner.Relation) {
   case TypeRelation::ConvertTo:
-    CKind = constraints::ConstraintKind::Conversion;
+    CKind = ConstraintKind::Conversion;
+    break;
+  case TypeRelation::SubtypeOf:
+    CKind = ConstraintKind::Subtype;
     break;
   }
   assert(CKind.has_value());
