@@ -367,6 +367,43 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &SGF) {
     SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Active);
 }
 
+StoreBorrowInitialization::StoreBorrowInitialization(SILValue address)
+    : address(address) {
+  assert(isa<AllocStackInst>(address) ||
+         isa<MarkUnresolvedNonCopyableValueInst>(address) &&
+             "invalid destination for store_borrow initialization!?");
+}
+
+void StoreBorrowInitialization::copyOrInitValueInto(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                                    ManagedValue mv,
+                                                    bool isInit) {
+  auto value = mv.getValue();
+  auto &lowering = SGF.getTypeLowering(value->getType());
+  if (lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+    llvm::report_fatal_error(
+        "Attempting to store_borrow an address-only value!?");
+  }
+  if (value->getType().isAddress()) {
+    value = SGF.emitManagedLoadBorrow(loc, value).getValue();
+  }
+  if (!isInit) {
+    value = lowering.emitCopyValue(SGF.B, loc, value);
+  }
+  storeBorrow = SGF.emitManagedStoreBorrow(loc, value, address);
+}
+
+SILValue StoreBorrowInitialization::getAddress() const {
+  if (storeBorrow) {
+    return storeBorrow.getValue();
+  }
+  return address;
+}
+
+ManagedValue StoreBorrowInitialization::getManagedAddress() const {
+  return storeBorrow;
+}
+
 namespace {
 class ReleaseValueCleanup : public Cleanup {
   SILValue v;
