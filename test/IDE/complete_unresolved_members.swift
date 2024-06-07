@@ -158,6 +158,7 @@ class C4 {
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws(Error) -> ~Copyable) -> ~Copyable?#]; name=map(:)
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws(Error) -> ~Copyable?) -> ~Copyable?#];
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: take({#(self): &Optional<SomeEnum1>#})[#() -> Optional<SomeEnum1>#];
 
 // Exhaustive to make sure we don't include `init({#(some):` or `init({#nilLiteral:` entries
 // UNRESOLVED_3_OPTOPTOPT: Begin completions, 10 items

@@ -16,7 +16,6 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import Synchronization
 
 struct Hypoarray<Element: ~Copyable>: ~Copyable {
   private var _storage: UnsafeMutableBufferPointer<Element>
