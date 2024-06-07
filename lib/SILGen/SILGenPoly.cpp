@@ -1080,6 +1080,33 @@ class ParamInfo {
   IndirectSlot slot;
   ParameterConvention convention;
 
+  bool temporaryShouldBorrow(SILGenFunction &SGF, bool forceAllocation) {
+    if (slot.hasAddress() && !forceAllocation) {
+      // An address has already been allocated via some projection.  It is not
+      // currently supported to store_borrow to such projections.
+      return false;
+    }
+    auto &tl = getTypeLowering(SGF);
+    if (tl.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+      // In address-lowered mode, address-only types can't be loaded in the
+      // first place before being store_borrow'd.
+      return false;
+    }
+    if (convention != ParameterConvention::Indirect_In_Guaranteed) {
+      // Can only store_borrow into a temporary allocation for @in_guaranteed.
+      return false;
+    }
+    if (tl.isTrivial()) {
+      // Can't store_borrow a trivial type.
+      return false;
+    }
+    return true;
+  }
+
+  TypeLowering const &getTypeLowering(SILGenFunction &SGF) {
+    return SGF.getTypeLowering(getType());
+  }
+
 public:
   ParamInfo(IndirectSlot slot, ParameterConvention convention)
     : slot(slot), convention(convention) {}
@@ -1088,11 +1115,26 @@ public:
     return slot.allocate(SGF, loc);
   }
 
-  std::unique_ptr<TemporaryInitialization>
-  allocateForInitialization(SILGenFunction &SGF, SILLocation loc) const {
-    auto addr = slot.allocate(SGF, loc);
-    auto &addrTL = SGF.getTypeLowering(addr->getType());
-    return SGF.useBufferAsTemporary(addr, addrTL);
+  std::unique_ptr<AnyTemporaryInitialization>
+  allocateForInitialization(SILGenFunction &SGF, SILLocation loc,
+                            bool forceAllocation = false) {
+    auto &lowering = getTypeLowering(SGF);
+    SILValue address;
+    if (forceAllocation) {
+      address = SGF.emitTemporaryAllocation(loc, lowering.getLoweredType());
+    } else {
+      address = allocate(SGF, loc);
+    }
+    if (address->getType().isMoveOnly())
+      address = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, address,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    if (temporaryShouldBorrow(SGF, forceAllocation)) {
+      return std::make_unique<StoreBorrowInitialization>(address);
+    }
+    auto innerTemp = SGF.useBufferAsTemporary(address, lowering);
+    return innerTemp;
   }
 
   SILType getType() const {
@@ -1904,8 +1946,8 @@ private:
                                ManagedValue outerArg,
                                ParamInfo innerSlot) {
     auto innerResultTy = innerSlot.getType();
-    auto &innerTL = SGF.getTypeLowering(innerResultTy);
-    auto innerTemp = SGF.emitTemporary(Loc, innerTL);
+    auto innerTemp =
+        innerSlot.allocateForInitialization(SGF, Loc, /*forceAllocation=*/true);
     processSingleInto(innerOrigType, innerSubstType,
                       outerOrigType, outerSubstType,
                       outerArg, innerResultTy.getAddressType(),
@@ -2139,7 +2181,7 @@ private:
                                      outer, innerTy,
                                      SGFContext(&init));
     if (!innerArg.isInContext()) {
-      if (innerArg.isPlusOneOrTrivial(SGF)) {
+      if (innerArg.isPlusOneOrTrivial(SGF) || init.isBorrow()) {
         innerArg.forwardInto(SGF, Loc, &init);
       } else {
         innerArg.copyInto(SGF, Loc, &init);
