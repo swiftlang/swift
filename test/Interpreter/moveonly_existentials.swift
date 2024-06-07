@@ -7,15 +7,24 @@
 
 protocol Boopable: ~Copyable {
   func boop()
+  mutating func bonk()
 }
 
 struct S: ~Copyable, Boopable {
   func boop() { print("boop") }
+  mutating func bonk() { print("hmm") }
 }
 
-func check(_ b: borrowing any Boopable & ~Copyable) {
+func borrow(_ b: borrowing any Boopable & ~Copyable) {
   b.boop()
 }
 
+func mutate(_ b: inout any Boopable & ~Copyable) {
+  b.bonk()
+}
+
 // CHECK: boop
-check(S())
+// CHECK: hmm
+borrow(S())
+var s = S() as any Boopable & ~Copyable
+mutate(&s)
