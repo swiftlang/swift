@@ -557,7 +557,7 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
+        EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false),
