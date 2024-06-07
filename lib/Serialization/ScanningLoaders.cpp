@@ -311,7 +311,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
          "Expected PlaceholderSwiftModuleScanner as the first dependency "
          "scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, nullptr,
+    if (scanner->canImportModule(modulePath, SourceLoc(), nullptr,
                                  isTestableDependencyLookup)) {
 
       ModuleDependencyVector moduleDependnecies;

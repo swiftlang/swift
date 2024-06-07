@@ -3513,7 +3513,7 @@ ModuleDecl *ClangImporter::Implementation::tryLoadFoundationModule() {
 bool ClangImporter::Implementation::canImportFoundationModule() {
   ImportPath::Module::Builder builder(SwiftContext.Id_Foundation);
   auto modulePath = builder.get();
-  return SwiftContext.canImportModule(modulePath);
+  return SwiftContext.canImportModule(modulePath, SourceLoc());
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,

@@ -830,6 +830,9 @@ ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))
 
+WARNING(can_import_invalid_swiftmodule,none,
+        "canImport() evaluated to false due to invalid swiftmodule: %0", (StringRef))
+
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,

@@ -603,7 +603,8 @@ public:
       }
       ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
                                           Arg->getStartLoc());
-      return Ctx.canImportModule(builder.get(), version, underlyingModule);
+      return Ctx.canImportModule(builder.get(), E->getLoc(), version,
+                                 underlyingModule);
     } else if (KindName == "hasFeature") {
       auto featureName = getDeclRefStr(Arg);
       return Ctx.LangOpts.hasFeature(featureName);
