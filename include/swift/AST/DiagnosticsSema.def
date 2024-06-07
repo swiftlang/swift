@@ -7830,6 +7830,10 @@ ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
+ERROR(consume_expression_needed_for_cast,none,
+      "implicit conversion to %0 is consuming", (Type))
+NOTE(add_consume_to_silence,none,
+     "add 'consume' to make consumption explicit", ())
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(consume_expression_partial_copyable,none,
@@ -7912,13 +7916,6 @@ ERROR(referencebindings_binding_must_have_initial_value,none,
       "%0 bindings must have an initial value", (StringRef))
 ERROR(referencebindings_binding_must_be_to_lvalue,none,
       "%0 bindings must be bound to an lvalue", (StringRef))
-
-//------------------------------------------------------------------------------
-// MARK: resultDependsOn Errors
-//------------------------------------------------------------------------------
-
-ERROR(result_depends_on_no_result,none,
-      "Incorrect use of %0 with no result", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Pack Iteration Diagnostics

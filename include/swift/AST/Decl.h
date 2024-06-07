@@ -6616,8 +6616,6 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
-
-    HasResultDependsOn = 1 << 2,
   };
 
   llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
@@ -6655,9 +6653,6 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
-
-    /// Whether or not this paramater is '_resultDependsOn'
-    IsResultDependsOn = 1 << 3,
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
@@ -6958,18 +6953,6 @@ public:
     auto flags = ArgumentNameAndFlags.getInt();
     flags = value ? flags | ArgumentNameFlags::IsCompileTimeConst
                   : flags - ArgumentNameFlags::IsCompileTimeConst;
-    ArgumentNameAndFlags.setInt(flags);
-  }
-
-  bool hasResultDependsOn() const {
-    return ArgumentNameAndFlags.getInt().contains(
-        ArgumentNameFlags::HasResultDependsOn);
-  }
-
-  void setResultDependsOn(bool value = true) {
-    auto flags = ArgumentNameAndFlags.getInt();
-    flags = value ? flags | ArgumentNameFlags::HasResultDependsOn
-                  : flags - ArgumentNameFlags::HasResultDependsOn;
     ArgumentNameAndFlags.setInt(flags);
   }
 

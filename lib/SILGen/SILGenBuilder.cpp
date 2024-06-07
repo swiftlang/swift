@@ -536,9 +536,6 @@ static ManagedValue createInputFunctionArgument(
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
     }
-    if (pd->hasResultDependsOn()) {
-      arg->setHasResultDependsOn();
-    }
   }
   if (isNoImplicitCopy)
     arg->setNoImplicitCopy(isNoImplicitCopy);

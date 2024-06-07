@@ -130,7 +130,8 @@ import SubE
 // CHECK-DAG:   "swift": "Swift"
 // CHECK-DAG:   "swift": "SwiftOnoneSupport"
 // CHECK: ],
-// CHECK-NEXT: "details": {
+// CHECK-NEXT: "linkLibraries": [
+// CHECK: "details": {
 
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"

@@ -2348,10 +2348,6 @@ bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitResultDependsOnTypeRepr(ResultDependsOnTypeRepr *T) {
-  return doIt(T->getBase());
-}
-
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
 }

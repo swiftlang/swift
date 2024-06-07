@@ -8535,6 +8535,16 @@ class EndLifetimeInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
+/// Mark the end of the linear live range of a value without destroying it.
+class ExtendLifetimeInst
+    : public UnaryInstructionBase<SILInstructionKind::ExtendLifetimeInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  ExtendLifetimeInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
+};
+
 /// An unsafe conversion in between ownership kinds.
 ///
 /// This is used today in destructors where due to Objective-C legacy

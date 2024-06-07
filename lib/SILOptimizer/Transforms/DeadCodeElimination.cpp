@@ -63,6 +63,11 @@ static bool seemsUseful(SILInstruction *I) {
   if (I->mayHaveSideEffects())
     return true;
 
+  if (llvm::any_of(I->getResults(),
+                   [](auto result) { return result->isLexical(); })) {
+    return true;
+  }
+
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     // Although the onFastPath builtin has no side-effects we don't want to
     // remove it.

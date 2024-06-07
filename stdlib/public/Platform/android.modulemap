@@ -354,6 +354,10 @@ module inet [system] {
     header "netinet/in6.h"
     export *
   }
+  explicit module netinet_tcp {
+    header "netinet/tcp.h"
+    export *
+  }
   explicit module bits_ip_mreq_source {
     header "bits/ip_mreq_source.h"
     export *

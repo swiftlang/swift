@@ -1326,6 +1326,14 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
+  // If we are suppressing @implementation, also suppress @objc on extensions.
+  if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    if (ED->isObjCImplementation() &&
+            Options.excludeAttrKind(DeclAttrKind::ObjCImplementation)) {
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
+    }
+  }
+
   // We will handle ownership specifiers separately.
   if (isa<FuncDecl>(D)) {
     Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
@@ -3782,9 +3790,6 @@ static void printParameterFlags(ASTPrinter &printer,
           options.SuppressOptionalIsolatedParams))
       printer.printKeyword("isolated", options, " ");
   }
-
-  if (flags.hasResultDependsOn())
-    printer.printKeyword("_resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");

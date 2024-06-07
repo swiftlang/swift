@@ -355,6 +355,45 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
   return true;
 }
 
+/// Since a cast to an optional will consume a noncopyable type, check to see
+/// if injecting the value into an optional here will potentially be confusing.
+static bool willHaveConfusingConsumption(Type type,
+                                         ConstraintLocatorBuilder locator,
+                                         ConstraintSystem &cs) {
+  assert(type);
+  if (!type->isNoncopyable())
+    return false; /// If it's a copyable type, there's no confusion.
+
+  auto loc = cs.getConstraintLocator(locator);
+  if (!loc)
+    return true;
+
+  auto path = loc->getPath();
+  if (path.empty())
+    return true;
+
+  switch (loc->getPath().back().getKind()) {
+  case ConstraintLocator::FunctionResult:
+  case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ClosureBody:
+  case ConstraintLocator::ContextualType:
+  case ConstraintLocator::CoercionOperand:
+    return false; // These last-uses won't be confused for borrowing.
+
+  case ConstraintLocator::ApplyArgToParam: {
+    auto argLoc = loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+    auto paramFlags = argLoc.getParameterFlags();
+    if (paramFlags.getOwnershipSpecifier() == ParamSpecifier::Consuming)
+      return false; // Parameter already declares 'consuming'.
+
+    return true;
+  }
+
+  default:
+    return true;
+  }
+}
+
 namespace {
 
   /// Rewrites an expression by applying the solution of a constraint
@@ -3241,9 +3280,11 @@ namespace {
     }
 
   private:
-    /// A list of "suspicious" optional injections that come from
-    /// forced downcasts.
+    /// A list of "suspicious" optional injections.
     SmallVector<InjectIntoOptionalExpr *, 4> SuspiciousOptionalInjections;
+
+    /// A list of implicit coercions of noncopyable types.
+    SmallVector<Expr *, 4> ConsumingCoercions;
 
     /// Create a member reference to the given constructor.
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
@@ -4466,9 +4507,9 @@ namespace {
       if (choice == 0) {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
-
-        sub = solution.coerceToType(sub, expr->getCastType(),
-                                    cs.getConstraintLocator(sub));
+        auto subLoc =
+            cs.getConstraintLocator(sub, ConstraintLocator::CoercionOperand);
+        sub = solution.coerceToType(sub, expr->getCastType(), subLoc);
         if (!sub)
           return nullptr;
 
@@ -5516,41 +5557,69 @@ namespace {
       assert(OpenedExistentials.empty());
 
       auto &ctx = cs.getASTContext();
+      auto *module = dc->getParentModule();
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
-        auto *cast = findForcedDowncast(ctx, injection->getSubExpr());
-        if (!cast)
-          continue;
+        if (auto *cast = findForcedDowncast(ctx, injection->getSubExpr())) {
+          if (!isa<ParenExpr>(injection->getSubExpr())) {
+            ctx.Diags.diagnose(
+                injection->getLoc(), diag::inject_forced_downcast,
+                cs.getType(injection->getSubExpr())->getRValueType());
+            auto exclaimLoc = cast->getExclaimLoc();
+            ctx.Diags
+                .diagnose(exclaimLoc, diag::forced_to_conditional_downcast,
+                          cs.getType(injection)->getOptionalObjectType())
+                .fixItReplace(exclaimLoc, "?");
+            ctx.Diags
+                .diagnose(cast->getStartLoc(),
+                          diag::silence_inject_forced_downcast)
+                .fixItInsert(cast->getStartLoc(), "(")
+                .fixItInsertAfter(cast->getEndLoc(), ")");
+          }
+        }
+      }
 
-        if (isa<ParenExpr>(injection->getSubExpr()))
-          continue;
-
-        ctx.Diags.diagnose(
-            injection->getLoc(), diag::inject_forced_downcast,
-            cs.getType(injection->getSubExpr())->getRValueType());
-        auto exclaimLoc = cast->getExclaimLoc();
+      // Diagnose the implicit coercions of noncopyable values that happen in
+      // a context where it isn't "obviously" consuming already.
+      for (auto *coercion : ConsumingCoercions) {
+        assert(coercion->isImplicit());
         ctx.Diags
-            .diagnose(exclaimLoc, diag::forced_to_conditional_downcast,
-                      cs.getType(injection)->getOptionalObjectType())
-            .fixItReplace(exclaimLoc, "?");
+            .diagnose(coercion->getLoc(),
+                      diag::consume_expression_needed_for_cast,
+                      cs.getType(coercion));
         ctx.Diags
-            .diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
-            .fixItInsert(cast->getStartLoc(), "(")
-            .fixItInsertAfter(cast->getEndLoc(), ")");
+            .diagnose(coercion->getLoc(),
+                      diag::add_consume_to_silence)
+            .fixItInsert(coercion->getStartLoc(), "consume ");
       }
     }
 
     /// Diagnose an optional injection that is probably not what the
-    /// user wanted, because it comes from a forced downcast.
-    void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection) {
+    /// user wanted, because it comes from a forced downcast, or from an
+    /// implicitly consumed noncopyable type.
+    void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection,
+                                   ConstraintLocatorBuilder locator) {
       // Check whether we have a forced downcast.
-      auto *cast =
-          findForcedDowncast(cs.getASTContext(), injection->getSubExpr());
-      if (!cast)
-        return;
-      
-      SuspiciousOptionalInjections.push_back(injection);
+      if (findForcedDowncast(cs.getASTContext(), injection->getSubExpr()))
+        SuspiciousOptionalInjections.push_back(injection);
+
+      /// Check if it needs an explicit consume, due to this being a cast.
+      auto *module = dc->getParentModule();
+      auto origType = cs.getType(injection->getSubExpr());
+      if (willHaveConfusingConsumption(origType, locator, cs) &&
+          canAddExplicitConsume(module, injection->getSubExpr()))
+        ConsumingCoercions.push_back(injection);
+    }
+
+    void diagnoseExistentialErasureOf(Expr *fromExpr, Expr *toExpr,
+                                      ConstraintLocatorBuilder locator) {
+      auto *module = dc->getParentModule();
+      auto fromType = cs.getType(fromExpr);
+      if (willHaveConfusingConsumption(fromType, locator, cs) &&
+          canAddExplicitConsume(module, fromExpr)) {
+        ConsumingCoercions.push_back(toExpr);
+      }
     }
   };
 } // end anonymous namespace
@@ -5821,7 +5890,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
     while (diff--) {
       Type type = toOptionals[diff];
       expr = cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, type));
-      diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr));
+      diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr), locator);
     }
 
     return expr;
@@ -6950,8 +7019,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceSuperclass(expr, toType);
 
     case ConversionRestrictionKind::Existential:
-    case ConversionRestrictionKind::MetatypeToExistentialMetatype:
-      return coerceExistential(expr, toType, locator);
+    case ConversionRestrictionKind::MetatypeToExistentialMetatype: {
+      auto coerced = coerceExistential(expr, toType, locator);
+      diagnoseExistentialErasureOf(expr, coerced, locator);
+      return coerced;
+    }
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(ctx.LangOpts.EnableObjCInterop &&
@@ -6980,7 +7052,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto *result =
           cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, toType));
-      diagnoseOptionalInjection(result);
+      diagnoseOptionalInjection(result, locator);
       return result;
     }
 
@@ -7674,7 +7746,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (!expr) return nullptr;
 
     auto *result = cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, toType));
-    diagnoseOptionalInjection(result);
+    diagnoseOptionalInjection(result, locator);
     return result;
   }
 

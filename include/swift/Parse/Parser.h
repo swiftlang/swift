@@ -1200,9 +1200,6 @@ public:
         Tok.isContextualKeyword("isolated") ||
         Tok.isContextualKeyword("_const"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-        Tok.isContextualKeyword("_resultDependsOn"))
-      return true;
     if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
         Tok.isContextualKeyword("transferring"))
       return true;
@@ -1210,8 +1207,7 @@ public:
         Tok.isContextualKeyword("sending"))
       return true;
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-        (Tok.isContextualKeyword("_resultDependsOn") ||
-         isLifetimeDependenceToken()))
+        isLifetimeDependenceToken())
       return true;
     return false;
   }
@@ -1257,7 +1253,6 @@ public:
     SourceLoc SpecifierLoc;
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
-    SourceLoc ResultDependsOnLoc;
     SourceLoc TransferringLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
@@ -1570,9 +1565,6 @@ public:
 
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
-
-    /// The location of the '_resultDependsOn' keyword, if present.
-    SourceLoc ResultDependsOnLoc;
 
     /// The location of the 'transferring' keyword if present.
     SourceLoc TransferringLoc;

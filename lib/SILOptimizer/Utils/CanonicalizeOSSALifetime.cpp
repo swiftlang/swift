@@ -265,7 +265,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   findDestroysOutsideBoundary(outsideDestroys);
 
   // OSSALifetimeCompletion: With complete lifetimes, creating completeLiveness
-  // and using it to visiti unreachable lifetime ends should be deleted.
+  // and using it to visit unreachable lifetime ends should be deleted.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks(this->discoveredBlocks);
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
 
@@ -273,10 +273,12 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
     completeLiveness.updateForUse(end, /*lifetimeEnding*/ true);
   }
 
-  OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
+  OSSALifetimeCompletion::visitAvailabilityBoundary(
       getCurrentDef(), OSSALifetimeCompletion::DoNotAllowLeaks,
-      completeLiveness, [&](auto *unreachable) {
-        recordUnreachableLifetimeEnd(unreachable);
+      completeLiveness, [&](auto *unreachable, auto end) {
+        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+          recordUnreachableLifetimeEnd(unreachable);
+        }
         unreachable->visitPriorInstructions([&](auto *inst) {
           liveness->extendToNonUse(inst);
           return true;
@@ -674,7 +676,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
       predecessor->getTerminator()->visitPriorInstructions([&](auto *inst) {
-        visitor(inst, PrunedLiveness::LifetimeEnding::NonUse());
+        visitor(inst, PrunedLiveness::LifetimeEnding::Value::NonUse);
         return true;
       });
     }
@@ -688,7 +690,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
     // hoisting it would avoid a copy.
     if (consumedAtExitBlocks.contains(block))
       continue;
-    visitor(destroy, PrunedLiveness::LifetimeEnding::Ending());
+    visitor(destroy, PrunedLiveness::LifetimeEnding::Value::Ending);
   }
 }
 

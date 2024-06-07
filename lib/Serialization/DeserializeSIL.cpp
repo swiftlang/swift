@@ -2258,6 +2258,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(ValueToBridgeObject)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(EndLifetime)
+  UNARY_INSTRUCTION(ExtendLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
   UNARY_INSTRUCTION(EndInitLetRef)

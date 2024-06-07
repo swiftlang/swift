@@ -337,6 +337,9 @@ public:
   /// Whether we should disable inserting autolink directives altogether.
   unsigned DisableAllAutolinking : 1;
 
+  /// Whether we should disable inserting __swift_FORCE_LOAD_ symbols.
+  unsigned DisableForceLoadSymbols : 1;
+
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 

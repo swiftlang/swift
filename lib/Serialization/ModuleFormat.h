@@ -58,8 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    875; // Add package field to SerializedKind_t
+const uint16_t SWIFTMODULE_VERSION_MINOR = 877; // extend_lifetime instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -862,11 +861,11 @@ namespace control_block {
     MODULE_NAME,
     TARGET,
     SDK_NAME,
-    SDK_VERSION,
     REVISION,
-    CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
+    CHANNEL,
+    SDK_VERSION,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -897,18 +896,8 @@ namespace control_block {
     BCBlob
   >;
 
-  using SDKVersionLayout = BCRecordLayout<
-    SDK_VERSION,
-    BCBlob
-  >;
-
   using RevisionLayout = BCRecordLayout<
     REVISION,
-    BCBlob
-  >;
-
-  using ChannelLayout = BCRecordLayout<
-    CHANNEL,
     BCBlob
   >;
 
@@ -919,6 +908,16 @@ namespace control_block {
 
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
+    BCBlob
+  >;
+
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
+    BCBlob
+  >;
+
+  using SDKVersionLayout = BCRecordLayout<
+    SDK_VERSION,
     BCBlob
   >;
 }
@@ -1268,7 +1267,6 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>,              // _resultDependsOn
                      BCFixed<1>               // transferring
                      >;
 
