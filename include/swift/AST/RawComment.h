@@ -57,7 +57,7 @@ struct SingleRawComment {
   }
 
   bool isGyb() const {
-    return RawText.startswith("// ###");
+    return RawText.starts_with("// ###");
   }
 };
 

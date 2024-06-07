@@ -136,6 +136,10 @@ enum class TypeCheckExprFlags {
 
   /// Don't expand macros.
   DisableMacroExpansions = 0x08,
+
+  /// If set, typeCheckExpression will avoid invalidating the AST if
+  /// type-checking fails. Do not add new uses of this.
+  AvoidInvalidatingAST = 0x10,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -282,6 +286,8 @@ enum class CheckedCastContextKind {
 };
 
 namespace TypeChecker {
+// DANGER: callers must verify that elementType satisfies the requirements of
+// the Wrapped generic parameter, as this function will not do so!
 Type getOptionalType(SourceLoc loc, Type elementType);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
@@ -746,14 +752,15 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
                              Type patternType = Type(),
                              TypeCheckExprOptions options = {});
 
-/// Type-check a for-each loop's pattern binding and sequence together.
+/// Type-check a for-each loop's pattern binding, sequence, and where clause
+/// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
-                             GenericEnvironment *packElementEnv);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              GenericEnvironment *packElementEnv);
 
-/// Compute the set of captures for the given function or closure.
-void computeCaptures(AnyFunctionRef AFR);
+/// Compute the set of captures for the given closure.
+void computeCaptures(AbstractClosureExpr *ACE);
 
 /// Check for invalid captures from stored property initializers.
 void checkPatternBindingCaptures(IterableDeclContext *DC);
@@ -936,10 +943,6 @@ Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
 /// decl, meaning that the second decl can always be used in place
 /// of the first one and the expression will still type check.
 bool isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB);
-
-/// Build a type-checked reference to the given value.
-Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC, DeclNameLoc nameLoc,
-                          bool Implicit);
 
 /// Build a reference to a declaration, where name lookup returned
 /// the given set of declarations.
@@ -1403,10 +1406,6 @@ bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
 
-/// Given an interface type and possibly a generic environment,
-/// is the type ever noncopyable?
-bool isInterfaceTypeNoncopyable(Type interfaceTy, GenericEnvironment *env);
-
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 
@@ -1421,6 +1420,14 @@ bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
 ///
 /// \returns true if there were any conflicts diagnosed.
 bool diagnoseObjCMethodConflicts(SourceFile &sf);
+
+/// Diagnose all conflicts between extensions of the same class that have the
+/// same Objective-C category name.
+///
+/// \param sf The source file for which we are diagnosing conflicts.
+///
+/// \returns true if there were any conflicts diagnosed.
+bool diagnoseObjCCategoryConflicts(SourceFile &sf);
 
 /// Diagnose any unsatisfied @objc optional requirements of
 /// protocols that conflict with methods.

@@ -89,43 +89,6 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   return ShowGlobalCompletions;
 }
 
-/// Applies heuristic to determine whether the result type of \p E is
-/// unconstrained, that is if the constraint system is satisfiable for any
-/// result type of \p E.
-static bool isExpressionResultTypeUnconstrained(const Solution &S, Expr *E) {
-  ConstraintSystem &CS = S.getConstraintSystem();
-  if (auto ParentExpr = CS.getParentExpr(E)) {
-    if (auto Assign = dyn_cast<AssignExpr>(ParentExpr)) {
-      if (isa<DiscardAssignmentExpr>(Assign->getDest())) {
-        // _ = <expr> is unconstrained
-        return true;
-      }
-    } else if (isa<RebindSelfInConstructorExpr>(ParentExpr)) {
-      // super.init() is unconstrained (it always produces the correct result
-      // by definition)
-      return true;
-    }
-  }
-  auto target = S.getTargetFor(E);
-  if (!target)
-    return false;
-
-  assert(target->kind == SyntacticElementTarget::Kind::expression);
-  switch (target->getExprContextualTypePurpose()) {
-  case CTP_Unused:
-    // If we aren't using the contextual type, its unconstrained by definition.
-    return true;
-  case CTP_Initialization: {
-    // let x = <expr> is unconstrained
-    auto contextualType = target->getExprContextualType();
-    return !contextualType || contextualType->is<UnresolvedType>();
-  }
-  default:
-    // Assume that it's constrained by default.
-    return false;
-  }
-}
-
 /// Returns whether `E` has a parent expression with arguments.
 static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
   E = CS.getParentExpr(E);
@@ -172,10 +135,21 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   auto ArgIdx = ArgInfo->completionIdx;
 
   Type ExpectedCallType;
-  if (!isExpressionResultTypeUnconstrained(S, ParentCall)) {
-    ExpectedCallType = getTypeForCompletion(S, ParentCall);
+  if (auto ArgLoc = S.getConstraintSystem().getArgumentLocator(ParentCall)) {
+    if (auto FuncArgApplyInfo = S.getFunctionArgApplyInfo(ArgLoc)) {
+      Type ParamType = FuncArgApplyInfo->getParamInterfaceType();
+      ExpectedCallType = S.simplifyTypeForCodeCompletion(ParamType);
+    }
   }
-
+  if (!ExpectedCallType) {
+    if (auto ContextualType = S.getContextualType(ParentCall)) {
+      ExpectedCallType = ContextualType;
+    }
+  }
+  if (ExpectedCallType && ExpectedCallType->hasUnresolvedType()) {
+    ExpectedCallType = Type();
+  }
+  
   auto *CallLocator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
 

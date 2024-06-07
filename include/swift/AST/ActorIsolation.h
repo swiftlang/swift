@@ -111,6 +111,9 @@ public:
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
 
+  /// Create an ActorIsolation appropriate for a type that is self.
+  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *decl);
+
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
@@ -167,6 +170,8 @@ public:
     return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
   }
 
+  bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
+
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
   /// Parameter 0 is `self`.
@@ -192,6 +197,7 @@ public:
   }
 
   NominalTypeDecl *getActor() const;
+  NominalTypeDecl *getActorOrNullPtr() const;
 
   VarDecl *getActorInstance() const;
 
@@ -200,6 +206,8 @@ public:
   bool isGlobalActor() const {
     return getKind() == GlobalActor;
   }
+
+  bool isActorInstanceIsolated() const { return getKind() == ActorInstance; }
 
   bool isMainActor() const;
 
@@ -244,37 +252,33 @@ public:
     return !(lhs == rhs);
   }
 
+  void Profile(llvm::FoldingSetNodeID &id) {
+    id.AddInteger(getKind());
+    id.AddPointer(pointer);
+    id.AddBoolean(isolatedByPreconcurrency);
+    id.AddBoolean(silParsed);
+    id.AddInteger(parameterIndex);
+  }
+
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(
-        state.kind, state.pointer, state.isolatedByPreconcurrency,
-        state.parameterIndex);
+    return llvm::hash_combine(state.kind, state.pointer,
+                              state.isolatedByPreconcurrency, state.silParsed,
+                              state.parameterIndex);
   }
 
-  void print(llvm::raw_ostream &os) const {
-    switch (getKind()) {
-    case Unspecified:
-      os << "unspecified";
-      return;
-    case ActorInstance:
-      os << "actor_instance";
-      return;
-    case Nonisolated:
-      os << "nonisolated";
-      return;
-    case NonisolatedUnsafe:
-      os << "nonisolated_unsafe";
-      return;
-    case GlobalActor:
-      os << "global_actor";
-      return;
-    case Erased:
-      os << "erased";
-      return;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
+  void print(llvm::raw_ostream &os) const;
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  void printForSIL(llvm::raw_ostream &os) const;
+
+  void printForDiagnostics(llvm::raw_ostream &os,
+                           StringRef openingQuotationMark = "'") const;
+
+  SWIFT_DEBUG_DUMPER(dump());
+
+  // Defined out of line to prevent linker errors since libswiftBasic would
+  // include this header exascerbating a layering violation where libswiftBasic
+  // depends on libswiftAST.
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
 /// Determine how the given value declaration is isolated.

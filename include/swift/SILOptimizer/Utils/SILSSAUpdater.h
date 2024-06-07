@@ -79,7 +79,8 @@ public:
   }
 
   /// Initialize for a use of a value of type and ownershipKind
-  void initialize(SILType type, ValueOwnershipKind ownershipKind);
+  void initialize(SILFunction *fn, SILType type,
+                  ValueOwnershipKind ownershipKind);
 
   bool hasValueForBlock(SILBasicBlock *block) const;
   void addAvailableValue(SILBasicBlock *block, SILValue value);

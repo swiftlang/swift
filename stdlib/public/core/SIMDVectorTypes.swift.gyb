@@ -190,6 +190,10 @@ extension SIMD${n}: Sendable
   where Scalar: Sendable,
         Scalar.SIMD${storageN}Storage: Sendable { }
 
+extension SIMD${n}: BitwiseCopyable
+  where Scalar: BitwiseCopyable,
+        Scalar.SIMD${storageN}Storage: BitwiseCopyable { }
+
 %end
 
 extension SIMD3 {
@@ -221,7 +225,7 @@ extension ${Self}: SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} integers.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage, Sendable {
+  public struct SIMD${n}Storage: SIMDStorage, Sendable, BitwiseCopyable {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
@@ -275,7 +279,7 @@ extension ${Self} : SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage, Sendable {
+  public struct SIMD${n}Storage: SIMDStorage, Sendable, BitwiseCopyable {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 

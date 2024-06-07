@@ -31,11 +31,10 @@ bb0(%0 : $Int64, %1 : $Int64):
   debug_value %0 : $Int64, let, name "in_x", argno 1, loc "sroa.swift":7:10, scope 2
   debug_value %1 : $Int64, let, name "in_y", argno 2, loc "sroa.swift":7:21, scope 2
   %4 = alloc_stack $MyStruct, var, name "my_struct", type $*MyContainer, expr op_fragment:#MyContainer.z, loc "sroa.swift":8:9, scope 2
-  // Recursive SROA of already SROA-ed aggregates is not yet supported.
   // CHECK-SROA:      alloc_stack $Int64
-  // CHECK-SROA-NOT:  var,
+  // CHECK-SROA-SAME: var,
   // CHECK-SROA:      alloc_stack $Int64
-  // CHECK-SROA-NOT:  var,
+  // CHECK-SROA-SAME: var,
   // CHECK-SROA:      metatype
   %5 = metatype $@thin MyStruct.Type, loc "sroa.swift":8:21, scope 2
   %6 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":8:33, scope 2

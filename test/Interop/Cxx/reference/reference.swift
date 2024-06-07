@@ -78,6 +78,17 @@ ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {
   expectEqual(getStaticInt(), 78)
 }
 
+ReferenceTestSuite.test("const reference to bool") {
+  expectTrue(takeConstRefBool(true))
+  expectFalse(takeConstRefBool(false))
+}
+
+ReferenceTestSuite.test("reference to bool") {
+  var b = false
+  takeRefBool(&b)
+  expectTrue(b)
+}
+
 ReferenceTestSuite.test("reference to template") {
   var val: CInt = 53
   let ref = refToTemplate(&val)

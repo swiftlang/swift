@@ -41,7 +41,7 @@ protocol P4 {
 class D {}
 
 // CHECK-LABEL: .P5@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P5]T : C, Self.[P5]T == D>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P5]T == D>
 protocol P5 {
 // expected-error@-1 {{no type for 'Self.T' can satisfy both 'Self.T : D' and 'Self.T : C'}}
   associatedtype T where T : C, T == D

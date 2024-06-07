@@ -41,10 +41,11 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
     if (isa<EndApplyInst>(user)) {
       if (hasEndApply) return false;
       hasEndApply = true;
-    } else {
-      assert(isa<AbortApplyInst>(user));
+    } else if (isa<AbortApplyInst>(user)) {
       if (hasAbortApply) return false;
       hasAbortApply = true;
+    } else {
+      assert(isa<EndBorrowInst>(user));
     }
   }
 
@@ -95,6 +96,8 @@ class BeginApplySite {
   SILBasicBlock *AbortApplyBB = nullptr;
   SILBasicBlock *AbortApplyReturnBB = nullptr;
 
+  SmallVector<EndBorrowInst *, 2> EndBorrows;
+
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
                  SILBuilder *Builder)
@@ -112,7 +115,8 @@ public:
                   SmallVectorImpl<SILInstruction *> &endBorrowInsertPts) {
     SmallVector<EndApplyInst *, 1> endApplyInsts;
     SmallVector<AbortApplyInst *, 1> abortApplyInsts;
-    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts);
+    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts,
+                                      &EndBorrows);
     while (!endApplyInsts.empty()) {
       auto *endApply = endApplyInsts.pop_back_val();
       collectEndApply(endApply);
@@ -207,13 +211,16 @@ public:
     // instructions in the caller.  That means this entire path is
     // unreachable.
     if (isa<ReturnInst>(terminator) || isa<UnwindInst>(terminator)) {
-      bool isNormal = isa<ReturnInst>(terminator);
-      auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
+      ReturnInst *retInst = dyn_cast<ReturnInst>(terminator);
+      auto *returnBB = retInst ? EndApplyReturnBB : AbortApplyReturnBB;
+      if (retInst && EndApply)
+        EndApply->replaceAllUsesWith(getMappedValue(retInst->getOperand()));
       if (returnBB) {
         Builder->createBranch(Loc, returnBB);
       } else {
         Builder->createUnreachable(Loc);
       }
+
       return true;
     }
 
@@ -245,8 +252,7 @@ public:
 
       // Replace all the yielded values in the callee with undef.
       for (auto calleeYield : BeginApply->getYieldedValues()) {
-        calleeYield->replaceAllUsesWith(
-            SILUndef::get(calleeYield->getType(), Builder->getFunction()));
+        calleeYield->replaceAllUsesWith(SILUndef::get(calleeYield));
       }
     }
 
@@ -255,6 +261,8 @@ public:
       EndApply->eraseFromParent();
     if (AbortApply)
       AbortApply->eraseFromParent();
+    for (auto *EndBorrow : EndBorrows)
+      EndBorrow->eraseFromParent();
 
     assert(!BeginApply->hasUsesOfAnyResult());
   }
@@ -312,7 +320,6 @@ protected:
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
 
   void visitTerminator(SILBasicBlock *BB);
-  void visitBuiltinInst(BuiltinInst *BI);
 
   /// This hook is called after either of the top-level visitors:
   /// cloneReachableBlocks or cloneSILFunction.
@@ -725,15 +732,15 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                : Scope::None;
   auto scope = scopeForArgument(scopeForOwnership, callArg, index,
                                 Apply.getFunction(), getCalleeFunction());
-  bool isLexical;
+  IsLexical_t isLexical;
   switch (scope) {
   case Scope::None:
     return SILValue();
   case Scope::Bare:
-    isLexical = false;
+    isLexical = IsNotLexical;
     break;
   case Scope::Lexical:
-    isLexical = true;
+    isLexical = IsLexical;
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
@@ -744,16 +751,16 @@ SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
                                                unsigned index) {
   auto scope = scopeForArgument(Scope::None, callArg, index,
                                 Apply.getFunction(), getCalleeFunction());
-  bool isLexical;
+  IsLexical_t isLexical;
   switch (scope) {
   case Scope::None:
     return SILValue();
   case Scope::Bare:
     assert(false && "Non-lexical move produced during inlining!?");
-    isLexical = false;
+    isLexical = IsNotLexical;
     break;
   case Scope::Lexical:
-    isLexical = true;
+    isLexical = IsLexical;
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
@@ -812,51 +819,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
-  if (IKind == InlineKind::MandatoryInline) {
-    if (auto kind = Inst->getBuiltinKind()) {
-      if (*kind == BuiltinValueKind::Copy) {
-        auto otherResultAddr = getOpValue(Inst->getOperand(0));
-        auto otherSrcAddr = getOpValue(Inst->getOperand(1));
-        auto otherType = otherSrcAddr->getType();
-
-        if (!otherType.isLoadable(*Inst->getFunction())) {
-          // If otherType is not loadable, emit a diagnostic since it was used
-          // on a generic or existential value.
-          diagnose(Inst->getModule().getASTContext(),
-                   getOpLocation(Inst->getLoc()).getSourceLoc(),
-                   diag::copy_operator_used_on_generic_or_existential_value);
-          return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
-        }
-
-        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-        // We stash otherValue in originalOtherValue in case we need to
-        // perform a writeback.
-        auto opLoc = getOpLocation(Inst->getLoc());
-
-        assert(otherType.isAddress());
-
-        // Perform a load_borrow and then copy that.
-        SILValue otherValue =
-            getBuilder().emitLoadBorrowOperation(opLoc, otherSrcAddr);
-
-        auto *mvi = getBuilder().createExplicitCopyValue(opLoc, otherValue);
-
-        getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
-                                             StoreOwnershipQualifier::Init);
-        // End the borrowed value.
-        getBuilder().emitEndBorrowOperation(opLoc, otherValue);
-
-        // We know that Inst returns a tuple value that isn't used by anything
-        // else, so this /should/ be safe.
-        return recordClonedInstruction(Inst, mvi);
-      }
-    }
-  }
-
-  return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
-}
-
 //===----------------------------------------------------------------------===//
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
@@ -887,6 +849,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:
@@ -895,6 +858,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::ExtendLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:

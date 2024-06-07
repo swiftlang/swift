@@ -872,7 +872,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
 
   switch value {
   case _: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   // Test being part of other spaces.
@@ -973,25 +973,25 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   switch interval {
   case .seconds, .milliseconds, .microseconds, .nanoseconds: break
   case .never: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   switch flag {
   case true: break
   case false: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   switch flag as Optional {
   case _?: break
   case nil: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   switch (flag, value) {
   case (true, _): break
   case (false, _): break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 }
 
@@ -1028,7 +1028,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
 
   switch value {
   case _: break
-  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  @unknown case _: break
   }
 
   // Test being part of other spaces.

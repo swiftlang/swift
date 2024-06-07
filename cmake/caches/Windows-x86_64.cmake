@@ -28,14 +28,18 @@ set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")
 set(LLVM_RUNTIME_TARGETS
       x86_64-unknown-windows-msvc
+      aarch64-unknown-windows-msvc
     CACHE STRING "")
 foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_LLVM_ENABLE_RUNTIMES
         compiler-rt
       CACHE STRING "")
   set(RUNTIMES_${target}_CMAKE_MT mt CACHE STRING "")
-  set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
+  if(${target} MATCHES windows-msvc)
+    set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
+  endif()
   set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_BUILTINS YES CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_ORC NO CACHE BOOL "")
@@ -68,6 +72,7 @@ set(LLDB_ALLOW_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_USE_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_ENABLE_PYTHON YES CACHE BOOL "")
 set(LLDB_EMBED_PYTHON_HOME NO CACHE BOOL "")
+set(LLDB_ENABLE_LIBXML2 NO CACHE BOOL "")
 
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")

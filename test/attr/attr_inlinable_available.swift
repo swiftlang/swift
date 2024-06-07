@@ -368,7 +368,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 // using the minimum inlining target.
 //
 
-@inlinable public func inlinedUseNoAvailable( // expected-note 8 {{add @available attribute}}
+@inlinable public func inlinedUseNoAvailable( // expected-note 13 {{add @available attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -395,6 +395,28 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   }
   if #available(macOS 11, *) {
     _ = AfterDeploymentTarget()
+  }
+
+  // Repeat everything with pattern binding decls instead of discard expressions.
+  defer {
+    let _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+    let _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+  }
+  let _ = NoAvailable()
+  let _ = BeforeInliningTarget()
+  let _ = AtInliningTarget()
+  let _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  let _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  let _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+
+  if #available(macOS 10.14.5, *) {
+    let _ = BetweenTargets()
+  }
+  if #available(macOS 10.15, *) {
+    let _ = AtDeploymentTarget()
+  }
+  if #available(macOS 11, *) {
+    let _ = AfterDeploymentTarget()
   }
 }
 

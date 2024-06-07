@@ -34,6 +34,7 @@
 #include "swift/Basic/BlockList.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -46,6 +47,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include <functional>
 #include <memory>
@@ -408,9 +410,17 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::StringSet<> FailedModuleImportNames;
 
+  /// Versions of the modules found during versioned canImport checks. 
+  struct ImportedModuleVersionInfo {
+    llvm::VersionTuple Version;
+    llvm::VersionTuple UnderlyingVersion;
+  };
+
   /// Cache of module names that passed the 'canImport' test. This cannot be
-  /// mutable since it needs to be queried for dependency discovery.
-  llvm::StringSet<> SucceededModuleImportNames;
+  /// mutable since it needs to be queried for dependency discovery. Keep sorted
+  /// so caller of `forEachCanImportVersionCheck` can expect deterministic
+  /// ordering.
+  std::map<std::string, ImportedModuleVersionInfo> CanImportModuleVersions;
 
   /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
   /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
@@ -726,68 +736,6 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
-  /// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
-  ///
-  /// \param actorOrSystem distributed actor or actor system to get the
-  /// remoteCall function for. Since the method we're looking for is an ad-hoc
-  /// requirement, a specific type MUST be passed here as it is not possible
-  /// to obtain the decl from just the `DistributedActorSystem` protocol type.
-  /// \param isVoidReturn true if the call will be returning `Void`.
-  AbstractFunctionDecl *getRemoteCallOnDistributedActorSystem(
-      NominalTypeDecl *actorOrSystem,
-      bool isVoidReturn) const;
-
-  /// Retrieve the declaration of DistributedActorSystem.make().
-  ///
-  /// \param thunk the function from which we'll be invoking things on the obtained
-  /// actor system; This way we'll always get the right type, taking care of any
-  /// where clauses etc.
-  FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
-      AbstractFunctionDecl *thunk) const;
-
-  // Retrieve the declaration of
-  // DistributedInvocationEncoder.recordGenericSubstitution(_:).
-  //
-  // \param nominal optionally provide a 'NominalTypeDecl' from which the
-  // function decl shall be extracted. This is useful to avoid witness calls
-  // through the protocol which is looked up when nominal is null.
-  FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordArgument(_:).
-  //
-  // \param nominal optionally provide a 'NominalTypeDecl' from which the
-  // function decl shall be extracted. This is useful to avoid witness calls
-  // through the protocol which is looked up when nominal is null.
-  AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordReturnType(_:).
-  AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordErrorType(_:).
-  AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of
-  // DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
-  AbstractFunctionDecl *getDecodeNextArgumentOnDistributedInvocationDecoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of
-  // getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
-  AbstractFunctionDecl *getOnReturnOnDistributedTargetInvocationResultHandler(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
-  //
-  // \param nominal optionally provide a 'NominalTypeDecl' from which the
-  // function decl shall be extracted. This is useful to avoid witness calls
-  // through the protocol which is looked up when nominal is null.
-  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,
@@ -1010,6 +958,12 @@ public:
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
 
+  /// Test support utility for loading a platform remap file
+  /// in case an SDK is not specified to the compilation.
+  const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
+  getAuxiliaryDarwinPlatformRemapInfo(
+      clang::DarwinSDKInfo::OSEnvPair Kind) const;
+
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -1157,7 +1111,12 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList) const;
+                           bool updateFailingList,
+                           llvm::VersionTuple &foundVersion) const;
+
+  /// Add successful canImport modules.
+  void addSucceededCanImportModule(StringRef moduleName, bool underlyingVersion,
+                                   const llvm::VersionTuple &versionInfo);
 
 public:
   namelookup::ImportCache &getImportCache() const;
@@ -1199,10 +1158,10 @@ public:
                         llvm::VersionTuple version = llvm::VersionTuple(),
                         bool underlyingVersion = false) const;
 
-  /// \returns a set of names from all successfully canImport module checks.
-  const llvm::StringSet<> &getSuccessfulCanImportCheckNames() const {
-    return SucceededModuleImportNames;
-  }
+  /// Callback on each successful imported.
+  void forEachCanImportVersionCheck(
+      std::function<void(StringRef, const llvm::VersionTuple &,
+                         const llvm::VersionTuple &)>) const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
@@ -1235,6 +1194,11 @@ public:
   ModuleDecl *getModuleByName(StringRef ModuleName);
 
   ModuleDecl *getModuleByIdentifier(Identifier ModuleID);
+
+  /// Looks up an already loaded module by its ABI name.
+  ///
+  /// \returns The module if found, nullptr otherwise.
+  ModuleDecl *getLoadedModuleByABIName(StringRef ModuleName);
 
   /// Returns the standard library module, or null if the library isn't present.
   ///
@@ -1288,7 +1252,8 @@ public:
                        DeclContext *dc,
                        ProtocolConformanceState state,
                        bool isUnchecked,
-                       bool isPreconcurrency);
+                       bool isPreconcurrency,
+                       SourceLoc preconcurrencyLoc = SourceLoc());
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *
@@ -1364,15 +1329,17 @@ public:
   /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
-                            RootProtocolConformance *generic,
+                            NormalProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
-  /// Produce an inherited conformance, for subclasses of a type
-  /// that already conforms to a protocol.
+  /// Produce an inherited conformance, which forwards all operations to a
+  /// base conformance, except for getType(), which must return some subclass
+  /// of the base conformance's conforming type. This models the case where a
+  /// subclass conforms to a protocol because its superclass already conforms.
   ///
   /// \param type The type for which we are retrieving the conformance.
   ///
-  /// \param inherited The inherited conformance.
+  /// \param inherited A normal or specialized conformance.
   ProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
@@ -1527,17 +1494,6 @@ public:
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
 
-  Type getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
-                                            Identifier member);
-
-  /// Find the concrete invocation decoder associated with the given actor.
-  NominalTypeDecl *
-  getDistributedActorInvocationDecoder(NominalTypeDecl *);
-
-  /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
-  /// invocation decoder of the given distributed actor.
-  FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
-
   /// The special Builtin.TheTupleType, which parents tuple extensions and
   /// conformances.
   BuiltinTupleDecl *getBuiltinTupleDecl();
@@ -1582,6 +1538,9 @@ private:
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;
   friend SILBoxType;
+
+public:
+  clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 };
 
 } // end namespace swift

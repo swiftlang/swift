@@ -30,8 +30,15 @@ namespace trace {
 os_log_t ActorLog;
 os_log_t TaskLog;
 swift::once_t LogsToken;
+bool TracingEnabled;
 
 void setupLogs(void *unused) {
+  if (!swift::runtime::trace::shouldEnableTracing()) {
+    TracingEnabled = false;
+    return;
+  }
+
+  TracingEnabled = true;
   ActorLog = os_log_create(SWIFT_LOG_CONCURRENCY_SUBSYSTEM,
                            SWIFT_LOG_ACTOR_CATEGORY);
   TaskLog = os_log_create(SWIFT_LOG_CONCURRENCY_SUBSYSTEM,

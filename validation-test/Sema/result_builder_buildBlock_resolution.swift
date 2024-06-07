@@ -14,11 +14,11 @@ struct ActionLookup<Identifier: ActionIdentifier> {
 
 @resultBuilder
 enum ActionLookupBuilder<Identifier: ActionIdentifier> { // expected-note 3{{'Identifier' previously declared here}}
-  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> ActionLookup<Identifier> { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
+  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> ActionLookup<Identifier> { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
     fatalError()
   }
 
-  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
+  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
     []
   }
 
@@ -26,7 +26,7 @@ enum ActionLookupBuilder<Identifier: ActionIdentifier> { // expected-note 3{{'Id
     []
   }
 
-  static func buildOptional<Identifier: ActionIdentifier>(_ component: [ActionLookup<Identifier>]?) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
+  static func buildOptional<Identifier: ActionIdentifier>(_ component: [ActionLookup<Identifier>]?) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
     []
   }
 }

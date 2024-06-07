@@ -34,7 +34,7 @@ bb0:
 
 sil [transparent] @$s28accessed_storage_unavailable11UnavailableV1iAA1SVvg : $@convention(method) (Unavailable) -> S {
 bb0(%0 : $Unavailable):
-  debug_value %0 : $Unavailable, let, name "self", argno 1, implicit
+  debug_value %0 : $Unavailable, let, name "self", argno 1
   %2 = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
   %3 = apply %2() : $@convention(thin) () -> Never
   unreachable

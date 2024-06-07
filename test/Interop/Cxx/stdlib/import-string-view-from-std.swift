@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %t/test.swift -c -enable-experimental-cxx-interop -Xcc -std=c++17 -Xcc -fmodules-cache-path=%t/cache -I %t/Inputs
+// RUN: %target-swift-frontend %t/test.swift -c -enable-experimental-cxx-interop -Xcc -fmodules-cache-path=%t/cache -I %t/Inputs
 // RUN: find %t/cache | %FileCheck %s
 
 // REQUIRES: OS=macosx || OS=linux-gnu

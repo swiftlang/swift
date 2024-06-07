@@ -4,8 +4,8 @@
 
 // Also test in non-embedded mode
 
-// RUN: %target-run-simple-swift(%S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macosx10.13 %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macosx10.13 -O %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
@@ -75,7 +75,7 @@ func globalWithAppend() {
   printit(S.a)
 }
 
-// First method to pass a FixedArray to a function: as `borrowing` paramter
+// First method to pass a FixedArray to a function: as `borrowing` parameter
 func printit<T: Printable>(_ a: borrowing FixedArray<T>) {
   // Currently FixedArray cannot conform to Collection, yet.
   // For iteration, we need to take the detour through BufferView.

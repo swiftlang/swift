@@ -36,6 +36,7 @@
 namespace swift {
 class ASTContext;
 class ModuleDecl;
+class ImportDecl;
 
 // MARK: - Fundamental import enums
 
@@ -101,6 +102,8 @@ enum class ImportFlags {
 using ImportOptions = OptionSet<ImportFlags>;
 
 void simple_display(llvm::raw_ostream &out, ImportOptions options);
+
+ImportOptions getImportOptions(ImportDecl *ID);
 
 // MARK: - Import Paths
 
@@ -592,17 +595,22 @@ struct AttributedImport {
   /// if the access level was implicit or explicit.
   SourceRange accessLevelRange;
 
+  /// Location of the `@_implementationOnly` attribute if set.
+  SourceRange implementationOnlyRange;
+
   AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
                    ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
                    SourceRange preconcurrencyRange = {},
                    std::optional<AccessLevel> docVisibility = std::nullopt,
                    AccessLevel accessLevel = AccessLevel::Public,
-                   SourceRange accessLevelRange = SourceRange())
+                   SourceRange accessLevelRange = SourceRange(),
+                   SourceRange implementationOnlyRange = SourceRange())
       : module(module), importLoc(importLoc), options(options),
         sourceFileArg(filename), spiGroups(spiGroups),
         preconcurrencyRange(preconcurrencyRange), docVisibility(docVisibility),
-        accessLevel(accessLevel), accessLevelRange(accessLevelRange) {
+        accessLevel(accessLevel), accessLevelRange(accessLevelRange),
+        implementationOnlyRange(implementationOnlyRange) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -613,7 +621,8 @@ struct AttributedImport {
     : AttributedImport(module, other.importLoc, other.options,
                        other.sourceFileArg, other.spiGroups,
                        other.preconcurrencyRange, other.docVisibility,
-                       other.accessLevel, other.accessLevelRange) { }
+                       other.accessLevel, other.accessLevelRange,
+                       other.implementationOnlyRange) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
@@ -623,7 +632,8 @@ struct AttributedImport {
            lhs.spiGroups == rhs.spiGroups &&
            lhs.docVisibility == rhs.docVisibility &&
            lhs.accessLevel == rhs.accessLevel &&
-           lhs.accessLevelRange == rhs.accessLevelRange;
+           lhs.accessLevelRange == rhs.accessLevelRange &&
+           lhs.implementationOnlyRange == rhs.implementationOnlyRange;
   }
 
   AttributedImport<ImportedModule> getLoaded(ModuleDecl *loadedModule) const {

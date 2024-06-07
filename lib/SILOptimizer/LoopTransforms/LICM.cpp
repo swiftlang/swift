@@ -1048,8 +1048,13 @@ computeInnerAccessPath(AccessPath::PathNode outerPath,
   if (outerPath == innerPath)
     return true;
 
-  if (!isa<StructElementAddrInst>(innerAddress)
-      && !isa<TupleElementAddrInst>(innerAddress)) {
+  auto *sea = dyn_cast<StructElementAddrInst>(innerAddress);
+
+  if (sea && sea->getStructDecl()->hasUnreferenceableStorage()) {
+    return false;
+  }
+
+  if (!sea && !isa<TupleElementAddrInst>(innerAddress)) {
     return false;
   }
   assert(ProjectionIndex(innerAddress).Index
@@ -1394,7 +1399,8 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
 
       if (!storeAddr) {
         storeAddr = SI->getDest();
-        ssaUpdater.initialize(storeAddr->getType().getObjectType(),
+        ssaUpdater.initialize(storeAddr->getFunction(),
+                              storeAddr->getType().getObjectType(),
                               storeAddr->getOwnershipKind());
       } else if (SI->getDest()->getType() != storeAddr->getType()) {
         // This transformation assumes that the values of all stores in the loop

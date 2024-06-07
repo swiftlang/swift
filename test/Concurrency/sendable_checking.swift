@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -verify -strict-concurrency=targeted -verify-additional-prefix targeted-and-complete- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete- -verify-additional-prefix complete-and-tns- -verify-additional-prefix complete- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s -enable-experimental-feature RegionBasedIsolation 
+// RUN: %target-swift-frontend -verify -strict-concurrency=targeted -verify-additional-prefix targeted-and-complete- -emit-sil -o /dev/null %s -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete- -verify-additional-prefix complete-and-tns- -verify-additional-prefix complete- -emit-sil -o /dev/null %s -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -96,6 +96,8 @@ public actor MyActor: MyProto {
 
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
+    // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
@@ -236,10 +238,19 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 }
 
 @available(SwiftStdlib 5.1, *)
+actor CustomActorInstance {}
+
+@available(SwiftStdlib 5.1, *)
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+@available(SwiftStdlib 5.1, *)
 final class NonSendable {
-  // expected-note @-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-note @-1 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // TransferNonSendable emits 3 fewer errors here.
-  // expected-targeted-and-complete-note @-3 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-targeted-and-complete-note @-3 7 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // expected-complete-and-tns-note @-4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
@@ -251,13 +262,13 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{transferring 'self' may cause a race}}
-    // expected-tns-note @-3 {{transferring nonisolated 'self' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+    // expected-tns-warning @-2 {{sending 'self' risks causing data races}}
+    // expected-tns-note @-3 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{transferring 'self' may cause a race}}
-    // expected-tns-note @-3 {{transferring nonisolated 'self' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+    // expected-tns-warning @-2 {{sending 'self' risks causing data races}}
+    // expected-tns-note @-3 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -268,19 +279,52 @@ final class NonSendable {
 
   @MainActor
   var x: Int { 0 }
+
+  @CustomActor
+  var y: Int { 0 }
+
+  var z: Int { 0 }
 }
 
+// This is not an error since t.update and t.x are both main actor isolated. We
+// still get the returning main actor-isolated property 'x' error though.
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
-  let t = NonSendable() // expected-tns-note {{variable defined here}}
+  let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 't' may cause a race}}
-  // expected-tns-note @-3 {{'t' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-tns-note@-2 {{access here could race}}
+}
+
+// We get the region isolation error here since t.y is custom actor isolated.
+@available(SwiftStdlib 5.1, *)
+func testNonSendableBaseArg2() async {
+  let t = NonSendable()
+  await t.update()
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{sending 't' risks causing data races}}
+  // TODO: Improve the diagnostic so that we say custom actor isolated instead since t.y
+  // is custom actor isolated.
+  // expected-tns-note @-5 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = await t.y
+  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to global actor 'CustomActor'-isolated property 'y' cannot cross actor boundary}}
+  // expected-tns-note @-2 {{access can happen concurrently}}
+}
+
+// We get the region isolation error here since t.z is not isolated.
+@available(SwiftStdlib 5.1, *)
+func testNonSendableBaseArg3() async {
+  let t = NonSendable()
+  await t.update()
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{sending 't' risks causing data races}}
+  // expected-tns-note @-3 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = t.z
+  // expected-tns-note @-1 {{access can happen concurrently}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -295,14 +339,14 @@ func callNonisolatedAsyncClosure(
 ) async {
   await g(ns)
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 'ns' may cause a race}}
-  // expected-tns-note @-3 {{transferring main actor-isolated 'ns' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
+  // expected-tns-note @-3 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{transferring 'ns' may cause a race}}
-  // expected-tns-note @-3 {{transferring main actor-isolated 'ns' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
+  // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
+  // expected-tns-note @-3 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -352,12 +396,98 @@ func testPointersAreNotSendable() {
 extension SynthesizedConformances.NotSendable: Sendable {}
 
 enum SynthesizedConformances {
-  // expected-note@+1 2 {{consider making struct 'NotSendable' conform to the 'Sendable' protocol}}
   struct NotSendable: Equatable {}
 
-  // expected-warning@+2 2{{non-sendable type 'SynthesizedConformances.NotSendable' in asynchronous access to main actor-isolated property 'x' cannot cross actor boundary}}
-  // expected-note@+1 2 {{in derived conformance to 'Equatable'}}
+  // expected-warning@+2 2{{main actor-isolated property 'x' can not be referenced from a non-isolated context}}
+  // expected-note@+1 2{{in static method '==' for derived conformance to 'Equatable'}}
   @MainActor struct Isolated: Equatable {
-    let x: NotSendable
+    let x: NotSendable // expected-note 2{{property declared here}}
   }
+}
+
+@available(SwiftStdlib 5.1, *)
+final class UseNonisolatedUnsafe: Sendable {
+  nonisolated(unsafe) var x1: NonSendable = .init()
+  nonisolated(unsafe) let x2: NonSendable = .init()
+  nonisolated(unsafe) var x3: Int = 0
+
+  func captureInTask() {
+    nonisolated(unsafe) var x = NonSendable()
+    Task {
+      print(x)
+      x = NonSendable()
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@preconcurrency
+func preconcurrencyContext(_: @escaping @Sendable () -> Void) {}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+struct DowngradeForPreconcurrency {
+  func capture(completion: @escaping @MainActor () -> Void) {
+    preconcurrencyContext {
+      Task {
+        completion()
+        // expected-warning@-1 2 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a `@Sendable` closure; this is an error in the Swift 6 language mode}}
+        // expected-note@-2 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+        // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
+        // expected-note@-4 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
+      }
+    }
+  }
+
+  var x: NonSendable
+  func createStream() -> AsyncStream<NonSendable> {
+    AsyncStream<NonSendable> {
+      self.x
+      // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
+      // expected-note@-2 {{property access is 'async'}}
+      // expected-warning@-3 {{non-sendable type 'NonSendable' in implicitly asynchronous access to main actor-isolated property 'x' cannot cross actor boundary; this is an error in the Swift 6 language mode}}
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor protocol InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+struct ImplicitSendableViaMain: InferMainActor {}
+
+@available(SwiftStdlib 5.1, *)
+extension ImplicitSendableViaMain {
+  nonisolated func capture() {
+    Task { @MainActor in
+      _ = self
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+struct TestImplicitSendable: Sendable {
+  var x: ImplicitSendableViaMain
+}
+
+struct UnavailableSendable {}
+
+@available(*, unavailable)
+extension UnavailableSendable: Sendable {}
+// expected-note@-1 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+
+@available(SwiftStdlib 5.1, *)
+func checkOpaqueType() -> some Sendable {
+  UnavailableSendable()
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
+}
+
+// rdar://129024926
+
+@available(SwiftStdlib 5.1, *)
+@MainActor class MainActorSuper<T: Sendable> {}
+
+@available(SwiftStdlib 5.1, *)
+class MainActorSub: MainActorSuper<MainActorSub.Nested> {
+  struct Nested {}  // no cycle
 }

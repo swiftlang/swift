@@ -219,7 +219,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 
   // Is the plural string just "[singular]s"?
   plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
+  if (plural.ends_with(firstLeftoverWord))
     return commonPrefixPlusWord;
 
   if (plural.empty() || plural.back() != 'e')
@@ -227,7 +227,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 
   // Is the plural string "[singular]es"?
   plural = plural.drop_back();
-  if (plural.endswith(firstLeftoverWord))
+  if (plural.ends_with(firstLeftoverWord))
     return commonPrefixPlusWord;
 
   if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
@@ -236,7 +236,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
   // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
   plural = plural.drop_back();
   firstLeftoverWord = firstLeftoverWord.drop_back();
-  if (plural.endswith(firstLeftoverWord))
+  if (plural.ends_with(firstLeftoverWord))
     return commonPrefixPlusWord;
 
   return commonPrefix;

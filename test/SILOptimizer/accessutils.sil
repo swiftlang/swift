@@ -27,6 +27,10 @@ struct Ptr {
   var p: Int64
 }
 
+class C {}
+
+sil @_getC : $@convention(thin) () -> @owned C
+
 // CHECK-LABEL: Accesses for readIdentifiedArg
 // CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Scope: base
@@ -358,7 +362,7 @@ bb0:
   (%1, %2, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64)
   %4 = load %1 : $*String
   %5 = load %2 : $*Int64
-  end_apply %3
+  end_apply %3 as $()
   %7 = tuple ()
   return %7 : $()
 }
@@ -409,9 +413,9 @@ bb0(%inoutArg : $*Int64, %aliasableArg1 : $*Int64, %aliasableArg2 : $*Int64, %3 
 
   %50 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int64
   (%yield1, %52) = begin_apply %50() : $@yield_once @convention(thin) () -> @yields @inout Int64
-  end_apply %52
+  end_apply %52 as $()
   (%yield2, %55) = begin_apply %50() : $@yield_once @convention(thin) () -> @yields @inout Int64
-  end_apply %55
+  end_apply %55 as $()
 
   %isDistinct = function_ref @_isDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
   %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
@@ -521,4 +525,25 @@ bb0(%twoInts: $*TwoInts):
 
   %200 = tuple ()
   return %200 : $()
+}
+
+// CHECK-LABEL: Accesses for storeBorrow
+// CHECK: Value:   [[SB:%.*]] = store_borrow %0 to [[DEST:%.*]] : $*C
+// CHECK:   Scope: base
+// CHECK:   Base: storeBorrow -   [[SB]] = store_borrow %0 to [[DEST]] : $*C
+// CHECK:   Path: ""
+// CHECK:    no Storage paths
+// CHECK-LABEL: End accesses for storeBorrow
+sil [ossa] @storeBorrow : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1 : $*C
+  %3 = function_ref @_getC : $@convention(thin) () -> @owned C
+  %4 = apply %3() : $@convention(thin) () -> @owned C
+  %5 = mark_dependence [unresolved] %4 : $C on %2 : $*C
+  %6 = load [copy] %2 : $*C
+  destroy_value %5 : $C
+  end_borrow %2 : $*C
+  dealloc_stack %1 : $*C
+  return %6 : $C
 }

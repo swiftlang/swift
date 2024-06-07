@@ -157,6 +157,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto context = AI.getFunction()->getTypeExpansionContext();
   auto oldOpRetTypes = substConventions.getIndirectSILResultTypes(context);
   auto newOpRetTypes = convertConventions.getIndirectSILResultTypes(context);
+  auto oldIndirectErrorResultType =
+      substConventions.getIndirectErrorResultType(context);
+  auto newIndirectErrorResultType =
+      convertConventions.getIndirectErrorResultType(context);
   auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
@@ -186,7 +190,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
        ++OpI, ++newRetI, ++oldRetI) {
     convertOp(Ops[OpI], *oldRetI, *newRetI);
   }
-  
+
+  if (oldIndirectErrorResultType) {
+    assert(newIndirectErrorResultType);
+    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType);
+    ++OpI;
+  }
+
   auto newParamI = newOpParamTypes.begin();
   auto oldParamI = oldOpParamTypes.begin();
   for (auto e = newOpParamTypes.end(); newParamI != e;
@@ -263,8 +273,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   ...
 ///   load/store %addr
-bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
-                                          SILFunction *callee) {
+bool swift::tryOptimizeKeypathApplication(ApplyInst *AI,
+                                          SILFunction *callee, SILBuilder Builder) {
   if (AI->getNumArguments() != 3)
     return false;
 
@@ -303,7 +313,6 @@ bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
     }
   });
   
-  eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
 }
@@ -329,9 +338,9 @@ bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
 ///   %offset_builtin_int = unchecked_trivial_bit_cast %offset_ptr
 ///   %offset_int = struct $Int (%offset_builtin_int)
 ///   %offset = enum $Optional<Int>, #Optional.some!enumelt, %offset_int
-bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
+bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
                                              FuncDecl *calleeFn,
-                                             KeyPathInst *kp) {
+                                             KeyPathInst *kp, SILBuilder Builder) {
   auto *accessor = dyn_cast<AccessorDecl>(calleeFn);
   if (!accessor || !accessor->isGetter())
     return false;
@@ -432,7 +441,6 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     result = Builder.createOptionalNone(loc, AI->getType());
   }
   AI->replaceAllUsesWith(result);
-  eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
 }
@@ -444,9 +452,9 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
 ///   %string = apply %keypath_kvcString_method(%kp)
 /// With:
 ///   %string = string_literal "blah"
-bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
+bool swift::tryOptimizeKeypathKVCString(ApplyInst *AI,
                                               FuncDecl *calleeFn,
-                                              KeyPathInst *kp) {
+                                              KeyPathInst *kp, SILBuilder Builder) {
   if (!calleeFn->getAttrs()
         .hasSemanticsAttr(semantics::KEYPATH_KVC_KEY_PATH_STRING))
     return false;
@@ -499,14 +507,13 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
   }
 
   AI->replaceAllUsesWith(literalValue);
-  eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
 }
 
-bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
+bool swift::tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder) {
   if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
-    return tryOptimizeKeypathApplication(AI, callee);
+    return tryOptimizeKeypathApplication(AI, callee, Builder);
   }
   
   // Try optimize keypath method calls.
@@ -530,10 +537,10 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   if (!kp || !kp->hasPattern())
     return false;
   
-  if (tryOptimizeKeypathOffsetOf(AI, calleeFn, kp))
+  if (tryOptimizeKeypathOffsetOf(AI, calleeFn, kp, Builder))
     return true;
 
-  if (tryOptimizeKeypathKVCString(AI, calleeFn, kp))
+  if (tryOptimizeKeypathKVCString(AI, calleeFn, kp, Builder))
     return true;
 
   return false;
@@ -657,7 +664,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       return false;
     // As we are extending the lifetimes of owned parameters, we have to make
     // sure that no dealloc_ref or dealloc_stack_ref instructions are
-    // within this extended liferange.
+    // within this extended liverange.
     // It could be that the dealloc_ref is deallocating a parameter and then
     // we would have a release after the dealloc.
     if (VLA.containsDeallocRef(Frontier))
@@ -1423,7 +1430,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
 ///  getContiguousArrayStorageType<Int>(for:)
 ///    => metatype @thick ContiguousArrayStorage<Int>.Type
 /// We know that `getContiguousArrayStorageType` will not return the AnyObject
-/// type optimization for any non class or objc existential type instantiation.
+/// type optimization for any non class or objc existential type instantiation
+/// or a C++ foreign reference type.
 static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
   if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
@@ -1444,8 +1452,18 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
-      isa<AnyFunctionType>(ty) ||
+      isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||
       (ty->isAnyExistentialType() && !ty->isObjCExistentialType()))
+    return true;
+
+  return false;
+}
+
+static bool canBeRemovedIfResultIsNotUsed(SILFunction *f) {
+  if (f->getEffectsKind() < EffectsKind::ReleaseNone)
+    return true;
+
+  if (f->hasSemanticsAttr("string.init_empty_with_capacity"))
     return true;
 
   return false;
@@ -1465,12 +1483,14 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
-  if (tryOptimizeKeypath(AI))
+  if (tryOptimizeKeypath(AI, Builder)) {
+    eraseInstFromFunction(*AI);
     return nullptr;
+  }
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunctionOrNull();
-  if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
+  if (SF && canBeRemovedIfResultIsNotUsed(SF)) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       if (eraseApply(AI, Users))

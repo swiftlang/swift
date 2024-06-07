@@ -25,4 +25,49 @@ bb0(%0 : $Builtin.RawPointer):
   return %ptr : $Builtin.RawPointer
 }
 
+public struct S {}
+public struct C {
+  var x: MP
+}
+
+enum MP {
+  case A(S)
+  case B(S)
+}
+
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum_without_take
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK-NOT:      name "a"
+// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", expr op_fragment:#C.x
+// CHECK-NEXT:   debug_value undef : $*MP, let, name "b"
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb3:
+// CHECK:        destroy_addr [[A]]
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_without_take'
+sil @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP, let, name "a", expr op_fragment:#C.x
+  debug_value %1 : $*MP, let, name "b", expr op_deref
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb3:
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+
 // CHECK-IR: ![[DBG_VAR]] = !DILocalVariable(name: "hello"

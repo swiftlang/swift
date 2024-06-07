@@ -6,16 +6,16 @@ func doSomething<T>(_ t: T) {}
 
 func outerGeneric<T>(t: T, x: AnyObject) {
   // Simple case -- closure captures outer generic parameter
-  // CHECK: closure_expr type="() -> ()" {{.*}} discriminator=0 captures=(<generic> t<direct>) escaping single_expression
+  // CHECK: closure_expr type="() -> ()" {{.*}} discriminator=0 nonisolated captures=(<generic> t<direct>) escaping single_expression
   _ = { doSomething(t) }
 
   // Special case -- closure does not capture outer generic parameters
-  // CHECK: closure_expr type="() -> ()" {{.*}} discriminator=1 captures=(x<direct>) escaping single_expression
+  // CHECK: closure_expr type="() -> ()" {{.*}} discriminator=1 nonisolated captures=(x<direct>) escaping single_expression
   _ = { doSomething(x) }
 
   // Special case -- closure captures outer generic parameter, but it does not
   // appear as the type of any expression
-  // CHECK: closure_expr type="() -> ()" {{.*}} discriminator=2 captures=(<generic> x<direct>)
+  // CHECK: closure_expr type="() -> ()" {{.*}} discriminator=2 nonisolated captures=(<generic> x<direct>)
   _ = { if x is T {} }
 
   // Nested generic functions always capture outer generic parameters, even if

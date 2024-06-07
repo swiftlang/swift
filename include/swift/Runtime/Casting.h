@@ -259,6 +259,7 @@ SWIFT_RUNTIME_EXPORT
 const WitnessTable *
 swift_conformsToProtocolCommon(const Metadata *type,
                                const ProtocolDescriptor *protocol);
+
 } // end namespace swift
 
 #endif // SWIFT_RUNTIME_CASTING_H

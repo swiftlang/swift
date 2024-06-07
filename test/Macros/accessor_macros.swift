@@ -163,3 +163,14 @@ struct MultipleVars {
   // expected-error@-1 2{{accessor macro 'AddWillSet()' can only apply to a single variable}}
 }
 #endif
+
+@attached(accessor)
+macro addGetterMacro() =
+    #externalMacro(module: "MacroDefinition", type: "AddGetterMacro")
+
+#if TEST_DIAGNOSTICS
+struct S {
+  @addGetterMacro let x: Int
+  // expected-warning@-1 {{cannot expand accessors on variable declared with 'let'; this is an error in the Swift 6 language mode}}
+}
+#endif

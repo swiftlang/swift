@@ -127,6 +127,29 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->eraseBlock(this);
 }
 
+/// Handle the mechanical aspects of removing an unreachable block.
+void SILBasicBlock::removeDeadBlock() {
+  for (SILArgument *arg : getArguments()) {
+    arg->replaceAllUsesWithUndef();
+    // To appease the ownership verifier, just set to None.
+    arg->setOwnershipKind(OwnershipKind::None);
+  }
+
+  // Instructions in the dead block may be used by other dead blocks.  Replace
+  // any uses of them with undef values.
+  while (!empty()) {
+    // Grab the last instruction in the bb.
+    auto *inst = &back();
+
+    // Replace any still-remaining uses with undef values and erase.
+    inst->replaceAllUsesOfAllResultsWithUndef();
+    inst->eraseFromParent();
+  }
+
+  // Now that the bb is empty, eliminate it.
+  eraseFromParent();
+}
+
 void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   assert(Other->isEntry() == isEntry() &&
          "Expected to both blocks to be entries or not");
@@ -232,7 +255,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
   // replacePhiArgument() expects the replaced argument to not have
   // any uses.
   SmallVector<Operand *, 16> operands;
-  SILValue undef = SILUndef::get(ty, *getParent());
+  SILValue undef = SILUndef::get(getParent(), ty);
   SILArgument *arg = getArgument(i);
   while (!arg->use_empty()) {
     Operand *use = *arg->use_begin();
@@ -335,12 +358,17 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
       for (SILValue result : II.getResults()) {
         result->resetBitfields();
       }
+      for (Operand &op : II.getAllOperands()) {
+        op.resetBitfields();
+      }
       II.asSILNode()->resetBitfields();
     
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
       // Special handling for SILDebugVariable.
+      // Fetch incomplete var info to avoid calling setDebugVarScope on
+      // alloc_box, crashing.
       if (auto DVI = DebugVarCarryingInst(&II))
-        if (auto VarInfo = DVI.getVarInfo())
+        if (auto VarInfo = DVI.getVarInfo(false))
           if (VarInfo->Scope)
             DVI.setDebugVarScope(
                 ScopeCloner.getOrCreateClonedScope(VarInfo->Scope));

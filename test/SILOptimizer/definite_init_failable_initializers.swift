@@ -43,7 +43,7 @@ struct FailableStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV24failBeforeInitializationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thin FailableStruct.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableStruct
 // CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
 // CHECK-NEXT:    return [[SELF]]
@@ -53,7 +53,7 @@ struct FailableStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV30failAfterPartialInitializationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thin FailableStruct.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableStruct
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -71,7 +71,7 @@ struct FailableStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV27failAfterFullInitializationACSgyt_tcfC
 // CHECK:       bb0
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableStruct
 // CHECK:         [[CANARY1:%.*]] = apply
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -94,7 +94,7 @@ struct FailableStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV46failAfterWholeObjectInitializationByAssignmentACSgyt_tcfC :
 // CHECK:       bb0
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableStruct
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableStruct
 // CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
@@ -110,7 +110,7 @@ struct FailableStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV46failAfterWholeObjectInitializationByDelegationACSgyt_tcfC
 // CHECK:       bb0
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers14FailableStructV6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%0)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
@@ -125,7 +125,7 @@ struct FailableStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers14FailableStructV20failDuringDelegationACSgyt_tcfC
 // CHECK:       bb0
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers14FailableStructV24failBeforeInitializationACSgyt_tcfC
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]](%0)
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
@@ -194,7 +194,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers22FailableAddrOnlyStructV{{[_0-9a-zA-Z]*}}failBeforeInitialization{{.*}}tcfC
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableAddrOnlyStruct<T>
 // CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    inject_enum_addr %0
 // CHECK:         return
@@ -204,7 +204,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers22FailableAddrOnlyStructV{{[_0-9a-zA-Z]*}}failAfterPartialInitialization{{.*}}tcfC
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableAddrOnlyStruct<T>
 // CHECK:         [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator
@@ -226,7 +226,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers22FailableAddrOnlyStructV{{[_0-9a-zA-Z]*}}failAfterFullInitialization{{.*}}tcfC
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableAddrOnlyStruct<T>
 // CHECK:         [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator
@@ -311,7 +311,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV20failBeforeDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
@@ -332,7 +332,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV28failBeforeOrDuringDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
@@ -358,7 +358,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV29failBeforeOrDuringDelegation2ACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
@@ -383,7 +383,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV20failDuringDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV4failACyt_tKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowStruct):
@@ -401,7 +401,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV19failAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
 // CHECK-NEXT:    retain_value [[NEW_SELF]]
@@ -425,7 +425,7 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV27failDuringOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowStruct
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV4failACyt_tKcfC
@@ -468,7 +468,7 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV27failBeforeOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowStruct
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
@@ -513,7 +513,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV16throwsToOptionalACSgSi_tcfC
 // CHECK:       bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@thin ThrowStruct.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV20failDuringDelegationACSi_tKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG1]], [[ARG2]]) : $@convention(method) (Int, @thin ThrowStruct.Type) -> (@owned ThrowStruct, @error any Error), normal [[TRY_APPLY_SUCC_BB:bb[0-9]+]], error [[TRY_APPLY_FAIL_BB:bb[0-9]+]]
 //
@@ -574,7 +574,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV25failDuringSelfReplacementACSi_tKcfC :
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV4failACyt_tKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowStruct):
@@ -594,7 +594,7 @@ struct ThrowStruct {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV24failAfterSelfReplacementACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
@@ -750,7 +750,7 @@ class FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17FailableBaseClassC20failBeforeDelegationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableBaseClass
 // CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
 // CHECK-NEXT:    return [[RESULT]]
@@ -760,7 +760,7 @@ class FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableBaseClass
 // CHECK:         [[INIT_FN:%.*]] = class_method %0
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%0)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
@@ -775,7 +775,7 @@ class FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfC
 // CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableBaseClass
 // CHECK:         [[INIT_FN:%.*]] = class_method %0
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]](%0)
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
@@ -831,7 +831,7 @@ class FailableDerivedClass : FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers20FailableDerivedClassC27derivedFailBeforeDelegationACSgyt_tcfc
 // CHECK:       bb0(%0 : $FailableDerivedClass):
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableDerivedClass
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableDerivedClass
 // CHECK:         store %0 to [[SELF_BOX]]
 // CHECK-NEXT:    [[RELOAD_FROM_SELF_BOX:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick FailableDerivedClass.Type
@@ -846,7 +846,7 @@ class FailableDerivedClass : FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers20FailableDerivedClassC27derivedFailDuringDelegationACSgyt_tcfc
 // CHECK:       bb0([[SELF:%.*]] : $FailableDerivedClass):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableDerivedClass
 // CHECK:         store [[SELF]] to [[SELF_BOX]]
 // CHECK:         [[CANARY_FUN:%.*]] = function_ref @$s35definite_init_failable_initializers6CanaryCACycfC :
 // CHECK:         [[CANARY:%.*]] = apply [[CANARY_FUN]](
@@ -923,7 +923,7 @@ class ThrowBaseClass {
 class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassCACyKcfc
 // CHECK:       bb0([[SELF:%.*]] : $ThrowDerivedClass):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         store [[SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast [[RELOAD_SELF]]
@@ -949,7 +949,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitializationACSi_tKcfc
 // CHECK:       bb0(%0 : $Int, [[SELF:%.*]] : $ThrowDerivedClass):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         store [[SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
@@ -978,7 +978,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitialization0h6DuringjK0ACSi_SitKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]] : $*ThrowDerivedClass
@@ -1024,7 +1024,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failAfterFullInitializationACSi_tKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         store %1 to [[SELF_BOX]]
 // CHECK-NEXT:    [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast [[RELOAD_SELF]]
@@ -1052,7 +1052,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failAfterFullInitialization0h6DuringjK0ACSi_SitKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowDerivedClass
 // CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]]
@@ -1101,7 +1101,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitialization0h5AfterjK0ACSi_SitKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]]
@@ -1166,7 +1166,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitialization0h6DuringjK00h5AfterjK0ACSi_S2itKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %3 to [[SELF_BOX]]
@@ -1237,7 +1237,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC20failBeforeDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
@@ -1258,7 +1258,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC20failDuringDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers17ThrowDerivedClassCACyKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowDerivedClass):
@@ -1276,7 +1276,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeOrDuringDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
@@ -1302,7 +1302,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC29failBeforeOrDuringDelegation2ACSi_tKcfC
 // CHECK:         bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
@@ -1327,7 +1327,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC19failAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $ThrowDerivedClass
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
 // CHECK-NEXT:    strong_retain [[NEW_SELF]]
@@ -1351,7 +1351,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failDuringOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK:         [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowDerivedClass
 // CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers17ThrowDerivedClassCACyKcfC
@@ -1393,7 +1393,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failBeforeOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] [var_decl] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF

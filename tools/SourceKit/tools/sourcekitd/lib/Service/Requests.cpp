@@ -288,8 +288,8 @@ static sourcekitd_response_t editorExtractTextFromComment(StringRef Source);
 
 static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source);
 
-static sourcekitd_response_t
-editorClose(StringRef Name, bool RemoveCache);
+static sourcekitd_response_t editorClose(StringRef Name, bool CancelBuilds,
+                                         bool RemoveCache);
 
 static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
@@ -831,10 +831,19 @@ handleRequestEditorClose(const RequestDict &Req,
     if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
 
-    // Whether we remove the cached AST from libcache, by default, false.
-    int64_t RemoveCache = false;
+    // Whether to cancel in-flight builds, default true.
+    int64_t CancelBuilds = true;
+    Req.getInt64(KeyCancelBuilds, CancelBuilds, /*isOptional=*/true);
+
+    // Whether to remove the cached AST from libcache. This is currently true by
+    // default since future requests will never match matchesSourceState or
+    // cursor info's canUseASTWithSnapshots since the newly opened document
+    // will always have a mismatching stamp. Once we fix that
+    // (rdar://127353608), we ought to be able to switch this back to false by
+    // default.
+    int64_t RemoveCache = true;
     Req.getInt64(KeyRemoveCache, RemoveCache, /*isOptional=*/true);
-    return Rec(editorClose(*Name, RemoveCache));
+    return Rec(editorClose(*Name, CancelBuilds, RemoveCache));
   }
 }
 
@@ -3656,11 +3665,11 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
   return EditC.createResponse();
 }
 
-static sourcekitd_response_t
-editorClose(StringRef Name, bool RemoveCache) {
+static sourcekitd_response_t editorClose(StringRef Name, bool CancelBuilds,
+                                         bool RemoveCache) {
   ResponseBuilder RespBuilder;
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorClose(Name, RemoveCache);
+  Lang.editorClose(Name, CancelBuilds, RemoveCache);
   return RespBuilder.createResponse();
 }
 

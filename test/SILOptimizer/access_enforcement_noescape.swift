@@ -60,7 +60,7 @@ func readRead() {
   x = 42
 }
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape8readReadyyF : $@convention(thin) () -> () {
-// CHECK: [[ALLOC:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[ALLOC:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // CHECK-NOT: begin_access
 // CHECK: apply
 // CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape8readReadyyF'

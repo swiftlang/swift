@@ -170,8 +170,12 @@ public:
   bool hasArchetypes() const;
 
   /// Query whether any replacement types in the map contain an opened
-  /// existential.
+  /// existential or opened element.
   bool hasLocalArchetypes() const;
+
+  /// Query whether any replacement types in the map contain an opaque
+  /// return type.
+  bool hasOpaqueArchetypes() const;
 
   /// Query whether any replacement types in the map contain dynamic Self.
   bool hasDynamicSelf() const;

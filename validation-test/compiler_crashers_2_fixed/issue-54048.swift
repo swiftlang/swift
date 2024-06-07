@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-silgen
 
-// REQUIRES: asserts
-
 // https://github.com/apple/swift/issues/54048
 
 @propertyWrapper

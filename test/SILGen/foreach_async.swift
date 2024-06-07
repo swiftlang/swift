@@ -95,7 +95,7 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 
 // CHECK: [[NONE_BB]]:
 // CHECK:   funcEnd
-// CHECK    return
+// CHECK:   return
 // CHECK: } // end sil function '$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYaF'
 func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
   for await x in xx {
@@ -136,7 +136,7 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
 
 // CHECK: [[NONE_BB]]:
 // CHECK:   funcEnd
-// CHECK    return
+// CHECK:   return
 // CHECK: } // end sil function '$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYaF'
 
 func trivialStructContinue(_ xx: AsyncLazySequence<[Int]>) async {

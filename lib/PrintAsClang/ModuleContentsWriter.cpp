@@ -750,7 +750,7 @@ public:
       for (const Decl *D : declsToWrite) {
         if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
           const auto *type = ED->getExtendedNominal();
-          if (isa<StructDecl>(type))
+          if (isa<StructDecl>(type) || isa<EnumDecl>(type))
             printer.getInteropContext().recordExtensions(type, ED);
         }
       }
@@ -834,7 +834,7 @@ public:
             [&](const ValueDecl *vd) {
               return !printer.isVisible(vd) || vd->isObjC() ||
                      (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
-                      vd->getBaseIdentifier().str().startswith("_")) ||
+                      vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
                       vd->getASTContext().getErrorDecl() == vd);

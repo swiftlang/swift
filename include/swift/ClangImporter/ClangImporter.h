@@ -131,6 +131,7 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
+  friend class SwiftDeclSynthesizer;
 
   // Make requests in the ClangImporter zone friends so they can access `Impl`.
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
@@ -193,7 +194,7 @@ public:
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        std::vector<std::string> &CC1Args);
+                        const std::vector<std::string> &CC1Args);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -401,8 +402,10 @@ public:
   getWrapperForModule(const clang::Module *mod,
                       bool returnOverlayIfPossible = false) const override;
 
-  std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
-                                        time_t &fileModTime);
+  std::string
+  getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
+                            time_t &fileModTime,
+                            StringRef pchIncludeTree);
 
   /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads
   /// an Objective-C header file into the replica and emits a PCH file of its
@@ -446,7 +449,9 @@ public:
   void verifyAllModules() override;
 
   using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  bridgeClangModuleDependencies(
+      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
       StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 
@@ -463,11 +468,12 @@ public:
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  /// Add dependency information for the bridging header.
+  /// Add dependency information for header dependencies
+  /// of a binary Swift module.
   ///
   /// \param moduleID the name of the Swift module whose dependency
   /// information will be augmented with information about the given
-  /// bridging header.
+  /// textual header inputs.
   ///
   /// \param clangScanningTool The clang dependency scanner.
   ///
@@ -475,10 +481,11 @@ public:
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  bool addBridgingHeaderDependencies(
+  bool addHeaderDependencies(
       ModuleDependencyID moduleID,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       ModuleDependenciesCache &cache);
+
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
@@ -509,6 +516,9 @@ public:
 
   std::string getClangModuleHash() const;
 
+  /// Get clang import creation cc1 args for swift explicit module build.
+  std::vector<std::string> getSwiftExplicitModuleDirectCC1Args() const;
+
   /// If we already imported a given decl successfully, return the corresponding
   /// Swift decl as an Optional<Decl *>, but if we previously tried and failed
   /// to import said decl then return nullptr.
@@ -535,7 +545,7 @@ public:
   void printStatistics() const override;
 
   /// Dump Swift lookup tables.
-  void dumpSwiftLookupTables();
+  void dumpSwiftLookupTables() const override;
 
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.
@@ -654,6 +664,11 @@ bool requiresCPlusPlus(const clang::Module *module);
 /// This could be the top-level std module, or any of the libc++ split modules
 /// (std_vector, std_iosfwd, etc).
 bool isCxxStdModule(const clang::Module *module);
+
+/// Returns true if the given module is one of the C++ standard library modules.
+/// This could be the top-level std module, or any of the libc++ split modules
+/// (std_vector, std_iosfwd, etc).
+bool isCxxStdModule(StringRef moduleName, bool IsSystem);
 
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.

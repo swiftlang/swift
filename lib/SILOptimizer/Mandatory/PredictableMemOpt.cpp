@@ -688,8 +688,9 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   // have multiple insertion points if we are storing exactly the same value
   // implying that we can just copy firstVal at each insertion point.
   SILSSAUpdater updater(&insertedPhiNodes);
-  updater.initialize(loadTy, B.hasOwnership() ? OwnershipKind::Owned
-                                              : OwnershipKind::None);
+  updater.initialize(&B.getFunction(), loadTy,
+                     B.hasOwnership() ? OwnershipKind::Owned
+                                      : OwnershipKind::None);
 
   std::optional<SILValue> singularValue;
   for (auto *insertPt : insertPts) {
@@ -865,8 +866,9 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // never have the same value along all paths unless we have a trivial value
   // meaning the SSA updater given a non-trivial value must /always/ be used.
   SILSSAUpdater updater(&insertedPhiNodes);
-  updater.initialize(loadTy, B.hasOwnership() ? OwnershipKind::Owned
-                                              : OwnershipKind::None);
+  updater.initialize(&B.getFunction(), loadTy,
+                     B.hasOwnership() ? OwnershipKind::Owned
+                                      : OwnershipKind::None);
 
   std::optional<SILValue> singularValue;
   for (auto *i : insertPts) {
@@ -2568,7 +2570,9 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
       // Today if we promote, this is always a store, since we would have
       // blown up the copy_addr otherwise. Given that, always make sure we
       // clean up the src as appropriate after we optimize.
-      auto *si = cast<StoreInst>(pmoMemUse.Inst);
+      auto *si = dyn_cast<StoreInst>(pmoMemUse.Inst);
+      if (!si)
+        return false;
       auto src = si->getSrc();
 
       // Bail if src has any uses that are forwarding unowned uses. This
@@ -2669,10 +2673,12 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     // Lexical enums can have incomplete lifetimes in non payload paths that
     // don't end in unreachable. Force their lifetime to end immediately after
     // the last use instead.
-    bool forceBoundaryCompletion = v->getType().isOrHasEnum();
+    auto boundary = v->getType().isOrHasEnum()
+                        ? OSSALifetimeCompletion::Boundary::Liveness
+                        : OSSALifetimeCompletion::Boundary::Availability;
     LLVM_DEBUG(llvm::dbgs() << "Completing lifetime of: ");
     LLVM_DEBUG(v->dump());
-    completion.completeOSSALifetime(v, forceBoundaryCompletion);
+    completion.completeOSSALifetime(v, boundary);
   }
 
   return true;

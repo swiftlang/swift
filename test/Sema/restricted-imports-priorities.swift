@@ -45,18 +45,22 @@ public struct LibAStruct {}
 
 //--- TwoIOI.swift
 @_implementationOnly import LibB
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 @_implementationOnly import LibC
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public func foo(a: LibAStruct) {} // expected-error {{cannot use struct 'LibAStruct' here; 'LibA' has been imported as implementation-only}}
 
 //--- SPIOnlyAndIOI1.swift
 @_spiOnly import LibB
 @_implementationOnly import LibC
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public func foo(a: LibAStruct) {} // expected-error {{cannot use struct 'LibAStruct' here; 'LibA' was imported for SPI only}}
 
 //--- SPIOnlyAndIOI2.swift
 @_implementationOnly import LibB
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 @_spiOnly import LibC
 
 public func foo(a: LibAStruct) {} // expected-error {{cannot use struct 'LibAStruct' here; 'LibA' was imported for SPI only}}

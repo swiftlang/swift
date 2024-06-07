@@ -127,6 +127,11 @@ void swift_reportError(uint32_t flags, const char *message);
 SWIFT_RUNTIME_EXPORT
 void swift_reportWarning(uint32_t flags, const char *message);
 
+#if !defined(SWIFT_HAVE_CRASHREPORTERCLIENT)
+SWIFT_RUNTIME_EXPORT
+std::atomic<const char *> *swift_getFatalErrorMessageBuffer();
+#endif
+
 // Halt due to an overflow in swift_retain().
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortRetainOverflow();

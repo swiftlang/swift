@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -DADDRESS_ONLY -emit-sil -verify %s
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -DLOADABLE -emit-sil -verify %s
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -DTRIVIAL -emit-sil -verify %s
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DADDRESS_ONLY -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DLOADABLE -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DTRIVIAL -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
 // REQUIRES: asserts
 

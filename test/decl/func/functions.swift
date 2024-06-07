@@ -192,8 +192,8 @@ func bogusDestructuring() {
     func registerCallback(_ callback: @escaping (Bar?) -> Void) {}
   }
 
-  Foo().registerCallback { ([Bar]) in } // expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}} {{29-29=_: }}
-  Foo().registerCallback { ([String: Bar]) in }// expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in Swift 6}} {{29-29=_: }}
+  Foo().registerCallback { ([Bar]) in } // expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{29-29=_: }}
+  Foo().registerCallback { ([String: Bar]) in }// expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{29-29=_: }}
   Foo().registerCallback { (Bar?) in } // expected-error {{unnamed parameters must be written with the empty name '_'}}
 
 }

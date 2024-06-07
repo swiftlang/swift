@@ -31,7 +31,7 @@ prefix operator .!
 /// elementwise accesses. Computational operations are defined on the `SIMD`
 /// protocol, which refines this protocol, and on the concrete types that
 /// conform to `SIMD`.
-public protocol SIMDStorage : _BitwiseCopyable {
+public protocol SIMDStorage {
   /// The type of scalars in the vector space.
   #if $Embedded
   associatedtype Scalar: Hashable
@@ -64,7 +64,7 @@ extension SIMDStorage {
 }
 
 /// A type that can be used as an element in a SIMD vector.
-public protocol SIMDScalar : _BitwiseCopyable {
+public protocol SIMDScalar : BitwiseCopyable {
   associatedtype SIMDMaskScalar: SIMDScalar & FixedWidthInteger & SignedInteger
     where SIMDMaskScalar.SIMDMaskScalar == SIMDMaskScalar
   associatedtype SIMD2Storage: SIMDStorage where SIMD2Storage.Scalar == Self
@@ -80,8 +80,7 @@ public protocol SIMDScalar : _BitwiseCopyable {
 public protocol SIMD<Scalar>:
   SIMDStorage,
   Hashable,
-  ExpressibleByArrayLiteral,
-  _BitwiseCopyable
+  ExpressibleByArrayLiteral
 {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD
@@ -96,8 +95,7 @@ public protocol SIMD<Scalar>:
   Codable,
   Hashable,
   CustomStringConvertible,
-  ExpressibleByArrayLiteral,
-  _BitwiseCopyable
+  ExpressibleByArrayLiteral
 {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD
@@ -722,6 +720,8 @@ public struct SIMDMask<Storage>: SIMD
   }
 }
 
+extension SIMDMask: Sendable where Storage: Sendable {}
+
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.
@@ -848,9 +848,9 @@ extension SIMD where Scalar: FixedWidthInteger {
   /// Equivalent to `indices.reduce(into: 0) { $0 &+= self[$1] }`.
   @_alwaysEmitIntoClient
   public func wrappedSum() -> Scalar {
-    var result:Scalar = 0
-    for index in indices {
-      result &+= self[index]
+    var result: Scalar = 0
+    for i in indices {
+      result &+= self[i]
     }
     return result
   }
@@ -929,7 +929,13 @@ extension SIMD where Scalar: FloatingPoint {
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
     // coding the tree sum is problematic, we probably need to define a
     // Swift Builtin to support it.
-    return indices.reduce(into: 0) { $0 += self[$1] }
+    //
+    // Use -0 so that LLVM can optimize away initial value + self[0].
+    var result = -Scalar.zero
+    for i in indices {
+      result += self[i]
+    }
+    return result
   }
 }
 

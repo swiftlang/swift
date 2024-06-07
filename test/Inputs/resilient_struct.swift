@@ -119,3 +119,5 @@ public struct UnavailableResilientInt {
     self.i = i
   }
 }
+
+public struct ResilientEmptyStruct {}

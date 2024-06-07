@@ -152,11 +152,19 @@ struct OwnershipModelEliminatorVisitor
     eraseInstructionAndRAUW(bbi, bbi->getOperand());
     return true;
   }
+  bool visitBorrowedFromInst(BorrowedFromInst *bfi) {
+    eraseInstructionAndRAUW(bfi, bfi->getBorrowedValue());
+    return true;
+  }
   bool visitEndBorrowInst(EndBorrowInst *ebi) {
     eraseInstruction(ebi);
     return true;
   }
   bool visitEndLifetimeInst(EndLifetimeInst *eli) {
+    eraseInstruction(eli);
+    return true;
+  }
+  bool visitExtendLifetimeInst(ExtendLifetimeInst *eli) {
     eraseInstruction(eli);
     return true;
   }
@@ -219,6 +227,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(LinearFunctionExtract)
   HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
   HANDLE_FORWARDING_INST(MarkUninitialized)
+  HANDLE_FORWARDING_INST(FunctionExtractIsolation)
 #undef HANDLE_FORWARDING_INST
 };
 

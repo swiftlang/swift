@@ -141,7 +141,7 @@ enum {
 /// After the swiftmodule file is written, the IsSerialized flag is cleared from
 /// all functions. This means that optimizations after the serialization point
 /// are not limited anymore regarding serialized functions.
-enum IsSerialized_t : unsigned char {
+enum SerializedKind_t : uint8_t {
 
   /// The function is not inlinable and will not be serialized.
   IsNotSerialized,
@@ -151,15 +151,30 @@ enum IsSerialized_t : unsigned char {
   /// This flag is only valid for Public, PublicNonABI, PublicExternal,
   /// HiddenExternal and Shared functions.
   /// Functions with external linkage (PublicExternal, HiddenExternal) will not
-  /// be serialized, because they are available in a different module (from which
-  /// they were de-serialized).
+  /// be serialized, because they are available in a different module (from
+  /// which they were de-serialized).
   ///
-  /// Functions with Shared linkage will only be serialized if they are referenced
-  /// from another serialized function (or table).
+  /// Functions with Shared linkage will only be serialized if they are
+  /// referenced from another serialized function (or table).
   ///
   /// This flag is removed from all functions after the serialization point in
   /// the optimizer pipeline.
-  IsSerialized
+  IsSerialized,
+
+  /// This flag is valid for all linkages applicable to IsSerialized as well as
+  /// Package, PackageNonABI, and PackageExternal, if package-wide
+  /// serialization is enabled with Package-CMO optimization.
+  ///
+  /// The [serialized_for_package] attribute is used to indicate that a function
+  /// is serialized because of Package CMO, which allows loadable types in a
+  /// serialized function in a resiliently built module, which is otherwise illegal.
+  /// It's also used to determine during SIL deserialization whether loadable
+  /// types in a serialized function can be allowed in the client module that
+  /// imports the module built with Package CMO. If the client contains a [serialized]
+  /// function due to `@inlinable`, funtions with [serialized_for_package] from
+  /// the imported module are not allowed being inlined into the client function,
+  /// which is the correct behavior.
+  IsSerializedForPackage
 };
 
 /// The scope in which a subclassable class can be subclassed.
@@ -289,6 +304,29 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
   llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
+/// Opt in package linkage for visibility in case Package CMO is enabled.
+/// Used in SIL verification and other checks that determine inlinability to
+/// accomodate for the optimization.
+inline bool hasPublicOrPackageVisibility(SILLinkage linkage, bool includePackage) {
+    switch (linkage) {
+    case SILLinkage::Public:
+    case SILLinkage::PublicExternal:
+    case SILLinkage::PublicNonABI:
+        return true;
+    case SILLinkage::Package:
+    case SILLinkage::PackageExternal:
+    case SILLinkage::PackageNonABI:
+        return includePackage;
+    case SILLinkage::Hidden:
+    case SILLinkage::Shared:
+    case SILLinkage::Private:
+    case SILLinkage::HiddenExternal:
+        return false;
+    }
+
+    llvm_unreachable("Unhandled SILLinkage in switch.");
+}
+
 inline bool hasSharedVisibility(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Shared:
@@ -371,12 +409,16 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
 // protocol requirement, even if the extended type is not public;
 // then SILGen gives the member private linkage, ignoring the more
 // visible access level it was given in the AST.
-inline bool
-fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness) {
+//
+// Despite the FIXME above, this is still used to determine the linkage
+// for witness thunks. In case package serialization is enabled, we need
+// to take the package linkage into account so we can set a proper final
+// linkage to the thunks in the witness table with a package linkage.
+inline bool fixmeWitnessHasLinkageThatNeedsToBePublic(SILDeclRef witness,
+                                                      bool isPackageVisible) {
   auto witnessLinkage = witness.getLinkage(ForDefinition);
-  return !hasPublicVisibility(witnessLinkage)
-         && (!hasSharedVisibility(witnessLinkage)
-             || !witness.isSerialized());
+  return !hasPublicOrPackageVisibility(witnessLinkage, isPackageVisible) &&
+         (!hasSharedVisibility(witnessLinkage) || !witness.isSerialized());
 }
 
 } // end swift namespace

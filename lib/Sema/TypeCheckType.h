@@ -24,8 +24,8 @@
 namespace swift {
 
 class ASTContext;
+class QualifiedIdentTypeRepr;
 class TypeRepr;
-class MemberTypeRepr;
 class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
@@ -202,6 +202,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is a custom attribute.
   CustomAttr,
+
+  /// Whether this is the argument of an inverted constraint (~).
+  Inverted,
 };
 
 /// Options that determine how type resolution should work.
@@ -298,6 +301,7 @@ public:
     case Context::GenericParameterInherited:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
+    case Context::Inverted:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -316,6 +320,7 @@ public:
     case Context::GenericRequirement:
     case Context::ExistentialConstraint:
     case Context::MetatypeBase:
+    case Context::Inverted:
       return false;
     case Context::None:
     case Context::ScalarGenericArgument:
@@ -353,6 +358,7 @@ public:
     case Context::PackElement:
     case Context::TupleElement:
     case Context::VariadicGenericArgument:
+    case Context::Inverted:
       return true;
     case Context::None:
     case Context::PatternBindingDecl:
@@ -425,6 +431,7 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::Inverted:
       return false;
     }
   }
@@ -624,7 +631,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  MemberTypeRepr *repr) const;
+                                  QualifiedIdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
@@ -674,12 +681,10 @@ void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
 /// \param repr the repr for the type of the parameter.
 /// \param ty the non-error resolved type of the repr.
 /// \param ownership the ownership kind of the parameter
-/// \param dc the decl context used for resolving the type
 /// \returns true iff a diagnostic was emitted and the \c repr was invalidated.
-bool diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
-                              ParamSpecifier ownership,
+bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
-                              TypeResolutionOptions options);
+                              const TypeResolution &resolution);
 
 } // end namespace swift
 

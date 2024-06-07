@@ -8,6 +8,8 @@ cake: Func P1.P1Constraint() has mangled name changing from '(extension in cake)
 cake: Func S1.foo3() has mangled name changing from 'cake.S1.foo3() -> ()' to 'static cake.S1.foo3() -> ()'
 cake: Func S1.foo5(x:y:) has mangled name changing from 'cake.S1.foo5(x: Swift.Int, y: Swift.Int) -> ()' to 'cake.S1.foo5(x: Swift.Int, y: Swift.Int, z: Swift.Int) -> ()'
 cake: Func Somestruct2.foo1(_:) has mangled name changing from 'static cake.Somestruct2.foo1(cake.C3) -> ()' to 'static cake.NSSomestruct2.foo1(cake.C1) -> ()'
+cake: Func addingAnInverse(_:) has generic signature change from <T> to <T where T : ~Copyable>
+cake: Func addingAnInverse(_:) has mangled name changing from 'cake.addingAnInverse<A>(A) -> ()' to 'cake.addingAnInverse<A where A: ~Swift.Copyable>(A) -> ()'
 cake: Func ownershipChange(_:_:) has mangled name changing from 'cake.ownershipChange(inout Swift.Int, __shared Swift.Int) -> ()' to 'cake.ownershipChange(Swift.Int, __owned Swift.Int) -> ()'
 cake: Func returnFunctionTypeOwnershipChange() has mangled name changing from 'cake.returnFunctionTypeOwnershipChange() -> (cake.C1) -> ()' to 'cake.returnFunctionTypeOwnershipChange() -> (__owned cake.C1) -> ()'
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
@@ -107,6 +109,7 @@ cake: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored 
 /* Protocol Conformance Change */
 cake: Class C7 has added a conformance to an existing protocol P1
 cake: Class SuperClassChange has added a conformance to an existing protocol P1
+cake: Enum IceKind has removed conformance to BitwiseCopyable
 cake: Enum IceKind has removed conformance to Sendable
 cake: Protocol P3 has added inherited protocol P4
 cake: Protocol P3 has removed inherited protocol P2

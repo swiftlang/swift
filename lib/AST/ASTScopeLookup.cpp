@@ -274,22 +274,24 @@ bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
   return false;
 }
 
-bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (scope->getCorrespondingNominalTypeDecl().isNull())
+    return false;
+
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return consumer.lookInMembers(scope->getGenericContext());
+}
+
+bool IterableTypeBodyPortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
     ASTScopeImpl::DeclConsumer consumer) const {
   if (scope->getCorrespondingNominalTypeDecl().isNull())
     return false;
   return consumer.lookInMembers(scope->getGenericContext());
-}
-
-bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
-    const GenericTypeOrExtensionScope *scope,
-    ASTScopeImpl::DeclConsumer consumer) const {
-  if (!scope->areMembersVisibleFromWhereClause())
-    return false;
-
-  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
-    scope, consumer);
 }
 
 bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {

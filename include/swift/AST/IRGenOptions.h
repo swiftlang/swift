@@ -337,6 +337,9 @@ public:
   /// Whether we should disable inserting autolink directives altogether.
   unsigned DisableAllAutolinking : 1;
 
+  /// Whether we should disable inserting __swift_FORCE_LOAD_ symbols.
+  unsigned DisableForceLoadSymbols : 1;
+
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
@@ -467,6 +470,8 @@ public:
   /// Use relative (and constant) protocol witness tables.
   unsigned UseRelativeProtocolWitnessTables : 1;
 
+  unsigned UseFragileResilientProtocolWitnesses : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -555,6 +560,7 @@ public:
         EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
+        UseFragileResilientProtocolWitnesses(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
@@ -602,7 +608,8 @@ public:
   }
 
   std::string getDebugFlags(StringRef PrivateDiscriminator,
-                            bool EnableCXXInterop) const {
+                            bool EnableCXXInterop,
+                            bool EnableEmbeddedSwift) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
       if (!Flags.empty())
@@ -614,6 +621,12 @@ public:
         Flags += " ";
       Flags += "-enable-experimental-cxx-interop";
     }
+    if (EnableEmbeddedSwift) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += "-enable-embedded-swift";
+    }
+
     return Flags;
   }
 
@@ -632,6 +645,10 @@ public:
   bool hasMultipleIRGenThreads() const { return !UseSingleModuleLLVMEmission && NumThreads > 1; }
   bool shouldPerformIRGenerationInParallel() const { return !UseSingleModuleLLVMEmission && NumThreads != 0; }
   bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
+
+  bool isDebugInfoCodeView() const {
+    return DebugInfoFormat == IRGenDebugInfoFormat::CodeView;
+  }
 };
 
 } // end namespace swift

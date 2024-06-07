@@ -57,7 +57,7 @@ func test_usedToBeAsync_but_remoteImplIsNotAnymore() async throws {
     // so mangling based on the 'async throws' thunk does not introduce
     // unexpected effects in remote calls.
     //
-    // Design limitation by choice: this means we cannot
+    // Design limitation by choice: this means we cannot overload distributed methods on async-ness alone
     target: RemoteCallTarget("$s4main7GreeterC28usedToHaveAsyncBytNotAnymoreSSyYaKFTE"),
     invocation: &invocation,
     throwing: Never.self,

@@ -42,10 +42,10 @@ class SubstitutionEntry {
   bool treatAsIdentifier = false;
 
 public:
-  void setNode(Node *node, bool treatAsIdentifier) {
+  void setNode(Node *node, bool treatAsIdentifier, size_t hash) {
     this->treatAsIdentifier = treatAsIdentifier;
     TheNode = node;
-    deepHash(node);
+    StoredHash = hash;
   }
 
   struct Hasher {
@@ -53,6 +53,14 @@ public:
       return entry.StoredHash;
     }
   };
+
+  bool isEmpty() const { return !TheNode; }
+
+  bool matches(Node *node, bool treatAsIdentifier) const {
+    return node == TheNode && treatAsIdentifier == this->treatAsIdentifier;
+  }
+
+  size_t hash() const { return StoredHash; }
 
 private:
   friend bool operator==(const SubstitutionEntry &lhs,
@@ -68,12 +76,6 @@ private:
   }
 
   static bool identifierEquals(Node *lhs, Node *rhs);
-
-  void combineHash(size_t newValue) {
-    StoredHash = 33 * StoredHash + newValue;
-  }
-
-  void deepHash(Node *node);
 
   bool deepEquals(Node *lhs, Node *rhs) const;
 };
@@ -131,6 +133,13 @@ protected:
   // Used to allocate temporary nodes and the output string (in Buffer).
   NodeFactory &Factory;
 
+  // Recursively calculating the node hashes can be expensive if the node tree
+  // is deep, so we keep a hash table mapping (Node *, treatAsIdentifier) pairs
+  // to hashes.
+  static const size_t HashHashCapacity = 512; // Must be a power of 2
+  static const size_t HashHashMaxProbes = 8;
+  SubstitutionEntry HashHash[HashHashCapacity] = {};
+
   // An efficient hash-map implementation in the spirit of llvm's SmallPtrSet:
   // The first 16 substitutions are stored in an inline-allocated array to avoid
   // malloc calls in the common case.
@@ -148,7 +157,16 @@ protected:
   RemanglerBuffer Buffer;
 
 protected:
-  RemanglerBase(NodeFactory &Factory) : Factory(Factory), Buffer(Factory) { }
+  RemanglerBase(NodeFactory &Factory)
+    : Factory(Factory), Buffer(Factory) { }
+
+  /// Compute the hash for a node.
+  size_t hashForNode(Node *node, bool treatAsIdentifier = false);
+
+  /// Construct a SubstitutionEntry for a given node.
+  /// This will look in the HashHash to see if we already know the hash,
+  /// to avoid having to walk the entire subtree.
+  SubstitutionEntry entryForNode(Node *node, bool treatAsIdentifier = false);
 
   /// Find a substitution and return its index.
   /// Returns -1 if no substitution is found.

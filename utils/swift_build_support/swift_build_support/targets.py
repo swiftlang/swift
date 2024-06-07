@@ -258,6 +258,14 @@ class StdlibDeploymentTarget(object):
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 
+    XROS = DarwinPlatform("xros", archs=["arm64", "arm64e"],
+                          sdk_name="XROS")
+
+    XROSSimulator = DarwinPlatform("xrsimulator",
+                                   archs=["arm64"],
+                                   sdk_name="XROS_SIMULATOR",
+                                   is_simulator=True)
+
     # A platform that's not tied to any particular OS, and it meant to be used
     # to build the stdlib as standalone and/or statically linked.
     Freestanding = Platform("freestanding", archs=[
@@ -280,6 +288,10 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64", "arm64"])
 
+    LinuxStatic = Platform('linux-static', sdk_name='LINUX_STATIC', archs=[
+        'x86_64',
+        'aarch64'])
+
     OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
@@ -298,8 +310,10 @@ class StdlibDeploymentTarget(object):
         iOS, iOSSimulator,
         AppleTV, AppleTVSimulator,
         AppleWatch, AppleWatchSimulator,
+        XROS, XROSSimulator,
         Freestanding,
         Linux,
+        LinuxStatic,
         FreeBSD,
         OpenBSD,
         Cygwin,
@@ -321,6 +335,8 @@ class StdlibDeploymentTarget(object):
         'TVOS_SIMULATOR': AppleTVSimulator.targets,
         'WATCHOS': AppleWatch.targets,
         'WATCHOS_SIMULATOR': AppleWatchSimulator.targets,
+        'XROS': XROS.targets,
+        'XROS_SIMULATOR': XROSSimulator.targets,
     }
 
     @staticmethod

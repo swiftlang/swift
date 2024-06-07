@@ -1,3 +1,4 @@
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-5.9 -DNO_CONSUME
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-6 -DNO_CONSUME
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -DNO_CONSUME
 
@@ -30,8 +31,8 @@ func testNonCopyableHolderConstDerefPointee() {
     holder.pointee.mutMethod(1) // expected-error {{cannot use mutating member on immutable value: 'pointee' is a get-only property}}
     holder.pointee.x = 2 // expected-error {{cannot assign to property: 'pointee' is a get-only property}}
 #else
-    consumingNC(holder.pointee) // CHECK: [[@LINE]]:{{.*}}: error:
-    let consumeVal = holder.pointee // CHECK: [[@LINE]]:{{.*}}: error:
+    consumingNC(holder.pointee) // CHECK-DAG: [[@LINE]]:{{.*}}: error:
+    let consumeVal = holder.pointee // CHECK-DAG: [[@LINE]]:{{.*}}: error:
 #endif
 }
 

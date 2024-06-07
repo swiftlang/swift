@@ -8,7 +8,7 @@ func blackhole<T>(_ x:T) {
 
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply9testapplySiyF :
 // CHECK-NOT: alloc_box
-// CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // CHECK-LABEL: } // end sil function '$s26allocboxtostack_localapply9testapplySiyF'
 @inline(never)
 public func testapply() -> Int {
@@ -27,7 +27,7 @@ public func testapply() -> Int {
 
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply12testtryapplySiyKF :
 // CHECK-NOT: alloc_box
-// CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // CHECK-LABEL: } // end sil function '$s26allocboxtostack_localapply12testtryapplySiyKF'
 @inline(never)
 public func testtryapply() throws -> Int {
@@ -47,7 +47,7 @@ public func testtryapply() throws -> Int {
 
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply16testpartialapplySiyF :
 // CHECK-NOT: alloc_box
-// CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[STK:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // CHECK-LABEL: } // end sil function '$s26allocboxtostack_localapply16testpartialapplySiyF'
 @inline(never)
 public func testpartialapply() -> Int {
@@ -66,8 +66,8 @@ public func testpartialapply() -> Int {
 
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply12testtwoboxesSiyF :
 // CHECK-NOT: alloc_box
-// CHECK: [[STK1:%.*]] = alloc_stack $Int, var, name "x"
-// CHECK: [[STK2:%.*]] = alloc_stack $Int, var, name "y"
+// CHECK: [[STK1:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
+// CHECK: [[STK2:%.*]] = alloc_stack [var_decl] $Int, var, name "y"
 // CHECK-LABEL: } // end sil function '$s26allocboxtostack_localapply12testtwoboxesSiyF'
 @inline(never)
 public func testtwoboxes() -> Int {
@@ -124,8 +124,8 @@ public func testrecur() -> Int {
 // AppliesToSpecialize should have the order: bar bas common.
 // Only then, the functions get specialized correctly, and we won't see an assert in checkNoPromotedBoxInApply.
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply8testdfs1SiyF :
-// CHECK-NOT : alloc_box ${ var Int }, var, name "x"
-// CHECK-NOT : alloc_box ${ var Int }, var, name "y"
+// CHECK-NOT: alloc_box ${ var Int }, var, name "x"
+// CHECK-NOT: alloc_box ${ var Int }, var, name "y"
 // CHECK-LABEL:} // end sil function '$s26allocboxtostack_localapply8testdfs1SiyF'
 @inline(never)
 public func testdfs1() -> Int {

@@ -415,7 +415,7 @@ protected:
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
-    if (!Text.substr(Pos).startswith(str)) return false;
+    if (!Text.substr(Pos).starts_with(str)) return false;
     Pos += str.size();
     return true;
   }
@@ -566,7 +566,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
-  NodePointer demangleImplParameterTransferring();
+  NodePointer demangleImplParameterSending();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();
@@ -587,6 +587,7 @@ protected:
   NodePointer demangleRetroactiveProtocolConformanceRef();
   NodePointer popAnyProtocolConformance();
   NodePointer demangleConcreteProtocolConformance();
+  NodePointer demanglePackProtocolConformance();
   NodePointer popDependentProtocolConformance();
   NodePointer demangleDependentProtocolConformanceRoot();
   NodePointer demangleDependentProtocolConformanceInherited();

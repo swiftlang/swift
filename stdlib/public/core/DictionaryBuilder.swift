@@ -43,6 +43,9 @@ struct _DictionaryBuilder<Key: Hashable, Value> {
   }
 }
 
+@available(*, unavailable)
+extension _DictionaryBuilder: Sendable {}
+
 extension Dictionary {
   /// Creates a new dictionary with the specified capacity, then calls the given
   /// closure to initialize its contents.
@@ -99,6 +102,17 @@ extension _NativeDictionary {
     ) -> Int
   ) {
     self.init(capacity: capacity)
+
+    // If the capacity is 0, then our storage is the empty singleton. Those are
+    // read only, so we shouldn't attempt to write to them.
+    if capacity == 0 {
+      let c = initializer(
+        UnsafeMutableBufferPointer(start: nil, count: 0), 
+        UnsafeMutableBufferPointer(start: nil, count: 0))
+      _precondition(c == 0)
+      return
+    }
+
     let initializedCount = initializer(
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
       UnsafeMutableBufferPointer(start: _values, count: capacity))

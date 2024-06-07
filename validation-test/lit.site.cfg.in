@@ -130,8 +130,8 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
-if "@SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS@" == "TRUE":
-    config.available_features.add('noncopyable_generics')
+if "@SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES@" == "TRUE":
+    config.available_features.add('nonescapable_types')
 if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
     config.available_features.add('string_processing')
 if "@SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE@" == "TRUE":
@@ -139,13 +139,11 @@ if "@SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE@" == "TRUE":
 
 config.swift_freestanding_is_darwin = "@SWIFT_FREESTANDING_IS_DARWIN@" == "TRUE"
 config.swift_stdlib_use_relative_protocol_witness_tables = "@SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES@" == "TRUE"
+config.swift_stdlib_use_use_fragile_resilient_protocol_witness_tables = "@SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES@" == "TRUE"
 config.swift_enable_dispatch = "@SWIFT_ENABLE_DISPATCH@" == "TRUE"
 config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" == "TRUE"
 # Configured in DarwinSDKs.cmake
 config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
-
-if "@BOOTSTRAPPING_MODE@" != "OFF":
-  config.available_features.add('swift_in_compiler')
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

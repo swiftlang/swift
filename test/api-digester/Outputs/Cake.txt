@@ -1,6 +1,7 @@
 
 /* Generic Signature Changes */
 cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
+cake: Func addingAnInverse(_:) has generic signature change from <T> to <T where T : ~Copyable>
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 
 /* RawRepresentable Changes */
@@ -48,6 +49,7 @@ cake: Var C1.CIIns2 changes from strong to weak
 cake: EnumElement FrozenKind.AddedCase has been added as a new enum case
 
 /* Conformance changes */
+cake: Enum IceKind has removed conformance to BitwiseCopyable
 cake: Enum IceKind has removed conformance to Sendable
 cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement
 cake: Protocol P3 has added inherited protocol P4

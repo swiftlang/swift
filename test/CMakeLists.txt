@@ -58,7 +58,8 @@ function(get_test_dependencies SDK result_var_name)
       swift-ide-test
       swift-refactor
       swift-reflection-dump
-      swift-remoteast-test)
+      swift-remoteast-test
+      swift-scan-test)
 
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)
@@ -100,12 +101,15 @@ function(get_test_dependencies SDK result_var_name)
   if(("${SDK}" STREQUAL "IOS") OR
      ("${SDK}" STREQUAL "TVOS") OR
      ("${SDK}" STREQUAL "WATCHOS") OR
+     ("${SDK}" STREQUAL "XROS") OR
      ("${SDK}" STREQUAL "OSX") OR
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "XROS_SIMULATOR") OR
      ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
+     ("${SDK}" STREQUAL "LINUX_STATIC") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
      ("${SDK}" STREQUAL "OPENBSD") OR
@@ -191,7 +195,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
@@ -211,6 +215,7 @@ normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
 normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
+normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 # Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
@@ -312,14 +317,22 @@ foreach(SDK ${SWIFT_SDKS})
         endif()
       endif()
 
-      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET "embedded-stdlib")
-        list(APPEND test_dependencies "embedded-stdlib")
-      endif()
-      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET "embedded-darwin")
-        list(APPEND test_dependencies "embedded-darwin")
-      endif()
-      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET "embedded-concurrency")
-        list(APPEND test_dependencies "embedded-concurrency")
+      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+        if(TARGET "embedded-stdlib")
+          list(APPEND test_dependencies "embedded-stdlib")
+        endif()
+       if(TARGET "embedded-darwin")
+          list(APPEND test_dependencies "embedded-darwin")
+        endif()
+        if(TARGET "embedded-concurrency")
+          list(APPEND test_dependencies "embedded-concurrency")
+        endif()
+        if(TARGET "embedded-synchronization")
+          list(APPEND test_dependencies "embedded-synchronization")
+        endif()
+        if(TARGET "embedded-volatile")
+          list(APPEND test_dependencies "embedded-volatile")
+        endif()
       endif()
 
       if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -334,7 +347,7 @@ foreach(SDK ${SWIFT_SDKS})
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
-      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
+      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS" OR "${SDK}" STREQUAL "XROS")
         # These are supported testing SDKs, but their implementation of
         # `command_upload_stdlib` is hidden.
       elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
@@ -400,8 +413,8 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "distributed")
         endif()
 
-        if(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
-          list(APPEND LIT_ARGS "--param" "noncopyable_generics")
+        if(SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES)
+          list(APPEND LIT_ARGS "--param" "nonescapable_types")
         endif()
 
         if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
@@ -418,6 +431,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_SYNCHRONIZATION)
           list(APPEND LIT_ARGS "--param" "synchronization")
+        endif()
+
+        if(SWIFT_BUILD_REMOTE_MIRROR)
+          list(APPEND LIT_ARGS "--param" "remote_mirror")
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")

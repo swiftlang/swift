@@ -139,15 +139,15 @@ private:
   /// Consider a function for deserialization if the current linking mode
   /// requires it.
   ///
-  /// If `setToSerializable` is true than all shared functions which are referenced
-  /// from `F` are set to
-  void maybeAddFunctionToWorklist(SILFunction *F, bool setToSerializable);
+  /// If `callerSerializedKind` is IsSerialized, then all shared
+  /// functions which are referenced from `F` are set to be serialized.
+  void maybeAddFunctionToWorklist(SILFunction *F,
+                                  SerializedKind_t callerSerializedKind);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
   bool isLinkAll() const {
-    return Mode == LinkingMode::LinkAll ||
-           Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+    return Mode == LinkingMode::LinkAll || Mod.getOptions().EmbeddedSwift;
   }
 
   void linkInVTable(ClassDecl *D);

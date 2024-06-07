@@ -8,13 +8,13 @@ extension DefaultStringInterpolation {
   fileprivate func appendInterpolation<A, B>(_ a: A, _ b: B) {}
 }
 
-@_DebugDescription
+@DebugDescription
 struct MyStruct1 {
   // expected-error @+1 {{unsupported custom string interpolation expression}}
   var debugDescription: String { "\(custom: 30)" }
 }
 
-@_DebugDescription
+@DebugDescription
 struct MyStruct2 {
   // expected-error @+1 {{unsupported custom string interpolation expression}}
   var debugDescription: String { "\(30, true)" }

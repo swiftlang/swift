@@ -103,3 +103,29 @@ func testTrailingClsure() {
   acceptClosures {} y: { 42 }
   acceptClosures(x: {}, y: { 12 }) {}
 }
+
+func testStringLiteral(arg: Int) {
+  _ = "test"
+  _ = "foo\(arg)bar"
+  _ = "\(arg)"
+  _ = """
+    foo
+    bar\
+    baz
+    """
+  _ = """
+    foo\(arg)
+    \(arg)bar
+    """
+  _ = "\n\r\u{1234}"
+  _ = """
+    foo
+    \(
+      ("bar", """
+         \tbaz\u{0d}
+         """
+      )
+    )
+    baz
+    """
+}

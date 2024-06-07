@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -70,6 +72,7 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
+CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, FunctionExtractIsolation)
 CONSTANT_OWNERSHIP_INST(None, GlobalValue)
@@ -347,14 +350,18 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
   return Arg->getOwnershipKind();
 }
 
-ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
-  auto *f = ai->getFunction();
-  bool isTrivial = ai->getType().isTrivial(*f);
+// We have to separate out ResultType here as `begin_apply` does not produce
+// normal results, `end_apply` does and there might be multiple `end_apply`'s
+// that correspond to a single `begin_apply`.
+static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
+                                             SILType ResultType) {
+  auto *f = fai->getFunction();
+  bool isTrivial = ResultType.isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
     return OwnershipKind::None;
 
-  SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
+  SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
@@ -363,7 +370,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(*f, ai->getSubstCalleeType());
+        return info.getOwnershipKind(*f, fai.getSubstCalleeType());
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -371,6 +378,14 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
   }
 
   return mergedOwnershipKind;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
+  return visitFullApplySite(ai, ai->getType());
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitEndApplyInst(EndApplyInst *eai) {
+  return visitFullApplySite(eai->getBeginApply(), eai->getType());
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
@@ -476,6 +491,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, FRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, FSub)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFSub)
+CONSTANT_OWNERSHIP_BUILTIN(None, Freeze)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_EQ)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_NE)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_SGE)
@@ -589,11 +605,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroup)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroup)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskWithExecutor)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroupWithExecutor)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroupWithExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
@@ -619,11 +630,11 @@ CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
-CONSTANT_OWNERSHIP_BUILTIN(None, Copy)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
+CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -641,8 +652,21 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
-UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_NONE_DEPENDING_ON_RESULT
+
+#define OWNED_OR_NONE_DEPENDING_ON_RESULT(ID)                                  \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    if (BI->getType().isTrivial(*BI->getFunction())) {                         \
+      return OwnershipKind::None;                                              \
+    }                                                                          \
+    return OwnershipKind::Owned;                                               \
+  }
+// A zeroInitializer may initialize an imported struct with __unsafe_unretained
+// fields. The initialized value is immediately consumed by an assignment, so it
+// must be owned.
+OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
+#undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)
 #define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY) \
@@ -690,3 +714,17 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
   assert(result && "Returned ownership kind invalid on values");
   return result;
 }
+
+namespace swift::test {
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - message
+static FunctionTest GetOwnershipKind("get-ownership-kind", [](auto &function,
+                                                              auto &arguments,
+                                                              auto &test) {
+  SILValue value = arguments.takeValue();
+  llvm::outs() << value;
+  llvm::outs() << "OwnershipKind: " << value->getOwnershipKind() << "\n";
+});
+} // end namespace swift::test

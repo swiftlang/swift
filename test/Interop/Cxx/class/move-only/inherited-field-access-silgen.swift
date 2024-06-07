@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=swift-6 %s -validate-tbd-against-ir=none | %FileCheck %s
 // RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s -validate-tbd-against-ir=none | %FileCheck %s
 
+// REQUIRES: rdar128424443
+
 import MoveOnlyCxxValueType
 
 func testGetX() -> CInt {

@@ -9,30 +9,32 @@
 \Index{where clause@\texttt{where} clause}
 \index{inheritance clause}
 \index{opaque parameter}
-\lettrine{G}{eneric signatures describe} the interface between generic declarations and their usages. Every generic declaration has its own generic signature, constructed from the assortment of syntactic building blocks described by the previous chapter. When generic declarations nest, outer generic parameters are visible in the inner declaration, but the inner declaration can also introduce new generic parameters of its own, as well as impose new requirements (possibly on outer parameters). All of this suggests a ``flat'' representation. A generic signature thus records the following in one place:
+\lettrine{G}{eneric signatures} are semantic objects that describe the type checking behavior of generic declarations. Declarations can nest, and outer generic parameters are visible inside inner declarations, so a generic signature is a ``flat'' representation that collects all \emph{generic parameter types} and \emph{requirements} that apply in the declaration's scope. This abstracts away the concrete syntax described in the previous chapter:
 \begin{itemize}
-\item All generic parameter types visible from the declaration's body. This includes the generic parameters defined with an explicit generic parameter list \texttt{<...>} in source, as well as those implicitly introduced by opaque parameter declarations, like \texttt{some P}. The generic parameters of each outer generic declaration are also included.
-\item A list of all generic requirements that apply to these generic parameters, which again includes requirements from outer declarations. We've seen three different syntactic forms for stating requirements: generic parameter inheritance clauses, trailing \texttt{where} clauses, and opaque parameters. A fourth, requirement inference, will be described in Section~\ref{requirementinference}.
+\item The list of generic parameter types begins with all outer generic parameters, which are followed by generic parameters from the explicit generic parameter list \texttt{<...>}, together with any generic parameter types implicitly introduced by opaque parameter declarations, like the ``\texttt{some P}'' in ``\verb|func f(_: some P)|''.
+\item The list of requirements in a generic signature includes the requirements stated by outer generic declarations, as well as any requirements from generic parameter inheritance clauses, the trailing \texttt{where} clause, and opaque parameters. A fourth mechanism, called requirement inference, will be described in \SecRef{requirementinference}.
 \end{itemize}
 
-We're going to use this written notation for generic signatures:
-\[\underbrace{\texttt{<A, B, C, ...}}_{\text{generic parameters}}\texttt{ where }\underbrace{\texttt{A:\ P, B == A.[P]T, ...>}}_{\text{requirements}}\]
+The following notation for generic signatures is used throughout this book, as well as debugging output from the compiler:
+\begin{center}
+$\underbrace{\texttt{<A, B, C, ...}}_{\text{generic parameters}}\texttt{ where }\underbrace{\texttt{A:\ Sequence, B:\ Equatable, A.Element == Int, ...>}}_{\text{requirements}}$
+\end{center}
 
-A \index{requirement}\emph{requirement} is a statement about a type parameter, called the \emph{subject type} of the requirement. Requirements were introduced together with trailing \texttt{where} clauses in Section~\ref{trailing where clauses}; the requirements of a generic signature use the same representation but with a further invariant. They are \index{minimal requirement}\emph{minimal}: no requirement can be derived from any other requirement, or replaced with an equivalent but ``simpler'' requirement.
+The requirements in a generic signature use the same semantic representation as the requirements in a trailing \texttt{where} clause, given by \DefRef{requirement def}, with a few additional properties. A generic signature always omits any redundant requirements from the list, and the remaining ones are written to be ``as simple as possible.'' We will describe this in \ChapRef{building generic signatures}, when we see how the generic signature of a declaration is built from the syntactic forms described in the previous chapter, but for now, we're just going to assume we're working with an existing generic signature that was given to us by this black box.
 
-After some preliminaries, we will introduce a formal model for reasoning about type parameters and requirements in Section~\ref{derived req}, and develop it over the three subsequent sections. For now, we're just going to assume we're working with an existing generic signature that was given to us by the type checker or some other part of the compiler. Understanding how generic signatures are built, and how minimal requirements are actually derived from user-written requirements, is left to Chapter~\ref{building generic signatures}.
+After some preliminaries, we will go on to introduce a formal system for reasoning about requirements and type parameters in \SecRef{derived req}. This makes precise the earlier concept of the \index{interface type}\emph{interface type} of a declaration---it contains valid type parameters of the declaration's generic signature. \SecRef{genericsigqueries} describes \emph{generic signature queries}, which are fundamental primitives in the implementation, used by the rest of the compiler to answer questions about generic signatures. These questions will be statements in our formal system.
 
-\paragraph{Debugging} The\IndexFlag{debug-generic-signatures} \texttt{-debug-generic-signatures} frontend flag prints generic signatures of each declaration being type checked. Here is a simple program with three nested generic declarations:
+\paragraph{Debugging.} The \IndexFlag{debug-generic-signatures}\texttt{-debug-generic-signatures} frontend flag gives us a glimpse into the generics implementation by printing the generic signature of each declaration being type checked. Here is a simple program with three nested generic declarations:
 \begin{Verbatim}
 struct Outer<T: Sequence> {
   struct Inner<U> {
-    func transform() -> (T, U) where T.Element == U {
+    func transform() where T.Element == U {
       ...
     }
   }
 }
 \end{Verbatim}
-Notice how the generic signature at each level of nesting incorporates all information from the outer declaration's generic signature:
+If we run the compiler with this flag, we see that the generic signature at each level of nesting incorporates all information from the outer declaration's generic signature:
 \begin{Verbatim}
 debug.(file).Outer@debug.swift:1:8
 Generic signature: <T where T : Sequence>
@@ -44,273 +46,839 @@ debug.(file).Outer.Inner.transform()@debug.swift:3:10
 Generic signature: <T, U where T : Sequence, U == T.[Sequence]Element>
 \end{Verbatim}
 
-\paragraph{Empty generic signature}
-\IndexDefinition{empty generic signature}
-\IndexDefinition{fully concrete type}
-If a nominal type declaration is not a generic context (that is, neither it nor any parent context has any generic parameters), then its generic signature will have no generic parameters or generic requirements. This is called the \emph{empty generic signature}. Lacking any generic parameters, the empty generic signature more generally has no type parameters, either. The valid interface types of the empty generic signature are the fully concrete types, that is, types that do not contain any type parameters.
+This flag also allows us to observe \index{requirement minimization}\emph{requirement minimization}. Here are three functions, each one generic over a pair of types conforming to \texttt{Sequence}:
+\begin{Verbatim}
+func sameElt<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
+    where S1.Element == S2.Element {}
 
-\paragraph{Canonical signatures}
+func sameIter<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
+    where S1.Iterator == S2.Iterator {}
+
+func sameEltAndIter<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
+    where S1.Element == S2.Element,
+          S1.Iterator == S2.Iterator {}
+\end{Verbatim}
+The first function expects two sequences with the same \texttt{Element} associated type, so ``\verb|sameElt(Array<Int>(), Set<Int>())|'' for example. The second requires both have the same \texttt{Iterator} type. The third requires both, but a consequence of how \texttt{Sequence} is declared in the standard library is that the second is a stronger condition; if two sequences have the same \texttt{Iterator} type, they will also have the same \texttt{Element} type, but not vice versa. In other words, the same-type requirement $\SameReq{S1.Element}{S2.Element}$ is \emph{redundant} in the trailing \texttt{where} clause of \texttt{sameEltAndIter()}. (We will be able to \emph{prove} it when we revisit this generic signature in \ExRef{same name rule example}.) When we compile this program with \texttt{-debug-generic-signatures}, we observe that the generic signature of \texttt{sameElt()} is completely distinct, while the other two have a generic signature that looks like this:
+\begin{quote}
+\begin{verbatim}
+<S1, S2 where S1: Sequence, S2: Sequence,
+              S1.[Sequence]Iterator == S2.[Sequence]Iterator>
+\end{verbatim}
+\end{quote}
+Requirement minimization is described in \SecRef{minimal requirements}.
+
+\paragraph{Canonical signatures.}
 \IndexDefinition{canonical generic signature}
 \IndexDefinition{generic signature equality}
-Generic signatures are immutable and uniqued, so two generic signatures with the same structure and the same sugared types are equal pointers. A generic signature is \emph{canonical} if all listed generic parameter types are canonical, and any types appearing in requirements are canonical. A canonical signature is computed from an arbitrary generic signature by replacing any sugared types appearing in the signature with canonical types. Two generic signatures are canonically equal if their canonical signatures are equal pointers. There is no notion of a ``reduced generic signature'' the way we have reduced types. The generic requirements in a generic signature are already reduced in this sense; the only variation allowed is type sugar.
-\begin{example}
-These two declarations have the same canonical generic signature:
-\begin{Verbatim}
-func allEqual1<T: Sequence<U.Element>, U: Sequence>(_: T, _U: U)
-    -> Bool {}
+Generic signatures are immutable and uniqued, so two generic signatures with the same structure and pointer-equal types are always pointer-equal generic signatures. While requirements in a generic signature are minimal and sorted in a certain order, they can still differ by type sugar. A generic signature is \emph{canonical} if all listed generic parameter types are canonical, and any types appearing in requirements are canonical. A canonical signature is computed from an arbitrary generic signature by replacing any sugared types appearing in the signature with canonical types, and this gives us the notion of canonical equality of generic signatures; two generic signatures are canonically equal if their canonical signatures are pointer-equal.
 
-func allEqual2<A, B>(_: A, _: B) -> Bool
-    where A: Sequence,
-          B: Sequence,
-          B.Element == A.Element {}
-\end{Verbatim}
-The first declaration's generic signature:
+The generic signatures of \texttt{sameIter()} and \texttt{sameEltAndIter()} above are canonically equal, but not pointer-equal; while their generic parameters have the same \emph{names}, the sugared generic parameter types refer to actual \emph{declarations}, which are distinct. Their canonical signature looks like this:
 \begin{quote}
 \begin{verbatim}
-<T, U where T: Sequence, U: Sequence,
-            T.[Sequence]Element == U.[Sequence]Element>
+<τ_0_0, τ_0_1 where τ_0_0: Sequence, τ_0_1: Sequence,
+           τ_0_0.[Sequence]Iterator == τ_0_1.[Sequence]Iterator>
 \end{verbatim}
 \end{quote}
 
-The second declaration's generic signature:
-\begin{quote}
-\begin{verbatim}
-<A, B where A: Sequence, B: Sequence,
-            A.[Sequence]Element == B.[Sequence]Element>
-\end{verbatim}
-\end{quote}
-The two generic signatures only differ by type sugar; namely, they use the corresponding sugared generic parameter types from their declaration. This makes them canonically equal but not equal pointers. The canonical generic signature of both is obtained by replacing generic parameters with their canonical types:
-\begin{quote}
-\begin{verbatim}
-<τ_0_0, τ_0_1
-    where τ_0_0: Sequence, τ_0_1: Sequence,
-          τ_0_0.[Sequence]Element == τ_0_1.[Sequence]Element>
-\end{verbatim}
-\end{quote}
-\end{example}
+\paragraph{Empty generic signature.}
+\IndexDefinition{empty generic signature}
+\IndexDefinition{fully-concrete type}
+A generic declaration without a generic parameter list or trailing \texttt{where} clause inherits the generic signature from the parent context. If no outer parent context is generic, we get the \emph{empty generic signature} with no generic parameters or requirements. The interface types described by the empty generic signature are the fully concrete types, that is, types that do not contain any type parameters.
+
+\paragraph{Protocol generic signature.}
+In \SecRef{protocols} we saw that every protocol declaration has a generic parameter named \texttt{Self} that conforms to the protocol itself. The \index{G P@$G_\texttt{P}$|see{protocol generic signature}}\Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type is always canonically equal to~\rT. We will denote the \IndexDefinition{protocol generic signature}generic signature of a protocol~\texttt{P} by $G_\texttt{P}$:
+\[
+G_\texttt{P} := \verb|<Self where Self: P>|
+\]
 
 \section{Requirement Signatures}\label{requirement sig}
 
-Just as a generic signature encodes the contract between a generic declaration and its usages, a \IndexDefinition{requirement signature}\emph{requirement signature} is the contract between a protocol and its conforming types. Section~\ref{protocols} enumerated the various ways of writing requirements inside a protocol declaration:
+Each protocol has a \IndexDefinition{requirement signature}\emph{requirement signature}, which collects the protocol's \index{associated type declaration}associated type declarations, and the \index{associated requirement}associated requirements imposed upon them. This abstracts away the concrete syntax from \SecRef{protocols}. There is a duality between generic signatures and requirement signatures, illustrated with the following diagram that shows each kind of entity with a concrete specimen to remind us of the notation:
+\begin{center}
+\begin{tabular}{cc}
+\toprule
+\textbf{Generic signature}&\textbf{Requirement signature}\\
+\midrule
+Generic parameters:&Associated types:\\
+\ttgp{0}{1}&\texttt{associatedtype Iterator}\\
+\midrule
+Generic requirements:&Associated requirements:\\
+$\ConfReq{\ttgp{0}{1}}{Sequence}$&$\ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+(Requirement signatures also describe the type alias members of the protocol; these are called \index{protocol type alias}\emph{protocol type aliases}. They're not covered by the formalism described in the next section, but we will discuss them in \SecRef{building rules}.)
+
+If a generic signature $G$ states a conformance requirement $\ConfReq{T}{P}$, the requirement signature of~\texttt{P} generates additional structure, which we describe informally at first:
 \begin{itemize}
-\item As a constraint type in the protocol's \index{inheritance clause}inheritance clause, which is a way of stating a requirement on the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type.
-\item As a constraint type in the inheritance clause of some \index{associated type declaration}associated type \texttt{A}, which similarly becomes a requirement on the dependent member type \texttt{Self.[P]A}.
-\item In the \Index{where clause@\texttt{where} clause}trailing \texttt{where} clause, either on an associated type, or equivalently the protocol itself, which allows stating arbitrary requirements.
+\item For every associated type \texttt{A} of \texttt{P}, we can talk about the dependent member type \texttt{T.[P]A}, which abstracts over the \index{type witness}type witness in the conformance.
+\item Because the associated requirements are satisfied by every concrete conforming type, they also hold ``in relation'' to the abstract type parameter~\texttt{T}.
 \end{itemize}
+To interpret a generic signature, we must also consult the requirement signatures of some set of protocols that the generic signature ``depends on.'' The question of \emph{which} protocols exactly is settled in \SecRef{protocol component}, but for now, we can take our generic signatures to exist in the universe of all protocols visible to name lookup, declared in the source program and all serialized modules. This set of protocols is always finite.
 
-A requirement signature collects all of the above requirements together. Just like with generic signatures, the requirements in a requirement signature are always in a minimal form. Unlike a generic signature though, there is no list of generic parameters; the only generic parameter is the implicit protocol \texttt{Self} type.
+Remember how the \index{protocol generic signature}generic signature of a protocol~\texttt{P} just has a single conformance requirement~$\ConfReq{Self}{P}$; thus, it is the simplest generic signature that allows us to ``look inside'' the requirement signature of~\texttt{P}.
 
-A concrete type conforming to a protocol must satisfy all requirements of the protocol's requirement signature:
+The \IndexFlag{debug-generic-signatures}\texttt{-debug-generic-signatures} frontend flag also prints the requirement signature of each protocol as its type checked. While we print a requirement signature as a generic signature with the single generic parameter \texttt{Self}, requirement signatures and generic signatures are distinct in theory and implementation.
+
+Our examples often use the fact that the \texttt{Sequence} protocol states two associated requirements:
+\begin{gather*}
+\ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}\\
+\SameReq{Self.Element}{Self.Iterator.Element}_\texttt{Sequence}
+\end{gather*}
+
+\begin{example}\label{motivating derived reqs}
+To motivate the formal system in the next section, we consider how the associated requirements of a protocol can manifest in a generic signature. Here is a generic function that states a conformance requirement to \texttt{Sequence}---two, in fact:
+\begin{Verbatim}
+func firstTwoEqual<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
+    where S1.Element == S2.Element, S1.Element: Equatable {
+  var iter1 = s1.makeIterator()
+  var iter2 = s2.makeIterator()
+  return iter1.next()! == iter2.next()!
+}
+\end{Verbatim}
+Instead of the \index{sugared type}sugared \index{generic parameter types}generic parameter types ``\texttt{S1}'' and ``\texttt{S2}'', we will use canonical types to emphasize that type sugar has no semantic effect. Here is the generic signature of \texttt{firstTwoEqual()}:
+\begin{quote}
+\begin{verbatim}
+<τ_0_0, τ_0_1 where τ_0_0: Sequence, τ_0_1: Sequence,
+                    τ_0_0.Element: Equatable,
+                    τ_0_0.Element == τ_0_1.Element>
+\end{verbatim}
+\end{quote}
+We expect roughly the following to happen while type checking the function body:
 \begin{enumerate}
-\item The conforming type must declare a \emph{type witness} for each associated type.
-\item The conforming type must conform to any \index{inherited protocol}inherited protocols, which are encoded as conformance requirements on \texttt{Self}.
-\item Similarly, the conforming type must be a class if the protocol imposes has a superclass or \texttt{AnyObject} requirement on \texttt{Self}.
-\item Finally, if the subject type of a requirement is not \texttt{Self}, it must be a dependent member type. These requirements must be satisfied by the type witnesses of the conforming type.
+\item ``\texttt{s1}'' has type $\rT$, which conforms to \texttt{Sequence}, so it has a \texttt{makeIterator()} method that we can call.
+\item This method returns \texttt{Self.Iterator}. We substitute \texttt{Self} with $\rT$, and conclude that ``\texttt{iter1}'' has type \texttt{\rT.Iterator}.
+\item Similarly, ``\texttt{iter2}'' has type \texttt{\rU.Iterator}.
 \end{enumerate}
-We'll have a lot to say about the representation of conformances, how they store type witnesses, and so on, in Chapter~\ref{conformances}. It is also worth mentioning that each one of the above checks (except for the first one concerning the existence of type witnesses) is actually an instance of the more general problem of checking whether concrete types satisfy generic requirements, which is something we'll cover in detail in Section~\ref{checking generic arguments}.
-
-Again, the requirement signature of a protocol defines a contract. One side is the concrete conforming type. The other side is a \emph{conformance requirement in a generic signature}. Let's look at the simplest case. The generic signature of a protocol, say \texttt{Sequence}, always has a single generic parameter \texttt{Self} together with a single conformance requirement $\ConfReq{Self}{Sequence}$:
+Then, consider the sub-expression ``\verb|iter1.next()!|'':
+\begin{enumerate}
+\item The requirement signature of \texttt{Sequence} tells us that \texttt{\rT.Iterator} conforms to \texttt{IteratorProtocol}, so we know it has a \texttt{next()} method.
+\item This method returns \texttt{Optional<Self.Element>}, and we substitute \texttt{Self} with \texttt{\rT.Iterator} to get \texttt{Optional<\rT.Iterator.Element>}.
+\item The forced unwrap expression has type \texttt{\rT.Iterator.Element}. 
+\end{enumerate}
+A similar analysis shows that ``\verb|iter2.next()!|'' has type \texttt{\rU.Iterator.Element}. We now look at the interface type of the \texttt{==} operator in the \texttt{Equatable} protocol:
 \begin{quote}
 \begin{verbatim}
-<Self where Self: Sequence>
+<Self where Self: Equatable> (Self, Self) -> Bool
 \end{verbatim}
 \end{quote}
-The requirement signature of \texttt{Sequence}, on the other hand, actually encodes information about the protocol:
-\begin{quote}
-\begin{verbatim}
-<Self where Self.Iterator: IteratorProtocol,
-            Self.Element == Self.Iterator.Element>
-\end{verbatim}
-\end{quote}
-Intuitively, the conformance requirement $\ConfReq{Self}{Sequence}$ in the generic signature of \texttt{Sequence} applies all requirements written in the requirement signature of \texttt{Sequence}, even though they're not written down in the generic signature. While this might seem pointless at first---why not just encode all of these requirements in the \emph{generic} signature of \texttt{Sequence}?---the next section will make it apparent what's going on.
-
-\paragraph{Debugging}
-The \texttt{-debug-generic-signatures} frontend flag also prints the requirement signature of each protocol that is type checked. The written representation of a requirement signature looks like a generic signature over the protocol's single \texttt{Self} generic parameter. We use the same printed representations for both requirement signatures and generic signatures, but they are not interchangeable. A requirement signature is almost never going to be a valid generic signature, because the conformance requirement on \texttt{Self} is implicit in the requirement signature.
-
-\paragraph{Protocol type aliases}
-\index{protocol type alias}
-Requirement signatures also store a compact description of all protocol type aliases defined within the protocol; these are used when resolving \texttt{where} clause requirements involving subject types that name protocol type aliases (Section~\ref{building rules}). Protocol type aliases are not shown by the \texttt{-debug-generic-signatures} flag.
+We see that for the expression ``\verb|iter1.next()! == iter2.next()!|'' to type check, the compiler must convince itself that these two requirements below are implied by the explicit requirements of our generic signature (together with the requirement signature of \texttt{Sequence}):
+\begin{gather*}
+\SameReq{\rT.Iterator.Element}{\rU.Iterator.Element}\\
+\ConfReq{\rT.Iterator.Element}{Equatable}
+\end{gather*}
+We will formalize what this actually means first, and eventually describe a \index{decision procedure}\emph{decision procedure}. It will answer affirmatively for either of the above two requirements, but report a negative answer for the below requirement for example, because it's not a consequence of our signature:
+\begin{gather*}
+\ConfReq{\rT.Iterator}{Equatable}
+\end{gather*}
+Our decision procedure will also tell us that \texttt{\rT.Iterator.Element} is a valid type parameter, but something like \texttt{\rT.Element.Iterator} is not.
+\end{example}
 
 \section{Derived Requirements}\label{derived req}
 
-\cite{combinatory}
+This section and the one that follows will define the \IndexDefinition{derived requirement}\emph{derived requirements} and \IndexDefinition{valid type parameter}\emph{valid type parameters} of a generic signature. This will allow us to precisely state those questions the compiler must be able to answer about generic signatures while type checking generic declarations.
 
-What \emph{exactly} are these mysterious \index{dependent member type}dependent member types, the \IndexDefinition{type parameter}type parameters that are not top-level generic parameters? The definition offered so far---a dependent member type stores a base type parameter together with a reference to an identifier or associated type declaration---is unsatisfying, for several reasons. Primarily, it does not address the question of which \IndexDefinition{valid type parameter}dependent member types are valid, or where they come from. It turns out the answer to this question is intertwined with the notion of a \IndexDefinition{derived requirement}\emph{derived requirement}.
+We do this by working in a system of deductive reasoning, or a \IndexDefinition{formal system}\emph{formal system}, of the sort studied in mathematical logic \cite{curry}. We define our formal system in relation to a fixed generic signature~$G$, so each generic signature has its own corresponding formal system. A formal system has three constituent parts, which we describe somewhat informally:
+\begin{enumerate}
+\item A description of the possible \emph{statements} in the formal system, generated by finite combination from a fixed set of symbols.
 
-Just like type parameters are more general than generic parameters, we can talk about requirements that are ``known to be true'' as a more general concept than the minimal requirements directly stated in the generic signature. This section will define a set of \emph{derivation rules} which start with a base set of assumptions---the generic parameters and minimal requirements of a generic signature---and prove new type parameters and derived requirements. Understanding this formalism will motivate much of the rest of the book.
+Our statements are requirements, such as $\ConfReq{\rT.Element}{Equatable}$, and type parameters, such as \texttt{\rU.Iterator}; their syntactic structure is quite simple, as we've already seen.
+\item A finite set of \IndexDefinition{elementary statement}\emph{elementary statements} which are assumed to be true.
 
-Let's take the following generic signature (it's a canonical signature, hence the lack of generic parameter names, but that doesn't really matter):
+Our elementary statements are the \index{generic parameter type}generic parameters and \index{expliit requirement}explicit requirements of our generic signature~$G$; all generic parameters are valid type parameters, and all explicit requirements are trivially ``derived.''
+
+\item A specification of the \IndexDefinition{inference rule}\emph{inference rules} for deriving new statements from previous statements, in a manner that depends only on their formal syntactic structure.
+
+We will describe inference rules for requirements and type parameters shortly.
+\end{enumerate}
+
+The \IndexDefinition{theory}\emph{theory} of a formal system is the set of all statements we can prove within the system. This always includes the elementary statements, but it should not include \emph{all} possible statements. (A theory where \emph{everything} is true explains nothing.)
+
+The theory of a generic signature is the set union of its derived requirements and valid type parameters. To demonstrate membership in this set, we write down a \IndexDefinition{derivation}\index{derivation|seealso{derived requirement}}\emph{derivation}---a finite sequence of steps that give a constructive proof of our desired statement as a consequence of the formal system:
+\begin{enumerate}
+\item A derivation necessarily begins by deriving one or more elementary statements.
+\item This is followed by zero or more steps that derive new statements from previous statements via inference rules.
+\item The derivation ends with the final step proving the conclusion. (However, we can also think of a derivation as proving multiple things, if we take \emph{all} conclusions from each intermediate step.)
+\end{enumerate}
+There can be many ways to prove the same thing, and we allow ``useless'' steps whose conclusions are unused, so derivations are not unique in general. The point of writing down a derivation is that we can \emph{check} the reasoning at each step, and convince ourselves the conclusion is a true statement in the theory.
+
+A remark for practitioners. We use our formal system to \emph{specify} various behaviors of the implementation, but the compiler itself does not directly encode derivations as data structures. (We learn in \ChapRef{symbols terms rules} that we reason about derived requirements and valid type parameters by translating the problem into a \emph{string rewrite system}.)
+
+\paragraph{Notation.} A \IndexDefinition{derivation step}derivation step will always be written on a single line, with the conclusion first; then on the right-hand side we write the ``kind'' of derivation step in small caps, followed by the list of assumptions. The conclusion and assumptions are statements:
+\[\textsl{conclusion}\tag{\textsc{Kind} \textsl{assumption}}\]
+An \emph{elementary derivation step} has no assumptions, so it proves an elementary statement. Any other kind of derivation step applies an inference rule to one or more assumptions, which are themselves conclusions of previous steps. When discussing a specific derivation step, we write the assumptions in place. When listing a derivation, we prefer to be concise so we \emph{number} each step and refer to the conclusion of a prior step by number:
+\begin{gather*}
+1.\ \textsl{an elementary statement of ``Pooh'' sort}\tag{\textsc{Pooh}}\\
+2.\ \textsl{a consequence of the above by the ``Piglet'' principle}\tag{\textsc{Piglet} 1}
+\end{gather*}
+We use the ``turnsile operator'' $\vdash$ as a predicate. If $G$ is a generic signature and $D$ is a requirement or type parameter, \index{$\vdash$}\index{$\vdash$!z@\igobble|seealso{derivation}}$G\vdash D$ means $D$ is an element of the theory of $G$, as in ``if $G\vdash D$, then \ldots''.
+
+Our formal system has 6 kinds of elementary statements and 17 inference rules; this section together with the next will explain them all, with examples in-between:
+\begin{enumerate}
+\item We start with \index{conformance requirement}conformance requirements, and \index{same-type requirement}same-type requirements between type parameters. The theory completely describes the behavior of this subset of the language. We will also sketch out the remaining requirement kinds.
+\item The next section defines some more inference rules so that the derived same-type requirements define an equivalence relation on type parameters. We will study the equivalence classes generated by this relation.
+\item We initially only consider type parameters formed from unbound dependent member types. The next section will also extend our theory to explain bound dependent member types, but this won't reveal anything fundamentally new.
+\end{enumerate}
+
+\paragraph{Elementary statements.}
+Let $G$ be a generic signature. We can \IndexStepDefinition{Generic}derive each generic parameter $\ttgp{d}{i}$ of $G$:
+\begin{gather*}
+\GenericStepDef
+\end{gather*}
+Let $\ConfReq{T}{P}$ be an explicit \index{conformance requirement}conformance requirement of $G$, so \texttt{T} is some type parameter and \texttt{P} is a protocol. We can \IndexStepDefinition{Conf}derive this requirement:
+\begin{gather*}
+\ConfStepDef
+\end{gather*}
+Let $\SameReq{T}{U}$ be an explicit \index{same-type requirement}same-type requirement of $G$, with \texttt{T}~and~\texttt{U} type parameters. We can \IndexStepDefinition{Same}derive this requirement:
+\begin{gather*}
+\SameStepDef
+\end{gather*}
+
+\paragraph{Requirement signatures.}
+We now assume we have derived a specific conformance requirement $\ConfReq{T}{P}$ for some type parameter~\texttt{T} and protocol~\texttt{P}. Each element of the requirement signature of \texttt{P} defines an inference rule that generates a new statement:
+\begin{center}
+$\ConfReq{T}{P} + \text{requirement signature of \texttt{P}} = \text{more statements}$
+\end{center}
+The three kinds of inference rules are \textsc{AssocName}, \textsc{AssocConf}, and \textsc{AssocSame}. They correspond to requirement signature elements in the same way that the \textsc{Generic}, \textsc{Conf} and \textsc{Same} elementary statements correspond to generic signature elements.
+
+From each \index{associated type declaration}associated type declaration~\texttt{A} of~\texttt{P}, the \IndexStepDefinition{AssocName}\textsc{AssocName} inference rule derives the \index{unbound dependent member type}unbound \index{dependent member type}dependent member type \texttt{T.A}, with base type~\texttt{T} and identifier~\texttt{A}. Notice how this step is a consequence of its assumption, the assumption being the original conformance requirement:
+\begin{gather*}
+\AssocNameStepDef
+\end{gather*}
+
+From each \index{associated conformance requirement}associated conformance requirement of~\texttt{P}, the \IndexStepDefinition{AssocConf}\textsc{AssocConf} inference rule derives the conformance requirement obtained by substituting~\texttt{T} in place of \Index{protocol Self type@protocol \texttt{Self} type}\texttt{Self}. An arbitrary \index{associated conformance requirement}associated conformance requirement takes the form $\ConfReq{Self.U}{Q}_\texttt{P}$ for some type parameter \texttt{Self.U} and protocol~\texttt{Q}. The substituted type parameter we described above is denoted by ``\texttt{T.U}'':
+\begin{gather*}
+\AssocConfStepDef
+\end{gather*}
+
+From each \index{associated same-type requirement}associated same-type requirement of~\texttt{P}, the \IndexStepDefinition{AssocSame}\textsc{AssocSame} inference rule derives a new same-type requirement by substituting \texttt{T} in place of \texttt{Self}. The most general form of an \index{associated same-type requirement}associated same-type requirement is $\SameReq{Self.U}{Self.V}_\texttt{P}$ for type parameters \texttt{Self.U} and \texttt{Self.V}, so we're forming a same-type requirement from the two substituted type parameters ``\texttt{T.U}'' and ``\texttt{T.V}'':
+\begin{gather*}
+\AssocSameStepDef
+\end{gather*}
+
+We will omit the associated requirement from the list of assumptions when listing a derivation in a fixed generic signature, because there is no ambiguity in doing so.
+
+A few words about the meta-syntactic variables used above, such as ``\texttt{T}'' and ``\texttt{U}'' and so on. In the conclusion of an elementary derivation step, they specify the most general form of an explicit requirement of~$G$; we're saying that we have a fixed set of elementary derivation steps, and each one can be obtained from the schema by suitable substitution of concrete entities in place of ``\texttt{T}'', ``\texttt{U}'' and ``\texttt{P}''. When meta-syntactic variables appear in the assumptions of a derivation step as above, they mean something else---we're defining the inference rule by pattern matching, and we can make use of the rule as long as a suitable substitution of the meta-syntactic variables matches each assumption to the conclusion of a previous step.
+
+The general form of a type parameter inside an associated requirement is denoted by ``\texttt{Self.U}'' because it's a type parameter for the protocol generic signature~$G_\texttt{P}$, so it must be \texttt{Self} recursively wrapped in dependent member types, \emph{zero} or more times. This means that \texttt{Self} itself is a valid substitution for ``\texttt{Self.U}''. This comes up with \index{protocol inheritance}protocol inheritance. If \texttt{Derived} inherits from \texttt{Base}, we have the associated requirement $\ConfReq{Self}{Base}_\texttt{Derived}$. Given a derivation of $\ConfReq{T}{Derived}$, we get a derivation of $\ConfReq{T}{Base}$ by adding an \textsc{AssocConf} derivation step for our associated requirement.
+
+\begin{example}\label{motivating derived equiv}
+The inference rules presented so far can already prove some interesting statements, but we they're not sufficient to explain everything in the informal overview from \ExRef{motivating derived reqs}. Let's revisit the generic signature from that example:
 \begin{quote}
 \begin{verbatim}
-<τ_0_0, τ_0_1 where τ_0_1: Sequence,
-                    τ_0_0 == τ_0_1.[Sequence]Element>
+<τ_0_0, τ_0_1 where τ_0_0: Sequence, τ_0_1: Sequence,
+                    τ_0_0.Element == τ_0_1.Element,
+                    τ_0_0.Element: Equatable>
 \end{verbatim}
 \end{quote}
-What are the type parameters of this signature? We can start with the generic parameter types \ttgp{0}{0} and \ttgp{0}{1}. These appear directly in the generic signature so we can write them down without further justification. Let's introduce some new notation:
+The \texttt{Sequence} protocol declares two associated types \texttt{Iterator} and \texttt{Element}, and since $\rT$ conforms to \texttt{Sequence}, we can derive \texttt{\rT.Element}, for example:
 \begin{gather*}
-\vdash\ttgp{0}{0}\\
-\vdash\ttgp{0}{1}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocNameStep{1}{\rT.Element}{2}
 \end{gather*}
-This symbol \index{$\vdash$}\index{$\vdash$!z@\igobble|seealso{derived requirement}}$\vdash$ means that we proved the thing on the right, from the assumptions on the left (this is sometimes called the \IndexDefinition{turnsile operator}``turnsile operator''). In the above, the validity generic parameter types follows immediately from ``first principles''; so there is nothing on the left side of the $\vdash$. In general, the assumptions must be facts previously proved.
-
-To prove the existence of other type parameters, we need to use the conformance requirement $\ConfReq{\ttgp{0}{1}}{Sequence}$. This is one of the minimal requirements of the generic signature, so again we just re-state it, but we'll give it a number so that we don't have to ``prove'' it again:
-\begin{gather}
-\vdash\ConfReq{\ttgp{0}{1}}{Sequence}\tag{1}
-\end{gather}
-So far this is just abstract nonsense, but here's the trick. The \texttt{Sequence} protocol declares two associated types, and we know \ttgp{0}{1} conforms to \texttt{Sequence}. This gives us a pair of dependent member types:
+We can derive \texttt{\rT.Iterator} similarly. Now consider \texttt{\rT.Iterator.Element}. We recall that \texttt{Sequence} declares two associated requirements:
 \begin{gather*}
-(1)\vdash\texttt{\ttgp{0}{1}.[Sequence]Iterator}\\
-(1)\vdash\texttt{\ttgp{0}{1}.[Sequence]Element}
+\ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}\\
+\SameReq{Self.Element}{Self.Iterator.Element}_\texttt{Sequence}
 \end{gather*}
-This time, our derivations actually made use of a previously-proven fact, albeit still in a rather trivial way. For the next step, we recall that the requirement signature of \texttt{Sequence} conforms \texttt{Self.[Sequence]Iterator} to \texttt{IteratorProtocol}. Just like the minimal requirements of a generic signature, the minimal requirements of a requirement signature can be immediately stated:
-\begin{gather}
-\vdash\ConfReq{Self.[Sequence]Iterator}{IteratorProtocol}_\texttt{Sequence}\tag{2}
-\end{gather}
-The above requirement applies to the requirement signature of \texttt{Sequence}. If we replace \texttt{Self} with \ttgp{0}{1} in (2), we get a derived requirement for our generic signature. This derivation is valid, because we established that \ttgp{0}{1} conforms to \texttt{Sequence} in (1). Thus,
-\begin{gather}
-(1),\,(2)\vdash\ConfReq{\ttgp{0}{1}.[Sequence]Iterator}{IteratorProtocol}\tag{3}
-\end{gather}
-Now, \texttt{IteratorProtocol} declares an associated type named \texttt{Element}, so we can derive a third type parameter:
-\[(3)\vdash\texttt{\ttgp{0}{1}.[Sequence]Iterator.[IteratorProtocol]Element}\]
-This last derivation is now non-trivial---it is a consequence of two requirements, one in our generic signature and one in the requirement signature of \texttt{Sequence}. Let's do one more. We begin by recalling the same-type requirement in our generic signature:
-\begin{gather}
-\vdash\FormalReq{\ttgp{0}{0} == \ttgp{0}{1}.[Sequence]Element}\tag{4}
-\end{gather}
-We also make use of that same-type requirement in the \texttt{Sequence} protocol; to avoid overfull hboxes, let's abbreviate the protocol qualification in those dependent member types:
-\begin{gather}
-\vdash\FormalReq{Self.[S]Element == Self.[S]Iterator.[I]Element}_\texttt{Sequence}\tag{5}
-\end{gather}
-Let's use this requirement signature requirement to derive a same-type requirement in our generic signature:
-\begin{gather}
-(1),\,(4)\vdash\FormalReq{\ttgp{0}{1}.[S]Element == \ttgp{0}{1}.[S]Iterator.[I]Element}\tag{6}
-\end{gather}
-Notice that the right hand side of $(5)$ is identical to the left hand side of $(6)$. We can derive one more same-type requirement:
-\begin{gather}
-(5),\,(6)\vdash\FormalReq{\ttgp{0}{0} == \ttgp{0}{1}.[S]Iterator.[I]Element}\tag{7}
-\end{gather}
-Requirement (7) is something which might be intuitively obvious, but it was not written down anywhere, and in fact the derivation makes use of \emph{every} requirement from both the generic signature itself and the requirement signature of \texttt{Sequence}.
-
-We'll now enumerate all derivation rules. It is important to realize that we're working in a single generic signature, but we can make use of requirements from the requirement signature of multiple protocols.
-
-\paragraph{Initial derivations}
-Every \index{generic parameter type}generic parameter in a generic signature is immediately a valid type parameter for this generic signature, with no assumptions:
-\[\vdash\ttgp{d}{i}\]
-\IndexStepDefinition{GenSig}Every minimal requirement of our generic signature can be immediately derived:
+The first associated requirement allows us to derive that \texttt{\rT.Iterator} conforms to \texttt{IteratorProtocol}, and from there we can derive \texttt{\rT.Iterator.Element}:
 \begin{gather*}
-\vdash\ConfReq{T}{P}\tag{\textsc{GenSig}}\\
-\vdash\ConfReq{T}{C}\\
-\vdash\ConfReq{T}{AnyObject}\\
-\vdash\FormalReq{T == U}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocConfStep{1}{\rT.Iterator}{IteratorProtocol}{2}\\
+\AssocNameStep{2}{\rT.Iterator.Element}{3}
 \end{gather*}
-
-\paragraph{Dependent member types} \IndexStepDefinition{AssocType}All other type parameters are dependent member types, and they owe their existence to conformance requirements. If we have a \index{conformance requirement}conformance requirement $\ConfReq{T}{P}$, and the protocol \texttt{P} declares an \index{associated type declaration}associated type named \texttt{A}, we get a pair of valid type parameters from this conformance requirement. These are the \index{unbound dependent member type}unbound and \index{bound dependent member type}bound \index{dependent member type}dependent member type for \texttt{A} with base type \texttt{T}. We also want them to be equivalent, so we derive a same-type requirement to that effect:
+We can also derive \texttt{\rU.Iterator.Element} if we start from $\ConfReq{\rU}{Sequence}$ instead:
 \begin{gather*}
-\ConfReq{T}{P}\vdash\texttt{T.A}\tag{\textsc{AssocType}}\\
-\ConfReq{T}{P}\vdash\texttt{T.[P]A}\\
-\ConfReq{T}{P}\vdash\FormalReq{T.[P]A == T.A}
+\ConfStep{\rU}{Sequence}{1}\\
+\AssocConfStep{1}{\rU.Iterator}{IteratorProtocol}{2}\\
+\AssocNameStep{2}{\rU.Iterator.Element}{3}
 \end{gather*}
-
-\paragraph{Requirement signatures}
-\IndexStepDefinition{ReqSig} For every protocol \texttt{P}, every minimal requirement of the requirement signature of \texttt{P} can be immediately derived; they are annotated with their protocol, making them distinct from other requirements of other protocols:
+Remember our original goal in \ExRef{motivating derived reqs} was to establish a same-type requirement relating \texttt{\rT.Iterator.Element} with \texttt{\rU.Iterator.Element}, and not just to show that these two type parameters exist. We're going to attempt to write down a derivation. The associated same-type requirement of \texttt{Sequence} gives us a same-type requirement between \texttt{\rT.Element} and \texttt{\rT.Iterator.Element}:
 \begin{gather*}
-\vdash\ConfReq{Self.U}{P}_\texttt{P}\tag{\textsc{ReqSig}}\\
-\vdash\ConfReq{Self.U}{C}_\texttt{P}\\
-\vdash\ConfReq{Self.U}{AnyObject}_\texttt{P}\\
-\vdash\FormalReq{Self.U == Self.V}_\texttt{P}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocSameStep{1}{\rT.Element}{\rT.Iterator.Element}{2}
 \end{gather*}
-These requirements, all rooted in the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type, come into play if we are also able to derive a conformance requirement $\ConfReq{T}{P}$. In fact, while any requirement signature requirement can be immediately derived as above, there is no way to make use of one unless one can prove a conformance requirement first. The idea of which protocols we can ``reach'' comes up again in Section~\ref{recursive conformances} and \ref{protocol component}.
-
-\IndexStepDefinition{Conf} Suppose then we have our conformance requirement. We can combine it with a requirement signature requirement, ``rebasing'' the requirement signature requirement from the \texttt{Self} type to the conformance requirement's subject type \texttt{T}:
+We can also derive a similar statement about \rU:
 \begin{gather*}
-\ConfReq{T}{P},\,\ConfReq{Self.U}{Q}\vdash\FormalReq{T.U:~Q}\tag{\textsc{Conf}}\\
-\ConfReq{T}{P},\,\ConfReq{Self.U}{C}\vdash\FormalReq{T.U:~C}\\
-\ConfReq{T}{P},\,\ConfReq{Self.U}{AnyObject}\vdash\FormalReq{T.U:~AnyObject}\\
-\ConfReq{T}{P},\,\FormalReq{Self.U == Self.V}\vdash\FormalReq{T.U == T.V}
+\ConfStep{\rU}{Sequence}{3}\\
+\AssocSameStep{1}{\rU.Element}{\rU.Iterator.Element}{4}
 \end{gather*}
-The \texttt{Self.U} can be a dependent member type nested to any depth, so really \texttt{Self.A.B}, and so on. The construction of \texttt{T.U} from \texttt{Self.U} and \texttt{T} is not completely trivial; we will show in Section~\ref{contextsubstmap} that this is understood as applying a \index{protocol substitution map}\emph{protocol substitution map} to \texttt{Self.U}.
-
-\paragraph{Same-type requirements}
-From every valid type parameter \texttt{T}, we \IndexStepDefinition{Equiv}derive a vacuous \index{same-type requirement}same-type requirement $\FormalReq{T == T}$ stating that the type parameter is equivalent to itself. While this doesn't give us anything new, it provides the justification for considering such a requirement as redundant if written by the user:
-\[\texttt{T}\vdash\FormalReq{T == T}\tag{\textsc{Equiv}}\]
-We can derive a new requirement from a same-type requirement by flipping the two types around:
-\[\FormalReq{T == U}\vdash\FormalReq{U == T}\]
-Same-type requirements combine as follows: if we have two same-type requirements where the first type of the second is equal to the second type of the first, we can derive a third same-type requirement relating the other pair of types:
-\[\FormalReq{T == U},\,\FormalReq{U == V}\vdash\FormalReq{T == V}\]
-A same-type requirement \FormalReq{T == U} also combines with the other requirement kinds. From a requirement with subject type \texttt{U}, we can \IndexStepDefinition{Same}derive a corresponding requirement with subject type \texttt{T}. This is actually three derivations, one for conformance, superclass and layout requirements, respectively:
+Now remember we have an explicit same-type requirement also:
 \begin{gather*}
-\ConfReq{U}{P},\,\FormalReq{T == U}\vdash\ConfReq{T}{P}\tag{\textsc{Same}}\\
-\ConfReq{U}{C},\,\FormalReq{T == U}\vdash\ConfReq{T}{C}\\
-\ConfReq{U}{AnyObject},\,\FormalReq{T == U}\vdash\ConfReq{T}{AnyObject}
+\SameStep{\rT.Element}{\rU.Element}{5}
 \end{gather*}
-The above derivations only go in one direction, but we don't lose any generality by doing so. Suppose we have $\ConfReq{T}{P}$ and $\FormalReq{T == U}$. We cannot immediately conclude that $\ConfReq{U}{P}$, because the first rule does not apply. However, if we first derive $\FormalReq{U == T}$ by symmetry, we can then derive that $\ConfReq{U}{P}$.
-
-Section~\ref{reducedtypes} develops the idea where two type parameters are essentially equivalent if we can derive a same-type requirement between them.
-
-\paragraph{Member types}
-\IndexStepDefinition{Member} Conformance requirements and same-type requirements have a further interaction, where conformance to a protocol with an associated type \texttt{A} implies a same-type requirement between the corresponding dependent member types:
+At this point, we have derived the three same-type requirements (2), (4) and (5), but no apparent way to conclude anything else:
 \begin{gather*}
-\ConfReq{U}{P},\,\FormalReq{T == U}\vdash\FormalReq{T.A == U.A}\tag{\textsc{Member}}\\
-\ConfReq{U}{P},\,\FormalReq{T == U}\vdash\FormalReq{T.[P]A == U.[P]A}
+\SameReq{\rT.Element}{\rT.Iterator.Element}\\
+\SameReq{\rU.Element}{\rU.Iterator.Element}\\
+\SameReq{\rT.Element}{\rU.Element}
 \end{gather*}
-This has the intuitive interpretation that collapsing two type parameters into a single equivalence class also collapses the corresponding member types. Once we develop type substitution in Chapter~\ref{substmaps}, this derivation will also make sense when one of the two sides of the original same-type requirement is a concrete type.
+We put this example aside until the next section, when we introduce more inference rules for working with same-type requirements between type parameters.
+\end{example}
 
-\paragraph{Concrete decomposition}
-\IndexStepDefinition{Concrete} The theory of requirements involving concrete types is more complex. If we derive a same-type requirement where both sides are concrete, we can break down the requirement into smaller requirements.
+\paragraph{Other requirements.}
+We will now extend our formal system to cover concrete same-type requirements, superclass requirements and layout requirements, with the caveat that this extended theory is \index{limitation!derived requirements}incomplete. All inferences made by these rules are correct, but they do not describe all implemented behaviors of these other requirement kinds. We will see examples in \SecRef{genericsigqueries} and \SecRef{minimal requirements}.
 
-For example, from $\FormalReq{T == Array<U>}$ and $\FormalReq{T == Array<Int>}$, we can derive the funny requirement $\FormalReq{Array<U> == Array<Int>}$ using the same-type requirement derivations above. This requirement has concrete types with identical structure on both sides. We would like to derive $\FormalReq{U == Int}$ by collapsing the parallel structure:
+We add some more elementary statements. Let $G$ be a generic signature. \IndexStepDefinition{Concrete}If $\SameReq{T}{X}$ is an explicit \index{same-type requirement}same-type requirement of~$G$, where~\texttt{T} is a type parameter and~\texttt{X} is a concrete type (so \texttt{X} is not a type parameter but it may contain type parameters):
 \begin{gather*}
-\FormalReq{Array<T> == Array<U>}\vdash\FormalReq{T == U}\tag{\textsc{Concrete}}
+\ConcreteStepDef
 \end{gather*}
-In full generality, any structural or nominal type to be decomposed in this manner; an algorithm is presented in Section~\ref{requirement desugaring}. There might also be more than one way to decompose parallel structure, so this rule potentially derives more than one requirement. For example,
-\begin{gather}
-\ldots\vdash\FormalReq{((U) -> V) == ((String) -> Int)}\tag{1}\\
-(1)\vdash\FormalReq{U == String}\tag{2}\\
-(1)\vdash\FormalReq{V == Int}\tag{3}
-\end{gather}
-
-\paragraph{Concrete embedding}
-If we start with $\FormalReq{T == Array<U>}$ and $\FormalReq{U == Int}$, we want to conclude that $\FormalReq{T == Array<U>}$, but we missing one more rule. We need to go in the other direction too, building up structure around both sides of a simpler same-type requirement:
+\IndexStepDefinition{Super}If $\ConfReq{T}{C}$ is an explicit \index{superclass requirement}superclass requirement of~$G$, so \texttt{C} is a \index{class type}class type:
 \begin{gather*}
-\FormalReq{T == U}\vdash\FormalReq{G<T> == G<U>}
+\SuperStepDef
 \end{gather*}
-With this rule, we could derive $\FormalReq{Array<U> == Array<Int>}$ from $\FormalReq{U == Int}$, and finally combine it with the other same-type requirement to get $\FormalReq{T == Array<Int>}$.
+\IndexStepDefinition{Layout}If $\ConfReq{T}{AnyObject}$ is an explicit \index{layout requirement}layout requirement of~$G$:
+\begin{gather*}
+\LayoutStepDef
+\end{gather*}
+We also have inference rules for the \index{associated requirement}associated requirement forms of the above, so in what follows, we assume we can derive $\ConfReq{T}{P}$ for some \texttt{T}~and~\texttt{P}.
 
-\paragraph{There's more}
-Requirements with concrete subject type are discussed in Section~\ref{checking generic arguments}. Superclass requirements need several derivation rules we won't talk about until Chapter~\ref{classinheritance}.
+Suppose that \texttt{P} declares an associated same-type requirement $\SameReq{Self.U}{X}_\texttt{P}$, for some \texttt{Self.U} and concrete type~\texttt{X}. We substitute \texttt{T} for \texttt{Self} inside \texttt{Self.U} to get a type parameter \texttt{T.U}, and inside \texttt{X} to get a concrete type~$\texttt{X}^\prime$. We can then \IndexStepDefinition{AssocConcrete}derive:
+\begin{gather*}
+\AssocConcreteStepDef
+\end{gather*}
+For an associated \IndexStepDefinition{AssocSuper}superclass requirement $\ConfReq{Self.U}{C}_\texttt{P}$, we substitute \texttt{T} for \texttt{Self} in \texttt{C} to get $\texttt{C}^\prime$:
+\begin{gather*}
+\AssocSuperStepDef
+\end{gather*}
+Finally, an \IndexStepDefinition{AssocLayout}associated layout requirement does not have anything to substitute on the right-hand side, so we derive the same statement about \texttt{T.U}:
+\begin{gather*}
+\AssocLayoutStepDef
+\end{gather*}
 
-\section{The Type Parameter Order}\label{typeparams}
+\pagebreak
 
-\index{type parameter order}%
-\index{conformance requirement}%
-\index{associated conformance requirement}%
-\index{witness table}%
-\index{mangling}%
-\IndexDefinition{type parameter order}%
-The type parameters of a generic signature are linearly ordered with respect to each other. This linear order defines reduced types and reduced type equality, and plays an important role in requirement minimization. It also surfaces directly in the Swift \index{ABI}ABI:
-\begin{enumerate}
-\item The calling convention of a generic function passes a witness table for each protocol conformance requirement in the function's generic signature. The conformance requirements are ordered by comparing their subject type.
-\item The in-memory layout of a witness table is determined by the requirement signature of the protocol, with each associated conformance requirement corresponding to an entry that points at some other witness table. The associated conformance requirements are again ordered by comparing their subject type.
-\item The mangled symbol names of generic functions encode their parameter and return types. If those types contain type parameters, the type parameters are reduced.
-\end{enumerate}
-\index{total order|see{linear order}}
-Let's begin by first defining partial orders, and then linear orders as a special kind of partial order. Swift programmers will recognize the \texttt{Comparable} protocol as abstracting over types that have a linear order. For a more thorough treatment of relations and orders, consult a discrete mathematics textbook like \cite{grimaldi}.
+At this point, we've seen all of the kinds of elementary statements that exist, but a few more inference rules remain to be defined. Here is a quick summary of all the elementary statements and inference rules we've seen so far:
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+\multicolumn{3}{c}{\textbf{Basic model:}}\\
+\textsc{Generic}&\textsc{Conf}&\textsc{Same}\\
+\textsc{AssocName}&\textsc{AssocConf}&\textsc{AssocSame}\\
+\midrule
+\multicolumn{3}{c}{\textbf{Other requirements:}}\\
+\textsc{Concrete}&\textsc{Super}&\textsc{Layout}\\
+\textsc{AssocConcrete}&\textsc{AssocSuper}&\textsc{AssocLayout}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Valid Type Parameters}\label{type params}
+
+In \ChapRef{types}, we discussed how \index{type}types containing \index{type parameter}type parameters have two kinds of equality. \index{canonical type equality}Canonical type equality tells us if the type parameters are spelled in the same way, and \index{reduced type equality}\emph{reduced type equality}, relative to a generic signature, also takes \index{same-type requirement}same-type requirements into account. We are now in a position to define reduced type equality on type parameters. \SecRef{genericsigqueries} will generalize it to all interface types.
+
+Reduced type equality is an \emph{equivalence relation}, so we begin by reviewing this idea in an abstract setting. Given a fixed set that we call the \index{domain}\emph{domain}, a relation models some property that a pair of elements might have. In programming languages, ``relational operators'' are typically functions taking a pair of values to a true or false result. In mathematics, we instead imagine that a relation is the set of those \index{ordered pair}ordered pairs $(x,y)$ such that the property is true of $x$ and $y$.
 
 \begin{definition}\label{def relation}
-A \IndexDefinition{relation}\emph{relation} on a \index{set}set $S$ is a \index{subset}subset of the \index{Cartesian product}Cartesian product $R\subseteq S\times S$ (so the elements of $R$ are \index{ordered pair}ordered pairs). A special kind of relation is a \IndexDefinition{partial order}\emph{partial order}. We say that $R$ is a partial order if it is anti-reflexive and transitive:
+Let $S$ be a \index{set}set. A \IndexDefinition{relation}\emph{relation} with domain $S$ is a \index{subset}subset of the \index{Cartesian product}Cartesian product $S\times S$.
+\end{definition}
+
+\begin{definition}
+An \IndexDefinition{equivalence relation}\emph{equivalence relation} $R\subseteq S\times S$ is reflexive, symmetric and transitive:
 \begin{itemize}
-\item $R$ is \emph{anti-reflexive} if $(x,x)\not\in R$ for any $x\in S$.
-\item $R$ is \IndexDefinition{transitive relation}\emph{transitive} if whenever $(x,y)\in R$ and $(y,z)\in R$, then $(x,z)\in R$.
+\item $R$ is \IndexDefinition{reflexive relation}\emph{reflexive} if $(x,x)\in R$ for all $x\in S$.
+\item $R$ is \IndexDefinition{symmetric relation}\emph{symmetric} if $(x,y)\in R$ implies that $(y,x)\in R$ for all $x$, $y\in S$.
+\item $R$ is \IndexDefinition{transitive relation}\emph{transitive} if $(x,y)$, $(y,z)\in R$ implies that $(x,z)\in R$ for all $x$, $y$, $z\in S$.
 \end{itemize}
-If the partial order relation $R$ is understood from context, we can write $x<y$ instead of $(x,y)\in R$, and $x\not< y$ if $(x,y)\not\in R$. Sometimes in the literature, partial orders use the symbol $\le$ and require that $a\le a$ for all $a\in S$ (that is, the relation is reflexive, not anti-reflexive). This is equivalent to our definition, because we can define $a<b$ to mean $a\leq b$ and $a\neq b$.
 \end{definition}
 
-\begin{definition} A \IndexDefinition{linear order}\emph{linear order} over some set $S$ is a partial order $<$ with the additional property that for each pair $a$, $b\in S$, exactly one of $a<b$, $b<a$ or $a=b$ is true. Sometimes, a linear order is called a ``total order.''
+Imagine a fraction $a/b$ as a purely formal object, a pair of \index{integers}integers $a$, $b$ with $b \neq 0$. While $1/2$, $2/4$, and $(-3)/(-6)$ are distinct fractions, they measure the same proportion, as we see by cross-multiplying denominators. We have two equivalence relations:
+\begin{itemize}
+\item $a/b$ and $c/d$ are ``identical'' if $a=b$ and $c=d$.
+\item $a/b$ and $c/d$ are ``equivalent'' if $ad=bc$.
+\end{itemize}
+
+\begin{definition}
+Let $R$ be an equivalence relation with domain $S$, and let $x\in S$. The \IndexDefinition{equivalence class}\emph{equivalence class} of $x$, denoted $\EquivClass{x}$, is the set of all $y\in S$ such that $(x, y)\in R$.
 \end{definition}
 
-With both partial and linear orders, if $a<b$, then $b\not< a$. To see why, note that if $a<b$ and $b<a$ were both simultaneously true, the transitivity of $<$ would imply that $a<a$, contradicting the assumption that $<$ is anti-reflexive. A partial order also allows for \emph{incomparable} elements, where both $a\not< b$ and $b\not< a$. This cannot occur in a linear order.
+Under our ``equivalence of proportion'' relation, the equivalence class of~$1/2$ is the set of all fractions of the form $n/2n$, as $n$ ranges over all non-zero integers. Every fraction belongs to exactly one equivalence class, so our equivalence relation partitions the set of fractions into disjoint equivalence classes. We now increase the level of abstraction, and consider the set whose \emph{elements} are equivalence classes of fractions. This is $\mathbb{Q}$, the set of \index{rational number}\emph{rational numbers}, where two equivalent fractions represent the same rational number. We can repeat this construction with any equivalence relation.
 
-The linear order on type parameters is built up from three simpler linear orders: on generic parameters, protocol declarations, and associated type declarations. Note that the below algorithms all compute whether $x<y$, $y>x$ or $x=y$ simultaneously.
-\begin{algorithm}[Generic parameter order]\label{generic parameter order} \IndexDefinition{generic parameter order}Takes \index{generic parameter type}generic parameter types \ttgp{d}{i} and \ttgp{D}{I} as input, where that all four of \texttt{d}, \texttt{i}, \texttt{D} and \texttt{I} are non-negative intgers. Returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
+\begin{proposition}
+Let $R$ be an equivalence relation with some domain $S$. Every element of $S$ belongs to exactly one equivalence class of $R$.
+\end{proposition}
+\begin{proof}
+The phrase ``exactly one'' is actually a shorthand for these two statements:
+\begin{enumerate}
+\item Every $x\in S$ belongs to \emph{at least} one equivalence class.
+\item Every $x\in S$ belongs to \emph{at most} one equivalence class, so if $x\in\EquivClass{y}$ and $x\in\EquivClass{z}$ for some $y$, $z\in S$, then in fact $\EquivClass{y}=\EquivClass{z}$ (this is equality of sets, meaning they have the same elements).
+\end{enumerate}
+
+For the first part, the assumption that $R$ is reflexive says that $(x,x)\in R$ for all $x\in S$. By definition of $\EquivClass{x}$, this means that $x\in\EquivClass{x}$, so every $x$ is, at the very least, an element of its \emph{own} equivalence class $\EquivClass{x}$.
+
+For the second part, assume that for some $y$, $z\in S$, there exists an $x\in\EquivClass{y}\cap\EquivClass{z}$. To show that $\EquivClass{y}=\EquivClass{z}$, we prove that $\EquivClass{y}\subseteq\EquivClass{z}$ and $\EquivClass{z}\subseteq\EquivClass{y}$ separately. For the ``$\subseteq$'' direction, we see that if we take an arbitrary element $t\in\EquivClass{y}$, we can chase a series of equivalences to derive that $t\in\EquivClass{z}$:
+\begin{enumerate}
+\item $t\in\EquivClass{y}$ and $x\in\EquivClass{y}$, so $(t,y)$, $(x,y)\in R$.
+\item $(x,y)\in R$, but $R$ is symmetric, so $(y,x)\in R$.
+\item $(t,y)$, $(y,x)\in R$, but $R$ is transitive, so $(t,x)\in R$.
+\item $(t,x)$, $(x,z)\in R$, but $R$ is transitive, so $(t,z)\in R$; that is, $t\in\EquivClass{z}$.
+\end{enumerate}
+This gives us $\EquivClass{y}\subseteq\EquivClass{z}$. To prove $\EquivClass{z}\subseteq\EquivClass{y}$, we pretend to copy and paste the above, and swap $y$~and~$z$ everywhere that they appear. (We tend to avoid writing out the other direction of the proof in a situation like this where it is completely mechanical.)
+
+We've shown that if two equivalence classes of $S$ have at least one element in common, they must in fact coincide. The only other possibility is that the two equivalence classes are disjoint, that is, their \index{intersection}intersection is the empty set. Note that we made use of all three defining properties of an equivalence relation; the result no longer holds if we relax either assumption of reflexivity, symmetry or transitivity.
+\end{proof}
+
+\paragraph{Reduced type equality.} We now define an equivalence relation on type parameters. We want to say that two type parameters are equivalent if we can derive a same-type requirement between them:
+
+\begin{definition}
+Let $G$ be a generic signature. The \IndexDefinition{reduced type equality}\emph{reduced type equality} relation on the valid type parameters of $G$ is the set of all pairs \texttt{T} and \texttt{U} such that $G\vdash\SameReq{T}{U}$.
+\end{definition}
+
+For this to work, we must extend our formal system with three new inference rules, one for each defining axiom of an equivalence relation. The first rule says that if we can derive a valid type parameter~\texttt{T}, we can \IndexStepDefinition{Reflex}derive the trivial \index{same-type requirement}same-type requirement $\SameReq{T}{T}$. Note that we're deriving a \emph{requirement} from a \emph{type parameter}; this is the only time we can do that:
+\begin{gather*}
+\ReflexStepDef
+\end{gather*}
+Next, if we can derive a same-type requirement $\SameReq{T}{U}$ for type parameters \texttt{T} and \texttt{U}, we can \IndexStepDefinition{Sym}derive the opposite same-type requirement:
+\begin{gather*}
+\SymStepDef
+\end{gather*}
+Finally, if we can derive two same-type requirements $\SameReq{T}{U}$ and $\SameReq{U}{V}$ where the right-hand side of the first is identical to the left-hand side of the second, we can \IndexStepDefinition{Trans}derive a same-type requirement that gets us from one end to the other in one jump:
+\begin{gather*}
+\TransStepDef
+\end{gather*}
+Given these new rules, we immediately see:
+\begin{proposition}
+Reduced type equality is an equivalence relation.
+\end{proposition}
+\begin{proof}
+Each axiom follows from the corresponding inference rule:
+\begin{itemize}
+\item
+(Reflexivity) Suppose that \texttt{T} is a valid type parameter of $G$. Given a derivation $G\vdash\texttt{T}$, we derive $G\vdash\SameReq{T}{T}$ via \IndexStep{Reflex}\textsc{Reflex}. Thus, \texttt{T} is equivalent to itself.
+\item
+(Symmetry) Suppose that \texttt{T} is equivalent to \texttt{U}. Given a derivation $G\vdash\SameReq{T}{U}$, we derive $G\vdash\SameReq{U}{T}$ via \IndexStep{Sym}\textsc{Sym}. Thus, \texttt{U} is equivalent to \texttt{T}.
+\item
+(Transitivity) Suppose that \texttt{T} is equivalent to \texttt{U}, and \texttt{U} is equivalent to \texttt{V}. Given the two derivations $G\vdash\SameReq{T}{U}$ and $G\vdash\SameReq{U}{V}$, we concatenate them together, and derive $G\vdash\SameReq{T}{V}$ via \IndexStep{Trans}\textsc{Trans}. Thus, \texttt{T} is equivalent to \texttt{V}.
+\end{itemize}
+
+We are careful to limit our relation's domain to the valid type parameters of~$G$, instead of considering all type parameters that can be formed syntactically. If \texttt{T} is some invalid type parameter that cannot be derived from $G$, we cannot use \textsc{Reflex} to derive $\SameReq{T}{T}$, so we would no longer have an equivalence relation.
+\end{proof}
+
+So far, nothing prevents us from deriving a requirement $\SameReq{T}{U}$ where \texttt{T}~or~\texttt{U} is not itself derivable. If this happens, we exclude the ordered pair from our relation. We will not worry about this for now, because \SecRef{generic signature validity} will show that such situations can be ruled out by diagnosing invalid requirements written by the user.
+
+\begin{example}\label{derived equiv example}
+The proof that reduced type equality is an equivalence relation may seem useless or circular, but the point is we can use these inference rules to derive more requirements. Returning to \ExRef{motivating derived equiv}, we had derived (2), (4) and (5) below:
+\begin{gather*}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocSameStep{1}{\rT.Element}{\rT.Iterator.Element}{2}\\
+\ConfStep{\rU}{Sequence}{3}\\
+\AssocSameStep{3}{\rU.Element}{\rU.Iterator.Element}{4}\\
+\SameStep{\rT.Element}{\rU.Element}{5}
+\end{gather*}
+We use \textsc{Sym} to flip the first requirement, and observe that the three requirements now form a chain where the right-hand side of each one is identical to the left-hand side of the next. Two applications of \textsc{Trans} give us what we're looking for:
+\begin{gather*}
+\SymStep{2}{\rT.Iterator.Element}{\rT.Element}{6}\\
+\TransStep{6}{5}{\rT.Iterator.Element}{\rU.Element}{7}\\
+\TransStep{7}{4}{\rT.Iterator.Element}{\rU.Iterator.Element}{8}
+\end{gather*}
+We managed to derive the first requirement from \ExRef{motivating derived reqs}. Along the way, we've shown that our generic signature has four ``singleton'' equivalence classes,
+\begin{gather*}
+\{\texttt{\rT}\},\,
+\{\texttt{\rU}\},\,
+\{\texttt{\rT.Iterator}\},\,
+\{\texttt{\rU.Iterator}\},
+\end{gather*}
+and one final equivalence class formed from the other four type parameters,
+\begin{align*}
+\{&\texttt{\rT.Element},\,\texttt{\rU.Element},\,\\
+&\texttt{\rT.Iterator.Element},\,\texttt{\rU.Iterator.Element}\}.
+\end{align*}
+To prove that \texttt{\rT.Iterator.Element} conforms to \texttt{Equatable}, we need another rule.
+\end{example}
+
+\paragraph{Compatibility.}
+Our equivalence relation on fractions had an interesting property: if we pick any two fractions from a pair of equivalence classes and add them together (or multiply, etc), the equivalence class of the result does not depend on our choice of representatives. In Swift generics, we have an analogous goal: any observable behavior of a type parameter, be it conforming to a protocol, having a superclass bound, being fixed to a concrete type, or having a dependent member type with a given name, should only depend on its equivalence class, and not on the ``spelling.''
+
+Once again, we wave our magic wand, and decree that reduced type equality is to have this property, by adding new \index{inference rule}inference rules. These rules relate \index{same-type requirement}same-type requirements with the other requirement kinds by replacing the other requirement's subject type. That is, if we can derive a same-type requirement $\SameReq{T}{U}$ and a conformance requirement $\ConfReq{U}{P}$, we can \IndexStepDefinition{SameConf}derive $\ConfReq{T}{P}$:
+\begin{gather*}
+\SameConfStepDef
+\end{gather*}
+A same-type requirement $\SameReq{T}{U}$ also composes with the \IndexStepDefinition{SameConcrete}\IndexStepDefinition{SameSuper}\IndexStepDefinition{SameLayout}other requirement kinds:
+\begin{gather*}
+\SameConcreteStepDef\\
+\SameSuperStepDef\\
+\SameLayoutStepDef
+\end{gather*}
+There is a second compatibility condition. We want equivalent type parameters to have equivalent member types, as follows. Suppose we can derive a conformance requirement $\ConfReq{U}{P}$ and a same-type requirement $\SameReq{T}{U}$. For every associated type~\texttt{A} of~\texttt{P}, we can \IndexStepDefinition{SameName}derive a same-type requirement $\SameReq{T.A}{U.A}$:
+\begin{gather*}
+\SameNameStepDef
+\end{gather*}
+We have yet to describe the inference rules for bound dependent member types, so that's coming up next. Apart from that, our formal system is complete, so let's look at a few more examples to justify these rules we just added.
+
+\begin{example}
+We can derive the second requirement of \ExRef{motivating derived reqs} by applying \textsc{SameConf} to $\ConfReq{\rT.Element}{Equatable}$, because as we already saw, \texttt{\rT.Element} and \texttt{\rT.Iterator.Element} are equivalent:
+\begin{gather*}
+\ConfStep{\rT.Element}{Equatable}{1}\\
+\AssocSameStep{1}{\rT.Element}{\rT.Iterator.Element}{2}\\
+\SymStep{2}{\rT.Iterator.Element}{\rT.Element}{3}\\
+\SameConfStep{1}{3}{$\rT$.Iterator.Element}{Equatable}{3}
+\end{gather*}
+In our generic signature, this \emph{entire} equivalence class conforms to \texttt{Equatable}:
+\begin{align*}
+\{&\texttt{\rT.Element},\,\texttt{\rU.Element},\,\\
+&\texttt{\rT.Iterator.Element},\,\texttt{\rU.Iterator.Element}\}.
+\end{align*}
+\end{example}
+
+\begin{example}\label{same name rule example}
+To see \textsc{SameName} in action, we now look recall the generic signature of \texttt{sameIter()} from the beginning of the chapter:
+\begin{quote}
+\begin{verbatim}
+<S1, S2 where S1: Sequence, S2: Sequence,
+              S1.Iterator == S2.Iterator>
+\end{verbatim}
+\end{quote}
+We also saw another declaration, \texttt{sameIterAndElt()}, which states both requirements:
+\begin{gather*}
+\SameReq{\rT.Iterator}{\rU.Iterator}\\
+\SameReq{\rT.Element}{\rU.Element}
+\end{gather*}
+We claimed that \index{requirement minimization}requirement minimization will drop the second requirement because it is \index{redundant requirement}redundant, giving \texttt{sameIterAndElt()} the same generic signature as \texttt{sameIter()}. This means we can derive the second requirement without invoking \emph{itself} as an elementary statement. We do this by first taking $\SameReq{\rT.Iterator}{\rU.Iterator}$, and applying \textsc{SameName} to derive the same-type requirement (3):
+\begin{gather*}
+\ConfStep{\rU}{Sequence}{1}\\
+\SameStep{\rT.Iterator}{\rU.Iterator}{2}\\
+\SameNameStep{1}{2}{\rT.Iterator.Element}{\rU.Iterator.Element}{3}
+\end{gather*}
+We then rewrite both sides of (3) into their short form by making use of the associated same-type requirement of \texttt{Sequence}:
+\begin{gather*}
+\ConfStep{\rT}{Sequence}{4}\\
+\AssocSameStep{4}{\rT.Element}{\rT.Iterator.Element}{5}\\
+\AssocSameStep{1}{\rU.Element}{\rU.Iterator.Element}{6}\\
+\SymStep{6}{\rU.Iterator.Element}{\rU.Element}{7}\\
+\TransStep{5}{3}{\rT.Element}{\rU.Iterator.Element}{8}\\
+\TransStep{8}{7}{\rT.Element}{\rU.Element}{9}
+\end{gather*}
+We could not have derived this requirement without \textsc{SameName}.
+\end{example}
+
+\begin{example}\label{protocol n example}
+We can conjure up a generic signature with infinitely many equivalence classes. We start with this protocol:
+\begin{Verbatim}
+protocol N {
+  associatedtype A: N
+}
+\end{Verbatim}
+Now, consider the protocol generic signature $G_\texttt{N}$. We can derive an infinite sequence of conformance requirements from $\ConfReq{\rT}{N}$, by repeated application of the \textsc{AssocConf} inference rule with the associated conformance requirement $\ConfReq{Self.A}{N}_\texttt{N}$:
+\begin{gather*}
+\ConfStep{\rT}{N}{1}\\
+\AssocConfStep{1}{\rT.A}{N}{2}\\
+\AssocConfStep{2}{\rT.A.A}{N}{3}\\
+4.\ \ldots
+\end{gather*}
+We can also derive infinitely many valid type parameters:
+\begin{gather*}
+\GenericStep{\rT}{4}\\
+\AssocNameStep{2}{\rT.A}{5}\\
+\AssocNameStep{3}{\rT.A.A}{6}\\
+7.\ \ldots
+\end{gather*}
+Each one of these type parameters is in its own equivalence class, because we cannot derive any non-trivial same-type requirements. We've shown that $G_\texttt{N}$ defines an infinite set of equivalence classes.
+\end{example}
+
+\begin{example}\label{protocol collection example}
+Here is a simplified form of the standard library \texttt{Collection} protocol:
+\begin{Verbatim}
+protocol Collection: Sequence {
+  associatedtype SubSequence: Collection
+      where Element == SubSequence.Element
+            SubSequence == SubSequence.SubSequence
+}
+\end{Verbatim}
+Our protocol inherits the \texttt{Element} and \texttt{Iterator} associated types from \texttt{Sequence}, then declares a new associated type and states these four associated requirements:
+\begin{gather*}
+\ConfReq{Self}{Sequence}_\texttt{Collection}\\
+\ConfReq{Self.SubSequence}{Collection}_\texttt{Collection}\\
+\SameReq{Self.Element}{Self.SubSequence.Element}_\texttt{Collection}\\
+\SameReq{Self.SubSequence}{Self.SubSequence.SubSequence}_\texttt{Collection}
+\end{gather*}
+We can read the associated requirements as follows:
+\begin{enumerate}
+\item The first conformance requirement states that all collections are sequences.
+\item The second conformance requirement states that a subsequence of a collection is another collection, of a possibly different concrete type.
+\item The first same-type requirement states that a subsequence of an arbitrary collection always has the same element type as the original.
+\item The second same-type requirement states that a subsequence is just a subsequence of the original collection, so subsequences don't stack more than once.
+\end{enumerate}
+For example, the \texttt{SubSequence} of \texttt{Array<Int>} is \texttt{ArraySlice<Int>}, and \texttt{SubSequence} of \texttt{ArraySlice<Int>} is again \texttt{ArraySlice<Int>}. (Type witnesses of concrete conformances are discussed in \SecRef{type witnesses}).
+
+We're going to look at the protocol generic signature $G_\texttt{Collection}$ and attempt to understand its equivalence classes. We can use the protocol inheritance relationship to derive \texttt{\rT.Iterator}:
+\begin{gather*}
+\ConfStep{\rT}{Collection}{1}\\
+\AssocConfStep{1}{\rT}{Sequence}{2}\\
+\AssocNameStep{2}{\rT.Iterator}{3}
+\end{gather*}
+The first thing we notice is that \rT\ and \texttt{\rT.Iterator} are not equivalent to each other or to any other type parameter. Each one is in an equivalence class by itself, so we have our first two equivalence classes.
+
+To understand how the remaining equivalence classes are formed, we notice that $\ConfReq{Self.SubSequence}{Collection}_\texttt{Collection}$ generates an infinite family of conformance requirements, like $\ConfReq{Self.A}{N}_\texttt{N}$ did in the previous example:
+\begin{gather*}
+\ConfStep{\rT}{Collection}{1}\\
+\AssocConfStep{1}{\rT.SubSequence}{Collection}{2}\\
+\AssocConfStep{2}{\rT.SubSequence.SubSequence}{Collection}{3}\\
+4.\ \ldots
+\end{gather*}
+To talk about this phenomenon, we introduce the following notation:
+\begin{gather*}
+\texttt{\rT.$\texttt{SubSequence}^n$} = \begin{cases}
+\rT&n=0\\
+\texttt{\rT.SubSequence}&n=1\\
+\texttt{\rT.SubSequence}^{n-1}\texttt{.SubSequence}&n>1
+\end{cases}
+\end{gather*}
+So the theory of $G_\texttt{Collection}$ contains $\ConfReq{\rT.$\texttt{SubSequence}^n$}{Collection}$ for all $n\geq 0$. Furthermore, for each $n\geq 0$, we can derive the following from (1) below:
+\begin{gather*}
+\AnyStep{\ConfReq{\rT.$\texttt{SubSequence}^n$}{Collection}}{1}\\
+\AssocConfStep{1}{\rT.$\texttt{SubSequence}^n$}{Sequence}{2}\\
+\AssocSameStep{1}{\rT.$\texttt{SubSequence}^n$.Element}{\rT.$\texttt{SubSequence}^{n+1}$.Element}{3}\\
+\AssocSameStep{2}{\rT.$\texttt{SubSequence}^n$.Element}{\rT.$\texttt{SubSequence}^n$.Iterator.Element}{4}
+\end{gather*}
+The infinite families (3) and (4) define a single equivalence class. This equivalence class contains \texttt{\rT.$\texttt{SubSequence}^n$.Element} and \texttt{\rT.$\texttt{SubSequence}^n$.Iterator.Element}, for all $n\geq 0$. (In particular, it contains \texttt{\rT.Element}.)
+
+We can also generate another infinite family of same-type requirements:
+\begin{gather*}
+\AssocSameStep{1}{\rT.$\texttt{SubSequence}^{n+1}$}{\rT.$\texttt{SubSequence}^{n+2}$}{5}
+\end{gather*}
+These form an equivalence class from all \texttt{\rT.$\texttt{SubSequence}^n$.SubSequence} for $n\geq 0$. Finally, applying \textsc{SameName} gives us one more infinite family:
+\begin{gather*}
+\SameNameStep{5}{2}{\rT.$\texttt{SubSequence}^{n+1}$.Iterator}{\rT.$\texttt{SubSequence}^{n+2}$.Iterator}{6}
+\end{gather*}
+These form the last equivalence class, because the \texttt{SubSequence} may have a distinct \texttt{Iterator} from the original sequence.
+
+We see that $G_\texttt{Collection}$ defines five equivalence classes, and three of those contain infinitely many representative type parameters each:
+\begin{align*}
+\{&\rT\}\tag{1}\\
+\{&\texttt{\rT.Element},\,\texttt{\rT.SubSequence.Element},\,\ldots\}\tag{2}\\
+&\cup\{\texttt{\rT.Iterator.Element},\, \texttt{\rT.SubSequence.Iterator.Element},\, \ldots\},\\
+\{&\texttt{\rT.Iterator}\}\tag{3}\\
+\{&\texttt{\rT.SubSequence},\,\texttt{\rT.SubSequence.SubSequence},\,\ldots\},\tag{4}\\
+\{&\texttt{\rT.SubSequence.Iterator},\tag{5}\\
+&\texttt{\rT.SubSequence.SubSequence.Iterator},\,\\
+&\ldots\}
+\end{align*}
+To describe the conformance requirements that apply to each equivalence class, it is sufficient to pick a single representative conformance requirement for each combination of type parameter and protocol, because the \textsc{SameConf} inference rule allows us to derive the rest. This table summarizes our ``pen and paper'' investigation:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Representative:}&\textbf{Conforms to:}\\
+\midrule
+\texttt{\rT}&\texttt{Collection} and \texttt{Sequence}\\
+\texttt{\rT.Element}&none\\
+\texttt{\rT.Iterator}&\texttt{IteratorProtocol}\\
+\texttt{\rT.SubSequence}&\texttt{Collection} and \texttt{Sequence}\\
+\texttt{\rT.SubSequence.Iterator}&\texttt{IteratorProtocol}\\
+\bottomrule
+\end{tabular}
+\end{center}
+That's pretty much all there is to say about the generic signature $G_\texttt{Collection}$, however our above description is somewhat lacking because it doesn't make the member type relationships apparent. We will revisit all of the generic signatures we saw here in \SecRef{type parameter graph}, when we introduce the \emph{type parameter graph}. We will define an edge relation on equivalence classes, which become the vertices of a graph. This will give us a visual aid for understanding member type relationships.
+\end{example}
+
+Notice how our formal system can generate an infinite theory! We saw that~$G_\texttt{N}$ has an infinite set of finite equivalence classes, while in~$G_\texttt{Collection}$, the equivalence classes themselves were infinite. Of course both can happen simultaneously. A generic signature with an infinite set of infinite equivalence classes will appear in \SecRef{monoidsasprotocols}.
+
+\paragraph{Bound dependent member types.}
+We saw in \SecRef{fundamental types} that dependent member types come in two varieties:
+\begin{itemize}
+\item \index{unbound dependent member type}Unbound dependent member types refer to an identifier. Denoted \texttt{T.A} for some base type \texttt{T} and identifier \texttt{A}.
+\item \index{bound dependent member type}Bound dependent member types refer to an associated type declaration. Denoted \texttt{T.[P]A} for some base type \texttt{T} and associated type declaration \texttt{A} of some protocol \texttt{P}.
+\end{itemize}
+
+\begin{definition}
+We define the following for convenience:
+\begin{itemize}
+\item An \IndexDefinition{unbound type parameter}\emph{unbound type parameter} is a generic parameter type, or an unbound dependent member type whose base type is another unbound type parameter.
+
+\item A \IndexDefinition{bound type parameter}\emph{bound type parameter} is a generic parameter type, or a bound dependent member type whose base type is another bound type parameter.
+\end{itemize}
+The bound and unbound type parameters do not exhaustively partition the set of all type parameters. A generic parameter type is \emph{both} bound and unbound per the above, while a type parameter like \texttt{\rT.[Sequence]Iterator.Element} is neither bound nor unbound, because it contains a mix of bound and unbound dependent member types.
+\end{definition}
+
+The fundamental tension here is the following:
+\begin{itemize}
+\item Unbound type parameters types appear when \index{type resolution}type resolution resolves the requirements in a \texttt{where} clause; they directly represent what was written by the user.
+
+\item Type substitution only operates on bound dependent member types, because as we will see in \SecRef{abstract conformances}, we need all three pieces of information that describe one as a valid type parameter: the base type, the protocol, and the associated type declaration.
+\end{itemize}
+We often apply substitution maps to requirements of \index{generic signature}generic signatures and requirement signatures, and the \index{interface type}interface types of declarations. Indeed, all of these semantic objects must only contain bound type parameters. We resolve this as follows:
+\begin{itemize}
+\item Requirement minimization (\SecRef{minimal requirements}) converts unbound type parameters in the \texttt{where} clause into bound type parameters when building a generic signature.
+\item Queries against an existing generic signature (\SecRef{genericsigqueries}) allow unbound type parameters. We will see that one can obtain a bound type parameter by asking the generic signature for an unbound type parameter's \index{reduced type}\emph{reduced type}.
+\item Type resolution makes use of generic signature queries to form bound dependent member types when resolving the interface type of a declaration (\ChapRef{typeresolution}).
+\end{itemize}
+
+We now extend our formal system to describe these behaviors. As always, let $G$ be a generic signature. We assume that $G\vdash\ConfReq{T}{P}$ for some~\texttt{T} and~\texttt{P}.
+
+We first add an inference rule that is analogous to \IndexStep{AssocName}\textsc{AssocName} except that it derives a bound dependent member type. From each \index{associated type declaration}associated type declaration~\texttt{A} of~\texttt{P}, the \IndexStepDefinition{AssocDecl}\textsc{AssocDecl} inference rule derives the \index{bound dependent member type}bound \index{dependent member type}dependent member type \texttt{T.[P]A}, with base type~\texttt{T}, referencing the associated type declaration~\texttt{A}:
+\begin{gather*}
+\AssocDeclStepDef
+\end{gather*}
+To encode the equivalence of bound and unbound dependent member types, we also add an inference rule that derives a same-type requirement between the two. That is, from each \index{associated type declaration}associated type declaration~\texttt{A} of~\texttt{P}, the \IndexStepDefinition{AssocBind}\textsc{AssocBind} inference rule derives a same-type requirement between the two dependent member types that \textsc{AssocDecl} and \textsc{AssocName} would derive under the same assumptions:
+\begin{gather*}
+\AssocBindStepDef
+\end{gather*}
+The \IndexStep{SameName}\textsc{SameName} inference rule, which gave us $\SameReq{T.A}{U.A}$ from $\ConfReq{U}{P}$ and $\SameReq{T}{U}$, also has a bound type parameter equivalent. Under the same assumptions, \IndexStepDefinition{SameDecl}\textsc{SameDecl} derives $\SameReq{T.[P]A}{U.[P]A}$:
+\begin{gather*}
+\SameDeclStepDef
+\end{gather*}
+The \textsc{SameDecl} inference rule is fundamentally different from all of the others, because its introduction does not contribute any novel statements to our theory:
+\begin{proposition}
+Any derivation containing a \textsc{SameDecl} step can be transformed into one without.
+\end{proposition}
+\begin{proof}
+Given $G\vdash\ConfReq{U}{P}$ and $G\vdash\SameReq{T}{U}$, we can derive $\SameReq{T.[P]A}{U.[P]A}$ without \textsc{SameDecl} by adding the below steps, for any suitable choice of \texttt{T}, \texttt{U}, \texttt{P} and \texttt{A}:
+\begin{gather*}
+\AnyStep{\ConfReq{U}{P}}{1}\\
+\AnyStep{\SameReq{T}{U}}{2}\\
+\SameNameStep{1}{2}{T.A}{U.A}{3}\\
+\AssocBindStep{1}{U.[P]A}{U.A}{4}\\
+\SymStep{4}{U.A}{U.[P]A}{5}\\
+\SameConfStep{1}{2}{T}{P}{6}\\
+\AssocBindStep{6}{T.[P]A}{T.A}{7}\\
+\TransStep{7}{3}{T.[P]A}{U.A}{8}\\
+\TransStep{8}{5}{T.[P]A}{U.[P]A}{9}
+\end{gather*}
+However, it is certainly more convenient to write 1 derivation step instead of 7 every time we need this equivalence. Thus, \textsc{SameDecl} is syntax sugar for our formal system.
+\end{proof}
+
+\begin{example}
+Consider the protocol generic signature $G_\texttt{Sequence}$, and recall that \texttt{Sequence} states two associated requirements:
+\begin{gather*}
+\ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}\\
+\SameReq{Self.Element}{Self.Iterator.Element}_\texttt{Sequence}
+\end{gather*}
+Let's continue to pretend that those associated requirements are written with unbound type parameters at first, but allow use of the new inference rules. We can derive the bound type parameter \texttt{\rT.[Sequence]Iterator.[IteratorProtocol]Element}:
+\begin{gather*}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocConfStep{1}{\rT.Iterator}{IteratorProtocol}{2}\\
+\AssocBindStep{2}{\rT.[Sequence]Iterator}{\rT.Iterator}{3}\\
+\SameConfStep{2}{3}{\rT.[Sequence]Iterator}{IteratorProtocol}{4}\\
+\AssocDeclStep{4}{\rT.[Sequence]Iterator.[IteratorProtocol]Element}{5}
+\end{gather*}
+We used the new inference rules in (3) and (5). Notice how (4) looks a lot like our associated conformance requirement, but with a bound type parameter.
+
+Now, we can also define our formal system so that the explicit requirements of our generic signature and the associated requirements of protocols are written in terms of bound type parameters, as they actually would be in the implementation:
+\begin{gather*}
+\ConfReq{Self.[Sequence]Iterator}{IteratorProtocol}_\texttt{Sequence}\\
+[\texttt{Self.[Sequence]Element ==}\\
+\qquad\qquad\texttt{Self.[Sequence]Iterator.[IteratorProtocol]Element}]_\texttt{Sequence}
+\end{gather*}
+We see that \texttt{\rT.[Sequence]Iterator.[IteratorProtocol]Element} can be derived, now with fewer steps:
+\begin{gather*}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocConfStep{1}{\rT.[Sequence]Iterator}{IteratorProtocol}{2}\\
+\AssocDeclStep{2}{\rT.[Sequence]Iterator.[IteratorProtocol]Element}{3}
+\end{gather*}
+And there's a symmetry here---we can just as easily derive the unbound type parameter \texttt{\rT.Iterator.Element} from our associated requirements that contain bound type parameters:
+\begin{gather*}
+\ConfStep{\rT}{Sequence}{1}\\
+\AssocConfStep{1}{\rT.[Sequence]Iterator}{IteratorProtocol}{2}\\
+\AssocBindStep{1}{\rT.[Sequence]Iterator}{\rT.Iterator}{3}\\
+\SymStep{3}{\rT.Iterator}{\rT.[Sequence]Iterator}{4}\\
+\SameConfStep{2}{4}{\rT.Iterator}{IteratorProtocol}{5}\\
+\AssocNameStep{5}{\rT.Iterator.Element}{6}
+\end{gather*}
+\end{example}
+
+In fact, we will prove the following in \ChapRef{building generic signatures}:
+\begin{itemize}
+\item \ThmRef{bound and unbound equiv} will show that every equivalence class of valid type parameters always contains at least one bound and at least one unbound type parameter.
+\item \PropRef{equiv generic signatures} will tell us that we can start with a list of explicit requirements written with bound or unbound type parameters without changing the theory.
+\end{itemize}
+
+Suppose a generic parameter \rT\ conforms to two protocols \texttt{P1} and \texttt{P2}, and both declare an associated type named \texttt{A}. The same unbound dependent type \texttt{\rT.A} can be derived from either conformance requirement, and this effectively merges the associated requirements imposed on \texttt{A} in the language semantics. This remains true once we add bound dependent member types, because we can derive:
+\begin{gather*}
+\ConfStep{\rT}{P1}{1}\\
+\AssocBindStep{1}{\rT.[P1]A}{\rT.A}{2}\\
+\ConfStep{\rT}{P2}{3}\\
+\AssocBindStep{3}{\rT.[P2]A}{\rT.A}{4}\\
+\SymStep{4}{\rT.A}{\rT.[P2]A}{5}\\
+\TransStep{2}{5}{\rT.[P1]A}{\rT.[P2]A}{6}
+\end{gather*}
+A special case is when the first protocol inherits from the other. Re-stating an associated type declaration with the same name as an associated type of an inherited protocol has no effect. This is explored further in \SecRef{tietze transformations}.
+
+Bound type parameters don't seem to yield anything new. Why bother then? Type substitution must issue generic signature queries in the general case anyway, and we could instead consult the generic signature every time we decompose a dependent member type. Instead, our representation basically pre-computes certain information and encodes it in the structure of the dependent member type itself. This avoids generic signature queries in simple cases, and our formal system proves this is equivalent. 
+
+\paragraph{Summary.}
+A complete summary of all elementary statements and inference rules in the derived requirements formalism appears in \AppendixRef{derived summary}. Bound type parameters are trivial from a theoretical standpoint, and our theory of concrete type requirements is incomplete, which leaves us with this fundamental set of elementary statements and inference rules:
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+\textbf{Elementary statements:}&\textsc{Generic}&\textsc{Conf}&\textsc{Same}\\
+\midrule
+\textbf{Inference rules:}&\textsc{AssocName}&\textsc{AssocConf}&\textsc{AssocSame}\\
+&\textsc{Reflex}&\textsc{Sym}&\textsc{Trans}\\
+&&\textsc{SameConf}&\textsc{SameName}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+So far, we've only used our formal system to derive concrete statements \emph{in} a fixed generic signature. In later chapters, we prove results \emph{about} generic signatures:
+\begin{itemize}
+\item In \ChapRef{building generic signatures}, we describe how we diagnose invalid requirements, and show that if no diagnostics are emitted, our formal system has a particularly nice theory.
+\item In \ChapRef{conformance paths}, we take a closer look at derived conformance requirements, to describe substitution of dependent member types; in particular, we prove that a certain algorithm must terminate.
+\item In \ChapRef{monoids}, we use derived requirements to show that a Swift protocol can encode an arbitrary finitely-presented monoid, which demonstrates that a generic signature can have an undecidable theory.
+\item In \ChapRef{symbols terms rules}, we will translate the explicit requirements of a generic signature into rewrite rules for a string rewrite system, and then show that derived requirements correspond to \emph{rewrite paths} under this correspondence. This provides a correctness proof for the implementation.
+\end{itemize}
+
+\section{Reduced Type Parameters}\label{reduced types}
+
+An equivalence class of type parameters might be infinite, or finite but large. For this reason, we cannot model an equivalence class as a set in the implementation. Instead, we define a way to consistently select a unique representative from each equivalence class, called the \emph{reduced type parameter} of the equivalence class. The reduced type parameter can ``stand in'' for its entire equivalence class, and the set of all reduced type parameters gives another description of the equivalence class structure of a generic signature.
+
+To continue the analogy with fractions from the previous section, we don't usually think of a single rational number as an infinite set of fractions. Instead, after performing a series of arithmetic operations, we \emph{reduce} the result to lowest terms by eliminating common factors from the numerator and denominator. For example, $2/4$ and $(-3)/(-6)$ reduce to $1/2$, while $1/2$ is already reduced. This gives us a new way to check if two fractions are equivalent: we reduce both, and then check if the reduced fractions are identical. A key fact is that we can find a reduced fraction by \emph{ordering} the elements of its equivalence class: the reduced fraction has the smallest positive denominator.
+
+\begin{definition}\label{def order}
+A \IndexDefinition{partial order}\emph{partial order} $R\subseteq S\times S$ is anti-reflexive and transitive:
+\begin{itemize}
+\item $R$ is \emph{anti-reflexive} if $(x,x)\notin R$ for all $x\in S$.
+\item $R$ is \index{transitive relation}\emph{transitive} if $(x,y)$, $(y,z)\in R$ implies that $(x,z)\in R$.
+\end{itemize}
+If $R$ is clear from context, we write $x<y$ instead of $(x,y)\in R$ and $x\not< y$ instead of $(x,y)\notin R$. We also define $>$, $\leq$ and $\geq$ in the usual way in terms of $<$.
+\end{definition}
+Note that $x<y$ and $y<x$ cannot both be true at once, because then we'd have $x<x$ by transitivity, which contradicts the requirement that $x\not< x$ for all $x\in S$. Therefore in a partial order, \emph{at most} one of the below is true for a pair of elements $x$, $y\in S$:
+\begin{enumerate}
+\item $x=y$,
+\item $x<y$,
+\item $x>y$.
+\end{enumerate}
+If none of these are true, we say $x$ and $y$ are \emph{incomparable}. We will consider general partial orders later, but for now we're going to restrict our attention to those orders where \emph{exactly} one of the three conditions above is true, for any pair of elements:
+\begin{definition}
+A \index{total order|see{linear order}}\IndexDefinition{linear order}\emph{linear order} is a partial order without incomparable elements. In a linear order, $x\not< y$ is another way of saying $x \geq y$.
+\end{definition}
+
+We will define a linear order on type parameters, denoted by $<$. This will express the idea that if $G\vdash\SameReq{T}{U}$ and $\texttt{T}<\texttt{U}$, then \texttt{T} is ``more reduced'' than \texttt{U}, within this equivalence class that contains both. The minimum out of all representatives is then the reduced type parameter itself. We will start by measuring the ``complexity'' of a type parameter by counting the number of dependent member types involved in its construction:
+\begin{definition}
+The \index{length!of type parameter}\IndexDefinition{type parameter length}\emph{length} of a type parameter \texttt{T}, denoted by $|\texttt{T}|$, is a natural number. The length of a generic parameter type is~1, while the length of a dependent member type \texttt{U.A} or \texttt{U.[P]A} is recursively defined as $|\texttt{U}|+1$.
+\end{definition}
+
+We want the reduced type parameter to be one of minimum possible length, and we also want to be able to apply substitution maps to it, so it ought to be a \index{bound type parameter}bound type parameter. This gives us two conditions our type parameter order must satisfy:
+\begin{enumerate}
+\item If $|\texttt{T}|<|\texttt{U}|$, then $\texttt{T}<\texttt{U}$.
+\item Bound dependent member types precede unbound dependent member types.
+\end{enumerate}
+
+\begin{example}
+In \ExRef{protocol collection example}, we studied a simplified \texttt{Collection} protocol. We saw that the equivalence class of \texttt{\rT.SubSequence} in 
+$G_\texttt{Collection}$ contains an infinite sequence of type parameters of increasing length, \[\{\texttt{\rT.SubSequence}^n\}_{n\geq 1}.\]
+After adding inference rules for bound dependent member types, our equivalence class will also contain some of those:
+\[\{\texttt{\rT.[Collection]SubSequence}^n\}_{n\geq 1}.\]
+(It also contains ``mixed'' bound and unbound type parameters.) The reduced type parameter of this equivalence class must be $\texttt{\rT.[Collection]SubSequence}$.
+
+\pagebreak
+
+Each equivalence class of $G_\texttt{Collection}$ has a unique representative of minimum length, which isn't true of all generic signatures in general. This condition means that if two equivalent type parameters have the same length, they only differ in being bound or unbound, so our two conditions completely determine the reduced type parameter of each equivalence class:
+\begin{quote}
+\begin{tabular}{l}
+\toprule
+\texttt{\rT}\\
+\texttt{\rT.[Sequence]Element}\\
+\texttt{\rT.[Sequence]Iterator}\\
+\texttt{\rT.[Collection]SubSequence}\\
+\texttt{\rT.[Collection]SubSequence.[Sequence]Iterator}\\
+\bottomrule
+\end{tabular}
+\end{quote}
+(The real \texttt{Collection} protocol defines these reduced types together with a few more equivalence classes related to the \texttt{Index} and \texttt{Indices} associated types.)
+\end{example}
+
+To complete our description of the type parameter order then, we must show how to compare type parameters of equal length. Note that all of the below algorithms take a pair of values $x$ and $y$ and then compute whether $x<y$, $x>y$ or $x=y$ simultaneously. We start with the generic parameters, which are the type parameters of length~1.
+
+\begin{algorithm}[Generic parameter order]\label{generic parameter order} \IndexDefinition{generic parameter order}Takes two \index{generic parameter type}generic parameter types \ttgp{d}{i} and \ttgp{D}{I} as input. Returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
 \item If $\texttt{d}<\texttt{D}$, return ``$<$''.
 \item If $\texttt{d}>\texttt{D}$, return ``$>$''.
@@ -319,35 +887,37 @@ The linear order on type parameters is built up from three simpler linear orders
 \item If $\texttt{d}=\texttt{D}$ and $\texttt{i}=\texttt{I}$, return ``$=$''.
 \end{enumerate}
 \end{algorithm}
-\IndexDefinition{protocol order}%
-\begin{algorithm}[Protocol order] \label{linear protocol order} Takes protocols \texttt{P} and \texttt{Q} as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
+
+To order dependent member types, we must order associated type declarations, and to do that we must order protocol declarations.
+
+\begin{algorithm}[Protocol order]\label{linear protocol order} Takes \IndexDefinition{protocol order}protocols \texttt{P} and \texttt{Q} as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
-\item Compare the names of the modules of \texttt{P} and \texttt{Q} lexicographically. Return the result if it is ``$<$'' or ``$>$''. Otherwise, both are defined in the same module, so keep going.
-\item Compare the names of \texttt{P} and \texttt{Q} lexicographically and return the result.
+\item Compare the parent \index{module declaration}module names of \texttt{P} and \texttt{Q} with the usual lexicographic order on identifiers. Return the result if it is ``$<$'' or ``$>$''. Otherwise, \texttt{P} and \texttt{Q} are declared in the same module, so keep going.
+\item Compare the names of \texttt{P} and~\texttt{Q} and return the result if it is ``$<$'' or ``$>$''. If \texttt{P}~and~\texttt{Q} are actually the same protocol, return ``$=$''. Otherwise, the program is invalid because it declares two protocols with the same name. Any tie-breaker can be used, such as source location.
 \end{enumerate}
 \end{algorithm}
-\begin{example}
-Say the \texttt{Barn} module defines a \index{horse}\texttt{Horse} protocol, and the \texttt{Swift} module defines \texttt{Collection}. We have $\mathtt{Barn.Horse}<\mathtt{Swift.Collection}$, since $\mathtt{Barn}<\mathtt{Swift}$.
 
-If the \texttt{Barn} module also defines a \texttt{Saddle} protocol, then $\mathtt{Barn.Horse}<\mathtt{Barn.Saddle}$; both are from the same module, so we compare protocol names, $\mathtt{Horse}<\mathtt{Saddle}$.
-\end{example}
-Adding or removing an associated type with the same name as an associated type of an inherited protocol should have no effect on the binary interface of a shared library. For this reason, the linear order essentially ignores associated type declarations which re-state an associated type from an inherited protocol.
-\IndexDefinition{root associated type}%
-\index{inherited protocol}%
-\begin{definition}\label{root associated type} A \emph{root associated type} is an associated type defined in a protocol such that no inherited protocol has an associated type with the same name.
+Suppose the \texttt{Barn} module declares a \index{horse}\texttt{Horse} protocol, and the \texttt{Swift} module declares \texttt{Collection}. Then \texttt{Horse} precedes \texttt{Collection}, because they are declared in different modules, and $\texttt{Barn}<\texttt{Swift}$. If the \texttt{Barn} module also declares a \texttt{Saddle} protocol, then $\texttt{Horse}<\texttt{Saddle}$, because both are from the same module, so we compare their protocol names.
+
+In the previous section, we showed that re-stating an inherited associated type has no effect in our formal system. We also want this to have no effect on reduced types, so our type parameter order must prefer certain associated type declarations over others:
+
+\begin{definition}\label{root associated type} A \IndexDefinition{root associated type}\emph{root associated type} is an associated type whose parent protocol does not \index{inherited protocol}inherit from any protocol having an associated type with the same name.
 \end{definition}
-\begin{example} In the following, \texttt{Q.A} is \emph{not} a root associated type, because \texttt{Q} inherits \texttt{P} and \texttt{P} also declares an associated type named \texttt{A}, but \texttt{Q.B} is a root:
+
+In the following, \texttt{Derived.Foo} is not a root, because \texttt{Derived} inherits \texttt{Base} and \texttt{Base} also declares an associated type named \texttt{Foo}. However, \texttt{Derived.Bar} is a root:
 \begin{Verbatim}
-protocol P {
-  associatedtype A  // root
+protocol Base {
+  associatedtype Foo  // root
 }
 
-protocol Q: P {
-  associatedtype A  // not a root
-  associatedtype B  // root
+protocol Derived: Base {
+  associatedtype Foo  // not a root
+  associatedtype Bar  // root
 }
 \end{Verbatim}
-\end{example}
+
+We define the associated type order in terms of the protocol order.
+
 \IndexDefinition{associated type order}%
 \begin{algorithm}[Associated type order]\label{associated type order}%
 Takes associated type declarations $\texttt{A}_1$ and $\texttt{A}_2$ as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
@@ -355,422 +925,330 @@ Takes associated type declarations $\texttt{A}_1$ and $\texttt{A}_2$ as input, a
 \item First, compare their names lexicographically. Return the result if it is ``$<$'' or ``$>$''. Otherwise, both associated types have the same name, so keep going.
 \item If $\texttt{A}_1$ is a root associated type and $\texttt{A}_2$ is not, return ``$<$''.
 \item If $\texttt{A}_2$ is a root associated type and $\texttt{A}_1$ is not, return ``$>$''.
-\item Compare the protocols of $\texttt{A}_1$ and $\texttt{A}_2$ using Algorithm~\ref{linear protocol order} and return the result.
+\item Otherwise, $\texttt{A}_1$ and $\texttt{A}_2$ are both root associated types. Compare the parent protocols of $\texttt{A}_1$~and~$\texttt{A}_2$ using \AlgRef{linear protocol order} and return the result if it is ``$<$'' or ``$>$''.
+\item Otherwise, we have two associated types with the same name in the same protocol. If $\texttt{A}_1$ and $\texttt{A}_2$ are the same associated type declaration, return ``$=$''.
+\item Otherwise, the program is invalid. As with the protocol order, any tie-breaker can be used, such as source location.
 \end{enumerate}
 \end{algorithm}
-Finally, we can use the generic parameter order and associated type order to define the type parameter order. We can summarize the type parameter order as follows: a type parameter of shorter length always precedes one of longer length, and when two type parameters have the same length we walk them in parallel and compare their structure. We can define the \IndexDefinition{type parameter length}\emph{length} of a type parameter recursively. A generic parameter type has length one, and the length of a dependent member type is one more than the length of its base type.
+
+We now have enough to order all type parameters. The type parameter order does not distinguish \index{sugared type}type sugar, so it outputs ``$=$'' if and only if \texttt{T} and \texttt{U} are canonically equal.
+
 \begin{algorithm}[Type parameter order]\label{type parameter order}
 Takes type parameters \texttt{T} and \texttt{U} as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
-\item If \texttt{T} and \texttt{U} are both generic parameter types, compare them using Algorithm~\ref{generic parameter order} and return the result.
-\item If \texttt{T} is a generic parameter type and \texttt{U} is a \index{dependent member type}dependent member type, return ``$<$''.
-\item If \texttt{T} is a dependent member type and \texttt{U} is a generic parameter type, return ``$>$''.
-\item Otherwise, both are dependent member types.
-\item Recursively invoke this algorithm to compare the base type of \texttt{T} with the base type of \texttt{U}, and return the result it is ``$<$'' or ``$>$''. Otherwise, both have the same base type, so keep going.
+\item If \texttt{T} is a generic parameter type and \texttt{U} is a \index{dependent member type}dependent member type, then $|\texttt{T}|<|\texttt{U}|$, so return ``$<$''.
+\item If \texttt{T} is a dependent member type and \texttt{U} is a generic parameter type, then $|\texttt{T}|>|\texttt{U}|$, so return ``$>$''.
+\item If \texttt{T} and \texttt{U} are both generic parameter types, compare them using \AlgRef{generic parameter order} and return the result.
+\item Otherwise, both are dependent member types. Recursively compare the base type of \texttt{T} with the base type of \texttt{U}, and return the result it is ``$<$'' or ``$>$''.
+
+\item Otherwise, \texttt{T} and \texttt{U} have canonically equal base types.
+
 \item If \texttt{T} is \index{bound dependent member type}bound and \texttt{U} is \index{unbound dependent member type}unbound, return ``$<$''.
 \item If \texttt{T} is unbound and \texttt{U} is bound, return ``$>$''.
-\item If \texttt{T} is unbound and \texttt{U} is unbound, compare their names lexicographically and return the result.
-\item If \texttt{T} is bound and \texttt{U} is bound, compare their associated types using Algorithm~\ref{associated type order} and return the result.
+\item If \texttt{T} and \texttt{U} are both unbound dependent member types, compare their names lexicographically and return the result.
+\item If \texttt{T} and \texttt{U} are both bound dependent member types, compare their associated type declarations using \AlgRef{associated type order} and return the result.
 \end{enumerate}
 \end{algorithm}
-The type parameter order is actually a special case of a \index{shortlex order}\emph{shortlex order}; we will see another shortlex order in Section~\ref{finding conformance paths}, and finally generalize the concept in Section~\ref{rewritesystemintro}.
-
-\begin{example}\label{typeparameterorderexample} Table~\ref{typeparameterordertable} shows the type parameters of the following generic signature in type parameter order:
-\begin{quote}
-\begin{verbatim}
-<τ_0_0, τ_0_1 where τ_0_1: Sequence,
-                    τ_0_0 == τ_0_1.[Sequence]Element>
-\end{verbatim}
-\end{quote}
-A few unbound type parameters are also thrown in the mix to show how they are ordered with respect to the bound type parameters.
-\end{example}
-\begin{table}\captionabove{Type parameters from Example~\ref{typeparameterorderexample}, ordered and grouped by length}\label{typeparameterordertable}
-\begin{center}
-\begin{tabular}{l}
-\toprule
-\ttgp{0}{0}\\
-\ttgp{0}{1}\\
-\midrule
-\texttt{\ttgp{0}{1}.[Sequence]Element}\\
-\texttt{\ttgp{0}{1}.[Sequence]Iterator}\\
-\texttt{\ttgp{0}{1}.Element}\\
-\texttt{\ttgp{0}{1}.Iterator}\\
-\midrule
-\texttt{\ttgp{0}{1}.[Sequence]Iterator.[IteratorProtocol]Element}\\
-\texttt{\ttgp{0}{1}.[Sequence]Iterator.Element}\\
-\texttt{\ttgp{0}{1}.Iterator.[IteratorProtocol]Element}\\
-\texttt{\ttgp{0}{1}.Iterator.Element}\\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\section{Reduced Types}\label{reducedtypes}
-\index{same-type requirement}
-\IndexDefinition{reduced type equality}
-\IndexDefinition{equivalence class}
-\IndexDefinition{reduced type}
-Canonical type equality does not take generic signatures into account at all; it only tells us if two type parameters are spelled in the same way. To correctly model same-type requirements, the generics implementation has a second, stronger, notion of equality on type parameters. With a generic signature on hand, \emph{reduced type equality} determines whether they abstractly represent the same replacement type within this signature. We will begin by reviewing equivalence relations and equivalence classes.
 
 \begin{definition}
-Recall that a relation on $S$ is a subset of $S\times S$. A relation $R$ is an \IndexDefinition{equivalence relation}\emph{equivalence relation} on $S$ if it is reflexive, symmetric and transitive.
-\begin{itemize}
-\item $R$ is \IndexDefinition{reflexive relation}\emph{reflexive} if $(x,x)\in R$ for all $x\in S$.
-\item $R$ is \IndexDefinition{symmetric relation}\emph{symmetric} if whenever $(x,y)\in R$, then $(y,x)\in R$.
-\item $R$ is \index{transitive relation}\emph{transitive} if whenever $(x,y)\in R$ and $(y,z)\in R$, then $(x,z)\in R$.
-\end{itemize}
-If $R$ is an equivalence relation on a set $S$ and $x\in S$, the \emph{equivalence class} of $x$, denoted $\EquivClass{x}$, is the set of all $y\in S$ such that $(x, y)\in R$.
+Let $G$ be a generic signature. A valid type parameter \texttt{T} of $G$ is a \emph{reduced type parameter} if $G\vdash\SameReq{T}{U}$ implies that $\texttt{T}\leq\texttt{U}$ for all~\texttt{U}.
 \end{definition}
-\begin{proposition}
-If $R$ is an equivalence relation on $S$, then every element of $S$ belongs to exactly one equivalence class of $R$.
+
+The type parameter order is a linear order, so if we can identify a reduced type parameter in some equivalence class, we know that it must be unique. However, we haven't seen how to calculate the reduced type parameter yet. Indeed, we haven't even established that an equivalence class of type parameters \emph{has} a minimum element. For example, the set of \index{integers}integers~$\mathbb{Z}$ certainly does not, under the usual linear order:
+\[\cdots < -2 < -1 < 0 < 1 < 2 < \cdots\]
+We wish to rule out this possibility:
+\begin{definition}
+A linear order with domain $S$ is \IndexDefinition{well-founded order}\emph{well-founded} if every non-empty subset of $S$ contains a minimum element.
+
+In the more general case of a partial order, this is not the right definition, because a set consisting of two incomparable elements does not have a minimum element. For a \index{partial order}partial order, the correct condition is that the domain $S$ must not contain an \emph{infinite descending chain}, which is an infinite sequence of elements $x_i\in S$ such that:
+\[x_1 > x_2 > x_3 > \ldots \]
+For a linear order the two conditions are equivalent.
+\end{definition}
+
+Any partial order on a finite set is always well-founded. The usual linear order on the \index{natural numbers}natural numbers~$\mathbb{N}$ is also well-founded (essentially by \emph{definition} of $\mathbb{N}$).
+
+\begin{proposition}\label{well founded type order} The type parameter order of \AlgRef{type parameter order} is well-founded.
 \end{proposition}
 \begin{proof}
-We first show that every element $x\in S$ belongs to \emph{at least one} equivalence class, specifically its own equivalence class $\EquivClass{x}$. Indeed, if $x\in S$, then $(x,x)\in R$, since $R$ is reflexive. From the definition of $\EquivClass{x}$, this means that $x\in\EquivClass{x}$. This can also be stated another way. With our \index{turnsile operator}``tursile'' $\vdash$ operator, we can view the reflexivity of $R$ as a ``derivation rule'' of sorts, for constructing elements of $R$ from elements of $S$:
-\[x\in S\vdash (x,x)\in R\]
-Next, we will show that every element belongs to \emph{exactly one} equivalence class. We will start with the assumption that some $t$ is an element of both $\EquivClass{x}$ and $\EquivClass{y}$, and argue that $\EquivClass{x}=\EquivClass{y}$, that is, $\EquivClass{x}\subseteq\EquivClass{y}$ and $\EquivClass{y}\subseteq\EquivClass{x}$. Let $u\in\EquivClass{x}$ be some other arbitrary element. We can write down derivations for the elements of $R$ we know exist so far:
-\begin{gather*}
-t\in\EquivClass{x}\vdash(x, t)\in R\\
-t\in\EquivClass{y}\vdash(y, t)\in R\\
-u\in\EquivClass{x}\vdash(x, u)\in R
-\end{gather*}
-The symmetry and transitivity of $R$ also give us two more rules for deriving new elements of $R$ from existing elements of $R$. We can thus derive the fact that $u\in\EquivClass{y}$:
-\begin{gather*}
-(x, t)\in R\vdash(t, x)\in R\\
-(y, t),\,(t, x)\in R\vdash (y, x)\in R\\
-(y, x),\,(x, u)\in R\vdash (y, u)\in R\\
-(y, u)\in R\vdash u\in\EquivClass{y}
-\end{gather*}
-However, since $u\in\EquivClass{x}$ was arbitrary, we've actually shown that $\EquivClass{x}\subseteq\EquivClass{y}$. But also, the same argument gives $\EquivClass{y}\subseteq\EquivClass{x}$ if you swap $x$ and $y$ throughout. Therefore, $\EquivClass{x}=\EquivClass{y}$, concluding the proof. Note that we made use of all three defining properties of an equivalence relation; the result no longer holds after relaxing any of these conditions.
+Let $S$ be any set of type parameters, possibly infinite. We will demonstrate that $S$ contains a minimum element.
+
+First, define the set $L(S)\subseteq\mathbb{N}$ by taking the length of each type parameter in $S$. While~$L(S)$ might be an infinite set, it must have a minimum element under the linear order on~$\mathbb{N}$, say~$n\in L(S)$. Let~$S_n\subseteq S$ be the subset of $S$ containing only type parameters of length~$n$. If~$S_n$ has a minimum element, it will also be the minimum element of~$S$.
+
+On the other hand, a set of type parameters of fixed length must be finite. If our entire program and all imported modules declare a total of $g$~distinct generic parameters and $a$~associated types, then the number of type parameters of length~$n$, generated by all generic signatures, cannot exceed $g(2a)^n$. (We count each associated type twice, to account for bound and unbound type parameters, but this exact number is irrelevant; the important fact is that it's finite.)
+
+Thus, the finite set~$S_n$ contains a minimum element, and so does~$S$, and since~$S$ was chosen arbitrarily, we conclude that the type parameter order is well-founded.
 \end{proof}
-Now, we can define reduced type equality using the idea of \index{derived requirement}derived requirements from Section~\ref{derived req}.
-\begin{definition}
-We say two type parameters \texttt{T} and \texttt{U} are \index{equivalent type parameters|see{reduced type equality}}\IndexDefinition{reduced type equality}equivalent with respect to a generic signature $G$ if the same-type requirement $\FormalReq{T == U}$ can be derived from $G$. Additionally, if we can derive a concrete same-type requirement $\FormalReq{T == C}$ which fixes a type parameter \texttt{T} to a concrete type \texttt{C}, we say that \texttt{T} is equivalent to the concrete type \texttt{C}. That this is an equivalence relation can be seen from the three \IndexStep{Equiv}\textsc{Equiv} derivation steps:
-\begin{itemize}
-\item (Reflexivity) Given a valid type parameter \texttt{T}, we can derive the vacuous requirement $\FormalReq{T == T}$. Thus, \texttt{T} is equivalent to \texttt{T}.
-\item (Symmetry) Given a requirement $\FormalReq{T == U}$, we can derive the requirement $\FormalReq{U == T}$. Thus, if \texttt{T} is equivalent to \texttt{U}, then \texttt{U} is equivalent to \texttt{T}.
-\item (Transitivity) Given a pair of requirements $\FormalReq{T == U}$ and $\FormalReq{U == V}$, we can derive the requirement $\FormalReq{T == V}$. Thus, if \texttt{T} is equivalent to \texttt{U} and \texttt{U} is equivalent to \texttt{V}, then \texttt{T} is equivalent to \texttt{V}.
-\end{itemize}
-\end{definition}
-The type parameters in an equivalence class can be sorted by the type parameter order from the previous section, which gives us the notion of ``simplest representative'' type parameters.
-\begin{definition}
-If \texttt{T} is any type parameter, the \IndexDefinition{reduced type parameter}\emph{reduced type} of \texttt{T} is the least element in the equivalence class of \texttt{T}. If \texttt{T} itself is the smallest element in its own equivalence class, we say that \texttt{T} is a reduced type parameter. As a special case, if we can derive a same-type requirement $\FormalReq{T == C}$ with a concrete type \texttt{C} on the right hand side, then \texttt{T} is not considered a reduced type parameter, and its reduced type is the concrete type \texttt{C}.
-\end{definition}
-\begin{definition}
-An interface type is a \IndexDefinition{reduced type}\emph{reduced type} with respect to a generic signature if all type parameters appearing inside the interface type are reduced type parameters. Reduced type equality generalizes from type parameters to interface types; we say that two interface types are \emph{equivalent} if they become canonically equal once each type parameter is replaced with its reduced type.
-\end{definition}
-In the implementation, the reduced type computation is actually a more primitive concept than the reduced equality check. Reduced type equality is implemented to first compute the reduced type of both sides, and then test for type pointer equality. Compare this with how canonical type equality takes the canonical type of both sides and tests type pointer equality. All reduced types are also canonical, so canonical equality implies reduced equality (but not vice versa).
 
-These definitions characterize reduced types but don't give an algorithm for computing the reduced type of an arbitrary type parameter. In fact, it is not immediately obvious that reduced types \emph{exist}; that is, if each equivalence class even \emph{has} a unique smallest element. For example, consider the set of (positive and negative) \index{integers}integers, $\mathbb{Z}$. The integers can be linearly ordered with the standard ``less-than'' relation, but the \index{subset}subset of negative integers does not have a minimum element, because we can exhibit an \emph{infinite descending chain} where each element is smaller than the one to the right:
-\[\cdots < -3 < -2 < -1\]
-On the other hand, in the set of \index{natural numbers}natural numbers (non-negative integers) $\mathbb{N}$, every non-empty subset $S\subseteq\mathbb{N}$ has a minimum element. We first check if $0\in S$; if so, we're done. Otherwise, we check if $1\in S$, $2\in S$, and so on. Since $S$ was non-empty this must terminate after a finite number of steps and produce a minimum element. The difference between the ``less-than'' order on $\mathbb{N}$ and $\mathbb{Z}$ is given by the following definition.
-\begin{definition}
-A \index{partial order}partial order over a set $S$ is \IndexDefinition{well-founded order}\emph{well-founded} if $S$ does not have an infinite descending chain; that is, there does not exist an infinite sequence of elements $x_i\in S$ such that:
-\[\ldots <x_n<\ldots <x_3<x_2<x_1\]
-\end{definition}
-\begin{proposition}\label{well founded type order} The type parameter order defined by Algorithm~\ref{type parameter order} is well-founded.
-\end{proposition}
-\begin{proof}
-Suppose our generic signature has $g$ generic parameters, and the user's entire program, together with all imported modules, defines a total of $a$ associated types in all protocols. This generic signature only has $g$ type parameters of length 1. Also, $(2a)g$ is an upper bound on the number of type parameters of length 2 (for each generic parameter and each associated type declaration, we have the bound and unbound forms). This is a massive overcount in general, because not every generic parameter has to conform to every protocol, and some associated types might have the same name, and thus the same unbound form. However, the point is that there are only finitely many type parameters of length 2. A similar argument shows that there are at most $(2a)^{n-1}g$ type parameters of length $n$, for all $n>1$. Thus, the number of type parameters of length $\leq n$, being a finite sum, is itself finite. Assume then, the type parameter order is not well-founded, and we have an infinite descending chain of type parameters:
-\[\ldots <\texttt{T}_n<\ldots <\texttt{T}_3<\texttt{T}_2<\texttt{T}_1\]
-For every $n>1$, we have $\texttt{T}_n<\texttt{T}_1$, and thus $|\texttt{T}_n|\leq|\texttt{T}_1|$, so $\{\texttt{T}_n\}_{n>1}$ is an infinite set of type parameters of length $\leq |\texttt{T}_1|$. But we just showed this set is always finite. This is a contradiction, so our assumption that an infinite descending chain exists must be invalid. Therefore the type parameter order is well-founded.
-\end{proof}
-\begin{table}\captionabove{Equivalence classes defined by the generic signature in Example~\ref{typeparameterorderexample}}\label{equivalenceclassestable}
-\begin{center}
-\begin{tabular}{l}
-\toprule
-\ttgp{0}{0} $(*)$\\
-\midrule
-\ttgp{0}{1} $(*)$\\
-\midrule
-\texttt{\ttgp{0}{1}.[Sequence]Element} $(*)$\\
-\texttt{\ttgp{0}{1}.Element}\\
-\texttt{\ttgp{0}{1}.[Sequence]Iterator.[IteratorProtocol]Element}\\
-\texttt{\ttgp{0}{1}.[Sequence]Iterator.Element}\\
-\texttt{\ttgp{0}{1}.Iterator.[IteratorProtocol]Element}\\
-\texttt{\ttgp{0}{1}.Iterator.Element}\\
-\midrule
-\texttt{\ttgp{0}{1}.[Sequence]Iterator} $(*)$\\
-\texttt{\ttgp{0}{1}.Iterator}\\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
+The type parameter order plays an important role in the Swift \index{ABI}ABI. For example, the \index{mangling}mangled symbol name of a generic function incorporates the function's parameter types and return type, and the mangler takes reduced types to ensure that cosmetic changes to the declaration have no effect on binary compatibility.
 
-\begin{example}
-Table~\ref{equivalenceclassestable} groups the type parameters from Example~\ref{typeparameterorderexample} into equivalence classes, with the reduced type of each equivalence class marked with $(*)$. The equivalence class of \texttt{T.[Sequence]Element} includes a number of elements; we've seen derivations for some of the same-type requirements already. However, notice that each equivalence class also has a bound and unbound form of each dependent member type represented. These are worth discussing in a little more detail.
-\end{example}
+To define reduced type parameters, we compared elements in a \emph{single} equivalence class. We also use the type parameter order to establish an order relation \emph{between} equivalence classes, by comparing their reduced types. We will extend this to a partial order on \emph{requirements} in \AlgRef{requirement order}. This requirement order surfaces in the Swift ABI:
+\begin{enumerate}
+\item The calling convention for a generic function passes a witness table for each explicit \index{conformance requirement}conformance requirement in the function's \index{generic signature}generic signature, sorted in this order.
+\item The in-memory layout of a \index{witness table}witness table stores an associated witness table for each associated conformance requirement in the protocol's \index{requirement signature}requirement signature, sorted in this order.
+\end{enumerate}
 
-\paragraph{Bound and unbound}
-If an equivalence class contains dependent member types, it will contain the \index{bound dependent member type}bound and \index{unbound dependent member type}unbound form of each one. So, in the generic signature of Example~\ref{typeparameterorderexample}, both \texttt{\ttgp{0}{1}.Element} and \texttt{\ttgp{0}{1}.[Sequence]Element} belong to the same equivalence class. This follows from our requirement derivation rules; specifically, a conformance requirement $\ConfReq{T}{P}$ implies for each associated type \texttt{A} of \texttt{P} a pair of valid type parameters, \verb|T.A| and \verb|T.[P]A|, and a same-type requirement between them.
+In \ChapRef{genericenv}, we introduce \emph{archetypes}, a self-describing representation of a reduced type parameter packaged up with a generic signature, which behaves more like a concrete type inside the compiler. An archetype thus represents an entire equivalence class of type parameters, and for this reason we will also use the equivalence class notation~$\archetype{T}$ to denote the archetype corresponding to the type parameter~\texttt{T}.
 
-A \index{bound type parameter}type parameter is bound if it does not contain any unbound dependent member types (so generic parameter types are also automatically bound type parameters). The bound form of a dependent member type precedes the unbound form in the type parameter order, so reduced type parameters are always bound type parameters. (The converse is not true, however; when we introduced our running example at the start of Section~\ref{derived req}, we immediately saw derivations of same-type requirements between pairs of bound type parameters.)
-
-The generics implementation itself is happy to operate on unbound type parameters. When building a generic signature, user-written requirements come in written with unbound type parameters, because initially type resolution has no way to resolve names to associated type declarations; we don't have a generic signature yet. The minimal requirements in the final generic signature, on the other hand, only involve reduced type parameters, which in particular are always bound type parameters. This transformation is part of the requirement minimization algorithm.
-
-After a generic signature is available, further invocations of type resolution can query the generic signature about conformance requirements, and find associated type declarations by performing name lookups into protocols. This ensures that type representations only refer to valid type parameters, which are resolved in their bound form. In particular, this means that all type parameters appearing in the \index{interface type}interface type of a \index{value declaration}value declaration will always be bound.
-
-This property of interface types is important for type substitution. While type substitution does not require the type parameters inside of an interface type to be reduced, it does require them bound. The reason being, to look up a type witness in a conformance requires the actual associated type declaration, not just its name. The staged behavior where type resolution can output both unbound and bound type parameters is discussed in Chapter~\ref{typeresolution}.
-
-There is one more subtle behavior that follows immediately from the requirement derivation rules. If a type parameter conforms to two unrelated protocols that declare an associated type with the same name, the derivation rules actually make these associated types equivalent. That is, if \texttt{T} conforms to \texttt{P} and \texttt{Q}, both of which define an associated type named \texttt{A}, then we can always derive $\FormalReq{T.[P]A == T.A}$ and $\FormalReq{T.[Q]A == T.A}$ with a \textsc{Member} step, and then $\FormalReq{T.[P]A == T.[Q]A}$ with \textsc{Equiv}. The equivalence class of \texttt{T.A} will contain all three of \verb|T.A|, \verb|T.[P]A|, and \verb|T.[Q]A|. Therefore, we effectively always introduce implicit  \index{same-type requirement}same-type requirements between unrelated associated types with the same name. This is explored further in Sections and \ref{tietze transformations}.
-
-\paragraph{To infinity} The well-foundedness of the type parameter order is only important if we find ourselves working with infinite sets of type parameters. What does it mean to have infinitely many type parameters though? This is actually quite easy to conjure up. We can declare a protocol \texttt{N} with an associated type conforming to itself:
-\begin{Verbatim}
-protocol N {
-  associatedtype A: N
-}
-\end{Verbatim}
-Now consider \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:~N>}. In this generic signature, we can derive an infinite sequence of type parameters. We start with some initial derivations:
-\begin{gather}
-\vdash\ConfReq{Self}{A}_\texttt{N}\tag{1}\\
-\vdash\ttgp{0}{0}\tag{2}
-\end{gather}
-Now, we can derive a dependent member type:
-\begin{gather}
-\vdash\ConfReq{\ttgp{0}{0}}{N}\tag{3}\\
-(3)\vdash\texttt{\ttgp{0}{0}.[N]A}\tag{4}
-\end{gather}
-And another:
-\begin{gather}
-(3),\,(1)\vdash\ConfReq{\ttgp{0}{0}.[N]A}{N}\tag{5}\\
-(5)\vdash\texttt{\ttgp{0}{0}.[N]A.[N]A}\tag{6}
-\end{gather}
-And another:
-\begin{gather}
-(5),\,(1)\vdash\ConfReq{\ttgp{0}{0}.[N]A.[N]A}{N}\tag{7}\\
-(7)\vdash\texttt{\ttgp{0}{0}.[N]A.[N]A.[N]A}\tag{8}
-\end{gather}
-This continues forever, and we can derive an infinite set of type parameters of arbitrary length. In fact, a consequence of the type parameter being well-founded is that \emph{any} infinite set of type parameters necessarily contains elements of arbitrary length. For any fixed length $n$, there are only finitely many type parameters of length $\le n$, thus almost all elements of our infinite set have length $> n$. This is true for any chosen $n\in\mathbb{N}$.
-
-In general, a generic signature might have infinitely many equivalence classes, or an equivalence class containing infinitely many type parameters, or both. This is explored further in Section~\ref{type parameter graph} and Section~\ref{recursive conformances}. Well-founded orders will again appear when we introduce rewrite systems in Section~\ref{rewritesystemintro}, and use them to compute reduced types.
+A more complete treatment of equivalence relations and partial orders can be found in a discrete mathematics textbook, such as~\cite{grimaldi}. Something to keep in mind is that some authors say that a partial order is reflexive instead of anti-reflexive, so $\leq$ is the basic operation. This necessitates the additional condition that if both $x\leq y$ and $y\geq x$ are true, then $x=y$; without this assumption, we have a \index{preorder}\emph{preorder}. Sometimes, a linear order is also called a \emph{total order}, and a set with a well-founded order is said to be \emph{well-ordered}. The type parameter order is actually a special case of a \index{shortlex order}\emph{shortlex order}. Under reasonable assumptions, a shortlex order is always well-founded. We will see another instance of a shortlex order in \SecRef{finding conformance paths}, and then generalize the concept when we introduce the theory of string rewriting in \SecRef{rewritesystemintro}.
 
 \section{Generic Signature Queries}\label{genericsigqueries}
-The generics implementation provides a set of entry points for the rest of the compiler to ask questions about the type parameters of generic signatures. Collectively these are called \IndexDefinition{generic signature query}generic signature queries. An description of their implementation will come together in Chapter~\ref{propertymap}. For now, we will define the semantics of these generic signature queries using \index{derived requirement}derived requirements, and look at some examples. Table~\ref{genericsigquerytable} lists the generic signature queries, with an informal grouping into categories: predicates, properties, reduced types, and a combined query to return all properties of a type parameter.
 
-\begin{table}\captionabove{Generic signature queries}\label{genericsigquerytable}
-\begin{center}
-\begin{tabular}{ll}
-\toprule
-\textbf{Predicates}&\texttt{isValidTypeParameter()}\\
-&\texttt{requiresProtocol()}\\
-&\texttt{requiresClass()}\\
-&\texttt{isConcreteType()}\\
-\midrule
-\textbf{Properties}&\texttt{getRequiredProtocols()}\\
-&\texttt{getSuperclassBound()}\\
-&\texttt{getConcreteType()}\\
-&\texttt{getLayoutConstraint()}\\
-\midrule
-\textbf{Reduced types}&\texttt{areReducedTypeParametersEqual()}\\
-&\texttt{isReducedType()}\\
-&\texttt{getReducedType()}\\
-\midrule
-\textbf{Combined}&\texttt{getLocalRequirements()}\\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
+In the implementation, we answer questions about the derived requirements and valid type parameters of a generic signature by invoking \IndexDefinition{generic signature query}\emph{generic signature queries}. These are methods on the \texttt{GenericSignature} class, used throughout the compiler. We can formalize the behavior of these queries using the notation we developed earlier in this chapter. Each query defines a mathematical \index{function}function that takes a generic signature and at least one other piece of data, and evaluates to some property of this signature.
 
-\paragraph{Predicate queries}
-The simplest of all queries are the binary predicates, which respond with \texttt{true} or \texttt{false}. Each one takes a type parameter, and tries to derive either the validity of the type parameter itself, or a requirement involving this type parameter.
-\begin{description}
-\item [\texttt{isValidTypeParameter()}] \IndexDefinition{isValidTypeParameter()@\texttt{isValidTypeParameter()}}takes a type parameter \texttt{T}, and answers if \texttt{T} is a \index{valid type parameter}valid type parameter in this generic signature.
+\paragraph{Basic queries.} We saw that the equivalence class structure of a generic signature is generated by conformance requirements, and same-type requirements between type parameters. The first four queries allow us to answer questions about this structure, and their behavior is completely defined by the derived requirements formalism.
 
-\item [\texttt{requiresProtocol()}] \IndexDefinition{requiresProtocol()@\texttt{requiresProtocol()}}takes a type parameter \texttt{T} and protocol \texttt{P}, and answers if the \index{conformance requirement}conformance requirement $\ConfReq{T}{P}$ can be derived from this generic signature.
+\begin{itemize}
+\QueryDef{requiresProtocol}
+{G,\,\texttt{T},\,\texttt{P}}{type parameter \texttt{T}, protocol \texttt{P}.}
+{true or false: $G\vdash\ConfReq{T}{P}$?}
+{Decides if a type parameter \index{conformance requirement!generic signature query}conforms to a given protocol.}
 
-\item [\texttt{requiresClass()}] \IndexDefinition{requiresClass()@\texttt{requiresClass()}}takes a type parameter \texttt{T} and answers if the layout requirement $\ConfReq{T}{AnyObject}$ can be derived from this generic signature, meaning that \texttt{T} has a single retainable pointer representation.
+\QueryDef{areReducedTypeParametersEqual}
+{G,\,\texttt{T},\,\texttt{U}}
+{type parameter \texttt{T}, type parameter \texttt{U}.}
+{true or false: $G\vdash\SameReq{T}{U}$?}
+{Decides if two type parameters are in the same \index{reduced type equality!generic signature query}equivalence class.}
 
-\item [\texttt{isConcreteType()}] \IndexDefinition{isConcreteType()@\texttt{isConcreteType()}}takes a type parameter \texttt{T} and answers if a same-type requirement between \texttt{T} and a concrete type can be derived from this generic signature.
-\end{description}
+\QueryDef{isValidTypeParameter}
+{G,\,\texttt{T}}
+{type parameter \texttt{T}.}
+{true or false: $G\vdash\texttt{T}$?}
+{Decides if a type parameter is \index{valid type parameter!generic signature query}valid.}
+
+\QueryDef{getRequiredProtocols}
+{G,\,\texttt{T}}
+{type parameter \texttt{T}.}
+{All protocols~\texttt{P} such that $G\vdash\ConfReq{T}{P}$.}
+{Produces a list of all protocols this type parameter is known to conform to.
+\end{itemize}
+
+The $\Query{getRequiredProtocols}{}$ query is used when type checking a \index{member reference expression}member reference expression like ``\texttt{foo.bar}'' where the type of ``\texttt{foo}'' is a type parameter, because we resolve ``\texttt{bar}'' by a \index{qualified lookup}qualified name lookup into this list of protocols. Qualified lookup recursively visits inherited protocols, so the list is minimal in the sense that no protocol inherits from any other. The protocols are also sorted using \AlgRef{linear protocol order}.}
 
 \begin{example}
-Consider this pair of generic signatures:
+Let $G$ be the generic signature from \ExRef{motivating derived reqs}:
 \begin{quote}
 \begin{verbatim}
-<E where E: Sequence>
-<E, F where E: Sequence, E.[Sequence]Element: Sequence,
-            F == E.[Sequence]Element.[Sequence]Element>
+<τ_0_0, τ_0_1 where τ_0_0: Sequence, τ_0_1: Sequence,
+                    τ_0_0.Element: Equatable,
+                    τ_0_0.Element == τ_0_1.Element>
 \end{verbatim}
 \end{quote}
-\texttt{isValidTypeParameter(E)} is true in both signatures:
-\begin{gather*}
-\vdash \texttt{E}
-\end{gather*}
-\texttt{isValidTypeParameter(F)} is only true in the second signature; the first signature does not have a generic parameter \texttt{F}:
-\begin{gather*}
-\vdash \texttt{F}
-\end{gather*}
-\texttt{isValidTypeParameter(E.Element)} is true in both signatures. Note that in a multi-step derivation, we can number each step and refer to previous steps by number instead of re-stating a requirement:
-\begin{gather}
-\vdash \FormalReq{E: Sequence}\tag{1}\\
-(1) \vdash \texttt{E.[Sequence]Element}\tag{2}
-\end{gather}
-\item \texttt{isValidTypeParameter(E.Element.Element)} is only true in the second signature, as $\FormalReq{E.Element:~Sequence}$ cannot be derived in the first signature.
+\begin{enumerate}
+\item $\Query{requiresProtocol}{G,\, \texttt{\rT.Element},\,\texttt{Equatable}}$ is true.
+\item $\Query{requiresProtocol}{G,\, \texttt{\rT.Iterator.Element},\, \texttt{Equatable}}$ is true.
+\item $\Query{requiresProtocol}{G,\, \texttt{\rT.Iterator},\, \texttt{Equatable}}$ is false.
+\item $\Query{areReducedTypeParametersEqual}{G,\, \texttt{\rT.Element},\, \texttt{\rU.Element}}$ is true.
+\item $\Query{areReducedTypeParametersEqual}{G,\, \texttt{\rT.Iterator},\, \texttt{\rU.Iterator}}$ is false.
+\item $\Query{isValidTypeParameter}{G,\, \texttt{\rT.Element}}$ is true.
+\item $\Query{isValidTypeParameter}{G,\, \texttt{\rT.Iterator.Element}}$ is true.
+\item $\Query{isValidTypeParameter}{G,\, \texttt{\rT.Element.Iterator}}$ is false.
+\item $\Query{getRequiredProtocols}{G,\, \texttt{\rT.Iterator}}$ is $\{\texttt{IteratorProtocol}\}$.
+\end{enumerate}
 \end{example}
 
-\begin{example}
-Consider this generic signature:
-\begin{quote}
-\begin{verbatim}
-<T, U, V where T: Collection, T.[Sequence]Element == Array<U>,
-               U: Executor, V: NSObject>
-\end{verbatim}
-\end{quote}
-\texttt{requiresProtocol(T, Collection)} is true because the requirement is directly stated:
-\begin{gather}
-\vdash\ConfReq{T}{Collection}\tag{1}
-\end{gather}
-\texttt{requiresProtocol(T, Sequence)} is true because \texttt{Collection} inherits from \texttt{Sequence}:
-\begin{gather*}
-\vdash \ConfReq{Self}{Sequence}\tag{2}\\
-(1),\,(2)\vdash \ConfReq{T}{Sequence}\tag{3}
-\end{gather*}
-\texttt{requiresProtocol(T.Iterator, IteratorProtocol)} is true because \texttt{Sequence} makes \texttt{Iterator} conform to \texttt{IteratorProtocol}:
-\begin{gather}
-\vdash \ConfReq{Self.Iterator}{IteratorProtocol}_\texttt{Sequence}\tag{4}\\
-(3),\,(4)\vdash \FormalReq{T.Iterator:~IteratorProtocol}\tag{5}
-\end{gather}
-\texttt{requiresClass(U)} is true because \texttt{Executor} is defined as a \index{class-constrained protocol}class-constrained protocol in the standard library:
-\begin{gather}
-\vdash \ConfReq{U}{Executor}\tag{6}\\
-\vdash \ConfReq{Self}{AnyObject}_\texttt{Executor}\tag{7}\\
-(6),\,(7)\vdash \ConfReq{U}{AnyObject}\tag{8}
-\end{gather}
-\texttt{requiresClass(V)} is true because \texttt{NSObject} is a class. This proof requires derivation kinds we haven't introduced, because we must say things about concrete types. So keep in mind the below is hand-waving, for now:
-\begin{gather}
-\vdash\FormalReq{V:~NSObject}\tag{9}\\
-\vdash\FormalReq{NSObject:~AnyObject}\qquad\mbox{(*)}\tag{10}\\
-(1),\,(2)\vdash\FormalReq{V:~AnyObject}\tag{11}
-\end{gather}
-\texttt{isConcreteType(T.Element)} is true because the requirement is directly stated:
-\begin{gather}
-\vdash\FormalReq{T.Element == Array<U>}\tag{12}
-\end{gather}
-\texttt{isConcreteType(T.Iterator.Element)} is also true because it is implied by the same-type requirement in \texttt{Sequence}:
-\begin{gather}
-\vdash\FormalReq{Self.Element == Self.Iterator.Element}_\texttt{Sequence}\tag{13}\\
-(3),(13)\vdash\FormalReq{T.Element == T.Iterator.Element}\tag{14}\\
-(14)\vdash\FormalReq{T.Iterator.Element == T.Element}\tag{15}\\
-(15),(12)\vdash\FormalReq{T.Iterator.Element == Array<U>}\tag{16}
-\end{gather}
-\end{example}
+From a theoretical point of view, the two fundamental queries are $\Query{requiresProtocol}{}$ and $\Query{areReducedTypeParametersEqual}{}$. The other two, $\Query{isValidTypeParameter}{}$ and $\Query{getRequiredProtocols}{}$, while primitive in the implementation, can be formalized in terms of the others. Here is $\Query{isValidTypeParameter}{G,\,\texttt{T}}$:
+\begin{itemize}
+\item A \index{generic parameter type}generic parameter type is valid if it appears in~$G$.
+\item An \index{unbound dependent member type}unbound dependent member type \texttt{U.A} is valid if there exists a protocol \texttt{P} in $\Query{getRequiredProtocols}{G,\,\texttt{U}}$
+such that \texttt{P} declares an associated type named~\texttt{A}.
+\item A \index{bound dependent member type}bound dependent member type \texttt{U.[P]A} is valid if $\Query{requiresProtocol}{G,\,\texttt{U},\,\texttt{P}}$.
+\end{itemize}
+As for $\Query{getRequiredProtocols}{}$, because the ``for all'' quantifier is selecting from a finite universe of protocols, a correct but inefficient implementation would repeatedly check if $\Query{requiresProtocol}{G,\texttt{T},\,\texttt{P}}$ for each~\texttt{P} in turn. We will describe the data structure that allows this to be implemented efficiently in \ChapRef{propertymap}.
 
-\IndexDefinition{getRequiredProtocols()@\texttt{getRequiredProtocols()}}
-\IndexDefinition{getSuperclassBound()@\texttt{getSuperclassBound()}}
-\IndexDefinition{getConcreteType()@\texttt{getConcreteType()}}
-\IndexDefinition{getLayoutConstraint()@\texttt{getLayoutConstraint()}}
-\Index{AnyObject@\texttt{AnyObject}}
-\index{superclass requirement}
-\index{layout requirement}
-\paragraph{Property queries}
-The next set of queries derive more complex properties that are not just true/false predicates.
-\begin{description}
-\item [\texttt{getRequiredProtocols()}] takes a type parameter \texttt{T}, and returns a list of all protocols \texttt{P} such that a conformance requirement $\ConfReq{T}{P}$ can be derived from this signature. The list is minimal in the sense that no protocol inherits from any other protocol in the list, and the elements are sorted in canonical protocol order (Definition~\ref{linear protocol order}).
-\item [\texttt{getSuperclassBound()}] takes a type parameter \texttt{T}. If a superclass requirement $\ConfReq{T}{C}$ can be derived from this signature, returns the class type \texttt{C}; otherwise, returns the empty type.
-\item [\texttt{getConcreteType()}] takes a type parameter \texttt{T}. If a concrete type requirement $\FormalReq{T == C}$ can be derived from this signature, returns the type \texttt{C}; otherwise, returns the empty type.
-\item [\texttt{getLayoutConstraint()}] takes a type parameter \texttt{T}. If a layout requirement $\ConfReq{T}{L}$ can be derived from this signature, returns the layout constraint \texttt{L}, otherwise returns the empty layout constraint.
+\paragraph{Concrete types.} The next two queries concern concrete \index{same-type requirement}same-type requirements. We can ask if a type parameter is fixed to a concrete type, and then we can ask for this concrete type. (We use ``$\vdash$'' below, but recall from \SecRef{derived req} that we \index{limitation!derived requirements}don't have a complete set of inference rules to describe the implemented behavior of concrete same-type requirements.)
 
-The \texttt{AnyObject} layout constraint is the only one that can be explicitly written in source. A second kind of layout constraint, \texttt{\_NativeClass}, can be derived from a superclass requirement whose superclass is a native Swift class, meaning a class not inheriting from \texttt{NSObject}. The \texttt{\_NativeClass} layout constraint implies the \texttt{AnyObject} layout constraint.
+\begin{itemize}
+\QueryDef{isConcreteType}
+{G, \texttt{T}}
+{type parameter \texttt{T}.}
+{true or false: exists some concrete type \texttt{X} such that $G\vdash\SameReq{T}{X}$?}
+{Decides if a type parameter is fixed to a concrete type.}
 
-The two differ in how reference counting operations on their instances are lowered in code generation; arbitrary class instances use the \index{Objective-C}Objective-C runtime entry points for retain and release operations, whereas native class instances use a more efficient calling convention.
-\end{description}
-
-\begin{example}
-Assume we have a generic class declaration \verb|class G<A> {}|. Then, in the following generic signature, \texttt{getSuperclassBound(T)} is \texttt{G<U>}:
-\begin{quote}
-\begin{verbatim}
-<T, U where T: G<U>>
-\end{verbatim}
-\end{quote}
-\end{example}
+\QueryDef{getConcreteType}
+{G, \texttt{T}}
+{type parameter \texttt{T}.}
+{some concrete type \texttt{X} such that $G\vdash\SameReq{T}{X}$.}
+{Outputs the fixed concrete type of a type parameter.}
+\end{itemize}
 
 \begin{example}\label{concrete type query example}
-In the following generic signature, \texttt{getConcreteType(T.Index)} is \texttt{Int}:
+Let $G$ be the generic signature,
 \begin{quote}
 \begin{verbatim}
-<T where T: Collection, T.[Collection]Indices == Range<Int>>
+<τ_0_0 where τ_0_0: Foo, τ_0_0.[Foo]B == Int>
 \end{verbatim}
 \end{quote}
-Proving this by hand is tricky, and demonstrates the expressivity of generic signature queries. First, we derive $\FormalReq{T.Indices:~Collection}$:
-\begin{gather}
-\vdash \ConfReq{T}{Collection}\tag{1}\\
-\vdash \FormalReq{Self.Indices:~Collection}_\texttt{Collection}\tag{2}\\
-(1),\,(2)\vdash\FormalReq{T.Indices:~Collection}\tag{3}
-\end{gather}
-Next, we need a same-type requirement between \texttt{T.Index} and \texttt{T.Indices.Element}:
-\begin{gather}
-\vdash \FormalReq{Self.Index == Self.Indices.Element}_\texttt{Collection}\tag{4}\\
-(1),\,(4)\vdash \FormalReq{T.Index == T.Indices.Element}\tag{5}
-\end{gather}
-Now, we're going to use the \textsc{Member} derivation step, by which same-type requirements recursively apply to dependent member types:
-\[\ConfReq{T}{P},\,\FormalReq{T == U}\vdash\FormalReq{T.[P]A == U.[P]A}\]
-Consider these two requirements, the first minimal, and the second derived:
-\begin{gather*}
-\FormalReq{T.Indices == Range<Int>}\\
-\FormalReq{T.Indices:~Collection}
-\end{gather*}
-According to the above, we can derive a new same-type requirement with left hand-side \texttt{T.[P]A}, and the right hand side a certain substitution of the concrete type \texttt{Range<Int>}. Specifically, it is the result of replacing \texttt{Self} with \texttt{Range<Int>} in the dependent member type \texttt{Self.[Sequence]Element}.
-
-What we actually want to do is apply a substitution map to a dependent member type; this will be formalized in Section~\ref{abstract conformances}. For now, it is enough to know that \texttt{Range<Int>} conforms to \texttt{Sequence}. We're interested in the \emph{type witness} for the \texttt{Element} associated type in this conformance. The conformance is defined in the standard library. It has a conditional requirement:
+with protocol \texttt{Foo} as below:
 \begin{Verbatim}
-extension Range: Collection where Element: Strideable {...}
-\end{Verbatim}
-It happens that \texttt{Int} conforms to \texttt{Strideable}, thus \texttt{Range<Int>} satisfies the conditional requirements of this conformance:
-\begin{Verbatim}
-extension Int: Strideable {...}
-\end{Verbatim}
-The \texttt{Element} associated type is witnessed by the \texttt{Element} generic parameter of \texttt{Range}, which in the case of \texttt{Range<Int>}, is \texttt{Int}. Thus, we complete our derivation:
-\begin{gather}
-\vdash \FormalReq{T.Indices == Range<Int>}\tag{6}\\
-(1),\,(5)\vdash \FormalReq{T.Indices.Element == Int}\tag{7}\\
-(6),\,(7)\vdash \FormalReq{T.Index == Int}\tag{8}
-\end{gather}
-The final result then, is that \texttt{T.Index} is fixed to the concrete type \texttt{Int}.
-\end{example}
-
-\paragraph{Reduced type queries}
-The next three generic signature queries compute \IndexSource{reduced type}reduced types. To test two arbitrary types for reduced type equality, apply \texttt{getReducedType()} to each and compare the results for canonical type equality.
-\begin{description}
-\item [\texttt{areReducedTypeParametersEqual()}] \IndexDefinition{areReducedTypeParametersEqual()@\texttt{areReducedTypeParametersEqual()}}takes two type parameters \texttt{T} and \texttt{U} and answers if the same-type requirement $\FormalReq{T == U}$ can be derived from this signature. Unlike the next two queries, it only operates on type parameters and does not produce a useful result if one or the other type parameter is fixed to a concrete type.
-
-\item [\texttt{isReducedType()}] \IndexDefinition{isReducedType()@\texttt{isReducedType()}}answers if an arbitrary type is a reduced type, by checking if any type parameters it contains are reduced types. Non-canonical types are never considered reduced. Applying \texttt{getReducedType()} to a type for which \texttt{isReducedType()} returns true will return the type unchanged.
-
-\item [\texttt{getReducedType()}] \IndexDefinition{getReducedType()@\texttt{getReducedType()}}computes the reduced type of an arbitrary interface type, replacing any type parameters it contains with their reduced type. Passing the result of \texttt{getReducedType()} to \texttt{isReducedType()} will always return \texttt{true}.
-\end{description}
-
-\begin{example}
-In the generic signature of Example~\ref{concrete type query example}, \texttt{getReducedType(T.Index)} returns \texttt{Int}, just like \texttt{getConcreteType(T.Index)}. In fact, \texttt{getConcreteType()} is just a ``weaker'' form of \texttt{getReducedType()}; it does not guarantee that every type parameter appearing inside the concrete type is reduced.
-
-Now take the generic signature \verb|<T where T: P, T.[P]B == Int>| with this protocol:
-\begin{Verbatim}
-protocol P {
-  associatedtype A
-  associatedtype B where A == Array<B>
+protocol Foo {
+  associatedtype A where A == Array<B>
+  associatedtype B
 }
 \end{Verbatim}
-The reduced type of \texttt{T.[P]A} is \texttt{Array<Int>}:
-\begin{gather}
-\vdash \ConfReq{T}{P}\tag{1}\\
-\vdash \FormalReq{Self.[P]A == Array<Self.[P]B>}_\texttt{P}\tag{2}\\
-(1),\,(2)\vdash \FormalReq{T.[P]A == Array<T.[P]B>}\tag{3}\\
-\vdash \FormalReq{T.[P]B == Int}\tag{4}\\
-(4)\vdash \FormalReq{Array<T.[P]B> == Array<Int>}\tag{5}\\
-(3),\,(4)\vdash\FormalReq{T.[P]A == Array<Int>}\tag{6}
-\end{gather}
-Note that we first derive a same-type requirement between \texttt{T.[P]A} and \texttt{Array<T.[P]B>}, but the latter type is not reduced, because \texttt{T.[P]B} is also fixed to a concrete type.
+\begin{enumerate}
+\item $\Query{isConcreteType}{G,\,\texttt{\rT.[Foo]A}}$ is true.
+\item $\Query{getConcreteType}{G,\,\texttt{\rT.[Foo]A}}$ is \texttt{Array<\rT.[Foo]B>}.
+\item $\Query{getConcreteType}{G,\,\texttt{\rT.[Foo]B}}$ is \texttt{Int}.
+\end{enumerate}
 \end{example}
 
-\paragraph{Combined queries}
-
-\index{local requirements}
-\IndexDefinition{getLocalRequirements()@\texttt{getLocalRequirements()}}
-
-The \texttt{getLocalRequirements()} query builds a single structure from the result of several queries against the same type parameter, to simplify archetype construction inside a generic environment (Chapter~\ref{genericenv}):
+\paragraph{Reduced types.} We will now generalize \index{reduced type parameter}reduced type equality from \SecRef{type params} to an equivalence relation on all interface types. In the previous example, the first invocation of $\Query{getConcreteType}{}$ returned a concrete type containing a type parameter \texttt{\rT.[Foo]B}, which was itself fixed to the concrete type~\texttt{Int}. We can write down three interface types that all abstract over the same concrete replacement type in our generic signature:
+\begin{gather*}
+\texttt{\rT.A}\\
+\texttt{Array<\rT.[Foo]B>}\\
+\texttt{Array<Int>}
+\end{gather*}
+This suggests that if one interface type can be obtained from another by replacing any type parameters that are fixed to concrete types, they ought to be considered equivalent. Now, consider this signature, with the same protocol~\texttt{Foo}:
+\begin{quote}
 \begin{verbatim}
-getReducedType()
-getRequiredProtocols()
-getSuperclassBound()
-getLayoutConstraint()
+<τ_0_0, τ_0_1 where τ_0_0: Foo, τ_0_1 == τ_0_0.[Foo]B>
 \end{verbatim}
+\end{quote}
+Here, instead of completely fixing it to \texttt{Int}, we just ask that the concrete replacement type for~\texttt{\rT.[Foo]B} is canonically equal to the concrete replacement type for~\rU. In this generic signature, the following three interface types abstract over the same concrete replacement type:
+\begin{gather*}
+\texttt{\rT.A}\\
+\texttt{Array<\rT.[Foo]B>}\\
+\texttt{Array<\rU>}
+\end{gather*}
+This suggests a process where we replace each type parameter within an interface type with its reduced type parameter. We assume we have a subroutine to compute the reduced type parameter of an equivalence class already, so we can iterate our simplifying transformations until fixed point:
+
+\begin{algorithm}[Reduced type of interface type]\label{reduced type algorithm}
+Takes a generic signature~$G$, and an interface type~\texttt{T}, as input. Outputs the reduced type of~\texttt{T}.
+\begin{enumerate}
+\item If \texttt{T} is a type parameter:
+\begin{enumerate}
+\item If $\Query{isConcreteType}{G,\,\texttt{T}}$: call $\Query{getConcreteType}{G,\,\texttt{T}}$, apply the algorithm recursively, and return the result.
+\item Otherwise, find the reduced type parameter~$\texttt{T}^\prime$ in the equivalence class of~\texttt{T} and return $\texttt{T}^\prime$.
+\end{enumerate}
+\item Otherwise, \texttt{T} is a concrete type. If \texttt{T} does not contain any child types, return \texttt{T}.
+\item Otherwise, recursively reduce each child type of~\texttt{T}, and construct a new type from these reduced child types together with any non-type attributes of~\texttt{T}.
+\end{enumerate}
+\end{algorithm}
+
+As its name suggests, the prior algorithm outputs a special kind of interface type:
+
+\begin{definition}
+An interface type is a \IndexDefinition{reduced type}\emph{reduced type} in case the following two conditions hold for each type parameter contained in the interface type:
+\begin{enumerate}
+\item Every such type parameter is a reduced type parameter.
+\item No such type parameter is fixed to a concrete type.
+\end{enumerate}
+\end{definition}
+
+To guarantee termination, we must rule out self-referential same-type requirements like $\SameReq{\rT}{Array<\rT>}$, otherwise we'll get stuck reducing \rT, \texttt{Array<\rT>}, \texttt{Array<Array<\rT>>}, and so on. We'll describe how in \SecRef{subst simplification}, but for now we just assume they don't appear. 
+
+A \index{fully-concrete type!reduced type}fully-concrete type (one without type parameters) is trivially a reduced type. In the implementation, we say that a reduced type must also be canonical, so it cannot contain \index{sugared type!not reduced}sugared types. This gives us the \index{reduced type equality!on interface types}reduced type equality relation on interface types: two interface types are equivalent under this relation if they have canonically equal reduced types. The following two generic signature queries pertain to reduced types:
+
+\begin{itemize}
+\QueryDef{isReducedType}
+{G,\,\texttt{T}}
+{interface type \texttt{T}}
+{true or false: is \texttt{T} canonically equal to its reduced type?}
+{Decides if an interface type is already a reduced type.}
+
+\QueryDef{getReducedType}
+{G,\,\texttt{T}}
+{interface type \texttt{T}}
+{the reduced type of \texttt{T}.}
+{Computes the reduced type of an interface type using \AlgRef{reduced type algorithm}. This will output a canonical type, so it will not contain type sugar.}
+\end{itemize}
+
+\begin{example}
+Equivalence of interface types is a \index{coarser relation}\emph{coarser} relation than equivalence of type parameters, because if two type parameters are equivalent as type parameters, they must also be equivalent as interface types. The converse does not hold. Let~$G$ be the generic signature:
+\begin{quote}
+\begin{verbatim}
+<τ_0_0, τ_0_1 where τ_0_0 == Int, τ_0_1 == Int>
+\end{verbatim}
+\end{quote}
+\begin{enumerate}
+\item $\Query{areReducedTypeParametersEqual}{G,\,\rT,\,\rU}$ is false.
+\item $\Query{getReducedType}{G,\,\rT}$ is \texttt{Int}.
+\item $\Query{getReducedType}{G,\,\rU}$ is \texttt{Int}.
+\end{enumerate}
+Thus, \rT\ and \rU\ are equivalent as interface types, but not as type parameters.
+\end{example}
+
+\paragraph{Other requirements.} The final set of queries concern superclass and layout requirements. Once again, we note that ``$\vdash$'' is aspirational, because not all implemented behaviors of these requirement kinds are described by our formal system.
+
+\begin{itemize}
+\QueryDef{getSuperclassBound}
+{G, \texttt{T}}
+{type parameter \texttt{T}.}
+{some concrete class type \texttt{C} such that $G\vdash\ConfReq{T}{C}$.}
+{Outputs the \index{superclass requirement!generic signature query}superclass bound, if the type parameter has one.}
+
+\QueryDef{requiresClass}
+{G, \texttt{T}}
+{type parameter \texttt{T}.}
+{true or false: $G\vdash\ConfReq{T}{AnyObject}$?}
+{Decides if \texttt{T} has a \index{AnyObject}\index{layout requirement!generic signature query}single retainable pointer representation.}
+
+\QueryDef{getLayoutConstraint}
+{G, \texttt{T}}
+{type parameter \texttt{T}.}
+{some layout constraint \texttt{L} such that $\texttt{T}\vdash\ConfReq{T}{L}$.}
+{Outputs the \index{layout requirement!generic signature query}layout constraint, if the type parameter has one.}
+
+The \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} layout constraint is the only one that can be explicitly written in source. A second kind of layout constraint, \texttt{\_NativeClass}, is implied by a superclass bound being a native Swift class, meaning a class not inheriting from \texttt{NSObject}. The \texttt{\_NativeClass} layout constraint in turn implies the \texttt{AnyObject} layout constraint.
+
+The two differ in how reference counting operations are lowered in \index{IRGen}IRGen. Classes of unknown ancestry use the \index{Objective-C}Objective-C runtime entry points, whereas native class instances use different entry points in the Swift runtime.
+\end{itemize}
+
+\begin{example}
+Let $G$ be the generic signature,
+\begin{quote}
+\begin{verbatim}
+<τ_0_0, τ_0_1, τ_0_2 where τ_0_0: Form, τ_0_1: Shape, τ_0_2: Entity>
+\end{verbatim}
+\end{quote}
+together with the three declarations:
+\begin{Verbatim}
+class Shape {}
+protocol Form: AnyObject {}
+protocol Entity: Shape, Form {}
+\end{Verbatim}
+
+\begin{enumerate}
+\item $\Query{getSuperclassBound}{G,\,\texttt{\rT}}$ is null.
+\item $\Query{getSuperclassBound}{G,\,\texttt{\rU}}$ is \texttt{Shape}.
+\item $\Query{getSuperclassBound}{G,\,\texttt{\rV}}$ is \texttt{Shape}.
+\item $\Query{requiresClass}{G,\,\texttt{\rT}}$ is true.
+\item $\Query{requiresClass}{G,\,\texttt{\rU}}$ is true.
+\item $\Query{requiresClass}{G,\,\texttt{\rV}}$ is true.
+\end{enumerate}
+We can write down a derivation of $\Query{requiresClass}{G,\,\texttt{\rT}}$:
+\begin{gather*}
+\ConfStep{\rT}{Form}{1}\\
+\AssocLayoutStep{1}{\rT}{2}
+\end{gather*}
+However, we cannot write down a derivation of $\Query{requiresClass}{G,\,\texttt{\rU}}$, even though we \emph{should} be able to. The implementation says this derived requirement holds, because any concrete replacement type for \rU\ that satisfies the superclass requirement must also satisfy the layout requirement. We are unable to make this inference within our formal system, so it is \emph{incomplete}. In this case, the missing rule is one that allows us to derive $\ConfReq{T}{AnyObject}$ from a superclass requirement $\ConfReq{T}{C}$. A formal description of the missing rules remains a work in progress.
+\end{example}
+
+\paragraph{Sugared types.} To avoid printing canonical generic parameter types like \ttgp{d}{i} in \index{diagnostic!printing generic parameter type}diagnostics, a special query can be used to transform a canonical type into a sugared type, using the generic parameter names of a given generic signature.
+
+\begin{itemize}
+\QueryDef{getSugaredType}
+{G, \texttt{T}}
+{interface type \texttt{T}.}
+{a canonically equal interface type, written using the sugared types of $G$.}
+{}
+\end{itemize}
+
+\paragraph{Combined queries.} To simplify archetype construction inside a generic environment (\ChapRef{genericenv}), we use a special entry point to perform multiple lookups at once. Its behavior is otherwise completely determined by the other queries.
+
+\begin{itemize}
+\QueryDef{getLocalRequirements}
+{G, \texttt{T}}
+{type parameter \texttt{T}.}
+{a \index{local requirements}single structure with the result of several queries.}
+{This outputs all known data points about the equivalence class of~\texttt{T}:
+\begin{gather*}
+\Query{getReducedType}{G,\,\texttt{T}}\\
+\Query{getRequiredProtocols}{G,\,\texttt{T}}\\
+\Query{getSuperclassBound}{G,\,\texttt{T}}\\
+\Query{getLayoutConstraint}{G,\,\texttt{T}}
+\end{gather*}}
+\end{itemize}
 
 \section{Source Code Reference}\label{genericsigsourceref}
 
@@ -791,14 +1269,14 @@ Other source files:
 
 \index{declaration context}
 \apiref{DeclContext}{class}
-See also Section~\ref{declarationssourceref} and Section~\ref{genericdeclsourceref}.
+See also \SecRef{declarationssourceref}.
 \begin{itemize}
 \item \texttt{getGenericSignatureOfContext()} returns the generic signature of the innermost generic context, or the empty generic signature if there isn't one.
 \end{itemize}
 
 \index{generic context}
 \apiref{GenericContext}{class}
-See also Section~\ref{genericdeclsourceref}.
+See also \SecRef{declarationssourceref}.
 \begin{itemize}
 \item \texttt{getGenericSignature()} returns the declaration's generic signature, computing it first if necessary. If the declaration does not have a generic parameter list or trailing \texttt{where} clause, returns the generic signature of the parent context.
 \end{itemize}
@@ -847,7 +1325,7 @@ Other:
 \item \texttt{print()} prints the generic signature, with various options to control the output.
 \item \texttt{dump()} prints the generic signature, meant for use from the debugger or ad-hoc print debug statements.
 \end{itemize}
-Also see Section~\ref{buildinggensigsourceref}.
+Also see \SecRef{buildinggensigsourceref}.
 
 \IndexSource{generic signature query}
 \apiref{GenericSignatureImpl}{class}
@@ -864,13 +1342,14 @@ The backing storage of a generic signature. Instances of this class are allocate
 \IndexSource{areReducedTypeParametersEqual()@\texttt{areReducedTypeParametersEqual()}}
 \IndexSource{isReducedType()@\texttt{isReducedType()}}
 \IndexSource{getReducedType()@\texttt{getReducedType()}}
+\IndexSource{getSugaredType()@\texttt{getSugaredType()}}
 \begin{itemize}
 \item \texttt{isEqual()} checks if two generic signatures are canonically equal.
 \item \texttt{getSugaredType()} given a type containing canonical type parameters that is understood to be written with respect to this generic signature, replaces the generic parameter types with their ``sugared'' forms, so that the name is preserved when the type is printed out to a string.
 \item \texttt{forEachParam()} invokes a callback on each generic parameter of the signature; the callback also receives a boolean indicating if the generic parameter type is reduced or not---a generic parameter on the left hand side of a same-type requirement is not reduced.
 \item \texttt{areAllParamsConcrete()} answers if all generic parameters are fixed to concrete types via same-type requirements, which makes the generic signature somewhat like an empty generic signature. Fully-concrete generic signatures are lowered away at the SIL level.
 \end{itemize}
-The generic signature queries from Section~\ref{genericsigqueries} are methods on \texttt{GenericSignatureImpl}:
+The generic signature queries from \SecRef{genericsigqueries} are methods on \texttt{GenericSignatureImpl}:
 \begin{itemize}
 \item Predicate queries:
 \begin{itemize}
@@ -913,7 +1392,7 @@ The \texttt{CanGenericSignature} class inherits from \texttt{GenericSignature}, 
 \IndexSource{layout requirement}
 \IndexSource{same-type requirement}
 \apiref{Requirement}{class}
-A generic requirement. See also Section \ref{type resolution source ref}~and~\ref{buildinggensigsourceref}.
+A generic requirement. See also \SecRef{type resolution source ref} and \SecRef{buildinggensigsourceref}.
 \begin{itemize}
 \item \texttt{getKind()} returns the \texttt{RequirementKind}.
 \item \texttt{getSubjectType()} returns the subject type.
@@ -935,7 +1414,7 @@ An enum encoding the four kinds of requirements.
 \IndexSource{protocol declaration}
 \IndexSource{class-constrained protocol}
 \apiref{ProtocolDecl}{class}
-See also Section~\ref{genericdeclsourceref}.
+See also \SecRef{declarationssourceref}.
 \begin{itemize}
 \item \texttt{getRequirementSignature()} returns the protocol's requirement signature, first computing it, if necessary.
 \item \texttt{requiresClass()} answers if the protocol is a class-constrained protocol.
@@ -948,7 +1427,7 @@ A protocol requirement signature.
 \item \texttt{getRequirements()} returns an array of \texttt{Requirement}.
 \item \texttt{getTypeAliases()} returns an array of \texttt{ProtocolTypeAlias}.
 \end{itemize}
-Also see Section~\ref{buildinggensigsourceref}.
+Also see \SecRef{buildinggensigsourceref}.
 
 \IndexSource{protocol type alias}
 \index{underlying type}
@@ -962,7 +1441,7 @@ A protocol type alias descriptor.
 \IndexSource{type parameter}
 \IndexSource{interface type}
 \apiref{TypeBase}{class}
-See also Section~\ref{typesourceref}.
+See also \SecRef{typesourceref}.
 \begin{itemize}
 \item \texttt{isTypeParameter()} answers if this type is a type parameter; that is, a generic parameter type, or a \texttt{DependentMemberType} whose base is another type parameter.
 \item \texttt{hasTypeParameter()} answers if this type is itself a type parameter, or if it contains a type parameter in structural position. For example, \texttt{Array<\ttgp{0}{0}>} will answer \texttt{false} to \texttt{isTypeParameter()}, but \texttt{true} to \texttt{hasTypeParameter()}. 
@@ -981,9 +1460,9 @@ A type representing a reference to an associated type.
 \IndexSource{type declaration}
 \IndexSource{protocol order}
 \apiref{TypeDecl}{class}
-See also Section~\ref{declarationssourceref}.
+See also \SecRef{declarationssourceref}.
 \begin{itemize}
-\item \texttt{compare()} compares two protocols by the protocol order (Definition~\ref{linear protocol order}), returning one of the following:
+\item \texttt{compare()} compares two protocols by the protocol order (\DefRef{linear protocol order}), returning one of the following:
 \begin{itemize}
 \item $-1$ if this protocol precedes the given protocol,
 \item 0 if both protocol declarations are equal,
@@ -994,7 +1473,7 @@ See also Section~\ref{declarationssourceref}.
 \IndexSource{type parameter order}
 \IndexSource{generic parameter order}
 \apiref{compareDependentTypes()}{function}
-Implements the type parameter order (Algorithm~\ref{type parameter order}), returning one of the following:
+Implements the type parameter order (\AlgRef{type parameter order}), returning one of the following:
 \begin{itemize}
 \item $-1$ if the left hand side precedes the right hand side,
 \item 0 if the two type parameters are equal as canonical types,

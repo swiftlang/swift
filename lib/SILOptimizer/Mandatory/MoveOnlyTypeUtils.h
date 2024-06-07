@@ -128,12 +128,13 @@ public:
   }
 };
 
-inline Feature partialMutationFeature(PartialMutation::Kind kind) {
+inline std::optional<Feature>
+partialMutationFeature(PartialMutation::Kind kind) {
   switch (kind) {
   case PartialMutation::Kind::Consume:
-    return Feature::MoveOnlyPartialConsumption;
+    return std::nullopt;
   case PartialMutation::Kind::Reinit:
-    return Feature::MoveOnlyPartialReinitialization;
+    return {Feature::MoveOnlyPartialReinitialization};
   }
 }
 
@@ -184,7 +185,7 @@ public:
   enum class Kind : uint8_t {
     /// The partial consumption feature is disabled.
     ///
-    /// See -enable-experimental-feature MoveOnlyPartialConsumption.
+    /// See -enable-experimental-feature MoveOnlyPartialReinitialization.
     FeatureDisabled,
     /// A partially consumed/reinitialized aggregate has a deinit.
     ///

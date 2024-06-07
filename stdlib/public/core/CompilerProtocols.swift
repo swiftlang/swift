@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -266,7 +266,7 @@ public protocol CaseIterable {
 /// `Optional` type conforms to `ExpressibleByNilLiteral`.
 /// `ExpressibleByNilLiteral` conformance for types that use `nil` for other
 /// purposes is discouraged.
-public protocol ExpressibleByNilLiteral {
+public protocol ExpressibleByNilLiteral: ~Copyable {
   /// Creates an instance initialized with `nil`.
   init(nilLiteral: ())
 }
@@ -792,7 +792,6 @@ public protocol ExpressibleByStringInterpolation
   init(stringInterpolation: StringInterpolation)
 }
 
-#if !$Embedded
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
   
@@ -815,7 +814,6 @@ extension ExpressibleByStringInterpolation
     self.init(stringLiteral: stringInterpolation.make())
   }
 }
-#endif
 
 /// Represents the contents of a string literal with interpolations while it's
 /// being built up.

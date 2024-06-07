@@ -163,12 +163,10 @@ public struct ObservationRegistrar: Sendable {
     internal mutating func cancel(_ id: Int) {
       if let observation = observations.removeValue(forKey: id) {
         for keyPath in observation.properties {
-          if var ids = lookups[keyPath] {
-            ids.remove(id)
-            if ids.count == 0 {
-              lookups.removeValue(forKey: keyPath)
-            } else {
-              lookups[keyPath] = ids
+          if let index = lookups.index(forKey: keyPath) {
+            lookups.values[index].remove(id)
+            if lookups.values[index].isEmpty {
+              lookups.remove(at: index)
             }
           }
         }

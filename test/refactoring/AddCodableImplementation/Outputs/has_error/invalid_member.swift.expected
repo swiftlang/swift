@@ -1,0 +1,9 @@
+
+struct Foo: Codable {
+    var other: Unknown
+
+    private enum CodingKeys: CodingKey {
+      case other
+    }
+}
+

@@ -242,7 +242,7 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
     return true;
 
   // Go ahead and initialize the substitution entry.
-  entry.setNode(node, /*treatAsIdentifier=*/ false);
+  entry = entryForNode(node);
 
   int Idx = findSubstitution(entry);
   if (Idx < 0)
@@ -514,6 +514,12 @@ Remangler::mangleProtocolConformanceRefInOtherModule(Node *node,
 ManglingError Remangler::mangleConcreteProtocolConformance(Node *node,
                                                            unsigned depth) {
   // Concrete conformances aren't in the old mangling
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::manglePackProtocolConformance(Node *node,
+                                                       unsigned depth) {
+  // Pack conformances aren't in the old mangling
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
@@ -852,8 +858,8 @@ ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleTransferringResultFunctionType(Node *node,
-                                                              unsigned depth) {
+ManglingError Remangler::mangleSendingResultFunctionType(Node *node,
+                                                         unsigned depth) {
   Buffer << "YT";
   return ManglingError::Success;
 }
@@ -1497,7 +1503,7 @@ ManglingError Remangler::mangleType(Node *node, unsigned depth) {
 template <size_t N> 
 static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   constexpr size_t prefixLength = N - 1;
-  if (!string.startswith(StringRef(data, prefixLength)))
+  if (!string.starts_with(StringRef(data, prefixLength)))
     return false;
   string = string.drop_front(prefixLength);
   return true;
@@ -1652,14 +1658,23 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplCoroutineKind(Node *node,
+                                                 unsigned depth) {
+  StringRef text = node->getText();
+  if (text == "yield_once") {
+    Buffer << "A";
+  } else if (text == "yield_many") {
+    Buffer << "G";
+  } else {
+    return MANGLING_ERROR(ManglingError::InvalidImplCoroutineKind, node);
+  }
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplFunctionAttribute(Node *node,
                                                      unsigned depth) {
   StringRef text = node->getText();
-  if (text == "@yield_once") {
-    Buffer << "A";
-  } else if (text == "@yield_many") {
-    Buffer << "G";
-  } else if (text == "@Sendable") {
+   if (text == "@Sendable") {
     Buffer << "h";
   } else if (text == "@async") {
     Buffer << "H";
@@ -1736,6 +1751,11 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
+  // The old mangler does not encode sending result
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplPatternSubstitutions(Node *node,
                                                         unsigned depth) {
   // The old mangler does not encode substituted function types.
@@ -1791,14 +1811,14 @@ Remangler::mangleImplParameterResultDifferentiability(Node *node,
   return MANGLING_ERROR(ManglingError::InvalidImplDifferentiability, node);
 }
 
-ManglingError Remangler::mangleImplParameterTransferring(Node *node,
-                                                         unsigned depth) {
+ManglingError Remangler::mangleImplParameterSending(Node *node,
+                                                    unsigned depth) {
   StringRef text = node->getText();
-  if (text == "transferring") {
+  if (text == "sending") {
     Buffer << 'T';
     return ManglingError::Success;
   }
-  return MANGLING_ERROR(ManglingError::InvalidImplParameterTransferring, node);
+  return MANGLING_ERROR(ManglingError::InvalidImplParameterSending, node);
 }
 
 ManglingError Remangler::mangleDynamicSelf(Node *node, unsigned depth) {
@@ -1903,7 +1923,7 @@ ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleTransferring(Node *node, unsigned depth) {
+ManglingError Remangler::mangleSending(Node *node, unsigned depth) {
   Buffer << "Yu";
   return mangleSingleChildNode(node, depth + 1); // type
 }
@@ -3013,13 +3033,6 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError
-Remangler::mangleAccessibleProtocolRequirementFunctionRecord(Node *node,
-                                                             unsigned depth) {
-  Buffer << "HpF";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleBackDeploymentThunk(Node *node, unsigned depth) {
   Buffer << "Twb";
   return ManglingError::Success;
@@ -3034,4 +3047,10 @@ ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
 ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
   Buffer << "TwS";
   return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDependentGenericInverseConformanceRequirement(Node *node,
+                                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

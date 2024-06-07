@@ -69,13 +69,13 @@ struct Rectangle {
 //
 
 @frozen struct InternalStruct { // expected-note * {{declared here}}
-// expected-error@-1 {{'@frozen' attribute can only be applied to '@usableFromInline' or public declarations, but 'InternalStruct' is internal}}
+// expected-error@-1 {{'@frozen' attribute can only be applied to '@usableFromInline', package, or public declarations, but 'InternalStruct' is internal}}
 
   @frozen public struct NestedStruct {}
 }
 
 @_fixed_layout struct FixedInternalStruct { // expected-note * {{declared here}}
-// expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline' or public declarations, but 'FixedInternalStruct' is internal}}
+// expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline', package, or public declarations, but 'FixedInternalStruct' is internal}}
 // expected-warning@-2 {{'@frozen' attribute is now used for fixed-layout structs}}
 
   @_fixed_layout public struct NestedStruct {}
@@ -83,17 +83,17 @@ struct Rectangle {
 }
 
 @frozen fileprivate struct FileprivateStruct {}
-// expected-error@-1 {{'@frozen' attribute can only be applied to '@usableFromInline' or public declarations, but 'FileprivateStruct' is fileprivate}}
+// expected-error@-1 {{'@frozen' attribute can only be applied to '@usableFromInline', package, or public declarations, but 'FileprivateStruct' is fileprivate}}
 
 @_fixed_layout fileprivate struct FixedFileprivateStruct {}
-// expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline' or public declarations, but 'FixedFileprivateStruct' is fileprivate}}
+// expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline', package, or public declarations, but 'FixedFileprivateStruct' is fileprivate}}
 // expected-warning@-2 {{'@frozen' attribute is now used for fixed-layout structs}}
 
 @frozen private struct PrivateStruct {} // expected-note * {{declared here}}
-// expected-error@-1 {{'@frozen' attribute can only be applied to '@usableFromInline' or public declarations, but 'PrivateStruct' is private}}
+// expected-error@-1 {{'@frozen' attribute can only be applied to '@usableFromInline', package, or public declarations, but 'PrivateStruct' is private}}
 
 @_fixed_layout private struct FixedPrivateStruct {} // expected-note * {{declared here}}
-// expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline' or public declarations, but 'FixedPrivateStruct' is private}}
+// expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline', package, or public declarations, but 'FixedPrivateStruct' is private}}
 // expected-warning@-2 {{'@frozen' attribute is now used for fixed-layout structs}}
 
 

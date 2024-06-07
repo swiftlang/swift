@@ -305,10 +305,10 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
   _swift_addRefCountStringForMetatype(writer, flags, payloadType, fullOffset,
                                       previousFieldOffset);
 
-  writer.writeBytes((uint64_t)previousFieldOffset);
+  writer.writeBytes((uint64_t)previousFieldOffset + extraTagBytes);
 
   writer.offset = skipBytesOffset;
-  writer.writeBytes(size - previousFieldOffset);
+  writer.writeBytes(payloadSize - previousFieldOffset);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers

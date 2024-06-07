@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
 
+// https://github.com/apple/swift/issues/73321
+// UNSUPPORTED: OS=windows-msvc
+
 @_used
 #if canImport(Darwin)
 @_section("__TEXT,__mysection")

@@ -37,7 +37,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -333,6 +332,9 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
         (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
+  }
+  case AccessorKind::DistributedGet: {
+    return false;
   }
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
@@ -680,9 +682,9 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
                                            ProtocolDecl *decl) const {
   // Marker protocols always self-conform.
   if (decl->isMarkerProtocol()) {
-    // Except for BitwiseCopyable an existential of which is non-trivial.
-    if (decl->getASTContext().LangOpts.hasFeature(Feature::BitwiseCopyable) &&
-        decl->getKnownProtocolKind() == KnownProtocolKind::BitwiseCopyable) {
+    // Except for BitwiseCopyable an existential of which is not bitwise
+    // copyable.
+    if (decl->getKnownProtocolKind() == KnownProtocolKind::BitwiseCopyable) {
       return false;
     }
     return true;
@@ -883,6 +885,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::Read:
           case AccessorKind::Modify:
           case AccessorKind::Get:
+          case AccessorKind::DistributedGet:
           case AccessorKind::Set: {
             // Coroutines and accessors are final if their storage is.
             auto storage = accessor->getStorage();
@@ -956,11 +959,6 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return true;
   }
-
-  // @_objcImplementation extension member implementations are implicitly
-  // dynamic.
-  if (decl->isObjCMemberImplementation())
-    return true;
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     // Runtime-replaceable accessors are dynamic when their storage declaration
@@ -1073,6 +1071,9 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     // Check to see if it's one of the opaque accessors for the declaration.
     auto storage = accessor->getStorage();
+    if (accessor->getAccessorKind() == AccessorKind::DistributedGet) {
+      return true;
+    }
     if (!storage->requiresOpaqueAccessor(accessor->getAccessorKind()))
       return false;
   }
@@ -1658,6 +1659,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     switch (AD->getAccessorKind()) {
     case AccessorKind::Address:
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Read:
       break;
 
@@ -2027,7 +2029,12 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   return op.get();
 }
 
-bool swift::isMemberOperator(FuncDecl *decl, Type type) {
+/// This means two things:
+/// - If selfTy is null, 'decl' is assumed to be a member of a nominal type
+///   or extension. We check if its a valid member operator.
+/// - Otherwise, 'decl' is a member or top-level operator. We check if it
+///   is a suitable witness for the given conforming type.
+bool swift::isMemberOperator(FuncDecl *decl, Type selfTy) {
   // Check that member operators reference the type of 'Self'.
   if (decl->isInvalid())
     return true;
@@ -2035,40 +2042,46 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   auto *DC = decl->getDeclContext();
 
   auto selfNominal = DC->getSelfNominalTypeDecl();
+  assert(selfNominal || selfTy);
 
-  // Check the parameters for a reference to 'Self'.
+  // Is the operator a member of a protocol or protocol extension?
   bool isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
+
+  // Is the operator a member of a tuple extension?
   bool isTuple = isa_and_nonnull<BuiltinTupleDecl>(selfNominal);
 
+  // Check the parameters for a reference to 'Self'.
   for (auto param : *decl->getParameters()) {
     // Look through a metatype reference, if there is one.
     auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
 
+    if (isProtocol || isTuple) {
+      // For a member of a protocol or tuple extension, is it the 'Self'
+      // type parameter?
+      if (paramType->isEqual(DC->getSelfInterfaceType()))
+        return true;
+
+      continue;
+    }
+
+    // We have a member operator of a concrete nominal type, or a global operator.
     auto nominal = paramType->getAnyNominal();
-    if (type.isNull()) {
-      // Is it the same nominal type?
-      if (selfNominal && nominal == selfNominal)
+
+    if (selfTy.isNull()) {
+      // We're validating a member operator.
+
+      // Does the parameter have the right nominal type?
+      if (nominal == selfNominal)
         return true;
     } else {
-      // Is it the same nominal type? Or a generic (which may or may not match)?
-      if (paramType->is<GenericTypeParamType>() ||
-          nominal == type->getAnyNominal())
+      // We're checking a conformance and this operator is a candidate witness.
+
+      // Does the parameter have the right nominal type for the conformance?
+      if (nominal == selfTy->getAnyNominal())
         return true;
-    }
 
-    if (isProtocol) {
-      // FIXME: Source compatibility hack for Swift 5. The compiler
-      // accepts member operators on protocols with existential
-      // type arguments. We should consider banning this in Swift 6.
-      if (auto existential = paramType->getAs<ExistentialType>()) {
-        if (selfNominal == existential->getConstraintType()->getAnyNominal())
-          return true;
-      }
-    }
-
-    if (isProtocol || isTuple) {
-      // For a protocol or tuple extension, is it the 'Self' type parameter?
-      if (paramType->isEqual(DC->getSelfInterfaceType()))
+      // Otherwise, we might also have a match if the top-level operator is generic.
+      if (paramType->is<GenericTypeParamType>())
         return true;
     }
   }
@@ -2099,6 +2112,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     switch (accessor->getAccessorKind()) {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
       return storage->getValueInterfaceType();
 
     // For setters and observers, set the old/new value parameter's type
@@ -2252,6 +2266,15 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = base;
   }
 
+  if (auto sending = dyn_cast<SendingTypeRepr>(nestedRepr)) {
+    // If we do not have an Ownership Repr, return implicit copyable consuming.
+    auto *base = sending->getBase();
+    if (!isa<OwnershipTypeRepr>(base)) {
+      return ParamSpecifier::ImplicitlyCopyableConsuming;
+    }
+    nestedRepr = base;
+  }
+
   if (auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(nestedRepr)) {
     if (ownershipRepr->getSpecifier() == ParamSpecifier::InOut
         && param->isDefaultArgument()) {
@@ -2323,17 +2346,20 @@ static Type validateParameterType(ParamDecl *decl) {
     break;
   }
 
-  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
-    // If the element is a variadic parameter, resolve the parameter type as if
-    // it were in non-parameter position, since we want functions to be
-    // @escaping in this case.
-    options.setContext(TypeResolverContext::VariadicFunctionInput);
-    options |= TypeResolutionFlags::Direct;
+  // If the element is a variadic parameter, resolve the parameter type as if
+  // it were in non-parameter position, since we want functions to be
+  // @escaping in this case.
+  options.setContext(isa<VarargTypeRepr>(nestedRepr)
+                     ? TypeResolverContext::VariadicFunctionInput
+                     : TypeResolverContext::FunctionInput);
+  options |= TypeResolutionFlags::Direct;
 
-    const auto resolution =
-        TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                     PlaceholderType::get,
-                                     /*packElementOpener*/ nullptr);
+  const auto resolution =
+      TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                   PlaceholderType::get,
+                                   /*packElementOpener*/ nullptr);
+
+  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
     Ty = resolution.resolveType(nestedRepr);
 
     // Monovariadic types (T...) for <T> resolve to [T].
@@ -2347,13 +2373,6 @@ static Type validateParameterType(ParamDecl *decl) {
       return ErrorType::get(ctx);
     }
   } else {
-    options.setContext(TypeResolverContext::FunctionInput);
-    options |= TypeResolutionFlags::Direct;
-
-    const auto resolution =
-        TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                     PlaceholderType::get,
-                                     /*packElementOpener*/ nullptr);
     Ty = resolution.resolveType(decl->getTypeRepr());
   }
 
@@ -2364,8 +2383,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   // Validate the presence of ownership for a parameter with an inverse applied.
   if (!Ty->hasUnboundGenericType() &&
-      diagnoseMissingOwnership(ctx, dc, ownership,
-                               decl->getTypeRepr(), Ty, options)) {
+      diagnoseMissingOwnership(ownership, decl->getTypeRepr(), Ty, resolution)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
@@ -2547,7 +2565,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
-    std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+    auto lifetimeDependenceInfo = AFD->getLifetimeDependenceInfo();
 
     // (Args...) -> Result
     Type funcTy;
@@ -2558,17 +2576,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
-      infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
+      infoBuilder = infoBuilder.withSendable(AFD->isSendable());
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
       // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D)) {
         infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
-        if (fd->hasTransferringResult())
-          infoBuilder = infoBuilder.withTransferringResult();
+        if (fd->hasSendingResult())
+          infoBuilder = infoBuilder.withSendingResult();
       }
 
-      lifetimeDependenceInfo = LifetimeDependenceInfo::get(AFD, resultTy);
       if (lifetimeDependenceInfo.has_value()) {
         infoBuilder =
             infoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
@@ -2744,9 +2761,15 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
         // We have some other parent stmt. Type check it completely.
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
           parentStmt = CS->getParentStmt();
+
+        bool LeaveBodyUnchecked = true;
+        // type-checking 'catch' patterns depends on the type checked body.
+        if (isa<DoCatchStmt>(parentStmt))
+          LeaveBodyUnchecked = false;
+
         ASTNode node(parentStmt);
         TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
-                                      /*LeaveBodyUnchecked=*/true);
+                                      LeaveBodyUnchecked);
       }
       namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
@@ -2875,9 +2898,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
 
     if (isDerivable) {
-      evaluateOrDefault(ctx.evaluator,
-                        ResolveValueWitnessesRequest{normal},
-                        evaluator::SideEffect());
+      normal->resolveValueWitnesses();
     }
   }
 
@@ -3093,10 +3114,13 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitSendableConformance(evaluator, nominal);
   case KnownProtocolKind::BitwiseCopyable:
     return deriveImplicitBitwiseCopyableConformance(nominal);
-  case KnownProtocolKind::Escapable:
-  case KnownProtocolKind::Copyable:
-    return deriveConformanceForInvertible(evaluator, nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }
+}
+
+std::optional<LifetimeDependenceInfo>
+LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
+                                        AbstractFunctionDecl *decl) const {
+  return LifetimeDependenceInfo::get(decl);
 }

@@ -18,7 +18,7 @@ func test(text: String) {
 }
 
 // COMPLETE: Begin completions
-// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#verbatim: String#}[')'][#MyText#];
-// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(content): StringProtocol#}[')'][#MyText#];
+// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#verbatim: String#}[')'][#MyText#];
+// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#(content): StringProtocol#}[')'][#MyText#];
 // COMPLETE-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: text[#String#];
 // COMPLETE: End completions

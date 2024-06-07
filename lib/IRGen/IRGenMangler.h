@@ -46,6 +46,7 @@ public:
   IRGenMangler() { }
 
   std::string mangleDispatchThunk(const FuncDecl *func) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tj");
@@ -55,6 +56,7 @@ public:
   std::string mangleDerivativeDispatchThunk(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -71,6 +73,7 @@ public:
 
   std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
                                              bool isAllocating) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tj");
@@ -78,6 +81,7 @@ public:
   }
 
   std::string mangleMethodDescriptor(const FuncDecl *func) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
@@ -87,6 +91,7 @@ public:
   std::string mangleDerivativeMethodDescriptor(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -103,6 +108,7 @@ public:
 
   std::string mangleConstructorMethodDescriptor(const ConstructorDecl *ctor,
                                                 bool isAllocating) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tq");
@@ -253,21 +259,24 @@ public:
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
-    appendContext(Decl, Decl->getAlternateModuleName());
+    BaseEntitySignature base(Decl);
+    appendContext(Decl, base, Decl->getAlternateModuleName());
     appendOperator("MXM");
     return finalize();
   }
   
   std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
     beginMangling();
-    appendContext(Decl, Decl->getAlternateModuleName());
+    BaseEntitySignature base(Decl);
+    appendContext(Decl, base, Decl->getAlternateModuleName());
     appendOperator("MXE");
     return finalize();
   }
   
   void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
     if (auto DC = Name.dyn_cast<DeclContext *>()) {
-      return appendContext(DC, StringRef());
+      BaseEntitySignature nullBase(nullptr);
+      return appendContext(DC, nullBase, StringRef());
     }
     if (auto VD = Name.dyn_cast<VarDecl *>()) {
       return appendEntity(VD);
@@ -324,6 +333,7 @@ public:
     // among the type descriptors of different protocols.
     llvm::SaveAndRestore<bool> optimizeProtocolNames(OptimizeProtocolNames,
                                                      false);
+
     beginMangling();
     bool isAssocTypeAtDepth = false;
     (void)appendAssocType(
@@ -382,6 +392,7 @@ public:
                                     const RootProtocolConformance *conformance);
 
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(storage));
     beginMangling();
     appendEntity(storage);
     appendOperator("MV");
@@ -389,6 +400,7 @@ public:
   }
 
   std::string mangleFieldOffset(const ValueDecl *Decl) {
+    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(Decl));
     beginMangling();
     appendEntity(Decl);
     appendOperator("Wvd");
@@ -710,14 +722,7 @@ protected:
 
   std::string mangleConformanceSymbol(Type type,
                                       const ProtocolConformance *Conformance,
-                                      const char *Op) {
-    beginMangling();
-    if (type)
-      appendType(type, nullptr);
-    appendProtocolConformance(Conformance);
-    appendOperator(Op);
-    return finalize();
-  }
+                                      const char *Op);
 };
 
 /// Determines if the minimum deployment target's runtime demangler will not

@@ -699,7 +699,7 @@ public:
 bool containsPrefix(const std::vector<std::string> &strs,
                     const std::string &prefix) {
   for (auto &str : strs) {
-    if (StringRef(str).startswith(StringRef(prefix))) {
+    if (StringRef(str).starts_with(StringRef(prefix))) {
       return true;
     }
   }

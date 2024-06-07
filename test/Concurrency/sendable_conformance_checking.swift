@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -181,3 +181,9 @@ extension SendableExtSub: @unchecked Sendable {}
 // Still want to know about same-class redundancy
 class MultiConformance: @unchecked Sendable {} // expected-note {{'MultiConformance' declares conformance to protocol 'Sendable' here}}
 extension MultiConformance: @unchecked Sendable {} // expected-error {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
+
+@available(SwiftStdlib 5.1, *)
+actor MyActor {
+  // expected-warning@+1 {{non-final class 'Nested' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
+  class Nested: Sendable {}
+}

@@ -114,5 +114,9 @@ void TemporarySet::destroyAll(IRGenFunction &IGF) const {
 
 void Temporary::destroy(IRGenFunction &IGF) const {
   auto &ti = IGF.getTypeInfo(Type);
+  if (Type.isSensitive()) {
+    llvm::Value *size = ti.getSize(IGF, Type);
+    IGF.emitClearSensitive(Addr.getAddress(), size);
+  }
   ti.deallocateStack(IGF, Addr, Type);
 }

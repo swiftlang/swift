@@ -137,13 +137,12 @@ extension MainActor {
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.1, *)
-  @backDeployed(before: SwiftStdlib 5.9)
+  @_alwaysEmitIntoClient
   @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
-  public static func assumeIsolated<T>(
+  public static func assumeIsolated<T : Sendable>(
       _ operation: @MainActor () throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
-
     typealias YesActor = @MainActor () throws -> T
     typealias NoActor = () throws -> T
 
@@ -155,12 +154,26 @@ extension MainActor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
+    #if $TypedThrows
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
       let rawFn = unsafeBitCast(fn, to: NoActor.self)
       return try rawFn()
     }
+    #else
+    fatalError("unsupported compiler")
+    #endif
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @usableFromInline
+  @_silgen_name("$sScM14assumeIsolated_4file4linexxyKScMYcXE_s12StaticStringVSutKlFZ")
+  internal static func __abi__assumeIsolated<T : Sendable>(
+      _ operation: @MainActor () throws -> T,
+      _ file: StaticString, _ line: UInt
+  ) rethrows -> T {
+    try assumeIsolated(operation, file: file, line: line)
   }
 }
 #endif

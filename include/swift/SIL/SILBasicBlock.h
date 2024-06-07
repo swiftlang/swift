@@ -130,15 +130,12 @@ private:
   ///    DD and EEE are uninitialized
   ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  int64_t lastInitializedBitfieldID = 0;
+  uint64_t lastInitializedBitfieldID = 0;
 
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
   // Used by `BasicBlockBitfield`.
   void setCustomBits(unsigned value) { customBits = value; }
-
-  // Used by `BasicBlockBitfield`.
-  enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
 
   friend struct llvm::ilist_traits<SILBasicBlock>;
 
@@ -155,7 +152,8 @@ public:
 
   ~SILBasicBlock();
 
-  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
+  enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
+  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() };
 
   /// Gets the ID (= index in the function's block list) of the block.
   ///
@@ -175,6 +173,9 @@ public:
 
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
+
+  /// Replaces usages of this block with 'undef's and then deletes it.
+  void removeDeadBlock();
 
   /// Remove all instructions of a SILGlobalVariable's static initializer block.
   void clearStaticInitializerBlock(SILModule &module);

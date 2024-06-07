@@ -172,7 +172,9 @@ func rdar21080030() {
   var s = "Hello"
   // https://github.com/apple/swift/issues/50141
   // This should be 'cannot_call_non_function_value'.
-  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}} {{13-15=}}
+  if s.count() == 0 {} 
+  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
+  // expected-error@-2 {{missing argument for parameter 'where' in call}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -1394,7 +1396,9 @@ do {
   func generic<T>(_ value: inout T, _ closure: (S<T>) -> Void) {}
 
   let arg: Int
+  // expected-note@-1{{change 'let' to 'var' to make it mutable}}
   generic(&arg) { (g: S<Double>) -> Void in } // expected-error {{cannot convert value of type '(S<Double>) -> Void' to expected argument type '(S<Int>) -> Void'}}
+  // expected-error@-1{{cannot pass immutable value as inout argument: 'arg' is a 'let' constant}}
 }
 
 // rdar://problem/62428353 - bad error message for passing `T` where `inout T` was expected
@@ -1534,7 +1538,8 @@ func issue63746() {
 
 func rdar86611718(list: [Int]) {
   String(list.count())
-  // expected-error@-1 {{cannot call value of non-function type 'Int'}}
+  // expected-error@-1 {{missing argument for parameter 'where' in call}}
+  // expected-error@-2 {{generic parameter 'E' could not be inferred}}
 }
 
 // rdar://108977234 - failed to produce diagnostic when argument to AnyHashable parameter doesn't conform to Hashable protocol
@@ -1553,18 +1558,17 @@ func testNilCoalescingOperatorRemoveFix() {
   let _ = "" /* This is a comment */ ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{13-43=}}
 
   let _ = "" // This is a comment
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1555:13-1556:10=}}
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1560:13-1561:10=}}
 
   let _ = "" // This is a comment
     /*
      * The blank line below is part of the test case, do not delete it
      */
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1563:13-1567:10=}}
 
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1558:13-1563:10=}}
-
-  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1566:9=}}
+  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1570:9=}}
       "").isEmpty {}
 
   if ("" // This is a comment
-      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1568:9-1569:12=}}
+      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1572:9-1573:12=}}
 }

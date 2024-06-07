@@ -18,17 +18,24 @@
 ///   swift_task_enqueueGlobalImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
+///   swift_task_checkIsolated
 /// as well as any Dispatch-specific functions for the runtime.
 ///
 ///===------------------------------------------------------------------===///
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#include "swift/Runtime/HeapObject.h"
 #include <dispatch/dispatch.h>
 #if defined(_WIN32)
 #include <Windows.h>
 #else
 #include <dlfcn.h>
 #endif
+#endif
+
+#if __has_include(<dispatch/private.h>)
+#include <dispatch/private.h>
+#define SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE 1
 #endif
 
 // Ensure that Job's layout is compatible with what Dispatch expects.
@@ -86,15 +93,16 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
 
   // Always fall back to plain dispatch_async_f for back-deployed concurrency.
 #if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
-  if (runtime::environment::concurrencyEnableJobDispatchIntegration())
-#if defined(_WIN32)
-    func = reinterpret_cast<dispatchEnqueueFuncType>(
-        GetProcAddress(LoadLibraryW(L"dispatch.dll"),
-        "dispatch_async_swift_job"));
+#if SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE
+  if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
+    func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
+#elif defined(_WIN32)
+  func = reinterpret_cast<dispatchEnqueueFuncType>(
+      GetProcAddress(LoadLibraryW(L"dispatch.dll"),
+      "dispatch_async_swift_job"));
 #else
-    func = reinterpret_cast<dispatchEnqueueFuncType>(
-        dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
-
+  func = reinterpret_cast<dispatchEnqueueFuncType>(
+      dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
 #endif
 #endif
 
@@ -233,7 +241,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                                  Job *job) {
+                                              Job *job) {
   assert(job && "no job provided");
 
   dispatch_function_t dispatchFunction = &__swift_run_job;
@@ -382,4 +390,57 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
   JobPriority priority = job->getPriority();
   auto queue = reinterpret_cast<dispatch_queue_t>(_queue);
   dispatchEnqueue(queue, job, (dispatch_qos_class_t)priority, queue);
+}
+
+/// Recognize if the SerialExecutor is specifically a `DispatchSerialQueue`
+/// by comparing witness tables and return it if true.
+static dispatch_queue_s *getAsDispatchSerialQueue(SerialExecutorRef executor) {
+  if (!executor.hasSerialExecutorWitnessTable()) {
+    return nullptr;
+  }
+
+  auto executorWitnessTable = reinterpret_cast<const WitnessTable *>(
+      executor.getSerialExecutorWitnessTable());
+  auto serialQueueWitnessTable = reinterpret_cast<const WitnessTable *>(
+      _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+
+  if (swift_compareWitnessTables(executorWitnessTable,
+                                 serialQueueWitnessTable)) {
+    return reinterpret_cast<dispatch_queue_s *>(executor.getIdentity());
+  } else {
+    return nullptr;
+  }
+}
+
+/// If the executor is a `DispatchSerialQueue` we're able to invoke the
+/// dispatch's precondition API directly -- this is more efficient than going
+/// through the runtime call to end up calling the same API, and also allows us
+/// to perform this assertion on earlier platforms, where the `checkIsolated`
+/// requirement/witness was not shipping yet.
+SWIFT_CC(swift)
+static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
+  // If it is the main executor, compare with the Main queue
+  if (executor.isMainExecutor()) {
+    dispatch_assert_queue(dispatch_get_main_queue());
+    return;
+  }
+
+  // if able to, use the checkIsolated implementation in Swift
+  if (executor.hasSerialExecutorWitnessTable()) {
+    _task_serialExecutor_checkIsolated(
+        executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
+        executor.getSerialExecutorWitnessTable());
+    return;
+  }
+
+  if (auto queue = getAsDispatchSerialQueue(executor)) {
+    // if the executor was not SerialExecutor for some reason but we're able
+    // to get a queue from it anyway, use the assert directly on it.
+    dispatch_assert_queue(queue); // TODO(concurrency): could we report a better message here somehow?
+    return;
+  }
+
+  // otherwise, we have no way to check, so report an error
+  // TODO: can we swift_getTypeName(swift_getObjectType(executor.getIdentity()), false).data safely in the message here?
+  swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
 }

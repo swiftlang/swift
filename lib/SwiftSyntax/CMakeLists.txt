@@ -37,6 +37,9 @@ set(SWIFT_SYNTAX_MODULES
   SwiftCompilerPluginMessageHandling
   # Support for LSP
   SwiftIDEUtils
+  SwiftRefactor
+  # For swift-plugin-server
+  SwiftLibraryPluginProvider
 )
 
 # Install shared runtime libraries
@@ -70,6 +73,10 @@ endif()
 
 add_dependencies(swift-syntax-lib
   ${SWIFT_SYNTAX_MODULES})
+
+if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+    add_dependencies(swift-syntax-lib swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+endif()
 
 # Install Swift module interface files.
 foreach(module ${SWIFT_SYNTAX_MODULES})

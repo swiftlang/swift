@@ -144,7 +144,7 @@ extension P {
   // CHECK-LABEL: sil [ossa] @$s6tuples1PPAAE12immutableUse5tupleyAA1CC5index_x5valuet_tFZ
   // CHECK: bb0([[TUP0:%.*]] : @guaranteed $C, [[TUP1:%.*]] : $*Self
   // Allocate space for the RValue.
-  // CHECK:   [[RVALUE:%.*]] = alloc_stack [lexical] $(index: C, value: Self), let, name "tuple"
+  // CHECK:   [[RVALUE:%.*]] = alloc_stack [lexical] [var_decl] $(index: C, value: Self), let, name "tuple"
   //
   // Initialize the RValue. (This is here to help pattern matching).
   // CHECK:   [[ZERO_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 0
@@ -192,7 +192,7 @@ public func testTupleAssign(x: inout [Int]) {
 // CHECK:     [[Z:%.*]] = copy_value %2 : $String
 // CHECK:     [[INPUT:%.*]] = tuple $(x: C, y: Int, z: String) ([[X]], %1, [[Z]])
 // CHECK:     [[INPUT_MOVE:%.*]] = move_value [lexical] [var_decl] [[INPUT]] : $(x: C, y: Int, z: String)
-// CHECK:     [[OUTPUT:%.*]] = alloc_stack [lexical] $(y: Optional<Int>, z: Any, x: AnyObject)
+// CHECK:     [[OUTPUT:%.*]] = alloc_stack [lexical] [var_decl] $(y: Optional<Int>, z: Any, x: AnyObject)
 // CHECK:     [[INPUT_BORROW:%.*]] = begin_borrow [[INPUT_MOVE]] : $(x: C, y: Int, z: String)
 // CHECK:     [[INPUT_COPY:%.*]] = copy_value [[INPUT_BORROW]] : $(x: C, y: Int, z: String)
 // CHECK:     ([[X:%.*]], [[Y:%.*]], [[Z:%.*]]) = destructure_tuple [[INPUT_COPY]] : $(x: C, y: Int, z: String)

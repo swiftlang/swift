@@ -8,5 +8,10 @@
     "module": "ToasterKit",
     "install_name": "/System/Previous/iOS/ToasterKit.dylib",
     "platforms": ["iOS", "iOS_sim"]
+  },
+  {
+    "module": "ToasterKit",
+    "install_name": "/System/Previous/macCatalyst/ToasterKit.dylib",
+    "platforms": ["macCatalyst"]
   }
 ]

@@ -278,10 +278,10 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         };
 
         if (sourcekitd::requestIsEnableBarriers(req)) {
+          RequestBarriersEnabled = true;
           dispatch_barrier_async(requestQueue, ^{
             auto Responder = std::make_shared<XPCResponder>(event, peer);
             xpc_release(event);
-            RequestBarriersEnabled = true;
             sourcekitd::sendBarriersEnabledResponse([Responder](sourcekitd_response_t response) {
               Responder->sendReply(response);
             });
@@ -308,13 +308,16 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
           sourcekitd::cancelRequest(/*CancellationToken=*/cancelToken);
         });
+        xpc_release(event);
       } else if (SourceKitCancellationToken cancelToken =
                      reinterpret_cast<SourceKitCancellationToken>(
                          xpc_dictionary_get_uint64(
                              event, xpc::KeyDisposeRequestHandle))) {
         sourcekitd::disposeCancellationToken(/*CancellationToken=*/cancelToken);
+        xpc_release(event);
       } else {
         assert(false && "unexpected message");
+        xpc_release(event);
       }
     });
   }

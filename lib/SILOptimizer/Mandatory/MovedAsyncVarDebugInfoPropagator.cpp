@@ -93,11 +93,10 @@ static DebugVarCarryingInst
 cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(
-      original.getOperandForDebugValueClone()->getType(), block->getModule());
+  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), false,
-                                  true /*was moved*/);
+                                  UsesMoveableValueDebugInfo);
 }
 
 static DebugVarCarryingInst
@@ -105,12 +104,10 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
                          SILInstruction *insertPt) {
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef =
-      SILUndef::get(original.getOperandForDebugValueClone()->getType(),
-                    insertPt->getModule());
+  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), false,
-                                  true /*was moved*/);
+                                  UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -122,7 +119,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -134,7 +131,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
 }
 
 namespace {
@@ -350,8 +347,11 @@ struct DebugInfoPropagator {
     // var with a count already and return that value. If we did not, we insert
     // with the new count before expanding the set (initializing the map with
     // the correct value).
+    auto debugVariable = debugVar;
+    debugVariable.DIExpr = debugVariable.DIExpr.getFragmentPart();
+    debugVariable.Type = {};
     auto iter = dbgVarToDbgVarIndexMap.insert(
-        {debugVar, dbgVarToDbgVarIndexMap.size()});
+        {debugVariable, dbgVarToDbgVarIndexMap.size()});
     LLVM_DEBUG(if (iter.second) llvm::dbgs()
                    << "Mapping: [" << iter.first->second
                    << "] = " << iter.first->first.Name << '\n';);

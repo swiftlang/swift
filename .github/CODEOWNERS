@@ -62,7 +62,7 @@
 /include/swift/AST/*Substitution*                  @slavapestov
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/AST/DiagnosticsParse.def            @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
-/include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan
+/include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder
 /include/swift/DependencyScan                      @artemcm
 /include/swift/Driver                              @artemcm
 # TODO: /include/swift/IRGen/
@@ -97,7 +97,7 @@
 /lib/AST/RequirementMachine/                        @slavapestov
 /lib/ASTGen/                                        @ahoppen @bnbarham @CodaFi @hamishknight @rintaro
 /lib/Basic/Windows                                  @compnerd
-/lib/ClangImporter                                  @zoecarver @hyp @egorzhdan
+/lib/ClangImporter                                  @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder
 /lib/ClangImporter/DWARFImporter*                   @adrian-prantl
 /lib/DependencyScan                                 @artemcm
 /lib/Driver                                         @artemcm

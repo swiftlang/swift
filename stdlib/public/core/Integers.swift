@@ -406,12 +406,6 @@ extension AdditiveArithmetic {
   }
 }
 
-#if !$Embedded
-public typealias _CustomStringConvertibleOrNone = CustomStringConvertible
-#else
-public typealias _CustomStringConvertibleOrNone = Any
-#endif
-
 //===----------------------------------------------------------------------===//
 //===--- BinaryInteger ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -573,7 +567,7 @@ public typealias _CustomStringConvertibleOrNone = Any
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, _CustomStringConvertibleOrNone, Strideable
+  Hashable, Numeric, CustomStringConvertible, Strideable
   where Magnitude: BinaryInteger, Magnitude.Magnitude == Magnitude
 {
   /// A Boolean value indicating whether this type is a signed integer type.
@@ -1499,7 +1493,6 @@ extension BinaryInteger {
 //===--- CustomStringConvertible conformance ------------------------------===//
 //===----------------------------------------------------------------------===//
 
-@_unavailableInEmbedded
 extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
@@ -1902,8 +1895,7 @@ public protocol _LosslessStringConvertibleOrNone {}
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger
-: BinaryInteger, _LosslessStringConvertibleOrNone, _BitwiseCopyable
+public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
 where Magnitude: FixedWidthInteger & UnsignedInteger,
       Stride: FixedWidthInteger & SignedInteger {
   /// The number of bits used for the underlying binary representation of
@@ -2252,6 +2244,32 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
   static func &<<=(lhs: inout Self, rhs: Self)
+  
+  /// Returns the product of the two given values, wrapping the result in case
+  /// of any overflow.
+  ///
+  /// The overflow multiplication operator (`&*`) discards any bits that
+  /// overflow the fixed width of the integer type. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
+  ///
+  ///     let x: Int8 = 10 &* 5
+  ///     // x == 50
+  ///     let y: Int8 = 10 &* 50
+  ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  @available(SwiftStdlib 6.0, *)
+  static func &*(lhs: Self, rhs: Self) -> Self
 }
 
 extension FixedWidthInteger {
@@ -3296,32 +3314,9 @@ extension FixedWidthInteger {
     lhs = lhs &- rhs
   }
 
-  /// Returns the product of the two given values, wrapping the result in case
-  /// of any overflow.
-  ///
-  /// The overflow multiplication operator (`&*`) discards any bits that
-  /// overflow the fixed width of the integer type. In the following example,
-  /// the product of `10` and `50` is greater than the maximum representable
-  /// `Int8` value, so the result is the partial value after discarding the
-  /// overflowing bits.
-  ///
-  ///     let x: Int8 = 10 &* 5
-  ///     // x == 50
-  ///     let y: Int8 = 10 &* 50
-  ///     // y == -12 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
   @_transparent
-  public static func &* (lhs: Self, rhs: Self) -> Self {
-    return lhs.multipliedReportingOverflow(by: rhs).partialValue
+  public static func &*(lhs: Self, rhs: Self) -> Self {
+    return rhs.multipliedReportingOverflow(by: lhs).partialValue
   }
 
   /// Multiplies two values and stores the result in the left-hand-side

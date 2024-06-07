@@ -121,6 +121,18 @@
 /// move-only types are introduced.
 OBJC_ACCESSOR(Get, get)
 
+/// This is a "distributed thunk" getter, that is used for a "distributed var"
+/// 'get { ... }' accessor.
+///
+/// A distributed thunk is mangled as it's Storage's name.
+/// This is never invoked directly by user code, but whenever making calls on
+/// a distributed actor and the target is not known to be local, we invoke the
+/// thunk. This is equivalent to a `distributed_thunk' FuncDecl of a
+/// 'distributed func'.
+///
+/// For the most part, its behavior is exactly the same as a normal getter.
+OBJC_ACCESSOR(DistributedGet, _distributed_get)
+
 /// This is a setter: a function that is called when a value is assigned
 /// to the storage.  It takes a value of the storage type as its
 /// primary parameter, in addition to any index values that may be

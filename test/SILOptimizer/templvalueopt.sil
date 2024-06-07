@@ -134,15 +134,15 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @write_to_dest_ok_if_before_liferange :
+// CHECK-LABEL: sil @write_to_dest_ok_if_before_liverange :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr
 // CHECK-NEXT:   init_enum_data_addr
 // CHECK-NEXT:   copy_addr
 // CHECK-NEXT:   inject_enum_addr
 // CHECK-NOT:    copy_addr
-// CHECK: } // end sil function 'write_to_dest_ok_if_before_liferange'
-sil @write_to_dest_ok_if_before_liferange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
+// CHECK: } // end sil function 'write_to_dest_ok_if_before_liverange'
+sil @write_to_dest_ok_if_before_liverange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   destroy_addr %0 : $*Optional<Any>
@@ -264,6 +264,16 @@ bb0(%ret_addr : $*T):
   apply undef<T>(%temporary) : $@convention(thin) <T> () -> @out T
   copy_addr [take] %temporary to [init] %ret_addr : $*T
   dealloc_stack %temporary : $*T
+
+  // Ensure that the following builtin instructions don't interfere with
+  // temp l value from getting rid of the temporary.
+  %empty = builtin "fence_release"() : $()
+  %ptr = address_to_pointer %ret_addr : $*T to $Builtin.RawPointer
+  %load = builtin "atomicload_monotonic_Int64"(%ptr : $Builtin.RawPointer) : $Builtin.Int64
+  %onetwoeight = integer_literal $Builtin.Int64, 128
+  %empty2 = builtin "atomicstore_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64) : $()
+  %add = builtin "atomicrmw_add_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64) : $Builtin.Int64
+  %cmpxchg = builtin "cmpxchg_monotonic_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64, %onetwoeight : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
   %15 = tuple ()
   return %15 : $()
 }

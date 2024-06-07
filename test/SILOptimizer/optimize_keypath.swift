@@ -331,9 +331,9 @@ func testGetter<T : P>(_ s: GenStruct<T>) -> Int {
 }
 
 // CHECK-LABEL: sil {{.*}} [noinline] {{.*}}testClassMemberGetter
+// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
 // CHECK: [[E:%[0-9]+]] = ref_element_addr
 // CHECK: [[M:%[0-9]+]] = begin_access [read] [dynamic] [[E]]
-// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
 // CHECK: [[F:%[0-9]+]] = function_ref {{.*}}computed
 // CHECK: apply [[F]]<T>([[A]], [[M]])
 // CHECK: end_access

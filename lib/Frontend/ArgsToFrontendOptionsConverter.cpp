@@ -66,6 +66,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ExplicitModulesOutputPath = A->getValue();
+  } else {
+    SmallString<128> defaultPath;
+    llvm::sys::path::cache_directory(defaultPath);
+    Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
@@ -166,6 +170,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
+  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
@@ -221,8 +227,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.RequestedAction = determineRequestedAction(Args);
   }
 
-  if (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
-      Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface) {
+  if (FrontendOptions::doesActionBuildModuleFromInterface(
+          Opts.RequestedAction)) {
     // The situations where we use this action, e.g. explicit module building and
     // generating prebuilt module cache, don't need synchronization. We should avoid
     // using lock files for them.
@@ -294,28 +300,6 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.SerializeOptionsForDebugging =
         A->getOption().matches(OPT_serialize_debugging_options);
   }
-
-  if (Args.hasArg(OPT_enable_library_evolution)) {
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-
-    Opts.SkipNonExportableDecls |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
-  } else {
-    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-skip-non-exportable-decls",
-                     "-enable-library-evolution");
-  }
-
-  // HACK: The driver currently erroneously passes all flags to module interface
-  // verification jobs. -experimental-skip-non-exportable-decls is not
-  // appropriate for verification tasks and should be ignored, though.
-  if (Opts.RequestedAction ==
-      FrontendOptions::ActionType::TypecheckModuleFromInterface)
-    Opts.SkipNonExportableDecls = false;
 
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
@@ -711,10 +695,8 @@ bool ArgsToFrontendOptionsConverter::
 
 bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
     const {
-  if (Opts.RequestedAction !=
-          FrontendOptions::ActionType::CompileModuleFromInterface &&
-      Opts.RequestedAction !=
-          FrontendOptions::ActionType::TypecheckModuleFromInterface &&
+  if (!FrontendOptions::doesActionBuildModuleFromInterface(
+          Opts.RequestedAction) &&
       Opts.ExplicitInterfaceBuild) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_explicit_interface_build_in_mode);

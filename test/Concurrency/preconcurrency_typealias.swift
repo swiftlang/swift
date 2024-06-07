@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-tns- -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -31,7 +31,7 @@ func test() {
   var mutableVariable = 0
   preconcurrencyFunc {
     mutableVariable += 1 // no sendable warning unless we have complete
-    // expected-complete-tns-warning @-1 {{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in Swift 6}}
+    // expected-complete-tns-warning @-1 {{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in the Swift 6 language mode}}
   }
   mutableVariable += 1
 }
@@ -49,7 +49,7 @@ func testAsync() async {
 
   var mutableVariable = 0
   preconcurrencyFunc {
-    mutableVariable += 1 // expected-warning{{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in Swift 6}}
+    mutableVariable += 1 // expected-warning{{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in the Swift 6 language mode}}
   }
   mutableVariable += 1
 }

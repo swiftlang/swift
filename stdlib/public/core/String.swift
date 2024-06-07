@@ -476,6 +476,7 @@ extension String {
       return
     }
 
+    #if !$Embedded
     // Fast path for untyped raw storage and known stdlib types
     if let contigBytes = codeUnits as? _HasContiguousBytes,
       contigBytes._providesContiguousBytesNoCopy
@@ -489,6 +490,7 @@ extension String {
       }
       return
     }
+    #endif
 
     self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits).0
   }
@@ -1159,7 +1161,7 @@ extension _StringGutsSlice {
       }
     }
 
-    for scalar in substring._internalNFC {
+    for scalar in substring.unicodeScalars._internalNFC {
       try scalar.withUTF8CodeUnits {
         for byte in $0 {
           try f(byte)

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 855; // ref_adhoc_requirement_witness attributes are back
+const uint16_t SWIFTMODULE_VERSION_MINOR = 877; // extend_lifetime instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -335,6 +335,7 @@ enum AccessorKind : uint8_t {
   Read,
   Modify,
   Init,
+  DistributedGet,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -402,7 +403,7 @@ enum class SILParameterDifferentiability : uint8_t {
 enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Isolated = 0x2,
-  Transferring = 0x4,
+  Sending = 0x4,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -423,6 +424,7 @@ using ResultConventionField = BCFixed<3>;
 /// module version.
 enum class SILResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
+  IsSending = 0x2,
 };
 
 using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
@@ -862,7 +864,8 @@ namespace control_block {
     REVISION,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
-    HAS_NONCOPYABLE_GENERICS,
+    CHANNEL,
+    SDK_VERSION,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -908,9 +911,14 @@ namespace control_block {
     BCBlob
   >;
 
-  using HasNoncopyableGenerics = BCRecordLayout<
-      HAS_NONCOPYABLE_GENERICS,
-      BCFixed<1>
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
+    BCBlob
+  >;
+
+  using SDKVersionLayout = BCRecordLayout<
+    SDK_VERSION,
+    BCBlob
   >;
 }
 
@@ -938,6 +946,8 @@ namespace options_block {
     MODULE_EXPORT_AS_NAME,
     PLUGIN_SEARCH_OPTION,
     HAS_CXX_INTEROPERABILITY_ENABLED,
+    ALLOW_NON_RESILIENT_ACCESS,
+    SERIALIZE_PACKAGE_ENABLED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1019,6 +1029,14 @@ namespace options_block {
 
   using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
     HAS_CXX_INTEROPERABILITY_ENABLED
+  >;
+
+  using AllowNonResilientAccess = BCRecordLayout<
+    ALLOW_NON_RESILIENT_ACCESS
+  >;
+
+  using SerializePackageEnabled = BCRecordLayout<
+    SERIALIZE_PACKAGE_ENABLED
   >;
 }
 
@@ -1234,6 +1252,7 @@ namespace decls_block {
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>                       // has transferring result
     // trailed by parameters
+    // Optionally lifetime dependence info
   );
 
   using FunctionParamLayout =
@@ -1248,7 +1267,6 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>,              // _resultDependsOn
                      BCFixed<1>               // transferring
                      >;
 
@@ -1335,6 +1353,7 @@ namespace decls_block {
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
+    // Optionally lifetime dependence info
   );
 
   TYPE_LAYOUT(SILFunctionTypeLayout,
@@ -1350,7 +1369,6 @@ namespace decls_block {
     BCFixed<1>,                         // erased isolation?
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
-    BCFixed<1>,                         // transferring result
     BCVBR<6>,                           // number of parameters
     BCVBR<5>,                           // number of yields
     BCVBR<5>,                           // number of results
@@ -1363,6 +1381,7 @@ namespace decls_block {
                           // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
     // Optionally a substitution map (for substituted function types)
+    // Optionally lifetime dependence info
   );
 
   TYPE_LAYOUT(SILBlockStorageTypeLayout,
@@ -1527,11 +1546,18 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
+    DeclIDField,            // superclass decl
     AccessLevelField,       // access level
-    BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
-    // Trailed by the generic parameters (if any), the members record, and
-    // the default witness table record
+    BCArray<TypeIDField>    // dependency types
+    // Trailed by the inherited protocols, the generic parameters (if any),
+    // the generic signature, the members record, and the default witness table record
+  >;
+
+  /// A default witness table for a protocol.
+  using InheritedProtocolsLayout = BCRecordLayout<
+    INHERITED_PROTOCOLS,
+    BCArray<DeclIDField>
+    // An array of inherited protocol declarations
   >;
 
   /// A default witness table for a protocol.
@@ -1610,7 +1636,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
-    BCFixed<1>,              // isTransferring?
+    BCFixed<1>,              // isSending?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -2138,7 +2164,8 @@ namespace decls_block {
     BCFixed<1>, // implicit
     TypeIDField, // like type
     BCVBR<32>, // size
-    BCVBR<8> // alignment
+    BCVBR<8>, // alignment
+    BCFixed<1> // movesAsLike
   >;
   
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
@@ -2232,6 +2259,8 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
+  using AllowFeatureSuppressionDeclAttrLayout =
+      BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;
   using ProjectedValuePropertyDeclAttrLayout = BCRecordLayout<
       ProjectedValueProperty_DECL_ATTR,
       BCFixed<1>,        // isImplicit
@@ -2296,6 +2325,7 @@ namespace decls_block {
     ObjCImplementation_DECL_ATTR,
     BCFixed<1>,                // implicit flag
     BCFixed<1>,                // category name invalid
+    BCFixed<1>,                // is early adopter
     IdentifierIDField          // category name
   >;
 
@@ -2359,14 +2389,6 @@ namespace decls_block {
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
   >;
-
-  using DistributedThunkTargetDeclAttrLayout = BCRecordLayout<
-      DistributedThunkTarget_DECL_ATTR,
-      BCFixed<1>, // implicit flag
-      DeclIDField // target function
-          // FIXME: not entirely right?
-  >;
-
 
   using TypeEraserDeclAttrLayout = BCRecordLayout<
     TypeEraser_DECL_ATTR,

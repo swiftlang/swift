@@ -286,10 +286,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
       M = DC->getParentModule();
       SubMap = BaseType->getContextSubstitutionMap(M, DC);
-      if (!SubMap.empty()) {
-        TypeContextDepth = SubMap.getGenericSignature()
-            .getGenericParams().back()->getDepth() + 1;
-      }
+      TypeContextDepth = SubMap.getGenericSignature().getNextDepth();
     }
   }
 
@@ -335,7 +332,13 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   if (auto *typeDC = GC->getInnermostTypeContext())
     Proto = typeDC->getSelfProtocolDecl();
 
-  for (auto Req: GenericSig.getRequirements()) {
+  SmallVector<Requirement, 2> Reqs;
+  SmallVector<InverseRequirement, 2> InverseReqs;
+  GenericSig->getRequirementsWithInverses(Reqs, InverseReqs);
+  // FIXME: Handle InverseReqs, or change the above to getRequirements()
+  // and update tests to include Copyable/Escapable
+
+  for (auto Req: Reqs) {
     if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&
@@ -709,6 +712,9 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
+      case PlatformKind::visionOS:
+        // FIXME: Formal platform support in SourceKit is needed.
+        PlatformUID = UIdent(); break;
       case PlatformKind::macCatalystApplicationExtension:
         PlatformUID = PlatformMacCatalystAppExt; break;
       case PlatformKind::macOSApplicationExtension:
@@ -717,6 +723,9 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformtvOSAppExt; break;
       case PlatformKind::watchOSApplicationExtension:
         PlatformUID = PlatformWatchOSAppExt; break;
+      case PlatformKind::visionOSApplicationExtension:
+        // FIXME: Formal platform support in SourceKit is needed.
+        PlatformUID = UIdent(); break;
       case PlatformKind::OpenBSD:
         PlatformUID = PlatformOpenBSD; break;
       case PlatformKind::Windows:

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking
-// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -strict-concurrency=complete
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -151,10 +151,10 @@ struct World {
 
 let helloworld:  @Sendable () -> Void = World.greet
 
-class NonSendableC {
+class NonSendableC { // expected-note{{class 'NonSendableC' does not conform to the 'Sendable' protocol}}
     var x: Int = 0
 
-    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in Swift 6}}
+    @Sendable func inc() { // expected-warning {{instance method of non-Sendable type 'NonSendableC' cannot be marked as '@Sendable'}}
         x += 1
     }
 }
@@ -185,10 +185,6 @@ actor TestActor {}
 struct SomeGlobalActor {
   static var shared: TestActor { TestActor() }
 }
-
-@SomeGlobalActor
-let globalValue: NonSendable = NonSendable()
-
 
 @SomeGlobalActor
 // CHECK-LABEL: sil hidden [ossa] @$s16sendable_methods8generic3yyxYalF : $@convention(thin) @async <T> (@in_guaranteed T) -> ()
@@ -226,5 +222,46 @@ do {
       let _: @Sendable (Test<Int>) -> Void = X.test // Ok
       let _ = X.test(self) // Ok
     }
+  }
+}
+
+func test_initializer_ref() {
+  func test<T>(_: @Sendable (T, T) -> Array<T>) {
+  }
+
+  let initRef: @Sendable (Int, Int) -> Array<Int> = Array<Int>.init // Ok
+
+  test(initRef) // Ok
+  test(Array<Int>.init) // Ok
+}
+
+// rdar://119593407 - incorrect errors when partially applied member is accessed with InferSendableFromCaptures
+do {
+  @MainActor struct ErrorHandler {
+    static func log(_ error: Error) {}
+  }
+
+  @MainActor final class Manager {
+    static var shared: Manager!
+
+    func test(_: @escaping @MainActor (Error) -> Void) {
+    }
+  }
+
+  @MainActor class Test {
+    func schedule() {
+      Task {
+        Manager.shared.test(ErrorHandler.log) // Ok (access is wrapped in an autoclosure)
+      }
+    }
+  }
+}
+
+// rdar://125932231 - incorrect `error: type of expression is ambiguous without a type annotation`
+do {
+  class C {}
+
+  func test(c: C) -> (any Sendable)? {
+    true ? nil : c // Ok
   }
 }

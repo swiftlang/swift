@@ -47,7 +47,7 @@ namespace path = llvm::sys::path;
 static std::optional<StringRef> getRelativeDepPath(StringRef DepPath,
                                                    StringRef Base) {
   // If Base is the root directory, or DepPath does not start with Base, bail.
-  if (Base.size() <= 1 || !DepPath.startswith(Base)) {
+  if (Base.size() <= 1 || !DepPath.starts_with(Base)) {
     return std::nullopt;
   }
 
@@ -123,7 +123,7 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
     path::native(InitialDepName, Scratch);
     StringRef DepName = Scratch.str();
 
-    assert(moduleCachePath.empty() || !DepName.startswith(moduleCachePath));
+    assert(moduleCachePath.empty() || !DepName.starts_with(moduleCachePath));
 
     // Serialize the paths of dependencies in the SDK relative to it.
     std::optional<StringRef> SDKRelativePath =
@@ -133,19 +133,19 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
 
     // Forwarding modules add the underlying prebuilt module to their
     // dependency list -- don't serialize that.
-    if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
+    if (!prebuiltCachePath.empty() && DepName.starts_with(prebuiltCachePath))
       continue;
     // Don't serialize interface path if it's from the preferred interface dir.
     // This ensures the prebuilt module caches generated from these interfaces
     // are relocatable.
-    if (!backupInterfaceDir.empty() && DepName.startswith(backupInterfaceDir))
+    if (!backupInterfaceDir.empty() && DepName.starts_with(backupInterfaceDir))
       continue;
     if (dependencyTracker) {
       dependencyTracker->addDependency(DepName, /*isSystem*/ IsSDKRelative);
     }
 
     // Don't serialize compiler-relative deps so the cache is relocatable.
-    if (DepName.startswith(ResourcePath))
+    if (DepName.starts_with(ResourcePath))
       continue;
 
     auto Status = fs.status(DepName);

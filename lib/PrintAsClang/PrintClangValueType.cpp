@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -193,13 +194,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   };
   if (typeDecl->isGeneric()) {
     genericSignature = typeDecl->getGenericSignature();
-
-    // FIXME: Support generic requirements.
-    SmallVector<Requirement, 2> reqs;
-    SmallVector<InverseRequirement, 2> inverseReqs;
-    genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
-    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
-    assert(reqs.empty());
+    assert(cxx_translation::isExposableToCxx(genericSignature));
 
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.

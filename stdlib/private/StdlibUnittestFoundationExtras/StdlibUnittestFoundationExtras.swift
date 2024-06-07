@@ -23,7 +23,7 @@ import StdlibUnittest
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
   invoking body: () -> Void
 ) {
-#if targetEnvironment(simulator) && arch(i386) && (os(iOS) || os(watchOS))
+#if targetEnvironment(simulator) && arch(i386) && (os(iOS) || os(watchOS) || os(visionOS))
   autoreleasepool(invoking: body)
 #else
   body()

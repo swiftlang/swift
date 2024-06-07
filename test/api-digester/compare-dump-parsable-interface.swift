@@ -13,5 +13,5 @@
 // RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
 // RUN: diff -u %t.expected %t.result.tmp
 
-// XFAIL: noncopyable_generics
+
 

@@ -1,10 +1,11 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -Xfrontend -disable-availability-checking -Onone -D NO_OPTIMIZATIONS)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -Xfrontend -disable-availability-checking -O)
 //
 // REQUIRES: executable_test
-// TODO: This should work without ObjC interop in the future rdar://97497120
-// REQUIRES: objc_interop
+// XFAIL: OS=windows-msvc
 
-// REQUIRES: rdar97532642
+// Temporarily disable on arm64e (rdar://128681137)
+// UNSUPPORTED: CPU=arm64e
 
 import StdlibUnittest
 import ReferenceCounted
@@ -17,13 +18,17 @@ public func blackHole<T>(_ _: T) {  }
 @inline(never)
 func localTest() {
     var x = NS.LocalCount.create()
-    expectEqual(x.value, 6) // This is 6 because of "var x" "x.value" * 2 and "(x, x, x)".
+#if NO_OPTIMIZATIONS
+    expectEqual(x.value, 8) // This is 8 because of "var x" "x.value" * 2, two method calls on x, and "(x, x, x)".
+#endif
 
     expectEqual(x.returns42(), 42)
     expectEqual(x.constMethod(), 42)
 
     let t = (x, x, x)
+#if NO_OPTIMIZATIONS
     expectEqual(x.value, 5)
+#endif
 }
 
 ReferenceCountedTestSuite.test("Local") {
@@ -35,7 +40,6 @@ ReferenceCountedTestSuite.test("Local") {
 var globalOptional: NS.LocalCount? = nil
 
 ReferenceCountedTestSuite.test("Global optional holding local ref count") {
-    expectEqual(finalLocalRefCount, 0)
     globalOptional = NS.LocalCount.create()
     expectEqual(finalLocalRefCount, 1)
 }
@@ -44,20 +48,38 @@ ReferenceCountedTestSuite.test("Global optional holding local ref count") {
 func globalTest1() {
     var x = GlobalCount.create()
     let t = (x, x, x)
+#if NO_OPTIMIZATIONS
     expectEqual(globalCount, 4)
+#endif
     blackHole(t)
 }
 
 @inline(never)
 func globalTest2() {
     var x = GlobalCount.create()
+#if NO_OPTIMIZATIONS
     expectEqual(globalCount, 1)
+#endif
 }
 
 ReferenceCountedTestSuite.test("Global") {
     expectEqual(globalCount, 0)
     globalTest1()
     globalTest2()
+    expectEqual(globalCount, 0)
+}
+
+var globalArray: [GlobalCount] = []
+
+ReferenceCountedTestSuite.test("Global array") {
+    expectEqual(globalCount, 0)
+
+    globalArray = [GlobalCount.create()]
+#if NO_OPTIMIZATIONS
+    expectEqual(globalCount, 1)
+#endif
+
+    globalArray = []
     expectEqual(globalCount, 0)
 }
 

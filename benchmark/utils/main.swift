@@ -28,6 +28,7 @@ import ArrayOfRef
 import ArrayRemoveAll
 import ArraySetElement
 import ArraySubscript
+import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
@@ -52,10 +53,13 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
+import CountAlgo
 import CreateObjects
-import CxxSetToCollection
+// rdar://128520766
+// import CxxSetToCollection
 import CxxStringConversion
-import CxxVectorSum
+// rdar://128520766
+// import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -222,6 +226,7 @@ register(ArrayOfRef.benchmarks)
 register(ArrayRemoveAll.benchmarks)
 register(ArraySetElement.benchmarks)
 register(ArraySubscript.benchmarks)
+register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
 register(BitCount.benchmarks)
@@ -245,11 +250,14 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
-register(CxxSetToCollection.benchmarks)
+// rdar://128520766
+// register(CxxSetToCollection.benchmarks)
 register(CxxStringConversion.benchmarks)
-register(CxxVectorSum.benchmarks)
+// rdar://128520766
+// register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)

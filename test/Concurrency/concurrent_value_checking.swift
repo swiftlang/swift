@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -disable-region-based-isolation-with-strict-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -215,7 +215,7 @@ func testUnsafeSendableInAsync() async {
 // ----------------------------------------------------------------------
 // Sendable restriction on key paths.
 // ----------------------------------------------------------------------
-class NC: Hashable { // expected-note 2{{class 'NC' does not conform to the 'Sendable' protocol}}
+class NC: Hashable { // expected-note 3{{class 'NC' does not conform to the 'Sendable' protocol}}
   func hash(into: inout Hasher) { }
   static func==(_: NC, _: NC) -> Bool { true }
 }
@@ -232,7 +232,7 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
 actor ANI {
-  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in Swift 6}}
+  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in the Swift 6 language mode}}
   nonisolated func f() -> NC? { nil }
 }
 
@@ -273,8 +273,10 @@ typealias CF = @Sendable () -> NotConcurrent?
 typealias BadGenericCF<T> = @Sendable () -> T?
 typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
-var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
-// expected-note@-1 {{isolate 'concurrentFuncVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
+var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
+// expected-note@-1 {{annotate 'concurrentFuncVar' with '@MainActor' if property should only be accessed from the main actor}}
+// expected-note@-2 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+// expected-note@-3 {{convert 'concurrentFuncVar' to a 'let' constant to make 'Sendable' shared state immutable}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on @Sendable closures.

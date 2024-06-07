@@ -57,3 +57,8 @@ func testMutating(value: S3) {
 class C1 {}
 @_alignment(7) // expected-error {{alignment value must be a power of two}}
 struct S4 {}
+
+@implementation extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
+@implementation(Category) extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
+@_objcImplementation extension ObjCClass2 {} // expected-error {{cannot find type 'ObjCClass2' in scope}}
+@_objcImplementation(Category) extension ObjCClass2 {} // expected-error {{cannot find type 'ObjCClass2' in scope}}

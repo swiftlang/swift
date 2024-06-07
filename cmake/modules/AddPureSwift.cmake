@@ -60,11 +60,27 @@ function(_add_host_swift_compile_options name)
     $<$<COMPILE_LANGUAGE:Swift>:none>)
 
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
+  if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+    add_dependencies(${name} swift-stdlib-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+    target_compile_options(${name} PRIVATE
+      $<$<COMPILE_LANGUAGE:Swift>:-sdk;${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH};>
+      $<$<COMPILE_LANGUAGE:Swift>:-resource-dir;${SWIFTLIB_DIR};>)
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID" AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+      swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-tools-directory;${tools_path};>)
+    endif()
+  endif()
   _add_host_variant_swift_sanitizer_flags(${name})
 
   target_compile_options(${name} PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
   )
+
+  if(LLVM_ENABLE_ASSERTIONS)
+    target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -UNDEBUG>")
+  else()
+    target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -DNDEBUG>")
+  endif()
 endfunction()
 
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
@@ -85,6 +101,26 @@ function(_set_pure_swift_link_flags name relpath_to_lib_dir)
     # RPATH to the builder's runtime.
   endif()
 endfunction()
+
+function(_set_pure_swift_profile_flags target_name)
+  # This replicates the code existing in LLVM llvm/cmake/modules/HandleLLVMOptions.cmake
+  # The second part of the clause replicates the LINKER_IS_LLD_LINK of the
+  # original.
+  if(LLVM_BUILD_INSTRUMENTED AND NOT (SWIFT_COMPILER_IS_MSVC_LIKE AND SWIFT_USE_LINKER STREQUAL "lld"))
+    string(TOUPPER "${LLVM_BUILD_INSTRUMENTED}" uppercase_LLVM_BUILD_INSTRUMENTED)
+    if(LLVM_ENABLE_IR_PGO OR uppercase_LLVM_BUILD_INSTRUMENTED STREQUAL "IR")
+      target_link_options(${target_name} PRIVATE
+        "SHELL:-Xclang-linker -fprofile-generate=\"${LLVM_PROFILE_DATA_DIR}\"")
+    elseif(uppercase_LLVM_BUILD_INSTRUMENTED STREQUAL "CSIR")
+      target_link_options(${target_name} PRIVATE
+        "SHELL:-Xclang-linker -fcs-profile-generate=\"${LLVM_CSPROFILE_DATA_DIR}\"")
+    else()
+      target_link_options(${target_name} PRIVATE
+        "SHELL:-Xclang-linker -fprofile-instr-generate=\"${LLVM_PROFILE_FILE_PATTERN}\"")
+    endif()
+  endif()
+endfunction()
+
 
 # Add a new "pure" Swift host library.
 #
@@ -264,22 +300,7 @@ function(add_pure_swift_host_library name)
     )
   endif()
 
-  # This replicates he code existing in LLVM llvm/cmake/modules/HandleLLVMOptions.cmake
-  # The second part of the clause replicates the LINKER_IS_LLD_LINK of the
-  # original.
-  if(LLVM_BUILD_INSTRUMENTED AND NOT (SWIFT_COMPILER_IS_MSVC_LIKE AND SWIFT_USE_LINKER STREQUAL "lld"))
-    string(TOUPPER "${LLVM_BUILD_INSTRUMENTED}" uppercase_LLVM_BUILD_INSTRUMENTED)
-    if(LLVM_ENABLE_IR_PGO OR uppercase_LLVM_BUILD_INSTRUMENTED STREQUAL "IR")
-      target_link_options(${name} PRIVATE
-        "SHELL:-Xclang-linker -fprofile-generate=\"${LLVM_PROFILE_DATA_DIR}\"")
-    elseif(uppercase_LLVM_BUILD_INSTRUMENTED STREQUAL "CSIR")
-      target_link_options(${name} PRIVATE
-        "SHELL:-Xclang-linker -fcs-profile-generate=\"${LLVM_CSPROFILE_DATA_DIR}\"")
-    else()
-      target_link_options(${name} PRIVATE
-        "SHELL:-Xclang-linker -fprofile-instr-generate=\"${LLVM_PROFILE_FILE_PATTERN}\"")
-    endif()
-  endif()
+  _set_pure_swift_profile_flags(${name})
 
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
@@ -414,4 +435,6 @@ function(add_pure_swift_host_tool name)
   else()
     set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
   endif()
+
+  _set_pure_swift_profile_flags(${name})
 endfunction()

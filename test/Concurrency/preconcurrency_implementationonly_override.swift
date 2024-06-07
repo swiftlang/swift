@@ -5,12 +5,13 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
 @_implementationOnly import ImplementationOnlyDefs
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 class D: C {
   @_implementationOnly

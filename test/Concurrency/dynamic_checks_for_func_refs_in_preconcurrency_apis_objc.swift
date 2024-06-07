@@ -1,10 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature DynamicActorIsolation -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target arm64-apple-macosx10.15 -enable-upcoming-feature DynamicActorIsolation -emit-silgen -verify %s | %FileCheck %s
 // REQUIRES: objc_interop
+// REQUIRES: asserts
 
 import Foundation
 
 install_global_event_handler { @MainActor _ in
-  // expected-warning@-1 {{converting function value of type '@MainActor (Any) -> ()' to 'event_handler' (aka '@convention(c) (Any) -> ()') loses global actor 'MainActor'; this is an error in Swift 6}}
+  // expected-warning@-1 {{converting function value of type '@MainActor (Any) -> ()' to 'event_handler' (aka '@convention(c) (Any) -> ()') loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
 }
 
 // CHECK-LABEL: sil private [thunk] [ossa] @$s56dynamic_checks_for_func_refs_in_preconcurrency_apis_objcyypScMYccfU_To : $@convention(c) (AnyObject) -> ()

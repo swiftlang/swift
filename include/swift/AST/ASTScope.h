@@ -482,45 +482,33 @@ public:
 
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
-  };
+};
 
-  // For the whole Decl scope of a GenericType or an Extension
-  class GenericTypeOrExtensionWholePortion final : public Portion {
-  public:
-    GenericTypeOrExtensionWholePortion() : Portion("Decl") {}
-    virtual ~GenericTypeOrExtensionWholePortion() {}
+// For the whole Decl scope of a GenericType or an Extension
+class GenericTypeOrExtensionWholePortion final : public Portion {
+public:
+  GenericTypeOrExtensionWholePortion() : Portion("Decl") {}
+  virtual ~GenericTypeOrExtensionWholePortion() {}
 
-    // Just for TypeAlias
-    ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
-                              ScopeCreator &) const override;
+  // Just for TypeAlias
+  ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
+                            ScopeCreator &) const override;
 
-    SourceRange getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *,
-                                          bool omitAssertions) const override;
+  SourceRange getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *,
+                                        bool omitAssertions) const override;
 
-    NullablePtr<const ASTScopeImpl>
-    getLookupLimitFor(const GenericTypeOrExtensionScope *) const override;
+  NullablePtr<const ASTScopeImpl>
+  getLookupLimitFor(const GenericTypeOrExtensionScope *) const override;
 
-    NullablePtr<ASTScopeImpl>
-    insertionPointForDeferredExpansion(IterableTypeScope *) const override;
-  };
-
-  /// GenericTypeOrExtension = GenericType or Extension
-  class GenericTypeOrExtensionWhereOrBodyPortion : public Portion {
-  public:
-    GenericTypeOrExtensionWhereOrBodyPortion(const char *n) : Portion(n) {}
-    virtual ~GenericTypeOrExtensionWhereOrBodyPortion() {}
-
-    bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
-                         ASTScopeImpl::DeclConsumer consumer) const override;
+  NullablePtr<ASTScopeImpl>
+  insertionPointForDeferredExpansion(IterableTypeScope *) const override;
 };
 
 /// Behavior specific to representing the trailing where clause of a
 /// GenericTypeDecl or ExtensionDecl scope.
-class GenericTypeOrExtensionWherePortion final
-    : public GenericTypeOrExtensionWhereOrBodyPortion {
+class GenericTypeOrExtensionWherePortion final : public Portion {
 public:
-  GenericTypeOrExtensionWherePortion()
-      : GenericTypeOrExtensionWhereOrBodyPortion("Where") {}
+  GenericTypeOrExtensionWherePortion() : Portion("Where") {}
 
   bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
                        ASTScopeImpl::DeclConsumer consumer) const override;
@@ -537,11 +525,12 @@ public:
 
 /// Behavior specific to representing the Body of a NominalTypeDecl or
 /// ExtensionDecl scope
-class IterableTypeBodyPortion final
-    : public GenericTypeOrExtensionWhereOrBodyPortion {
+class IterableTypeBodyPortion final : public Portion {
 public:
-  IterableTypeBodyPortion()
-      : GenericTypeOrExtensionWhereOrBodyPortion("Body") {}
+  IterableTypeBodyPortion() : Portion("Body") {}
+
+  bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
+                       ASTScopeImpl::DeclConsumer consumer) const override;
 
   ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
                             ScopeCreator &) const override;

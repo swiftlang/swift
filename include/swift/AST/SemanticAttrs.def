@@ -124,7 +124,6 @@ SEMANTICS_ATTR(FORCE_EMIT_OPT_REMARK_PREFIX, "optremark")
 SEMANTICS_ATTR(OBJC_FORBID_ASSOCIATED_OBJECTS, "objc.forbidAssociatedObjects")
 
 SEMANTICS_ATTR(LIFETIMEMANAGEMENT_MOVE, "lifetimemanagement.move")
-SEMANTICS_ATTR(LIFETIMEMANAGEMENT_COPY, "lifetimemanagement.copy")
 
 SEMANTICS_ATTR(NO_PERFORMANCE_ANALYSIS, "no_performance_analysis")
 
@@ -137,15 +136,25 @@ SEMANTICS_ATTR(NO_PERFORMANCE_ANALYSIS, "no_performance_analysis")
 // errors that may cause the user to think there is a bug in the compiler.
 SEMANTICS_ATTR(NO_MOVEONLY_DIAGNOSTICS, "sil.optimizer.moveonly.diagnostic.ignore")
 
-// Tell the move-only checker to delete this function body instead of performing
+// Tell the compiler that it can delete this function body instead of performing
 // diagnostics if the function is not used at the time of checking.
+//
+// This is currently used by allocbox to stack and capture promotion.
+//
+// MoveOnlyChecker and TransferNonSendable both potentially delete functions.
+//
+// DISCUSSION: We want to make sure that in cases where we may emit diagnostics
+// twice, we just delete the original function. When running alloc box to stack
+// and capture promotion, we may not have eliminated all of the relevant uses so
+// we may not know to eliminate them.
+//
 // When allocbox to stack specializes a function, we do not want to emit move
-// errors twice, once on the specialized and once on the original
-// function. The semantics of the closure with regards to move-only values may
-// also be dependent on stack promotion. Therefore, we mark the original with
-// this attribute, so that after it's promoted, the original function gets deleted
+// errors twice, once on the specialized and once on the original function. The
+// semantics of the closure with regards to move-only values may also be
+// dependent on stack promotion. Therefore, we mark the original with this
+// attribute, so that after it's promoted, the original function gets deleted
 // instead of raising spurious diagnostics.
-SEMANTICS_ATTR(MOVEONLY_DELETE_IF_UNUSED, "sil.optimizer.moveonly.delete_if_unused")
+SEMANTICS_ATTR(DELETE_IF_UNUSED, "sil.optimizer.delete_if_unused")
 
 // Force the use of the frame pointer for the specified function
 SEMANTICS_ATTR(USE_FRAME_POINTER, "use_frame_pointer")

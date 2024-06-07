@@ -34,27 +34,25 @@ private:
 
   /// Scan the given interface file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo>
-  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework);
+  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework,
+                    bool isTestableImport);
 
   InterfaceSubContextDelegate &astDelegate;
 
   /// Location where pre-built moduels are to be built into.
   std::string moduleOutputPath;
 
-  std::optional<SwiftDependencyTracker> dependencyTracker;
-
 public:
   std::optional<ModuleDependencyInfo> dependencies;
 
-  SwiftModuleScanner(
-      ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
-      InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
-      ScannerKind kind = MDS_plain,
-      std::optional<SwiftDependencyTracker> tracker = std::nullopt)
+  SwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
+                     Identifier moduleName,
+                     InterfaceSubContextDelegate &astDelegate,
+                     StringRef moduleOutputPath, ScannerKind kind = MDS_plain)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         kind(kind), moduleName(moduleName), astDelegate(astDelegate),
-        moduleOutputPath(moduleOutputPath), dependencyTracker(tracker) {}
+        moduleOutputPath(moduleOutputPath) {}
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -91,13 +89,13 @@ class PlaceholderSwiftModuleScanner : public SwiftModuleScanner {
   llvm::BumpPtrAllocator Allocator;
 
 public:
-  PlaceholderSwiftModuleScanner(
-      ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
-      StringRef PlaceholderDependencyModuleMap,
-      InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
-      std::optional<SwiftDependencyTracker> tracker = std::nullopt)
+  PlaceholderSwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
+                                Identifier moduleName,
+                                StringRef PlaceholderDependencyModuleMap,
+                                InterfaceSubContextDelegate &astDelegate,
+                                StringRef moduleOutputPath)
       : SwiftModuleScanner(ctx, LoadMode, moduleName, astDelegate,
-                           moduleOutputPath, MDS_placeholder, tracker) {
+                           moduleOutputPath, MDS_placeholder) {
 
     // FIXME: Find a better place for this map to live, to avoid
     // doing the parsing on every module.

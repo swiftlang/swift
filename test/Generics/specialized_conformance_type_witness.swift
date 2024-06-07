@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
-// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift
 
 struct Row {}
 

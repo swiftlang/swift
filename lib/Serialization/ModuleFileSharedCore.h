@@ -66,6 +66,9 @@ class ModuleFileSharedCore {
   /// The canonical name of the SDK the module was built with.
   StringRef SDKName;
 
+  /// Version string of the SDK against which the module was built.
+  StringRef SDKVersion;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.
@@ -102,9 +105,6 @@ class ModuleFileSharedCore {
 
   /// \c true if this module was compiled with -enable-ossa-modules.
   bool RequiresOSSAModules;
-
-  /// \c true if this module was compiled with NoncopyableGenerics
-  bool RequiresNoncopyableGenerics;
 
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
@@ -391,6 +391,12 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
+    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    unsigned AllowNonResilientAccess : 1;
+
+    /// Whether this module is built with -experimental-package-cmo.
+    unsigned SerializePackageEnabled : 1;
+
     // Explicitly pad out to the next word boundary.
     unsigned : 3;
   } Bits = {};
@@ -413,7 +419,6 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
       bool isFramework,
       bool requiresOSSAModules,
-      bool requiresNoncopyableGenerics,
       StringRef requiredSDK,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
@@ -551,14 +556,13 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, bool requiresOSSAModules,
-       bool requiresNoncopyableGenerics,
        StringRef requiredSDK, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiresNoncopyableGenerics, requiredSDK, info,
+        requiresOSSAModules, requiredSDK, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -602,6 +606,21 @@ public:
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
+  }
+
+  /// Returns the list of modules this module depends on.
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return LinkLibraries;
+  }
+
+  /// Does this module correspond to a framework.
+  bool isFramework() const {
+    return Bits.IsFramework;
+  }
+
+  /// Does this module correspond to a static archive.
+  bool isStaticLibrary() const {
+    return Bits.IsStaticLibrary;
   }
 
   /// Returns \c true if this module file contains a section with incremental

@@ -261,4 +261,20 @@ extension Float80: CustomReflectable {
 }
 #endif
 
+@available(SwiftStdlib 6.0, *)
+extension UInt128: CustomReflectable {
+  /// A mirror that reflects the `UInt128` instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
+}
+
+@available(SwiftStdlib 6.0, *)
+extension Int128: CustomReflectable {
+  /// A mirror that reflects the `Int128` instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
+}
+
 #endif

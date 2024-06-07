@@ -232,7 +232,7 @@ public:
   void printKeyword(StringRef name,
                     const PrintOptions &Opts,
                     StringRef Suffix = "") {
-    if (Opts.SkipUnderscoredKeywords && name.startswith("_"))
+    if (Opts.SkipUnderscoredKeywords && name.starts_with("_"))
       return;
     assert(!name.empty() && "Tried to print empty keyword");
     callPrintNamePre(PrintNameContext::Keyword);

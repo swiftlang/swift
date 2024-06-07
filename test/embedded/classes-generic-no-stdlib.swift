@@ -50,8 +50,8 @@ public func bar(t: T2) -> MyClass<T2> {
 // CHECK-SIL: }
 
 
-// CHECK-IR: @"$s4main7MyClassCyAA2T2VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfDAA2T2V_Tg5", ptr @"$s4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$s4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$s4main7MyClassC1txvMAA2T2V_Tg5", ptr @"$s4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
-// CHECK-IR: @"$s4main7MyClassCyAA2T1VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfDAA2T1V_Tg5", ptr @"$s4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$s4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$s4main7MyClassC1txvMAA2T1V_Tg5", ptr @"$s4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
+// CHECK-IR: @"$s4main7MyClassCyAA2T2VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfDAA2T2V_Tg5", ptr null, ptr @"$s4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$s4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$s4main7MyClassC1txvMAA2T2V_Tg5", ptr @"$s4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
+// CHECK-IR: @"$s4main7MyClassCyAA2T1VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfDAA2T1V_Tg5", ptr null, ptr @"$s4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$s4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$s4main7MyClassC1txvMAA2T1V_Tg5", ptr @"$s4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
 
 // CHECK-IR-DAG: define {{.*}}void @"$s4main7MyClassC1txvgAA2T1V_Tg5"(ptr swiftself %0)
 // CHECK-IR-DAG: define {{.*}}i1 @"$s4main7MyClassC1txvgAA2T2V_Tg5"(ptr swiftself %0)

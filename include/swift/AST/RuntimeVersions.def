@@ -135,6 +135,7 @@ RUNTIME_VERSION(
   PLATFORM(macOS,   (14, 4, 0))
   PLATFORM(iOS,     (17, 4, 0))
   PLATFORM(watchOS, (10, 4, 0))
+  PLATFORM(xrOS, (1, 0, 0))
 )
 
 RUNTIME_VERSION(

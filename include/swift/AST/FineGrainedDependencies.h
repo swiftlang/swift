@@ -989,7 +989,7 @@ private:
         includeExternals || n->getKey().getKind() != NodeKind::externalDepend;
     bool apiPredicate =
         includeAPINotes ||
-        !StringRef(n->getKey().humanReadableName()).endswith(".apinotes");
+        !StringRef(n->getKey().humanReadableName()).ends_with(".apinotes");
     return externalPredicate && apiPredicate;
   }
   bool includeGraphArc(const NodeT *def, const NodeT *use) const {

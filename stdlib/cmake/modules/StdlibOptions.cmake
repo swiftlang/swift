@@ -210,6 +210,10 @@ option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
 
+option(SWIFT_USE_OS_TRACE_LAZY_INIT
+       "Use the os_trace call to check if lazy init has been completed before making os_signpost calls."
+       FALSE)
+
 # Use dispatch as the system scheduler by default.
 # For convenience, we set this to false when concurrency is disabled.
 set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
@@ -268,6 +272,10 @@ option(SWIFT_STDLIB_CONCURRENCY_TRACING
 
 option(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
        "Use relative protocol witness tables"
+       FALSE)
+
+option(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES
+       "Use fragile protocol witness tables for resilient protocols"
        FALSE)
 
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)

@@ -327,6 +327,14 @@ keyPath.test("computed properties") {
   }
 }
 
+keyPath.test("equality") {
+  expectNotEqual(\Array<String>.isEmpty, \Substring.isEmpty)
+  expectNotEqual(\Array<String>.isEmpty, \Substring.isEmpty)
+  expectNotEqual(\Array<String>.isEmpty, \String.isEmpty)
+  expectNotEqual(\Array<String>.isEmpty, \Substring.last)
+  expectNotEqual(\Array<String>.isEmpty, \Array<Substring>.isEmpty)
+}
+
 class AB {
 }
 class ABC: AB, ABCProtocol {

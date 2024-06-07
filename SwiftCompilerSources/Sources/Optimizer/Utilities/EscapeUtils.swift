@@ -225,7 +225,7 @@ struct EscapeUtilityTypes {
     ///   store %other to %2   // 4. ignore (followStores == false): %other doesn't impact the "escapeness" of %1
     /// \endcode
     ///
-    /// But once the the up-walk sees a load, it has to follow stores from that point on.
+    /// But once the up-walk sees a load, it has to follow stores from that point on.
     /// Example:
     /// \code
     /// bb0(%function_arg):            // 7. escaping! %1 escapes through %function_arg
@@ -420,6 +420,41 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
           return .continueWalk
         }
         return isEscaping
+
+      case .AtomicLoad:
+        // Treat atomic loads as regular loads and just walk down their uses.
+        if !followLoads(at: path) {
+          return .continueWalk
+        }
+
+        // Even when analyzing atomics, a loaded trivial value can be ignored.
+        if hasRelevantType(bi, at: path.projectionPath) {
+          return .continueWalk
+        }
+
+        return walkDownUses(ofValue: bi, path: path.with(knownType: nil))
+
+      case .AtomicStore, .AtomicRMW:
+        // If we shouldn't follow the store, then we can keep walking.
+        if !path.followStores {
+          return .continueWalk
+        }
+
+        // Be conservative and just say the store is escaping.
+        return isEscaping
+
+      case .CmpXChg:
+        // If we have to follow loads or stores of a cmpxchg, then just bail.
+        if followLoads(at: path) || path.followStores {
+          return isEscaping
+        }
+
+        return .continueWalk
+
+      case .Fence:
+        // Fences do not affect escape analysis.
+        return .continueWalk
+
       default:
         return isEscaping
       }

@@ -456,6 +456,26 @@ func destroyGenArray<T>(_ array: Builtin.RawPointer, count: Builtin.Word, _: T) 
   Builtin.destroyArray(T.self, array, count)
 }
 
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins21destroyArraySinglePODyyBpF"(ptr %0)
+// CHECK-NOT:     call void @swift_arrayDestroy
+func destroyArraySinglePOD(_ array: Builtin.RawPointer) {
+  Builtin.destroyArray(Int.self, array, 1._builtinWordValue)
+}
+
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins24destroyArraySingleNonPODyyBpF"(ptr %0)
+// CHECK-NOT:     call void @swift_arrayDestroy
+// CHECK:         [[TO_DESTROY:%.*]] = load ptr, ptr {{%.*}}
+// CHECK:         call void @swift_release(ptr [[TO_DESTROY]])
+func destroyArraySingleNonPOD(_ array: Builtin.RawPointer) {
+  Builtin.destroyArray(C.self, array, 1._builtinWordValue)
+}
+
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins21destroyArraySingleGenyyBp_xmtlF"(ptr %0, ptr %1, ptr %T)
+// CHECK-NOT:     call void @swift_arrayDestroy
+// CHECK:         call void {{%.*}}(ptr {{.*}} {{%.*}}, ptr %T)
+func destroyArraySingleGen<T>(_ array: Builtin.RawPointer, _: T.Type) {
+  Builtin.destroyArray(T.self, array, 1._builtinWordValue)
+}
 
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12copyPODArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2)
 // check:         mul nuw i64 4, %2

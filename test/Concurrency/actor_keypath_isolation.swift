@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -48,7 +48,7 @@ func tryKeyPathsMisc(d : Door) {
 
     // in combination with other key paths
 
-    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path to actor-isolated property 'letBox'; this is an error in Swift 6}}
+    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path to actor-isolated property 'letBox'; this is an error in the Swift 6 language mode}}
                                        \Box?.?.size)
 
     _ = (\Door.varBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'varBox'}}
@@ -58,18 +58,18 @@ func tryKeyPathsMisc(d : Door) {
 
 func tryKeyPathsFromAsync() async {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in Swift 6}}
+    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in the Swift 6 language mode}}
 }
 
 func tryNonSendable() {
-    _ = \Door.letDict[0] // expected-warning {{cannot form key path to actor-isolated property 'letDict'; this is an error in Swift 6}}
+    _ = \Door.letDict[0] // expected-warning {{cannot form key path to actor-isolated property 'letDict'; this is an error in the Swift 6 language mode}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
-    _ = \Door.letBox!.size // expected-warning {{cannot form key path to actor-isolated property 'letBox'; this is an error in Swift 6}}
+    _ = \Door.letBox!.size // expected-warning {{cannot form key path to actor-isolated property 'letBox'; this is an error in the Swift 6 language mode}}
 }
 
 func tryKeypaths() {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in Swift 6}}
+    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in the Swift 6 language mode}}
 
     _ = \Door.immutable
     _ = \Door.globActor_immutable
@@ -84,7 +84,7 @@ func tryKeypaths() {
     let _ : PartialKeyPath<Door> = \.mutable // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
     let _ : AnyKeyPath = \Door.mutable  // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
 
-    _ = \Door.globActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'globActor_mutable'; this is an error in Swift 6}}
+    _ = \Door.globActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'globActor_mutable'; this is an error in the Swift 6 language mode}}
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
-    _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in Swift 6}}
+    _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 }

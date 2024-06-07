@@ -1506,6 +1506,9 @@ extension Set {
   }
 }
 
+@available(*, unavailable)
+extension Set.Iterator._Variant: Sendable {}
+
 extension Set.Iterator {
 #if _runtime(_ObjC)
   @usableFromInline @_transparent

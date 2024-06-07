@@ -28,6 +28,7 @@ from .ninja import Ninja
 from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
+from .staticswiftlinux import StaticSwiftLinuxConfig
 from .swift import Swift
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
@@ -37,9 +38,10 @@ from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
-from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
+from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs, WasmThreadsLLVMRuntimeLibs
 from .wasmkit import WasmKit
-from .wasmstdlib import WasmStdlib
+from .wasmstdlib import WasmStdlib, WasmThreadsStdlib
+from .wasmswiftsdk import WasmSwiftSDK
 from .xctest import XCTest
 from .zlib import Zlib
 
@@ -58,6 +60,7 @@ __all__ = [
     'MinimalStdlib',
     'Ninja',
     'PlaygroundSupport',
+    'StaticSwiftLinuxConfig',
     'Swift',
     'SwiftFormat',
     'SwiftInspect',
@@ -76,5 +79,8 @@ __all__ = [
     'WASILibc',
     'WasmLLVMRuntimeLibs',
     'WasmKit',
-    'WasmStdlib'
+    'WasmStdlib',
+    'WasmThreadsLLVMRuntimeLibs',
+    'WasmThreadsStdlib',
+    'WasmSwiftSDK',
 ]

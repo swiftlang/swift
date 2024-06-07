@@ -381,11 +381,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   bool addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                    ConformanceSource source);
 
-  /// Add the protocols from the given list.
-  void addInheritedProtocols(
-      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-      ConformanceSource source);
-
   /// Add the protocols added by attached extension macros that are not
   /// yet expanded.
   void addMacroGeneratedProtocols(
@@ -464,10 +459,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// Update a lookup table with conformances from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal, ConformanceStage stage);
 
-  /// Load all of the protocol conformances for the given (serialized)
+  /// Register deserialized protocol conformances for the given (serialized)
   /// declaration context.
-  void loadAllConformances(DeclContext *dc,
-                           ArrayRef<ProtocolConformance *> conformances);
+  void registerProtocolConformances(DeclContext *dc,
+                                  ArrayRef<ProtocolConformance *> conformances);
 
 public:
   /// Create a new conformance lookup table.
@@ -482,7 +477,8 @@ public:
                                  DeclContext *conformanceDC);
 
   /// Register an externally-supplied protocol conformance.
-  void registerProtocolConformance(ProtocolConformance *conformance,
+  void registerProtocolConformance(DeclContext *dc,
+                                   ProtocolConformance *conformance,
                                    bool synthesized = false);
 
   /// Look for conformances to the given protocol.

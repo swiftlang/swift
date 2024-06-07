@@ -32,6 +32,9 @@
 // CHECK-NEXT: struct CopyAndMoveConstructor {
 // CHECK-NEXT:   @available(*, deprecated, message
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   init(value: Int32, ptr: UnsafeMutablePointer<Int32>!)
+// CHECK-NEXT:   var value: Int32
+// CHECK-NEXT:   var ptr: UnsafeMutablePointer<Int32>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct Base {
 // CHECK-NEXT:   init()

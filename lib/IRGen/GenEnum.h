@@ -153,11 +153,17 @@ protected:
   TypeInfoKind TIK;
   IsFixedSize_t AlwaysFixedSize;
   IsABIAccessible_t ElementsAreABIAccessible;
+  IsTriviallyDestroyable_t TriviallyDestroyable;
+  IsCopyable_t Copyable;
+  IsBitwiseTakable_t BitwiseTakable;
   unsigned NumElements;
   
   EnumImplStrategy(IRGenModule &IGM,
                    TypeInfoKind tik,
                    IsFixedSize_t alwaysFixedSize,
+                   IsTriviallyDestroyable_t triviallyDestroyable,
+                   IsCopyable_t copyable,
+                   IsBitwiseTakable_t bitwiseTakable,
                    unsigned NumElements,
                    std::vector<Element> &&ElementsWithPayload,
                    std::vector<Element> &&ElementsWithNoPayload);
@@ -402,7 +408,8 @@ public:
   virtual void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                                   SILType T, bool isOutlined) const = 0;
   virtual void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                                  SILType T, bool isOutlined) const = 0;
+                                  SILType T, bool isOutlined,
+                                  bool zeroizeIfSensitive) const = 0;
 
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,

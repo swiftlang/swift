@@ -7,4 +7,7 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: objc_interop
 
+// rdar://124277662
+// XFAIL: freestanding
+
 // RUN: %{python} %utils/check_freestanding_dependencies.py --vendor %target-vendor --library %test-resource-dir/freestanding/libswiftCore.a --nm-path %llvm-nm

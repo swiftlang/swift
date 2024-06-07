@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// XFAIL: noncopyable_generics
-
 //// Build the private module and the public module normally.
 //// Force the public module to be system with an underlying Clang module.
 // RUN: %target-swift-frontend -emit-module -DPRIVATE_LIB %s -module-name private_lib -emit-module-path %t/private_lib.swiftmodule
@@ -12,7 +10,7 @@
 
 #if PRIVATE_LIB
 
-public struct HiddenStruct {
+public struct HiddenStruct: Equatable {
   public init() {}
 }
 
@@ -21,7 +19,9 @@ public struct HiddenStruct {
 @_implementationOnly import private_lib
 
 protocol SomeProtocol {
-  associatedtype Value
+  // Make sure we recover from failure when reading the type witness and
+  // associated conformance.
+  associatedtype Value: Equatable
   static var defaultValue: Value { get }
 }
 public struct M: SomeProtocol {

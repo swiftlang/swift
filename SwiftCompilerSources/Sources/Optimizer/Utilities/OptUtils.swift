@@ -47,9 +47,6 @@ extension Value {
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
   /// It can also handle non-trivial enums with trivial cases.
   func isTrivial(_ context: some Context) -> Bool {
-    if self is Undef {
-      return true
-    }
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -64,12 +61,12 @@ extension Value {
       switch v {
       case is ValueToBridgeObjectInst:
         break
-      case is StructInst, is TupleInst:
-        let inst = (v as! SingleValueInstruction)
-        worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
+      case let si as StructInst:
+        worklist.pushIfNotVisited(contentsOf: si.operands.values)
+      case let ti as TupleInst:
+        worklist.pushIfNotVisited(contentsOf: ti.operands.values)
       case let en as EnumInst:
-        if let payload = en.payload,
-           !(payload is Undef) {
+        if let payload = en.payload {
           worklist.pushIfNotVisited(payload)
         }
       default:
@@ -134,18 +131,18 @@ extension Value {
   }
 
   /// True if this value is a valid in a static initializer, including all its operands.
-  var isValidGlobalInitValue: Bool {
+  func isValidGlobalInitValue(_ context: some Context) -> Bool {
     guard let svi = self as? SingleValueInstruction else {
       return false
     }
     if let beginAccess = svi as? BeginAccessInst {
-      return beginAccess.address.isValidGlobalInitValue
+      return beginAccess.address.isValidGlobalInitValue(context)
     }
-    if !svi.isValidInStaticInitializerOfGlobal {
+    if !svi.isValidInStaticInitializerOfGlobal(context) {
       return false
     }
     for op in svi.operands {
-      if !op.value.isValidGlobalInitValue {
+      if !op.value.isValidGlobalInitValue(context) {
         return false
       }
     }
@@ -180,6 +177,11 @@ extension Builder {
       let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
     }
+  }
+
+  func destroyCapturedArgs(for paiOnStack: PartialApplyInst) {
+    precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
+    self.bridged.destroyCapturedArgs(paiOnStack.bridged)
   }
 }
 
@@ -243,7 +245,7 @@ extension Value {
 
     useToDefRange.insert(destBlock)
 
-    // The value needs to be destroyed at every exit of the liferange.
+    // The value needs to be destroyed at every exit of the liverange.
     for exitBlock in useToDefRange.exits {
       let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)
@@ -292,10 +294,111 @@ extension Instruction {
       if bi.id == .OnFastPath {
         return false
       }
+    case is UncheckedEnumDataInst:
+      // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
+      // for consuming an enum value.
+      return !parentFunction.hasOwnership
     default:
       break
     }
     return !mayReadOrWriteMemory && !hasUnspecifiedSideEffects
+  }
+
+  func isValidInStaticInitializerOfGlobal(_ context: some Context) -> Bool {
+    // Rule out SILUndef and SILArgument.
+    if operands.contains(where: { $0.value.definingInstruction == nil }) {
+      return false
+    }
+    switch self {
+    case let bi as BuiltinInst:
+      switch bi.id {
+      case .ZeroInitializer:
+        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType : bi.type
+        return type.isBuiltinInteger || type.isBuiltinFloat
+      case .PtrToInt:
+        return bi.operands[0].value is StringLiteralInst
+      case .IntToPtr:
+        return bi.operands[0].value is IntegerLiteralInst
+      case .StringObjectOr:
+        // The first operand can be a string literal (i.e. a pointer), but the
+        // second operand must be a constant. This enables creating a
+        // a pointer+offset relocation.
+        // Note that StringObjectOr requires the or'd bits in the first
+        // operand to be 0, so the operation is equivalent to an addition.
+        return bi.operands[1].value is IntegerLiteralInst
+      case .ZExtOrBitCast:
+        return true;
+      case .USubOver:
+        // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
+        // This pattern appears in UTF8 String literal construction.
+        if let tei = bi.uses.getSingleUser(ofType: TupleExtractInst.self),
+           tei.isResultOfOffsetSubtract {
+          return true
+        }
+        return false
+      case .OnFastPath:
+        return true
+      default:
+        return false
+      }
+    case let tei as TupleExtractInst:
+      // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
+      // This pattern appears in UTF8 String literal construction.
+      if tei.isResultOfOffsetSubtract,
+         let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
+         bi.id == .StringObjectOr {
+        return true
+      }
+      return false
+    case let sli as StringLiteralInst:
+      switch sli.encoding {
+      case .Bytes, .UTF8, .UTF8_OSLOG:
+        return true
+      case .ObjCSelector:
+        // Objective-C selector string literals cannot be used in static
+        // initializers.
+        return false
+      }
+    case let gvi as GlobalValueInst:
+      return context.canMakeStaticObjectReadOnly(objectType: gvi.type)
+    case is StructInst,
+         is TupleInst,
+         is EnumInst,
+         is IntegerLiteralInst,
+         is FloatLiteralInst,
+         is ObjectInst,
+         is VectorInst,
+         is AllocVectorInst,
+         is UncheckedRefCastInst,
+         is UpcastInst,
+         is ValueToBridgeObjectInst,
+         is ConvertFunctionInst,
+         is ThinToThickFunctionInst,
+         is AddressToPointerInst,
+         is GlobalAddrInst,
+         is FunctionRefInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+// Match the pattern:
+// tuple_extract(usub_with_overflow(x, integer_literal, integer_literal 0), 0)
+private extension TupleExtractInst {
+  var isResultOfOffsetSubtract: Bool {
+    if fieldIndex == 0,
+       let bi = tuple as? BuiltinInst,
+       bi.id == .USubOver,
+       bi.operands[1].value is IntegerLiteralInst,
+       let overflowLiteral = bi.operands[2].value as? IntegerLiteralInst,
+       let overflowValue = overflowLiteral.value,
+       overflowValue == 0
+    {
+      return true
+    }
+    return false
   }
 }
 
@@ -539,6 +642,10 @@ extension Function {
     }
     return nil
   }
+
+  var mayBindDynamicSelf: Bool {
+    self.bridged.mayBindDynamicSelf()
+  }
 }
 
 extension FullApplySite {
@@ -548,9 +655,8 @@ extension FullApplySite {
       return false
     }
     // Cannot inline a non-inlinable function it an inlinable function.
-    if parentFunction.isSerialized,
-       let calleeFunction = referencedFunction,
-       !calleeFunction.isSerialized {
+    if let calleeFunction = referencedFunction,
+       !calleeFunction.canBeInlinedIntoCaller(parentFunction.serializedKind) {
       return false
     }
 
@@ -625,7 +731,7 @@ extension InstructionRange {
         case let endBorrow as EndBorrowInst:
           self.insert(endBorrow)
         case let branch as BranchInst:
-          worklist.pushIfNotVisited(branch.getArgument(for: use))
+          worklist.pushIfNotVisited(branch.getArgument(for: use).lookThroughBorrowedFromUser)
         default:
           break
         }
@@ -647,7 +753,8 @@ extension InstructionRange {
 /// ```
 func getGlobalInitialization(
   of function: Function,
-  allowGlobalValue: Bool
+  forStaticInitializer: Bool,
+  _ context: some Context
 ) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
   guard let block = function.blocks.singleElement else {
     return nil
@@ -685,10 +792,10 @@ func getGlobalInitialization(
         return nil
       }
       store = si
-    case is GlobalValueInst where allowGlobalValue:
+    case is GlobalValueInst where !forStaticInitializer:
       break
     default:
-      if !inst.isValidInStaticInitializerOfGlobal {
+      if !inst.isValidInStaticInitializerOfGlobal(context) {
         return nil
       }
     }
@@ -697,4 +804,24 @@ func getGlobalInitialization(
     return (allocInst: allocInst!, storeToGlobal: store)
   }
   return nil
+}
+
+func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+  switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
+    case .willSucceed: return true
+    case .maySucceed:  return nil
+    case .willFail:    return false
+    default: fatalError("unknown result from classifyDynamicCastBridged")
+  }
+}
+
+extension CheckedCastAddrBranchInst {
+  var dynamicCastResult: Bool? {
+    switch classifyDynamicCastBridged(bridged) {
+      case .willSucceed: return true
+      case .maySucceed:  return nil
+      case .willFail:    return false
+      default: fatalError("unknown result from classifyDynamicCastBridged")
+    }
+  }
 }

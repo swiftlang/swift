@@ -30,7 +30,7 @@ static inline unsigned measureNewline(StringRef S) {
 }
 
 static inline bool startsWithNewline(StringRef S) {
-  return S.startswith("\n") || S.startswith("\r\n");
+  return S.starts_with("\n") || S.starts_with("\r\n");
 }
 
 /// Breaks a given string to lines and trims leading whitespace from them.

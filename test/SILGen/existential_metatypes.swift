@@ -24,7 +24,7 @@ struct S: P {
 func existentialMetatype(_ x: P) {
   // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick any P.Type, [[X]]
   let type1 = type(of: x)
-  // CHECK: [[INSTANCE1:%.*]] = alloc_stack [lexical] $any P
+  // CHECK: [[INSTANCE1:%.*]] = alloc_stack [lexical] [var_decl] $any P
   // CHECK: [[OPEN_TYPE1:%.*]] = open_existential_metatype [[TYPE1]]
   // CHECK: [[INIT:%.*]] = witness_method {{.*}} #P.init!allocator
   // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*any P
@@ -34,7 +34,7 @@ func existentialMetatype(_ x: P) {
   // CHECK: [[S:%.*]] = metatype $@thick S.Type
   // CHECK: [[TYPE2:%.*]] = init_existential_metatype [[S]] : $@thick S.Type, $@thick any P.Type
   let type2: P.Type = S.self
-  // CHECK: [[INSTANCE2:%.*]] = alloc_stack [lexical] $any P
+  // CHECK: [[INSTANCE2:%.*]] = alloc_stack [lexical] [var_decl] $any P
   // CHECK: [[OPEN_TYPE2:%.*]] = open_existential_metatype [[TYPE2]]
   // CHECK: [[STATIC_METHOD:%.*]] = witness_method {{.*}} #P.staticMethod
   // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*any P

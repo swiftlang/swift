@@ -129,6 +129,8 @@ public:
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
+        addDistributedWitnessMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
       }
     });
   }
@@ -146,11 +148,12 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (func->requiresNewWitnessTableEntry()) {
-      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
-      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
-      addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
-    }
+    if (!func->requiresNewWitnessTableEntry())
+      return;
+
+    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -160,7 +163,7 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // We already visited these in the first pass.
   }
-    
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {
     // We don't care about these by themselves for witnesses.
   }
@@ -200,11 +203,14 @@ private:
 
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
-    if (!AFD->isDistributed())
+    if (!AFD)
       return;
 
-    // Add another which will be witnessed by the 'distributed thunk'
-    SILDeclRef declRef(AFD, kind);
+    auto thunk = AFD->getDistributedThunk();
+    if (!thunk)
+      return;
+
+    SILDeclRef declRef(thunk, kind);
     asDerived().addMethod(declRef.asDistributed());
   }
 };

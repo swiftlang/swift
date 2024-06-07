@@ -12,17 +12,17 @@
 // RUN:   -module-name Client -I %t -swift-version 5 -enable-library-evolution \
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
-// RUN:   -enable-experimental-feature DynamicActorIsolation \
+// RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:   -disable-availability-checking \
 // RUN:   -verify
 
 // RUN: %FileCheck %s < %t/Client.swiftinterface
 
 // RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) -I %t %t/src/Client.swift -module-name Client \
-// RUN:   -disable-availability-checking -enable-experimental-feature DynamicActorIsolation -verify
+// RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -module-name Client \
-// RUN:   -disable-availability-checking -enable-experimental-feature DynamicActorIsolation -verify
+// RUN:   -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -verify
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -44,8 +44,8 @@ public protocol WithAssoc {
 //--- Client.swift
 import A
 
-// CHECK: #if {{.*}} $DynamicActorIsolation
-// CHECK-NEXT: @_Concurrency.MainActor public struct GlobalActorTest : @preconcurrency A.P
+// CHECK-NOT: #if {{.*}} $DynamicActorIsolation
+// CHECK: @_Concurrency.MainActor public struct GlobalActorTest : @preconcurrency A.P
 
 @MainActor
 public struct GlobalActorTest : @preconcurrency P {
@@ -56,14 +56,14 @@ public struct GlobalActorTest : @preconcurrency P {
 public class ExtTest {
 }
 
-// CHECK: #if {{.*}} $DynamicActorIsolation
-// CHECK-NEXT: extension Client.ExtTest : @preconcurrency A.P
+// CHECK-NOT: #if {{.*}} $DynamicActorIsolation
+// CHECK: extension Client.ExtTest : @preconcurrency A.P
 extension ExtTest : @preconcurrency P {
   public func test() -> Int { 1 }
 }
 
-// CHECK: #if {{.*}} && $DynamicActorIsolation
-// CHECK-NEXT: public actor ActorTest : @preconcurrency A.P
+// CHECK-NOT: #if {{.*}} && $DynamicActorIsolation
+// CHECK: public actor ActorTest : @preconcurrency A.P
 public actor ActorTest : @preconcurrency P {
   public func test() -> Int { 2 }
 }
@@ -71,22 +71,21 @@ public actor ActorTest : @preconcurrency P {
 public actor ActorExtTest {
 }
 
-// CHECK: #if {{.*}} $DynamicActorIsolation
-// CHECK-NEXT: extension Client.ActorExtTest : @preconcurrency A.Q
+// CHECK-NOT: #if {{.*}} $DynamicActorIsolation
+// CHECK: extension Client.ActorExtTest : @preconcurrency A.Q
 extension ActorExtTest : @preconcurrency Q {
   public var x: Int { 42 }
 }
 
 public struct TestConditional<T> {}
 
-// CHECK: #if {{.*}} $DynamicActorIsolation
-// CHECK-NEXT: extension Client.TestConditional : @preconcurrency A.WithAssoc where T == Swift.Int {
+// CHECK-NOT: #if {{.*}} $DynamicActorIsolation
+// CHECK: extension Client.TestConditional : @preconcurrency A.WithAssoc where T == Swift.Int {
 // CHECK-NEXT:  @_Concurrency.MainActor public func test() -> T
 // CHECK-NEXT: }
 extension TestConditional : @preconcurrency WithAssoc where T == Int {
   @MainActor public func test() -> T { 42 } // Ok
 }
 
-// CHECK: #if {{.*}} $DynamicActorIsolation
-// CHECK-NEXT: extension Client.GlobalActorTest : Swift.Sendable {}
-// CHECK-NEXT: #endif
+// CHECK-NOT: #if {{.*}} $DynamicActorIsolation
+// CHECK: extension Client.GlobalActorTest : Swift.Sendable {}

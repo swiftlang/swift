@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 struct Foo<A, B> {}
 
 protocol P1 {
@@ -29,5 +27,5 @@ struct MergeTest<G : P1 & P2> {
 // CHECK-LABEL: Property map: {
 // CHECK:  [P1:X] => { concrete_type: [concrete: Foo<[P1:Y1], [P1:Z1]>] }
 // CHECK:  [P2:X] => { concrete_type: [concrete: Foo<[P2:Y2], [P2:Z2]>] }
-// CHECK:  τ_0_0 => { conforms_to: [P1 P2] }
+// CHECK:  τ_0_0 => { conforms_to: [P1 P2 Copyable Escapable] }
 // CHECK: }

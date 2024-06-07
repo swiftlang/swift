@@ -15,6 +15,7 @@
 
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
@@ -24,6 +25,7 @@
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -115,7 +117,7 @@ getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
     llvm::sys::path::append(pathWithSDKVer, vs);
     if (llvm::sys::fs::exists(pathWithSDKVer)) {
       return pathWithSDKVer.str().str();
-    } else if (vs.endswith(".0")) {
+    } else if (vs.ends_with(".0")) {
       vs = vs.substr(0, vs.size() - 2);
     } else {
       return defaultPrebuiltPath.str();
@@ -186,8 +188,9 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
-                                      LangOptions &LangOpts) {
-  llvm::Triple &Triple = LangOpts.Target;
+                                      const FrontendOptions &FrontendOpts,
+                                      const LangOptions &LangOpts) {
+  const llvm::Triple &Triple = LangOpts.Target;
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   StringRef LibSubDir = getPlatformNameForTriple(Triple);
@@ -220,15 +223,18 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   }
 
   if (!SearchPathOpts.getSDKPath().empty()) {
+    const char *swiftDir = FrontendOpts.UseSharedResourceFolder
+      ? "swift" : "swift_static";
+
     if (tripleIsMacCatalystEnvironment(Triple)) {
       LibPath = SearchPathOpts.getSDKPath();
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
-      llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+      llvm::sys::path::append(LibPath, "usr", "lib", swiftDir);
       RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
     }
 
     LibPath = SearchPathOpts.getSDKPath();
-    llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+    llvm::sys::path::append(LibPath, "usr", "lib", swiftDir);
     if (!Triple.isOSDarwin()) {
       // Use the non-architecture suffixed form with directory-layout
       // swiftmodules.
@@ -298,7 +304,11 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path.str();
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+}
+
+void CompilerInvocation::setPlatformAvailabilityInheritanceMapPath(StringRef Path) {
+  SearchPathOpts.PlatformAvailabilityInheritanceMapPath = Path.str();
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
@@ -307,17 +317,24 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
   SearchPathOpts.setSDKPath(Path);
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
 }
 
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
                                            DiagnosticEngine &diags) {
   return ModuleAliasesConverter::computeModuleAliases(args, FrontendOpts, diags);
+}
+
+static void ParseAssertionArgs(ArgList &args) {
+  using namespace options;
+  if (args.hasArg(OPT_compiler_assertions)) {
+    CONDITIONAL_ASSERT_Global_enable_flag = 1;
+  }
 }
 
 static bool ParseFrontendArgs(
@@ -369,7 +386,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
     llvm::sys::fs::make_absolute(TempPath);
     llvm::sys::path::native(TempPath);
 
-    if (StringRef(ArgPath).startswith(TempPath)) {
+    if (StringRef(ArgPath).starts_with(TempPath)) {
       // Don't write temporary file names in the debug info. This would prevent
       // incremental llvm compilation because we would generate different IR on
       // every compiler invocation.
@@ -462,13 +479,6 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     interleave(RenderedArgs,
                [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
                [&] { OS << " "; });
-
-    // Backward-compatibility hack: disable availability checking in the
-    // _Concurrency module, so that older (Swift 5.5) compilers that did not
-    // support back deployment of concurrency do not complain about 'async'
-    // with older availability.
-    if (FOpts.ModuleName == "_Concurrency")
-      OS << " -disable-availability-checking";
   }
   {
     llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
@@ -505,6 +515,9 @@ validateCxxInteropCompatibilityMode(StringRef mode) {
   // Swift 5 is the default language version.
   if (mode == "swift-5.9")
     return {CxxCompatMode::enabled, version::Version({5})};
+  // Note: If this is updated, corresponding code in
+  // InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl needs
+  // to be updated also.
   return {CxxCompatMode::invalid, {}};
 }
 
@@ -519,6 +532,40 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
                     llvm::StringRef("swift-6"), llvm::StringRef("swift-5.9")};
   auto versStr = "'" + llvm::join(validVers, "', '") + "'";
   diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
+}
+
+void LangOptions::setCxxInteropFromArgs(ArgList &Args,
+                                        swift::DiagnosticEngine &Diags) {
+  if (Arg *A = Args.getLastArg(options::OPT_cxx_interoperability_mode)) {
+    if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+      Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
+    }
+
+    auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
+    EnableCXXInterop |=
+        (interopCompatMode.first == CxxCompatMode::enabled);
+    if (EnableCXXInterop) {
+      cxxInteropCompatVersion = interopCompatMode.second;
+      // The default is tied to the current language version.
+      if (cxxInteropCompatVersion.empty())
+        cxxInteropCompatVersion =
+            EffectiveLanguageVersion.asMajorVersion();
+    }
+
+    if (interopCompatMode.first == CxxCompatMode::invalid)
+      diagnoseCxxInteropCompatMode(A, Args, Diags);
+  }
+
+  if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+    Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
+    Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
+    EnableCXXInterop |= true;
+    // Using the deprecated option only forces the 'swift-5.9' compat
+    // mode.
+    if (cxxInteropCompatVersion.empty())
+      cxxInteropCompatVersion =
+          validateCxxInteropCompatibilityMode("swift-5.9").second;
+  }
 }
 
 static std::optional<swift::StrictConcurrency>
@@ -563,13 +610,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
-      Opts.ClangIncludeTrees.empty() &&
-      FrontendOptions::supportCompilationCaching(
-          FrontendOpts.RequestedAction)) {
-    Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-    return true;
-  }
+  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty())
+    Opts.HasImmutableFileSystem = true;
 
   return false;
 }
@@ -578,6 +620,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
+  bool buildingFromInterface =
+      FrontendOptions::doesActionBuildModuleFromInterface(
+          FrontendOpts.RequestedAction);
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
@@ -626,11 +671,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       !Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics) &&
       Args.hasArg(OPT_enable_experimental_eager_clang_module_diagnostics);
 
+  Opts.DisableNamedLazyImportAsMemberLoading |=
+      Args.hasArg(OPT_disable_named_lazy_import_as_member_loading);
+
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
   Opts.DisableImplicitStringProcessingModuleImport |=
     Args.hasArg(OPT_disable_implicit_string_processing_module_import);
+
+  Opts.DisableImplicitCxxModuleImport |=
+    Args.hasArg(OPT_disable_implicit_cxx_module_import);
 
   Opts.DisableImplicitBacktracingModuleImport =
     Args.hasFlag(OPT_disable_implicit_backtracing_module_import,
@@ -674,7 +725,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
-  Opts.EnableBypassResilienceInPackage = Args.hasArg(OPT_experimental_package_bypass_resilience);
+  Opts.EnableBypassResilienceInPackage =
+      Args.hasArg(OPT_experimental_package_bypass_resilience) ||
+      Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -782,10 +835,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                OPT_disable_testable_attr_requires_testable_module)) {
     Opts.EnableTestableAttrRequiresTestableModule
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
-  } else if (FrontendOpts.RequestedAction ==
-             FrontendOptions::ActionType::TypecheckModuleFromInterface ||
-	     FrontendOpts.RequestedAction ==
-             FrontendOptions::ActionType::CompileModuleFromInterface) {
+  } else if (buildingFromInterface) {
     Opts.EnableObjCAttrRequiresFoundation = false;
   }
 
@@ -849,7 +899,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // Allow StrictConcurrency to have a value that corresponds to the
     // -strict-concurrency=<blah> settings.
     StringRef value = A->getValue();
-    if (value.startswith("StrictConcurrency")) {
+    if (value.starts_with("StrictConcurrency")) {
       auto decomposed = value.split("=");
       if (decomposed.first == "StrictConcurrency") {
         if (decomposed.second == "") {
@@ -863,17 +913,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
     if (auto feature = getExperimentalFeature(value)) {
-#ifdef NDEBUG
-      if (!isFeatureAvailableInProduction(*feature)) {
+      if (Opts.RestrictNonProductionExperimentalFeatures &&
+          !isFeatureAvailableInProduction(*feature)) {
         Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
                        A->getValue());
         HadError = true;
       } else {
         Opts.enableFeature(*feature);
       }
-#else
-      Opts.enableFeature(*feature);
-#endif
+
+      if (*feature == Feature::NoncopyableGenerics2)
+        Opts.enableFeature(Feature::NoncopyableGenerics);
+
+      if (*feature == Feature::IsolatedAny2)
+        Opts.enableFeature(Feature::IsolatedAny);
     }
 
     // Hack: In order to support using availability macros in SPM packages, we
@@ -883,7 +936,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // this form of feature, so specially handle it here until features can
     // maybe have extra arguments in the future.
     auto strRef = StringRef(A->getValue());
-    if (strRef.startswith("AvailabilityMacro=")) {
+    if (strRef.starts_with("AvailabilityMacro=")) {
       auto availability = strRef.split("=").second;
 
       Opts.AvailabilityMacros.push_back(availability.str());
@@ -974,8 +1027,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto pkgName = A->getValue();
     if (StringRef(pkgName).empty())
       Diags.diagnose(SourceLoc(), diag::error_empty_package_name);
-    else
+    else {
       Opts.PackageName = pkgName;
+      // Unless the input type is public or private swift interface, do not
+      // allow non package interface imports for dependencies in the same
+      // package.
+      Opts.AllowNonPackageInterfaceImportFromSamePackage =
+          FrontendOpts.InputsAndOutputs
+              .shouldTreatAsNonPackageModuleInterface();
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
@@ -1041,6 +1101,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
     Opts.enableFeature(Feature::IsolatedDefaultValues);
     Opts.enableFeature(Feature::GlobalConcurrency);
+
+    // If asserts are enabled, allow for region based isolation to be disabled
+    // with a flag. This is intended only to be used with tests.
+    bool enableRegionIsolation = true;
+#ifndef NDEBUG
+    enableRegionIsolation =
+        !Args.hasArg(OPT_disable_strict_concurrency_region_based_isolation);
+#endif
+    if (enableRegionIsolation)
+      Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
   Opts.WarnImplicitOverrides =
@@ -1051,10 +1121,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_nskeyedarchiver_diagnostics,
                    Opts.EnableNSKeyedArchiverDiagnostics);
 
-  Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
-    Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
-                 OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                 Opts.isSwiftVersionAtLeast(5));
+  if (Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
+                   OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
+                   Opts.isSwiftVersionAtLeast(5))) {
+    Opts.enableFeature(Feature::NonfrozenEnumExhaustivity);
+  }
 
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =
@@ -1097,7 +1168,53 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
-  
+
+  if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
+    // Only allow -experimental-skip-non-exportable-decls if either library
+    // evolution is enabled (in which case the module's ABI is independent of
+    // internal declarations) or when -experimental-skip-all-function-bodies is
+    // present. The latter implies the module will not be used for code
+    // generation, so omitting details needed for ABI should be safe.
+    if (Args.hasArg(OPT_enable_library_evolution) ||
+        Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
+      Opts.SkipNonExportableDecls |= true;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-skip-non-exportable-decls",
+                     "-enable-library-evolution");
+    }
+  }
+
+  Opts.AllowNonResilientAccess =
+      Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
+      Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
+  if (Opts.AllowNonResilientAccess) {
+    // Override the option to skip non-exportable decls.
+    if (Opts.SkipNonExportableDecls) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-exportable-decls",
+                     "-experimental-allow-non-resilient-access");
+      Opts.SkipNonExportableDecls = false;
+    }
+    // If built from interface, non-resilient access should not be allowed.
+    if (Opts.AllowNonResilientAccess &&
+        FrontendOptions::doesActionBuildModuleFromInterface(
+            FrontendOpts.RequestedAction)) {
+      Diags.diagnose(
+          SourceLoc(), diag::warn_ignore_option_overriden_by,
+          "-experimental-allow-non-resilient-access",
+          "-compile-module-from-interface or -typecheck-module-from-interface");
+      Opts.AllowNonResilientAccess = false;
+    }
+  }
+
+  // HACK: The driver currently erroneously passes all flags to module interface
+  // verification jobs. -experimental-skip-non-exportable-decls is not
+  // appropriate for verification tasks and should be ignored, though.
+  if (FrontendOpts.RequestedAction ==
+      FrontendOptions::ActionType::TypecheckModuleFromInterface)
+    Opts.SkipNonExportableDecls = false;
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   std::string TargetArgScratch;
@@ -1105,6 +1222,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
+
+    const bool targetNeedsRemapping = Target.isXROS();
+    if (targetNeedsRemapping && Target.getOSMajorVersion() == 0) {
+      // FIXME(xrOS): Work around an LLVM-ism until we have something
+      // akin to Target::get*Version for this platform. The Clang driver
+      // also has to pull version numbers up to 1.0.0 when a triple for an
+      // unknown platform with no explicit version number is passed.
+      if (Target.getEnvironmentName().empty()) {
+        Target = llvm::Triple(Target.getArchName(),
+                              Target.getVendorName(),
+                              Target.getOSName() + "1.0");
+      } else {
+        Target = llvm::Triple(Target.getArchName(),
+                              Target.getVendorName(),
+                              Target.getOSName() + "1.0",
+                              Target.getEnvironmentName());
+      }
+    }
 
     // Backward compatibility hack: infer "simulator" environment for x86
     // iOS/tvOS/watchOS. The driver takes care of this for the frontend
@@ -1135,37 +1270,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
-
-  if (Arg *A = Args.getLastArg(OPT_cxx_interoperability_mode)) {
-    if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
-      Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
-    }
-    
-    auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
-    Opts.EnableCXXInterop |=
-        (interopCompatMode.first == CxxCompatMode::enabled);
-    if (Opts.EnableCXXInterop) {
-      Opts.cxxInteropCompatVersion = interopCompatMode.second;
-      // The default is tied to the current language version.
-      if (Opts.cxxInteropCompatVersion.empty())
-        Opts.cxxInteropCompatVersion =
-            Opts.EffectiveLanguageVersion.asMajorVersion();
-    }
-
-    if (interopCompatMode.first == CxxCompatMode::invalid)
-      diagnoseCxxInteropCompatMode(A, Args, Diags);
-  }
-
-  if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
-    Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
-    Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
-    Opts.EnableCXXInterop |= true;
-    // Using the deprecated option only forces the 'swift-5.9' compat
-    // mode.
-    if (Opts.cxxInteropCompatVersion.empty())
-      Opts.cxxInteropCompatVersion =
-          validateCxxInteropCompatibilityMode("swift-5.9").second;
-  }
+  
+  Opts.setCxxInteropFromArgs(Args, Diags);
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -1177,6 +1283,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
   Opts.RequireCxxInteropToImportCxxInteropModule =
       !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
+  Opts.CxxInteropUseOpaquePointerForMoveOnly =
+      Args.hasArg(OPT_cxx_interop_use_opaque_pointer_for_moveonly);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
@@ -1380,13 +1488,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
 
-  Opts.EnableExperimentalAssociatedTypeInference = true;
-
-  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
-    Opts.EnableExperimentalAssociatedTypeInference = true;
-  if (Args.hasArg(OPT_disable_experimental_associated_type_inference))
-    Opts.EnableExperimentalAssociatedTypeInference = false;
-
   if (Args.hasArg(OPT_enable_experimental_lifetime_dependence_inference))
     Opts.EnableExperimentalLifetimeDependenceInference = true;
   if (Args.hasArg(OPT_disable_experimental_lifetime_dependence_inference))
@@ -1444,9 +1545,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
+  } else if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.UseCheckedAsyncObjCBridging = true;
   }
 
-#ifndef NDEBUG
+  Opts.DisableDynamicActorIsolation |=
+      Args.hasArg(OPT_disable_dynamic_actor_isolation);
+
+  // @DebugDescription uses @_section and @_used attributes.
+  if (Opts.hasFeature(Feature::DebugDescriptionMacro))
+    Opts.enableFeature(Feature::SymbolLinkageMarkers);
+
+#if SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
   /// explicitly. The new Swift parser can have mismatches with C++ parser -
   /// rdar://118013482 Use this flag to disable round trip through the new
@@ -1461,6 +1571,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
 static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                                  DiagnosticEngine &Diags,
+                                 const LangOptions &LangOpts,
                                  const FrontendOptions &FrontendOpts) {
   using namespace options;
 
@@ -1501,17 +1612,43 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // Check for SkipFunctionBodies arguments in order from skipping less to
   // skipping more.
   if (Args.hasArg(
-        OPT_experimental_skip_non_inlinable_function_bodies_without_types))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+        OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-inlinable-function-bodies-without-types",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
+  }
 
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
-  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
-      Args.hasArg(OPT_tbd_is_installapi))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-inlinable-function-bodies",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+  }
 
-  if (Args.hasArg(OPT_experimental_skip_all_function_bodies))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::All;
+  if (Args.hasArg(OPT_tbd_is_installapi)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-tbd-is-installapi",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+  }
+
+  if (Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
+    if (LangOpts.AllowNonResilientAccess)
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-all-function-bodies",
+                     "-experimental-allow-non-resilient-access");
+    else
+      Opts.SkipFunctionBodies = FunctionBodySkipping::All;
+  }
 
   if (Opts.SkipFunctionBodies != FunctionBodySkipping::None &&
       FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
@@ -1564,23 +1701,26 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
   Opts.DebugInverseRequirements |= Args.hasArg(OPT_debug_inverse_requirements);
 
-  if (Args.hasArg(OPT_enable_library_evolution)) {
-    Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
-    Opts.EnableLazyTypecheck |=
-        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-        Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
-  } else {
-    if (Args.hasArg(OPT_experimental_lazy_typecheck))
+  if (Args.hasArg(OPT_experimental_lazy_typecheck)) {
+    // Same restrictions as -experimental-skip-non-exportable-decls. These
+    // could be relaxed in the future, since lazy typechecking is probably not
+    // inherently unsafe without these options.
+    if (Args.hasArg(OPT_enable_library_evolution) ||
+        Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
+      Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
+    } else {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-lazy-typecheck",
                      "-enable-library-evolution");
+    }
+  }
 
-    if (Args.hasArg(
-            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy))
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-skip-non-inlinable-function-bodies-is-lazy",
-                     "-enable-library-evolution");
+  if (LangOpts.AllowNonResilientAccess &&
+      Opts.EnableLazyTypecheck) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                   "-experimental-lazy-typecheck",
+                   "-experimental-allow-non-resilient-access");
+    Opts.EnableLazyTypecheck = false;
   }
 
   // HACK: The driver currently erroneously passes all flags to module interface
@@ -1649,43 +1789,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
-  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
-                                    OPT_debug_prefix_map)) {
-    std::string Val(A->getValue());
-    // Forward -debug-prefix-map arguments from Swift to Clang as
-    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
-    //
-    // This is required to ensure DIFiles created there, like
-    /// "<swift-imported-modules>", as well as index data, have their paths
-    // remapped properly.
-    //
-    // (Note, however, that Clang's usage of std::map means that the remapping
-    // may not be applied in the same order, which can matter if one mapping is
-    // a prefix of another.)
-    if (A->getOption().matches(OPT_file_prefix_map))
-      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
-    else
-      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
-  }
-
-  if (auto *A = Args.getLastArg(OPT_file_compilation_dir)) {
-    // Forward the -file-compilation-dir flag to correctly set the
-    // debug compilation directory.
-    std::string Val(A->getValue());
-    Opts.ExtraArgs.push_back("-ffile-compilation-dir=" + Val);
-  }
-
-  if (CASOpts.CASFSRootIDs.empty() &&
-      CASOpts.ClangIncludeTrees.empty()) {
-    if (!workingDirectory.empty()) {
-      // Provide a working directory to Clang as well if there are any -Xcc
-      // options, in case some of them are search-related. But do it at the
-      // beginning, so that an explicit -Xcc -working-directory will win.
-      Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
-                            {"-working-directory", workingDirectory.str()});
-    }
-  }
-
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   // When the repl is invoked directly (ie. `lldb --repl="..."`) the action
@@ -1736,6 +1839,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
+  Opts.ClangImporterDirectCC1Scan |=
+      Args.hasArg(OPT_experimental_clang_importer_direct_cc1_scan);
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
   if (CASOpts.EnableCaching) {
@@ -1743,6 +1848,47 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     // useful in non-caching context.
     Opts.UseClangIncludeTree |= !Args.hasArg(OPT_no_clang_include_tree);
     Opts.HasClangIncludeTreeRoot |= Args.hasArg(OPT_clang_include_tree_root);
+    // Caching requires direct clang import cc1 scanning.
+    Opts.ClangImporterDirectCC1Scan = true;
+  }
+
+  // If in direct clang cc1 module build mode, return early.
+  if (Opts.DirectClangCC1ModuleBuild)
+    return false;
+
+  // Only amend the following path option when not in direct cc1 mode.
+  for (const Arg *A : Args.filtered(OPT_file_prefix_map,
+                                    OPT_debug_prefix_map)) {
+    std::string Val(A->getValue());
+    // Forward -debug-prefix-map arguments from Swift to Clang as
+    // -fdebug-prefix-map= and -file-prefix-map as -ffile-prefix-map=.
+    //
+    // This is required to ensure DIFiles created there, like
+    /// "<swift-imported-modules>", as well as index data, have their paths
+    // remapped properly.
+    //
+    // (Note, however, that Clang's usage of std::map means that the remapping
+    // may not be applied in the same order, which can matter if one mapping is
+    // a prefix of another.)
+    if (A->getOption().matches(OPT_file_prefix_map))
+      Opts.ExtraArgs.push_back("-ffile-prefix-map=" + Val);
+    else
+      Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
+  }
+
+  if (auto *A = Args.getLastArg(OPT_file_compilation_dir)) {
+    // Forward the -file-compilation-dir flag to correctly set the
+    // debug compilation directory.
+    std::string Val(A->getValue());
+    Opts.ExtraArgs.push_back("-ffile-compilation-dir=" + Val);
+  }
+
+  if (!workingDirectory.empty()) {
+    // Provide a working directory to Clang as well if there are any -Xcc
+    // options, in case some of them are search-related. But do it at the
+    // beginning, so that an explicit -Xcc -working-directory will win.
+    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                          {"-working-directory", workingDirectory.str()});
   }
 
   return false;
@@ -1807,8 +1953,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
   return false;
 }
 
-static bool ParseSearchPathArgs(SearchPathOptions &Opts,
-                                ArgList &Args,
+static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
                                 StringRef workingDirectory) {
   using namespace options;
@@ -1919,7 +2064,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
       Args.hasArg(OPT_disable_modules_validate_system_headers);
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
-    Opts.ExplicitSwiftModuleMap = A->getValue();
+    Opts.ExplicitSwiftModuleMapPath = A->getValue();
   for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
     if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
                                               Opts.ExplicitSwiftModuleInputs))
@@ -1936,6 +2081,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
 
+  if (const Arg *A = Args.getLastArg(OPT_platform_availability_inheritance_map_path))
+    Opts.PlatformAvailabilityInheritanceMapPath = A->getValue();
+
   for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
@@ -1943,6 +2091,52 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
+
+  Opts.NoScannerModuleValidation |=
+      Args.hasArg(OPT_no_scanner_module_validation);
+
+  std::optional<std::string> forceModuleLoadingMode;
+  if (auto *A = Args.getLastArg(OPT_module_load_mode))
+    forceModuleLoadingMode = A->getValue();
+  else if (auto Env = llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING"))
+    forceModuleLoadingMode = Env;
+  if (forceModuleLoadingMode) {
+    if (*forceModuleLoadingMode == "prefer-interface" ||
+        *forceModuleLoadingMode == "prefer-parseable")
+      Opts.ModuleLoadMode = ModuleLoadingMode::PreferInterface;
+    else if (*forceModuleLoadingMode == "prefer-serialized")
+      Opts.ModuleLoadMode = ModuleLoadingMode::PreferSerialized;
+    else if (*forceModuleLoadingMode == "only-interface" ||
+             *forceModuleLoadingMode == "only-parseable")
+      Opts.ModuleLoadMode = ModuleLoadingMode::OnlyInterface;
+    else if (*forceModuleLoadingMode == "only-serialized")
+      Opts.ModuleLoadMode = ModuleLoadingMode::OnlySerialized;
+    else
+      Diags.diagnose(SourceLoc(), diag::unknown_forced_module_loading_mode,
+                     *forceModuleLoadingMode);
+  }
+
+  for (auto *A : Args.filtered(OPT_swift_module_cross_import))
+    Opts.CrossImportInfo[A->getValue(0)].push_back(A->getValue(1));
+
+  for (auto &Name : Args.getAllArgValues(OPT_module_can_import))
+    Opts.CanImportModuleInfo.push_back({Name, {}, {}});
+
+  for (auto *A: Args.filtered(OPT_module_can_import_version)) {
+    llvm::VersionTuple Version, UnderlyingVersion;
+    if (Version.tryParse(A->getValue(1)))
+      Diags.diagnose(SourceLoc(), diag::invalid_can_import_module_version,
+                     A->getValue(1));
+    if (UnderlyingVersion.tryParse(A->getValue(2)))
+      Diags.diagnose(SourceLoc(), diag::invalid_can_import_module_version,
+                     A->getValue(2));
+    Opts.CanImportModuleInfo.push_back(
+        {A->getValue(0), Version, UnderlyingVersion});
+  }
+
+  Opts.DisableCrossImportOverlaySearch |=
+      Args.hasArg(OPT_disable_cross_import_overlay_search);
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -1977,7 +2171,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
-  // If no style options are specified, default to LLVM style.
+  // If no style options are specified, default to Swift style.
   Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
@@ -1991,10 +2185,13 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       return true;
     }
   }
+  // Swift style is not fully supported in cached mode yet.
+  if (Args.hasArg(OPT_cache_compile_job))
+    Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
-    bool negated = contents.startswith("no-");
+    bool negated = contents.starts_with("no-");
     if (negated)
       contents = contents.drop_front(3);
     if (contents == "diagnostics")
@@ -2083,12 +2280,26 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
   }
 }
 
+static std::optional<IRGenLLVMLTOKind>
+ParseLLVMLTOKind(const ArgList &Args, DiagnosticEngine &Diags) {
+  std::optional<IRGenLLVMLTOKind> LLVMLTOKind;
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    LLVMLTOKind =
+        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
+            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
+            .Case("llvm-full", IRGenLLVMLTOKind::Full)
+            .Default(std::nullopt);
+    if (!LLVMLTOKind)
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+  return LLVMLTOKind;
+}
+
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
-                         IRGenOptions &IRGenOpts,
-                         const FrontendOptions &FEOpts,
+                         IRGenOptions &IRGenOpts, const FrontendOptions &FEOpts,
                          const TypeCheckerOptions &TCOpts,
-                         DiagnosticEngine &Diags,
-                         const llvm::Triple &Triple,
+                         DiagnosticEngine &Diags, LangOptions &LangOpts,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
@@ -2121,12 +2332,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       FEOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface)
     Opts.StopOptimizationAfterSerialization = true;
 
+  if (Args.getLastArg(OPT_emit_empty_object_file)) {
+    Opts.StopOptimizationAfterSerialization = true;
+  }
+
   // Propagate the typechecker's understanding of
   // -experimental-skip-*-function-bodies to SIL.
   Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
 
   // Propagate -experimental-skip-non-exportable-decls to SIL.
-  Opts.SkipNonExportableDecls = FEOpts.SkipNonExportableDecls;
+  Opts.SkipNonExportableDecls = LangOpts.SkipNonExportableDecls;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -2332,6 +2547,19 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   } else if (Args.hasArg(OPT_EnbaleCMOEverything)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
+
+  if (Args.hasArg(OPT_ExperimentalPackageCMO) ||
+      LangOpts.hasFeature(Feature::PackageCMO)) {
+    if (!LangOpts.AllowNonResilientAccess) {
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-package-cmo",
+                     "-experimental-allow-non-resilient-access");
+    } else {
+      Opts.EnableSerializePackage = true;
+      Opts.CMOMode = CrossModuleOptimizationMode::Default;
+    }
+  }
+
   Opts.EnableStackProtection =
       Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
                    Opts.EnableStackProtection);
@@ -2339,9 +2567,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_enable_move_inout_stack_protector, OPT_disable_stack_protector,
       Opts.EnableMoveInoutStackProtection);
   Opts.EnableImportPtrauthFieldFunctionPointers =
-      Args.hasArg(OPT_enable_import_ptrauth_field_function_pointers,
-                  OPT_disable_import_ptrauth_field_function_pointers,
-                  Opts.EnableImportPtrauthFieldFunctionPointers);
+      !Args.hasArg(OPT_disable_import_ptrauth_field_function_pointers);
+  Opts.EnableLifetimeDependenceDiagnostics =
+      Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
+                   OPT_disable_lifetime_dependence_diagnostics,
+                   Opts.EnableLifetimeDependenceDiagnostics);
+
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -2409,8 +2640,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
     Opts.Sanitizers = parseSanitizerArgValues(
-        Args, A, Triple, Diags,
-        /* sanitizerRuntimeLibExists= */[](StringRef libName, bool shared) {
+        Args, A, LangOpts.Target, Diags,
+        /* sanitizerRuntimeLibExists= */ [](StringRef libName, bool shared) {
 
           // The driver has checked the existence of the library
           // already.
@@ -2450,31 +2681,72 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
 
-  Opts.OSSACompleteLifetimes |= Args.hasArg(OPT_enable_ossa_complete_lifetimes);
+  Opts.OSSACompleteLifetimes =
+      Args.hasFlag(OPT_enable_ossa_complete_lifetimes,
+                   OPT_disable_ossa_complete_lifetimes,
+                   Opts.OSSACompleteLifetimes);
+
+  Opts.OSSAVerifyComplete =
+      Args.hasFlag(OPT_enable_ossa_verify_complete,
+                   OPT_disable_ossa_verify_complete,
+                   Opts.OSSAVerifyComplete);
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
+
+  Opts.EnableExperimentalSwiftBasedClosureSpecialization = 
+      Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
+
+  // If these optimizations are enabled never preserve functions for the
+  // debugger.
+  Opts.ShouldFunctionsBePreservedToDebugger =
+      !Args.hasArg(OPT_enable_llvm_wme);
+  Opts.ShouldFunctionsBePreservedToDebugger &=
+      !Args.hasArg(OPT_enable_llvm_vfe);
+  if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
+    Opts.ShouldFunctionsBePreservedToDebugger &=
+        LTOKind.value() == IRGenLLVMLTOKind::None;
 
   return false;
 }
 
 void CompilerInvocation::buildDebugFlags(std::string &Output,
-                                         const ArrayRef<const char*> &Args,
+                                         const ArgList &Args,
                                          StringRef SDKPath,
                                          StringRef ResourceDir) {
+  ArgStringList ReducedArgs;
+  for (auto *A : Args) {
+    // Do not encode cache invariant options, even for non-caching build.
+    // Those options do not affect compilation task thus do not need to be
+    // tracked.
+    if (A->getOption().hasFlag(options::CacheInvariant))
+      continue;
+
+    A->render(Args, ReducedArgs);
+
+    // If the argument is file list, the path itself is irrelevant.
+    if (A->getOption().hasFlag(options::ArgumentIsFileList)) {
+      assert(A->getValues().size() == 1 &&
+             A->getOption().getRenderStyle() == Option::RenderSeparateStyle &&
+             "filelist options all have one argument and are all Separate<>");
+      ReducedArgs.pop_back();
+      ReducedArgs.push_back("<filelist>");
+    }
+  }
+
   // This isn't guaranteed to be the same temp directory as what the driver
   // uses, but it's highly likely.
   llvm::SmallString<128> TDir;
   llvm::sys::path::system_temp_directory(true, TDir);
 
   llvm::raw_string_ostream OS(Output);
-  interleave(Args,
+  interleave(ReducedArgs,
              [&](const char *Argument) { PrintArg(OS, Argument, TDir.str()); },
              [&] { OS << " "; });
 
   // Inject the SDK path and resource dir if they are nonempty and missing.
   bool haveSDKPath = SDKPath.empty();
   bool haveResourceDir = ResourceDir.empty();
-  for (auto A : Args) {
+  for (auto A : ReducedArgs) {
     StringRef Arg(A);
     // FIXME: this should distinguish between key and value.
     if (!haveSDKPath && Arg.equals("-sdk"))
@@ -2511,6 +2783,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
   Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
+  Opts.FragileResilientProtocols =
+    Args.hasArg(OPT_enable_fragile_resilient_protocol_witnesses);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
@@ -2551,14 +2825,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
              "unknown -g<kind> option");
   }
   if (Opts.DebugInfoLevel >= IRGenDebugInfoLevel::LineTables) {
-    if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
-      ArgStringList RenderedArgs;
-      for (auto A : Args)
-        A->render(Args, RenderedArgs);
+    if (Args.hasArg(options::OPT_debug_info_store_invocation))
       CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
-                                          RenderedArgs, SDKPath,
+                                          Args, SDKPath,
                                           ResourceDir);
-    }
 
     if (const Arg *A = Args.getLastArg(OPT_file_compilation_dir))
       Opts.DebugCompilationDir = A->getValue();
@@ -2626,7 +2896,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
-    if (Opt.startswith("-D") || Opt.startswith("-U"))
+    if (Opt.starts_with("-D") || Opt.starts_with("-U"))
       Opts.ClangDefines.push_back(Opt.str());
   }
 
@@ -2725,6 +2995,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
   Opts.DisableFrameworkAutolinking = Args.hasArg(OPT_disable_autolink_frameworks);
   Opts.DisableAllAutolinking = Args.hasArg(OPT_disable_all_autolinking);
+  Opts.DisableForceLoadSymbols = Args.hasArg(OPT_disable_force_load_symbols);
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
@@ -2782,18 +3053,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
-    auto LLVMLTOKind =
-        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
-            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
-            .Case("llvm-full", IRGenLLVMLTOKind::Full)
-            .Default(std::nullopt);
-    if (LLVMLTOKind)
-      Opts.LLVMLTOKind = LLVMLTOKind.value();
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
+  if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
+     Opts.LLVMLTOKind = LTOKind.value();
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
@@ -3032,6 +3293,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
                  OPT_disable_relative_protocol_witness_tables,
                  Opts.UseRelativeProtocolWitnessTables);
+  Opts.UseFragileResilientProtocolWitnesses =
+    Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
+                 OPT_disable_fragile_resilient_protocol_witnesses,
+                 Opts.UseFragileResilientProtocolWitnesses);
   Opts.EnableLargeLoadableTypesReg2Mem =
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
@@ -3214,11 +3479,13 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  ParseAssertionArgs(ParsedArgs);
+
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
 
-  if (ParseTypeCheckerArgs(TypeCheckerOpts, ParsedArgs, Diags, FrontendOpts)) {
+  if (ParseTypeCheckerArgs(TypeCheckerOpts, ParsedArgs, Diags, LangOpts, FrontendOpts)) {
     return true;
   }
 
@@ -3236,8 +3503,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
-                   TypeCheckerOpts, Diags,
-                   LangOpts.Target, ClangImporterOpts)) {
+                   TypeCheckerOpts, Diags, LangOpts, ClangImporterOpts)) {
     return true;
   }
 
@@ -3260,7 +3526,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
 
@@ -3289,6 +3555,17 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
+  // With Swift 6, enable @_spiOnly by default and forbid the old version.
+  // This also enables proper error reporting of ioi references from spi decls.
+  if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
+    LangOpts.EnableSPIOnlyImports = true;
+
+    if (ParsedArgs.hasArg(OPT_experimental_spi_imports)) {
+      Diags.diagnose(SourceLoc(), diag::error_old_spi_only_import_unsupported);
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -3299,7 +3576,6 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
       serialization::validateSerializedAST(
         data,
         getSILOptions().EnableOSSAModules,
-        LangOpts.hasFeature(Feature::NoncopyableGenerics),
         LangOpts.SDKName,
         &extendedInfo);
 
@@ -3338,7 +3614,6 @@ CompilerInvocation::setUpInputForSILTool(
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(),
       getSILOptions().EnableOSSAModules,
-      LangOpts.hasFeature(Feature::NoncopyableGenerics),
       LangOpts.SDKName,
       &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;

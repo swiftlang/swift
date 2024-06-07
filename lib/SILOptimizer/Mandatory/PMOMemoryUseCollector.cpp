@@ -364,7 +364,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       unsigned ArgumentNumber = UI->getOperandNumber() - 1;
 
       // If this is an out-parameter, it is like a store.
-      unsigned NumIndirectResults = substConv.getNumIndirectSILResults();
+      unsigned NumIndirectResults = substConv.getNumIndirectSILResults() +
+                                    substConv.getNumIndirectSILErrorResults();
       if (ArgumentNumber < NumIndirectResults) {
         // We do not support initializing sub members. This is an old
         // restriction from when this code was used by Definite

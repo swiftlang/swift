@@ -492,3 +492,25 @@ func matchCEnum(_ variant: c_closed_enum_t) -> Int {
   }
 }
 
+public struct GenericStruct<T> {
+    private var x = 0
+    private var y: T?
+    @inline(never)
+    init() {}
+}
+
+@_noLocks
+func testLargeTuple() {
+    typealias SixInt8s = (Int8, Int8, Int8, Int8, Int8, Int8)
+    _ = GenericStruct<SixInt8s>()
+}
+
+struct NonCopyableStruct: ~Copyable {
+  func foo() {}
+}
+
+@_noLocks
+func testNonCopyable() {
+  let t = NonCopyableStruct()
+  t.foo()
+}

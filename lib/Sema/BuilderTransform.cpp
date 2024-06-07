@@ -197,9 +197,6 @@ protected:
         return std::nullopt;
       }
 
-      // Allocate variable with a placeholder type
-      auto *resultVar = buildPlaceholderVar(stmt->getStartLoc(), newBody);
-
       if (ctx.CompletionCallback && stmt->getSourceRange().isValid() &&
           !containsIDEInspectionTarget(stmt->getSourceRange(), ctx.SourceMgr) &&
           !isa<GuardStmt>(stmt)) {
@@ -208,6 +205,9 @@ protected:
         // it to improve performance.
         return std::nullopt;
       }
+
+      // Allocate variable with a placeholder type
+      auto *resultVar = buildPlaceholderVar(stmt->getStartLoc(), newBody);
 
       auto result = visit(stmt, resultVar);
       if (!result)
@@ -1424,7 +1424,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
           continue;
       }
 
-      // Check if the the candidate has a suitable availability for the
+      // Check if the candidate has a suitable availability for the
       // calling context.
       if (isUnavailable(func)) {
         foundUnavailable = true;

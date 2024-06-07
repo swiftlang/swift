@@ -19,7 +19,7 @@ import SIL
 /// are initialized, a statically initialized global is created where the initializer is a
 /// `vector` instruction.
 ///
-/// TODO: liferange computation is done very ad-hoc and should be eventually done by inspecting
+/// TODO: liverange computation is done very ad-hoc and should be eventually done by inspecting
 ///       forwarding instructions.
 let allocVectorLowering = FunctionPass(name: "alloc-vector-lowering") {
   (function: Function, context: FunctionPassContext) in
@@ -190,7 +190,7 @@ private extension StructInst {
 /// Lowers the allocateVector builtin either to an stack-allocated vector (`alloc_vector`)
 /// or to a statically initialized global.
 private func lower(allocVectorBuiltin: BuiltinInst, _ context: FunctionPassContext) {
-  let visitor = ComputeNonEscapingLiferange(of: allocVectorBuiltin, context)
+  let visitor = ComputeNonEscapingLiverange(of: allocVectorBuiltin, context)
 
   guard let result = allocVectorBuiltin.visit(using: visitor, context) else {
     if allocVectorBuiltin.parentFunction.isTransparent {
@@ -203,9 +203,9 @@ private func lower(allocVectorBuiltin: BuiltinInst, _ context: FunctionPassConte
   case .storeToGlobal(let storeInst):
     createOutlinedGlobal(for: allocVectorBuiltin, storeToGlobal: storeInst, context)
 
-  case .liferange(var liferange):
-    defer { liferange.deinitialize() }
-    createStackAllocatedVector(for: allocVectorBuiltin, liferange: liferange, context)
+  case .liverange(var liverange):
+    defer { liverange.deinitialize() }
+    createStackAllocatedVector(for: allocVectorBuiltin, liverange: liverange, context)
 
   case .invalid:
     context.diagnosticEngine.diagnose(allocVectorBuiltin.location.sourceLoc, .lifetime_value_outside_scope)
@@ -255,7 +255,7 @@ private func createOutlinedGlobal(
 
 private func createStackAllocatedVector(
   for allocVectorBuiltin: BuiltinInst,
-  liferange: InstructionRange,
+  liverange: InstructionRange,
   _ context: FunctionPassContext
 ) {
   let builder = Builder(before: allocVectorBuiltin, context)
@@ -267,7 +267,7 @@ private func createStackAllocatedVector(
   allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)
   context.erase(instruction: allocVectorBuiltin)
 
-  for endInst in liferange.ends {
+  for endInst in liverange.ends {
     let builder = Builder(after: endInst, context)
     builder.createDeallocStack(allocVec)
   }
@@ -283,7 +283,7 @@ private func getInitStores(to allocVectorBuiltin: BuiltinInst, count: Int,
 
   for use in allocVectorBuiltin.uses {
     if let ptrToAddr = use.instruction as? PointerToAddressInst {
-      if !findInitStores(of: ptrToAddr, atIndex: 0, &stores) {
+      if !findInitStores(of: ptrToAddr, atIndex: 0, &stores, context) {
         return nil
       }
     } else {
@@ -307,18 +307,20 @@ private func getInitStores(to allocVectorBuiltin: BuiltinInst, count: Int,
   return stores.map { $0! }
 }
 
-private func findInitStores(of address: Value, atIndex: Int, _ initStores: inout [StoreInst?]) -> Bool {
+private func findInitStores(of address: Value, atIndex: Int, _ initStores: inout [StoreInst?],
+                            _ context: FunctionPassContext) -> Bool
+{
   for use in address.uses {
     switch use.instruction {
     case let indexAddr as IndexAddrInst:
       guard let indexLiteral = indexAddr.index as? IntegerLiteralInst,
             let index = indexLiteral.value,
-            findInitStores(of: indexAddr, atIndex: atIndex + index, &initStores) else
+            findInitStores(of: indexAddr, atIndex: atIndex + index, &initStores, context) else
       {
         return false
       }
     case let store as StoreInst where store.destinationOperand == use:
-      if !store.source.isValidGlobalInitValue {
+      if !store.source.isValidGlobalInitValue(context) {
         return false
       }
       if atIndex >= initStores.count ||
@@ -336,47 +338,47 @@ private func findInitStores(of address: Value, atIndex: Int, _ initStores: inout
 
 // This is very experimental and not ideal at all.
 // TODO: replace this with DiagnoseLifetimeDependence from https://github.com/apple/swift/pull/68682
-private struct ComputeNonEscapingLiferange : EscapeVisitorWithResult {
+private struct ComputeNonEscapingLiverange : EscapeVisitorWithResult {
 
   enum Result {
-    case liferange(InstructionRange)
+    case liverange(InstructionRange)
     case storeToGlobal(StoreInst)
     case invalid
   }
 
-  var liferange: InstructionRange
+  var liverange: InstructionRange
   var storeToGlobal: StoreInst? = nil
   let domTree: DominatorTree
 
   init(of instruction: Instruction, _ context: FunctionPassContext) {
-    self.liferange = InstructionRange(begin: instruction, context)
+    self.liverange = InstructionRange(begin: instruction, context)
     self.domTree = context.dominatorTree
   }
 
   var result: Result {
     if let storeToGlobal = storeToGlobal {
       defer {
-        var lr = liferange
+        var lr = liverange
         lr.deinitialize()
       }
-      precondition(liferange.inclusiveRangeContains(storeToGlobal))
-      if liferange.inclusiveRangeContains(storeToGlobal.next!) ||
-         liferange.ends.contains(where: { $0 != storeToGlobal }) ||
+      precondition(liverange.inclusiveRangeContains(storeToGlobal))
+      if liverange.inclusiveRangeContains(storeToGlobal.next!) ||
+         liverange.ends.contains(where: { $0 != storeToGlobal }) ||
          !storeToGlobal.isInitializingGlobal
       {
         return .invalid
       }
       return .storeToGlobal(storeToGlobal)
     }
-    return .liferange(liferange)
+    return .liverange(liverange)
   }
 
   mutating func cleanupOnAbort() {
-    liferange.deinitialize()
+    liverange.deinitialize()
   }
 
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
-    if def.definingInstruction == liferange.begin {
+    if def.definingInstruction == liverange.begin {
       return .walkDown
     }
     switch def {
@@ -392,12 +394,12 @@ private struct ComputeNonEscapingLiferange : EscapeVisitorWithResult {
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    let beginBlockOfRange = liferange.blockRange.begin
+    let beginBlockOfRange = liverange.blockRange.begin
     let dominates = beginBlockOfRange.dominates(user.parentBlock, domTree)
     switch user {
     case let store as StoreInst:
       if dominates {
-        liferange.insert(store)
+        liverange.insert(store)
       }
       let accessPath = store.destination.accessPath
       if case .global = accessPath.base {
@@ -412,9 +414,9 @@ private struct ComputeNonEscapingLiferange : EscapeVisitorWithResult {
       return .continueWalk
     case let apply as ApplyInst:
       if dominates {
-        liferange.insert(user)
+        liverange.insert(user)
       }
-      if !apply.type.isEscapable {
+      if !apply.isEscapable {
         return .abort
       }
       return .ignore
@@ -422,7 +424,7 @@ private struct ComputeNonEscapingLiferange : EscapeVisitorWithResult {
       return .continueWalk
     default:
       if dominates {
-        liferange.insert(user)
+        liverange.insert(user)
       }
       return .continueWalk
     }

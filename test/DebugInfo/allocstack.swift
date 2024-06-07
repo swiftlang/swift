@@ -9,7 +9,7 @@ func main() {
   // CHECK-SIL-DAG: debug_value {{.*}}: $Int, let, name "x"
   // CHECK-DAG: DILocalVariable(name: "x"
   let x = 10
-  // CHECK-SIL-DAG: alloc_stack $Int, var, name "y"
+  // CHECK-SIL-DAG: alloc_stack [var_decl] $Int, var, name "y"
   // CHECK-DAG: DILocalVariable(name: "y"
   var y = 10
   // The expression x+y may become constant folded.

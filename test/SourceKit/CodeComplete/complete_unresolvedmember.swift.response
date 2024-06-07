@@ -3,86 +3,86 @@
     {
       key.kind: source.lang.swift.decl.function.method.class,
       key.name: "create()",
-      key.sourcetext: "create()",
       key.description: "create()",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO6createACyFZ",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "create()"
     },
     {
       key.kind: source.lang.swift.decl.enumelement,
       key.name: "east",
-      key.sourcetext: "east",
       key.description: "east",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO4eastyA2CmF",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "east"
     },
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init(i:)",
-      key.sourcetext: "init(i: <#T##Int#>)",
       key.description: "init(i: Int)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO1iACSi_tcfc",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "init(i: <#T##Int#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init(s:)",
-      key.sourcetext: "init(s: <#T##String#>)",
       key.description: "init(s: String)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO1sACSS_tcfc",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "init(s: <#T##String#>)"
     },
     {
       key.kind: source.lang.swift.decl.var.class,
       key.name: "instance",
-      key.sourcetext: "instance",
       key.description: "instance",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO8instanceACvpZ",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "instance"
     },
     {
       key.kind: source.lang.swift.decl.enumelement,
       key.name: "other()",
-      key.sourcetext: "other(<#T##String#>)",
       key.description: "other(String)",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO5otheryACSScACmF",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "other(<#T##String#>)"
     },
     {
       key.kind: source.lang.swift.decl.enumelement,
       key.name: "west",
-      key.sourcetext: "west",
       key.description: "west",
       key.typename: "Foo",
       key.context: source.codecompletion.context.exprspecific,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:25complete_unresolvedmember3FooO4westyA2CmF",
-      key.modulename: "complete_unresolvedmember"
+      key.modulename: "complete_unresolvedmember",
+      key.sourcetext: "west"
     }
   ],
   key.kind: source.lang.swift.completion.unresolvedmember

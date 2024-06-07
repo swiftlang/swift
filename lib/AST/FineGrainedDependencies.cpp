@@ -46,7 +46,7 @@ std::optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromPath(StringRef path, const bool allowSwiftModule) {
   const bool treatAsModule =
       allowSwiftModule &&
-      path.endswith(file_types::getExtension(file_types::TY_SwiftModuleFile));
+      path.ends_with(file_types::getExtension(file_types::TY_SwiftModuleFile));
   auto bufferOrError = llvm::MemoryBuffer::getFile(path);
   if (!bufferOrError)
     return std::nullopt;

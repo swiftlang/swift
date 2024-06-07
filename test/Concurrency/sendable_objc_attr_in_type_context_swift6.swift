@@ -9,6 +9,7 @@
 // RUN:   -module-name main -I %t -verify
 
 // REQUIRES: objc_interop
+// REQUIRES: asserts
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -57,6 +58,7 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 @end
 
 @protocol InnerSendableTypes
+-(void) testComposition:(SWIFT_SENDABLE MyValue *)composition;
 -(void) test:(NSDictionary<NSString *, SWIFT_SENDABLE id> *)options;
 -(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
 @end
@@ -114,6 +116,10 @@ func test_sendable_attr_in_type_context(test: Test) {
 class TestConformanceWithStripping : InnerSendableTypes {
   // expected-error@-1 {{type 'TestConformanceWithStripping' does not conform to protocol 'InnerSendableTypes'}}
 
+  func testComposition(_: MyValue) {
+    // expected-note@-1 {{candidate has non-matching type '(MyValue) -> ()'}}
+  }
+
   func test(_ options: [String: Any]) {
     // expected-note@-1 {{candidate has non-matching type '([String : Any]) -> ()'}}
   }
@@ -124,6 +130,9 @@ class TestConformanceWithStripping : InnerSendableTypes {
 }
 
 class TestConformanceWithoutStripping : InnerSendableTypes {
+  func testComposition(_: any MyValue & Sendable) { // Ok
+  }
+
   func test(_ options: [String: any Sendable]) { // Ok
   }
 

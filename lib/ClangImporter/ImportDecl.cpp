@@ -2192,22 +2192,12 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-          if (decl->isInStdNamespace() && decl->getName() == "promise") {
-            // Do not import std::promise.
-            return nullptr;
-          }
-          result->getAttrs().add(new (Impl.SwiftContext)
-                                     MoveOnlyAttr(/*Implicit=*/true));
-        } else {
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(
-                  diag::move_only_requires_move_only,
-                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
-              decl->getLocation());
+        if (decl->isInStdNamespace() && decl->getName() == "promise") {
+          // Do not import std::promise.
           return nullptr;
         }
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   MoveOnlyAttr(/*Implicit=*/true));
       }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -2650,6 +2640,14 @@ namespace {
         return nullptr;
       }
 
+      // Bail if this is `std::chrono::tzdb`. This type causes issues in copy
+      // constructor instantiation.
+      // FIXME: https://github.com/apple/swift/issues/73037
+      if (decl->getDeclContext()->isNamespace() &&
+          decl->getDeclContext()->getParent()->isStdNamespace() &&
+          decl->getIdentifier() && decl->getName() == "tzdb")
+        return nullptr;
+
       auto &clangSema = Impl.getClangSema();
       // Make Clang define any implicit constructors it may need (copy,
       // default). Make sure we only do this if the class has been fully defined
@@ -2658,8 +2656,7 @@ namespace {
       // SemaLookup.cpp).
       if (!decl->isBeingDefined() && !decl->isDependentContext() &&
           areRecordFieldsComplete(decl)) {
-        if (decl->hasInheritedConstructor() &&
-            Impl.isCxxInteropCompatVersionAtLeast(6)) {
+        if (decl->hasInheritedConstructor()) {
           for (auto member : decl->decls()) {
             if (auto usingDecl = dyn_cast<clang::UsingDecl>(member)) {
               for (auto usingShadowDecl : usingDecl->shadows()) {
@@ -2830,14 +2827,12 @@ namespace {
     void
     addExplicitProtocolConformances(NominalTypeDecl *decl,
                                     const clang::CXXRecordDecl *clangDecl) {
-      if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-        // Propagate conforms_to attribute from public base classes.
-        for (auto base : clangDecl->bases()) {
-          if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
-            continue;
-          if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
-            addExplicitProtocolConformances(decl, baseClangDecl);
-        }
+      // Propagate conforms_to attribute from public base classes.
+      for (auto base : clangDecl->bases()) {
+        if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+          continue;
+        if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
+          addExplicitProtocolConformances(decl, baseClangDecl);
       }
 
       if (!clangDecl->hasAttrs())
@@ -2847,7 +2842,7 @@ namespace {
       auto conformsToAttr =
           llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
             if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-              return swiftAttr->getAttribute().startswith("conforms_to:");
+              return swiftAttr->getAttribute().starts_with("conforms_to:");
             return false;
           });
       if (conformsToAttr == clangDecl->getAttrs().end())
@@ -3392,8 +3387,8 @@ namespace {
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
             if ((file->getDir() == owningModule->Directory) &&
-                (filename.endswith("cmath") || filename.endswith("math.h") ||
-                 filename.endswith("stdlib.h") || filename.endswith("cstdlib"))) {
+                (filename.ends_with("cmath") || filename.ends_with("math.h") ||
+                 filename.ends_with("stdlib.h") || filename.ends_with("cstdlib"))) {
               return nullptr;
             }
           }
@@ -3753,38 +3748,37 @@ namespace {
         }
       }
 
-      if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-          if (auto dc = method->getDeclContext();
-              !decl->isPure() &&
-              isa_and_nonnull<NominalTypeDecl>(dc->getAsDecl())) {
-
-            // generates the __synthesizedVirtualCall_ C++ thunk
-            clang::CXXMethodDecl *cxxThunk = synthesizeCxxVirtualMethod(
-                *static_cast<ClangImporter *>(
-                    dc->getASTContext().getClangModuleLoader()),
-                decl->getParent(), decl->getParent(), decl);
-
-            // call the __synthesizedVirtualCall_ C++ thunk from a Swift thunk
-            if (Decl *swiftThunk =
-                    cxxThunk ? VisitCXXMethodDecl(cxxThunk) : nullptr;
-                isa_and_nonnull<FuncDecl>(swiftThunk)) {
-              // synthesize the body of the Swift method to call the swiftThunk
-              synthesizeForwardingThunkBody(cast<FuncDecl>(method),
-                                            cast<FuncDecl>(swiftThunk));
-              return method;
+      if (decl->isVirtual()) {
+        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+          if (auto structDecl =
+                  dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
+            // If this is a method of a Swift struct, any possible override of
+            // this method would get sliced away, and an invocation would get
+            // dispatched statically. This is fine because it matches the C++
+            // behavior.
+            if (decl->isPure()) {
+              // If this is a pure virtual method, we won't have any
+              // implementation of it to invoke.
+              Impl.markUnavailable(funcDecl,
+                                   "virtual function is not available in Swift "
+                                   "because it is pure");
+            }
+          } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
+                         funcDecl->getDeclContext())) {
+            // This is a foreign reference type. Since `class T` on the Swift
+            // side is mapped from `T*` on the C++ side, an invocation of a
+            // virtual method `t->method()` should get dispatched dynamically.
+            // Create a thunk that will perform dynamic dispatch.
+            // TODO: we don't have to import the actual `method` in this case,
+            // we can just synthesize a thunk and import that instead.
+            auto result = synthesizer.makeVirtualMethod(decl);
+            if (result) {
+              return result;
+            } else {
+              Impl.markUnavailable(
+                  funcDecl, "virtual function is not available in Swift");
             }
           }
-
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              decl->isPure() ? "virtual function is not available in Swift "
-                               "because it is pure"
-                             : "virtual function is not available in Swift");
-        } else {
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              "virtual functions are not yet available in Swift");
         }
       }
 
@@ -4041,8 +4035,7 @@ namespace {
       //   1. Types
       //   2. C++ methods from privately inherited base classes
       if (!isa<clang::TypeDecl>(decl->getTargetDecl()) &&
-          !(isa<clang::CXXMethodDecl>(decl->getTargetDecl()) &&
-            Impl.isCxxInteropCompatVersionAtLeast(6)))
+          !isa<clang::CXXMethodDecl>(decl->getTargetDecl()))
         return nullptr;
       // Constructors (e.g. `using BaseClass::BaseClass`) are handled in
       // VisitCXXRecordDecl, since we need them to determine whether a struct
@@ -4139,14 +4132,16 @@ namespace {
     /// selector.
     ///
     /// The importer should use this rather than adding the attribute directly.
-    void addObjCAttribute(ValueDecl *decl, std::optional<ObjCSelector> name) {
+    void addObjCAttribute(Decl *decl, std::optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
       if (name) {
         decl->getAttrs().add(ObjCAttr::create(ctx, name,
                                               /*implicitName=*/true));
       }
-      decl->setIsObjC(true);
-      decl->setIsDynamic(true);
+      if (auto VD = dyn_cast<ValueDecl>(decl)) {
+        VD->setIsObjC(true);
+        VD->setIsDynamic(true);
+      }
 
       // If the declaration we attached the 'objc' attribute to is within a
       // type, record it in the type.
@@ -4164,7 +4159,7 @@ namespace {
     /// selector.
     ///
     /// The importer should use this rather than adding the attribute directly.
-    void addObjCAttribute(ValueDecl *decl, Identifier name) {
+    void addObjCAttribute(Decl *decl, Identifier name) {
       addObjCAttribute(decl, ObjCSelector(Impl.SwiftContext, 0, name));
     }
 
@@ -4785,6 +4780,11 @@ namespace {
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
                                               std::move(objcClass));
+      
+      Identifier categoryName;
+      if (!decl->getName().empty())
+        categoryName = Impl.SwiftContext.getIdentifier(decl->getName());
+      addObjCAttribute(result, categoryName);
 
       // Create the extension declaration and record it.
       objcClass->addExtension(result);
@@ -8035,6 +8035,59 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      if (swiftAttr->getAttribute() == "BitwiseCopyable") {
+        auto *protocol =
+            SwiftContext.getProtocol(KnownProtocolKind::BitwiseCopyable);
+        auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);
+        if (!nominal)
+          continue;
+        auto *module = nominal->getModuleContext();
+        // Don't synthesize a conformance if one already exists.
+        auto ty = nominal->getDeclaredInterfaceType();
+        if (module->lookupConformance(ty, protocol))
+          continue;
+        auto conformance = SwiftContext.getNormalConformance(
+            ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
+            ProtocolConformanceState::Complete,
+            /*isUnchecked=*/false,
+            /*isPreconcurrency=*/false);
+        conformance->setSourceKindAndImplyingConformance(
+            ConformanceEntryKind::Synthesized, nullptr);
+
+        nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+      }
+
+      if (swiftAttr->getAttribute() == "transferring") {
+        // Swallow this if the feature is not enabled.
+        if (!SwiftContext.LangOpts.hasFeature(
+                Feature::TransferringArgsAndResults))
+          continue;
+        auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
+        if (!funcDecl)
+          continue;
+        funcDecl->setSendingResult();
+        continue;
+      }
+
+      if (swiftAttr->getAttribute() == "sending") {
+        // Swallow this if the feature is not enabled.
+        if (!SwiftContext.LangOpts.hasFeature(Feature::SendingArgsAndResults))
+          continue;
+        auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
+        if (!funcDecl)
+          continue;
+        funcDecl->setSendingResult();
+        continue;
+      }
+
+      if (swiftAttr->getAttribute() == "sensitive") {
+        if (!SwiftContext.LangOpts.hasFeature(Feature::Sensitive))
+          continue;
+        auto attr = new (SwiftContext) SensitiveAttr(/*implicit=*/true);
+        MappedDecl->getAttrs().add(attr);
+        continue;
+      }
+
       // Dig out a buffer with the attribute text.
       unsigned bufferID = getClangSwiftAttrSourceBuffer(
           swiftAttr->getAttribute());
@@ -8273,6 +8326,8 @@ void ClangImporter::Implementation::importAttributes(
               .Case("maccatalyst", PlatformKind::macCatalyst)
               .Case("tvos", PlatformKind::tvOS)
               .Case("watchos", PlatformKind::watchOS)
+              .Case("xros", PlatformKind::visionOS)
+              .Case("visionos", PlatformKind::visionOS)
               .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
               .Case("maccatalyst_app_extension",
                     PlatformKind::macCatalystApplicationExtension)
@@ -8282,6 +8337,8 @@ void ClangImporter::Implementation::importAttributes(
                     PlatformKind::tvOSApplicationExtension)
               .Case("watchos_app_extension",
                     PlatformKind::watchOSApplicationExtension)
+              .Case("xros_app_extension",
+                    PlatformKind::visionOSApplicationExtension)
               .Default(std::nullopt);
       if (!platformK)
         continue;
@@ -8393,9 +8450,9 @@ void ClangImporter::Implementation::importAttributes(
   // such as CGColorRelease(CGColorRef).
   if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
     if (FD->getNumParams() == 1 && FD->getDeclName().isIdentifier() &&
-         (FD->getName().endswith("Release") ||
-          FD->getName().endswith("Retain") ||
-          FD->getName().endswith("Autorelease")) &&
+         (FD->getName().ends_with("Release") ||
+          FD->getName().ends_with("Retain") ||
+          FD->getName().ends_with("Autorelease")) &&
         !FD->getAttr<clang::SwiftNameAttr>()) {
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {

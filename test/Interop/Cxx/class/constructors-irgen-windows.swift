@@ -23,6 +23,7 @@ public func createImplicitDefaultConstructor() -> ImplicitDefaultConstructor {
   // MICROSOFT_X64: define dllexport swiftcc i32 @"$s7MySwift32createImplicitDefaultConstructorSo0{{bcD0VyF|deF0VyF}}"()
   // MICROSOFT_X64-NOT: define
   // Note `this` return type but no implicit "most derived" argument.
+  // MICROSOFT_X64: call void @llvm.memset.p0.i64
   // MICROSOFT_X64: call ptr @"??0ImplicitDefaultConstructor@@QEAA@XZ"(ptr %{{[0-9]+}})
   return ImplicitDefaultConstructor()
 }

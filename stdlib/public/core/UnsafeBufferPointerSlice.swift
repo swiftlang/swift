@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -279,9 +279,9 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
-    to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+  public func withMemoryRebound<T, Result, E: Error>(
+    to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     let buffer = Base(rebasing: self)
     return try buffer.withMemoryRebound(to: T.self, body)
   }
@@ -378,19 +378,20 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
-#if $BitwiseCopyable
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T : _BitwiseCopyable>(
+  public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     let buffer = Base(rebasing: self)
     return buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
-#endif
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -518,9 +519,9 @@ extension Slice where Base == UnsafeRawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
-    to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+  public func withMemoryRebound<T, Result, E: Error>(
+    to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     let buffer = Base(rebasing: self)
     return try buffer.withMemoryRebound(to: T.self, body)
   }
@@ -617,19 +618,20 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
-#if $BitwiseCopyable
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T : _BitwiseCopyable>(
+  public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     let buffer = Base(rebasing: self)
     return buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
-#endif
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message:
+    "Use the BitwiseCopyable-constrained overload"
+  )
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type

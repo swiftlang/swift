@@ -248,7 +248,7 @@ static bool hasDoubleUnderscore(const Decl *D) {
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     auto Name = VD->getBaseName();
-    if (!Name.isSpecial() && Name.getIdentifier().str().startswith(Prefix)) {
+    if (!Name.isSpecial() && Name.getIdentifier().str().starts_with(Prefix)) {
       return true;
     }
   }

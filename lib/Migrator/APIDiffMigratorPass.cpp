@@ -160,6 +160,10 @@ public:
     return visit(T->getBase());
   }
 
+  FoundResult visitSendingTypeRepr(SendingTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
   FoundResult visitArrayTypeRepr(ArrayTypeRepr *T) {
     return handleParent(T, T->getBase());
   }
@@ -246,7 +250,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   bool isDotMember(CharSourceRange Range) {
     auto S = Range.str();
-    return S.startswith(".") && S.substr(1).find(".") == StringRef::npos;
+    return S.starts_with(".") && S.substr(1).find(".") == StringRef::npos;
   }
 
   bool isDotMember(SourceRange Range) {

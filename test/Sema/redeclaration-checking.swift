@@ -87,7 +87,6 @@ func stmtTest() {
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
   // expected-warning@-3 {{unreachable}}
-  // expected-error@-4{{pattern of type 'MyError' cannot match 'Never'}}
 }
 
 func fullNameTest() {

@@ -147,7 +147,6 @@ public:
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
-  IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(ProjectedValueProperty)
@@ -164,7 +163,8 @@ public:
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
-  IGNORED_ATTR(DistributedThunkTarget)
+  IGNORED_ATTR(AllowFeatureSuppression)
+  IGNORED_ATTR(PreInverseGenerics)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -205,16 +205,8 @@ public:
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitBorrowingAttr(BorrowingAttr *attr) { visitMutationAttr(attr); }
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
-  void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) { visitMutationAttr(attr); }
-  void visitResultDependsOnSelfAttr(ResultDependsOnSelfAttr *attr) {
-    FuncDecl *FD = cast<FuncDecl>(D);
-    if (FD->getDescriptiveKind() != DescriptiveDeclKind::Method) {
-      diagnoseAndRemoveAttr(attr, diag::attr_methods_only, attr);
-    }
-    if (FD->getResultTypeRepr() == nullptr) {
-      diagnoseAndRemoveAttr(attr, diag::result_depends_on_no_result,
-                            attr->getAttrName());
-    }
+  void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) {
+    visitMutationAttr(attr);
   }
   void visitDynamicAttr(DynamicAttr *attr);
 
@@ -343,6 +335,8 @@ public:
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
 
+  void visitSensitiveAttr(SensitiveAttr *attr);
+
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
@@ -368,6 +362,7 @@ public:
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
+  void visitWeakLinkedAttr(WeakLinkedAttr *attr);
 };
 
 } // end anonymous namespace
@@ -447,6 +442,13 @@ void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFrom
   if (!Ctx.LangOpts.hasFeature(Feature::ExtractConstantsFromMembers)) {
     diagnoseAndRemoveAttr(attr,
                           diag::attr_extractConstantsFromMembers_experimental);
+  }
+}
+
+void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Sensitive)) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_sensitive_experimental);
   }
 }
 
@@ -704,6 +706,9 @@ static bool iswatchOS(ASTContext &ctx) {
 }
 
 static bool isRelaxedIBAction(ASTContext &ctx) {
+  if (ctx.LangOpts.Target.isXROS())
+    return true;
+
   return isiOS(ctx) || iswatchOS(ctx);
 }
 
@@ -1270,7 +1275,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     if (importedModule) {
       auto path = importedModule->getModuleFilename();
       if (llvm::sys::path::extension(path) == ".swiftinterface" &&
-          !(path.endswith(".private.swiftinterface") || path.endswith(".package.swiftinterface"))) {
+          !(path.ends_with(".private.swiftinterface") || path.ends_with(".package.swiftinterface"))) {
         // If the module was built from the public swiftinterface, it can't
         // have any SPI.
         diagnose(attr->getLocation(),
@@ -1425,6 +1430,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                                     attr->getLParenLoc(), firstNameLoc,
                                     objcName->getSelectorPieces()[0],
                                     attr->getRParenLoc()));
+      } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+        assert(Ext->getSelfClassDecl());
+        // This is an extension with an explicit, and otherwise valid, category
+        // name. Schedule it to be checked for name conflicts later.
+        if (auto *SF = Ext->getParentSourceFile())
+          SF->ObjCCategories.push_back(Ext);
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
       SourceLoc diagLoc = attr->getLParenLoc();
@@ -1515,20 +1526,96 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
+static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
+                                         Feature requiredFeature) {
+  auto &ctx = D->getASTContext();
+
+  if (ctx.LangOpts.hasFeature(requiredFeature))
+    return true;
+
+  // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
+  // as long as you're using the early adopter syntax. (Avoids breaking existing
+  // adopters.)
+  if (requiredFeature == Feature::ObjCImplementation && attr->isEarlyAdopter())
+    return true;
+
+  // Either you're using Feature::ObjCImplementation without the early adopter
+  // syntax, or you're using Feature::CImplementation. Either way, no go.
+  ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
+                     attr->getAttrName(), attr->isDeclModifier(),
+                     getFeatureName(requiredFeature));
+  return false;
+}
+
+static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
+  // attr->getRange() covers the attr name and argument list; adjust it to
+  // exclude the first token.
+  auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
+                                             attr->getRange().Start);
+  if (attr->getRange().contains(newStart)) {
+    return SourceRange(newStart, attr->getRange().End);
+  }
+  return SourceRange();
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
+  DeclAttribute * langAttr =
+    D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
+  if (!langAttr)
+    langAttr = D->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+
+  if (!langAttr) {
+    diagnose(attr->getLocation(), diag::attr_implementation_requires_language);
+
+    // If this is an extension, suggest '@objc'.
+    if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+      auto diag = diagnose(attr->getLocation(),
+                           diag::make_decl_objc_for_implementation,
+                           D->getDescriptiveKind());
+
+      ObjCSelector correctSelector(Ctx, 0, {attr->CategoryName});
+      fixDeclarationObjCName(diag, ED, ObjCSelector(), correctSelector);
+    }
+
+    return;
+  }
+
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
+      return;
+
+    auto objcLangAttr = dyn_cast<ObjCAttr>(langAttr);
+    assert(objcLangAttr && "extension with @_cdecl or another lang attr???");
+
+    // Only early adopters should specify the category name on the attribute;
+    // the stabilized syntax uses @objc(CustomName) for that.
+    if (!attr->isEarlyAdopter() && !attr->CategoryName.empty()) {
+      auto diag = diagnose(attr->getLocation(),
+                           diag::attr_implementation_category_goes_on_objc_attr);
+
+      ObjCSelector correctSelector(Ctx, 0, {attr->CategoryName});
+      auto argListRange = getArgListRange(Ctx, attr);
+      if (argListRange.isValid()) {
+        diag.fixItRemove(argListRange);
+        fixDeclarationObjCName(diag, ED, objcLangAttr->getName(),
+                               correctSelector);
+      }
+      objcLangAttr->setName(correctSelector, /*implicit=*/false);
+
+      attr->setCategoryNameInvalid();
+
+      return;
+    }
+
     if (ED->isConstrainedExtension())
       diagnoseAndRemoveAttr(attr,
                             diag::attr_objc_implementation_must_be_unconditional);
 
     auto CD = dyn_cast<ClassDecl>(ED->getExtendedNominal());
     if (!CD) {
-      diagnoseAndRemoveAttr(attr,
-                            diag::attr_objc_implementation_must_extend_class,
-                            ED->getExtendedNominal());
-      ED->getExtendedNominal()->diagnose(diag::decl_declared_here,
-                                         ED->getExtendedNominal());
+      // This will be diagnosed as diag::objc_extension_not_class.
+      attr->setInvalid();
       return;
     }
 
@@ -1540,51 +1627,62 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
 
     if (!CD->hasSuperclass()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_objc_implementation_must_have_super,
-                            CD);
+      diagnoseAndRemoveAttr(attr,
+                            diag::attr_objc_implementation_must_have_super, CD);
       CD->diagnose(diag::decl_declared_here, CD);
       return;
     }
 
     if (CD->isTypeErasedGenericClass()) {
-      diagnoseAndRemoveAttr(attr, diag::objc_implementation_cannot_have_generics,
-                            CD);
+      diagnoseAndRemoveAttr(attr,
+                            diag::objc_implementation_cannot_have_generics, CD);
       CD->diagnose(diag::decl_declared_here, CD);
+      return;
     }
 
     if (!attr->isCategoryNameInvalid() && !ED->getImplementedObjCDecl()) {
       diagnose(attr->getLocation(),
                diag::attr_objc_implementation_category_not_found,
-               attr->CategoryName, CD);
+               ED->getObjCCategoryName(), CD);
 
-      // attr->getRange() covers the attr name and argument list; adjust it to
-      // exclude the first token.
-      auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
-                                                 attr->getRange().Start);
-      if (attr->getRange().contains(newStart)) {
-        auto argListRange = SourceRange(newStart, attr->getRange().End);
+      SourceRange argListRange;
+      if (attr->CategoryName.empty())
+        argListRange = getArgListRange(Ctx, langAttr);
+      else
+        argListRange = getArgListRange(Ctx, attr);
+      if (argListRange.isValid()) {
         diagnose(attr->getLocation(),
                  diag::attr_objc_implementation_fixit_remove_category_name)
             .fixItRemove(argListRange);
       }
 
-      attr->setCategoryNameInvalid();
+      attr->setInvalid();
 
       return;
     }
+
+    // While it's possible that @objc @implementation would function with
+    // pre-stable runtimes, this isn't a configuration that's been tested or
+    // supported.
+    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (!deploymentAvailability.isContainedIn(Ctx.getSwift50Availability())) {
+      diagnose(attr->getLocation(),
+               diag::attr_objc_implementation_raise_minimum_deployment_target,
+               prettyPlatformString(targetPlatform(Ctx.LangOpts)),
+               Ctx.getSwift50Availability().getOSVersion().getLowerEndpoint());
+    }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
+      return;
+
     if (!attr->CategoryName.empty()) {
       auto diagnostic =
           diagnose(attr->getLocation(),
                    diag::attr_objc_implementation_no_category_for_func, AFD);
 
-      // attr->getRange() covers the attr name and argument list; adjust it to
-      // exclude the first token.
-      auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
-                                                 attr->getRange().Start);
-      if (attr->getRange().contains(newStart)) {
-        auto argListRange = SourceRange(newStart, attr->getRange().End);
+      auto argListRange = getArgListRange(Ctx, attr);
+      if (argListRange.isValid()) {
         diagnostic.fixItRemove(argListRange);
       }
 
@@ -2029,6 +2127,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     }
   }
 
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
   SourceLoc attrLoc = attr->getLocation();
   auto versionAvailability = attr->getVersionAvailability(Ctx);
   if (versionAvailability == AvailableVersionComparison::Obsoleted ||
@@ -2160,7 +2265,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     // Verify that the name mentioned in the expose
     // attribute matches the supported name pattern.
     if (!attr->Name.empty()) {
-      if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
+      if (isa<ConstructorDecl>(VD) && !attr->Name.starts_with("init"))
         diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
                  attr->Name);
     }
@@ -3142,7 +3247,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getFormalAccess() < AccessLevel::Public &&
+  if (VD->getFormalAccess() < AccessLevel::Package &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
                           VD->getName(), VD->getFormalAccess());
@@ -3201,7 +3306,8 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
     return;
   }
 
-  // @inlinable can only be applied to public or internal declarations.
+  // @inlinable can only be applied to public, package, or
+  // internal declarations.
   auto access = VD->getFormalAccess();
   if (access < AccessLevel::Internal) {
     diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
@@ -3884,7 +3990,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   // conforms to the specified protocol.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
-    if (!OtherPD->inheritsFrom(PD) &&
+    if (!(OtherPD == PD || OtherPD->inheritsFrom(PD)) &&
         !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||
           PD->isSpecificProtocol(KnownProtocolKind::Actor))) {
       diagnose(attr->getLocation(),
@@ -3903,12 +4009,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    if (!ED->getModuleContext()->isResilient()) {
-      attr->setInvalid();
-      return;
-    }
-
-    if (ED->getFormalAccess() < AccessLevel::Public &&
+    if (ED->getFormalAccess() < AccessLevel::Package &&
         !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
       diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
       return;
@@ -3917,7 +4018,9 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getFormalAccess() < AccessLevel::Public &&
+  // @frozen attribute is allowed for public, package, or
+  // usableFromInline decls.
+  if (VD->getFormalAccess() < AccessLevel::Package &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
                           VD->getName(), VD->getFormalAccess());
@@ -4559,6 +4662,11 @@ void AttributeChecker::checkBackDeployedAttrs(
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
 
+        llvm::VersionTuple ignoredVersion;
+
+        AvailabilityInference::updateBeforePlatformForFallback(
+            Attr, Ctx, platformString, ignoredVersion);
+
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                  platformString);
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
@@ -4577,6 +4685,11 @@ void AttributeChecker::checkBackDeployedAttrs(
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr->Introduced.value();
       StringRef introPlatformString = availableAttr->prettyPlatformString();
+
+      AvailabilityInference::updateBeforePlatformForFallback(
+          Attr, Ctx, beforePlatformString, beforeVersion);
+      AvailabilityInference::updateIntroducedPlatformForFallback(
+          availableAttr, Ctx, introPlatformString, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
@@ -4678,6 +4791,16 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
         .warnUntilSwiftVersion(5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
+  }
+
+  // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
+  if (var->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (ownershipKind == ReferenceOwnership::Weak ||
+        ownershipKind == ReferenceOwnership::Unowned) {
+      Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
+               ownershipKind);
+      attr->setInvalid();
+    }
   }
 
   if (attr->isInvalid())
@@ -5104,6 +5227,7 @@ static IndexSubset *computeDifferentiabilityParameters(
 static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return DescriptiveDeclKind::Getter;
   case AccessorKind::Set:
     return DescriptiveDeclKind::Setter;
@@ -6858,10 +6982,13 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   // Prevent Sendable Attr from being added to methods of non-sendable types
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
     if (auto selfDecl = funcDecl->getImplicitSelfDecl()) {
-      if (!selfDecl->getTypeInContext()->isSendableType()) {
-        diagnose(attr->getLocation(), diag::nonsendable_instance_method)
-        .warnUntilSwiftVersion(6);
-      }
+      diagnoseIfAnyNonSendableTypes(
+          selfDecl->getTypeInContext(),
+          SendableCheckContext(funcDecl),
+          Type(),
+          SourceLoc(),
+          attr->getLocation(),
+          diag::nonsendable_instance_method);
     }
   }
 }
@@ -6885,13 +7012,16 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
       // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable variables.
       auto type = var->getTypeInContext();
-      if (!attr->isUnsafe() && !type->hasError() &&
-          !type->isSendableType()) {
-        Ctx.Diags.diagnose(attr->getLocation(),
-                           diag::nonisolated_non_sendable,
-                           type)
-          .warnUntilSwiftVersion(6);
-        return;
+      if (!attr->isUnsafe() && !type->hasError()) {
+        bool diagnosed = diagnoseIfAnyNonSendableTypes(
+            type,
+            SendableCheckContext(dc),
+            Type(),
+            SourceLoc(),
+            attr->getLocation(),
+            diag::nonisolated_non_sendable);
+        if (diagnosed)
+          return;
       }
 
       if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
@@ -6909,16 +7039,39 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
                                 diag::nonisolated_distributed_actor_storage);
           return;
         }
+      }
 
-        // 'nonisolated' is redundant for the stored properties of a struct.
-        if (isa<StructDecl>(nominal) &&
-            !var->isStatic() &&
-            var->isOrdinaryStoredProperty() &&
-            !isWrappedValueOfPropWrapper(var)) {
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
-                                nominal->getDescriptiveKind())
-            .warnUntilSwiftVersion(6);
-          return;
+      // 'nonisolated(unsafe)' is redundant for 'Sendable' immutables.
+      if (attr->isUnsafe() &&
+          type->isSendableType() &&
+          var->isLet()) {
+
+        // '(unsafe)' is redundant for a public actor-isolated 'Sendable'
+        // immutable.
+        auto nominal = dyn_cast<NominalTypeDecl>(dc);
+        if (nominal && nominal->isActor()) {
+          auto access = nominal->getFormalAccessScope(
+              /*useDC=*/nullptr,
+              /*treatUsableFromInlineAsPublic=*/true);
+          if (access.isPublic()) {
+            // Get the location where '(unsafe)' starts.
+            SourceLoc unsafeStart = Lexer::getLocForEndOfToken(
+                Ctx.SourceMgr, attr->getRange().Start);
+            diagnose(unsafeStart, diag::unsafe_sendable_actor_constant, type)
+                .fixItRemoveChars(unsafeStart,
+                                  attr->getRange().End.getAdvancedLoc(1));
+          } else {
+            // This actor is not public, so suggest to remove
+            // 'nonisolated(unsafe)'.
+            diagnose(attr->getLocation(),
+                     diag::nonisolated_unsafe_sendable_actor_constant, type)
+                .fixItRemove(attr->getRange());
+          }
+
+        } else {
+          diagnose(attr->getLocation(),
+                   diag::nonisolated_unsafe_sendable_constant, type)
+              .fixItRemove(attr->getRange());
         }
       }
     }
@@ -7042,20 +7195,25 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
   if (!proto)
     return;
 
-  // A marker protocol cannot inherit a non-marker protocol.
-  for (auto inheritedProto : proto->getInheritedProtocols()) {
-    if (!inheritedProto->isMarkerProtocol()) {
-      proto->diagnose(
-          diag::marker_protocol_inherit_nonmarker,
-          proto->getName(), inheritedProto->getName());
-      inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
-    }
-  }
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
+    if (!req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
+      continue;
 
-  if (Type superclass = proto->getSuperclass()) {
-    proto->diagnose(
+    if (req.getKind() == RequirementKind::Superclass) {
+      // A marker protocol cannot have a superclass requirement.
+      proto->diagnose(
         diag::marker_protocol_inherit_class,
-        proto->getName(), superclass);
+        proto->getName(), req.getSecondType());
+    } else if (req.getKind() == RequirementKind::Conformance) {
+      // A marker protocol cannot inherit a non-marker protocol.
+      auto inheritedProto = req.getProtocolDecl();
+      if (!inheritedProto->isMarkerProtocol()) {
+        proto->diagnose(
+            diag::marker_protocol_inherit_nonmarker,
+            proto->getName(), inheritedProto->getName());
+        inheritedProto->diagnose( diag::decl_declared_here, inheritedProto);
+      }
+    }
   }
 
   // A marker protocol cannot have any requirements.
@@ -7342,6 +7500,14 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   }
 }
 
+void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
+  if (!Ctx.LangOpts.Target.isOSBinFormatCOFF())
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::attr_unsupported_on_target,
+                        attr->getAttrName(), Ctx.LangOpts.Target.str());
+}
+
 namespace {
 
 class ClosureAttributeChecker
@@ -7362,6 +7528,13 @@ public:
 
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
+  }
+
+  void visitNonisolatedAttr(NonisolatedAttr *attr) {
+    if (attr->isUnsafe() ||
+        !ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
+      visitDeclAttribute(attr);
+    }
   }
 
   void visitCustomAttr(CustomAttr *attr) {

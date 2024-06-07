@@ -201,3 +201,16 @@ do {
   (fn as () -> Void)() // expected-error {{no exact matches in reference to local function 'fn'}}
   (fn_1 as () -> Void)() // expected-error {{cannot convert value of type '(Bool) -> ()' to type '() -> Void' in coercion}}
 }
+
+// Test generic parameter inference through casts
+do {
+  class A<T> {
+  }
+
+  class B<U> : A<U> {
+  }
+
+  func test(v: any B<Int> & Sendable) {
+    _ = v as A // infers `Int` for `A.T`
+  }
+}

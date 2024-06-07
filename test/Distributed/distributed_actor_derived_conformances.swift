@@ -11,4 +11,4 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 distributed actor DA: Comparable {}
 // expected-error@-1 {{type 'DA' does not conform to protocol 'Comparable'}}
-// expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for actor declarations}}
+// expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for distributed actor declarations}}

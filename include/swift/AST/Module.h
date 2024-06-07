@@ -18,6 +18,7 @@
 #define SWIFT_MODULE_H
 
 #include "swift/AST/AccessNotes.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -551,7 +552,7 @@ public:
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
 
   /// Returns true if this module is the Clang overlay of \p other.
-  bool isClangOverlayOf(ModuleDecl *other);
+  bool isClangOverlayOf(ModuleDecl *other) const;
 
   /// Returns true if this module is the same module or either module is a clang
   /// overlay of the other.
@@ -711,6 +712,26 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
+  /// Returns true if -experimental-allow-non-resilient-access was passed
+  /// and the module is built from source.
+  bool allowNonResilientAccess() const {
+    return Bits.ModuleDecl.AllowNonResilientAccess &&
+          !Bits.ModuleDecl.IsBuiltFromInterface;
+  }
+  void setAllowNonResilientAccess(bool flag = true) {
+    Bits.ModuleDecl.AllowNonResilientAccess = flag;
+  }
+
+  /// Returns true if -experimental-package-cmo was passed, which
+  /// enables serialization of package, public, and inlinable decls in a
+  /// package. This requires -experimental-allow-non-resilient-access.
+  bool serializePackageEnabled() const {
+    return Bits.ModuleDecl.SerializePackageEnabled;
+  }
+  void setSerializePackageEnabled(bool flag = true) {
+    Bits.ModuleDecl.SerializePackageEnabled = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///
@@ -756,6 +777,15 @@ public:
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
+  /// True if this module is resilient AND also does _not_ allow
+  /// non-resilient access; the module can allow such access if
+  /// package optimization is enabled so its client modules within
+  /// the same package can have a direct access to decls in this
+  /// module even if it's built resiliently.
+  bool isStrictlyResilient() const {
+    return isResilient() && !allowNonResilientAccess();
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -846,6 +876,7 @@ public:
                                            bool allowMissing = false);
 
   /// Global conformance lookup, checks conditional requirements.
+  /// Requires a contextualized type.
   ///
   /// \param type The type for which we are computing conformance. Must not
   /// contain type parameters.
@@ -859,8 +890,32 @@ public:
   /// \returns An invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
   ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
-                                          // Note: different default than above
-                                          bool allowMissing = true);
+                              // Note: different default from lookupConformance
+                              bool allowMissing = true);
+
+  /// Global conformance lookup, checks conditional requirements.
+  /// Accepts interface types without context. If the conformance cannot be
+  /// definitively established without the missing context, returns \c nullopt.
+  ///
+  /// \param type The type for which we are computing conformance. Must not
+  /// contain type parameters.
+  ///
+  /// \param protocol The protocol to which we are computing conformance.
+  ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
+  /// \returns An invalid conformance if the search definitively failed. An
+  /// abstract, concrete or pack conformance, depending on the lookup type,
+  /// if the search succeeded. `std::nullopt` if the type could have
+  /// conditionally conformed depending on the context of the interface types.
+  std::optional<ProtocolConformanceRef>
+  checkConformanceWithoutContext(Type type,
+                                 ProtocolDecl *protocol,
+                                 // Note: different default from lookupConformance
+                                 bool allowMissing = true);
+
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
@@ -1049,6 +1104,24 @@ public:
   /// for that.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
+  struct ImportCollector {
+    SmallPtrSet<const ModuleDecl *, 4> imports;
+    llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+        qualifiedImports;
+    AccessLevel minimumDocVisibility = AccessLevel::Private;
+    llvm::function_ref<bool(const ModuleDecl *)> importFilter = nullptr;
+
+    void collect(const ImportedModule &importedModule);
+
+    ImportCollector() = default;
+    ImportCollector(AccessLevel minimumDocVisibility)
+        : minimumDocVisibility(minimumDocVisibility) {}
+  };
+
+  void
+  getDisplayDeclsRecursivelyAndImports(SmallVectorImpl<Decl *> &results,
+                                       ImportCollector &importCollector) const;
+
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
   /// Generate the list of libraries needed to link this module, based on its
@@ -1228,11 +1301,10 @@ inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
 
-/// Collects modules that this module imports via `@_exported import`.
-void collectParsedExportedImports(const ModuleDecl *M,
-                                  SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
-                                  llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
+/// If the import that would make the given declaration visibile is absent,
+/// emit a diagnostic and a fix-it suggesting adding the missing import.
+bool diagnoseMissingImportForMember(const ValueDecl *decl,
+                                    const DeclContext *dc, SourceLoc loc);
 
 } // end namespace swift
 

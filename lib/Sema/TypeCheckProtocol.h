@@ -112,6 +112,9 @@ enum class ResolveWitnessResult {
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
+  /// Whether we already suggested adding `@preconcurrency`.
+  bool suggestedPreconcurrency = false;
+
 public:
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
@@ -222,6 +225,16 @@ void diagnoseConformanceFailure(Type T,
 AssociatedTypeDecl *findDefaultedAssociatedType(
     DeclContext *dc, NominalTypeDecl *adoptee,
     AssociatedTypeDecl *assocType);
+
+/// Determine whether this witness has an `@_implements` attribute whose
+/// name matches that of the given requirement.
+bool witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
+                                             ValueDecl *requirement);
+
+/// Determine whether this witness has an `@_implements` attribute whose name
+/// and protocol match that of the requirement exactly.
+bool witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
+                                                 ValueDecl *requirement);
 
 }
 

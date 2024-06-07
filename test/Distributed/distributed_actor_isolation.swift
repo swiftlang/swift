@@ -203,16 +203,16 @@ func test_params(
 
 // Actor initializer isolation (through typechecking only!)
 distributed actor DijonMustard {
-  nonisolated init(system: FakeActorSystem) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init(system: FakeActorSystem) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in the Swift 6 language mode}} {{3-15=}}
 
-  convenience init(conv: FakeActorSystem) { // expected-warning {{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
+  convenience init(conv: FakeActorSystem) { // expected-warning {{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{3-15=}}
     self.init(system: conv)
     self.f() // expected-error {{call to actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   }
 
   func f() {} // expected-note {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 
-  nonisolated init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in the Swift 6 language mode}} {{3-15=}}
     self.init(system: conv2)
   }
 }

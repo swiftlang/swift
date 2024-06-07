@@ -779,6 +779,11 @@ of a header as non-`Sendable` so that you can make spot exceptions with
 
 ## `@_objcImplementation(CategoryName)`
 
+A pre-stable form of `@implementation`. The main difference between them is that
+many things that are errors with `@implementation` are warnings with
+`@_objcImplementation`, which permitted workarounds for compiler bugs and 
+changes in compiler behavior.
+
 Declares an extension that defines an implementation for the Objective-C
 category `CategoryName` on the class in question, or for the main `@interface`
 if the argument list is omitted.
@@ -841,12 +846,6 @@ Notes:
 
 * We don't currently plan to support ObjC generics.
 
-* Eventually, we want the main `@_objcImplementation` extension to be able to
-  declare stored properties that aren't in the interface. We also want
-  `final` stored properties to be allowed to be resilent Swift types, but
-  it's not clear how to achieve that without boxing them in `__SwiftValue`
-  (which we might do as a stopgap).
-     
 * We should think about ObjC "direct" members, but that would probably
   require a way to spell this in Swift. 
 
@@ -956,12 +955,16 @@ the memory of the annotated type:
   threads, writes don't overlap with reads or writes coming from the same
   thread, and that the pointer is not used after the value is moved or
   consumed.
-- When the value is moved, a bitwise copy of its memory is performed to the new
-  address of the value in its new owner. As currently implemented, raw storage
-  types are not suitable for storing values which are not bitwise-movable, such
-  as nontrivial C++ types, Objective-C weak references, and data structures
-  such as `pthread_mutex_t` which are implemented in C as always requiring a
-  fixed address.
+- By default, when the value is moved a bitwise copy of its memory is performed
+  to the new address of the value in its new owner. This makes it unsuitable to
+  store not bitwise-movable types such as nontrivial C++ types, Objective-C weak
+  references, and data structures such as `pthread_mutex_t` which are
+  implemented in C as always requiring a fixed address. However, you can provide
+  `movesAsLike` to the `like:` version of this attribute to enforce that moving
+  the value will defer its move semantics to the type it's like. This makes it
+  suitable for storing such values that are not bitwise-movable. Note that the
+  raw storage for this variant must always be properly initialized after
+  initialization because foreign moves will assume an initialized state.
 
 Using the `@_rawLayout` attribute will suppress the annotated type from
 being implicitly `Sendable`. If the type is safe to access across threads, it
@@ -988,6 +991,11 @@ forms are currently accepted:
 - `@_rawLayout(likeArrayOf: T, count: N)` specifies the type's size should be
   `MemoryLayout<T>.stride * N` and alignment should match `T`'s, like an
   array of N contiguous elements of `T` in memory.
+- `@_rawLayout(like: T, movesAsLike)` specifies the type's size and alignment
+  should be equal to the type `T`'s. It also guarantees that moving a value of
+  this raw layout type will have the same move semantics as the type it's like.
+  This is important for things like ObjC weak references and non-trivial move
+  constructors in C++.
 
 A notable difference between `@_rawLayout(like: T)` and
 `@_rawLayout(likeArrayOf: T, count: 1)` is that the latter will pad out the
@@ -1135,7 +1143,7 @@ doing a textual search.
 
 Like `@available`, this attribute indicates a decl is available only as an SPI.
 This implies several behavioral changes comparing to regular `@available`:
-1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+1. Type checker diagnoses when a client accidentally exposes such a symbol in library APIs.
 2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
 3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
 

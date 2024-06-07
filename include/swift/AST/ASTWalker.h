@@ -102,8 +102,8 @@ enum class MacroWalking {
   None
 };
 
-/// A scheme for walking a `MemberTypeRepr`.
-enum class MemberTypeReprWalkingScheme {
+/// A scheme for walking a `QualifiedIdentTypeRepr`.
+enum class QualifiedIdentTypeReprWalkingScheme {
   /// Walk in source order, such that each subsequent dot-separated component is
   /// a child of the previous one. For example, walk `A.B<T.U>.C` like so
   /// (top-down order):
@@ -593,9 +593,10 @@ public:
     return Action::Continue();
   }
 
-  /// This method configures how to walk `MemberTypeRepr` nodes.
-  virtual MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const {
-    return MemberTypeReprWalkingScheme::ASTOrderRecursive;
+  /// This method configures how to walk `QualifiedIdentTypeRepr` nodes.
+  virtual QualifiedIdentTypeReprWalkingScheme
+  getQualifiedIdentTypeReprWalkingScheme() const {
+    return QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive;
   }
 
   /// This method configures whether the walker should explore into the generic

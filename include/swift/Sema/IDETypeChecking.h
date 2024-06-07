@@ -162,6 +162,15 @@ namespace swift {
   void
   getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
 
+  /// Get all of the top-level declarations that should be printed as part of
+  /// this module. This may force synthesis of top-level declarations that
+  /// \p getDisplayDeclsForModule would only return if previous
+  /// work happened to have synthesized them.
+  void getTopLevelDeclsForDisplay(
+      ModuleDecl *M, SmallVectorImpl<Decl *> &Results,
+      llvm::function_ref<void(ModuleDecl *, SmallVectorImpl<Decl *> &)>
+          getDisplayDeclsForModule);
+
   struct ExtensionInfo {
     // The extension with the declarations to apply.
     ExtensionDecl *Ext;

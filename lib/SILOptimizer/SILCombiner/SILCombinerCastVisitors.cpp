@@ -183,7 +183,7 @@ private:
       auto *next = inst->getSingleUse();
       assert(next);
       assert(rest.empty() || bool(next->getUser() == rest.back()));
-      next->set(SILUndef::get(next->get()->getType(), inst->getModule()));
+      next->set(SILUndef::get(next->get()));
       SC.eraseInstFromFunction(*inst);
     }
   }

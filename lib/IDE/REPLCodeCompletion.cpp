@@ -186,7 +186,7 @@ public:
         context.getResultSink().Results);
     for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
-      if (StringRef(InsertableString).startswith(Completions.Prefix)) {
+      if (StringRef(InsertableString).starts_with(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;
         {
           llvm::raw_svector_ostream OS(PrintedResult);

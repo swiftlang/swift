@@ -37,7 +37,7 @@ protected:
   /// The specialization pass.
   SpecializationPass Pass;
 
-  IsSerialized_t Serialized;
+  swift::SerializedKind_t Serialized;
 
   /// The original function which is specialized.
   SILFunction *Function;
@@ -50,12 +50,12 @@ protected:
   PossibleEffects RemovedEffects;
 
 protected:
-  SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
+  SpecializationMangler(SpecializationPass P, swift::SerializedKind_t Serialized,
                         SILFunction *F)
       : Pass(P), Serialized(Serialized), Function(F),
         ArgOpBuffer(ArgOpStorage) {}
 
-  SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
+  SpecializationMangler(SpecializationPass P, swift::SerializedKind_t Serialized,
                         std::string functionName)
       : Pass(P), Serialized(Serialized), Function(nullptr),
         FunctionName(functionName), ArgOpBuffer(ArgOpStorage) {}
@@ -88,7 +88,7 @@ class GenericSpecializationMangler : public SpecializationMangler {
                                       SubstitutionMap subs);
 
 public:
-  GenericSpecializationMangler(SILFunction *F, IsSerialized_t Serialized)
+  GenericSpecializationMangler(SILFunction *F, swift::SerializedKind_t Serialized)
       : SpecializationMangler(SpecializationPass::GenericSpecializer,
                               Serialized, F) {}
 
@@ -103,7 +103,7 @@ public:
   /// This is the default for generic specializations.
   ///
   /// \param alternativeMangling   true for specialized functions with a
-  ///                              differet resilience expansion.
+  ///                              different resilience expansion.
   /// \param metatyeParamsRemoved  true if non-generic metatype parameters are
   ///                              removed in the specialized function.
   std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,

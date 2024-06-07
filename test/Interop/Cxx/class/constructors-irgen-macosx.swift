@@ -18,6 +18,7 @@ public func createHasVirtualBase() -> HasVirtualBase {
 public func createImplicitDefaultConstructor() -> ImplicitDefaultConstructor {
   // ITANIUM_X64: define swiftcc i32 @"$s7MySwift32createImplicitDefaultConstructorSo0deF0VyF"()
   // ITANIUM_X64-NOT: define
+  // ITANIUM_X64: call void @llvm.memset.p0.i64
   // ITANIUM_X64: call void @_ZN26ImplicitDefaultConstructorC1Ev(ptr %{{[0-9]+}})
   return ImplicitDefaultConstructor()
 }

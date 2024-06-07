@@ -284,7 +284,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
-        TypeChecker::contextualizeTopLevelCode(TLCD);
       } else {
         TypeChecker::typeCheckDecl(D);
       }
@@ -316,7 +315,11 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     SF->typeCheckDelayedFunctions();
   }
 
-  diagnoseUnnecessaryPreconcurrencyImports(*SF);
+  // If region based isolation is enabled, we diagnose unnecessary
+  // preconcurrency imports in the SIL pipeline in the
+  // DiagnoseUnnecessaryPreconcurrencyImports pass.
+  if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))
+    diagnoseUnnecessaryPreconcurrencyImports(*SF);
   diagnoseUnnecessaryPublicImports(*SF);
 
   // Check to see if there are any inconsistent imports.
@@ -377,6 +380,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
+    diagnoseObjCCategoryConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
     diagnoseAttrsAddedByAccessNote(SF);
@@ -490,10 +494,11 @@ namespace {
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       // Only unqualified identifiers can reference generic parameters.
-      if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
-        auto name = simpleIdentTR->getNameRef().getBaseIdentifier();
+      auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(T);
+      if (unqualIdentTR && !unqualIdentTR->hasGenericArgList()) {
+        auto name = unqualIdentTR->getNameRef().getBaseIdentifier();
         if (auto *paramDecl = params->lookUpGenericParam(name)) {
-          simpleIdentTR->setValue(paramDecl, dc);
+          unqualIdentTR->setValue(paramDecl, dc);
         }
       }
 
@@ -580,7 +585,7 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
 
   StringRef Str = Name.getIdentifier().str();
   for (auto forbiddenPrefix : C.TypeCheckerOpts.DebugForbidTypecheckPrefixes) {
-    if (Str.startswith(forbiddenPrefix)) {
+    if (Str.starts_with(forbiddenPrefix)) {
       llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
     }
   }

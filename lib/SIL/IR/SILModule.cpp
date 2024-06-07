@@ -315,23 +315,23 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 
   // Several operation names have suffixes and don't match the name from
   // Builtins.def, so handle those first.
-  if (OperationName.startswith("fence_"))
+  if (OperationName.starts_with("fence_"))
     Info.ID = BuiltinValueKind::Fence;
-  else if (OperationName.startswith("ifdef_"))
+  else if (OperationName.starts_with("ifdef_"))
     Info.ID = BuiltinValueKind::Ifdef;
-  else if (OperationName.startswith("cmpxchg_"))
+  else if (OperationName.starts_with("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
-  else if (OperationName.startswith("atomicrmw_"))
+  else if (OperationName.starts_with("atomicrmw_"))
     Info.ID = BuiltinValueKind::AtomicRMW;
-  else if (OperationName.startswith("atomicload_"))
+  else if (OperationName.starts_with("atomicload_"))
     Info.ID = BuiltinValueKind::AtomicLoad;
-  else if (OperationName.startswith("atomicstore_"))
+  else if (OperationName.starts_with("atomicstore_"))
     Info.ID = BuiltinValueKind::AtomicStore;
-  else if (OperationName.startswith("allocWithTailElems_"))
+  else if (OperationName.starts_with("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
-  else if (OperationName.startswith("applyDerivative_"))
+  else if (OperationName.starts_with("applyDerivative_"))
     Info.ID = BuiltinValueKind::ApplyDerivative;
-  else if (OperationName.startswith("applyTranspose_"))
+  else if (OperationName.starts_with("applyTranspose_"))
     Info.ID = BuiltinValueKind::ApplyTranspose;
   else
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
@@ -680,10 +680,33 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
   SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedLocalArchetypes++;
-    def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
+    def = ::new PlaceholderValue(inFunction,
+                                 SILType::getPrimitiveAddressType(archetype));
   }
 
   return def;
+}
+
+void SILModule::reclaimUnresolvedLocalArchetypeDefinitions() {
+  llvm::DenseMap<LocalArchetypeKey, SILValue> newLocalArchetypeDefs;
+
+  for (auto pair : RootLocalArchetypeDefs) {
+    if (auto *placeholder = dyn_cast<PlaceholderValue>(pair.second)) {
+      // If a placeholder has no uses, the instruction that introduced it
+      // was deleted before the local archetype was resolved. Reclaim the
+      // placeholder so that we don't complain.
+      if (placeholder->use_empty()) {
+        assert(numUnresolvedLocalArchetypes > 0);
+        --numUnresolvedLocalArchetypes;
+        ::delete placeholder;
+        continue;
+      }
+    }
+
+    newLocalArchetypeDefs.insert(pair);
+  }
+
+  std::swap(newLocalArchetypeDefs, RootLocalArchetypeDefs);
 }
 
 bool SILModule::hasUnresolvedLocalArchetypeDefinitions() {
@@ -752,6 +775,8 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
       auto *placeholder = cast<PlaceholderValue>(val);
       placeholder->replaceAllUsesWith(dependency);
       ::delete placeholder;
+
+      assert(numUnresolvedLocalArchetypes > 0);
       numUnresolvedLocalArchetypes--;
     }
     val = dependency;
@@ -760,6 +785,12 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
+  for (auto &op : inst->getAllOperands()) {
+    if (auto *undef = dyn_cast<SILUndef>(op.get())) {
+      op.set(SILUndef::get(inst->getFunction(), undef->getType()));
+    }
+  }
+
   inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
                                          SILValue dependency) {
     LocalArchetypeKey key = {archeTy, fromFunction};
@@ -905,7 +936,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
 }
 
 SILProperty *
-SILProperty::create(SILModule &M, bool Serialized, AbstractStorageDecl *Decl,
+SILProperty::create(SILModule &M, unsigned Serialized, AbstractStorageDecl *Decl,
                     std::optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);

@@ -149,75 +149,44 @@ extension _ArrayBufferProtocol {
     elementsOf newValues: __owned C
   ) where C: Collection, C.Element == Element {
     _internalInvariant(startIndex == 0, "_SliceBuffer should override this function.")
-    let oldCount = self.count
+    let elements = self.firstElementAddress
+
+    // erase all the elements we're replacing to create a hole
+    let holeStart = elements + subrange.lowerBound
+    let holeEnd = holeStart + newCount
     let eraseCount = subrange.count
+    holeStart.deinitialize(count: eraseCount)
 
     let growth = newCount - eraseCount
-    // This check will prevent storing a 0 count to the empty array singleton.
+
     if growth != 0 {
-      self.count = oldCount + growth
+      let tailStart = elements + subrange.upperBound
+      let tailCount = self.count - subrange.upperBound
+      holeEnd.moveInitialize(from: tailStart, count: tailCount)
+      self.count += growth
     }
 
-    let elements = self.subscriptBaseAddress
-    let oldTailIndex = subrange.upperBound
-    let oldTailStart = elements + oldTailIndex
-    let newTailIndex = oldTailIndex + growth
-    let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subrange.upperBound
-
-    if growth > 0 {
-      // Slide the tail part of the buffer forwards, in reverse order
-      // so as not to self-clobber.
-      newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
-
-      // Update the original subrange
-      var i = newValues.startIndex
-      for j in subrange {
-        elements[j] = newValues[i]
-        newValues.formIndex(after: &i)
+    // don't use UnsafeMutableBufferPointer.initialize(fromContentsOf:)
+    // since it behaves differently on collections that misreport count,
+    // and breaks validation tests for those usecases / potentially
+    // breaks ABI guarantees.
+    if newCount > 0 {
+      let done: Void? = newValues.withContiguousStorageIfAvailable {
+        _precondition(
+          $0.count == newCount,
+          "invalid Collection: count differed in successive traversals"
+        )
+        holeStart.initialize(from: $0.baseAddress!, count: newCount)
       }
-      // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(to: newValues[i])
-        newValues.formIndex(after: &i)
-      }
-      _expectEnd(of: newValues, is: i)
-    }
-    else { // We're not growing the buffer
-      // Assign all the new elements into the start of the subrange
-      var i = subrange.lowerBound
-      var j = newValues.startIndex
-      for _ in 0..<newCount {
-        elements[i] = newValues[j]
-        i += 1
-        newValues.formIndex(after: &j)
-      }
-      _expectEnd(of: newValues, is: j)
-
-      // If the size didn't change, we're done.
-      if growth == 0 {
-        return
-      }
-
-      // Move the tail backward to cover the shrinkage.
-      let shrinkage = -growth
-      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
-
-        // Update the rest of the replaced range with the first
-        // part of the tail.
-        newTailStart.moveUpdate(from: oldTailStart, count: shrinkage)
-
-        // Slide the rest of the tail back
-        oldTailStart.moveInitialize(
-          from: oldTailStart + shrinkage, count: tailCount - shrinkage)
-      }
-      else {                      // Tail fits within erased elements
-        // Update the start of the replaced range with the tail
-        newTailStart.moveUpdate(from: oldTailStart, count: tailCount)
-
-        // Destroy elements remaining after the tail in subrange
-        (newTailStart + tailCount).deinitialize(
-          count: shrinkage - tailCount)
+      if done == nil {
+        var place = holeStart
+        var i = newValues.startIndex
+        while place < holeEnd {
+          place.initialize(to: newValues[i])
+          place += 1
+          newValues.formIndex(after: &i)
+        }
+        _expectEnd(of: newValues, is: i)
       }
     }
   }

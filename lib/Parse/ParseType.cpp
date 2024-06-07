@@ -53,12 +53,12 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
   }
 
-  if (ResultDependsOnLoc.isValid()) {
-    ty = new (p.Context) ResultDependsOnTypeRepr(ty, ResultDependsOnLoc);
-  }
-
   if (TransferringLoc.isValid()) {
     ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
+  }
+
+  if (SendingLoc.isValid()) {
+    ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
   if (!lifetimeDependenceSpecifiers.empty()) {
@@ -311,13 +311,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // Wrap in an InverseTypeRepr if needed.
   if (tildeLoc) {
-    TypeRepr *repr;
-    if (EnabledNoncopyableGenerics)
-      repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
-    else
-      repr =
-          ErrorTypeRepr::create(Context, tildeLoc, diag::cannot_suppress_here);
-
+    TypeRepr *repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
     ty = makeParserResult(ty, repr);
   }
 
@@ -562,10 +556,11 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
         // Only unqualified identifiers can reference generic parameters.
-        if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+        auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(T);
+        if (unqualIdentTR && !unqualIdentTR->hasGenericArgList()) {
           if (auto *genericParam = dyn_cast_or_null<GenericTypeParamDecl>(
-                  simpleIdentTR->getBoundDecl())) {
-            simpleIdentTR->overwriteNameRef(genericParam->createNameRef());
+                  unqualIdentTR->getBoundDecl())) {
+            unqualIdentTR->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return Action::Continue();
@@ -1140,7 +1135,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 
 /// FIXME: This is an egregious hack.
 static bool isMacroSignatureFile(SourceFile &sf) {
-  return sf.getFilename().startswith("Macro signature of");
+  return sf.getFilename().starts_with("Macro signature of");
 }
 
 /// parseTypeTupleBody
@@ -1413,7 +1408,7 @@ bool Parser::isOptionalToken(const Token &T) const {
   if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
     // We'll munch off the '?', so long as it is left-bound with
     // the type (i.e., parsed as a postfix or unspaced binary operator).
-    return T.getText().startswith("?");
+    return T.getText().starts_with("?");
   }
 
   return false;
@@ -1429,7 +1424,7 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
   if (T.is(tok::oper_postfix) || T.is(tok::oper_binary_unspaced)) {
     // We'll munch off the '!', so long as it is left-bound with
     // the type (i.e., parsed as a postfix or unspaced binary operator).
-    return T.getText().startswith("!");
+    return T.getText().starts_with("!");
   }
 
   return false;
@@ -1563,6 +1558,15 @@ bool Parser::canParseType() {
   case tok::kw_Any:
   case tok::identifier:
   case tok::code_complete:
+    if (!canParseTypeIdentifier())
+      return false;
+    break;
+  case tok::oper_prefix:
+    if (Tok.getText() != "~") {
+      return false;
+    }
+
+    consumeToken();
     if (!canParseTypeIdentifier())
       return false;
     break;

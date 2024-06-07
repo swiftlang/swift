@@ -298,7 +298,7 @@ class BarFrame: PictureFrame {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrame: NotIsolatedPictureFrame {
-// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'BazFrame' has different actor isolation from nonisolated superclass 'NotIsolatedPictureFrame'; this is an error in Swift 6}}
+// expected-note@-1 2 {{class 'BazFrame' does not conform to the 'Sendable' protocol}}
   init() {
     super.init(size: 0)
   }
@@ -322,10 +322,12 @@ func check() async {
   _ = await BarFrame()
   _ = await FooFrame()
   _ = await BazFrame()
+  // expected-warning@-1 {{non-sendable type 'BazFrame' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary; this is an error in the Swift 6 language mode}}
 
   _ = await BarFrame(size: 0)
   _ = await FooFrame(size: 0)
   _ = await BazFrame(size: 0)
+  // expected-warning@-1 {{non-sendable type 'BazFrame' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary; this is an error in the Swift 6 language mode}}
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -365,7 +367,7 @@ func testSender(
 
   sender.sendAnyArray([sendableObject])
   sender.sendAnyArray([nonSendableObject])
-  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in Swift 6}}
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
 
   sender.sendGeneric(sendableGeneric) // no warning
 
@@ -393,7 +395,7 @@ extension SomeWrapper: Sendable where T: Sendable {}
   func makeCall(slowServer: SlowServer) {
     slowServer.doSomethingSlow("churn butter") { (_ : Int) in
       let _ = self.isolatedThing
-      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure; this is an error in Swift 6}}
+      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
     }
   }
 }

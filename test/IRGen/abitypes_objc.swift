@@ -20,6 +20,7 @@ import Foundation
 // arm64_32-watchos: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 // arm64-watchos: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 // arm64-macosx: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
+// arm64-xros: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
   // x86_64-macosx: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
@@ -48,6 +49,8 @@ class Foo {
   // arm64-watchos: define internal [[ARM64_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
   // x86_64-watchos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
   // x86_64-watchos: define internal { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
+  // arm64-xros: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(ptr swiftself %0) {{.*}} {
+  // arm64-xros: define internal [[ARM64_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1) {{[#0-9]*}} {
   @objc dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }

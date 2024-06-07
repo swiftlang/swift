@@ -8,14 +8,16 @@ enum Payload_D: Decodable {
   case plain(String)
   case pair(key: String, value: String)
 
-  enum CodingKeys: CodingKey {
+  private enum CodingKeys: CodingKey {
     case plain
     case pair
   }
-  enum PlainCodingKeys: CodingKey {
+
+  private enum PlainCodingKeys: CodingKey {
     case _0
   }
-  enum PairCodingKeys: CodingKey {
+
+  private enum PairCodingKeys: CodingKey {
     case key
     case value
   }

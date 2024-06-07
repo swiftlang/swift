@@ -378,6 +378,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
+  PASS_THROUGH_REFERENCE(ExtractFunctionIsolation, getFunctionExpr);
 
   NO_REFERENCE(Tuple);
   SIMPLE_REFERENCE(Array, getInitializer);
@@ -723,6 +724,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedSpecialize:
   case ExprKind::UnresolvedMember:
   case ExprKind::UnresolvedDot:
+  case ExprKind::ExtractFunctionIsolation:
     return true;
 
   case ExprKind::Sequence:
@@ -1032,6 +1034,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::MacroExpansion:
   case ExprKind::CurrentContextIsolation:
   case ExprKind::ActorIsolationErasure:
+  case ExprKind::ExtractFunctionIsolation:
     return false;
   }
 
@@ -1350,21 +1353,28 @@ VarDecl *CaptureListEntry::getVar() const {
   return PBD->getSingleVar();
 }
 
-bool CaptureListEntry::isSimpleSelfCapture() const {
+bool CaptureListEntry::isSimpleSelfCapture(bool excludeWeakCaptures) const {
   auto *Var = getVar();
   auto &ctx = Var->getASTContext();
 
   if (Var->getName() != ctx.Id_self)
     return false;
 
-  if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-    if (attr->get() == ReferenceOwnership::Weak)
-      return false;
-
   if (PBD->getPatternList().size() != 1)
     return false;
 
   auto *expr = PBD->getInit(0);
+
+  if (auto *attr = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+    if (attr->get() == ReferenceOwnership::Weak && excludeWeakCaptures) {
+      return false;
+    }
+  }
+
+  // Look through any ImplicitConversionExpr that may contain the DRE
+  if (auto conversion = dyn_cast_or_null<ImplicitConversionExpr>(expr)) {
+    expr = conversion->getSubExpr();
+  }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
@@ -2211,7 +2221,7 @@ TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                   DeclContext *DC) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
+  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   return new (C) TypeExpr(Repr);
 }
@@ -2219,7 +2229,7 @@ TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
 TypeExpr *TypeExpr::createImplicitForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                           DeclContext *DC, Type ty) {
   ASTContext &C = Decl->getASTContext();
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
+  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   auto result = new (C) TypeExpr(Repr);
   assert(ty && !ty->hasTypeParameter());
@@ -2237,26 +2247,26 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   assert(NameLoc.isValid());
 
   // The base is the parent type.
-  auto *BaseTR =
-      new (C) SimpleIdentTypeRepr(ParentNameLoc, Parent->createNameRef());
+  auto *BaseTR = UnqualifiedIdentTypeRepr::create(C, ParentNameLoc,
+                                                  Parent->createNameRef());
   BaseTR->setValue(Parent, nullptr);
 
-  auto *MemberTR =
-      MemberTypeRepr::create(C, BaseTR, NameLoc, Decl->createNameRef());
-  MemberTR->setValue(Decl, nullptr);
+  auto *QualIdentTR =
+      QualifiedIdentTypeRepr::create(C, BaseTR, NameLoc, Decl->createNameRef());
+  QualIdentTR->setValue(Decl, nullptr);
 
-  return new (C) TypeExpr(MemberTR);
+  return new (C) TypeExpr(QualIdentTR);
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(TypeRepr *ParentTR, DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
-  auto *MemberTR =
-      MemberTypeRepr::create(C, ParentTR, NameLoc, Decl->createNameRef());
-  MemberTR->setValue(Decl, nullptr);
+  auto *QualIdentTR = QualifiedIdentTypeRepr::create(C, ParentTR, NameLoc,
+                                                     Decl->createNameRef());
+  QualIdentTR->setValue(Decl, nullptr);
 
-  return new (C) TypeExpr(MemberTR);
+  return new (C) TypeExpr(QualIdentTR);
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
@@ -2270,12 +2280,12 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
     return nullptr;
   }
 
-  if (isa<IdentTypeRepr>(ParentTR)) {
-    specializedTR = GenericIdentTypeRepr::create(
+  if (isa<UnqualifiedIdentTypeRepr>(ParentTR)) {
+    specializedTR = UnqualifiedIdentTypeRepr::create(
         C, ParentTR->getNameLoc(), ParentTR->getNameRef(), Args, AngleLocs);
     specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
   } else {
-    auto *const memberTR = cast<MemberTypeRepr>(ParentTR);
+    auto *const qualIdentTR = cast<QualifiedIdentTypeRepr>(ParentTR);
     if (isa<TypeAliasDecl>(boundDecl)) {
       // If any of our parent types are unbound, bail out and let
       // the constraint solver can infer generic parameters for them.
@@ -2289,7 +2299,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
       //
       // FIXME: Once we can model generic typealiases properly, rip
       // this out.
-      MemberTypeRepr *currTR = memberTR;
+      QualifiedIdentTypeRepr *currTR = qualIdentTR;
       while (auto *declRefBaseTR =
                  dyn_cast<DeclRefTypeRepr>(currTR->getBase())) {
         if (!declRefBaseTR->hasGenericArgList()) {
@@ -2299,16 +2309,16 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
             return nullptr;
         }
 
-        currTR = dyn_cast<MemberTypeRepr>(declRefBaseTR);
+        currTR = dyn_cast<QualifiedIdentTypeRepr>(declRefBaseTR);
         if (!currTR) {
           break;
         }
       }
     }
 
-    specializedTR =
-        MemberTypeRepr::create(C, memberTR->getBase(), ParentTR->getNameLoc(),
-                               ParentTR->getNameRef(), Args, AngleLocs);
+    specializedTR = QualifiedIdentTypeRepr::create(
+        C, qualIdentTR->getBase(), ParentTR->getNameLoc(),
+        ParentTR->getNameRef(), Args, AngleLocs);
     specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
   }
 

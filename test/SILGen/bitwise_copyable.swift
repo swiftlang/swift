@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend                           \
-// RUN:     %s                                           \
-// RUN:     -emit-silgen                                 \
-// RUN:     -disable-availability-checking               \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
+// RUN: %target-swift-frontend                                  \
+// RUN:     %s                                                  \
+// RUN:     -emit-silgen                                        \
+// RUN:     -disable-availability-checking                      \
+// RUN:     -enable-experimental-feature Sensitive              \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts
@@ -11,7 +11,7 @@
 
 import Builtin
 
-struct S : _BitwiseCopyable {
+struct S : BitwiseCopyable {
   unowned(unsafe) let c: Builtin.AnyObject
 }
 
@@ -26,7 +26,7 @@ func doit() -> B<Int> {
 struct Conditional<T> {
   var t: T
 }
-extension Conditional : _BitwiseCopyable where T : _BitwiseCopyable {}
+extension Conditional : BitwiseCopyable where T : BitwiseCopyable {}
 
 func doit() -> B<Conditional<Int>> { 
   .init(t: .init(t: 0)) 
@@ -40,10 +40,31 @@ enum Context<T> {
 
 func doit() -> Context<Int>.Here { .init(t: 0) }
 
-public enum E : _BitwiseCopyable {
+public enum E : BitwiseCopyable {
   case a
 }
 
-func take<T : _BitwiseCopyable>(_ t: T) {}
+func take<T : BitwiseCopyable>(_ t: T) {}
 
 func pass(_ e: E) { take(e) }
+
+func opacify() -> some BitwiseCopyable {
+    return Int()
+}
+
+struct NeverGoingToBeBitwiseCopyable {
+  var a: AnyObject
+}
+
+@available(*, unavailable)
+extension NeverGoingToBeBitwiseCopyable : BitwiseCopyable {
+}
+
+struct AlsoNotBitwiseCopyable : ~BitwiseCopyable {}
+
+@sensitive
+struct S_Explicit_Sensitive {
+}
+
+func takeS_Explicit_Sensitive(_ s: S_Explicit_Sensitive) {
+}

@@ -14,7 +14,7 @@ import SILBridging
 
 /// An operand of an instruction.
 public struct Operand : CustomStringConvertible, NoReflectionChildren {
-  fileprivate let bridged: BridgedOperand
+  public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
     self.bridged = bridged
@@ -60,6 +60,10 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   init(base: Operand, count: Int) {
     self.base = OptionalBridgedOperand(bridged: base.bridged)
     self.count = count
+  }
+
+  static public var empty: OperandArray {
+    OperandArray(base: OptionalBridgedOperand(bridged: nil), count: 0)
   }
 
   public var startIndex: Int { return 0 }
@@ -148,6 +152,10 @@ extension Sequence where Element == Operand {
 
   public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
+  }
+
+  public func ignore(user: Instruction) -> LazyFilterSequence<Self> {
+    self.lazy.filter { !($0.instruction == user) }
   }
 
   public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {

@@ -332,16 +332,18 @@ swift::rewriting::buildTypeDifference(
               return nextSubstitution(substitution);
             }
 
-            assert(!t->is<DependentMemberType>());
+            // DependentMemberType with ErrorType base is OK.
+            assert(!t->isTypeParameter());
             return std::nullopt;
           });
         }
       }
 
-      assert(!t->is<DependentMemberType>());
       return nextSubstitution(substitutions[index]);
     }
 
+    // DependentMemberType with ErrorType base is OK.
+    assert(!t->isTypeParameter());
     return std::nullopt;
   });
 

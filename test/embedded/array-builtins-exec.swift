@@ -31,6 +31,11 @@ struct Large : P {
   }
 }
 
+enum Enum {
+  case nontrivial(Noisy)
+  case trivial(Int)
+}
+
 func exerciseArrayValueWitnesses<T>(_ value: T) {
   let buf = UnsafeMutablePointer<T>.allocate(capacity: 5)
 
@@ -52,6 +57,8 @@ func test() {
     exerciseArrayValueWitnesses(44)
     exerciseArrayValueWitnesses(Noisy())
     exerciseArrayValueWitnesses(Large())
+    exerciseArrayValueWitnesses(Enum.trivial(42))
+    exerciseArrayValueWitnesses(Enum.nontrivial(Noisy()))
   }
   precondition(NoisyLifeCount == NoisyDeathCount)
   print("Checks out")

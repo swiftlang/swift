@@ -11,7 +11,9 @@
 
 // RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %S/Inputs/with_macro_default_arg_same_module.swift %s -o %t/main -module-name MacroUser -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t -L %t %target-rpath(%t) -lWithMacroDefaultArg -lWithMacroDefaultArgInterface
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-codesign %t/%target-library-name(WithMacroDefaultArg)
+// RUN: %target-codesign %t/%target-library-name(WithMacroDefaultArgInterface)
+// RUN: %target-run %t/main %t/%target-library-name(WithMacroDefaultArg) %t/%target-library-name(WithMacroDefaultArgInterface) | %FileCheck %s
 
 import WithMacroDefaultArg
 import WithMacroDefaultArgInterface

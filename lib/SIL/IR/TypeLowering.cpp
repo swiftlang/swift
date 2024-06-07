@@ -20,14 +20,16 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -116,6 +118,19 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
                                               TypeExpansionContext expansion) {
+  if (auto *expr = capture.getPackElement()) {
+    auto contextTy = expr->getType();
+    auto &lowering = getTypeLowering(
+        contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                            expansion.getResilienceExpansion()));
+
+    assert(!contextTy->isNoncopyable() && "Not implemented");
+    if (!lowering.isAddressOnly())
+      return CaptureKind::Constant;
+
+    return CaptureKind::Immutable;
+  }
+
   auto decl = capture.getDecl();
   auto *var = cast<VarDecl>(decl);
   assert(var->hasStorage() &&
@@ -2322,23 +2337,34 @@ namespace {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
-        bool sameModule = (D->getModuleContext() == &TC.M);
-        if (sameModule)
+        // The same should happen if the type was resilient and serialized in
+        // another module in the same package with package-cmo enabled, which
+        // treats those modules to be in the same resilience domain.
+        auto declModule = D->getModuleContext();
+        bool sameModule = (declModule == &TC.M);
+        bool serializedPackage = declModule != &TC.M &&
+                                 declModule->inSamePackage(&TC.M) &&
+                                 declModule->isResilient() &&
+                                 declModule->serializePackageEnabled();
+        auto inSameResilienceDomain = sameModule || serializedPackage;
+        if (inSameResilienceDomain)
           properties.addSubobject(RecursiveProperties::forResilient());
 
-        // If the type is in a different module, or if we're using a minimal
+        // If the type is in a different module and not in the same package
+        // resilience domain (with package-cmo), or if we're using a minimal
         // expansion, the type is address only and completely opaque to us.
         //
-        // Note: if the type is in a different module, the lowering does
-        // not depend on the resilience expansion, so we do not need to set
-        // the isResilient() flag above.
-        if (!sameModule || Expansion.getResilienceExpansion() ==
+        // Note: if the type is in a different module and not in the same
+        // package resilience domain, the lowering does not depend on the
+        // resilience expansion, so we do not need to set the isResilient()
+        // flag above.
+        if (!inSameResilienceDomain ||
+            Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
           return true;
         }
       }
-
       return false;
     }
 
@@ -2353,7 +2379,7 @@ namespace {
 
       return handleReference(classType, properties);
     }
-
+    
     // WARNING: when the specification of trivial types changes, also update
     // the isValueTrivial() API used by SILCombine.
     TypeLowering *visitAnyStructType(CanType structType,
@@ -2400,6 +2426,13 @@ namespace {
         return handleMoveOnlyAddressOnly(structType, properties);
       }
 
+      if (D->getAttrs().hasAttribute<SensitiveAttr>()) {
+        properties.setAddressOnly();
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return handleAddressOnly(structType, properties);
+      }
+
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
       // Classify the type according to its stored properties.
@@ -2433,7 +2466,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
+      if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2441,7 +2474,9 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-      if (D->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2530,7 +2565,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
+      if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2538,10 +2573,11 @@ namespace {
         return new (TC)
             MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
-
-      assert(D->canBeEscapable() == TypeDecl::CanBeInvertible::Always
-             && "missing typelowering case here!");
-
+      // Regardless of their member types, Nonescapable values have ownership
+      // for lifetime diagnostics.
+      if (!origType.isEscapable(enumType)) {
+        properties.setNonTrivial();
+      }
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
     }
@@ -3031,8 +3067,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           TypeExpansionContext forExpansion) {
-  if (!Context.LangOpts.hasFeature(Feature::BitwiseCopyable))
-    return;
   auto *bitwiseCopyableProtocol =
       Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol)
@@ -3047,10 +3081,20 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
-    if (module && module->isBuiltFromInterface()) {
-      // Don't verify for types in modules built from interfaces; the feature
-      // may not have been enabled in them.
-      return;
+    if (module) {
+      if (module->isBuiltFromInterface()) {
+        // Don't verify for types in modules built from interfaces; the feature
+        // may not have been enabled in them.
+        return;
+      }
+      auto *file = dyn_cast_or_null<FileUnit>(module->getModuleScopeContext());
+      if (file && file->getKind() == FileUnitKind::Source) {
+        auto sourceFile = nominal->getParentSourceFile();
+        if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
+          // Don't verify for types in SIL files.
+          return;
+        }
+      }
     }
   }
 
@@ -3075,6 +3119,8 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (7) being or containing a variadic generic type which doesn't conform
     //     unconditionally but does in this case
     // (8) being or containing the error type
+    // (9) explicitly suppressing conformance
+    // (10) a layout constrained archetype
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3089,6 +3135,13 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // non-conformance; walk into the rest.
           if (!nominal)
             return false;
+
+          // A trivial type that suppresses conformance doesn't conform (case
+          // (9)).
+          if (nominal && nominal->suppressesConformance(
+                             KnownProtocolKind::BitwiseCopyable)) {
+            return true;
+          }
 
           // Nominals with fields that are generic may not conform
           // unconditionally (the only kind automatically derived currently)
@@ -3137,7 +3190,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
-          if (isa<ModuleType, SILTokenType>(ty)) {
+          if (isa<ModuleType>(ty) || isa<SILTokenType>(ty)) {
             // These types should never appear within aggregates.
             assert(isTopLevel && "aggregate containing marker type!?");
             // If they did, though, they would not justify the aggregate's
@@ -3156,18 +3209,33 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return !isTopLevel;
           }
 
+          // Case (10): a layout-constrained archetype.
+          if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
+            auto constraint = archetype->getLayoutConstraint();
+            if (constraint && constraint->isTrivial()) {
+              return false;
+            }
+          }
+
           auto *nominal = ty.getAnyNominal();
 
           // Non-nominal types (besides case (3) handled above) are trivial iff
           // conforming.
           if (!nominal) {
             llvm::errs()
-                << "Non-nominal type without conformance to _BitwiseCopyable:\n"
+                << "Non-nominal type without conformance to BitwiseCopyable:\n"
                 << ty << "\n"
                 << "within " << substType << "\n"
                 << "of " << origType << "\n";
             assert(false);
             return true;
+          }
+
+          // A trivial type that suppresses conformance doesn't conform (case
+          // (9)).
+          if (nominal->suppressesConformance(
+                  KnownProtocolKind::BitwiseCopyable)) {
+            return false;
           }
 
           // A generic type may be trivial when instantiated with particular
@@ -3196,15 +3264,20 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
                    << substType << "\n"
-                   << "of " << origType << "\n";
+                   << "of " << origType << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
 
-  if (!lowering.isTrivial() && conformance) {
-    // A non-trivial type can have a conformance in one case:
-    // (1) contains a conforming archetype
+  if (!lowering.isTrivial() && conformance &&
+      !conformance.hasUnavailableConformance()) {
+    // A non-trivial type can have a conformance in a few cases:
+    // (1) containing or being a conforming archetype
     // (2) is resilient with minimal expansion
+    // (3) containing or being ~Escapable
+    // (4) containing or being an opaque archetype
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
@@ -3215,6 +3288,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal && nominal->isResilient() &&
               forExpansion.getResilienceExpansion() ==
                   ResilienceExpansion::Minimal) {
+            return true;
+          }
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
             return true;
           }
           // Walk into every aggregate.
@@ -3236,17 +3315,31 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return false;
           }
 
+          // A type that may not be escapable is non-trivial but can conform
+          // (case (3)).
+          if (nominal &&
+              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+            return false;
+          }
+
           // An archetype may conform but be non-trivial (case (1)).
           if (origTy.isTypeParameter())
             return false;
 
+          // An opaque archetype may conform but be non-trivial (case (4)).
+          if (isa<OpaqueTypeArchetypeType>(ty)) {
+            return false;
+          }
+
           return true;
         });
     if (hasNoConformingArchetypeNode) {
-      llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
+      llvm::errs() << "Non-trivial type with BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
-      llvm::errs() << "\n";
+      llvm::errs() << "\n"
+                   << "Disable this validation with -Xllvm "
+                      "-type-lowering-disable-verification.\n";
       assert(false);
     }
   }
@@ -3269,7 +3362,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                              AbstractionPattern origType)
         : TC(TC), forExpansion(forExpansion), origType(origType) {
       if (auto origEltType = origType.getVanishingTupleElementPatternType())
-        origType = *origEltType;
+        this->origType = *origEltType;
     }
 
     // AST function types are turned into SIL function types:
@@ -3572,20 +3665,37 @@ const TypeLowering *TypeConverter::getTypeLoweringForExpansion(
   return nullptr;
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(DeclContext *dc,
-                             CaptureInfo captureInfo) {
-  if (dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures())
-    return nullptr;
+static GenericSignatureWithCapturedEnvironments
+getGenericSignatureWithCapturedEnvironments(DeclContext *dc,
+                                            CaptureInfo captureInfo) {
+  auto capturedEnvs = captureInfo.getGenericEnvironments();
 
-  return dc->getGenericSignatureOfContext();
+  // A closure or local function does not need a generic signature if it
+  // doesn't capture the primary generic environment or any pack element
+  // environments from the outer scope.
+  if (dc->getParent()->isLocalContext() &&
+      capturedEnvs.empty() &&
+      !captureInfo.hasGenericParamCaptures())
+    return GenericSignatureWithCapturedEnvironments();
+
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (capturedEnvs.empty())
+    return GenericSignatureWithCapturedEnvironments(genericSig);
+
+  // Build a new generic signature where all captured element archetypes
+  // are represented by new generic parameters.
+  auto newSig = buildGenericSignatureWithCapturedEnvironments(
+      dc->getASTContext(), genericSig, capturedEnvs);
+
+  LLVM_DEBUG(llvm::dbgs() << "-- effective generic signature: " << newSig << "\n");
+  return GenericSignatureWithCapturedEnvironments(genericSig, newSig, capturedEnvs);
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(AnyFunctionRef fn,
-                             CaptureInfo captureInfo) {
-  return getEffectiveGenericSignature(fn.getAsDeclContext(), captureInfo);
+static GenericSignatureWithCapturedEnvironments
+getGenericSignatureWithCapturedEnvironments(AnyFunctionRef fn,
+                                            CaptureInfo captureInfo) {
+  return getGenericSignatureWithCapturedEnvironments(
+      fn.getAsDeclContext(), captureInfo);
 }
 
 static CanGenericSignature
@@ -3642,7 +3752,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
-  auto sig = TC.getConstantGenericSignature(c);
+  auto sig = TC.getGenericSignatureWithCapturedEnvironments(c).genericSig;
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
@@ -3695,7 +3805,8 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
     inputType = interfaceType->getCanonicalType();
   }
 
-  GenericSignature sig = TC.getConstantGenericSignature(c);
+  GenericSignature sig = TC.getGenericSignatureWithCapturedEnvironments(c)
+      .genericSig;
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
@@ -3768,30 +3879,43 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 }
 
 static CanAnyFunctionType
-getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
-                                     CanAnyFunctionType funcType,
-                                     SILDeclRef constant) {
+getAnyFunctionRefInterfaceType(TypeConverter &TC,
+                               CanAnyFunctionType funcType,
+                               SILDeclRef constant) {
   // Get transitive closure of value captured by this function, and any
   // captured functions.
   auto captureInfo = TC.getLoweredLocalCaptures(constant);
 
+  LLVM_DEBUG(llvm::dbgs() << "-- capture info: ";
+             captureInfo.print(llvm::dbgs());
+             llvm::dbgs() << "\n");
+
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
-  auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
+  auto sig = getGenericSignatureWithCapturedEnvironments(closure, captureInfo);
+
+  if (funcType->hasArchetype()) {
+    assert(isa<FunctionType>(funcType));
+    auto substType = Type(funcType).subst(
+        MapLocalArchetypesOutOfContext(sig.baseGenericSig, sig.capturedEnvs),
+        MakeAbstractConformanceForGenericType(),
+        SubstFlags::PreservePackExpansionLevel);
+    funcType = cast<FunctionType>(substType->getCanonicalType());
+  }
 
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing(),
                                       funcType->getThrownError())
-          .withConcurrent(funcType->isSendable())
+          .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
-          .withTransferringResult(funcType->hasTransferringResult())
+          .withSendingResult(funcType->hasSendingResult())
           .build();
 
   return CanAnyFunctionType::get(
-      getCanonicalSignatureOrNull(genericSig),
+      getCanonicalSignatureOrNull(sig.genericSig),
       funcType.getParams(), funcType.getResult(),
       innerExtInfo);
 }
@@ -3877,14 +4001,11 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      // FIXME: Closures could have an interface type computed by Sema.
-      funcTy = cast<AnyFunctionType>(
-        ACE->getType()->mapTypeOutOfContext()->getCanonicalType());
+      funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
     } else {
-      funcTy = cast<AnyFunctionType>(
-        vd->getInterfaceType()->getCanonicalType());
+      funcTy = cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
     }
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::EnumElement: {
@@ -3901,14 +4022,14 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                                    cd->getInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::Initializer: {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                          cd->getInitializerInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::Destroyer:
@@ -3945,10 +4066,10 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-GenericSignature 
-TypeConverter::getConstantGenericSignature(SILDeclRef c) {
+GenericSignatureWithCapturedEnvironments
+TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
-  
+
   /// Get the function generic params, including outer params.
   switch (c.kind) {
   case SILDeclRef::Kind::Func:
@@ -3957,16 +4078,17 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator: {
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
+    return ::getGenericSignatureWithCapturedEnvironments(
       *c.getAnyFunctionRef(), captureInfo);
   }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    return cast<ClassDecl>(vd)->getGenericSignature();
+    return GenericSignatureWithCapturedEnvironments(
+        cast<ClassDecl>(vd)->getGenericSignature());
   case SILDeclRef::Kind::DefaultArgGenerator: {
     // Use the generic environment of the original function.
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
+    return ::getGenericSignatureWithCapturedEnvironments(
       vd->getInnermostDeclContext(), captureInfo);
   }
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
@@ -3983,25 +4105,63 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
       } else {
         enclosingDecl = SILDeclRef(cast<AbstractFunctionDecl>(dc));
       }
-      return getConstantGenericSignature(enclosingDecl);
+      return getGenericSignatureWithCapturedEnvironments(enclosingDecl);
     }
-    return dc->getGenericSignatureOfContext();
+    return GenericSignatureWithCapturedEnvironments(
+        dc->getGenericSignatureOfContext());
   }
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return vd->getDeclContext()->getGenericSignatureOfContext();
+    return GenericSignatureWithCapturedEnvironments(
+        vd->getDeclContext()->getGenericSignatureOfContext());
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-    llvm_unreachable("Doesn't have generic signature");
+    return GenericSignatureWithCapturedEnvironments();
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
+SubstitutionMap
+TypeConverter::getSubstitutionMapWithCapturedEnvironments(
+    SILDeclRef constant, const CaptureInfo &captureInfo,
+    SubstitutionMap subs) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+  if (!sig.genericSig) {
+    assert(!sig.baseGenericSig);
+    assert(sig.capturedEnvs.empty());
+    return SubstitutionMap();
+  }
+
+  return buildSubstitutionMapWithCapturedEnvironments(
+      subs, sig.genericSig, sig.capturedEnvs);
+}
+
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  return getConstantGenericSignature(c).getGenericEnvironment();
+  return getGenericSignatureWithCapturedEnvironments(c)
+      .genericSig.getGenericEnvironment();
+}
+
+std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
+TypeConverter::getForwardingSubstitutionsForLowering(SILDeclRef constant) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+
+  auto *genericEnv = sig.baseGenericSig.getGenericEnvironment();
+  SubstitutionMap forwardingSubs;
+
+  if (sig.baseGenericSig)
+    forwardingSubs = genericEnv->getForwardingSubstitutionMap();
+
+  if (!sig.capturedEnvs.empty()) {
+    assert(sig.genericSig && !sig.genericSig->isEqual(sig.baseGenericSig));
+
+    forwardingSubs = buildSubstitutionMapWithCapturedEnvironments(
+        forwardingSubs, sig.genericSig, sig.capturedEnvs);
+  }
+
+  return std::make_tuple(genericEnv, sig.capturedEnvs, forwardingSubs);
 }
 
 SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
@@ -4094,23 +4254,48 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::MapVector<ValueDecl*,CapturedValue> captures;
+
+  // FIXME: CapturedValue should just be a hash key
+  llvm::MapVector<VarDecl *, CapturedValue> varCaptures;
+  llvm::MapVector<PackElementExpr *, CapturedValue> packElementCaptures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
   std::optional<CapturedValue> selfCapture;
 
+  // Captured pack element environments.
+  llvm::SetVector<GenericEnvironment *> genericEnv;
+
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
 
-  std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
+  std::function<void (CaptureInfo captureInfo)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
-  collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
-    assert(captureInfo.hasBeenComputed());
+  auto recordCapture = [&](CapturedValue capture) {
+    if (auto *expr = capture.getPackElement()) {
+      auto existing = packElementCaptures.find(expr);
+      if (existing != packElementCaptures.end()) {
+        existing->second = existing->second.mergeFlags(capture.getFlags());
+      } else {
+        packElementCaptures.insert(std::pair<PackElementExpr *, CapturedValue>(
+          expr, capture));
+      }
+    } else {
+      VarDecl *value = cast<VarDecl>(capture.getDecl());
+      auto existing = varCaptures.find(value);
+      if (existing != varCaptures.end()) {
+        existing->second = existing->second.mergeFlags(capture.getFlags());
+      } else {
+        varCaptures.insert(std::pair<VarDecl *, CapturedValue>(
+          value, capture));
+      }
+    }
+  };
 
+  collectCaptures = [&](CaptureInfo captureInfo) {
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
@@ -4118,9 +4303,22 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (captureInfo.hasOpaqueValueCapture())
       capturesOpaqueValue = captureInfo.getOpaqueValue();
 
-    SmallVector<CapturedValue, 4> localCaptures;
-    captureInfo.getLocalCaptures(localCaptures);
-    for (auto capture : localCaptures) {
+    // Any set of mutually-recursive local functions will capture the same
+    // element environments, because we can't "cross" a pack expansion
+    // expression.
+    for (auto *env : captureInfo.getGenericEnvironments()) {
+      genericEnv.insert(env);
+    }
+
+    for (auto capture : captureInfo.getCaptures()) {
+      if (capture.isPackElement()) {
+        recordCapture(capture);
+        continue;
+      }
+
+      if (!capture.isLocalCapture())
+        continue;
+
       // If the capture is of another local function, grab its transitive
       // captures instead.
       if (auto capturedFn = getAnyFunctionRefFromCapture(capture)) {
@@ -4232,7 +4430,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             // If we've already captured the same value already, just merge
             // flags.
             if (selfCapture && selfCapture->getDecl() == capture.getDecl()) {
-              selfCapture = selfCapture->mergeFlags(capture);
+              selfCapture = selfCapture->mergeFlags(capture.getFlags());
               continue;
 
             // Otherwise, record the canonical self capture. It will appear
@@ -4252,13 +4450,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       }
 
       // Collect non-function captures.
-      ValueDecl *value = capture.getDecl();
-      auto existing = captures.find(value);
-      if (existing != captures.end()) {
-        existing->second = existing->second.mergeFlags(capture);
-      } else {
-        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
-      }
+      recordCapture(capture);
     }
   };
 
@@ -4270,8 +4462,27 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       return;
 
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
-    auto dc = curFn.getAsDeclContext();
-    collectCaptures(curFn.getCaptureInfo(), dc);
+    collectCaptures(curFn.getCaptureInfo());
+
+    if (auto *afd = curFn.getAbstractFunctionDecl()) {
+      // If a local function inherits isolation from the enclosing context,
+      // make sure we capture the isolated parameter, if we haven't already.
+      if (afd->isLocalCapture()) {
+        auto actorIsolation = getActorIsolation(afd);
+        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+          if (auto *var = actorIsolation.getActorInstance()) {
+            assert(isa<ParamDecl>(var));
+            recordCapture(CapturedValue(var, 0, afd->getLoc()));
+	    if (var->getInterfaceType()->hasTypeParameter()) {
+	      // If the isolated parameter is of a generic (actor)
+	      // type, we need to treat as if the local function is
+	      // generic.
+	      capturesGenericParams = true;
+	    }
+          }
+        }
+      }
+    }
 
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
@@ -4282,7 +4493,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (auto *AFD = curFn.getAbstractFunctionDecl()) {
       for (auto *P : *AFD->getParameters()) {
         if (P->hasDefaultExpr())
-          collectCaptures(P->getDefaultArgumentCaptureInfo(), dc);
+          collectCaptures(P->getDefaultArgumentCaptureInfo());
       }
     }
   };
@@ -4295,10 +4506,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(static_cast<ValueDecl *>(afd),
                                      curFn.defaultArgIndex);
-        if (param->hasDefaultExpr()) {
-          auto dc = afd->getInnermostDeclContext();
-          collectCaptures(param->getDefaultArgumentCaptureInfo(), dc);
-        }
+        if (param->hasDefaultExpr())
+          collectCaptures(param->getDefaultArgumentCaptureInfo());
         return;
       }
 
@@ -4315,7 +4524,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   collectConstantCaptures(fn);
 
   SmallVector<CapturedValue, 4> resultingCaptures;
-  for (auto capturePair : captures) {
+  for (auto capturePair : varCaptures) {
+    resultingCaptures.push_back(capturePair.second);
+  }
+  for (auto capturePair : packElementCaptures) {
     resultingCaptures.push_back(capturePair.second);
   }
 
@@ -4334,9 +4546,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     resultingCaptures.push_back(*selfCapture);
   }
 
-  // Cache the uniqued set of transitive captures.
-  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
-                   capturesOpaqueValue, capturesGenericParams};
+  // Cache the result.
+  CaptureInfo info(Context, resultingCaptures,
+                   capturesDynamicSelf, capturesOpaqueValue,
+                   capturesGenericParams, genericEnv.getArrayRef());
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;
@@ -4619,6 +4832,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
                 SILFunctionLanguage::Swift) !=
         ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
+  }
+
+  // Non-throwing functions and functions with indirect error result need thunk
+  // because of the trailing error result storage parameter.
+  if (fnTy1->hasIndirectErrorResult() != fnTy2->hasIndirectErrorResult()) {
+    return ABIDifference::NeedsThunk;
   }
 
   // Asynchronous functions require a thunk if they differ in whether they

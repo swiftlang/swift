@@ -1,6 +1,7 @@
 
 public func fromClangFramework()
 
+
 // MARK: - BystandingLibrary Additions
 
 import SwiftOnoneSupport
@@ -27,49 +28,49 @@ public func fromClangFrameworkCrossImport()
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 35,
+    key.offset: 36,
     key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 38,
+    key.offset: 39,
     key.length: 35
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 75,
+    key.offset: 76,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 82,
+    key.offset: 83,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 101,
+    key.offset: 102,
     key.length: 68
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 169,
+    key.offset: 170,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 176,
+    key.offset: 177,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 181,
+    key.offset: 182,
     key.length: 29
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.module,
-    key.offset: 82,
+    key.offset: 83,
     key.length: 17,
     key.is_system: 1
   }
@@ -95,13 +96,13 @@ public func fromClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromClangFrameworkCrossImport()",
-    key.offset: 176,
+    key.offset: 177,
     key.length: 36,
-    key.nameoffset: 181,
+    key.nameoffset: 182,
     key.namelength: 31,
     key.attributes: [
       {
-        key.offset: 169,
+        key.offset: 170,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

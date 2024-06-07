@@ -12,6 +12,7 @@
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=iosmac
+// UNSUPPORTED: OS=xros
 
 // See also resilient-ancestry.swift, for the stable ABI deployment target test.
 

@@ -65,16 +65,26 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   destroy_value [[DD]]
+// SILGEN:   [[L_ADDR:%[^,]+]] = struct_element_addr [[DD]]
+// SILGEN-SAME: #KlassPairWithDeinit.lhs 
+// SILGEN:   [[L_ACCESS:%[^,]+]] = begin_access [deinit] [static] [[L_ADDR]]
+// SILGEN:   destroy_addr [[L_ACCESS]]
+// SILGEN:   [[R_ADDR:%[^,]+]] = struct_element_addr [[DD]]
+// SILGEN-SAME: #KlassPairWithDeinit.rhs 
+// SILGEN:   [[R_ACCESS:%[^,]+]] = begin_access [deinit] [static] [[R_ADDR]]
+// SILGEN:   destroy_addr [[R_ACCESS]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
-// SILGEN:   [[DD:%.*]] = drop_deinit [[MARKED]]
-// SILGEN:   destroy_value [[DD]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
 // SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
 
 ////////////////////////
@@ -323,20 +333,40 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   destroy_value [[DD]] : $KlassEnumPairWithDeinit
-// SILGEN-NEXT: tuple ()
-// SILGEN-NEXT: return
+// SILGEN:   switch_enum_addr [[DD]]
+// SILGEN-SAME:  case #KlassEnumPairWithDeinit.lhs!enumelt: [[BASIC_BLOCK1:bb[0-9]+]]
+// SILGEN-SAME:  case #KlassEnumPairWithDeinit.rhs!enumelt: [[BASIC_BLOCK2:bb[0-9]+]]
+// SILGEN: [[BASIC_BLOCK1]]:
+// SILGEN:   [[L_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #KlassEnumPairWithDeinit.lhs!enumelt
+// SILGEN:   destroy_addr [[L_ADDR]]
+// SILGEN: [[BASIC_BLOCK2]]:
+// SILGEN:   [[R_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #KlassEnumPairWithDeinit.rhs!enumelt
+// SILGEN:   destroy_addr [[R_ADDR]]
 // SILGEN: } // end sil function '$s16moveonly_deinits23KlassEnumPairWithDeinitOfD'
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   destroy_value [[DD]] : $IntEnumPairWithDeinit
-// SILGEN-NEXT: tuple ()
-// SILGEN-NEXT: return
+// SILGEN:   switch_enum_addr [[DD]]
+// SILGEN-SAME:  case #IntEnumPairWithDeinit.lhs!enumelt: [[BASIC_BLOCK1:bb[0-9]+]]
+// SILGEN-SAME:  case #IntEnumPairWithDeinit.rhs!enumelt: [[BASIC_BLOCK2:bb[0-9]+]]
+// SILGEN: [[BASIC_BLOCK1]]:
+// SILGEN:   [[L_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #IntEnumPairWithDeinit.lhs!enumelt
+// SILGEN:   destroy_addr [[L_ADDR]]
+// SILGEN: [[BASIC_BLOCK2]]:
+// SILGEN:   [[R_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #IntEnumPairWithDeinit.rhs!enumelt
+// SILGEN:   destroy_addr [[R_ADDR]]
 // SILGEN: } // end sil function '$s16moveonly_deinits21IntEnumPairWithDeinitOfD'
 
 //////////////////////

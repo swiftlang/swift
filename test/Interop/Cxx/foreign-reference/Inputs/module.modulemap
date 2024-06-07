@@ -28,6 +28,12 @@ module ReferenceCounted {
   requires cplusplus
 }
 
+module ReferenceCountedObjCProperty {
+  header "reference-counted-objc-property.h"
+  requires cplusplus
+  export *
+}
+
 module MemberLayout {
   header "member-layout.h"
   requires cplusplus

@@ -60,6 +60,8 @@ static std::string adjustClangTriple(StringRef TripleStr) {
     OS << "armv5"; break;
   case llvm::Triple::SubArchType::ARMSubArch_v5te:
     OS << "armv5te"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v4t:
+    OS << "armv4t"; break;
   default:
     // Adjust i386-macosx to x86_64 because there is no Swift stdlib for i386.
     if ((Triple.getOS() == llvm::Triple::MacOSX ||
@@ -254,8 +256,6 @@ bool ide::initCompilerInvocation(
                                      std::to_string(sessionTimestamp - 1));
     ImporterOpts.ExtraArgs.push_back(
         "-fmodules-validate-once-per-build-session");
-
-    SearchPathOpts.DisableModulesValidateSystemDependencies = true;
   }
 
   // Disable expensive SIL options to reduce time spent in SILGen.

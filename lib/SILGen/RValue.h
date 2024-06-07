@@ -234,6 +234,11 @@ public:
   /// The values must not require any cleanups.
   SILValue getUnmanagedSingleValue(SILGenFunction &SGF, SILLocation l) const &;
 
+  SILType getTypeOfSingleValue() const & {
+    assert(isComplete() && values.size() == 1);
+    return values[0].getType();
+  }
+
   ManagedValue getScalarValue() && {
     if (isInContext()) {
       makeUsed();

@@ -325,10 +325,8 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
   return true;
 }
 
-/// Computes the confluent completion using the Knuth-Bendix algorithm and
-/// returns a status code.
-///
-/// The first element of the pair is a status.
+/// Runs the Knuth-Bendix algorithm and returns a pair consisting of a
+/// status code and code-specific result.
 ///
 /// The status is CompletionResult::MaxRuleCount if we add more than
 /// \p maxRuleCount rules.
@@ -341,8 +339,8 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
 /// Otherwise, the status is CompletionResult::Success and the second element
 /// is zero.
 std::pair<CompletionResult, unsigned>
-RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
-                                          unsigned maxRuleLength) {
+RewriteSystem::performKnuthBendix(unsigned maxRuleCount,
+                                  unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
   assert(!Frozen);

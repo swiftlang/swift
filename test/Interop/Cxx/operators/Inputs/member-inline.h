@@ -386,6 +386,16 @@ struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
 
 struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
 
+struct SubscriptUnnamedParameter {
+  int operator[](int) const { return 123; }
+};
+
+struct SubscriptUnnamedParameterReadWrite {
+  int value = 0;
+  const int &operator[](int) const { return value; }
+  int &operator[](int) { return value; }
+};
+
 struct Iterator {
 private:
   int value = 123;

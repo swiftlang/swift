@@ -94,6 +94,11 @@ static llvm::cl::opt<std::string> HidingModule(
     "hiding-module",
     llvm::cl::desc("Don't qualify types originating from this module"),
     llvm::cl::Hidden);
+
+static llvm::cl::opt<bool>
+    ShowClosureSignature("show-closure-signature", llvm::cl::init(true),
+                         llvm::cl::desc("Show type signature of closures"),
+                         llvm::cl::Hidden);
 /// \}
 
 
@@ -132,7 +137,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      swift::Demangle::Context &DCtx,
                      const swift::Demangle::DemangleOptions &options) {
   bool hadLeadingUnderscore = false;
-  if (name.startswith("__")) {
+  if (name.starts_with("__")) {
     hadLeadingUnderscore = true;
     name = name.substr(1);
   }
@@ -143,8 +148,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   }
   if (RemangleMode) {
     std::string remangled;
-    if (!pointer || !(name.startswith(MANGLING_PREFIX_STR) ||
-                      name.startswith("_S"))) {
+    if (!pointer || !(name.starts_with(MANGLING_PREFIX_STR) ||
+                      name.starts_with("_S"))) {
       // Just reprint the original mangled name if it didn't demangle or is in
       // the old mangling scheme.
       // This makes it easier to share the same database between the
@@ -162,7 +167,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled);
       assert(prefixLen > 0);
       // Replace the prefix if we remangled with a different prefix.
-      if (!name.startswith(remangled.substr(0, prefixLen))) {
+      if (!name.starts_with(remangled.substr(0, prefixLen))) {
         unsigned namePrefixLen =
           swift::Demangle::getManglingPrefixLength(name);
         assert(namePrefixLen > 0);
@@ -287,7 +292,7 @@ static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
           matchStart = ptr - 1;
           break;
         } else if (ch == '@' &&
-                   llvm::StringRef(ptr, end - ptr).startswith("__swiftmacro_")){
+                   llvm::StringRef(ptr, end - ptr).starts_with("__swiftmacro_")){
           matchStart = ptr - 1;
           ptr = ptr + strlen("__swiftmacro_");
           state = FoundPrefix;
@@ -390,6 +395,7 @@ int main(int argc, char **argv) {
   options.DisplayObjCModule = DisplayObjCModule;
   options.HidingCurrentModule = HidingModule;
   options.DisplayLocalNameContexts = DisplayLocalNameContexts;
+  options.ShowClosureSignature = ShowClosureSignature;
 
   if (InputNames.empty()) {
     CompactMode = true;
@@ -409,7 +415,7 @@ int main(int argc, char **argv) {
                         "is quoted or escaped.\n";
         continue;
       }
-      if (name.startswith("S") || name.startswith("s") ) {
+      if (name.starts_with("S") || name.starts_with("s") ) {
         std::string correctedName = std::string("$") + name.str();
         demangle(llvm::outs(), correctedName, DCtx, options);
       } else {

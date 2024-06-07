@@ -25,6 +25,7 @@
 
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
+#include "swift/ABI/InvertibleProtocols.h"
 
 // FIXME: this include shouldn't be here, but removing it causes symbol
 // mangling mismatches on Windows for some reason?
@@ -1119,7 +1120,7 @@ public:
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
-  withConcurrent(bool isSendable) const {
+  withSendable(bool isSendable) const {
     return TargetFunctionTypeFlags<int_type>(
         (Data & ~SendableMask) |
         (isSendable ? SendableMask : 0));
@@ -1197,7 +1198,11 @@ class TargetExtendedFunctionTypeFlags {
     IsolatedAny            = 0x00000002U,
 
     // Values if we have a transferring result.
-    HasTransferringResult  = 0x00000010U,
+    HasSendingResult  = 0x00000010U,
+
+    /// A InvertibleProtocolSet in the high bits.
+    InvertedProtocolshift = 16,
+    InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
   int_type Data;
 
@@ -1223,24 +1228,35 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withTransferringResult(bool newValue = true) const {
+  withSendingResult(bool newValue = true) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~HasTransferringResult) |
-        (newValue ? HasTransferringResult : 0));
+        (Data & ~HasSendingResult) |
+        (newValue ? HasSendingResult : 0));
   }
 
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withInvertedProtocols(InvertibleProtocolSet inverted) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~InvertedProtocolMask) |
+        (inverted.rawBits() << InvertedProtocolshift));
+  }
+  
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
     return (Data & IsolationMask) == IsolatedAny;
   }
 
-  bool hasTransferringResult() const {
-    return bool(Data & HasTransferringResult);
+  bool hasSendingResult() const {
+    return bool(Data & HasSendingResult);
   }
 
   int_type getIntValue() const {
     return Data;
+  }
+
+  InvertibleProtocolSet getInvertedProtocols() const {
+    return InvertibleProtocolSet(Data >> InvertedProtocolshift);
   }
 
   static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
@@ -1279,7 +1295,7 @@ class TargetParameterTypeFlags {
     AutoClosureMask       = 0x100,
     NoDerivativeMask      = 0x200,
     IsolatedMask          = 0x400,
-    TransferringMask      = 0x800,
+    SendingMask           = 0x800,
   };
   int_type Data;
 
@@ -1319,9 +1335,9 @@ public:
   }
 
   constexpr TargetParameterTypeFlags<int_type>
-  withTransferring(bool isTransferring) const {
+  withSending(bool isSending) const {
     return TargetParameterTypeFlags<int_type>(
-        (Data & ~TransferringMask) | (isTransferring ? TransferringMask : 0));
+        (Data & ~SendingMask) | (isSending ? SendingMask : 0));
   }
 
   bool isNone() const { return Data == 0; }
@@ -1329,7 +1345,7 @@ public:
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   bool isNoDerivative() const { return Data & NoDerivativeMask; }
   bool isIsolated() const { return Data & IsolatedMask; }
-  bool isTransferring() const { return Data & TransferringMask; }
+  bool isSending() const { return Data & SendingMask; }
 
   ParameterOwnership getOwnership() const {
     return (ParameterOwnership)(Data & OwnershipMask);
@@ -1619,8 +1635,6 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Functions accessible at runtime (i.e. distributed method accessors).
   const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
-  const uint16_t AccessibleProtocolRequirementFunctionRecord =
-      0xa98e; // = 43406
 
   /// C type GetExtraInhabitantTag function descriminator
   const uint16_t GetExtraInhabitantTagFunction = 0x392e; // = 14638
@@ -1690,13 +1704,15 @@ public:
   constexpr ContextDescriptorFlags(ContextDescriptorKind kind,
                                    bool isGeneric,
                                    bool isUnique,
-                                   uint8_t version,
+                                   bool hasInvertibleProtocols,
                                    uint16_t kindSpecificFlags)
     : ContextDescriptorFlags(ContextDescriptorFlags()
                                .withKind(kind)
                                .withGeneric(isGeneric)
                                .withUnique(isUnique)
-                               .withVersion(version)
+                               .withInvertibleProtocols(
+                                 hasInvertibleProtocols
+                               )
                                .withKindSpecificFlags(kindSpecificFlags))
   {}
 
@@ -1715,10 +1731,10 @@ public:
     return (Value & 0x40u) != 0;
   }
 
-  /// The format version of the descriptor. Higher version numbers may have
-  /// additional fields that aren't present in older versions.
-  constexpr uint8_t getVersion() const {
-    return (Value >> 8u) & 0xFFu;
+  /// Whether the context has information about invertible protocols, which
+  /// will show up as a trailing field in the context descriptor.
+  constexpr bool hasInvertibleProtocols() const {
+    return (Value & 0x20u) != 0;
   }
 
   /// The most significant two bytes of the flags word, which can have
@@ -1742,8 +1758,11 @@ public:
                                   | (isUnique ? 0x40u : 0));
   }
 
-  constexpr ContextDescriptorFlags withVersion(uint8_t version) const {
-    return ContextDescriptorFlags((Value & 0xFFFF00FFu) | (version << 8u));
+  constexpr ContextDescriptorFlags withInvertibleProtocols(
+      bool hasInvertibleProtocols
+  ) const {
+    return ContextDescriptorFlags((Value & ~0x20u)
+                                  | (hasInvertibleProtocols ? 0x20u : 0));
   }
 
   constexpr ContextDescriptorFlags
@@ -1983,10 +2002,13 @@ public:
   explicit constexpr GenericContextDescriptorFlags(uint16_t value)
     : Value(value) {}
 
-  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
-    : GenericContextDescriptorFlags(
+  constexpr GenericContextDescriptorFlags(
+      bool hasTypePacks, bool hasConditionalInvertedProtocols
+  ) : GenericContextDescriptorFlags(
         GenericContextDescriptorFlags((uint16_t)0)
-          .withHasTypePacks(hasTypePacks)) {}
+          .withHasTypePacks(hasTypePacks)
+          .withConditionalInvertedProtocols(
+            hasConditionalInvertedProtocols)) {}
 
   /// Whether this generic context has at least one type parameter
   /// pack, in which case the generic context will have a trailing
@@ -1995,10 +2017,23 @@ public:
     return (Value & 0x1) != 0;
   }
 
+  /// Whether this generic context has any conditional conformances to
+  /// inverted protocols, in which case the generic context will have a
+  /// trailing InvertibleProtocolSet and conditional requirements.
+  constexpr bool hasConditionalInvertedProtocols() const {
+    return (Value & 0x2) != 0;
+  }
+
   constexpr GenericContextDescriptorFlags
   withHasTypePacks(bool hasTypePacks) const {
     return GenericContextDescriptorFlags((uint16_t)(
       (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withConditionalInvertedProtocols(bool value) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x2) | (value ? 0x2 : 0)));
   }
 
   constexpr uint16_t getIntValue() const {
@@ -2097,6 +2132,12 @@ enum class GenericRequirementKind : uint8_t {
   SameConformance = 3,
   /// A same-shape requirement between generic parameter packs.
   SameShape = 4,
+  /// A requirement stating which invertible protocol checks are
+  /// inverted.
+  ///
+  /// This is more of an "anti-requirement", specifing which checks don't need
+  /// to happen for a given type.
+  InvertedProtocols = 5,
   /// A layout requirement.
   Layout = 0x1F,
 };
@@ -2470,6 +2511,32 @@ inline int descendingPriorityOrder(JobPriority lhs,
   return (lhs == rhs ? 0 : lhs > rhs ? -1 : 1);
 }
 
+enum { PriorityBucketCount = 5 };
+
+inline int getPriorityBucketIndex(JobPriority priority) {
+  // Any unknown priorities will be rounded up to a known one.
+  // Priorities higher than UserInteractive are clamped to UserInteractive.
+  // Jobs of unknown priorities will end up in the same bucket as jobs of a
+  // corresponding known priority. Within the bucket they will be sorted in
+  // FIFO order.
+  if (priority > JobPriority::UserInitiated) {
+    // UserInteractive and higher
+    return 0;
+  } else if (priority > JobPriority::Default) {
+    // UserInitiated
+    return 1;
+  } else if (priority > JobPriority::Utility) {
+    // Default
+    return 2;
+  } else if (priority > JobPriority::Background) {
+    // Utility
+    return 3;
+  } else {
+    // Background and lower
+    return 4;
+  }
+}
+
 inline JobPriority withUserInteractivePriorityDowngrade(JobPriority priority) {
   return (priority == JobPriority::UserInteractive) ? JobPriority::UserInitiated
                                                     : priority;
@@ -2616,8 +2683,10 @@ enum class TaskStatusRecordKind : uint8_t {
 
 /// Kinds of option records that can be passed to creating asynchronous tasks.
 enum class TaskOptionRecordKind : uint8_t {
-  /// Request a task to be kicked off, or resumed, on a specific executor.
-  InitialTaskExecutor = 0,
+  /// Request a task to start running on a specific serial executor.
+  /// This was renamed in 6.0 to disambiguate with task executors, but the
+  /// support was in the runtime from the first release.
+  InitialSerialExecutor = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
   /// DEPRECATED. AsyncLetWithBuffer is used instead.
@@ -2627,6 +2696,8 @@ enum class TaskOptionRecordKind : uint8_t {
   AsyncLetWithBuffer = 3,
   /// Information about the result type of the task, used in embedded Swift.
   ResultTypeInfo = 4,
+  /// Set the initial task executor preference of the task.
+  InitialTaskExecutor = 5,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

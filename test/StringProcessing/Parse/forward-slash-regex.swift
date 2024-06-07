@@ -262,7 +262,7 @@ default:
 }
 
 do {} catch /x/ {}
-// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'Never'}}
+// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
 // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {

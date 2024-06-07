@@ -112,6 +112,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ThrownErrorType:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
+  case ConstraintLocator::ExistentialMemberAccessConversion:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -304,9 +305,7 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
   case ConstraintLocator::ProtocolRequirement: {
-    auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
-    out << "protocol requirement ";
-    reqElt.getDecl()->dumpRef(out);
+    out << "protocol requirement";
     break;
   }
   case ConstraintLocator::Witness: {
@@ -534,6 +533,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "key path subscript index parameter";
     break;
   }
+  case ConstraintLocator::ExistentialMemberAccessConversion:
+    out << "existential member access conversion";
+    break;
   }
 }
 
@@ -812,7 +814,7 @@ void ConstraintLocatorBuilder::dump(SourceManager *SM, llvm::raw_ostream &out) c
     prev->dump(SM, out);
   }
   if (element) {
-    out << " -> ";
+    out << " → ";
     element->dump(out);
   }
 }

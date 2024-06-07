@@ -332,6 +332,22 @@ extension P2 {
   func f() throws(Failure) { }
 }
 
+public func withUnsafeRawBuffer<T, E>(
+    _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Void
+) throws(E) -> T {
+  fatalError("boom")
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic16withUnsafeBufferyxySryxGq_YKXEq_YKs5ErrorR_r0_lFySwq_YKXEfU_ : $@convention(thin) <T, E where E : Error> (UnsafeMutableRawBufferPointer, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (UnsafeMutableBufferPointer<τ_0_0>) -> @error_indirect τ_0_1 for <T, E>) -> @error_indirect E {
+// CHECK: try_apply{{.*}}@error_indirect τ_0_1 for <T, E>
+public func withUnsafeBuffer<T, E>(
+    _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> Void
+) throws(E) -> T {
+    try withUnsafeRawBuffer { (buf_ptr: UnsafeMutableRawBufferPointer) throws(E) in
+        try body(buf_ptr.bindMemory(to: T.self))
+    }
+}
+
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic1SVAA2P2A2aDP1fyy7FailureQzYKFTW : $@convention(witness_method: P2) (@in_guaranteed S) -> @error_indirect Never
 // CHECK: bb0(%0 : $*Never, %1 : $*S)
 struct S: P2 {

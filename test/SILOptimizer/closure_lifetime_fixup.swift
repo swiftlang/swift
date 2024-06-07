@@ -97,8 +97,8 @@ public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> 
 // CHECK-LABEL: sil @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tF
 // CHECK:  [[FN:%.*]] = function_ref @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tFSSSvcfu_ :
 // CHECK:  [[PA:%.*]] = thin_to_thick_function [[FN]]
-// CHECK:  [[MAP:%.*]] = function_ref @$sSq3mapyqd__Sgqd__xKXEKlF
-// CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, String>({{.*}}, [[PA]], {{.*}})
+// CHECK:  [[MAP:%.*]] = function_ref @$sSq3mapyqd_0_Sgqd_0_xqd__YKXEqd__YKs5ErrorRd__Ri_d_0_r0_lF
+// CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, Never, String>({{.*}}, [[PA]], {{.*}})
 public func to_stack_of_convert_function(p: UnsafeMutableRawPointer?) {
   _ = p.map(String.init(describing:))
 }

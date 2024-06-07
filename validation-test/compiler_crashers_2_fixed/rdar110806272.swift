@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck %s -enable-experimental-associated-type-inference
+// RUN: not %target-swift-frontend -typecheck %s
 
 // This code is invalid, but we shouldn't crash.
 

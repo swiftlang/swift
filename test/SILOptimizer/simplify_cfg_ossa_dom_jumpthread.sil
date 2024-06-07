@@ -506,11 +506,11 @@ bb7(%r : $Builtin.Int32, %carg2 : $Builtin.Int32):
 
 // CHECK-LABEL: sil [ossa] @jumpthread_switch_enum5
 // CHECK:      bb0:
-// CHECK:        br bb1
-// CHECK:      bb1({{.*}}):
-// CHECK-NEXT:   cond_br undef, bb2, bb3
+// CHECK:        br bb2
+// CHECK:      bb1:
+// CHECK-NEXT:   br bb2
 // CHECK:      bb2:
-// CHECK:        br bb1
+// CHECK:        cond_br undef, bb1, bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
@@ -650,9 +650,9 @@ sil [ossa] @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  switch_enum {{.*}} case #Optional.some!enumelt: bb2
 
 // CHECK: bb2{{.*}}
-// CHECK:  br bb4({{.*}} : $Builtin.Int32, %2 : $Builtin.Int32, [[EXT]]
+// CHECK:  br bb4(%2 : $Builtin.Int32, [[EXT]]
 
-// CHECK: bb4({{.*}} : $Builtin.Int32, [[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
+// CHECK: bb4([[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
 // CHECK:  [[F:%.*]] = function_ref @f
 // CHECK:  apply [[F]]([[CUR]])
 // CHECK:  cond_br {{.*}}, bb5, bb7
@@ -660,7 +660,7 @@ sil [ossa] @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK: bb5:
 // CHECK:   [[VARADD:%.*]] = builtin "sadd_with_overflow_Int32"([[NEXT]] : $Builtin.Int32
 // CHECK:   [[NEXT2:%.*]] = tuple_extract [[VARADD]]
-// CHECK:   br bb4({{.*}} : $Builtin.Int32, [[NEXT]] : $Builtin.Int32, [[NEXT2]]
+// CHECK:   br bb4([[NEXT]] : $Builtin.Int32, [[NEXT2]]
 sil [ossa] @switch_enum_jumpthreading_bug : $@convention(thin) (Optional<Builtin.Int32>, Builtin.Int1, Builtin.Int32, Builtin.Int1) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>, %1 : $Builtin.Int1, %2: $Builtin.Int32, %3 : $Builtin.Int1):
   cond_br %1, bb2, bb10a

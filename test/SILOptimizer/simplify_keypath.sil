@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=keypath | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct S {
+  @_hasStorage var a: Int
+  @_hasStorage var b: Int
+}
+
+// CHECK-LABEL: sil [ossa] @remove_dead_keypath_ossa :
+// CHECK-NOT:     keypath
+// CHECK-NOT:     destroy_value
+// CHECK:         %0 = tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'remove_dead_keypath_ossa'
+sil [ossa] @remove_dead_keypath_ossa : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
+  %1 = upcast %0 : $WritableKeyPath<S, Int> to $KeyPath<S, Int>
+  %2 = begin_borrow %1 : $KeyPath<S, Int>
+  end_borrow %2 : $KeyPath<S, Int>
+  %4 = copy_value %1 : $KeyPath<S, Int>
+  %5 = move_value %4 : $KeyPath<S, Int>
+  destroy_value %1 : $KeyPath<S, Int>
+  destroy_value %5 : $KeyPath<S, Int>
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @remove_dead_keypath :
+// CHECK-NOT:     keypath
+// CHECK-NOT:     strong_release
+// CHECK:         %0 = tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'remove_dead_keypath'
+sil @remove_dead_keypath : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
+  %1 = upcast %0 : $WritableKeyPath<S, Int> to $KeyPath<S, Int>
+  strong_release %1 : $KeyPath<S, Int>
+  %r = tuple()
+  return %r : $()
+}
+

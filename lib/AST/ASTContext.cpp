@@ -36,6 +36,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
@@ -73,6 +74,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include <algorithm>
@@ -129,6 +131,39 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const InvertibleProtocolKind &value) {
   out << getProtocolName(getKnownProtocolKind(value));
 }
+
+std::optional<RepressibleProtocolKind>
+swift::getRepressibleProtocolKind(KnownProtocolKind kp) {
+  switch (kp) {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name)                               \
+  case KnownProtocolKind::Id:                                                  \
+    return RepressibleProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  default:
+    return std::nullopt;
+  }
+}
+
+/// Returns the KnownProtocolKind corresponding to an RepressibleProtocolKind.
+KnownProtocolKind swift::getKnownProtocolKind(RepressibleProtocolKind ip) {
+  switch (ip) {
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name)                               \
+  case RepressibleProtocolKind::Id:                                            \
+    return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const RepressibleProtocolKind &value) {
+  out << getProtocolName(getKnownProtocolKind(value));
+}
+
+// Metadata stores a 16-bit field for invertible protocols. Trigger a build
+// error when we assign the 15th bit so we can think about what to do.
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+  static_assert(Bit < 15);
+#include "swift/ABI/InvertibleProtocols.def"
 
 namespace {
 enum class SearchPathKind : uint8_t {
@@ -624,6 +659,8 @@ struct ASTContext::Implementation {
   /// The scratch context used to allocate intrinsic data on behalf of \c swift::IntrinsicInfo
   std::unique_ptr<llvm::LLVMContext> IntrinsicScratchContext;
 
+  mutable std::optional<std::unique_ptr<clang::DarwinSDKInfo>> SDKInfo;
+
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
 
@@ -749,6 +786,12 @@ ASTContext::ASTContext(
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
+
+  // Register canImport module info.
+  for (auto &info: SearchPathOpts.CanImportModuleInfo) {
+    addSucceededCanImportModule(info.ModuleName, false, info.Version);
+    addSucceededCanImportModule(info.ModuleName, true, info.UnderlyingVersion);
+  }
 
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
@@ -1109,16 +1152,24 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // There must be a property named "pointee".
   auto identifier = ctx.getIdentifier("pointee");
   auto results = nominal->lookupDirect(identifier);
-  if (results.size() != 1) return nullptr;
+  for (auto result : results) {
+    // The property must have type T.
+    auto *property = dyn_cast<VarDecl>(result);
+    if (!property)
+      continue;
 
-  // The property must have type T.
-  auto *property = dyn_cast<VarDecl>(results[0]);
-  if (!property) return nullptr;
-  if (!property->getInterfaceType()->isEqual(sig.getGenericParams()[0]))
-    return nullptr;
+    if (!property->getInterfaceType()->isEqual(sig.getGenericParams()[0]))
+      continue;
 
-  cache = property;
-  return property;
+    if (property->getFormalAccess() != AccessLevel::Public)
+      continue;
+
+    cache = property;
+    return property;
+  }
+
+  llvm_unreachable("Could not find pointee property");
+  return nullptr;
 }
 
 VarDecl *
@@ -1264,7 +1315,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Differentiation);
     break;
   case KnownProtocolKind::Actor:
-  case KnownProtocolKind::AnyActor:
   case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
@@ -1543,119 +1593,6 @@ FuncDecl *ASTContext::getLessThanIntDecl() const {
 }
 FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
-}
-
-FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
-    AbstractFunctionDecl *thunk) const {
-  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  assert(systemTy && "No specific ActorSystem type found!");
-
-  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
-  assert(systemNominal && "No system nominal type found!");
-
-  for (auto result : systemNominal->lookupDirect(Id_makeInvocationEncoder)) {
-    auto *func = dyn_cast<FuncDecl>(result);
-    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
-      return func;
-    }
-  }
-
-  return nullptr;
-}
-
-FuncDecl *
-ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
-    auto *func = dyn_cast<FuncDecl>(result);
-    if (func &&
-        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
-      return func;
-    }
-  }
-
-  return nullptr;
-}
-
-AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDecoder(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{nominal},
-      nullptr);
-}
-
-AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResultHandler(
-    NominalTypeDecl *nominal) const {
-  if (!nominal)
-    return nullptr;
-
-  return evaluateOrDefault(
-      nominal->getASTContext().evaluator,
-      GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{nominal},
-      nullptr);
-}
-
-FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
-    NominalTypeDecl *nominal) const {
-
-  llvm::SmallVector<ValueDecl *, 2> results;
-  nominal->lookupQualified(nominal, DeclNameRef(Id_doneRecording),
-                           SourceLoc(), NL_QualifiedDefault, results);
-  for (auto result : results) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-
-    if (fd->getParameters()->size() != 0)
-      continue;
-
-    if (fd->getResultInterfaceType()->isVoid() &&
-        fd->hasThrows() &&
-        !fd->hasAsync())
-      return fd;
-  }
-
-  return nullptr;
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {
@@ -2193,12 +2130,20 @@ unsigned ASTContext::getNextMacroDiscriminator(
 
 /// Get the next discriminator within the given declaration context.
 unsigned ASTContext::getNextDiscriminator(const DeclContext *dc) {
+  // Top-level code declarations don't have their own discriminators.
+  if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
+    dc = tlcd->getParent();
+
   return getImpl().NextDiscriminator[dc];
 }
 
 /// Set the maximum assigned discriminator within the given declaration context.
 void ASTContext::setMaxAssignedDiscriminator(
     const DeclContext *dc, unsigned discriminator) {
+  // Top-level code declarations don't have their own discriminators.
+  if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
+    dc = tlcd->getParent();
+
   assert(discriminator >= getImpl().NextDiscriminator[dc]);
   getImpl().NextDiscriminator[dc] = discriminator;
 }
@@ -2447,23 +2392,56 @@ getModuleVersionKindString(const ModuleLoader::ModuleVersionInfo &info) {
   }
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
-                                     llvm::VersionTuple version,
-                                     bool underlyingVersion,
-                                     bool updateFailingList) const {
+void ASTContext::addSucceededCanImportModule(
+    StringRef moduleName, bool underlyingVersion,
+    const llvm::VersionTuple &versionInfo) {
+  auto &entry = CanImportModuleVersions[moduleName.str()];
+  if (!versionInfo.empty()) {
+    if (underlyingVersion)
+      entry.UnderlyingVersion = versionInfo;
+    else
+      entry.Version = versionInfo;
+  }
+}
+
+bool ASTContext::canImportModuleImpl(
+    ImportPath::Module ModuleName, llvm::VersionTuple version,
+    bool underlyingVersion, bool updateFailingList,
+    llvm::VersionTuple &foundVersion) const {
   SmallString<64> FullModuleName;
   ModuleName.getString(FullModuleName);
-  auto ModuleNameStr = FullModuleName.str();
+  auto ModuleNameStr = FullModuleName.str().str();
 
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
 
-  if (version.empty()) {
-    // If this module has already been checked successfully, it is importable.
-    if (SucceededModuleImportNames.count(ModuleNameStr))
+  // If this module has already been checked or there is information for the
+  // module from commandline, use that information instead of loading the
+  // module.
+  auto Found = CanImportModuleVersions.find(ModuleNameStr);
+  if (Found != CanImportModuleVersions.end()) {
+    if (version.empty())
       return true;
 
+    if (underlyingVersion) {
+      if (!Found->second.UnderlyingVersion.empty())
+        return version <= Found->second.UnderlyingVersion;
+    } else {
+      if (!Found->second.Version.empty())
+        return version <= Found->second.Version;
+    }
+
+    // If the canImport information is coming from the command-line, then no
+    // need to continue the search, return false. For checking modules that are
+    // not passed from command-line, allow fallback to the module loading since
+    // this is not in a canImport request context that has already been resolved
+    // by scanner.
+    if (!SearchPathOpts.CanImportModuleInfo.empty())
+      return false;
+  }
+
+  if (version.empty()) {
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
@@ -2515,28 +2493,38 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     return true;
   }
 
+  foundVersion = bestVersionInfo.getVersion();
   return version <= bestVersionInfo.getVersion();
 }
 
-bool ASTContext::canImportModule(ImportPath::Module ModuleName,
+void ASTContext::forEachCanImportVersionCheck(
+    std::function<void(StringRef, const llvm::VersionTuple &,
+                       const llvm::VersionTuple &)>
+        Callback) const {
+  for (auto &entry : CanImportModuleVersions)
+    Callback(entry.first, entry.second.Version, entry.second.UnderlyingVersion);
+}
+
+bool ASTContext::canImportModule(ImportPath::Module moduleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
-  if (!canImportModuleImpl(ModuleName, version, underlyingVersion, true))
+  llvm::VersionTuple versionInfo;
+  if (!canImportModuleImpl(moduleName, version, underlyingVersion, true,
+                           versionInfo))
     return false;
 
-  // If checked successfully, add the top level name to success list as
-  // dependency to handle clang submodule correctly. Swift does not have
-  // submodule so the name should be the same.
-  SmallString<64> TopModuleName;
-  ModuleName.getTopLevelPath().getString(TopModuleName);
-  SucceededModuleImportNames.insert(TopModuleName.str());
+  SmallString<64> fullModuleName;
+  moduleName.getString(fullModuleName);
+  addSucceededCanImportModule(fullModuleName, underlyingVersion, versionInfo);
   return true;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
                                   llvm::VersionTuple version,
                                   bool underlyingVersion) const {
-  return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
+  llvm::VersionTuple versionInfo;
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, false,
+                             versionInfo);
 }
 
 ModuleDecl *
@@ -2612,6 +2600,14 @@ ModuleDecl *ASTContext::getModuleByIdentifier(Identifier ModuleID) {
   return getModule(builder.get());
 }
 
+ModuleDecl *ASTContext::getLoadedModuleByABIName(StringRef ModuleName) {
+  for (auto &[_, module] : getLoadedModules()) {
+    if (ModuleName == module->getABIName().str())
+      return module;
+  }
+  return nullptr;
+}
+
 ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (TheStdlibModule)
     return TheStdlibModule;
@@ -2646,7 +2642,8 @@ ASTContext::getNormalConformance(Type conformingType,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
                                  bool isUnchecked,
-                                 bool isPreconcurrency) {
+                                 bool isPreconcurrency,
+                                 SourceLoc preconcurrencyLoc) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2662,7 +2659,7 @@ ASTContext::getNormalConformance(Type conformingType,
   // Build a new normal protocol conformance.
   auto result = new (*this, AllocationArena::Permanent)
       NormalProtocolConformance(conformingType, protocol, loc, dc, state,
-                                isUnchecked, isPreconcurrency);
+                                isUnchecked, isPreconcurrency, preconcurrencyLoc);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -2697,7 +2694,7 @@ ASTContext::getBuiltinConformance(Type type, ProtocolDecl *protocol,
 }
 
 static bool collapseSpecializedConformance(Type type,
-                                           RootProtocolConformance *conformance,
+                                           NormalProtocolConformance *conformance,
                                            SubstitutionMap substitutions) {
   if (!conformance->getType()->isEqual(type))
     return false;
@@ -2712,7 +2709,7 @@ static bool collapseSpecializedConformance(Type type,
 
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
-                                      RootProtocolConformance *generic,
+                                      NormalProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
   // If the specialization is a no-op, use the root conformance instead.
   if (collapseSpecializedConformance(type, generic, substitutions)) {
@@ -4621,29 +4618,29 @@ SILFunctionType::SILFunctionType(
       !ext.getLifetimeDependenceInfo().empty();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
-  if (coroutineKind == SILCoroutineKind::None) {
-    assert(yields.empty());
-    NumAnyResults = normalResults.size();
-    NumAnyIndirectFormalResults = 0;
-    NumPackResults = 0;
-    for (auto &resultInfo : normalResults) {
-      if (resultInfo.isFormalIndirect())
-        NumAnyIndirectFormalResults++;
-      if (resultInfo.isPack())
-        NumPackResults++;
-    }
-    memcpy(getMutableResults().data(), normalResults.data(),
-           normalResults.size() * sizeof(SILResultInfo));
-  } else {
-    assert(normalResults.empty());
-    NumAnyResults = yields.size();
-    NumAnyIndirectFormalResults = 0;
+  assert((coroutineKind == SILCoroutineKind::None && yields.empty()) ||
+         coroutineKind != SILCoroutineKind::None);
+
+  NumAnyResults = normalResults.size();
+  NumAnyIndirectFormalResults = 0;
+  NumPackResults = 0;
+  for (auto &resultInfo : normalResults) {
+    if (resultInfo.isFormalIndirect())
+      NumAnyIndirectFormalResults++;
+    if (resultInfo.isPack())
+      NumPackResults++;
+  }
+  memcpy(getMutableResults().data(), normalResults.data(),
+         normalResults.size() * sizeof(SILResultInfo));
+  if (coroutineKind != SILCoroutineKind::None) {
+    NumAnyYieldResults = yields.size();
+    NumAnyIndirectFormalYieldResults = 0;
     NumPackResults = 0;
     for (auto &yieldInfo : yields) {
       if (yieldInfo.isFormalIndirect())
-        NumAnyIndirectFormalResults++;
+        NumAnyIndirectFormalYieldResults++;
       if (yieldInfo.isPack())
-        NumPackResults++;
+        NumPackYieldResults++;
     }
     memcpy(getMutableYields().data(), yields.data(),
            yields.size() * sizeof(SILYieldInfo));
@@ -4815,7 +4812,6 @@ CanSILFunctionType SILFunctionType::get(
     std::optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs, const ASTContext &ctx,
     ProtocolConformanceRef witnessMethodConformance) {
-  assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig ||
          coroutineKind != SILCoroutineKind::None);
@@ -5939,11 +5935,8 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 
 Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature parentSig,
                                                           ASTContext &ctx) {
-  unsigned depth = 0;
-  if (!parentSig.getGenericParams().empty())
-    depth = parentSig.getGenericParams().back()->getDepth() + 1;
   return GenericTypeParamType::get(/*isParameterPack=*/ false,
-                                   /*depth=*/ depth, /*index=*/ 0,
+                                   parentSig.getNextDepth(), /*index=*/ 0,
                                    ctx);
 }
 
@@ -5955,45 +5948,25 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
-  assert(parentSig || !constraint->hasTypeParameter() &&
-         "Interface type here requires a parent signature");
 
-  // The opened archetype signature for a protocol type is identical
-  // to the protocol's own canonical generic signature if there aren't any
-  // outer generic parameters to worry about.
-  if (parentSig.isNull()) {
-    if (const auto protoTy = dyn_cast<ProtocolType>(constraint)) {
-      return protoTy->getDecl()->getGenericSignature().getCanonicalSignature();
-    }
-  }
-
-  // Otherwise we need to build a generic signature that captures any outer
-  // generic parameters. This ensures that we keep e.g. generic superclass
-  // existentials contained in a well-formed generic context.
   auto canParentSig = parentSig.getCanonicalSignature();
   auto key = std::make_pair(constraint, canParentSig.getPointer());
   auto found = getImpl().ExistentialSignatures.find(key);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
-      canParentSig, type->getASTContext())
-    ->castTo<GenericTypeParamType>();
-  Requirement requirement(RequirementKind::Conformance, genericParam,
-                          constraint);
+  LocalArchetypeRequirementCollector collector(*this, canParentSig);
+  collector.addOpenedExistential(type);
   auto genericSig = buildGenericSignature(
-      *this, canParentSig,
-      {genericParam}, {requirement},
-      /*allowInverses=*/true);
-
-  CanGenericSignature canGenericSig(genericSig);
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
+      /*allowInverses=*/true).getCanonicalSignature();
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(key, canGenericSig));
+      std::make_pair(key, genericSig));
   assert(result.second);
   (void) result;
 
-  return canGenericSig;
+  return genericSig;
 }
 
 CanGenericSignature
@@ -6005,100 +5978,12 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   if (found != sigs.end())
     return found->second;
 
-  // This operation doesn't make sense if the input signature does not contain`
-  // any pack generic parameters.
-#ifndef NDEBUG
-  {
-    auto found = std::find_if(baseGenericSig.getGenericParams().begin(),
-                              baseGenericSig.getGenericParams().end(),
-                              [](GenericTypeParamType *paramType) {
-                                return paramType->isParameterPack();
-                              });
-    assert(found != baseGenericSig.getGenericParams().end());
-  }
-#endif
-
-  // The pack element signature includes all type parameters and requirements
-  // from the outer context, plus a new set of type parameters representing
-  // open pack elements and their corresponding element requirements.
-
-  llvm::SmallMapVector<GenericTypeParamType *,
-                       GenericTypeParamType *, 2> packElementParams;
-  SmallVector<GenericTypeParamType *, 2> genericParams(
-      baseGenericSig.getGenericParams().begin(), baseGenericSig.getGenericParams().end());
-  SmallVector<Requirement, 2> requirements;
-
-  auto packElementDepth =
-      baseGenericSig.getInnermostGenericParams().front()->getDepth() + 1;
-
-  for (auto paramType : baseGenericSig.getGenericParams()) {
-    if (!paramType->isParameterPack())
-      continue;
-
-    // Only include opened element parameters for packs in the given
-    // shape equivalence class.
-    if (!baseGenericSig->haveSameShape(paramType, shapeClass))
-      continue;
-
-    auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
-                                                   packElementDepth,
-                                                   packElementParams.size(),
-                                                   *this);
-    genericParams.push_back(elementParam);
-    packElementParams[paramType] = elementParam;
-  }
-
-  auto eraseParameterPackRec = [&](Type type) -> Type {
-    return type.transformTypeParameterPacks(
-        [&](SubstitutableType *t) -> std::optional<Type> {
-          if (auto *paramType = dyn_cast<GenericTypeParamType>(t)) {
-            if (packElementParams.find(paramType) != packElementParams.end()) {
-              return Type(packElementParams[paramType]);
-            }
-
-            return Type(t);
-          }
-          return std::nullopt;
-        });
-  };
-
-  for (auto requirement : baseGenericSig.getRequirements()) {
-    requirements.push_back(requirement);
-
-    // If this requirement contains parameter packs, create a new requirement
-    // for the corresponding pack element.
-    switch (requirement.getKind()) {
-    case RequirementKind::SameShape:
-      // Drop same-shape requirements from the element signature.
-      break;
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType: {
-      auto firstType = eraseParameterPackRec(requirement.getFirstType());
-      auto secondType = eraseParameterPackRec(requirement.getSecondType());
-      if (firstType->isEqual(requirement.getFirstType()) &&
-          secondType->isEqual(requirement.getSecondType()))
-        break;
-
-      requirements.emplace_back(requirement.getKind(),
-                                firstType, secondType);
-      break;
-    }
-    case RequirementKind::Layout: {
-      auto firstType = eraseParameterPackRec(requirement.getFirstType());
-      if (firstType->isEqual(requirement.getFirstType()))
-        break;
-
-      requirements.emplace_back(requirement.getKind(), firstType,
-                                requirement.getLayoutConstraint());
-      break;
-    }
-    }
-  }
-
+  LocalArchetypeRequirementCollector collector(*this, baseGenericSig);
+  collector.addOpenedElement(shapeClass);
   auto elementSig = buildGenericSignature(
-      *this, GenericSignature(), genericParams, requirements,
+      *this, collector.OuterSig, collector.Params, collector.Requirements,
       /*allowInverses=*/false).getCanonicalSignature();
+
   sigs[key] = elementSig;
   return elementSig;
 }
@@ -6473,6 +6358,44 @@ bool ASTContext::isASCIIString(StringRef s) const {
     }
   }
   return true;
+}
+
+clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
+  if (!getImpl().SDKInfo) {
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
+            *llvm::vfs::getRealFileSystem(),
+            SearchPathOpts.SDKPath);
+    if (!SDKInfoOrErr) {
+      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
+                            [](const llvm::ErrorInfoBase &) {
+                              // Ignore the error for now..
+                            });
+      getImpl().SDKInfo.emplace();
+    } else if (!*SDKInfoOrErr) {
+      getImpl().SDKInfo.emplace();
+    } else {
+      getImpl().SDKInfo.emplace(std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
+    }
+  }
+
+  return getImpl().SDKInfo->get();
+}
+
+const clang::DarwinSDKInfo::RelatedTargetVersionMapping
+*ASTContext::getAuxiliaryDarwinPlatformRemapInfo(clang::DarwinSDKInfo::OSEnvPair Kind) const {
+  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
+            *llvm::vfs::getRealFileSystem(),
+            *SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
+    if (!SDKInfoOrErr || !*SDKInfoOrErr) {
+      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
+                            [](const llvm::ErrorInfoBase &) {
+        // Ignore the error for now..
+      });
+    }
+    return (*SDKInfoOrErr)->getVersionMapping(Kind);
+  }
+  return nullptr;
 }
 
 /// The special Builtin.TheTupleType, which parents tuple extensions and

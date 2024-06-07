@@ -26,16 +26,13 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *FragmentStorageTy,
-                             std::optional<Size::int_type> SizeInBits,
                              Alignment Align, bool HasDefaultAlignment,
-                             bool IsMetadata, bool SizeIsFragmentSize,
-                             bool IsFixedBuffer,
+                             bool IsMetadata, bool IsFixedBuffer,
                              std::optional<uint32_t> NumExtraInhabitants)
     : Type(Ty.getPointer()), FragmentStorageType(FragmentStorageTy),
-      SizeInBits(SizeInBits), NumExtraInhabitants(NumExtraInhabitants),
+      NumExtraInhabitants(NumExtraInhabitants),
       Align(Align), DefaultAlignment(HasDefaultAlignment),
-      IsMetadataType(IsMetadata), SizeIsFragmentSize(SizeIsFragmentSize),
-      IsFixedBuffer(IsFixedBuffer) {
+      IsMetadataType(IsMetadata), IsFixedBuffer(IsFixedBuffer) {
   assert(Align.getValue() != 0);
 }
 
@@ -50,32 +47,23 @@ static bool hasDefaultAlignment(swift::Type Ty) {
 }
 
 DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
-                                             IRGenModule &IGM,
-                                             bool IsFragmentTypeInfo) {
-  std::optional<Size::int_type> SizeInBits;
+                                             IRGenModule &IGM) {
   llvm::Type *StorageType = TI.getStorageType();
   std::optional<uint32_t> NumExtraInhabitants;
-  if (StorageType->isSized())
-    SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
-  else if (TI.isFixedSize()) {
-    const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&TI);
-    Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
-    SizeInBits = Size;
-  }
   if (TI.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&TI);
     NumExtraInhabitants = FixTy.getFixedExtraInhabitantCount(IGM);
   }
   assert(TI.getStorageType() && "StorageType is a nullptr");
-  return DebugTypeInfo(Ty.getPointer(), StorageType, SizeInBits,
+  return DebugTypeInfo(Ty.getPointer(), StorageType,
                        TI.getBestKnownAlignment(), ::hasDefaultAlignment(Ty),
-                       false, IsFragmentTypeInfo, false, NumExtraInhabitants);
+                       /* IsMetadataType = */ false,
+                       /* IsFixedBuffer = */ false, NumExtraInhabitants);
 }
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
                                               const TypeInfo &Info,
-                                              IRGenModule &IGM,
-                                              bool IsFragmentTypeInfo) {
+                                              IRGenModule &IGM) {
 
   auto DeclType = Decl->getInterfaceType();
   auto RealType = Ty;
@@ -89,14 +77,15 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
   // the type hasn't been mucked with by an optimization pass.
   auto *Type = Sugared->isEqual(RealType) ? DeclType.getPointer()
                                           : RealType.getPointer();
-  return getFromTypeInfo(Type, Info, IGM, IsFragmentTypeInfo);
+  return getFromTypeInfo(Type, Info, IGM);
 }
 
 DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty,
                                                llvm::Type *StorageTy, Size size,
                                                Alignment align) {
-  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, size.getValue() * 8, align,
-                      true, false, false);
+  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, align,
+                      /* HasDefaultAlignment = */ true,
+                      /* IsMetadataType = */ false);
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type metadata cannot contain an archetype");
@@ -106,8 +95,9 @@ DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty,
 DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty,
                                              llvm::Type *StorageTy, Size size,
                                              Alignment align) {
-  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, size.getValue() * 8, align,
-                      true, true, false);
+  DebugTypeInfo DbgTy(Ty.getPointer(), StorageTy, align,
+                      /* HasDefaultAlignment = */ true,
+                      /* IsMetadataType = */ true);
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type metadata cannot contain an archetype");
@@ -132,7 +122,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
       Type = DeclType.getPointer();
   }
   auto &TI = IGM.getTypeInfoForUnlowered(Type);
-  DebugTypeInfo DbgTy = getFromTypeInfo(Type, TI, IGM, false);
+  DebugTypeInfo DbgTy = getFromTypeInfo(Type, TI, IGM);
   assert(FragmentStorageType && "FragmentStorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type of global variable cannot be an archetype");
@@ -152,8 +142,9 @@ DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
-  DebugTypeInfo DbgTy(Type, FragmentStorageType, SizeInBytes.getValue() * 8,
-                      Align, ::hasDefaultAlignment(Type), false, false, true);
+  DebugTypeInfo DbgTy(Type, FragmentStorageType,
+                      Align, ::hasDefaultAlignment(Type),
+                      /* IsMetadataType = */ false, /* IsFixedBuffer = */ true);
   assert(FragmentStorageType && "FragmentStorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type of global variable cannot be an archetype");
@@ -164,8 +155,9 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
                                           llvm::Type *FragmentStorageType,
                                           Size SizeInBytes, Alignment align) {
   DebugTypeInfo DbgTy(theClass->getInterfaceType().getPointer(),
-                      FragmentStorageType, SizeInBytes.getValue() * 8, align,
-                      true, false, false);
+                      FragmentStorageType, align,
+                      /* HasDefaultAlignment = */ true,
+                      /* IsMetadataType = */ false);
   assert(FragmentStorageType && "FragmentStorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type of objc class cannot be an archetype");
@@ -175,13 +167,12 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
 DebugTypeInfo DebugTypeInfo::getErrorResult(swift::Type Ty,
                                             IRGenModule &IGM) {
   auto &TI = IGM.getTypeInfoForUnlowered(Ty);
-  DebugTypeInfo DbgTy = getFromTypeInfo(Ty, TI, IGM, false);
+  DebugTypeInfo DbgTy = getFromTypeInfo(Ty, TI, IGM);
   return DbgTy;
 }
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
   return getType() == T.getType() &&
-         SizeInBits == T.SizeInBits &&
          Align == T.Align;
 }
 
@@ -204,8 +195,6 @@ TypeDecl *DebugTypeInfo::getDecl() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
-  if (SizeInBits)
-    llvm::errs() << "SizeInBits " << *SizeInBits << " ";
   llvm::errs() << "Alignment " << Align.getValue() << "] ";
   if (auto *Type = getType())
     Type->dump(llvm::errs());
@@ -217,3 +206,19 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
     llvm::errs() << "forward-declared\n";
 }
 #endif
+
+std::optional<CompletedDebugTypeInfo>
+CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM) {
+  auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
+  std::optional<uint64_t> SizeInBits;
+  if (StorageType->isSized())
+    SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
+  else if (Info.isFixedSize()) {
+    const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
+    Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
+    SizeInBits = Size;
+  }
+
+  return CompletedDebugTypeInfo::get(
+      DebugTypeInfo::getFromTypeInfo(Ty, Info, IGM), SizeInBits);
+}

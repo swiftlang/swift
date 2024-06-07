@@ -342,7 +342,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*any SimpleProtocol, %1 : $Int):
-// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
+// CHECK-NEXT:    %2 = alloc_stack [lexical] [var_decl] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr %0 to [init] %3 : $*any SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 1
@@ -512,7 +512,7 @@ struct LetDeclInStruct {
 func test_unassigned_let_constant() {
   let string : String
 }
-// CHECK: [[S:%[0-9]+]] = alloc_stack $String, let, name "string"
+// CHECK: [[S:%[0-9]+]] = alloc_stack [var_decl] $String, let, name "string"
 // CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String

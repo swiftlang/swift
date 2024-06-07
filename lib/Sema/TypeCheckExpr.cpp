@@ -581,17 +581,6 @@ bool TypeChecker::requireArrayLiteralIntrinsics(ASTContext &ctx,
   return true;
 }
 
-Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
-                                       DeclNameLoc loc, bool Implicit) {
-  auto type = constraints::ConstraintSystem::getUnopenedTypeOfReference(
-      value, Type(), UseDC,
-      [&](VarDecl *var) -> Type { return value->getTypeInContext(); });
-  auto semantics = value->getAccessSemanticsFromContext(UseDC,
-                                                       /*isAccessOnSelf*/false);
-  return new (value->getASTContext())
-      DeclRefExpr(value, loc, Implicit, semantics, type);
-}
-
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 DeclContext *UseDC, DeclNameLoc NameLoc,
                                 bool Implicit, FunctionRefKind functionRefKind) {

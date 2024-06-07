@@ -1,32 +1,17 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA1
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA2
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA3
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA4
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA5
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA6
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA7
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA8
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA9
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA10
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA11
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA12
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA13
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference -DA14
-
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA1
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA2
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA3
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA4
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA5
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA6
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA7
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA8
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA9
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA10
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA11
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA12
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA13
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference -DA14
+// RUN: %target-swift-frontend -emit-silgen %s -DA1
+// RUN: %target-swift-frontend -emit-silgen %s -DA2
+// RUN: %target-swift-frontend -emit-silgen %s -DA3
+// RUN: %target-swift-frontend -emit-silgen %s -DA4
+// RUN: %target-swift-frontend -emit-silgen %s -DA5
+// RUN: %target-swift-frontend -emit-silgen %s -DA6
+// RUN: %target-swift-frontend -emit-silgen %s -DA7
+// RUN: %target-swift-frontend -emit-silgen %s -DA8
+// RUN: %target-swift-frontend -emit-silgen %s -DA9
+// RUN: %target-swift-frontend -emit-silgen %s -DA10
+// RUN: %target-swift-frontend -emit-silgen %s -DA11
+// RUN: %target-swift-frontend -emit-silgen %s -DA12
+// RUN: %target-swift-frontend -emit-silgen %s -DA13
+// RUN: %target-swift-frontend -emit-silgen %s -DA14
 
 #if A1
 

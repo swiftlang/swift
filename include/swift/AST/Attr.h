@@ -66,7 +66,7 @@ class ModuleDecl;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
-class IdentTypeRepr;
+class UnqualifiedIdentTypeRepr;
 
 class alignas(1 << AttrAlignInBits) AttributeBase
     : public ASTAllocated<AttributeBase> {
@@ -184,12 +184,20 @@ protected:
       isUnchecked : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
-      isCategoryNameInvalid : 1
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 2,
+      isCategoryNameInvalid : 1,
+      isEarlyAdopter : 1
     );
 
     SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
       isUnsafe : 1
+    );
+
+    SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
+      : NumPadBits,
+      Inverted : 1,
+
+      NumFeatures : 31
     );
   } Bits;
   // clang-format on
@@ -1766,7 +1774,8 @@ public:
   ///
   /// For an identifier type repr, return a pair of `nullptr` and the
   /// identifier.
-  std::pair<IdentTypeRepr *, DeclRefTypeRepr *> destructureMacroRef();
+  std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
+  destructureMacroRef();
 
   /// Whether the attribute has any arguments.
   bool hasArgs() const { return argList != nullptr; }
@@ -1857,8 +1866,8 @@ public:
   struct ActiveVersion {
     StringRef ModuleName;
     PlatformKind Platform;
-    bool IsSimulator;
     llvm::VersionTuple Version;
+    bool ForTargetVariant = false;
   };
 
   /// Returns non-optional if this attribute is active given the current platform.
@@ -2413,14 +2422,25 @@ public:
 
 class ObjCImplementationAttr final : public DeclAttribute {
 public:
+  /// Name of the category being implemented. This should only be used with
+  /// the early adopter \@\_objcImplementation syntax, but we support it there
+  /// for backwards compatibility.
   Identifier CategoryName;
 
   ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
-                         SourceRange Range, bool Implicit = false,
+                         SourceRange Range, bool isEarlyAdopter = false,
+                         bool Implicit = false,
                          bool isCategoryNameInvalid = false)
       : DeclAttribute(DeclAttrKind::ObjCImplementation, AtLoc, Range, Implicit),
         CategoryName(CategoryName) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+    Bits.ObjCImplementationAttr.isEarlyAdopter = isEarlyAdopter;
+  }
+
+  /// Early adopters use the \c \@_objcImplementation spelling. For backwards
+  /// compatibility, issues with them are diagnosed as warnings, not errors.
+  bool isEarlyAdopter() const {
+    return Bits.ObjCImplementationAttr.isEarlyAdopter;
   }
 
   bool isCategoryNameInvalid() const {
@@ -2516,6 +2536,8 @@ class RawLayoutAttr final : public DeclAttribute {
   unsigned SizeOrCount;
   /// If `LikeType` is null, the alignment in bytes to use for the raw storage.
   unsigned Alignment;
+  /// If a value of this raw layout type should move like its `LikeType`.
+  bool MovesAsLike = false;
   /// The resolved like type.
   mutable Type CachedResolvedLikeType = Type();
 
@@ -2523,10 +2545,12 @@ class RawLayoutAttr final : public DeclAttribute {
 
 public:
   /// Construct a `@_rawLayout(like: T)` attribute.
-  RawLayoutAttr(TypeRepr *LikeType, SourceLoc AtLoc, SourceRange Range)
+  RawLayoutAttr(TypeRepr *LikeType, bool movesAsLike, SourceLoc AtLoc,
+                SourceRange Range)
       : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
                       /*implicit*/ false),
-        LikeType(LikeType), SizeOrCount(0), Alignment(~0u) {}
+        LikeType(LikeType), SizeOrCount(0), Alignment(~0u),
+        MovesAsLike(movesAsLike) {}
 
   /// Construct a `@_rawLayout(likeArrayOf: T, count: N)` attribute.
   RawLayoutAttr(TypeRepr *LikeType, unsigned Count, SourceLoc AtLoc,
@@ -2598,30 +2622,13 @@ public:
     return std::make_pair(getResolvedLikeType(sd), SizeOrCount);
   }
 
+  /// Whether a value of this raw layout should move like its `LikeType`.
+  bool shouldMoveAsLikeType() const {
+    return MovesAsLike;
+  }
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RawLayout;
-  }
-};
-
-/// The @_distributedThunkTarget(for:) attribute.
-class DistributedThunkTargetAttr final
-    : public DeclAttribute {
-
-  AbstractFunctionDecl *TargetFunction;
-
-public:
-  DistributedThunkTargetAttr(AbstractFunctionDecl *target)
-      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(),
-                      SourceRange(),
-                      /*Implicit=*/false),
-        TargetFunction(target) {}
-
-  AbstractFunctionDecl *getTargetFunction() const {
-    return TargetFunction;
-  }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::DistributedThunkTarget;
   }
 };
 
@@ -2633,6 +2640,35 @@ template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
     if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
       return cast<ATTR>(Attr);
     return std::nullopt;
+  }
+};
+
+/// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
+/// names are intentionally not validated, and the attribute itself is
+/// not printed when rendering a module interface.
+class AllowFeatureSuppressionAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<AllowFeatureSuppressionAttr, Identifier> {
+  friend TrailingObjects;
+
+  AllowFeatureSuppressionAttr(SourceLoc atLoc, SourceRange range, bool implicit,
+                              bool inverted, ArrayRef<Identifier> features);
+
+public:
+  static AllowFeatureSuppressionAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                                             SourceRange range, bool implicit,
+                                             bool inverted,
+                                             ArrayRef<Identifier> features);
+
+  bool getInverted() const { return Bits.AllowFeatureSuppressionAttr.Inverted; }
+
+  ArrayRef<Identifier> getSuppressedFeatures() const {
+    return {getTrailingObjects<Identifier>(),
+            Bits.AllowFeatureSuppressionAttr.NumFeatures};
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::AllowFeatureSuppression;
   }
 };
 
@@ -3011,6 +3047,9 @@ public:
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.
   static std::optional<TypeAttrKind> getAttrKindFromString(StringRef Str);
+
+  /// Returns true if type attributes of the given kind only appear in SIL.
+  static bool isSilOnly(TypeAttrKind TK);
 
   /// Return the name (like "autoclosure") for an attribute ID.
   static const char *getAttrName(TypeAttrKind kind);

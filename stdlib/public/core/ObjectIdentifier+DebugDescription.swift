@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #if !$Embedded
-@_DebugDescription
+@DebugDescription
 extension ObjectIdentifier {
   var _debugDescription: String {
     return "ObjectIdentifier(\(_value))"

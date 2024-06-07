@@ -73,9 +73,7 @@ public:
 
   unsigned getOperandNumber() const { return op->getOperandNumber(); }
 
-  void markUndef() & {
-    op->set(SILUndef::get(getType(), *op->getUser()->getFunction()));
-  }
+  void markUndef() & { op->set(SILUndef::get(getValue())); }
 
   SILInstruction *getInst() const { return op->getUser(); }
 

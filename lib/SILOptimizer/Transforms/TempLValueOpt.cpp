@@ -128,10 +128,10 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   //
   //   alloc_stack %temp
   //   ...
-  //   first_use_of %temp // beginOfLiferange
+  //   first_use_of %temp // beginOfLiverange
   //   ... // no reads or writes from/to %destination
   //   copy_addr [take] %temp to %destination // copyInst
-  //   ... // no further uses of %temp (copyInst is the end of %temp liferange)
+  //   ... // no further uses of %temp (copyInst is the end of %temp liverange)
   //   dealloc_stack %temp
   //
   // All projections to %destination are hoisted above the first use of %temp.
@@ -184,10 +184,10 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
     bca = PM->getAnalysis<BasicCalleeAnalysis>();
   }
 
-  // Iterate over the liferange of the temporary and make some validity checks.
+  // Iterate over the liverange of the temporary and make some validity checks.
   AliasAnalysis *AA = nullptr;
-  SILInstruction *beginOfLiferange = nullptr;
-  bool endOfLiferangeReached = false;
+  SILInstruction *beginOfLiverange = nullptr;
+  bool endOfLiverangeReached = false;
   for (auto iter = temporary->getIterator(); iter != block->end(); ++iter) {
     SILInstruction *inst = &*iter;
     // The dealloc_stack is the last user of the temporary.
@@ -197,20 +197,20 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
     if (users.contains(inst) != 0) {
       // Check if the copyInst is the last user of the temporary (beside the
       // dealloc_stack).
-      if (endOfLiferangeReached)
+      if (endOfLiverangeReached)
         return;
 
-      // Find the first user of the temporary to get a more precise liferange.
+      // Find the first user of the temporary to get a more precise liverange.
       // It would be too conservative to treat the alloc_stack itself as the
-      // begin of the liferange.
-      if (!beginOfLiferange)
-        beginOfLiferange = inst;
+      // begin of the liverange.
+      if (!beginOfLiverange)
+        beginOfLiverange = inst;
 
       if (inst == copyInst)
-        endOfLiferangeReached = true;
+        endOfLiverangeReached = true;
     }
-    if (beginOfLiferange && !endOfLiferangeReached) {
-      // If the root address of the destination is within the liferange of the
+    if (beginOfLiverange && !endOfLiverangeReached) {
+      // If the root address of the destination is within the liverange of the
       // temporary, we cannot replace all uses of the temporary with the
       // destination (it would break the def-use dominance rule).
       if (inst == destRootInst)
@@ -218,8 +218,8 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
         
       if (!AA)
         AA = PM->getAnalysis<AliasAnalysis>(getFunction());
-  
-      // Check if the destination is not accessed within the liferange of
+
+      // Check if the destination is not accessed within the liverange of
       // the temporary.
       // This is unlikely, because the destination is initialized at the
       // copyInst. But still, the destination could contain an initialized value
@@ -233,21 +233,21 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
         return;
     }
   }
-  assert(endOfLiferangeReached);
+  assert(endOfLiverangeReached);
 
-  // Move all projections of the destination address before the liferange of
+  // Move all projections of the destination address before the liverange of
   // the temporary.
-  for (auto iter = beginOfLiferange->getIterator();
+  for (auto iter = beginOfLiverange->getIterator();
        iter != copyInst->getIterator();) {
     SILInstruction *inst = &*iter++;
     if (projections.contains(inst))
-      inst->moveBefore(beginOfLiferange);
+      inst->moveBefore(beginOfLiverange);
   }
 
   if (!copyInst->isInitializationOfDest()) {
-    // Make sure the destination is uninitialized before the liferange of
+    // Make sure the destination is uninitialized before the liverange of
     // the temporary.
-    SILBuilderWithScope builder(beginOfLiferange);
+    SILBuilderWithScope builder(beginOfLiverange);
     builder.createDestroyAddr(copyInst->getLoc(), destination);
   }
 

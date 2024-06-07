@@ -13,9 +13,12 @@
 add_swift_macro_library(SwiftMacros
   OptionSetMacro.swift
   DebugDescriptionMacro.swift
-  DistributedProtocolMacro.swift
+  DistributedResolvableMacro.swift
+  SyntaxExtensions.swift
+  TaskLocalMacro.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
+    SwiftOperators
     SwiftSyntax
     SwiftSyntaxBuilder
     SwiftSyntaxMacros

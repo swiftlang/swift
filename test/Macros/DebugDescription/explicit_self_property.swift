@@ -1,10 +1,10 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -enable-experimental-feature SymbolLinkageMarkers -plugin-path %swift-plugin-dir -dump-macro-expansions > %t/expansions-dump.txt 2>&1
+// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -enable-experimental-feature DebugDescriptionMacro -plugin-path %swift-plugin-dir -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck %s < %t/expansions-dump.txt
 
-@_DebugDescription
+@DebugDescription
 struct MyStruct: CustomDebugStringConvertible {
   var name: String = "thirty"
   var debugDescription: String { "name: \(self.name)" }
@@ -16,7 +16,7 @@ struct MyStruct: CustomDebugStringConvertible {
 // CHECK:     /* "name: ${var.name}" */ 18 as UInt8, 110 as UInt8, 97 as UInt8, 109 as UInt8, 101 as UInt8, 58 as UInt8, 32 as UInt8, 36 as UInt8, 123 as UInt8, 118 as UInt8, 97 as UInt8, 114 as UInt8, 46 as UInt8, 110 as UInt8, 97 as UInt8, 109 as UInt8, 101 as UInt8, 125 as UInt8, 0 as UInt8
 // CHECK: )
 
-@_DebugDescription
+@DebugDescription
 class MyClass: CustomDebugStringConvertible {
   var name: String = "thirty"
   var debugDescription: String { "name: \(self.name)" }

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: echo "public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
+// RUN: echo "import Swift; public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
 // RUN: echo "public func phoûx() -> Int { return false }" > %t/français.swift
 // RUN: %target-swift-frontend -typecheck %s -I %t -I %S/../../Inputs/ -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal -verify-ignore-unknown

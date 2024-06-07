@@ -262,6 +262,10 @@ enum class FixKind : uint8_t {
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
 
+  /// Type of the element in generic pack couldn't be inferred and has to be
+  /// specified explicitly.
+  SpecifyPackElementType,
+
   /// Allow any type (and not just class or class-constrained type) to
   /// be convertible to AnyObject.
   AllowNonClassTypeToConvertToAnyObject,
@@ -427,9 +431,6 @@ enum class FixKind : uint8_t {
   /// Allow function type actor mismatch e.g. `@MainActor () -> Void`
   /// vs.`@OtherActor () -> Void`
   AllowGlobalActorMismatch,
-
-  /// Produce an error about a type that must be Copyable
-  MustBeCopyable,
 
   /// Allow 'each' applied to a non-pack type.
   AllowInvalidPackElement,
@@ -819,9 +820,9 @@ public:
   bool coalesceAndDiagnose(const Solution &solution,
                            ArrayRef<ConstraintFix *> secondaryFixes,
                            bool asNote = false) const override {
-    // If the from type or to type is a placeholer type that corresponds to an
+    // If the from type or to type is a placeholder type that corresponds to an
     // ErrorExpr, the issue has already been diagnosed. There's no need to
-    // produce another diagnostic for the contextual mismatch complainting that
+    // produce another diagnostic for the contextual mismatch complaining that
     // a type is not convertible to a placeholder type.
     if (auto fromPlaceholder = getFromType()->getAs<PlaceholderType>()) {
       if (fromPlaceholder->getOriginator().is<ErrorExpr *>()) {
@@ -1335,8 +1336,7 @@ class UseWrappedValue final : public ConstraintFix {
         PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
 
   bool usingProjection() const {
-    auto nameStr = PropertyWrapper->getName().str();
-    return !nameStr.startswith("_");
+    return !PropertyWrapper->getName().hasUnderscoredNaming();
   }
 
 public:
@@ -2136,32 +2136,6 @@ public:
   }
 };
 
-class MustBeCopyable final : public ConstraintFix {
-  Type noncopyableTy;
-  NoncopyableMatchFailure failure;
-
-  MustBeCopyable(ConstraintSystem &cs,
-                 Type noncopyableTy,
-                 NoncopyableMatchFailure failure,
-                 ConstraintLocator *locator);
-
-public:
-  std::string getName() const override { return "remove move-only from type"; }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
-
-  static MustBeCopyable *create(ConstraintSystem &cs,
-                             Type noncopyableTy,
-                             NoncopyableMatchFailure failure,
-                             ConstraintLocator *locator);
-
-  static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::MustBeCopyable;
-  }
-};
-
 class AllowInvalidPackElement final : public ConstraintFix {
   Type packElementType;
 
@@ -2736,6 +2710,25 @@ public:
     return fix->getKind() == FixKind::SpecifyObjectLiteralTypeImport;
   }
 };
+
+class SpecifyPackElementType final : public ConstraintFix {
+  SpecifyPackElementType(ConstraintSystem &cs, ConstraintLocator *locator)
+        : ConstraintFix(cs, FixKind::SpecifyPackElementType, locator) {}
+public:
+  std::string getName() const override {
+    return "specify pack element type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote) const override;
+
+  static SpecifyPackElementType *create(ConstraintSystem &cs,
+                                        ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::SpecifyPackElementType;
+  }
+};
+
 
 class AddQualifierToAccessTopLevelName final : public ConstraintFix {
   AddQualifierToAccessTopLevelName(ConstraintSystem &cs,

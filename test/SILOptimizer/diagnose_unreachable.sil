@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
 
 import Builtin
 import Swift

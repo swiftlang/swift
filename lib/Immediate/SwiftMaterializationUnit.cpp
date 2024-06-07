@@ -58,7 +58,7 @@ static std::string mangle(const StringRef Unmangled) {
 
 /// Whether a function name is mangled to be a lazy reexport
 static bool isMangled(const StringRef Symbol) {
-  return Symbol.endswith(ManglingSuffix);
+  return Symbol.ends_with(ManglingSuffix);
 }
 
 /// Demangle a lazy reexport

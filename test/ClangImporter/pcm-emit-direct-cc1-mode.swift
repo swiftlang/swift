@@ -11,7 +11,8 @@
 // Verify that the clang command-line used is cc1
 // RUN: %FileCheck -check-prefix CHECK-CLANG -DTRIPLE=%target-triple %s < %t.diags.txt
 // CHECK-CLANG: clang importer cc1 args
-// CHECK-CLANG-SAME: '{{.*[/\\]}}module.modulemap' '-o' '{{.*[/\\]}}script.pcm' '-fmodules' '-triple' '[[TRIPLE]]' '-x' 'objective-c'
+// CHECK-CLANG-SAME: '-o' '{{.*[/\\]}}script.pcm' '-fsyntax-only' '-x' 'objective-c' '{{.*[/\\]}}module.modulemap' '-triple' '[[TRIPLE]]'
+// CHECK-CLANG-SAME: '-fmodules'
 // CHECK-CLANG-NOT: clang importer driver args
 
 import script

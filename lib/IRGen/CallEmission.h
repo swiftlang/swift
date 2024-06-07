@@ -57,6 +57,15 @@ protected:
   /// The function we're going to call.
   Callee CurCallee;
 
+  /// Only valid if the SIL function has indirect return values.
+  /// If the function has multiple indirect return values, this is the address
+  /// of the first indirect return value.
+  Address indirectReturnAddress;
+
+  /// For C-functions: true if the return is indirect in SIL, but direct for a C-function.
+  /// That can happen for "sensitive" structs.
+  bool convertDirectToIndirectReturn = false;
+
   unsigned LastArgWritten;
 
   /// Whether this is a coroutine invocation.
@@ -94,6 +103,11 @@ protected:
   virtual llvm::CallBase *createCall(const FunctionPointer &fn,
                                      ArrayRef<llvm::Value *> args) = 0;
 
+  void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
+                                   Explosion &in, Explosion &out,
+                                   TemporarySet &temporaries,
+                                   bool isOutlined);
+
   CallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
       : IGF(IGF), selfValue(selfValue), CurCallee(std::move(callee)) {}
 
@@ -118,6 +132,8 @@ public:
   virtual Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) = 0;
 
   void addFnAttribute(llvm::Attribute::AttrKind Attr);
+
+  void setIndirectReturnAddress(Address addr) { indirectReturnAddress = addr; }
 
   void addParamAttribute(unsigned ParamIndex, llvm::Attribute::AttrKind Attr);
 

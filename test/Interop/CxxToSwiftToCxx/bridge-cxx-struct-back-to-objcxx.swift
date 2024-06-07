@@ -10,5 +10,4 @@
 
 // REQUIRES: objc_interop
 
-// RUN: %target-interop-build-clangxx -fsyntax-only -x objective-c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++20 -c -fmodules -fcxx-modules -I %t -D_LIBCPP_DISABLE_AVAILABILITY
-// FIXME: remove _LIBCPP_DISABLE_AVAILABILITY above (https://github.com/apple/swift/issues/67841)
+// RUN: %target-interop-build-clangxx -fsyntax-only -x objective-c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++20 -c -fmodules -fcxx-modules -I %t 

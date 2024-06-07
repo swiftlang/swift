@@ -496,7 +496,7 @@ class YieldOnceCheck : public SILFunctionTransform {
             switchValue->getUniqueCaseForDestination(noYieldTarget);
         assert(caseNumberOpt.has_value());
 
-        auto caseNumber = caseNumberOpt.value();
+        auto caseNumber = caseNumberOpt.value() + 1;
         diagnose(
             astCtx, enumCaseLoc, diag::switch_value_case_doesnt_yield,
             (Twine(caseNumber) + llvm::getOrdinalSuffix(caseNumber)).str());

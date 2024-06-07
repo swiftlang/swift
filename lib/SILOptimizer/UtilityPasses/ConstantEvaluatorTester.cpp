@@ -35,7 +35,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
 
   bool shouldInterpret() {
     auto *fun = getFunction();
-    return fun->getName().startswith("interpret");
+    return fun->getName().starts_with("interpret");
   }
 
   bool shouldSkipInstruction(SILInstruction *inst) {
@@ -47,7 +47,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
     if (!callee)
       return false;
 
-    return callee->getName().startswith("skip");
+    return callee->getName().starts_with("skip");
   }
 
   void run() override {

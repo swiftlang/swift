@@ -1,0 +1,9 @@
+module objc_implementation_class_extension {
+  header "objc_implementation_class_extension.h"
+  export *
+}
+
+module objc_implementation_class_extension_internal {
+  header "objc_implementation_class_extension_internal.h"
+  export *
+}

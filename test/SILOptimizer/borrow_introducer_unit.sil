@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -update-borrowed-from -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
 //
 // REQUIRES: swift_in_compiler
 
@@ -167,7 +167,7 @@ exit:
 
 // CHECK-LABEL: introducer_single: borrow_introducers with: %aggregate2
 // CHECK: } // end sil function 'introducer_single'
-// CHECK: Borrow introducers for: %11 = struct $PairC (%9 : $C, %10 : $C)
+// CHECK: Borrow introducers for: %12 = struct $PairC (%10 : $C, %11 : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: introducer_single: borrow_introducers with: %aggregate2
 sil [ossa] @introducer_single : $@convention(thin) (@guaranteed C) -> () {
@@ -217,8 +217,8 @@ exit:
 // CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
 // CHECK: } // end sil function 'introducer_revisit_reborrow'
 // CHECK: Borrow introducers for:  %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
-// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: introducer_revisit_reborrow: borrow_introducers with: %aggregate2
 sil [ossa] @introducer_revisit_reborrow : $@convention(thin) (@guaranteed C) -> () {
 entry(%0 : @guaranteed $C):
@@ -259,9 +259,9 @@ exit:
 // CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
 // CHECK: } // end sil function 'introducer_multiple_borrow'
 // CHECK: Borrow introducers for: %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
-// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: [[BORROW2]] = begin_borrow %0 : $C
+// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: introducer_multiple_borrow: borrow_introducers with: %aggregate2
 sil [ossa] @introducer_multiple_borrow : $@convention(thin) (@guaranteed C) -> () {
 entry(%0 : @guaranteed $C):
@@ -332,18 +332,13 @@ bb0(%0 : $Builtin.Word):
   %bridge = ref_to_bridge_object %c : $C, %0 : $Builtin.Word
   cond_br undef, bb1, bb2
 bb1:
-  end_apply %t
+  end_apply %t as $()
   %r = tuple ()
   return %r : $()
 bb2:
   abort_apply %t
   unreachable
 }
-
-// CHECK-LABEL: introducer_example: borrow_introducers with: %0
-// CHECK: Borrow introducers for: %0 = argument of bb0 : $C
-// CHECK-NEXT: %0 = argument of bb0 : $C
-// CHECK-NEXT: introducer_example: borrow_introducers with: %0
 
 // CHECK-LABEL: introducer_example: borrow_introducers with: %borrow0
 // CHECK: Borrow introducers for:   %{{.*}} = begin_borrow %0 : $C
@@ -352,13 +347,9 @@ bb2:
 
 // CHECK-LABEL: introducer_example: borrow_introducers with: %first
 // CHECK: Borrow introducers for:   %{{.*}} = struct_extract %{{.*}} : $PairC, #PairC.first
-// CHECK-NEXT:  %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT:  %{{.*}} = argument of bb0 : $C
+// CHECK-NEXT:  %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT: introducer_example: borrow_introducers with: %first
-
-// CHECK-LABEL: introducer_example: borrow_introducers with: %field
-// CHECK: Borrow introducers for:   %{{.*}} = ref_element_addr %{{.*}} : $C, #C.field
-// CHECK-NEXT: introducer_example: borrow_introducers with: %field
 
 // CHECK-LABEL: introducer_example: borrow_introducers with: %load
 // CHECK-LABEL: Borrow introducers for:   %{{.*}} = load_borrow %{{.*}} : $*C
@@ -367,14 +358,12 @@ bb2:
 sil [ossa] @introducer_example : $@convention(thin) (@owned C, @guaranteed C) -> () {
 bb0(%0 : @owned $C,
     %1 : @guaranteed $C):
-  specify_test "borrow_introducers %0"
   %borrow0 = begin_borrow %0 : $C
   specify_test "borrow_introducers %borrow0"
   %pair = struct $PairC(%borrow0 : $C, %1 : $C)
   %first = struct_extract %pair : $PairC, #PairC.first
   specify_test "borrow_introducers %first"
   %field = ref_element_addr %first : $C, #C.field
-  specify_test "borrow_introducers %field"
   %load = load_borrow %field : $*C
   specify_test "borrow_introducers %load"
   end_borrow %load : $C
@@ -390,8 +379,8 @@ bb0(%0 : @owned $C,
 // CHECK-NEXT: testSelfIntroducer: borrow_introducers with: %phi
 
 // CHECK-LABEL: testSelfIntroducer: enclosing_values with: %reborrow
-// CHECK: Enclosing values for: %4 = argument of bb1 : $C                         // users: %8, %7
-// CHECK-NEXT: %0 = argument of bb0 : $C                         // user: %1
+// CHECK: Enclosing values for: %4 = argument of bb1 : $C
+// CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: testSelfIntroducer: enclosing_values with: %reborrow
 sil [ossa] @testSelfIntroducer : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -417,10 +406,10 @@ bb3:
 // visited once on each path, and each time the recursive algorithm
 // must find the enclosing def %0, which maps to a %outer0 on one path
 // and %outer1 on another path. If the cache fails, then we only find
-// one of the outer adjacent phis as and enclosing value for %inner.
+// one of the outer adjacent phis as an enclosing value for %inner.
 //
 // CHECK-LABEL: testEnclosingRevisitReborrow: enclosing_values with: %inner
-// CHECK: Enclosing values for: %10 = argument of bb4 : $C                        // user: %11
+// CHECK: Enclosing values for: %11 = argument of bb4 : $C
 // CHECK-NEXT: %{{.*}} = argument of bb4 : $C
 // CHECK-NEXT: %{{.*}} = argument of bb4 : $C
 // CHECK-NEXT: end running test 1 of 1 on testEnclosingRevisitReborrow: enclosing_values with: %inner

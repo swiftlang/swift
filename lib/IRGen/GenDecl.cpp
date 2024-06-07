@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -454,6 +455,11 @@ public:
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF) {
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
+    // We're asked to emit an empty IR module
+    return;
+  }
+
   // Type-check the file if we haven't already (this may be necessary for .sil
   // files, which don't get fully type-checked by parsing).
   performTypeChecking(SF);
@@ -470,61 +476,33 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);
 
-  SF.collectLinkLibraries([this](LinkLibrary linkLib) {
-    this->addLinkLibrary(linkLib);
+  auto registerLinkLibrary = [this](const LinkLibrary &ll) {
+    this->addLinkLibrary(ll);
+  };
+
+  SF.collectLinkLibraries([registerLinkLibrary](LinkLibrary linkLib) {
+    registerLinkLibrary(linkLib);
   });
 
   if (ObjCInterop)
-    this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+    registerLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
   // (std) if available.
   if (Context.LangOpts.EnableCXXInterop) {
-    const llvm::Triple &target = Context.LangOpts.Target;
-    if (target.isOSDarwin())
-      this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
-    else if (target.isOSLinux())
-      this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
-
-    // Do not try to link Cxx with itself.
-    if (!getSwiftModule()->getName().is("Cxx")) {
-      bool isStatic = false;
-      if (const auto *M = Context.getModuleByName("Cxx"))
-        isStatic = M->isStaticLibrary();
-      this->addLinkLibrary(LinkLibrary(target.isOSWindows() && isStatic
-                                          ? "libswiftCxx"
-                                          : "swiftCxx",
-                                       LibraryKind::Library));
-    }
-
-    // Do not try to link CxxStdlib with the C++ standard library, Cxx or
-    // itself.
-    if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
-                      [M = getSwiftModule()->getName().str()](StringRef Name) {
-                        return M == Name;
-                      })) {
-      // Only link with CxxStdlib on platforms where the overlay is available.
-      switch (target.getOS()) {
-      case llvm::Triple::Linux:
-        if (!target.isAndroid())
-          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
-                                           LibraryKind::Library));
-        break;
-      case llvm::Triple::Win32: {
-        bool isStatic = Context.getModuleByName("CxxStdlib")->isStaticLibrary();
-        this->addLinkLibrary(
-            LinkLibrary(isStatic ? "libswiftCxxStdlib" : "swiftCxxStdlib",
-                        LibraryKind::Library));
-        break;
-      }
-      default:
-        if (target.isOSDarwin())
-          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
-                                           LibraryKind::Library));
-        break;
-      }
-    }
+    bool hasStaticCxx = false;
+    bool hasStaticCxxStdlib = false;
+    if (const auto *M = Context.getModuleByName("Cxx"))
+      hasStaticCxx = M->isStaticLibrary();
+    if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
+      if (const auto *M = Context.getModuleByName("CxxStdlib"))
+        hasStaticCxxStdlib = M->isStaticLibrary();
+    dependencies::registerCxxInteropLibraries(Context.LangOpts.Target,
+                                              getSwiftModule()->getName().str(),
+                                              hasStaticCxx,
+                                              hasStaticCxxStdlib,
+                                              registerLinkLibrary);
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that
@@ -536,36 +514,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // libraries. This may however cause the library to get pulled in in
   // situations where it isn't useful, such as for dylibs, though this is
   // harmless aside from code size.
-  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded)) {
-    auto addBackDeployLib = [&](llvm::VersionTuple version,
-                                StringRef libraryName, bool forceLoad) {
-      std::optional<llvm::VersionTuple> compatibilityVersion;
-      if (libraryName == "swiftCompatibilityDynamicReplacements") {
-        compatibilityVersion = IRGen.Opts.
-            AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
-      } else if (libraryName == "swiftCompatibilityConcurrency") {
-        compatibilityVersion =
-            IRGen.Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
-      } else {
-        compatibilityVersion = IRGen.Opts.
-            AutolinkRuntimeCompatibilityLibraryVersion;
-      }
-
-      if (!compatibilityVersion)
-        return;
-
-      if (*compatibilityVersion > version)
-        return;
-
-      this->addLinkLibrary(LinkLibrary(libraryName,
-                                       LibraryKind::Library,
-                                       forceLoad));
-    };
-
-#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
-      addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
-    #include "swift/Frontend/BackDeploymentLibs.def"
-  }
+  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded))
+    dependencies::registerBackDeployLibraries(IRGen.Opts, registerLinkLibrary);
 }
 
 /// Emit all the top-level code in the synthesized file unit.
@@ -1030,15 +980,6 @@ bool LinkInfo::isUsed(IRLinkage IRL) {
 ///
 /// This value must have a definition by the time the module is finalized.
 void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-
-  // As of reviews.llvm.org/D97448 "ELF: Create unique SHF_GNU_RETAIN sections
-  // for llvm.used global objects" LLVM creates separate sections for globals in
-  // llvm.used on ELF.  Therefore we use llvm.compiler.used on ELF instead.
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF) {
-    addCompilerUsedGlobal(global);
-    return;
-  }
-
   LLVMUsed.push_back(global);
 }
 
@@ -1259,6 +1200,11 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
 
 void IRGenerator::emitGlobalTopLevel(
     const std::vector<std::string> &linkerDirectives) {
+  if (PrimaryIGM->getSILModule().getOptions().StopOptimizationAfterSerialization) {
+    // We're asked to emit an empty IR module
+    return;
+  }
+
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -2195,6 +2141,11 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
 /// from other modules. This happens e.g. if a public class contains a (dead)
 /// private method.
 void IRGenModule::emitVTableStubs() {
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
+    // We're asked to emit an empty IR module
+    return;
+  }
+
   llvm::Function *stub = nullptr;
   for (auto I = getSILModule().zombies_begin();
            I != getSILModule().zombies_end(); ++I) {
@@ -2835,6 +2786,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Mark as llvm.used if @_used, set section if @_section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
+    else if (var->shouldBePreservedForDebugger() && forDefinition) 
+      addUsedGlobal(gvar);
     if (auto *sectionAttr = var->getSectionAttr())
       gvar->setSection(sectionAttr->Name);
   }
@@ -3461,7 +3414,12 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::FunctionType *ctorFnType =
       cast<llvm::FunctionType>(clangFunc->getValueType());
 
-  if (assumedFnType == ctorFnType) {
+  // Only need a thunk if either:
+  // 1. The calling conventions do not match, and we need to pass arguments
+  //    differently.
+  // 2. This is a default constructor, and we need to zero the backing memory of
+  //    the struct.
+  if (assumedFnType == ctorFnType && !ctor->isDefaultConstructor()) {
     return ctorAddress;
   }
 
@@ -3495,14 +3453,34 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
       Args.push_back(i);
   }
 
-  clang::CodeGen::ImplicitCXXConstructorArgs implicitArgs =
-      clang::CodeGen::getImplicitCXXConstructorArgs(IGM.ClangCodeGen->CGM(),
-                                                    ctor);
-  for (size_t i = 0; i < implicitArgs.Prefix.size(); ++i) {
-    Args.insert(Args.begin() + 1 + i, implicitArgs.Prefix[i]);
+  if (assumedFnType != ctorFnType) {
+    clang::CodeGen::ImplicitCXXConstructorArgs implicitArgs =
+        clang::CodeGen::getImplicitCXXConstructorArgs(IGM.ClangCodeGen->CGM(),
+                                                      ctor);
+    for (size_t i = 0; i < implicitArgs.Prefix.size(); ++i) {
+      Args.insert(Args.begin() + 1 + i, implicitArgs.Prefix[i]);
+    }
+    for (const auto &arg : implicitArgs.Suffix) {
+      Args.push_back(arg);
+    }
   }
-  for (const auto &arg : implicitArgs.Suffix) {
-    Args.push_back(arg);
+
+  if (ctor->isDefaultConstructor()) {
+    assert(Args.size() > 0 && "expected at least 1 argument (result address) "
+                              "for default constructor");
+
+    // Zero out the backing memory of the struct.
+    // This makes default initializers for C++ structs behave consistently with
+    // the synthesized empty initializers for C structs. When C++ interop is
+    // enabled in a project, all imported C structs are treated as C++ structs,
+    // which sometimes means that Clang will synthesize a default constructor
+    // for the C++ struct that does not zero out trivial fields of a struct.
+    auto cxxRecord = ctor->getParent();
+    clang::ASTContext &ctx = cxxRecord->getASTContext();
+    auto typeSize = ctx.getTypeSizeInChars(ctx.getRecordType(cxxRecord));
+    subIGF.Builder.CreateMemSet(Args[0],
+                                llvm::ConstantInt::get(subIGF.IGM.Int8Ty, 0),
+                                typeSize.getQuantity(), llvm::MaybeAlign());
   }
 
   auto *call =
@@ -3679,7 +3657,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   // Also mark as llvm.used any functions that should be kept for the debugger.
   // Only definitions should be kept.
-  if (f->shouldBePreservedForDebugger() && !fn->isDeclaration())
+  if (f->shouldBePreservedForDebugger() && forDefinition)
     addUsedGlobal(fn);
 
   // If `hasCReferences` is true, then the function is either marked with
@@ -4423,8 +4401,34 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   }
 }
 
-void IRGenModule::addAccessibleFunction(SILFunction *func) {
-  AccessibleFunctions.push_back(func);
+AccessibleFunction AccessibleFunction::forSILFunction(IRGenModule &IGM,
+                                                      SILFunction *func) {
+  assert(!func->isDistributed() && "use forDistributed(...) instead");
+
+  llvm::Constant *funcAddr = nullptr;
+  if (func->isAsync()) {
+    funcAddr = IGM.getAddrOfAsyncFunctionPointer(func);
+  } else {
+    funcAddr = IGM.getAddrOfSILFunction(func, NotForDefinition);
+  }
+
+  return AccessibleFunction(
+      /*recordName=*/LinkEntity::forAccessibleFunctionRecord(func)
+          .mangleAsString(),
+      /*funcName=*/LinkEntity::forSILFunction(func).mangleAsString(),
+      /*isDistributed=*/false, func->getLoweredFunctionType(), funcAddr);
+}
+
+AccessibleFunction AccessibleFunction::forDistributed(std::string recordName,
+                                                      std::string accessorName,
+                                                      CanSILFunctionType type,
+                                                      llvm::Constant *address) {
+  return AccessibleFunction(recordName, accessorName,
+                            /*isDistributed=*/true, type, address);
+}
+
+void IRGenModule::addAccessibleFunction(AccessibleFunction func) {
+  AccessibleFunctions.push_back(std::move(func));
 }
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
@@ -4648,50 +4652,35 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   return nullptr;
 }
 
-void IRGenModule::emitAccessibleFunction(
-    StringRef sectionName, std::string mangledRecordName,
-    std::optional<std::string> mangledActorName,
-    std::string mangledFunctionName, SILFunction* func) {
-
-  auto recordTy = mangledActorName.has_value()
-                      ? AccessibleProtocolRequirementFunctionRecordTy
-                      : AccessibleFunctionRecordTy;
-
+void IRGenModule::emitAccessibleFunction(StringRef sectionName,
+                                         const AccessibleFunction &func) {
   auto var = new llvm::GlobalVariable(
-      Module, recordTy, /*isConstant=*/true,
+      Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
-      mangledRecordName);
+      func.getRecordName());
 
   ConstantInitBuilder builder(*this);
 
   // ==== Store fields of 'TargetAccessibleFunctionRecord'
   ConstantStructBuilder fields =
-      builder.beginStruct(recordTy);
+      builder.beginStruct(AccessibleFunctionRecordTy);
 
   // -- Field: Name (record name)
   {
-    llvm::Constant *recordName = nullptr;
-    if (recordTy == AccessibleProtocolRequirementFunctionRecordTy) {
-      recordName = getAddrOfGlobalString(mangledRecordName,
-                                         /*willBeRelativelyAddressed=*/true);
-    } else if (recordTy == AccessibleFunctionRecordTy) {
-      recordName = getAddrOfGlobalString(mangledFunctionName,
-                                         /*willBeRelativelyAddressed=*/true);
-    } else {
-      assert(false && "Unknown recordTy");
-    }
-    assert(recordName && "record name must be initialized");
-    fields.addRelativeAddress(recordName);
+    llvm::Constant *name =
+        getAddrOfGlobalString(func.getFunctionName(),
+                              /*willBeRelativelyAddressed=*/true);
+    fields.addRelativeAddress(name);
   }
 
   // -- Field: GenericEnvironment
   llvm::Constant *genericEnvironment = nullptr;
 
-  GenericSignature signature;
-  if (auto *env = func->getGenericEnvironment()) {
-    // Drop all of the marker protocols because they are effect-less
+  GenericSignature signature = func.getType()->getInvocationGenericSignature();
+  if (signature) {
+    // Drop all the marker protocols because they are effect-less
     // at runtime.
-    signature = env->getGenericSignature().withoutMarkerProtocols();
+    signature = signature.withoutMarkerProtocols();
 
     genericEnvironment =
         getAddrOfGenericEnvironment(signature.getCanonicalSignature());
@@ -4699,48 +4688,19 @@ void IRGenModule::emitAccessibleFunction(
   fields.addRelativeAddressOrNull(genericEnvironment);
 
   // -- Field: FunctionType
-  llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
-                                    MangledTypeRefRole::Metadata)
-                             .first;
+  llvm::Constant *type =
+      getTypeRef(func.getType(), signature, MangledTypeRefRole::Metadata).first;
   fields.addRelativeAddress(type);
 
   // -- Field: Function
-  llvm::Constant *funcAddr = nullptr;
-  if (func->isDistributed()) {
-    funcAddr = getAddrOfAsyncFunctionPointer(
-        LinkEntity::forDistributedTargetAccessor(func));
-  } else if (func->isAsync()) {
-    funcAddr = getAddrOfAsyncFunctionPointer(func);
-  } else {
-    funcAddr = getAddrOfSILFunction(func, NotForDefinition);
-  }
-
-  fields.addRelativeAddress(funcAddr);
+  fields.addRelativeAddress(func.getAddress());
 
   // -- Field: Flags
   AccessibleFunctionFlags flags;
-  flags.setDistributed(func->isDistributed());
+  flags.setDistributed(func.isDistributed());
   fields.addInt32(flags.getOpaqueValue());
 
   // ---- End of 'TargetAccessibleFunctionRecord' fields
-
-  // -- Field: ConcreteActorName
-  if (func->isDistributed()) {
-    if (mangledActorName) {
-      assert(recordTy == AccessibleProtocolRequirementFunctionRecordTy &&
-             "Only store additional actor type when record type is the "
-             "extended one.");
-      llvm::Constant *mangledActorNameAddr = getAddrOfGlobalString(
-          *mangledActorName, /*willBeRelativelyAddressed=*/true);
-      fields.addRelativeAddress(mangledActorNameAddr);
-    }
-  }
-  // -- Field: ConcreteWitnessMethodName
-  if (recordTy == AccessibleProtocolRequirementFunctionRecordTy) {
-    llvm::Constant *witnessMethodName = getAddrOfGlobalString(
-        mangledFunctionName, /*willBeRelativelyAddressed=*/true);
-    fields.addRelativeAddress(witnessMethodName);
-  }
 
   fields.finishAndSetAsInitializer(var);
   var->setSection(sectionName);
@@ -4774,15 +4734,8 @@ void IRGenModule::emitAccessibleFunctions() {
     break;
   }
 
-  for (auto *func : AccessibleFunctions) {
-    auto mangledRecordName =
-        LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-    std::string mangledFunctionName =
-        LinkEntity::forSILFunction(func).mangleAsString();
-
-    emitAccessibleFunction(
-        fnsSectionName, mangledRecordName,
-        /*mangledActorName=*/{}, mangledFunctionName, func);
+  for (const auto &func : AccessibleFunctions) {
+    emitAccessibleFunction(fnsSectionName, func);
   }
 }
 
@@ -5845,7 +5798,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
 static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
   if (ext->isObjCImplementation()) {
-    assert(ext->getCategoryNameForObjCImplementation() != Identifier());
+    assert(!ext->getObjCCategoryName().empty());
     return true;
   }
 
@@ -5889,8 +5842,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == Identifier()) {
+  if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty()) {
     // This is the @_objcImplementation for the class--generate its class
     // metadata.
     emitClassDecl(origClass);
@@ -6039,6 +5991,11 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
                               ResilienceExpansion expansion,
                               ClassDecl *asViewedFromRootClass) {
   assert(!asViewedFromRootClass || isa<ClassDecl>(D));
+
+  // Ignore resilient protocols if requested.
+  if (isa<ProtocolDecl>(D) && IRGen.Opts.UseFragileResilientProtocolWitnesses) {
+    return false;
+  }
 
   if (D->getModuleContext()->getBypassResilience())
     return false;

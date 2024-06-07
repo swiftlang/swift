@@ -23,6 +23,10 @@ distributed actor Worker {
     print("hi!")
   }
 
+  distributed var greeting: String {
+    "hi!"
+  }
+
   nonisolated var description: Swift.String {
     "Worker(\(id))"
   }
@@ -36,5 +40,8 @@ distributed actor Worker {
     let actor = Worker(actorSystem: system)
     try await actor.hi() // local calls should still just work
     // CHECK: hi!
+
+    let g = try await actor.greeting // local calls should still just work
+    print("g = \(g)") // CHECK: g = hi!
   }
 }

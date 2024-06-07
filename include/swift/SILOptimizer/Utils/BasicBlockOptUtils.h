@@ -83,13 +83,6 @@ public:
   }
 };
 
-/// Remove all instructions in the body of \p bb in safe manner by using
-/// undef.
-void clearBlockBody(SILBasicBlock *bb);
-
-/// Handle the mechanical aspects of removing an unreachable block.
-void removeDeadBlock(SILBasicBlock *bb);
-
 /// Remove all unreachable blocks in a function.
 bool removeUnreachableBlocks(SILFunction &f);
 
@@ -101,16 +94,6 @@ inline bool isUsedOutsideOfBlock(SILValue v) {
       return true;
   return false;
 }
-
-/// Rotate a loop's header as long as it is exiting and not equal to the
-/// passed basic block.
-/// If \p RotateSingleBlockLoops is true a single basic block loop will be
-/// rotated once. ShouldVerify specifies whether to perform verification after
-/// the transformation.
-/// Returns true if the loop could be rotated.
-bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo, SILLoopInfo *loopInfo,
-                bool rotateSingleBlockLoops, SILBasicBlock *upToBB,
-                bool shouldVerify);
 
 //===----------------------------------------------------------------------===//
 //                             BasicBlock Cloning
@@ -209,6 +192,8 @@ protected:
   // If available, the current DeadEndBlocks for incremental update.
   DeadEndBlocks *deBlocks;
 
+  SILPassManager *pm;
+
 public:
   /// An ordered list of old to new available value pairs.
   ///
@@ -217,8 +202,8 @@ public:
   SmallVector<std::pair<SILValue, SILValue>, 16> availVals;
 
   // Clone blocks starting at `origBB`, within the same function.
-  BasicBlockCloner(SILBasicBlock *origBB, DeadEndBlocks *deBlocks = nullptr)
-      : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks) {}
+  BasicBlockCloner(SILBasicBlock *origBB, SILPassManager *pm, DeadEndBlocks *deBlocks = nullptr)
+      : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks), pm(pm) {}
 
   bool canCloneBlock() {
     for (auto &inst : *origBB) {

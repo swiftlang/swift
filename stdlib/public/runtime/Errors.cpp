@@ -34,6 +34,7 @@
 
 #include "ImageInspection.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Win32.h"
@@ -64,13 +65,14 @@
 #include <inttypes.h>
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <atomic>
 #include <malloc/malloc.h>
-
-#include "swift/Runtime/Atomic.h"
+#else
+static std::atomic<const char *> kFatalErrorMessage;
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 #include "BacktracePrivate.h"
+
+#include <atomic>
 
 namespace FatalErrorFlags {
 enum: uint32_t {
@@ -297,7 +299,24 @@ reportOnCrash(uint32_t flags, const char *message)
              std::memory_order_release,
              SWIFT_MEMORY_ORDER_CONSUME));
 #else
-  // empty
+  const char *previous = nullptr;
+  char *current = nullptr;
+  previous =
+      std::atomic_load_explicit(&kFatalErrorMessage, SWIFT_MEMORY_ORDER_CONSUME);
+
+  do {
+    ::free(current);
+    current = nullptr;
+
+    if (previous)
+      swift_asprintf(&current, "%s%s", current, message);
+    else
+      current = ::strdup(message);
+  } while (!std::atomic_compare_exchange_strong_explicit(&kFatalErrorMessage,
+                                                         &previous,
+                                                         static_cast<const char *>(current),
+                                                         std::memory_order_release,
+                                                         SWIFT_MEMORY_ORDER_CONSUME));
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
 
@@ -420,6 +439,12 @@ swift::warning(uint32_t flags, const char *format, ...)
 void swift::swift_reportWarning(uint32_t flags, const char *message) {
   warning(flags, "%s", message);
 }
+
+#if !defined(SWIFT_HAVE_CRASHREPORTERCLIENT)
+std::atomic<const char *> *swift::swift_getFatalErrorMessageBuffer() {
+  return &kFatalErrorMessage;
+}
+#endif
 
 // Crash when a deleted method is called by accident.
 SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {

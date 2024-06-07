@@ -20,7 +20,7 @@ import SIL
 /// One or more "potential" end instructions can be inserted.
 /// Though, not all inserted instructions end up as "end" instructions.
 ///
-/// `InstructionRange` is useful for calculating the liferange of values.
+/// `InstructionRange` is useful for calculating the liverange of values.
 ///
 /// The `InstructionRange` is similar to a `BasicBlockRange`, but defines the range
 /// in a "finer" granularity, i.e. on instructions instead of blocks.
@@ -60,16 +60,15 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   init(for value: Value, _ context: some Context) {
-    var begin: Instruction
-    if let def = value.definingInstruction {
-      begin = def
-    } else if let result = TerminatorResult(value) {
-      begin = result.terminator
-    } else {
-      assert(Phi(value) != nil || value is FunctionArgument)
-      begin = value.parentBlock.instructions.first!
+    self = InstructionRange(begin: InstructionRange.beginningInstruction(for: value), context)
+  }
+
+  static func beginningInstruction(for value: Value) -> Instruction {
+    if let def = value.definingInstructionOrTerminator {
+      return def
     }
-    self = InstructionRange(begin: begin, context)
+    assert(Phi(value) != nil || value is FunctionArgument)
+    return value.parentBlock.instructions.first!
   }
 
   /// Insert a potential end instruction.

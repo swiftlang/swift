@@ -53,16 +53,16 @@
   %#^*&
 #endif
 
-#if swift(">=7.1") // expected-error {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
+#if swift(">=7.1") // expected-error@:11 {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
 #endif
 
-#if swift("<7.1") // expected-error {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
+#if swift("<7.1") // expected-error@:11 {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
 #endif
 
-#if swift(">=2n.2") // expected-error {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
+#if swift(">=2n.2") // expected-error@:11 {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
 #endif
 
-#if swift("") // expected-error {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
+#if swift("") // expected-error@:11 {{unexpected platform condition argument: expected a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'}}
 #endif
 
 #if swift(>=2.2.1)
@@ -75,10 +75,13 @@ class C {
 #endif
 }
 
-#if swift(>=2.0, *) // expected-error {{expected only one argument to platform condition}}
+#if swift(>=2.0, *) // expected-error@:11 {{expected only one unlabeled argument to platform condition}}
 #endif
 
-#if swift(>=, 2.0) // expected-error {{expected only one argument to platform condition}}
+#if swift(>=, 2.0) // expected-error@:11 {{expected only one unlabeled argument to platform condition}}
+#endif
+
+#if swift(version: >=2.0) // expected-error@:11 {{expected only one unlabeled argument to platform condition}}
 #endif
 
 protocol P {

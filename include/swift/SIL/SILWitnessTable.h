@@ -35,7 +35,7 @@ class SILFunction;
 class SILModule;
 class ProtocolConformance;
 class RootProtocolConformance;
-enum IsSerialized_t : unsigned char;
+enum SerializedKind_t : uint8_t;
 
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
@@ -197,10 +197,10 @@ private:
  
   /// Whether or not this witness table is serialized, which allows
   /// devirtualization from another module.
-  bool Serialized;
+  unsigned SerializedKind : 2;
 
   /// Private constructor for making SILWitnessTable definitions.
-  SILWitnessTable(SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized,
+  SILWitnessTable(SILModule &M, SILLinkage Linkage, SerializedKind_t Serialized,
                   StringRef name, RootProtocolConformance *conformance,
                   ArrayRef<Entry> entries,
                   ArrayRef<ConditionalConformance> conditionalConformances);
@@ -214,7 +214,7 @@ private:
 public:
   /// Create a new SILWitnessTable definition with the given entries.
   static SILWitnessTable *
-  create(SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized,
+  create(SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
          RootProtocolConformance *conformance, ArrayRef<Entry> entries,
          ArrayRef<ConditionalConformance> conditionalConformances);
 
@@ -252,13 +252,21 @@ public:
   bool isDefinition() const { return !isDeclaration(); }
 
   /// Returns true if this witness table is going to be (or was) serialized.
-  IsSerialized_t isSerialized() const {
-    return Serialized ? IsSerialized : IsNotSerialized;
+  bool isSerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized;
   }
 
+  bool isAnySerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized ||
+           SerializedKind_t(SerializedKind) == IsSerializedForPackage;
+  }
+
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(SerializedKind);
+  }
   /// Sets the serialized flag.
-  void setSerialized(IsSerialized_t serialized) {
-    Serialized = (serialized ? 1 : 0);
+  void setSerializedKind(SerializedKind_t serializedKind) {
+    SerializedKind = serializedKind;
   }
 
   /// Return all of the witness table entries.
@@ -295,11 +303,11 @@ public:
   void
   convertToDefinition(ArrayRef<Entry> newEntries,
                       ArrayRef<ConditionalConformance> conditionalConformances,
-                      IsSerialized_t isSerialized);
+                      SerializedKind_t serializedKind);
 
-  // Whether a conformance should be serialized.
-  static bool
-  conformanceIsSerialized(const RootProtocolConformance *conformance);
+  // Gets conformance serialized kind.
+  static SerializedKind_t
+  conformanceSerializedKind(const RootProtocolConformance *conformance);
 
   /// Call \c fn on each (split apart) conditional requirement of \c conformance
   /// that should appear in a witness table, i.e., conformance requirements that

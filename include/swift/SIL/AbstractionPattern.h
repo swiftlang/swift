@@ -1014,6 +1014,10 @@ public:
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  bool conformsToKnownProtocol(
+    CanType substTy, KnownProtocolKind protocolKind) const;
+  bool isNoncopyable(CanType substTy) const;
+  bool isEscapable(CanType substTy) const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.
@@ -1535,6 +1539,11 @@ public:
   /// *not* () -> (@error_indirect Never) or () -> (@error_indirect any Error).
   std::optional<std::pair<AbstractionPattern, CanType>>
   getFunctionThrownErrorType(CanAnyFunctionType substFnInterfaceType) const;
+
+  /// For the abstraction pattern produced by `getFunctionThrownErrorType()`,
+  /// produce the effective thrown error type to be used when we don't have
+  /// a substituted error type.
+  CanType getEffectiveThrownErrorType() const;
 
   /// Given that the value being abstracted is a function type, return
   /// the abstraction pattern for one of its parameter types.

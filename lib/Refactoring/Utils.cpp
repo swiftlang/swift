@@ -26,7 +26,7 @@ swift::refactoring::correctNameInternal(ASTContext &Ctx, StringRef Name,
   llvm::StringSet<> UsedSuffixes;
   for (auto VD : AllVisibles) {
     StringRef S = VD->getBaseName().userFacingName();
-    if (!S.startswith(Name))
+    if (!S.starts_with(Name))
       continue;
     StringRef Suffix = S.substr(Name.size());
     if (Suffix.empty())

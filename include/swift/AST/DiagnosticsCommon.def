@@ -45,7 +45,7 @@ NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
 WARNING(error_in_future_swift_version,none,
-        "%0; this is an error in Swift %1",
+        "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
 
 // Generic disambiguation
@@ -55,11 +55,6 @@ NOTE(while_parsing_as_left_angle_bracket,none,
 // Generic determinism-forcing override.
 REMARK(remark_max_determinism_overriding,none,
          "SWIFTC_MAXIMUM_DETERMINISM overriding %0", (StringRef))
-
-// FIXME: This is used both as a parse error (a literal "super" outside a
-// method) and a type-checker error ("super" in a method of a non-class type).
-ERROR(super_not_in_class_method,none,
-      "'super' cannot be used outside of class members", ())
 
 ERROR(class_func_not_in_class,none,
       "class methods are only allowed within classes; "

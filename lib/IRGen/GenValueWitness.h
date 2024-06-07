@@ -49,6 +49,8 @@ namespace irgen {
 
   SILType getLoweredTypeInPrimaryContext(IRGenModule &IGM,
                                          NominalTypeDecl *type);
+
+  bool layoutStringsEnabled(IRGenModule &IGM, bool diagnose = false);
 }
 }
 

@@ -25,8 +25,8 @@ bb0:
   %3 = struct_element_addr %2 : $*MyStruct, #MyStruct.x, loc "file.swift":9:17, scope 1
   // CHECK: %[[FIELD_X:.*]] = getelementptr {{.*}} %[[MY_STRUCT]]
   // CHECK-SIL: debug_value %{{[0-9]+}} : $*Builtin.Int64
-  // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":8:9, scope {{[0-9]+}})
-  // CHECK-SIL-SAME         type $MyStruct, expr op_deref:op_fragment:#MyStruct.x
+  // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":8:9)
+  // CHECK-SIL-SAME:        type $MyStruct, expr op_deref:op_fragment:#MyStruct.x
   debug_value %3 : $*Builtin.Int64, var, (name "my_struct", loc "file.swift":8:9, scope 1), type $MyStruct, expr op_deref:op_fragment:#MyStruct.x, loc "file.swift":9:17, scope 1
 
   %4 = alloc_stack $SmallStruct, var, name "small_struct", loc "file.swift":10:11, scope 1
@@ -51,7 +51,7 @@ bb0:
   // CHECK: %[[MY_STRUCT:.+]] = alloca %{{.*}}MyStruct
   // CHECK: llvm.dbg.declare(metadata ptr %[[MY_STRUCT]], metadata ![[VAR_DECL_MD:[0-9]+]]
   // CHECK-SIL: alloc_stack $Int, var
-  // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":15:9, scope {{[0-9]+}})
+  // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":15:9)
   // CHECK-SIL-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
   %field_x = alloc_stack $Int, var, (name "my_struct", loc "file.swift":15:9, scope 2), type $MyStruct, expr op_fragment:#MyStruct.x, loc "file.swift":16:17, scope 2
   // CHECK: %[[FIELD_X:.+]] = alloca %TSi

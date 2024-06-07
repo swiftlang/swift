@@ -38,6 +38,76 @@ public protocol Executor: AnyObject, Sendable {
 }
 
 /// A service that executes jobs.
+///
+/// ### Custom Actor Executors
+/// By default, all actor types execute tasks on a shared global concurrent pool.
+/// The global pool does not guarantee any thread (or dispatch queue) affinity,
+/// so actors are free to use different threads as they execute tasks.
+///
+/// > The runtime may perform various optimizations to minimize un-necessary
+/// > thread switching.
+///
+/// Sometimes it is important to be able to customize the execution behavior
+///  of an actor. For example, when an actor is known to perform heavy blocking
+/// operations (such as IO), and we would like to keep this work *off* the global
+/// shared pool, as blocking it may prevent other actors from being responsive.
+///
+/// You can implement a custom executor, by conforming a type to the
+/// ``SerialExecutor`` protocol, and implementing the ``enqueue(_:)`` method.
+///
+/// Once implemented, you can configure an actor to use such executor by
+/// implementing the actor's ``Actor/unownedExecutor`` computed property.
+/// For example, you could accept an executor in the actor's initializer,
+/// store it as a variable (in order to retain it for the duration of the
+/// actor's lifetime), and return it from the `unownedExecutor` computed
+/// property like this:
+///
+/// ```
+/// actor MyActor {
+///   let myExecutor: MyExecutor
+///
+///   // accepts an executor to run this actor on.
+///   init(executor: MyExecutor) {
+///     self.myExecutor = executor
+///   }
+///
+///   nonisolated var unownedExecutor: UnownedSerialExecutor {
+///     self.myExecutor.asUnownedSerialExecutor()
+///   }
+/// }
+/// ```
+///
+/// It is also possible to use a form of shared executor, either created as a
+/// global or static property, which you can then re-use for every MyActor
+/// instance:
+///
+/// ```
+/// actor MyActor {
+///   // Serial executor reused by *all* instances of MyActor!
+///   static let sharedMyActorsExecutor = MyExecutor() // implements SerialExecutor
+///
+///
+///   nonisolated var unownedExecutor: UnownedSerialExecutor {
+///     Self.sharedMyActorsExecutor.asUnownedSerialExecutor()
+///   }
+/// }
+/// ```
+///
+/// In the example above, *all* "MyActor" instances would be using the same
+/// serial executor, which would result in only one of such actors ever being
+/// run at the same time. This may be useful if some of your code has some
+/// "specific thread" requirement when interoperating with non-Swift runtimes
+/// for example.
+///
+/// Since the ``UnownedSerialExecutor`` returned by the `unownedExecutor`
+/// property *does not* retain the executor, you must make sure the lifetime of
+/// it extends beyond the lifetime of any actor or task using it, as otherwise
+/// it may attempt to enqueue work on a released executor object, causing a crash.
+/// The executor returned by unownedExecutor *must* always be the same object,
+/// and returning different executors can lead to unexpected behavior.
+///
+/// Alternatively, you can also use existing serial executor implementations,
+/// such as Dispatch's `DispatchSerialQueue` or others.
 @available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
@@ -100,6 +170,43 @@ public protocol SerialExecutor: Executor {
   ///            perspective–to execute code assuming one on the other.
   @available(SwiftStdlib 5.9, *)
   func isSameExclusiveExecutionContext(other: Self) -> Bool
+
+  /// Last resort "fallback" isolation check, called when the concurrency runtime
+  /// is comparing executors e.g. during ``assumeIsolated()`` and is unable to prove
+  /// serial equivalence between the expected (this object), and the current executor.
+  ///
+  /// During executor comparison, the Swift concurrency runtime attempts to compare
+  /// current and expected executors in a few ways (including "complex" equality
+  /// between executors (see ``isSameExclusiveExecutionContext(other:)``), and if all
+  /// those checks fail, this method is invoked on the expected executor.
+  ///
+  /// This method MUST crash if it is unable to prove that the current execution
+  /// context belongs to this executor. At this point usual executor comparison would
+  /// have already failed, though the executor may have some external tracking of
+  /// threads it owns, and may be able to prove isolation nevertheless.
+  ///
+  /// A default implementation is provided that unconditionally crashes the
+  /// program, and prevents calling code from proceeding with potentially
+  /// not thread-safe execution.
+  ///
+  /// - Warning: This method must crash and halt program execution if unable
+  ///     to prove the isolation of the calling context.
+  @available(SwiftStdlib 6.0, *)
+  func checkIsolated()
+
+}
+
+@available(SwiftStdlib 6.0, *)
+extension SerialExecutor {
+
+  @available(SwiftStdlib 6.0, *)
+  public func checkIsolated() {
+    #if !$Embedded
+    fatalError("Unexpected isolation context, expected to be executing on \(Self.self)")
+    #else
+    Builtin.int_trap()
+    #endif
+  }
 }
 
 /// An executor that may be used as preferred executor by a task.
@@ -120,7 +227,7 @@ public protocol SerialExecutor: Executor {
 ///
 /// Unstructured tasks do not inherit the task executor.
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
@@ -152,7 +259,7 @@ public protocol TaskExecutor: Executor {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension TaskExecutor {
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
     UnownedTaskExecutor(ordinary: self)
@@ -270,7 +377,7 @@ public struct UnownedSerialExecutor: Sendable {
 
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @frozen
 public struct UnownedTaskExecutor: Sendable {
   #if $BuiltinExecutor
@@ -279,7 +386,7 @@ public struct UnownedTaskExecutor: Sendable {
 
   /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   public var _executor: Builtin.Executor {
     self.executor
   }
@@ -303,7 +410,7 @@ public struct UnownedTaskExecutor: Sendable {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 extension UnownedTaskExecutor: Equatable {
   @inlinable
   public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
@@ -311,16 +418,26 @@ extension UnownedTaskExecutor: Equatable {
   }
 }
 
-/// Checks if the current task is running on the expected executor.
+/// Returns either `true` or will CRASH if called from a different executor
+/// than the passed `executor`.
+///
+/// This method will attempt to verify the current executor against `executor`,
+/// and as a last-resort call through to `SerialExecutor.checkIsolated`.
+///
+/// This method will never return `false`. It either can verify we're on the
+/// correct executor, or will crash the program. It should be used in
+/// isolation correctness guaranteeing APIs.
 ///
 /// Generally, Swift programs should be constructed such that it is statically
 /// known that a specific executor is used, for example by using global actors or
 /// custom executors. However, in some APIs it may be useful to provide an
 /// additional runtime check for this, especially when moving towards Swift
 /// concurrency from other runtimes which frequently use such assertions.
+///
 /// - Parameter executor: The expected executor.
+@_spi(ConcurrencyExecutors)
 @available(SwiftStdlib 5.9, *)
-@_silgen_name("swift_task_isOnExecutor")
+@_silgen_name("swift_task_isOnExecutor") // This function will CRASH rather than return `false`!
 public func _taskIsOnExecutor<Executor: SerialExecutor>(_ executor: Executor) -> Bool
 
 @_spi(ConcurrencyExecutors)
@@ -361,6 +478,13 @@ internal func _task_serialExecutor_isSameExclusiveExecutionContext<E>(current cu
   currentExecutor.isSameExclusiveExecutionContext(other: executor)
 }
 
+@available(SwiftStdlib 6.0, *)
+@_silgen_name("_task_serialExecutor_checkIsolated")
+internal func _task_serialExecutor_checkIsolated<E>(executor: E)
+    where E: SerialExecutor {
+  executor.checkIsolated()
+}
+
 /// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @available(SwiftStdlib 5.9, *)
@@ -373,7 +497,7 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("_task_executor_getTaskExecutorRef")
 internal func _task_executor_getTaskExecutorRef(_ taskExecutor: any TaskExecutor) -> Builtin.Executor {
   return taskExecutor.asUnownedTaskExecutor().executor
@@ -396,7 +520,7 @@ where E: SerialExecutor {
 }
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
 internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: TaskExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

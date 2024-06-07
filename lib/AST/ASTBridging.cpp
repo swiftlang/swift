@@ -429,6 +429,20 @@ BridgedAlignmentAttr_createParsed(BridgedASTContext cContext,
       cValue, cAtLoc.unbridged(), cRange.unbridged(), /*Implicit=*/false);
 }
 
+BridgedAllowFeatureSuppressionAttr
+BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
+                                                BridgedSourceLoc cAtLoc,
+                                                BridgedSourceRange cRange,
+                                                bool inverted,
+                                                BridgedArrayRef cFeatures) {
+  SmallVector<Identifier> features;
+  for (auto elem : cFeatures.unbridged<BridgedIdentifier>())
+    features.push_back(elem.unbridged());
+  return AllowFeatureSuppressionAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      /*implicit*/ false, inverted, features);
+}
+
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
                                                BridgedSourceRange cRange,
@@ -648,9 +662,10 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
 
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName) {
+    BridgedSourceRange cRange, BridgedIdentifier cName, bool isEarlyAdopter) {
   return new (cContext.unbridged()) ObjCImplementationAttr(
-      cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged());
+      cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      isEarlyAdopter);
 }
 
 BridgedObjCRuntimeNameAttr BridgedObjCRuntimeNameAttr_createParsed(
@@ -825,22 +840,10 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  auto *declContext = cDeclContext.unbridged();
-
-  auto *defaultValue = opaqueDefaultValue.unbridged();
-  DefaultArgumentKind defaultArgumentKind;
-
-  if (declContext->getParentSourceFile()->Kind == SourceFileKind::Interface &&
-      isa<SuperRefExpr>(defaultValue)) {
-    defaultValue = nullptr;
-    defaultArgumentKind = DefaultArgumentKind::Inherited;
-  } else {
-    defaultArgumentKind = getDefaultArgKind(defaultValue);
-  }
-
-  auto *paramDecl = new (cContext.unbridged()) ParamDecl(
-      cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(), cArgName.unbridged(),
-      cParamNameLoc.unbridged(), cParamName.unbridged(), declContext);
+  auto *paramDecl = ParamDecl::createParsed(
+      cContext.unbridged(), cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(),
+      cArgName.unbridged(), cParamNameLoc.unbridged(), cParamName.unbridged(),
+      opaqueDefaultValue.unbridged(), cDeclContext.unbridged());
 
   if (auto type = opaqueType.unbridged()) {
     paramDecl->setTypeRepr(type);
@@ -874,7 +877,9 @@ BridgedParamDecl BridgedParamDecl_createParsed(
         else if (isa<CompileTimeConstTypeRepr>(STR))
           paramDecl->setCompileTimeConst(true);
         else if (isa<TransferringTypeRepr>(STR))
-          paramDecl->setTransferring(true);
+          paramDecl->setSending(true);
+        else if (isa<SendingTypeRepr>(STR))
+          paramDecl->setSending(true);
 
         unwrappedType = STR->getBase();
         continue;
@@ -883,9 +888,6 @@ BridgedParamDecl BridgedParamDecl_createParsed(
       break;
     }
   }
-
-  paramDecl->setDefaultExpr(defaultValue, /*isTypeChecked*/ false);
-  paramDecl->setDefaultArgumentKind(defaultArgumentKind);
 
   return paramDecl;
 }
@@ -1321,6 +1323,12 @@ BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
   return new (context) TopLevelCodeDecl(declContext, Brace);
 }
 
+BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(
+    BridgedDeclContext cDeclContext) {
+  return VarDecl::createImplicitStringInterpolationVar(
+      cDeclContext.unbridged());
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: AbstractStorageDecl
 //===----------------------------------------------------------------------===//
@@ -1358,6 +1366,13 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
 //===----------------------------------------------------------------------===//
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
+
+BridgedArgumentList
+BridgedArgumentList_createImplicitUnlabeled(BridgedASTContext cContext,
+                                            BridgedArrayRef cExprs) {
+  return ArgumentList::forImplicitUnlabeled(cContext.unbridged(),
+                                            cExprs.unbridged<Expr *>());
+}
 
 BridgedArgumentList BridgedArgumentList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
@@ -1485,6 +1500,14 @@ BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
       CopyExpr(cCopyLoc.unbridged(), cSubExpr.unbridged());
 }
 
+BridgedDeclRefExpr BridgedDeclRefExpr_create(BridgedASTContext cContext,
+                                             BridgedDecl cDecl,
+                                             BridgedDeclNameLoc cLoc,
+                                             bool IsImplicit) {
+  return new (cContext.unbridged()) DeclRefExpr(
+      cast<ValueDecl>(cDecl.unbridged()), cLoc.unbridged(), IsImplicit);
+}
+
 BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLBracketLoc,
     BridgedArrayRef cElements, BridgedArrayRef cCommaLocs,
@@ -1534,6 +1557,15 @@ BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   auto str = context.AllocateCopy(cStr.unbridged());
   return new (context) IntegerLiteralExpr(str, cTokenLoc.unbridged());
+}
+
+BridgedInterpolatedStringLiteralExpr
+BridgedInterpolatedStringLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLoc, size_t literalCapacity,
+    size_t interpolationCount, BridgedTapExpr cAppendingExpr) {
+  return new (cContext.unbridged()) InterpolatedStringLiteralExpr(
+      cLoc.unbridged(), literalCapacity, interpolationCount,
+      cAppendingExpr.unbridged());
 }
 
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
@@ -1608,6 +1640,11 @@ BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   auto str = context.AllocateCopy(cStr.unbridged());
   return new (context) StringLiteralExpr(str, cTokenLoc.unbridged());
+}
+
+BridgedTapExpr BridgedTapExpr_create(BridgedASTContext cContext,
+                                     BridgedBraceStmt cBody) {
+  return new (cContext.unbridged()) TapExpr(nullptr, cBody.unbridged());
 }
 
 BridgedTernaryExpr BridgedTernaryExpr_createParsed(
@@ -2040,14 +2077,14 @@ BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//
 
-BridgedSimpleIdentTypeRepr BridgedSimpleIdentTypeRepr_createParsed(
+BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLoc, BridgedIdentifier id) {
-  ASTContext &context = cContext.unbridged();
-  return new (context) SimpleIdentTypeRepr(DeclNameLoc(cLoc.unbridged()),
-                                           DeclNameRef(id.unbridged()));
+  return UnqualifiedIdentTypeRepr::create(cContext.unbridged(),
+                                          DeclNameLoc(cLoc.unbridged()),
+                                          DeclNameRef(id.unbridged()));
 }
 
-BridgedGenericIdentTypeRepr BridgedGenericIdentTypeRepr_createParsed(
+BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedIdentifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef genericArgs,
     BridgedSourceLoc cLAngleLoc, BridgedSourceLoc cRAngleLoc) {
@@ -2056,9 +2093,9 @@ BridgedGenericIdentTypeRepr BridgedGenericIdentTypeRepr_createParsed(
   auto Name = DeclNameRef(name.unbridged());
   SourceLoc lAngleLoc = cLAngleLoc.unbridged();
   SourceLoc rAngleLoc = cRAngleLoc.unbridged();
-  return GenericIdentTypeRepr::create(context, Loc, Name,
-                                      genericArgs.unbridged<TypeRepr *>(),
-                                      SourceRange{lAngleLoc, rAngleLoc});
+  return UnqualifiedIdentTypeRepr::create(context, Loc, Name,
+                                          genericArgs.unbridged<TypeRepr *>(),
+                                          SourceRange{lAngleLoc, rAngleLoc});
 }
 
 BridgedOptionalTypeRepr
@@ -2190,14 +2227,14 @@ BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
   case BridgedAttributedTypeSpecifierTransferring: {
     return new (context) TransferringTypeRepr(baseType, loc);
   }
+  case BridgedAttributedTypeSpecifierSending: {
+    return new (context) SendingTypeRepr(baseType, loc);
+  }
   case BridgedAttributedTypeSpecifierConst: {
     return new (context) CompileTimeConstTypeRepr(baseType, loc);
   }
   case BridgedAttributedTypeSpecifierIsolated: {
     return new (context) IsolatedTypeRepr(baseType, loc);
-  }
-  case BridgedAttributedTypeSpecifierResultDependsOn: {
-    return new (context) ResultDependsOnTypeRepr(baseType, loc);
   }
   }
 }

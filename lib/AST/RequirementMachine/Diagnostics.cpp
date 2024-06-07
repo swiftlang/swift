@@ -108,26 +108,22 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::InvalidInverseSubject: {
-      auto requirement = error.getRequirement();
-      if (requirement.hasError())
-        break;
+      auto inverse = error.getInverse();
+      auto subjectType = inverse.subject;
+      auto protoKind = getKnownProtocolKind(inverse.getKind());
 
-      assert(requirement.getKind() == RequirementKind::Conformance);
+      StringRef name = getProtocolName(protoKind);
 
-      auto subjectType = requirement.getFirstType();
-      auto constraintType = requirement.getSecondType();
+      if (subjectType->is<DependentMemberType>()) {
+        // explain that associated types can't have inverses
+        ctx.Diags.diagnose(loc, diag::inverse_associatedtype_restriction,
+                           name);
+      } else {
+        // generic diagnostic
+        ctx.Diags.diagnose(loc, diag::requires_not_suitable_inverse_subject,
+                           subjectType, name);
+      }
 
-      assert(constraintType->is<ProtocolCompositionType>());
-
-      // Pick one of the inverses to diagnose.
-      auto inverses =
-          constraintType->getAs<ProtocolCompositionType>()->getInverses();
-      assert(!inverses.empty());
-
-      StringRef name = getProtocolName(getKnownProtocolKind(*inverses.begin()));
-
-      ctx.Diags.diagnose(loc, diag::requires_not_suitable_inverse_subject,
-                         subjectType, name);
       diagnosedError = true;
       break;
     }

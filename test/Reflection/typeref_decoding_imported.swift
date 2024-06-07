@@ -1,5 +1,8 @@
 // XFAIL: OS=windows-msvc
-
+//
+// LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
+// UNSUPPORTED: OS=xros
+//
 // https://github.com/apple/swift/issues/55339
 // XFAIL: OS=openbsd
 

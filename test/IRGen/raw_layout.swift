@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+import Builtin
 import Swift
+import RawLayoutCXX
 
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}4LockVWV" = {{.*}} %swift.vwtable
 // size
@@ -142,6 +144,79 @@ struct BadBuffer: ~Copyable {
     let buffer: SmallVectorOf3<Int64?>
 }
 
+// Raw Layout types that move like their like type
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}19CellThatMovesAsLikeVWV" = {{.*}} %swift.vwtable
+// initializeWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout19CellThatMovesAsLikeVwtk
+// assignWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout19CellThatMovesAsLikeVwta
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
+@_rawLayout(like: T, movesAsLike)
+struct CellThatMovesAsLike<T>: ~Copyable {}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}18ConcreteMoveAsLikeVWV" = {{.*}} %swift.vwtable
+// initializeWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk
+// assignWithTake
+// CHECK-SAME:  , ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta
+// size
+// CHECK-SAME:  , {{i64|i32}} 1
+// stride
+// CHECK-SAME:  , {{i64|i32}} 1
+// flags: not copyable, not bitwise takable, not pod, not inline
+// CHECK-SAME:  , <i32 0x930000>
+struct ConcreteMoveAsLike: ~Copyable {
+  let cell: CellThatMovesAsLike<NonBitwiseTakableCXXType>
+}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}21ConcreteIntMoveAsLikeVWV" = {{.*}} %swift.vwtable
+// initializeWithTake
+// CHECK-SAME:  , ptr @__swift_memcpy4_4
+// assignWithTake
+// CHECK-SAME:  , ptr @__swift_memcpy4_4
+// size
+// CHECK-SAME:  , {{i64|i32}} 4
+// stride
+// CHECK-SAME:  , {{i64|i32}} 4
+// flags: alignment 3, not copyable
+// CHECK-SAME:  , <i32 0x800003>
+struct ConcreteIntMoveAsLike: ~Copyable {
+  let cell: CellThatMovesAsLike<Int32>
+}
+
+sil @use_lock : $@convention(thin) (@in_guaranteed Lock) -> () {
+entry(%L: $*Lock):
+    return undef : $()
+}
+
+sil @use_keymaster_locks : $@convention(thin) (@in_guaranteed Keymaster) -> () {
+entry(%K: $*Keymaster):
+    %f = function_ref @use_lock : $@convention(thin) (@in_guaranteed Lock) -> ()
+    %a = struct_element_addr %K : $*Keymaster, #Keymaster.lock1
+    apply %f(%a) : $@convention(thin) (@in_guaranteed Lock) -> ()
+    %b = struct_element_addr %K : $*Keymaster, #Keymaster.lock2
+    apply %f(%b) : $@convention(thin) (@in_guaranteed Lock) -> ()
+    %c = struct_element_addr %K : $*Keymaster, #Keymaster.lock2
+    apply %f(%c) : $@convention(thin) (@in_guaranteed Lock) -> ()
+    return undef : $()
+}
+
+// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself [[SELF:%.*]])
+// CHECK-NEXT:   entry:
+// CHECK-NEXT:     ret ptr [[SELF]]
+sil @get_cell_addr : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
+entry(%0 : $*Cell<T>):
+    %1 = builtin "addressOfRawLayout"(%0 : $*Cell<T>) : $Builtin.RawPointer
+    %2 = struct $UnsafeMutablePointer<T> (%1 : $Builtin.RawPointer)
+    return %2 : $UnsafeMutablePointer<T>
+}
+
 // Dependent layout metadata initialization:
 
 // Cell<T>
@@ -166,19 +241,32 @@ struct BadBuffer: ~Copyable {
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}14SmallVectorBufVMr"(ptr %"SmallVectorBuf<T>", ptr {{.*}}, ptr {{.*}})
 // CHECK: call void @swift_initRawStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 8)
 
-sil @use_lock : $@convention(thin) (@in_guaranteed Lock) -> () {
-entry(%L: $*Lock):
-    return undef : $()
-}
+// Ensure that 'movesAsLike' is correctly calling the underlying type's move constructor
 
-sil @use_keymaster_locks : $@convention(thin) (@in_guaranteed Keymaster) -> () {
-entry(%K: $*Keymaster):
-    %f = function_ref @use_lock : $@convention(thin) (@in_guaranteed Lock) -> ()
-    %a = struct_element_addr %K : $*Keymaster, #Keymaster.lock1
-    apply %f(%a) : $@convention(thin) (@in_guaranteed Lock) -> ()
-    %b = struct_element_addr %K : $*Keymaster, #Keymaster.lock2
-    apply %f(%b) : $@convention(thin) (@in_guaranteed Lock) -> ()
-    %c = struct_element_addr %K : $*Keymaster, #Keymaster.lock2
-    apply %f(%c) : $@convention(thin) (@in_guaranteed Lock) -> ()
-    return undef : $()
-}
+// CellThatMovesAsLike<T> initializeWithTake
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout19CellThatMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"CellThatMovesAsLike<T>")
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 2
+// CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
+// CHECK: {{%.*}} = call ptr %InitializeWithTake(ptr {{.*}} %dest, ptr {{.*}} %src, ptr [[T]])
+
+// CellThatMovesAsLike<T> assignWithTake
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout19CellThatMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %"CellThatMovesAsLike<T>")
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 2
+// CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
+// CHECK: {{%.*}} = call ptr %AssignWithTake(ptr {{.*}} %dest, ptr {{.*}} %src, ptr [[T]])
+
+// ConcreteMoveAsLike initializeWithTake
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
+// CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
+// CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
+
+// ConcreteMoveAsLike assignWithTake
+
+// CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
+// CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
+// CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])

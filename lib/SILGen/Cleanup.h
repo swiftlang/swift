@@ -176,7 +176,6 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   /// we can only reap the cleanup stack up to the innermost depth
   /// that we've handed out as a Scope.
   Scope *innermostScope = nullptr;
-  FormalEvaluationScope *innermostFormalScope = nullptr;
 
   void popTopDeadCleanups();
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
@@ -219,6 +218,17 @@ public:
   /// \param branchLoc  The location of the branch instruction.
   /// \param args       Arguments to pass to the destination block.
   void emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
+                             ArrayRef<SILValue> args = {},
+                             ForUnwind_t forUnwind = NotForUnwind);
+
+  /// Emit a branch to the given jump destination,
+  /// threading out through any cleanups we need to run. This does not pop the
+  /// cleanup stack.
+  ///
+  /// \param dest       The destination scope and block.
+  /// \param branchLoc  The location of the branch instruction.
+  /// \param args       Arguments to pass to the destination block.
+  void emitCleanupsForBranch(JumpDest dest, SILLocation branchLoc,
                              ArrayRef<SILValue> args = {},
                              ForUnwind_t forUnwind = NotForUnwind);
 

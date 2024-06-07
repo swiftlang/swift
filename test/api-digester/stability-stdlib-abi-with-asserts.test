@@ -66,4 +66,4 @@ Struct _RuntimeFunctionCounters is a new API without @available attribute
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
-// XFAIL: noncopyable_generics
+

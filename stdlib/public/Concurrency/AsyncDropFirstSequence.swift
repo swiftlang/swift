@@ -81,6 +81,10 @@ extension AsyncDropFirstSequence: AsyncSequence {
 
   /// The iterator that produces elements of the drop-first sequence.
   public struct Iterator: AsyncIteratorProtocol {
+    // FIXME: Remove when $AssociatedTypeImplements is no longer needed
+    @available(SwiftStdlib 6.0, *)
+    public typealias Failure = Base.Failure
+
     @usableFromInline
     var baseIterator: Base.AsyncIterator
     

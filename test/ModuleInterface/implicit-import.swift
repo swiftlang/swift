@@ -54,11 +54,11 @@ import DefinesTypealias
 import DefinesStruct
 
 public func takesQ<T>(_ b: T) where T: Q { }
-// expected-warning @-1 {{'Q' aliases 'DefinesProtocol.P' and cannot be used here because 'DefinesProtocol' was not imported by this file; this is an error in Swift 6}}
+// expected-warning @-1 {{'Q' aliases 'DefinesProtocol.P' and cannot be used here because 'DefinesProtocol' was not imported by this file; this is an error in the Swift 6 language mode}}
 // expected-note @-2 {{The missing import of module 'DefinesProtocol' will be added implicitly}}
 
 @inlinable public func takesC(_ c: C) {
   c.foo()
-  // expected-warning @-1 {{instance method 'foo()' cannot be used in an '@inlinable' function because 'DefinesExtension' was not imported by this file; this is an error in Swift 6}}
+  // expected-warning @-1 {{instance method 'foo()' cannot be used in an '@inlinable' function because 'DefinesExtension' was not imported by this file; this is an error in the Swift 6 language mode}}
   // expected-note @-2 {{The missing import of module 'DefinesExtension' will be added implicitly}}
 }

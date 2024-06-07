@@ -368,7 +368,7 @@ protocol subject_containerObjCProtocol2 {
 
   @objc // FIXME: Access notes can't distinguish between init(a:) overloads
   init(a: Double)
-  // expected-warning@-1 {{initializer 'init(a:)' with Objective-C selector 'initWithA:' conflicts with previous declaration with the same Objective-C selector; this is an error in Swift 6}}
+  // expected-warning@-1 {{initializer 'init(a:)' with Objective-C selector 'initWithA:' conflicts with previous declaration with the same Objective-C selector; this is an error in the Swift 6 language mode}}
 
   func func1() -> Int
   @objc // access-note-move{{subject_containerObjCProtocol2.func1_()}}
@@ -383,6 +383,17 @@ protocol subject_containerObjCProtocol2 {
   @objc // FIXME: Access notes can't distinguish between subscript(_:) overloads
   subscript(i: String) -> Int { get set}
 }
+
+@objc(ConflictingName)
+extension subject_class1 {}
+// expected-note@-1 {{'ConflictingName' previously declared here}}
+
+@objc(ConflictingName)
+extension subject_class2 {}
+
+@objc(ConflictingName)
+extension subject_class1 {}
+// expected-warning@-1 {{extension with Objective-C category name 'ConflictingName' conflicts with previous extension with the same category name; this is an error in the Swift 6 language mode}}
 
 protocol nonObjCProtocol {
   @objc // bad-access-note-move{{nonObjCProtocol.objcRequirement()}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
@@ -2018,6 +2029,9 @@ class BadClass1 { }
 
 @objc(Protocol:) // bad-access-note-move{{BadProto1}} expected-error{{'@objc' protocol must have a simple name}}{{15-16=}}
 protocol BadProto1 { }
+
+@objc(Extension:) // expected-error{{'@objc' extension must have a simple name}}{{16-17=}}
+extension PlainClass {}
 
 @objc(Enum:) // bad-access-note-move{{BadEnum1}} expected-error{{'@objc' enum must have a simple name}}{{11-12=}}
 enum BadEnum1: Int { case X }

@@ -27,6 +27,7 @@ import B
 
 //--- client-resilient.swift
 @_implementationOnly import A
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 import B
 
 //--- Crypto.swift

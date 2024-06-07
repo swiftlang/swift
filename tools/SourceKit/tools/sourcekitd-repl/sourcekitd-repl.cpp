@@ -610,12 +610,12 @@ static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
   bool UseTimer = false;
   while (true) {
     ReqStr = ReqStr.ltrim();
-    if (ReqStr.startswith("async")) {
+    if (ReqStr.starts_with("async")) {
       UseAsync = true;
       ReqStr = ReqStr.substr(strlen("async"));
       continue;
     }
-    if (ReqStr.startswith("time")) {
+    if (ReqStr.starts_with("time")) {
       UseTimer = true;
       ReqStr = ReqStr.substr(strlen("time"));
       continue;

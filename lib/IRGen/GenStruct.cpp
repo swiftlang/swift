@@ -186,8 +186,14 @@ namespace {
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.isEmpty())
-        return fieldInfo.getTypeInfo().getUndefAddress();
+      if (fieldInfo.isEmpty()) {
+        // For fields with empty types, we could return undef.
+        // But if this is a struct_element_addr which is a result of an optimized
+        // `MemoryLayout<S>.offset(of: \.field)` we cannot return undef. We have
+        // to be consistent with `offset(of:)`, which returns 0. Therefore we
+        // return the base address of the struct.
+        return addr;
+      }
 
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
@@ -265,12 +271,11 @@ namespace {
                  bool isOutlined) const override {
       // If the struct has a deinit declared, then call it to destroy the
       // value.
-      if (tryEmitDestroyUsingDeinit(IGF, address, T)) {
-        return;
+      if (!tryEmitDestroyUsingDeinit(IGF, address, T)) {
+        // Otherwise, perform elementwise destruction of the value.
+        super::destroy(IGF, address, T, isOutlined);
       }
-      
-      // Otherwise, perform elementwise destruction of the value.
-      return super::destroy(IGF, address, T, isOutlined);
+      super::fillWithZerosIfSensitive(IGF, address, T);
     }
 
     void verify(IRGenTypeVerifierFunction &IGF,
@@ -513,7 +518,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dst, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       emitCopyWithCopyFunction(IGF, T, src, dst);
       destroy(IGF, src, T, isOutlined);
     }
@@ -597,10 +603,17 @@ namespace {
                                 ParameterConvention::Direct_Unowned);
       SILResultInfo result(T.getASTType(), ResultConvention::Indirect);
 
+      auto clangFnType = T.getASTContext().getCanonicalClangFunctionType(
+          {ptrParam}, result, SILFunctionTypeRepresentation::CFunctionPointer);
+      auto extInfo = SILExtInfoBuilder()
+                         .withClangFunctionType(clangFnType)
+                         .withRepresentation(
+                             SILFunctionTypeRepresentation::CFunctionPointer)
+                         .build();
+
       return SILFunctionType::get(
           GenericSignature(),
-          SILFunctionType::ExtInfo().withRepresentation(
-              SILFunctionTypeRepresentation::CFunctionPointer),
+          extInfo,
           SILCoroutineKind::None,
           /*callee=*/ParameterConvention::Direct_Unowned,
           /*params*/ {ptrParam},
@@ -788,7 +801,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       if (auto moveConstructor = findMoveConstructor()) {
         emitCopyWithCopyConstructor(IGF, T, moveConstructor,
                                     src.getAddress(),
@@ -807,7 +821,7 @@ namespace {
 
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                          ClangFieldInfo>::initializeWithTake(IGF, dest, src, T,
-                                                             isOutlined);
+                                                             isOutlined, zeroizeIfSensitive);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
@@ -1692,8 +1706,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
         IGM.getSwiftModule()->getASTContext().getProtocol(
             KnownProtocolKind::BitwiseCopyable);
     if (bitwiseCopyableProtocol &&
-        IGM.getSwiftModule()->lookupConformance(D->getDeclaredInterfaceType(),
-                                                bitwiseCopyableProtocol)) {
+        IGM.getSwiftModule()->checkConformance(type, bitwiseCopyableProtocol)) {
       return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, structAccessible);
     }
     return &getResilientStructTypeInfo(copyable, structAccessible);

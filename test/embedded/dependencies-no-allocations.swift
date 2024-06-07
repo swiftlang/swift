@@ -13,6 +13,7 @@
 
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
+// DEP: _memmove
 // DEP: _memset
 // DEP: _putchar
 
@@ -26,7 +27,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 

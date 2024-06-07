@@ -6,10 +6,10 @@ class SomeClass {
 }
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "SomeClass", 
-// CHECK-SAME: size: 64, elements: 
+// CHECK-SAME: size: {{64|32}}, elements: 
 // CHECK-SAME: runtimeLang: DW_LANG_Swift, identifier: "$s7classes9SomeClassCD")
 
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "first",
-// CHECK-SAME: size: 64)
+// CHECK-SAME: size: {{64|32}})
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "second", 
-// CHECK-SAME: size: 128, offset: 64)
+// CHECK-SAME: size: {{128|96}}, offset: {{64|32}})

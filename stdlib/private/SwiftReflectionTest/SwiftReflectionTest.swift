@@ -28,7 +28,7 @@ let RequestDone = "d"
 let RequestPointerSize = "p"
 
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 import MachO
 import Darwin
 
@@ -131,6 +131,8 @@ import SwiftShims
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 let rtldDefault: UnsafeMutableRawPointer? = nil
@@ -318,7 +320,7 @@ internal func sendBytes() {
   var totalBytesWritten = 0
   var pointer = UnsafeMutableRawPointer(bitPattern: address)
   while totalBytesWritten < count {
-    let bytesWritten = Int(fwrite(pointer, 1, Int(count), stdout))
+    let bytesWritten = Int(fwrite(pointer!, 1, Int(count), stdout))
     fflush(stdout)
     if bytesWritten == 0 {
       printErrnoAndExit()

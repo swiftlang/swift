@@ -1,0 +1,87 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -experimental-swift-based-closure-specialization %s | %FileCheck %s
+// XFAIL: *
+
+import Builtin
+
+class C {}
+
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+
+class Storage {}
+
+struct Val {}
+
+// Verify that the argument to the specialized take_closure is still @_eagerMove.
+
+// CHECK-LABEL: sil {{.*}}@$s12take_closure0B04main1CCTf1nc_n : {{.*}}{
+// CHECK:           {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove @owned $C, {{%[^,]+}} :
+// CHECK-LABEL: } // end sil function '$s12take_closure0B04main1CCTf1nc_n'
+
+sil [ossa] [noinline] @take_closure : $@convention(thin) (@owned C, @guaranteed @noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()) -> () {
+bb0(%c : @_eagerMove @owned $C, %0 : @guaranteed $@noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()):
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %c1 = apply %getC() : $@convention(thin) () -> @owned C
+  %c2 = apply %getC() : $@convention(thin) () -> @owned C
+  %3 = apply %0(%c1, %c2) : $@noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()
+  destroy_value %c2 : $C
+  destroy_value %c1 : $C
+  destroy_value %c : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
+sil shared [ossa] @closure : $@convention(thin) (@guaranteed C, @guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C, %2 : @guaranteed $C):
+  %15 = tuple ()
+  return %15 : $()
+}
+
+sil @caller : $@convention(thin) (@owned C) -> () {
+bb0(%0 : $C):
+  %3 = function_ref @closure : $@convention(thin) (@guaranteed C, @guaranteed C, @guaranteed C) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%0) : $@convention(thin) (@guaranteed C, @guaranteed C, @guaranteed C) -> ()
+  %take_closure = function_ref @take_closure : $@convention(thin) (@owned C, @guaranteed @noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()) -> ()
+  strong_retain %0 : $C
+  %5 = apply %take_closure(%0, %4) : $@convention(thin) (@owned C, @guaranteed @noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()) -> ()
+  strong_release %0 : $C
+  dealloc_stack %4 : $@noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()
+  %retval = tuple()
+  return %retval : $()
+}
+
+// =============================================================================
+// rdar://105887096: do not insert a retain inside a read-only function.
+// For now, the specialization is disabled.
+//
+// TODO: A @noescape closure should never be converted to an @owned argument
+// regardless of the function attribute.
+
+// This should not be specialized until we support guaranteed arguments.
+// CHECK-NOT: @$s20takesReadOnlyClosure
+sil private [readonly] @takesReadOnlyClosure : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val {
+bb0(%2 : $@noescape @callee_guaranteed (Val) -> Val):
+  %46 = struct $Val ()
+  %261 = apply %2(%46) : $@noescape @callee_guaranteed (Val) -> Val
+  return %261 : $Val
+}
+
+sil private @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val {
+bb0(%0 : $Val, %1 : @closureCapture $Storage):
+  %46 = struct $Val ()
+  return %46 : $Val
+}
+
+// CHECK-LABEL: sil @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
+// CHECK-NOT: @owned Storage
+// CHECK: apply %{{.*}} : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+// CHECK-LABEL: } // end sil function 'testPassReadOnlyClosure'
+sil @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
+bb0(%0 : $Storage):
+  %176 = function_ref @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %177 = partial_apply [callee_guaranteed] [on_stack] %176(%0) : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %178 = mark_dependence %177 : $@noescape @callee_guaranteed (Val) -> Val on %0 : $Storage
+  %188 = function_ref @takesReadOnlyClosure : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+  %189 = apply %188(%178) : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+  dealloc_stack %177 : $@noescape @callee_guaranteed (Val) -> Val
+  return %189 : $Val
+}

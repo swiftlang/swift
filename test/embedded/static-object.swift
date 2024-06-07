@@ -1,27 +1,129 @@
-// RUN: %target-swift-frontend -O -emit-irgen %s -module-name main -parse-as-library -enable-experimental-feature Embedded | %FileCheck %s --check-prefix CHECK-IR
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded %s -O -wmo -sil-verify-all -module-name=test -emit-ir | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
-// REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
+// Also do an end-to-end test to check all components, including IRGen.
+// RUN: %empty-directory(%t) 
+// RUN: %target-build-swift -parse-as-library -enable-experimental-feature Embedded -O -wmo -module-name=test %s -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+
+// REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+
+// Check if the optimizer is able to convert array literals to constant statically initialized arrays.
+
+// CHECK-DAG: @"$s4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test3StrV9staticLet_WZTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test3StrV9staticVar_WZTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$s4test3StrV9staticVarSaySiGvpZ" = global {{.*}} ptr @"$s4test3StrV9staticVar_WZTv_r"
+// CHECK-DAG: @"$s4test3StrV14twoDimensionalSaySaySiGGvpZ" = global {{.*}} ptr @"$s4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r"
+
+// Currently, constant static arrays only work on Darwin platforms.
+// REQUIRES: VENDOR=apple
+
+
+public struct Str {
+  public static let staticLet = [ 200, 201, 202 ]
+  public static var staticVar = [ 300, 301, 302 ]
+  public static var twoDimensional = [[1, 2], [3, 4], [5, 6]]
+}
+
+@inline(never)
+public func arrayLookup(_ i: Int) -> Int {
+  let lookupTable = [10, 11, 12]
+  return lookupTable[i]
+}
+
+@inline(never)
+public func returnArray() -> [Int] {
+  return [20, 21]
+}
+
+@inline(never)
+public func modifyArray() -> [Int] {
+  var a = returnArray()
+  a[1] = 27
+  return a
+}
+
+public var gg: [Int]?
+
+@inline(never)
+public func receiveArray(_ a: [Int]) {
+  gg = a
+}
+
+@inline(never)
+public func passArray() {
+  receiveArray([27, 28])
+  receiveArray([29])
+}
+
+@inline(never)
+public func storeArray() {
+  gg = [227, 228]
+}
 
 public func stringArray() -> [StaticString] {
   return ["a", "b", "c", "d"]
 }
-// CHECK-IR:      define {{.*}}@"$s4main11stringArraySays12StaticStringVGyF"
-// CHECK-IR-NEXT: entry:
-// CHECK-IR-NEXT:   call {{.*}}@swift_initStaticObject
 
-@main
-struct Main {
+@main struct Main {
   static func main() {
+
+    // CHECK-OUTPUT:      [200, 201, 202]
+    printArray(Str.staticLet)
+
+    // CHECK-OUTPUT:      [300, 301, 302]
+    printArray(Str.staticVar)
+
+    // CHECK-OUTPUT:      [1, 2]
+    // CHECK-OUTPUT-NEXT: [3, 4]
+    // CHECK-OUTPUT-NEXT: [5, 6]
+    for x in Str.twoDimensional {
+      printArray(x)
+    }
+
+    // CHECK-OUTPUT-NEXT: 11
+    print(arrayLookup(1))
+
+    // CHECK-OUTPUT-NEXT: [20, 21]
+    printArray(returnArray())
+
+    // CHECK-OUTPUT-NEXT: [20, 27]
+    // CHECK-OUTPUT-NEXT: [20, 27]
+    // CHECK-OUTPUT-NEXT: [20, 27]
+    // CHECK-OUTPUT-NEXT: [20, 27]
+    // CHECK-OUTPUT-NEXT: [20, 27]
+    for _ in 0..<5 {
+      printArray(modifyArray())
+    }
+
+    passArray()
+    // CHECK-OUTPUT-NEXT: [29]
+    printArray(gg!)
+
+    storeArray()
+    // CHECK-OUTPUT-NEXT: [227, 228]
+    printArray(gg!)
+
     for c in stringArray() {
+      // CHECK-OUTPUT-NEXT: a
+      // CHECK-OUTPUT-NEXT: b
+      // CHECK-OUTPUT-NEXT: c
+      // CHECK-OUTPUT-NEXT: d
       print(c)
-      // CHECK: a
-      // CHECK: b
-      // CHECK: c
-      // CHECK: d
     }
   }
 }
+
+func printArray(_ a: [Int]) {
+  print("[", terminator: "")
+  for (i, x) in a.enumerated() {
+    print(x, terminator: i == a.count - 1 ? "" :  ", ")
+  }
+  print("]")
+}
+

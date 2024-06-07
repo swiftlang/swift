@@ -464,7 +464,7 @@ static StringRef stripLeadingK(StringRef name) {
 StringRef importer::stripNotification(StringRef name) {
   name = stripLeadingK(name);
   StringRef notification = "Notification";
-  if (name.size() <= notification.size() || !name.endswith(notification))
+  if (name.size() <= notification.size() || !name.ends_with(notification))
     return {};
   return name.drop_back(notification.size());
 }
@@ -743,7 +743,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     // Special case: mapping to an initializer.
-    if (attr->getName().startswith("init(")) {
+    if (attr->getName().starts_with("init(")) {
       // If we have a class method, honor the annotation to turn a class
       // method into an initializer.
       if (method->isClassMethod()) return decodeAttr(attr);
@@ -768,7 +768,7 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
                  const clang::ObjCMethodDecl *method,
                  ImportNameVersion version) {
   if (auto customNameAttr = findSwiftNameAttr(method, version)) {
-    if (customNameAttr->name.startswith("init("))
+    if (customNameAttr->name.starts_with("init("))
       return FactoryAsInitKind::AsInitializer;
     else
       return FactoryAsInitKind::AsClassMethod;
@@ -1160,9 +1160,9 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
     StringRef suffixToStrip;
     StringRef origBaseName = baseName;
     if (adjustName && index == 0 && paramNames[0].empty()) {
-      if (baseName.endswith(ErrorSuffix))
+      if (baseName.ends_with(ErrorSuffix))
         suffixToStrip = ErrorSuffix;
-      else if (baseName.endswith(AltErrorSuffix))
+      else if (baseName.ends_with(AltErrorSuffix))
         suffixToStrip = AltErrorSuffix;
 
       if (!suffixToStrip.empty()) {
@@ -1438,7 +1438,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   auto &ctx = method->getASTContext();
   if (paramIndex == 0 && !suffixToStrip.empty()) {
     StringRef name = chunks[0]->getName();
-    assert(name.endswith(suffixToStrip));
+    assert(name.ends_with(suffixToStrip));
     name = name.drop_back(suffixToStrip.size());
     chunks[0] = &ctx.Idents.get(name);
   } else if (paramIndex != 0) {
@@ -2076,7 +2076,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
       // Drop "With" if present after the "init".
       bool droppedWith = false;
-      if (argName.startswith("With")) {
+      if (argName.starts_with("With")) {
         argName = argName.substr(4);
         droppedWith = true;
       }
@@ -2156,7 +2156,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty()) {
-      if (baseName.startswith(removePrefix)) {
+      if (baseName.starts_with(removePrefix)) {
         baseName = baseName.substr(removePrefix.size());
         strippedPrefix = true;
       } else if (givenName) {
@@ -2257,6 +2257,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         newName += "Mutating";
         baseName = newName;
       }
+    }
+    if (method->isImplicit() &&
+        baseName.starts_with("__synthesizedVirtualCall_")) {
+      // If this is a thunk for a virtual method of a C++ reference type, we
+      // strip away the underscored prefix. This method should be visible and
+      // callable from Swift.
+      newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
+      baseName = newName;
     }
   }
 

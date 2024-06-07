@@ -58,7 +58,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
                           SILPassPipelinePlan::getSILGenPassPipeline(opts),
                           /*isMandatory*/ true);
 
-  if (opts.VerifyAll && opts.OSSACompleteLifetimes)
+  if (opts.VerifyAll && opts.OSSAVerifyComplete)
     Module.verifyOwnership();
 
   executePassPipelinePlan(&Module,

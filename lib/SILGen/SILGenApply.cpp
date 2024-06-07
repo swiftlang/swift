@@ -682,12 +682,9 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            // We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
-          }
+        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
+          auto thunk = func->getDistributedThunk();
+          constant = SILDeclRef(thunk).asDistributed();
         }
       }
 
@@ -753,6 +750,16 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::ClassMethod: {
+      if (auto func = dyn_cast_or_null<AccessorDecl>(constant->getFuncDecl())) {
+        if (func->getStorage()->isDistributed()) {
+          // If we're calling cross-actor, we must always use a distributed thunk
+          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
+            /// We must adjust the constant to use a distributed thunk.
+            constant = constant->asDistributed();
+          }
+        }
+      }
+
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(
           SGF.getTypeExpansionContext(), *constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -765,12 +772,8 @@ public:
     }
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
-        if (func->isDistributed() && isa<ProtocolDecl>(func->getDeclContext())) {
-          // If we're calling cross-actor, we must always use a distributed thunk
-          if (!isSameActorIsolated(func, SGF.FunctionDC)) {
-            /// We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
-          }
+        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
+          constant = constant->asDistributed();
         }
       }
 
@@ -1222,9 +1225,8 @@ public:
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
     
-    if (afd->getDeclContext()->isLocalContext() &&
-        !captureInfo.hasGenericParamCaptures())
-      subs = SubstitutionMap();
+    subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+        constant, captureInfo, subs);
 
     // Check whether we have to dispatch to the original implementation of a
     // dynamically_replaceable inside of a dynamic_replacement(for:) function.
@@ -1301,17 +1303,14 @@ public:
 
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
-
-    auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
-
     SubstitutionMap subs;
-    if (captureInfo.hasGenericParamCaptures())
-      subs = SGF.getForwardingSubstitutionMap();
+    std::tie(std::ignore, std::ignore, subs)
+        = SGF.SGM.Types.getForwardingSubstitutionsForLowering(constant);
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
     // If the closure requires captures, emit them.
-    if (!captureInfo.getCaptures().empty()) {
+    if (SGF.SGM.Types.hasLoweredLocalCaptures(constant)) {
       SmallVector<ManagedValue, 4> captures;
       SGF.emitCaptures(e, constant, CaptureEmission::ImmediateApplication,
                        captures);
@@ -1998,7 +1997,13 @@ static void emitRawApply(SILGenFunction &SGF,
     options -= ApplyFlags::DoesNotThrow;
 
   // If we don't have an error result, we can make a simple 'apply'.
-  if (!substFnType->hasErrorResult()) {
+  if (substFnType->hasErrorResult() &&
+      SGF.F.isDistributed() &&
+      dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) ) {
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    rawResults.push_back(result);
+
+  } else if (!substFnType->hasErrorResult()) {
     auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
     rawResults.push_back(result);
 
@@ -2015,8 +2020,9 @@ static void emitRawApply(SILGenFunction &SGF,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
-    SGF.B.createTryApply(loc, fnValue, subs, argValues,
-                         normalBB, errorBB, options);
+    SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
+                         options);
+
     SGF.B.emitBlock(normalBB);
   }
 }
@@ -3043,34 +3049,46 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 done:
 
   if (defaultArgIsolation) {
-    assert(SGF.F.isAsync());
     assert(!isolatedArgs.empty());
 
-    auto &firstArg = *std::get<0>(isolatedArgs[0]);
-    auto loc = firstArg.getDefaultArgLoc();
+    // Only hop to the default arg isolation if the callee is async.
+    // If we're in a synchronous function, the isolation has to match,
+    // so no hop is required. This is enforced by the actor isolation
+    // checker.
+    //
+    // FIXME: Note that we don't end up in this situation for user-written
+    // synchronous functions, because the default argument is only considered
+    // isolated to the callee if the call crosses an isolation boundary. We
+    // do end up here for default argument generators and stored property
+    // initializers. An alternative (and better) approach is to formally model
+    // those generator functions as isolated.
+    if (SGF.F.isAsync()) {
+      auto &firstArg = *std::get<0>(isolatedArgs[0]);
+      auto loc = firstArg.getDefaultArgLoc();
 
-    SILValue executor;
-    switch (*defaultArgIsolation) {
-    case ActorIsolation::GlobalActor:
-      executor = SGF.emitLoadGlobalActorExecutor(
-          defaultArgIsolation->getGlobalActor());
-      break;
+      SILValue executor;
+      switch (*defaultArgIsolation) {
+      case ActorIsolation::GlobalActor:
+        executor = SGF.emitLoadGlobalActorExecutor(
+            defaultArgIsolation->getGlobalActor());
+        break;
 
-    case ActorIsolation::ActorInstance:
-      llvm_unreachable("default arg cannot be actor instance isolated");
+      case ActorIsolation::ActorInstance:
+        llvm_unreachable("default arg cannot be actor instance isolated");
 
-    case ActorIsolation::Erased:
-      llvm_unreachable("default arg cannot have erased isolation");
+      case ActorIsolation::Erased:
+        llvm_unreachable("default arg cannot have erased isolation");
 
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-      llvm_unreachable("Not isolated");
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+        llvm_unreachable("Not isolated");
+      }
+
+      // Hop to the target isolation domain once to evaluate all
+      // default arguments.
+      SGF.emitHopToTargetExecutor(loc, executor);
     }
-
-    // Hop to the target isolation domain once to evaluate all
-    // default arguments.
-    SGF.emitHopToTargetExecutor(loc, executor);
 
     size_t argsEmitted = 0;
     for (auto &isolatedArg : isolatedArgs) {
@@ -3201,6 +3219,14 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
 
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
+  ForceValueExpr *forceUnwrap = nullptr;
+  // Check for a force unwrap. This might show up inside or outside of the
+  // load.
+  if (auto *fu = dyn_cast<ForceValueExpr>(argExpr)) {
+    forceUnwrap = fu;
+    argExpr = fu->getSubExpr();
+  }
+  
   // If there's a load around the outer part of this arg expr, look past it.
   bool sawLoad = false;
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
@@ -3208,40 +3234,40 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     sawLoad = true;
   }
 
-  // If we have a subscript, strip it off and make sure that our base is
-  // something that we can process. If we do and we succeed below, we return the
-  // subscript instead.
-  SubscriptExpr *subscriptExpr = nullptr;
-  if ((subscriptExpr = dyn_cast<SubscriptExpr>(argExpr))) {
-    auto *decl = cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl());
-    if (decl->getReadImpl() != ReadImplKind::Read) {
-      subscriptExpr = nullptr;
-    } else {
-      argExpr = subscriptExpr->getBase();
-    }
-
-    // If there's a load on the base of the subscript expr, look past it.
-    if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
-      argExpr = li->getSubExpr();
-    }
+  // Check again for a force unwrap before the load.
+  if (auto *fu = dyn_cast<ForceValueExpr>(argExpr)) {
+    forceUnwrap = fu;
+    argExpr = fu->getSubExpr();
   }
 
   // If we're consuming instead, then the load _must_ have been there.
   if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
     return nullptr;
 
-  // If we did not see a load or a subscript expr and our argExpr is a
-  // declref_expr, return nullptr. We have an object not something that will be
-  // in memory. This can happen with classes or with values captured by a
-  // closure.
-  //
-  // NOTE: If we see a member_ref_expr from a decl_ref_expr, we still process it
-  // since the declref_expr could be from a class.
-  if (!sawLoad && !subscriptExpr) {
+  // TODO: This section should be removed eventually. Decl refs should not be
+  // handled different from other storage. Removing it breaks some things
+  // currently.
+  if (!sawLoad) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-      return nullptr;
+             
+      // Proceed if the storage reference is a force unwrap.
+      if (!forceUnwrap) {
+        // Proceed if the storage references a global or static let.
+        // TODO: We should treat any storage reference as a borrow, it seems, but
+        // that currently disrupts what the move checker expects. It would also
+        // be valuable to borrow copyable global lets, but this is a targeted
+        // fix to allow noncopyable globals to work properly.
+        bool isGlobal = false;
+        if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
+          isGlobal = vd->isGlobalStorage();
+        }
+        
+        if (!isGlobal) {
+          return nullptr;
+        }
+      }
     }
   }
 
@@ -3253,18 +3279,27 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // We want to perform a borrow/consume if the first piece of storage being
   // referenced is a move-only type.
 
-  VarDecl *storage = nullptr;
+  AbstractStorageDecl *storage = nullptr;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
-    storage = dyn_cast<VarDecl>(dre->getDecl());
+    storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());
     type = dre->getType();
   } else if (auto mre = dyn_cast<MemberRefExpr>(result.getStorageRef())) {
-    storage = dyn_cast<VarDecl>(mre->getDecl().getDecl());
+    storage = dyn_cast<AbstractStorageDecl>(mre->getDecl().getDecl());
     type = mre->getType();
+  } else if (auto se = dyn_cast<SubscriptExpr>(result.getStorageRef())) {
+    storage = dyn_cast<AbstractStorageDecl>(se->getDecl().getDecl());
+    type = se->getType();
   }
 
   if (!storage)
     return nullptr;
+  if (!storage->hasStorage()
+      && storage->getReadImpl() != ReadImplKind::Read
+      && storage->getReadImpl() != ReadImplKind::Address) {
+    return nullptr;
+  }
+
   assert(type);
 
   SILType ty =
@@ -3276,12 +3311,10 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   }
   if (!isMoveOnly)
     return nullptr;
-
-  // If we saw a subscript expr and the base of the subscript expr passed our
-  // tests above, we can emit the call to the subscript directly as a borrowed
-  // lvalue. Return the subscript expr here so that we emit it appropriately.
-  if (subscriptExpr)
-    return subscriptExpr;
+    
+  if (forceUnwrap) {
+    return forceUnwrap;
+  }
 
   return result.getTransitiveRoot();
 }
@@ -3812,6 +3845,7 @@ private:
         case SILFunctionLanguage::Swift:
           return Conversion::getSubstToOrig(origParamType,
                                             arg.getSubstRValueType(),
+                                            loweredSubstArgType,
                                             param.getSILStorageInterfaceType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
@@ -4037,7 +4071,9 @@ private:
         convertingInit.emplace(
             Conversion::getSubstToOrig(
                 origExpansionType.getPackExpansionPatternType(),
-                substPatternType, expectedElementType),
+                substPatternType,
+                SILType::getPrimitiveObjectType(loweredPatternTy),
+                expectedElementType),
             SGFContext(innermostInit));
         innermostInit = &*convertingInit;
       }
@@ -4933,7 +4969,8 @@ public:
     if (forUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
-      SGF.B.createEndApply(l, ApplyToken);
+      SGF.B.createEndApply(l, ApplyToken,
+                           SILType::getEmptyTupleType(SGF.getASTContext()));
     }
   }
   
@@ -5511,7 +5548,7 @@ RValue SILGenFunction::emitApply(
     const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
     SGFContext evalContext,
     std::optional<ActorIsolation> implicitActorHopTarget) {
-  auto substFnType = calleeTypeInfo.substFnType;
+  auto substFnType = calleeTypeInfo.substFnType; // TODO: this has error but should not
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
@@ -5949,7 +5986,8 @@ void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
-  B.createEndApply(loc, token);
+  B.createEndApply(loc, token,
+                   SILType::getEmptyTupleType(getASTContext()));
 }
 
 void SILGenFunction::emitYield(SILLocation loc,
@@ -6647,6 +6685,16 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (!isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (accessor->isGetter()) {
+        if (accessor->getStorage()->isDistributed()) {
+          return Callee::forDirect(SGF, constant, subs, loc);
+        }
+      }
+    }
+  }
+
   bool isObjCReplacementSelfCall = false;
   if (isOnSelfParameter &&
       SGF.getOptions()
@@ -6660,14 +6708,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
         subs, loc, true);
   }
 
-  // The accessor might be a local function that does not capture any
-  // generic parameters, in which case we don't want to pass in any
-  // substitutions.
   auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
-  if (decl->getDeclContext()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
-    subs = SubstitutionMap();
-  }
+  subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+      constant, captureInfo, subs);
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {
@@ -7259,6 +7302,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       origParamType);
   
   auto conversion = Conversion::getSubstToOrig(origParam, substParamType,
+                                     getLoweredType(asyncLetEntryPoint->getType()),
                                      getLoweredType(origParam, substParamType));
   auto taskFunction = emitConvertedRValue(asyncLetEntryPoint, conversion);
 

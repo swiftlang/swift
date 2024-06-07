@@ -214,7 +214,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// This can be called more than once and returns to the caller immediately
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
-    public func yield(_ value: __owned Element) -> YieldResult {
+    public func yield(_ value: sending Element) -> YieldResult {
       storage.yield(value)
     }
 
@@ -369,8 +369,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///         print(error)
   ///     }
   ///
+  @preconcurrency
   public init(
-    unfolding produce: @escaping () async throws -> Element?
+    unfolding produce: @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
     let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
       = .create(produce)
@@ -462,7 +463,7 @@ extension AsyncThrowingStream.Continuation {
   /// blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield(
-    with result: Result<Element, Failure>
+    with result: __shared sending Result<Element, Failure>
   ) -> YieldResult where Failure == Error {
     switch result {
     case .success(let val):
@@ -546,7 +547,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     @discardableResult
     @available(SwiftStdlib 5.1, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-    public func yield(_ value: __owned Element) -> YieldResult {
+    public func yield(_ value: sending Element) -> YieldResult {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
     @available(SwiftStdlib 5.1, *)
@@ -609,7 +610,7 @@ extension AsyncThrowingStream.Continuation {
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public func yield(
-    with result: Result<Element, Failure>
+    with result: __shared sending Result<Element, Failure>
   ) -> YieldResult where Failure == Error {
     fatalError("Unavailable in task-to-thread concurrency model")
   }

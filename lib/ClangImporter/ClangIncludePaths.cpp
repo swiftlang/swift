@@ -178,18 +178,11 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   return clangDriverArgs;
 }
 
-static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
-  return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
-         triple.isAndroid() || triple.isOSWASI();
-}
-
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
-                   std::optional<StringRef> maybeHeaderFileName,
+                   std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  if (!shouldInjectLibcModulemap(triple))
-    return {};
 
   // Extract the libc path from Clang driver.
   auto clangDriver = createClangDriver(ctx, vfs);
@@ -227,18 +220,20 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   SmallVector<std::pair<std::string, std::string>, 2> vfsMappings{
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)}};
 
-  if (maybeHeaderFileName) {
-    // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
-    // directly from the modulemap.
-    Path actualHeaderPath = actualModuleMapPath;
-    llvm::sys::path::remove_filename(actualHeaderPath);
-    llvm::sys::path::append(actualHeaderPath, maybeHeaderFileName.value());
+  if (maybeHeaderFileNames) {
+    for (const auto &filename : *maybeHeaderFileNames) {
+      // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
+      // directly from the modulemap.
+      Path actualHeaderPath = actualModuleMapPath;
+      llvm::sys::path::remove_filename(actualHeaderPath);
+      llvm::sys::path::append(actualHeaderPath, filename);
 
-    Path injectedHeaderPath(libcDir);
-    llvm::sys::path::append(injectedHeaderPath, maybeHeaderFileName.value());
+      Path injectedHeaderPath(libcDir);
+      llvm::sys::path::append(injectedHeaderPath, filename);
 
-    vfsMappings.push_back(
-        {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+      vfsMappings.push_back(
+          {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+    }
   }
 
   return vfsMappings;
@@ -254,8 +249,9 @@ static void getLibStdCxxFileMapping(
   // We currently only need this when building for Linux.
   if (!triple.isOSLinux())
     return;
-  // Android uses libc++.
-  if (triple.isAndroid())
+  // Android uses libc++, as does our fully static Linux config.
+  if (triple.isAndroid()
+      || (triple.isMusl() && triple.getVendor() == llvm::Triple::Swift))
     return;
 
   // Extract the libstdc++ installation path from Clang driver.
@@ -529,30 +525,50 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
+  // For modulemaps that have all the C standard library headers together in
+  // a single module, we end up with module cycles with the clang _Builtin_
+  // modules.  e.g. <inttypes.h> includes <stdint.h> on these platforms. The
+  // clang builtin <stdint.h> include-nexts <stdint.h>. When both of those
+  // platform headers are in the SwiftLibc module, there's a module cycle
+  // SwiftLibc -> _Builtin_stdint -> SwiftLibc (i.e. inttypes.h (platform) ->
+  // stdint.h (builtin) -> stdint.h (platform)).
+  //
+  // Until these modulemaps can be fixed, the builtin headers need to join
+  // the system modules to avoid the cycle.
+  //
+  // Note that this does nothing to fix the same problem with C++ headers,
+  // and that this is generally a fragile solution.
+  //
+  // We start by assuming we do *not* need to do this, then enable it for
+  // affected modulemaps.
+  result.requiresBuiltinHeadersInSystemModules = false;
+
   SmallVector<std::pair<std::string, std::string>, 2> libcFileMapping;
   if (triple.isOSWASI()) {
     // WASI Mappings
     libcFileMapping =
         getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs);
-  } else {
-    // Android/BSD/Linux Mappings
+
+    // WASI's module map needs fixing
+    result.requiresBuiltinHeadersInSystemModules = true;
+  } else if (triple.isMusl()) {
+    libcFileMapping =
+        getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs);
+  } else if (triple.isAndroid()) {
+    // Android uses the android-specific module map that overlays the NDK.
+    StringRef headerFiles[] = {"SwiftAndroidNDK.h", "SwiftBionic.h"};
+    libcFileMapping =
+        getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs);
+  } else if (triple.isOSGlibc() || triple.isOSOpenBSD() ||
+             triple.isOSFreeBSD()) {
+    // BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);
+
+    // glibc.modulemap needs fixing
+    result.requiresBuiltinHeadersInSystemModules = true;
   }
   result.redirectedFiles.append(libcFileMapping);
-  // Both libc module maps have the C standard library headers all together in a
-  // SwiftLibc module. That leads to module cycles with the clang _Builtin_
-  // modules. e.g. <inttypes.h> includes <stdint.h> on these platforms. The
-  // clang builtin <stdint.h> include-nexts <stdint.h>. When both of those
-  // platform headers are in the SwiftLibc module, there's a module cycle
-  // SwiftLibc -> _Builtin_stdint -> SwiftLibc (i.e. inttypes.h (platform) ->
-  // stdint.h (builtin) -> stdint.h (platform)). Until this can be fixed in
-  // these module maps, the clang builtin headers need to join the "system"
-  // modules (SwiftLibc). i.e. when the clang builtin stdint.h is in the
-  // SwiftLibc module too, the cycle goes away. Note that
-  // -fbuiltin-headers-in-system-modules does nothing to fix the same problem
-  // with C++ headers, and is generally fragile.
-  result.requiresBuiltinHeadersInSystemModules = !libcFileMapping.empty();
 
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs);

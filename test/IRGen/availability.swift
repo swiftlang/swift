@@ -19,7 +19,7 @@ import Foundation
 // OPT: s10Foundation11MeasurementVySo17NSUnitTemperature
 
 public func dontHoist() {
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
       let measurement = Measurement<UnitTemperature>(value: Double(42), unit: .celsius)
       print("\(measurement)")
   } else {
@@ -49,13 +49,13 @@ public func dontHoist() {
 // OPT-NOT: call {{.*}} @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"
 // OPT: ret void
 public func multipleAvailabilityChecks() {
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
     print("test one")
   }
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
     print("test two")
   }
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.1, *) {
     print("test three")
   }
 }

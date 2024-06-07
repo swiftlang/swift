@@ -864,6 +864,23 @@ bb(%0: $*T):
  return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @testReturnBlockWithArgument
+// CHECK:       [[BB1:bb[0-9]+]](%{{.*}} : $Optional<()>):
+// CHECK-NEXT:    br [[BBRET:bb[0-9]+]]
+// CHECK:       [[BBRET]]:
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'testReturnBlockWithArgument'
+sil [_specialize exported: false, kind: full, where T == S] [ossa] @testReturnBlockWithArgument : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %41 = enum $Optional<()>, #Optional.none!enumelt
+  br bb4(%41 : $Optional<()>)
+
+bb4(%37 : $Optional<()>):
+  %38 = tuple ()
+  return %38 : $()
+}
+
 sil_vtable ClassUsingThrowingP {
   #ClassUsingThrowingP.init!allocator: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
   #ClassUsingThrowingP.init!initializer: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()

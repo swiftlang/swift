@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -parse-stdlib -module-name Swift \
-// RUN:   -enable-experimental-feature NoncopyableGenerics
+// RUN:   -parse-stdlib -module-name Swift
 
 @_marker protocol Copyable {}
 

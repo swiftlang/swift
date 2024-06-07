@@ -541,9 +541,7 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
   if (genericParams == nullptr)
     return nullptr;
 
-  unsigned depth = 0;
-  if (auto classSig = classDecl->getGenericSignature())
-    depth = classSig.getGenericParams().back()->getDepth() + 1;
+  unsigned depth = classDecl->getGenericSignature().getNextDepth();
 
   SmallVector<GenericTypeParamDecl *, 4> newParams;
   for (auto *param : genericParams->getParams()) {
@@ -1401,9 +1399,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       // FIXME: This should be more fine-grained to avoid having to check
       // for a cycle here.
       if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
-        evaluateOrDefault(evaluator,
-                          ResolveValueWitnessesRequest{conformance},
-                          evaluator::SideEffect());
+        conformance->resolveValueWitnesses();
       }
     }
 

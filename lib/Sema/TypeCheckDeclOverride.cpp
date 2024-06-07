@@ -1536,7 +1536,6 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(RawLayout)
-    UNINTERESTING_ATTR(ResultDependsOnSelf)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
@@ -1559,6 +1558,7 @@ namespace  {
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
     UNINTERESTING_ATTR(Preconcurrency)
+    UNINTERESTING_ATTR(AllowFeatureSuppression)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1626,6 +1626,7 @@ namespace  {
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
     UNINTERESTING_ATTR(ExtractConstantsFromMembers)
+    UNINTERESTING_ATTR(Sensitive)
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
@@ -1635,7 +1636,7 @@ namespace  {
     UNINTERESTING_ATTR(NonEscapable)
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
     UNINTERESTING_ATTR(StaticExclusiveOnly)
-    UNINTERESTING_ATTR(DistributedThunkTarget)
+    UNINTERESTING_ATTR(PreInverseGenerics)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1756,6 +1757,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
   // the getter and the setter.
   switch (overrideFn->getAccessorKind()) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
   case AccessorKind::Set:
     break;
 
@@ -2275,6 +2277,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Init:
@@ -2305,6 +2308,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
       switch (kind) {
       case AccessorKind::Get:
+      case AccessorKind::DistributedGet:
       case AccessorKind::Read:
         break;
 

@@ -72,8 +72,6 @@ class RewriteSystem final {
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
-  unsigned FirstLocalRule = 0;
-
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
@@ -89,6 +87,8 @@ class RewriteSystem final {
   llvm::DenseSet<const ProtocolDecl *> ReferencedProtocols;
 
   DebugOptions Debug;
+
+  unsigned FirstLocalRule = 0;
 
   /// Whether we've initialized the rewrite system with a call to initialize().
   unsigned Initialized : 1;
@@ -113,6 +113,10 @@ class RewriteSystem final {
   /// The length of the longest initial rule, used for the MaxRuleLength
   /// completion non-termination heuristic.
   unsigned LongestInitialRule : 16;
+
+  /// The most deeply nested concrete type appearing in an initial rule, used
+  /// for the MaxConcreteNesting completion non-termination heuristic.
+  unsigned DeepestInitialRule : 16;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -140,6 +144,10 @@ public:
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
+  }
+
+  unsigned getDeepestInitialRule() const {
+    return DeepestInitialRule;
   }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
@@ -204,8 +212,7 @@ public:
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxRuleCount,
-                             unsigned maxRuleLength);
+  performKnuthBendix(unsigned maxRuleCount, unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 

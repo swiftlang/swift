@@ -9,6 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+//  This file forces emission of lazily-generated ClangImporter-synthesized
+//  conformances.
+//
+//===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
 #include "swift/AST/Decl.h"

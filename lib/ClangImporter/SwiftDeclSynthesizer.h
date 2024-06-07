@@ -44,6 +44,14 @@ inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
   return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
 }
 
+enum class ReferenceReturnTypeBehaviorForBaseMethodSynthesis {
+  KeepReference,
+  RemoveReference,
+  RemoveReferenceIfPointer,
+};
+
+enum class ForwardingMethodKind { Base, Virtual };
+
 class SwiftDeclSynthesizer {
 private:
   ClangImporter::Implementation &ImporterImpl;
@@ -51,6 +59,8 @@ private:
 public:
   explicit SwiftDeclSynthesizer(ClangImporter::Implementation &Impl)
       : ImporterImpl(Impl) {}
+  explicit SwiftDeclSynthesizer(ClangImporter *importer)
+      : ImporterImpl(importer->Impl) {}
 
   /// Create a typedpattern(namedpattern(decl))
   static Pattern *createTypedNamedPattern(VarDecl *decl);
@@ -292,6 +302,22 @@ public:
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::OverloadedOperatorKind opKind);
+  
+  // Synthesize a C++ method that invokes the method from the base
+  // class. This lets Clang take care of the cast from the derived class
+  // to the base class during the invocation of the method.
+  clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
+      const clang::CXXRecordDecl *derivedClass,
+      const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
+      ForwardingMethodKind forwardingMethodKind,
+      ReferenceReturnTypeBehaviorForBaseMethodSynthesis
+          referenceReturnTypeBehavior =
+              ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+      bool forceConstQualifier = false);
+
+  /// Given an overload of a C++ virtual method on a reference type, create a
+  /// method that dispatches the call dynamically.
+  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);

@@ -1361,45 +1361,6 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
   return failure.diagnose(asNote);
 }
 
-MustBeCopyable::MustBeCopyable(ConstraintSystem &cs,
-                               Type noncopyableTy,
-                               NoncopyableMatchFailure failure,
-                               ConstraintLocator *locator)
-    : ConstraintFix(cs, FixKind::MustBeCopyable, locator, FixBehavior::Error),
-      noncopyableTy(noncopyableTy), failure(failure) {}
-
-bool MustBeCopyable::diagnose(const Solution &solution, bool asNote) const {
-  NotCopyableFailure failDiag(solution, noncopyableTy, failure, getLocator());
-  return failDiag.diagnose(asNote);
-}
-
-MustBeCopyable* MustBeCopyable::create(ConstraintSystem &cs,
-                                              Type noncopyableTy,
-                                              NoncopyableMatchFailure failure,
-                                              ConstraintLocator *locator) {
-  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy,
-                                                failure, locator);
-}
-
-bool MustBeCopyable::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
-  // Only diagnose if all solutions agreed on the same errant non-copyable type.
-  Type firstNonCopyable;
-  for (const auto &solutionAndFix : commonFixes) {
-    const auto *solution = solutionAndFix.first;
-    const auto *fix = solutionAndFix.second->getAs<MustBeCopyable>();
-
-    auto otherNonCopyable = solution->simplifyType(fix->noncopyableTy);
-    if (!firstNonCopyable)
-      firstNonCopyable = otherNonCopyable;
-
-    if (firstNonCopyable->getCanonicalType() != otherNonCopyable->getCanonicalType()) {
-      return false; // fixes differed, so decline to emit a tailored diagnostic.
-    }
-  }
-
-  return diagnose(*commonFixes.front().first);
-}
-
 bool AllowInvalidPackElement::diagnose(const Solution &solution,
                                        bool asNote) const {
   InvalidPackElement failure(solution, packElementType, getLocator());
@@ -1971,6 +1932,20 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
   return new (cs.getAllocator())
       AllowNonClassTypeToConvertToAnyObject(cs, type, locator);
 }
+
+
+bool SpecifyPackElementType::diagnose(const Solution &solution,
+                                      bool asNote) const {
+  UnableToInferGenericPackElementType failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyPackElementType *
+SpecifyPackElementType::create(ConstraintSystem &cs,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyPackElementType(cs, locator);
+}
+
 
 bool AddQualifierToAccessTopLevelName::diagnose(const Solution &solution,
                                                 bool asNote) const {

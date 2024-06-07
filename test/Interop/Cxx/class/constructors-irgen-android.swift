@@ -23,6 +23,7 @@ public func createImplicitDefaultConstructor() -> ImplicitDefaultConstructor {
   // ITANIUM_ARM: define protected swiftcc i32 @"$s7MySwift32createImplicitDefaultConstructorSo0deF0VyF"()
   // ITANIUM_ARM-NOT: define
   // Note `this` return type.
+  // ITANIUM_ARM: call void @llvm.memset.p0.i64
   // ITANIUM_ARM: call void @_ZN26ImplicitDefaultConstructorC2Ev(ptr %{{[0-9]+}})
   return ImplicitDefaultConstructor()
 }

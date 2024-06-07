@@ -17,35 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Type.h"
-#include "swift/Basic/TaggedUnion.h"
-#include "swift/SIL/FieldSensitivePrunedLiveness.h"
-#include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
-#include "swift/SIL/OwnershipLiveness.h"
-#include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/ParseTestSpecification.h"
-#include "swift/SIL/PrunedLiveness.h"
-#include "swift/SIL/SILArgumentArrayRef.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include <iterator>
-#include <memory>
 
 using namespace swift;
 using namespace swift::test;

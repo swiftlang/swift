@@ -40,12 +40,13 @@ SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPhiArgument *> *phis)
 
 SILSSAUpdater::~SILSSAUpdater() = default;
 
-void SILSSAUpdater::initialize(SILType inputType, ValueOwnershipKind kind) {
+void SILSSAUpdater::initialize(SILFunction *fn, SILType inputType,
+                               ValueOwnershipKind kind) {
   type = inputType;
   ownershipKind = kind;
 
   phiSentinel = std::unique_ptr<SILUndef, void (*)(SILUndef *)>(
-      SILUndef::getSentinelValue(inputType, this),
+      SILUndef::getSentinelValue(fn, this, inputType),
       SILSSAUpdater::deallocateSentinel);
 
   if (!blockToAvailableValueMap)
@@ -225,7 +226,7 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
 
   // Return undef for blocks without predecessor.
   if (predVals.empty())
-    return SILUndef::get(type, *block->getParent());
+    return SILUndef::get(block->getParent(), type);
 
   if (singularValue)
     return singularValue;
@@ -325,7 +326,7 @@ public:
   }
 
   static SILValue GetUndefVal(SILBasicBlock *block, SILSSAUpdater *ssaUpdater) {
-    return SILUndef::get(ssaUpdater->type, *block->getParent());
+    return SILUndef::get(block->getParent(), ssaUpdater->type);
   }
 
   /// Add an Argument to the basic block.

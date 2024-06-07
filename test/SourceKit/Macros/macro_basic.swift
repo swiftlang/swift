@@ -121,7 +121,7 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
   return Result.conjureValue()
 }
 
-// REQUIRES: swift_swift_parser, executable_test, shell
+// REQUIRES: swift_swift_parser, executable_test, shell, asserts
 
 // RUN: %empty-directory(%t)
 
@@ -132,7 +132,7 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroUser \
-// RUN:   -enable-experimental-feature BodyMacros \
+// RUN:   -enable-experimental-feature PreambleMacros \
 // RUN: )
 
 // RUN: COMPILER_ARGS=( \

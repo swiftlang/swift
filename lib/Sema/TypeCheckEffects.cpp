@@ -617,7 +617,7 @@ public:
     /// argument that was not rethrows/reasync-only in this context.
     ByDefaultClosure,
 
-    /// The the function is rethrows/reasync, and it was called with
+    /// The function is rethrows/reasync, and it was called with
     /// a throwing conformance as one of its generic arguments.
     ByConformance,
 
@@ -800,6 +800,24 @@ static bool isRethrowingDueToAsyncSequence(DeclContext *rethrowsDC) {
   return true;
 }
 
+/// Type-erase the opened archetypes in the given type, if there is one.
+static Type typeEraseOpenedArchetypes(Type type) {
+  if (!type || !type->hasOpenedExistential())
+    return type;
+
+  const OpenedArchetypeType *root = nullptr;
+  type.visit([&](Type type) {
+    if (auto opened = dyn_cast<OpenedArchetypeType>(type.getPointer())) {
+      root = opened->getRoot();
+    }
+  });
+
+  if (!root)
+    return type;
+
+  return constraints::typeEraseOpenedArchetypesWithRoot(type, root);
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
@@ -928,7 +946,7 @@ public:
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
-    result.ThrownError = thrownError;
+    result.ThrownError = typeEraseOpenedArchetypes(thrownError);
     return result;
   }
 
@@ -1165,6 +1183,13 @@ public:
     return Classification();
   }
 
+  bool isContextPreconcurrency() const {
+    if (!DC)
+      return false;
+
+    return getActorIsolationOfContext(DC).preconcurrency();
+  }
+
   /// Whether a missing 'await' error on accessing an async var should be
   /// downgraded to a warning.
   ///
@@ -1172,7 +1197,7 @@ public:
   /// global or static 'let' variables, which was previously accepted in
   /// compiler versions before 5.10, or for declarations marked preconcurrency.
   bool downgradeAsyncAccessToWarning(Decl *decl) {
-    if (decl->preconcurrency()) {
+    if (decl->preconcurrency() || isContextPreconcurrency()) {
       return true;
     }
 
@@ -1284,8 +1309,13 @@ public:
     if (!fnType) return Classification::forInvalidCode();
 
     auto fnRef = AbstractFunction::getAppliedFn(E);
-    auto conformances = fnRef.getSubstitutions().getConformances();
-    const auto hasAnyConformances = !conformances.empty();
+    auto substitutions = fnRef.getSubstitutions();
+    const bool hasAnyConformances =
+        llvm::any_of(substitutions.getConformances(),
+                     [](const ProtocolConformanceRef conformance) {
+                       auto *requirement = conformance.getRequirement();
+                       return !requirement->getInvertibleProtocolKind();
+                     });
 
     // If the function doesn't have any effects or conformances, we're done
     // here.
@@ -1316,7 +1346,8 @@ public:
 
     // Downgrade missing 'await' errors for preconcurrency references.
     result.setDowngradeToWarning(
-        result.hasAsync() && fnRef.isPreconcurrency());
+        result.hasAsync() &&
+        (fnRef.isPreconcurrency() || isContextPreconcurrency()));
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
@@ -1329,21 +1360,21 @@ public:
       switch (auto polyKind = fnRef.getPolymorphicEffectKind(kind)) {
       case PolymorphicEffectKind::AsyncSequenceRethrows:
       case PolymorphicEffectKind::ByConformance: {
-        auto substitutions = fnRef.getSubstitutions();
-        auto requirements =
-            substitutions.getGenericSignature().getRequirements();
-        auto conformances = substitutions.getConformances();
+        auto requirements = substitutions.getGenericSignature()
+                                .withoutMarkerProtocols()
+                                .getRequirements();
         for (const auto &req : requirements) {
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
-          auto conformanceRef = conformances.front();
-          conformances = conformances.drop_front();
-
           Type type = req.getFirstType().subst(substitutions);
+
+          auto conformanceRef = substitutions.lookupConformance(
+              req.getFirstType()->getCanonicalType(), req.getProtocolDecl());
+          assert(conformanceRef);
+
           result.merge(classifyConformance(type, conformanceRef, kind));
         }
-        assert(conformances.empty());
 
         // 'ByConformance' is a superset of 'ByClosure', so check for
         // closure arguments too.
@@ -2778,7 +2809,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   static bool isEffectAnchor(Expr *e) {
     return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
-           isa<AssignExpr>(e);
+           isa<AssignExpr>(e) || (isa<DeclRefExpr>(e) && e->isImplicit());
   }
 
   static bool isAnchorTooEarly(Expr *e) {
@@ -3351,7 +3382,7 @@ private:
     }
 
     // Check throwing calls.
-    MaxThrowingKind = std::max(MaxThrowingKind, throwsKind);
+    MaxThrowingKind = std::max(MaxThrowingKind, throwsKind); // FIXME: why is the left Never for property?
 
     switch (throwsKind) {
     // Completely ignores sites that don't throw.
@@ -3558,19 +3589,35 @@ private:
     Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
   }
 
+  std::pair<SourceLoc, std::string>
+  getFixItForUncoveredAsyncSite(const Expr *anchor) const {
+    SourceLoc awaitInsertLoc = anchor->getStartLoc();
+    std::string insertText = "await ";
+    if (auto *tryExpr = dyn_cast<AnyTryExpr>(anchor))
+      awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
+    else if (auto *autoClosure = dyn_cast<AutoClosureExpr>(anchor)) {
+      if (auto *tryExpr =
+              dyn_cast<AnyTryExpr>(autoClosure->getSingleExpressionBody()))
+        awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
+      // Supply a tailored fixIt including the identifier if we are
+      // looking at a shorthand optional binding.
+    } else if (anchor->isImplicit()) {
+      if (auto declRef = dyn_cast<DeclRefExpr>(anchor))
+        if (auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl())) {
+          insertText = " = await " + var->getNameStr().str();
+          awaitInsertLoc = Lexer::getLocForEndOfToken(Ctx.Diags.SourceMgr,
+                                                       anchor->getStartLoc());
+        }
+    }
+    return std::make_pair(awaitInsertLoc, insertText);
+  }
+
   void diagnoseUncoveredAsyncSite(const Expr *anchor) const {
     auto asyncPointIter = uncoveredAsync.find(anchor);
     if (asyncPointIter == uncoveredAsync.end())
       return;
-    const std::vector<DiagnosticInfo> &errors = asyncPointIter->getSecond();
-    SourceLoc awaitInsertLoc = anchor->getStartLoc();
-    if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(anchor))
-      awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
-    else if (const AutoClosureExpr *autoClosure = dyn_cast<AutoClosureExpr>(anchor)) {
-      if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(autoClosure->getSingleExpressionBody()))
-        awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
-    }
-
+    const auto &errors = asyncPointIter->getSecond();
+    const auto &[loc, insertText] = getFixItForUncoveredAsyncSite(anchor);
     bool downgradeToWarning = llvm::all_of(errors,
         [&](DiagnosticInfo diag) -> bool {
           return diag.downgradeToWarning;
@@ -3578,7 +3625,7 @@ private:
 
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
       .warnUntilSwiftVersionIf(downgradeToWarning, 6)
-      .fixItInsert(awaitInsertLoc, "await ")
+      .fixItInsert(loc, insertText)
       .highlight(anchor->getSourceRange());
 
     for (const DiagnosticInfo &diag: errors) {

@@ -11,7 +11,6 @@ struct MoveOnlyStruct: ~Copyable {
     deinit {
         // expected-error @-1 {{'self' consumed more than once}}
         // expected-error @-2 {{'self' consumed more than once}}
-        // expected-error @-3 {{'self' consumed more than once}}
         let x = self // expected-note {{consumed here}}
         _ = x
         var y = MoveOnlyStruct() // expected-error {{'y' consumed more than once}}
@@ -22,9 +21,9 @@ struct MoveOnlyStruct: ~Copyable {
         // expected-note @-1 {{consumed here}}
         let z = y // expected-note {{consumed again here}}
         let _ = z
-        globalMoveOnlyStruct = self // expected-note {{consumed here}}
+        globalMoveOnlyStruct = self
         // expected-note @-1 {{consumed again here}}
-    } // expected-note {{consumed again here}}
+    }
 }
 
 enum MoveOnlyEnum: ~Copyable {
@@ -34,7 +33,7 @@ enum MoveOnlyEnum: ~Copyable {
     deinit {
         // expected-error @-1 {{'self' consumed more than once}}
         // expected-error @-2 {{'self' consumed more than once}}
-        // expected-error @-3 {{'self' consumed more than once}}
+        // expected-error @-3 {{'self' used after consume}}
         let x = self // expected-note {{consumed here}}
         _ = x
         var y = MoveOnlyEnum.lhs(Klass())
@@ -43,5 +42,5 @@ enum MoveOnlyEnum: ~Copyable {
         _ = y 
         globalMoveOnlyEnum = self // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
-    } // expected-note {{consumed again here}}
+    } // expected-note {{used here}}
 }

@@ -16,25 +16,19 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 class ModuleFile;
 class PathObfuscator;
+class ModuleFileSharedCore;
 enum class ModuleLoadingBehavior;
 namespace file_types {
   enum ID : uint8_t;
 }
-
-/// Specifies how to load modules when both a module interface and serialized
-/// AST are present, or whether to disallow one format or the other altogether.
-enum class ModuleLoadingMode {
-  PreferInterface,
-  PreferSerialized,
-  OnlyInterface,
-  OnlySerialized
-};
 
 /// How a dependency should be loaded.
 ///
@@ -68,8 +62,13 @@ struct SerializedModuleBaseName {
   std::optional<std::string> findInterfacePath(llvm::vfs::FileSystem &fs,
                                                ASTContext &ctx) const;
 
+  /// Returns the package-name of the interface file.
+  std::optional<std::string>
+  getPackageNameFromInterface(StringRef interfacePath,
+                              llvm::vfs::FileSystem &fs) const;
+
   /// Returns the .package.swiftinterface path if its package-name also applies to
-  /// the the importing module. Returns an empty optional otherwise.
+  /// the importing module. Returns an empty optional otherwise.
   std::optional<std::string>
   getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
                                          ASTContext &ctx) const;
@@ -164,23 +163,18 @@ protected:
   }
 
   /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath, bool isFramework);
+  llvm::ErrorOr<ModuleDependencyInfo>
+  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
-    llvm::StringSet<> headerImports;
+    std::string headerImport;
   };
 
-  static llvm::ErrorOr<BinaryModuleImports>
-  getImportsOfModule(Twine modulePath,
+  llvm::ErrorOr<BinaryModuleImports>
+  getImportsOfModule(const ModuleFileSharedCore &loadedModuleFile,
                      ModuleLoadingBehavior transitiveBehavior,
-                     bool isFramework,
-                     bool isRequiredOSSAModules,
-                     bool isRequiredNoncopyableGenerics,
-                     StringRef SDKName,
-                     StringRef packageName,
-                     llvm::vfs::FileSystem *fileSystem,
-                     PathObfuscator &recoverer);
+                     StringRef packageName, bool isTestableImport);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
@@ -206,7 +200,6 @@ public:
           bool isFramework);
 
   bool isRequiredOSSAModules() const;
-  bool isRequiredNoncopyableGenerics() const;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.
@@ -309,6 +302,9 @@ public:
 class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 
   struct MemoryBufferInfo {
+    MemoryBufferInfo(std::unique_ptr<llvm::MemoryBuffer> &&buffer,
+                     llvm::VersionTuple userVersion)
+        : buffer(std::move(buffer)), userVersion(userVersion) {}
     std::unique_ptr<llvm::MemoryBuffer> buffer;
     llvm::VersionTuple userVersion;
   };
@@ -357,11 +353,16 @@ public:
   /// discovered in the __swift_ast section of a Mach-O file (or the .swift_ast
   /// section of an ELF file) to the search path.
   ///
+  /// If a module is inserted twice, the first one wins, and the return value is
+  /// false.
+  ///
   /// FIXME: make this an actual import *path* once submodules are designed.
-  void registerMemoryBuffer(StringRef importPath,
+  bool registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input,
                             llvm::VersionTuple version) {
-    MemoryBuffers[importPath] = {std::move(input), version};
+    return MemoryBuffers
+        .insert({importPath, MemoryBufferInfo(std::move(input), version)})
+        .second;
   }
 
   void collectVisibleTopLevelModuleNames(
@@ -547,9 +548,10 @@ public:
 };
 
 /// Extract compiler arguments from an interface file buffer.
-bool extractCompilerFlagsFromInterface(StringRef interfacePath,
-                                       StringRef buffer, llvm::StringSaver &ArgSaver,
-                                       SmallVectorImpl<const char *> &SubArgs);
+bool extractCompilerFlagsFromInterface(
+    StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
+    SmallVectorImpl<const char *> &SubArgs,
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);

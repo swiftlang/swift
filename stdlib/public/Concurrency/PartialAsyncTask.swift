@@ -22,14 +22,14 @@ internal func _swiftJobRun(_ job: UnownedJob,
                            _ executor: UnownedSerialExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_job_run_on_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ executor: UnownedTaskExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_job_run_on_serial_and_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
@@ -109,16 +109,51 @@ public struct UnownedJob: Sendable {
     _swiftJobRun(self, executor)
   }
 
+  /// Run this job isolated to the passed task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter executor: the task executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedTaskExecutor) {
     _swiftJobRunOnTaskExecutor(self, executor)
   }
 
+  /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter serialExecutor: the executor this job will be semantically running on.
+  /// - Parameter taskExecutor: the task executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(on:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
@@ -286,6 +321,58 @@ extension ExecutorJob {
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
     _swiftJobRun(UnownedJob(self), executor)
   }
+
+  /// Run this job on the passed in task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter executor: the executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(on executor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
+  }
+
+  /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
+  ///
+  /// This operation runs the job on the calling thread and *blocks* until the job completes.
+  /// The intended use of this method is for an executor to determine when and where it
+  /// wants to run the job and then call this method on it.
+  ///
+  /// The passed in executor reference is used to establish the executor context for the job,
+  /// and should be the same executor as the one semantically calling the `runSynchronously` method.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has been run.
+  ///
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  ///
+  /// - Parameter serialExecutor: the executor this job will be semantically running on.
+  /// - Parameter taskExecutor: the task executor this job will be run on.
+  ///
+  /// - SeeAlso: ``runSynchronously(on:)``
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
+                               taskExecutor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
+  }
 }
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -418,7 +505,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(returning value: __owned T) where E == Never {
+  public func resume(returning value: sending T) where E == Never {
     #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeNonThrowingContinuationReturning(context, value)
     #else
@@ -440,7 +527,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(returning value: __owned T) {
+  public func resume(returning value: sending T) {
     #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationReturning(context, value)
     #else
@@ -462,7 +549,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(throwing error: __owned E) {
+  public func resume(throwing error: consuming E) {
     #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationThrowing(context, error)
     #else
@@ -490,7 +577,7 @@ extension UnsafeContinuation {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
+  public func resume<Er: Error>(with result: __shared sending Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
         self.resume(returning: val)
@@ -516,7 +603,7 @@ extension UnsafeContinuation {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(with result: Result<T, E>) {
+  public func resume(with result: __shared sending Result<T, E>) {
     switch result {
       case .success(let val):
         self.resume(returning: val)
@@ -548,7 +635,7 @@ extension UnsafeContinuation {
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
-  _ value: __owned T
+  _ value: sending T
 ) {
   continuation.resume(returning: value)
 }
@@ -557,7 +644,7 @@ internal func _resumeUnsafeContinuation<T>(
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
-  _ value: __owned T
+  _ value: sending T
 ) {
   continuation.resume(returning: value)
 }
@@ -566,7 +653,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
-  _ error: __owned Error
+  _ error: consuming Error
 ) {
   continuation.resume(throwing: error)
 }
@@ -598,11 +685,11 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
+  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
-) async -> T {
+) async -> sending T {
   return await Builtin.withUnsafeContinuation {
     fn(UnsafeContinuation<T, Never>($0))
   }
@@ -634,11 +721,11 @@ public func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
+  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
-) async throws -> T {
+) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
     fn(UnsafeContinuation<T, Error>($0))
   }

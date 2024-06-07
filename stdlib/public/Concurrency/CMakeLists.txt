@@ -60,6 +60,10 @@ else()
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+  "-enable-experimental-feature"
+  "IsolatedAny2"
+)
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
@@ -152,6 +156,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
 
+  SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
@@ -195,6 +200,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
+  set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
+  set(SWIFT_STDLIB_HAS_ASL FALSE)
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -216,9 +223,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
     endif()
     
+    set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
+
     add_swift_target_library_single(
       embedded-concurrency-${mod}
       swift_Concurrency
@@ -270,6 +279,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       TARGETS embedded-concurrency-${mod}
       DESTINATION "lib/swift/embedded/${mod}"
       COMPONENT "stdlib"
+      )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_Concurrency.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "stdlib"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 

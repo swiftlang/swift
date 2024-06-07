@@ -158,6 +158,13 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
       IsDynamic = true;
       ide::getReceiverType(BaseE, ReceiverTypes);
     }
+  } else if (ExprStack.empty() && isDeclOverridable(D)) {
+    // We aren't in a call (otherwise we would have an expression stack wouldn't
+    // be empty), so we're at the declaration of an overridable declaration.
+    // Mark the declaration as dynamic so that jump-to-definition can offer to
+    // jump to any declaration that overrides this declaration.
+    IsDynamic = true;
+    ReceiverTypes.push_back(D->getDeclContext()->getSelfNominalTypeDecl());
   }
 
   if (Data)
@@ -165,7 +172,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   CursorInfo = new ResolvedValueRefCursorInfo(
       CursorInfo->getSourceFile(), CursorInfo->getLoc(), D, CtorTyRef, ExtTyRef,
-      IsRef, Ty, ContainerType, CustomAttrRef,
+      IsRef, /*SolutionSpecificInterfaceType=*/Type(), ContainerType,
+      CustomAttrRef,
       /*IsKeywordArgument=*/false, IsDynamic, ReceiverTypes,
       /*ShorthandShadowedDecls=*/{});
 

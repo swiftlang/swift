@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_LANGOPTIONS_H
 #define SWIFT_BASIC_LANGOPTIONS_H
 
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
@@ -31,6 +32,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
@@ -319,6 +321,9 @@ namespace swift {
     /// to the Swift language version.
     version::Version cxxInteropCompatVersion;
 
+    void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
+                               swift::DiagnosticEngine &Diags);
+
     bool CForeignReferenceTypes = false;
 
     /// Imports getters and setters as computed properties.
@@ -327,6 +332,9 @@ namespace swift {
     /// Should the compiler require C++ interoperability to be enabled
     /// when importing Swift modules that enable C++ interoperability.
     bool RequireCxxInteropToImportCxxInteropModule = true;
+
+    // Workaround for bug when building SwiftCompilerSources (rdar://128013193)
+    bool CxxInteropUseOpaquePointerForMoveOnly = false;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
@@ -380,6 +388,11 @@ namespace swift {
     /// Enable experimental eager Clang module diagnostics.
     bool EnableExperimentalEagerClangModuleDiagnostics = false;
 
+    /// Force ClangImporter's import-as-member extensions to load thier members
+    /// immediately, bypassing their SwiftLookupTables. This emulates an
+    /// implementation quirk of previous compilers.
+    bool DisableNamedLazyImportAsMemberLoading = false;
+
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
@@ -393,6 +406,9 @@ namespace swift {
     /// Disable the implicit import of the _Backtracing module.
     bool DisableImplicitBacktracingModuleImport =
         !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
+
+    /// Disable the implicit import of the Cxx module.
+    bool DisableImplicitCxxModuleImport = false;
 
     // Whether to use checked continuations when making an async call from
     // Swift into ObjC. If false, will use unchecked continuations instead.
@@ -440,15 +456,14 @@ namespace swift {
     /// The name of the package this module belongs to.
     std::string PackageName;
 
+    /// Allow importing a non-package interface from the same package.
+    bool AllowNonPackageInterfaceImportFromSamePackage = false;
+
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
-
-    /// Diagnose switches over non-frozen enums that do not have catch-all
-    /// cases.
-    bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
 
     /// Regex for the passes that should report passed and missed optimizations.
     ///
@@ -559,11 +574,15 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
-    /// Enable experimental associated type inference improvements.
-    bool EnableExperimentalAssociatedTypeInference = false;
-
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = true;
+
+    /// Skips decls that cannot be referenced externally.
+    bool SkipNonExportableDecls = false;
+
+    /// True if -experimental-allow-non-resilient-access is passed and built
+    /// from source.
+    bool AllowNonResilientAccess = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -581,8 +600,24 @@ namespace swift {
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
 
+    /// Disables `DynamicActorIsolation` feature.
+    bool DisableDynamicActorIsolation = false;
+
+    /// Whether or not to allow experimental features that are only available
+    /// in "production".
+#ifdef NDEBUG
+    bool RestrictNonProductionExperimentalFeatures = true;
+#else
+    bool RestrictNonProductionExperimentalFeatures = false;
+#endif
+
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
+    }
+
+    bool isDynamicActorIsolationCheckingEnabled() const {
+      return !DisableDynamicActorIsolation &&
+             hasFeature(Feature::DynamicActorIsolation);
     }
 
     LangOptions();
@@ -606,6 +641,8 @@ namespace swift {
       } else if (Target.isiOS()) {
         return Target.getiOSVersion();
       } else if (Target.isWatchOS()) {
+        return Target.getOSVersion();
+      } else if (Target.isXROS()) {
         return Target.getOSVersion();
       }
       return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
@@ -960,6 +997,10 @@ namespace swift {
 
     /// Using ClangIncludeTreeRoot for compilation.
     bool HasClangIncludeTreeRoot = false;
+
+    /// Whether the dependency scanner should construct all swift-frontend
+    /// invocations directly from clang cc1 args.
+    bool ClangImporterDirectCC1Scan = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

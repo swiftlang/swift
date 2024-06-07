@@ -27,8 +27,8 @@ func forwardAndReabstractFunctionPack<each T>(functions: repeat (each T) -> Bool
 // CHECK-NEXT:    [[COPY_CONVERT:%.*]] = convert_function [[COPY]] : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <@pack_element([[UUID]]) each T> to $@noescape @callee_guaranteed (@in_guaranteed @pack_element([[UUID]]) each T) -> Bool
 //   Wrap in the conversion thunk.
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sxSbIgnd_xSbIegnr_lTR : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> Bool) -> @out Bool
-// CHECK-NEXT:    [[THUNKED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<@pack_element([[UUID]]) each T>([[COPY_CONVERT]])
+// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sqd__SbIgnd_qd__SbIegnr_Rvzr__lTR : $@convention(thin) <each τ_0_0><τ_1_0> (@in_guaranteed τ_1_0, @guaranteed @noescape @callee_guaranteed (@in_guaranteed τ_1_0) -> Bool) -> @out Bool
+// CHECK-NEXT:    [[THUNKED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<Pack{repeat each T}, @pack_element([[UUID]]) each T>([[COPY_CONVERT]])
 //   Convert to a substituted type.
 // CHECK-NEXT:    [[THUNKED_CONVERT:%.*]] = convert_function [[THUNKED]] : $@callee_guaranteed (@in_guaranteed @pack_element([[UUID]]) each T) -> @out Bool to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <@pack_element([[UUID]]) each T, Bool>
 //   Convert to noescape.

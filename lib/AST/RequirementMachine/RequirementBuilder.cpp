@@ -192,50 +192,31 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
                           prop->getLayoutConstraint());
         return;
 
-      case Symbol::Kind::Superclass: {
-        // Requirements containing unresolved name symbols originate from
-        // invalid code and should not appear in the generic signature.
-        for (auto term : prop->getSubstitutions()) {
-          if (term.containsUnresolvedSymbols())
-            return;
-        }
-
-        Type superclassType = Map.getTypeFromSubstitutionSchema(
-                                prop->getConcreteType(),
-                                prop->getSubstitutions(),
-                                GenericParams, MutableTerm());
-        if (rule.isRecursive())
-          superclassType = replaceTypeParametersWithErrorTypes(superclassType);
-
-        if (ReconstituteSugar)
-          superclassType = superclassType->reconstituteSugar(/*recursive=*/true);
-
-        Reqs.emplace_back(RequirementKind::Superclass,
-                          subjectType, superclassType);
-        return;
-      }
-
+      case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType: {
-        // Requirements containing unresolved name symbols originate from
-        // invalid code and should not appear in the generic signature.
+        bool containsUnresolvedSymbols = false;
         for (auto term : prop->getSubstitutions()) {
-          if (term.containsUnresolvedSymbols())
-            return;
+          containsUnresolvedSymbols |= term.containsUnresolvedSymbols();
         }
 
         Type concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
-        if (rule.isRecursive())
+        if (containsUnresolvedSymbols || rule.isRecursive())
           concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
         if (ReconstituteSugar)
           concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
 
-        auto &component = Components[rule.getRHS()];
-        assert(!component.ConcreteType);
-        component.ConcreteType = concreteType;
+        if (prop->getKind() == Symbol::Kind::Superclass) {
+          Reqs.emplace_back(RequirementKind::Superclass,
+                            subjectType, concreteType);
+        } else {
+          auto &component = Components[rule.getRHS()];
+          assert(!component.ConcreteType);
+          component.ConcreteType = concreteType;
+        }
         return;
       }
 

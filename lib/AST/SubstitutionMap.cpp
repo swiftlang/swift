@@ -140,6 +140,14 @@ bool SubstitutionMap::hasLocalArchetypes() const {
   return false;
 }
 
+bool SubstitutionMap::hasOpaqueArchetypes() const {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
+    if (replacementTy && replacementTy->hasOpaqueArchetype())
+      return true;
+  }
+  return false;
+}
+
 bool SubstitutionMap::hasDynamicSelf() const {
   for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasDynamicSelfType())
@@ -386,6 +394,15 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
   }
 
+  // If the protocol is invertible, fall back to a global lookup instead of
+  // evaluating a conformance path, to avoid an infinite substitution issue.
+  if (proto->getInvertibleProtocolKind()) {
+    auto substType = type.subst(*this);
+    if (!substType->isTypeParameter())
+      return proto->getModuleContext()->lookupConformance(substType, proto);
+    return ProtocolConformanceRef(proto);
+  }
+
   auto path = genericSig->getConformancePath(type, proto);
 
   ProtocolConformanceRef conformance;
@@ -569,7 +586,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
     DerivedParams(derivedParams) {
 
   if (auto baseNominalSig = baseNominal->getGenericSignature()) {
-    BaseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
+    BaseDepth = baseNominalSig.getNextDepth();
 
     auto *genericEnv = derivedNominal->getGenericEnvironment();
     auto derivedNominalTy = derivedNominal->getDeclaredInterfaceType();
@@ -593,7 +610,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
   }
 
   if (auto derivedNominalSig = derivedNominal->getGenericSignature())
-    OrigDepth = derivedNominalSig.getGenericParams().back()->getDepth() + 1;
+    OrigDepth = derivedNominalSig.getNextDepth();
 }
 
 Type QueryOverrideSubs::operator()(SubstitutableType *type) const {

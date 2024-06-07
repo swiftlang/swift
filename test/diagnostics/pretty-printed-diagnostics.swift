@@ -69,19 +69,19 @@ foo(b:
 
 // Test fallback for non-ASCII characters.
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
-// CHECK: [[#LINE-2]] │
-// CHECK: [[#LINE]]   │ let abc = "👍
-// CHECK:             │ ╰─  error: unterminated string literal
-// CHECK: [[#LINE+1]] │
+// CHECK: [[#LINE-2]] |
+// CHECK: [[#LINE]]   | let abc = "👍
+// CHECK:             | `-  error: unterminated string literal
+// CHECK: [[#LINE+1]] |
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:3
-// CHECK: [[#LINE-1]] │
-// CHECK: [[#LINE]]   │ 1 + 2
-// CHECK:             │ ╰─ warning: result of operator '+' is unused
-// CHECK: [[#LINE+1]] │
+// CHECK: [[#LINE-1]] |
+// CHECK: [[#LINE]]   | 1 + 2
+// CHECK:             | `- warning: result of operator '+' is unused
+// CHECK: [[#LINE+1]] |
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
-// CHECK:  [[#LINE-1]] │
-// CHECK:  [[#LINE]] │ foo(b: 1, a: 2)
-// CHECK:              │         ╰─ error: argument 'a' must precede argument 'b'
-// CHECK: [[#LINE+1]]  │
+// CHECK:  [[#LINE-1]] |
+// CHECK:  [[#LINE]] | foo(b: 1, a: 2)
+// CHECK:              |         `- error: argument 'a' must precede argument 'b'
+// CHECK: [[#LINE+1]]  |

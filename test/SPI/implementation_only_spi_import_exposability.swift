@@ -27,6 +27,7 @@ public protocol IOIProtocol {}
 #elseif CLIENT
 
 @_spi(A) @_implementationOnly import Lib
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 @_spi(B) public func leakSPIStruct(_ a: SPIStruct) -> SPIStruct { fatalError() } // expected-warning 2 {{cannot use struct 'SPIStruct' here; 'Lib' has been imported as implementation-only}}
 @_spi(B) public func leakIOIStruct(_ a: IOIStruct) -> IOIStruct { fatalError() } // expected-warning 2 {{cannot use struct 'IOIStruct' here; 'Lib' has been imported as implementation-only}}

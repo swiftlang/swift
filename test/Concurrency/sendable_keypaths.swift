@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -147,10 +147,9 @@ func testGlobalActorIsolatedReferences() {
     subscript(v: Int) -> Bool { false }
   }
 
-  let dataKP = \Isolated.data
-  // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in Swift 6}}
+  let dataKP = \Isolated.data // Ok
   let subscriptKP = \Isolated.[42]
-  // expected-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in Swift 6}}
+  // expected-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 
   let _: KeyPath<Isolated, Int> & Sendable = dataKP
   // expected-warning@-1 {{type 'WritableKeyPath<Isolated, Int>' does not conform to the 'Sendable' protocol}}
@@ -158,8 +157,7 @@ func testGlobalActorIsolatedReferences() {
   // expected-warning@-1 {{type 'KeyPath<Isolated, Bool>' does not conform to the 'Sendable' protocol}}
 
   func testNonIsolated() {
-    _ = \Isolated.data
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in Swift 6}}
+    _ = \Isolated.data // Ok
   }
 
   @MainActor func testIsolated() {
@@ -190,14 +188,14 @@ func testReferencesToDifferentGlobalActorIsolatedMembers() {
   @MainActor func testIsolatedToMain() {
     _ = \Info.name // Ok
     _ = \Isolated.info.name
-    // expected-warning@-1 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'; this is an error in the Swift 6 language mode}}
   }
 
   @GlobalActor func testIsolatedToCustom() {
     _ = \Info.name // Ok
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in the Swift 6 language mode}}
     _ = \Isolated.info.name
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -216,4 +214,46 @@ do {
 
   let _: [PartialKeyPath<S>] = [\.a, \.b] // Ok
   let _: [any PartialKeyPath<S> & Sendable] = [\.a, \.b] // Ok
+}
+
+do {
+  func kp() -> KeyPath<String, Int> & Sendable {
+    fatalError()
+  }
+
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  func test() -> KeyPath<String, Int> {
+    true ? kp() : kp() // expected-error {{type of expression is ambiguous without a type annotation}}
+  }
+
+  func forward<T>(_ v: T) -> T { v }
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: KeyPath<String, Int> = forward(kp()) // expected-error {{conflicting arguments to generic parameter 'T' ('any KeyPath<String, Int> & Sendable' vs. 'KeyPath<String, Int>')}}
+}
+
+do {
+  final class C<T> {
+    let immutable: String = ""
+  }
+
+  _ = \C<Int>.immutable as? ReferenceWritableKeyPath // Ok
+}
+
+// Should be moved back to sendable_methods.swift once ambiguities are fixed
+do {
+  struct Test {
+    static func fn() {}
+    static func otherFn() {}
+  }
+
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  func fnRet(cond: Bool) -> () -> Void {
+    cond ? Test.fn : Test.otherFn // expected-error {{type of expression is ambiguous without a type annotation}}
+  }
+
+  func forward<T>(_: T) -> T {
+  }
+
+  // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: () -> Void = forward(Test.fn) // expected-error {{conflicting arguments to generic parameter 'T' ('@Sendable () -> ()' vs. '() -> Void')}}
 }

@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -89,7 +90,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
     OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
 
     StringRef FirstArg(Args[0]);
-    if (FirstArg.startswith(OptName))
+    if (FirstArg.starts_with(OptName))
       DriverName = FirstArg.drop_front(OptName.size());
   }
 
@@ -129,7 +130,7 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
 
   StringRef OptName =
     getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
-  if (StringRef(Args[0]).startswith(OptName))
+  if (StringRef(Args[0]).starts_with(OptName))
     Args = Args.slice(1);
   return Args;
 }
@@ -260,7 +261,7 @@ static void validateCompilationConditionArgs(DiagnosticEngine &diags,
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);
-    } else if (name.startswith("-D")) {
+    } else if (name.starts_with("-D")) {
       diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
     } else if (!Lexer::isIdentifier(name)) {
@@ -274,7 +275,7 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
                                    const ArgList &args) {
   for (const Arg *A : args.filtered(options::OPT_F, options::OPT_Fsystem)) {
     StringRef name = A->getValue();
-    if (name.endswith(".framework") || name.endswith(".framework/"))
+    if (name.ends_with(".framework") || name.ends_with(".framework/"))
       diags.diagnose(SourceLoc(),
                      diag::framework_search_path_includes_framework_extension,
                      name);
@@ -340,6 +341,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   }
 
   switch (target.getOS()) {
+  case llvm::Triple::XROS:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
@@ -1336,7 +1338,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     if ((OI.LinkAction == LinkKind::DynamicLibrary ||
          OI.LinkAction == LinkKind::StaticLibrary) &&
         !llvm::sys::path::extension(A->getValue()).empty() &&
-        StringRef(OI.ModuleName).startswith("lib")) {
+        StringRef(OI.ModuleName).starts_with("lib")) {
       // Chop off a "lib" prefix if we're building a library.
       OI.ModuleName.erase(0, strlen("lib"));
     }
@@ -1830,7 +1832,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         if (auto *IA = dyn_cast<InputAction>(A)) {
           StringRef ObjectName = IA->getInputArg().getValue();
           if (Triple.getObjectFormat() == llvm::Triple::ELF &&
-              ObjectName.endswith(".so"))
+              ObjectName.ends_with(".so"))
             continue;
         }
         AutolinkExtractInputs.push_back(A);
@@ -1939,6 +1941,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   if (Args.hasArg(options::OPT_help_hidden)) {
     printHelp(true);
     return false;
+  }
+
+  if (Args.hasArg(options::OPT_compiler_assertions)) {
+    CONDITIONAL_ASSERT_Global_enable_flag = 1;
   }
 
   if (Args.hasArg(options::OPT_version)) {

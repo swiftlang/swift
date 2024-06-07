@@ -3,36 +3,37 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -disable-experimental-parser-round-trip \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ i: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
   }
 
-  consuming func derive() -> _consume(self) BV {
+  @_unsafeNonescapableResult
+  init(independent p: UnsafeRawPointer, _ i: Int) {
+    self.p = p
+    self.i = i
+  }
+
+  consuming func derive() -> dependsOn(self) BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
-    return BV(self.p, self.i)
+    return BV(independent: self.p, self.i)
   }
 }
 
-@_nonescapable
-struct NE {
+struct NE : ~Escapable {
   var bv: BV
 
-  init(_ bv: consuming BV) -> _consume(bv) Self {
+  init(_ bv: consuming BV) -> dependsOn(bv) Self {
     self.bv = bv
     return self
   }

@@ -1105,7 +1105,8 @@ public:
                                  SourceKitCancellationToken CancellationToken,
                                  std::shared_ptr<EditorConsumer> Consumer) = 0;
 
-  virtual void editorClose(StringRef Name, bool RemoveCache) = 0;
+  virtual void editorClose(StringRef Name, bool CancelBuilds,
+                           bool RemoveCache) = 0;
 
   virtual void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                  unsigned Offset, unsigned Length,

@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift
 
 // We can't infer anything from 'Self', but we must still validate the
 // binding.

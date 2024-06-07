@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
 
+
+
 // rdar://110391963
 
 struct Use<each T> {}
@@ -256,8 +258,8 @@ func test11<each T>() -> Use<repeat each T> {
   return Use()
 }
 // CHECK-LABEL: sil {{.*}} @$s4main6test11AA3UseVyxxQp_QPGyRvzlF :
-// CHECK:         function_ref @$sSS_xq_r0_lyxSbIsegnr_xQpSiQSiIegk_SSxSblyxIsegnd_xQp_QSiSiIegokd_RvzlTR : $@convention(thin) <each τ_0_0> (@guaranteed @callee_guaranteed () -> @pack_out Pack{String, repeat @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <each τ_0_0, Bool>, Int}) -> (@owned String, @pack_out Pack{repeat @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <each τ_0_0>}, Int)
-// CHECK-LABEL: sil shared {{.*}} @$sSS_xq_r0_lyxSbIsegnr_xQpSiQSiIegk_SSxSblyxIsegnd_xQp_QSiSiIegokd_RvzlTR :
+// CHECK:         function_ref @$sSS_xq_Ri_zRi0_zRi__Ri0__r0_lyxSbIsegnr_xQpSiQSiIegk_SSxSbRi_zRi0_zlyxIsegnd_xQp_QSiSiIegokd_RvzlTR : $@convention(thin) <each τ_0_0> (@guaranteed @callee_guaranteed () -> @pack_out Pack{String, repeat @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <each τ_0_0, Bool>, Int}) -> (@owned String, @pack_out Pack{repeat @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <each τ_0_0>}, Int)
+// CHECK-LABEL: sil shared {{.*}} @$sSS_xq_Ri_zRi0_zRi__Ri0__r0_lyxSbIsegnr_xQpSiQSiIegk_SSxSbRi_zRi0_zlyxIsegnd_xQp_QSiSiIegokd_RvzlTR :
 //   Create the inner pack argument.
 // CHECK:         [[PACK:%.*]] = alloc_pack $Pack{String, repeat @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <each T, Bool>, Int}
 //   - Set up the string result temporary.
@@ -310,7 +312,7 @@ func test11<each T>() -> Use<repeat each T> {
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <each T>} as $*@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> Bool for <@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[ESCAPING_ELT:%.*]] = convert_function [[ELT]]
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sxSbIegnr_xSbIegnd_lTR : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0) -> @out Bool) -> Bool
+// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sqd__SbIegnr_qd__SbIegnd_Rvzr__lTR : $@convention(thin) <each τ_0_0><τ_1_0> (@in_guaranteed τ_1_0, @guaranteed @callee_guaranteed (@in_guaranteed τ_1_0) -> @out Bool) -> Bool
 // CHECK-NEXT:    [[CONVERTED_ELT:%.*]] = partial_apply
 // CHECK-NEXT:    [[CONVERTED_ELT_2:%.*]] = convert_function [[CONVERTED_ELT]]
 // CHECK-NEXT:    store [[CONVERTED_ELT_2]] to [init] [[DEST_ELT_ADDR]] :

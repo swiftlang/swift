@@ -922,7 +922,7 @@ public:
 ///
 /// Calls to functions with an async alternative will be replaced with a call
 /// to the alternative, possibly wrapped in a do/catch. The do/catch is skipped
-/// if the the closure either:
+/// if the closure either:
 ///   1. Has no error
 ///   2. Has an error but no error handling (eg. just ignores)
 ///   3. Has error handling that only calls the containing function's handler

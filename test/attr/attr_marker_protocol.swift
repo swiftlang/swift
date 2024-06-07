@@ -20,6 +20,7 @@ protocol P4 { } // expected-note{{'P4' declared here}}
 class C { }
 @_marker protocol P5a: AnyObject { }  // okay
 @_marker protocol P5b: C { }   // expected-error{{marker protocol 'P5b' cannot inherit class 'C'}}
+@_marker protocol P5c where Self: C { }   // expected-error{{marker protocol 'P5c' cannot inherit class 'C'}}
 
 // Legitimate uses of marker protocols.
 extension P3 {

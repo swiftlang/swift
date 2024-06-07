@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift
 
 // An inner generic parameter of the protocol requirement should not
 // match against a concrete type in the witness.

@@ -33,7 +33,6 @@ func test() {
   // CHECK-NEXT:     {
   // CHECK-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
   // CHECK-NEXT:       key.name: "foo()",
-  // CHECK-NEXT:       key.sourcetext: "foo()",
   // CHECK-NEXT:       key.description: "foo()",
   // CHECK-NEXT:       key.typename: "Void",
   // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.foo",
@@ -41,6 +40,7 @@ func test() {
   // CHECK-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
   // CHECK-NEXT:       key.num_bytes_to_erase: 0,
   // CHECK-NEXT:       key.associated_usrs: "s:12DocBriefTest1SV3fooyyF s:12DocBriefTest1PP3fooyyF",
-  // CHECK-NEXT:       key.modulename: "DocBriefTest"
+  // CHECK-NEXT:       key.modulename: "DocBriefTest",
+  // CHECK-NEXT:       key.sourcetext: "foo()"
   // CHECK-NEXT:     }
 }

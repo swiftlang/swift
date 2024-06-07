@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-irgen                             \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -disable-type-layout                             \
 // RUN:     %s                                               \
 // RUN: |                                                    \

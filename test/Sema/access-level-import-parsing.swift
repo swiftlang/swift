@@ -26,4 +26,4 @@ package import PackageLib // expected-warning {{package import of 'PackageLib' w
 internal import InternalLib
 fileprivate import FileprivateLib
 private import PrivateLib
-open import OpenLib // expected-error {{The access level 'open' is unsupported on imports: only 'public', 'package', 'internal', 'fileprivate' and 'private' are unsupported}}
+open import OpenLib // expected-error {{The access level 'open' is unsupported on imports: only 'public', 'package', 'internal', 'fileprivate' and 'private' are accepted}}

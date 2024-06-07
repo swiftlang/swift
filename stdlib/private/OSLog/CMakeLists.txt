@@ -29,6 +29,7 @@ add_swift_target_library(swiftOSLogTestHelper
   SWIFT_MODULE_DEPENDS_OSX ${swift_oslog_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_TVOS ${swift_oslog_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_WATCHOS ${swift_oslog_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_XROS ${swift_oslog_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_oslog_darwin_dependencies}
   TARGET_SDKS ALL_APPLE_PLATFORMS
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

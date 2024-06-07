@@ -196,9 +196,30 @@ extension _StringGuts {
   /// inconsistent with `_opaqueCharacterStride(endingAt:)`. On the other hand,
   /// this behavior makes this suitable for use in substrings whose start index
   /// itself does not fall on a cluster boundary.
-  @usableFromInline @inline(never)
+  @usableFromInline @inline(__always)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
+    _internalInvariant(i < endIndex._encodedOffset)
+    if isFastUTF8 {
+      let fast = withFastUTF8 { utf8 in
+        if i &+ 1 == utf8.count { return true }
+        let pair = UnsafeRawPointer(
+          utf8.baseAddress.unsafelyUnwrapped
+        ).loadUnaligned(fromByteOffset: i, as: UInt16.self)
+        //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
+        return pair & 0x8080 == 0 && pair != 0x0A0D
+      }
+      if _fastPath(fast) {
+        _internalInvariant(_opaqueComplexCharacterStride(startingAt: i) == 1)
+        return 1
+      }
+    }
+    
+    return _opaqueComplexCharacterStride(startingAt: i)
+  }
+
+  @_effects(releasenone) @inline(never)
+  internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
@@ -221,9 +242,32 @@ extension _StringGuts {
   ///
   /// Note: unlike `_opaqueCharacterStride(startingAt:)`, this method always
   /// finds a correct grapheme cluster boundary.
-  @usableFromInline @inline(never)
+
+  @usableFromInline @inline(__always)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
+    if i <= 1 {
+      return i
+    }
+    if isFastUTF8 {
+      let fast = withFastUTF8 { utf8 in
+        let pair = UnsafeRawPointer(
+          utf8.baseAddress.unsafelyUnwrapped
+        ).loadUnaligned(fromByteOffset: i &- 2, as: UInt16.self)
+        //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
+        return pair & 0x8080 == 0 && pair != 0x0A0D
+      }
+      if _fastPath(fast) {
+        _internalInvariant(_opaqueComplexCharacterStride(endingAt: i) == 1)
+        return 1
+      }
+    }
+
+    return _opaqueComplexCharacterStride(endingAt: i)
+  }
+
+  @_effects(releasenone) @inline(never)
+  internal func _opaqueComplexCharacterStride(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(endingAt: i)
     }

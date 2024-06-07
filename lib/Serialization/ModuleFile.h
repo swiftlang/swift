@@ -538,6 +538,9 @@ private:
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
       llvm::BitstreamCursor &Cursor);
 
+  /// Read a list of the protocol declarations inherited by another protocol.
+  bool readInheritedProtocols(SmallVectorImpl<ProtocolDecl *> &inherited);
+
   /// Populates the protocol's default witness table.
   ///
   /// Returns true if there is an error.
@@ -650,6 +653,15 @@ public:
 
   bool isBuiltFromInterface() const {
     return Core->Bits.IsBuiltFromInterface;
+  }
+
+  bool allowNonResilientAccess() const {
+    return Core->Bits.AllowNonResilientAccess;
+  }
+
+  /// Whether this module was built with -experimental-package-cmo.
+  bool serializePackageEnabled() const {
+    return Core->Bits.SerializePackageEnabled;
   }
 
   /// Whether this module is compiled with implicit dynamic.
@@ -1060,9 +1072,16 @@ public:
   /// Reads a foreign async convention from \c DeclTypeCursor, if present.
   std::optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
 
-  bool maybeReadLifetimeDependence(
+  bool maybeReadLifetimeDependenceRecord(SmallVectorImpl<uint64_t> &scratch);
+
+  // Reads lifetime dependence info from type if present.
+  std::optional<LifetimeDependenceInfo>
+  maybeReadLifetimeDependenceInfo(unsigned numParams);
+
+  // Reads lifetime dependence specifier from decl if present
+  bool maybeReadLifetimeDependenceSpecifier(
       SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-      unsigned numParams);
+      unsigned numDeclParams, bool hasSelf);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadInlinableBodyText();

@@ -40,11 +40,16 @@ static TaskAllocator &allocator(AsyncTask *task) {
   if (task)
     return task->Private.get().Allocator;
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // FIXME: this fall-back shouldn't be necessary, but it's useful
   // for now, since the current execution tests aren't setting up a task
   // properly.
   static GlobalAllocator global;
   return global.allocator;
+#else
+  fprintf(stderr, "global allocator fallback not available\n");
+  abort();
+#endif
 }
 
 void *swift::swift_task_alloc(size_t size) {

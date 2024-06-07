@@ -145,6 +145,11 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch");
   }
 
+  friend bool operator!=(const Requirement &lhs,
+                         const Requirement &rhs) {
+    return !(lhs == rhs);
+  }
+
   /// Whether this requirement's types contain ErrorTypes.
   bool hasError() const;
 
@@ -223,6 +228,12 @@ enum class CheckRequirementsResult : uint8_t {
 /// not contain any type parameters.
 CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements);
 
+/// Check if each substituted requirement is satisfied. If the requirement
+/// contains type parameters, and the answer would depend on the context of
+/// those type parameters, then `nullopt` is returned.
+std::optional<CheckRequirementsResult>
+checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
+
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
@@ -251,11 +262,16 @@ struct InverseRequirement {
 
   InvertibleProtocolKind getKind() const;
 
+  /// Linear order on inverse requirements in a generic signature.
+  int compare(const InverseRequirement &other) const;
+
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
   static void expandDefaults(ASTContext &ctx,
                              ArrayRef<Type> gps,
                              SmallVectorImpl<StructuralRequirement> &result);
+
+  void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };
 
 } // end namespace swift

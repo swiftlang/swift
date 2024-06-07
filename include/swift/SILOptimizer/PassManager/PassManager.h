@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/NodeBits.h"
+#include "swift/SIL/OperandBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -73,15 +74,22 @@ class SwiftPassInvocation {
 
   SILSSAUpdater *ssaUpdater = nullptr;
 
-  static constexpr int BlockSetCapacity = 8;
+  SwiftPassInvocation *nestedSwiftPassInvocation = nullptr;
+
+  static constexpr int BlockSetCapacity = SILBasicBlock::numCustomBits;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
   int numBlockSetsAllocated = 0;
 
-  static constexpr int NodeSetCapacity = 8;
+  static constexpr int NodeSetCapacity = SILNode::numCustomBits;
   char nodeSetStorage[sizeof(NodeSet) * NodeSetCapacity];
   bool aliveNodeSets[NodeSetCapacity];
   int numNodeSetsAllocated = 0;
+
+  static constexpr int OperandSetCapacity = Operand::numCustomBits;
+  char operandSetStorage[sizeof(OperandSet) * OperandSetCapacity];
+  bool aliveOperandSets[OperandSetCapacity];
+  int numOperandSetsAllocated = 0;
 
   int numClonersAllocated = 0;
 
@@ -123,6 +131,10 @@ public:
 
   void freeNodeSet(NodeSet *set);
 
+  OperandSet *allocOperandSet();
+
+  void freeOperandSet(OperandSet *set);
+
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);
 
@@ -160,15 +172,29 @@ public:
   void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
   bool getNeedFixStackNesting() const { return needFixStackNesting; }
 
-  void initializeSSAUpdater(SILType type, ValueOwnershipKind ownership) {
+  void initializeSSAUpdater(SILFunction *fn, SILType type,
+                            ValueOwnershipKind ownership) {
     if (!ssaUpdater)
       ssaUpdater = new SILSSAUpdater;
-    ssaUpdater->initialize(type, ownership);
+    ssaUpdater->initialize(fn, type, ownership);
   }
 
   SILSSAUpdater *getSSAUpdater() const {
     assert(ssaUpdater && "SSAUpdater not initialized");
     return ssaUpdater;
+  }
+
+  SwiftPassInvocation *initializeNestedSwiftPassInvocation(SILFunction *newFunction) {
+    assert(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
+    nestedSwiftPassInvocation = new SwiftPassInvocation(passManager, transform, newFunction);
+    return nestedSwiftPassInvocation;
+  }
+
+  void deinitializeNestedSwiftPassInvocation() {
+    assert(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
+    nestedSwiftPassInvocation->endTransformFunction();
+    delete nestedSwiftPassInvocation;
+    nestedSwiftPassInvocation = nullptr;
   }
 };
 
@@ -214,6 +240,7 @@ class SILPassManager {
 
   unsigned maxNumPassesToRun = UINT_MAX;
   unsigned maxNumSubpassesToRun = UINT_MAX;
+  unsigned breakBeforePassCount = UINT_MAX;
 
   /// For invoking Swift passes.
   SwiftPassInvocation swiftPassInvocation;
@@ -427,7 +454,8 @@ public:
   void runSwiftModuleVerification();
 
 private:
-  void parsePassCount(StringRef countsStr);
+  void parsePassesToRunCount(StringRef countsStr);
+  void parseBreakBeforePassCount(StringRef countsStr);
 
   bool doPrintBefore(SILTransform *T, SILFunction *F);
 
@@ -459,6 +487,9 @@ private:
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.
   bool continueTransforming();
+
+  /// Break before running a pass.
+  bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT);
 
   /// Return true if all analyses are unlocked.
   bool analysesUnlocked();

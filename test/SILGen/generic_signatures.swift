@@ -87,22 +87,22 @@ protocol Whereable {
   associatedtype Bssoc: Whereable
 }
 extension Whereable {
-  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE19staticExtensionFunc3arg7ElementSTQz8IteratorSTQz_tSTRzrlFZ : $@convention(method) <Self where Self : Sequence, Self : Whereable> (@in_guaranteed Self.Iterator, @thick Self.Type) -> @out Self.Element
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures9WhereablePAAE19staticExtensionFunc3arg7ElementSTQz8IteratorSTQz_tSTRzrlFZ : $@convention(method) <Self where Self : Sequence, Self : Whereable> (@in_guaranteed Self.Iterator, @thick Self.Type) -> @out Self.Element
   static func staticExtensionFunc(arg: Self.Iterator) -> Self.Element
     where Self: Sequence {
       fatalError()
   }
 
-  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE13extensionFuncyy5BssocQz5AssocRtzrlF : $@convention(method) <Self where Self : Whereable, Self.Assoc == Self.Bssoc> (@in_guaranteed Self) -> ()
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures9WhereablePAAE13extensionFuncyy5BssocQz5AssocRtzrlF : $@convention(method) <Self where Self : Whereable, Self.Assoc == Self.Bssoc> (@in_guaranteed Self) -> ()
   func extensionFunc() where Assoc == Bssoc { }
 
-  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE5AssocQzSgycAabERQAD_5BssocQZAGRtzrluig : $@convention(method) <Self where Self : Whereable, Self.Assoc : Whereable, Self.Bssoc == Self.Assoc.Bssoc> (@in_guaranteed Self) -> @out Optional<Self.Assoc>
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures9WhereablePAAE5AssocQzycAabERQAD_5BssocQZAFRtzrluig : $@convention(method) <Self where Self : Whereable, Self.Assoc : Whereable, Self.Bssoc == Self.Assoc.Bssoc> (@in_guaranteed Self) -> @out Self.Assoc
   subscript() -> Assoc
     where Assoc: Whereable, Bssoc == Assoc.Bssoc {
       fatalError()
   }
 
-  // CHECK-LABEL sil hidden [ossa] @$s18generic_signatures9WhereablePAAE5AssocQzSgycAabERQ5Bssoc_ADQZAERSrluig : $@convention(method) <Self where Self : Whereable, Self.Assoc : Whereable, Self.Assoc == Self.Bssoc.Assoc> (@in_guaranteed Self) -> @out Optional<Self.Assoc>
+  // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures9WhereablePAAE5AssocQzycAabERQ5Bssoc_ADQZAERSrluig : $@convention(method) <Self where Self : Whereable, Self.Assoc : Whereable, Self.Assoc == Self.Bssoc.Assoc> (@in_guaranteed Self) -> @out Self.Assoc
   subscript() -> Assoc
     where Assoc: Whereable, Assoc == Bssoc.Assoc {
       fatalError()

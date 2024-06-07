@@ -141,3 +141,8 @@ module CopyMoveAssignment {
   header "copy-move-assignment.h"
   requires cplusplus
 }
+
+module Closure {
+  header "closure.h"
+  requires cplusplus
+}

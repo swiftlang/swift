@@ -219,7 +219,7 @@ bb0(%0 : $*ThreeNonTrivialNoDeinit):
 
 sil hidden [ossa] @$s4main12StructDeinitVfD : $@convention(method) (@owned StructDeinit) -> () {
 bb0(%0 : @owned $StructDeinit):
-  debug_value %0 : $StructDeinit, let, name "self", argno 1, implicit
+  debug_value %0 : $StructDeinit, let, name "self", argno 1
   %2 = drop_deinit %0 : $StructDeinit
   end_lifetime %2 : $StructDeinit
   %4 = tuple ()
@@ -228,7 +228,7 @@ bb0(%0 : @owned $StructDeinit):
 
 sil hidden [ossa] @$s4main21SingleFieldNonTrivialVfD : $@convention(method) (@owned SingleFieldNonTrivial) -> () {
 bb0(%0 : @owned $SingleFieldNonTrivial):
-  debug_value %0 : $SingleFieldNonTrivial, let, name "self", argno 1, implicit
+  debug_value %0 : $SingleFieldNonTrivial, let, name "self", argno 1
   %1 = drop_deinit %0 : $SingleFieldNonTrivial
   %2 = destructure_struct %1 : $SingleFieldNonTrivial
   destroy_value %2 : $Klass
@@ -238,7 +238,7 @@ bb0(%0 : @owned $SingleFieldNonTrivial):
 
 sil hidden [ossa] @$s4main15ThreeNonTrivialVfD : $@convention(method) (@owned ThreeNonTrivial) -> () {
 bb0(%0 : @owned $ThreeNonTrivial):
-  debug_value %0 : $ThreeNonTrivial, let, name "self", argno 1, implicit
+  debug_value %0 : $ThreeNonTrivial, let, name "self", argno 1
   %1 = drop_deinit %0 : $ThreeNonTrivial
   (%2, %3, %4) = destructure_struct %1 : $ThreeNonTrivial
   destroy_value %2 : $Klass
@@ -249,7 +249,7 @@ bb0(%0 : @owned $ThreeNonTrivial):
 
 sil hidden [ossa] @$s4main19TrivialMoveOnlyEnumOfD : $@convention(method) (@owned TrivialMoveOnlyEnum) -> () {
 bb0(%0 : @owned $TrivialMoveOnlyEnum):
-  debug_value %0 : $TrivialMoveOnlyEnum, let, name "self", argno 1, implicit
+  debug_value %0 : $TrivialMoveOnlyEnum, let, name "self", argno 1
   switch_enum %0 : $TrivialMoveOnlyEnum, case #TrivialMoveOnlyEnum.first!enumelt: bb1, case #TrivialMoveOnlyEnum.second!enumelt: bb2, case #TrivialMoveOnlyEnum.third!enumelt: bb3
 
 bb1:
@@ -273,7 +273,7 @@ bb4:
 // CHECK: } // end sil function '$s4main22NonTrivialMoveOnlyEnumOfD'
 sil hidden [ossa] @$s4main22NonTrivialMoveOnlyEnumOfD : $@convention(method) (@owned NonTrivialMoveOnlyEnum) -> () {
 bb0(%0 : @owned $NonTrivialMoveOnlyEnum):
-  debug_value %0 : $NonTrivialMoveOnlyEnum, let, name "self", argno 1, implicit
+  debug_value %0 : $NonTrivialMoveOnlyEnum, let, name "self", argno 1
   switch_enum %0 : $NonTrivialMoveOnlyEnum, case #NonTrivialMoveOnlyEnum.first!enumelt: bb1, case #NonTrivialMoveOnlyEnum.second!enumelt: bb2, case #NonTrivialMoveOnlyEnum.third!enumelt: bb3, case #NonTrivialMoveOnlyEnum.fourth!enumelt: bb4, case #NonTrivialMoveOnlyEnum.fifth!enumelt: bb5
 
 bb1:

@@ -48,6 +48,7 @@ add_swift_host_library(swiftAST STATIC
   ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
+  FeatureSet.cpp
   FineGrainedDependencies.cpp
   FineGrainedDependencyFormat.cpp
   FreestandingMacroExpansion.cpp
@@ -60,6 +61,8 @@ add_swift_host_library(swiftAST STATIC
   IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
+  LifetimeDependence.cpp
+  LocalArchetypeRequirementCollector.cpp
   Module.cpp
   ModuleDependencies.cpp
   ModuleLoader.cpp

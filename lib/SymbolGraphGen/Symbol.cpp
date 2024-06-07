@@ -516,12 +516,18 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
       filterGenericParams(Generics.getGenericParams(), FilteredParams,
                           SubMap);
 
-      const auto *Self = dyn_cast<NominalTypeDecl>(D);
+      const auto *Self = dyn_cast<ProtocolDecl>(D);
       if (!Self) {
-        Self = D->getDeclContext()->getSelfNominalTypeDecl();
+        Self = D->getDeclContext()->getSelfProtocolDecl();
       }
 
-      filterGenericRequirements(Generics.getRequirements(), Self,
+      SmallVector<Requirement, 2> Reqs;
+      SmallVector<InverseRequirement, 2> InverseReqs;
+      Generics->getRequirementsWithInverses(Reqs, InverseReqs);
+      // FIXME(noncopyable_generics): Do something with InverseReqs, or just use
+      // getRequirements() above and update the tests.
+
+      filterGenericRequirements(Reqs, Self,
                                 FilteredRequirements, SubMap, FilteredParams);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {

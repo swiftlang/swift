@@ -264,6 +264,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_actor_data_race_checks,
                        options::OPT_disable_actor_data_race_checks);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_dynamic_actor_isolation);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
   inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
@@ -300,6 +301,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
   inputArgs.AddLastArg(arguments, options::OPT_experimental_package_bypass_resilience);
+  inputArgs.AddLastArg(arguments, options::OPT_ExperimentalPackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
@@ -341,6 +343,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
+  inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

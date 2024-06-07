@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-ir -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %S/Inputs -cxx-interoperability-mode=swift-5.9 %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
 // RUN: %target-swift-emit-ir -I %S/Inputs -cxx-interoperability-mode=swift-6 %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
 
 import VirtualMethods

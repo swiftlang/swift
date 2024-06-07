@@ -288,9 +288,9 @@ public:
                 cd->getClangDecl()->getAttrs().end(), [](clang::Attr *attr) {
                   if (auto *sa = dyn_cast<clang::SwiftAttrAttr>(attr)) {
                     llvm::StringRef value = sa->getAttribute();
-                    if ((value.startswith("retain:") ||
-                         value.startswith("release:")) &&
-                        !value.endswith(":immortal"))
+                    if ((value.starts_with("retain:") ||
+                         value.starts_with("release:")) &&
+                        !value.ends_with(":immortal"))
                       return true;
                   }
                   return false;
@@ -604,6 +604,12 @@ static bool printDirectReturnOrParamCType(
         addABIRecordToTypeEncoding(typeEncodingOS, offset, end, t, typeMapping);
       }))
     return false;
+  if (isResultType && Count == 0) {
+    // A direct result with no record members can happen for uninhabited result
+    // types like `Never`.
+    os << "void";
+    return true;
+  }
   assert(Count > 0 && "missing return values");
 
   // FIXME: is this "prettyfying" logic sound for multiple return values?
@@ -700,15 +706,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   }
   if (FD->isGeneric()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
-
-    // FIXME: Support generic requirements.
-    SmallVector<Requirement, 2> reqs;
-    SmallVector<InverseRequirement, 2> inverseReqs;
-    Signature->getRequirementsWithInverses(reqs, inverseReqs);
-    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
-
-    if (!reqs.empty())
+    if (!cxx_translation::isExposableToCxx(Signature))
       return ClangRepresentation::unsupported;
+
     // Print the template and requires clauses for this function.
     if (kind == FunctionSignatureKind::CxxInlineThunk)
       ClangSyntaxPrinter(os).printGenericSignature(Signature);
@@ -1427,7 +1427,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!resultTy->isVoid() && hasThrows)
     os << "  auto returnValue = ";
   // If the function doesn't have a return value just call it.
-  else if (resultTy->isVoid() && hasThrows)
+  else if (resultTy->isVoid())
     os << "  ";
   // If the function can't throw just return its value result.
   else if (!hasThrows)
@@ -1444,6 +1444,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     if (resultTy->isVoid()) {
       os << "    return swift::Expected<void>(swift::Error(opaqueError));\n";
       os << "#endif\n";
+      if (FD->getInterfaceType()->castTo<FunctionType>()->getResult()->isUninhabited())
+        os << "  abort();\n";
     } else {
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
@@ -1541,7 +1543,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 /// directly to a C++ method.
 static bool canRemapBoolPropertyNameDirectly(StringRef name) {
   auto startsWithAndLonger = [&](StringRef prefix) -> bool {
-    return name.startswith(prefix) && name.size() > prefix.size();
+    return name.starts_with(prefix) && name.size() > prefix.size();
   };
   return startsWithAndLonger("is") || startsWithAndLonger("has");
 }

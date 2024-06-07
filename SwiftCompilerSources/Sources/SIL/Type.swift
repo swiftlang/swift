@@ -57,14 +57,20 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
+  public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
+  public var isThickFunction: Bool { bridged.isThickFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
   public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
-  public var isEscapable: Bool { bridged.isEscapable() }
-  public var mayEscape: Bool { !isNoEscapeFunction && isEscapable }
+  public func isEscapable(in function: Function) -> Bool {
+    bridged.isEscapable(function.bridged)
+  }
+  public func mayEscape(in function: Function) -> Bool {
+    !isNoEscapeFunction && isEscapable(in: function)
+  }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
@@ -91,6 +97,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
+
+  public func getLoweredType(in function: Function) -> Type {
+    function.bridged.getLoweredType(self.bridged).type
+  }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   /// Returns nil if the nominal is a resilient type because in this case the complete list
@@ -137,12 +147,26 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return idx >= 0 ? idx : nil
   }
 
+// compiling bridged.getFunctionTypeWithNoEscape crashes the 5.10 Windows compiler
+#if !os(Windows)
+  // TODO: https://github.com/apple/swift/issues/73253
   public func getFunctionType(withNoEscape: Bool) -> Type {
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
+#endif
 
   public var description: String {
     String(taking: bridged.getDebugDescription())
+  }
+}
+
+extension Value {
+  public var isEscapable: Bool {
+    type.objectType.isEscapable(in: parentFunction)
+  }
+
+  public var mayEscape: Bool {
+    type.objectType.mayEscape(in: parentFunction)
   }
 }
 

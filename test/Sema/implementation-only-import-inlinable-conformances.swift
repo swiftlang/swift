@@ -4,11 +4,10 @@
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
 // RUN:   -enable-library-evolution -swift-version 5
 
-// XFAIL: noncopyable_generics
-
 // RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution -swift-version 5
 
 @_implementationOnly import BADLibrary
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 import NormalLibrary
 
 @available(*, unavailable)

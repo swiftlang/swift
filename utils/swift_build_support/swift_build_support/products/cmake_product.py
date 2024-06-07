@@ -24,11 +24,11 @@ class CMakeProduct(product.Product):
         return self.args.verbose_build
 
     def build_with_cmake(self, build_targets, build_type, build_args,
-                         prefer_just_built_toolchain=False):
+                         prefer_native_toolchain=False):
         assert self.toolchain.cmake is not None
         cmake_build = []
         _cmake = cmake.CMake(self.args, self.toolchain,
-                             prefer_just_built_toolchain)
+                             prefer_native_toolchain)
 
         if self.toolchain.distcc_pump:
             cmake_build.append(self.toolchain.distcc_pump)
@@ -198,10 +198,21 @@ class CMakeProduct(product.Product):
             swift_host_triple = 'armv7-unknown-linux-gnueabihf'
             llvm_target_arch = 'ARM'
 
+        elif host_target.startswith('linux-static'):
+
+            if host_target == 'linux-static-aarch64':
+                swift_host_triple = 'aarch64-swift-linux-musl'
+                llvm_target_arch = 'AArch64'
+            elif host_target == 'linux-static-x86_64':
+                swift_host_triple = 'x86_64-swift-linux-musl'
+                llvm_target_arch = 'X86'
+
         elif host_target.startswith('macosx') or \
                 host_target.startswith('iphone') or \
                 host_target.startswith('appletv') or \
-                host_target.startswith('watch'):
+                host_target.startswith('watch') or \
+                host_target.startswith('xros-') or \
+                host_target.startswith('xrsimulator-'):
 
             swift_cmake_options.define('Python3_EXECUTABLE',
                                        self.toolchain.find_tool('python3'))
@@ -327,6 +338,27 @@ class CMakeProduct(product.Product):
                     self.args.darwin_deployment_version_watchos)
                 llvm_target_arch = 'AArch64'
                 swift_host_variant_sdk = 'WATCHOS'
+                cmake_osx_deployment_target = None
+
+            elif host_target == 'xrsimulator-arm64':
+                swift_host_triple = 'arm64-apple-xros{}-simulator'.format(
+                    self.args.darwin_deployment_version_xros)
+                llvm_target_arch = 'AARCH64'
+                swift_host_variant_sdk = 'XROS_SIMULATOR'
+                cmake_osx_deployment_target = None
+
+            elif host_target == 'xros-arm64':
+                swift_host_triple = 'arm64-apple-xros{}'.format(
+                    self.args.darwin_deployment_version_xros)
+                llvm_target_arch = 'AARCH64'
+                swift_host_variant_sdk = 'XROS'
+                cmake_osx_deployment_target = None
+
+            elif host_target == 'xros-arm64e':
+                swift_host_triple = 'arm64e-apple-xros{}'.format(
+                    self.args.darwin_deployment_version_xros)
+                llvm_target_arch = 'AARCH64'
+                swift_host_variant_sdk = 'XROS'
                 cmake_osx_deployment_target = None
 
             darwin_sdk_deployment_targets = os.environ.get(

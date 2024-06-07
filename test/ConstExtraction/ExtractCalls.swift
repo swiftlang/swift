@@ -156,6 +156,3 @@ public struct Bat {
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
-
-// XFAIL: noncopyable_generics
-

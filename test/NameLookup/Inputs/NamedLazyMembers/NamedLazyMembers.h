@@ -138,3 +138,6 @@
 
 @interface PrivateDoer(Category) <PrivateMethods>
 @end
+
+typedef NSString * const SimpleDoerMode NS_TYPED_ENUM NS_SWIFT_NAME(SimpleDoer.Mode);
+typedef NSString * const SimpleDoerKind NS_TYPED_ENUM NS_SWIFT_NAME(SimpleDoer.Kind);

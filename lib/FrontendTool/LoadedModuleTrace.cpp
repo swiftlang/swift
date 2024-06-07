@@ -658,7 +658,7 @@ static void computeSwiftModuleTraceInfo(
     //
     // FIXME: This is incorrect if both paths are not relative w.r.t. to the
     // same root.
-    if (StringRef(depPath).startswith(prebuiltCachePath))
+    if (StringRef(depPath).starts_with(prebuiltCachePath))
       continue;
 
     // If we have a swiftmodule next to an interface, that interface path will

@@ -5,7 +5,7 @@
 // Note: in actuality, this will be included
 // as <swift/bridging>, but in this test we include
 // it directly.
-#include "bridging"
+#include "swift/bridging"
 #else
 #define SWIFT_MUTATING
 #endif

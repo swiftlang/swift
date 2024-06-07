@@ -1238,7 +1238,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
     Clones.push_back(SI);
   }
 
-  auto *Undef = SILUndef::get(FSI->getType(), *BB->getParent());
+  auto *Undef = SILUndef::get(FSI);
 
   // Delete the debug info of the instruction that we are about to sink.
   deleteAllDebugUses(FSI);

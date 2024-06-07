@@ -10,20 +10,12 @@
 
 // RUN: %target-swift-reflection-dump %t/AssociatedTypeRequirements | %FileCheck %s
 
+// This test is useless and was just relying on a bug where we didn't substitute away
+// known opaque return types in non-WMO mode.
+
 // CHECK: ASSOCIATED TYPES:
 // CHECK: - AssociatedTypeRequirements.Foo : AssociatedTypeRequirements.myProto
-// CHECK-NEXT: typealias PerformReturn = opaque type symbolic reference
-// CHECK-NEXT: opaque type symbolic reference
-// CHECK-NEXT: (bound_generic_struct AssociatedTypeRequirements.Bar
-
-// CHECK: conformance requirements:
-// CHECK-NEXT: AssociatedTypeRequirements.protoA
-// CHECK-NEXT: AssociatedTypeRequirements.protoB
-// CHECK-NEXT: testModB.testModBProtocol
-
-// CHECK: same-type requirements:
-// CHECK-NEXT: A.AssociatedTypeRequirements.protoB.K = Sf (Swift.Float)
-// CHECK-NEXT: A.AssociatedTypeRequirements.protoA.T = 8testModB0aB7BStructV (testModB.testModBStruct)
+// CHECK-NEXT: typealias PerformReturn = AssociatedTypeRequirements.Bar<testModB.testModBStruct, Swift.Float>
 
 import testModB
 

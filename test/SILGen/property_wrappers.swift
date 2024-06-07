@@ -978,7 +978,7 @@ struct S_58201 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7S_58201V1ayyF : $@convention(method) (S_58201) -> () {
 // CHECK: bb0(%0 : $S_58201):
-// CHECK-NEXT:  debug_value %0 : $S_58201, let, name "self", argno 1, implicit
+// CHECK-NEXT:  debug_value %0 : $S_58201, let, name "self", argno 1
 // CHECK-NEXT:  [[BOX:%.*]] = alloc_box ${ var BasicComputedIntWrapper }, var, name "_b"
 // CHECK-NEXT:  [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
 // CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var BasicComputedIntWrapper }, 0

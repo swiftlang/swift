@@ -156,7 +156,9 @@ void RewriteSystem::recordConflict(unsigned existingRuleID,
     // conflicting rules of the same kind, so we rule that out by
     // marking the shorter rule as the conflict. Otherwise, we just
     // leave both rules in place.
-    if (existingRule.getRHS().size() > newRule.getRHS().size()) {
+    if (existingRule.getRHS().size() > newRule.getRHS().size() ||
+        (existingRule.getRHS().size() == newRule.getRHS().size() &&
+         existingRuleID < newRuleID)) {
       existingRule.markConflicting();
     } else {
       newRule.markConflicting();
@@ -192,6 +194,12 @@ void PropertyMap::addLayoutProperty(
   // If the intersection is invalid, we have a conflict.
   if (!mergedLayout->isKnownLayout()) {
     System.recordConflict(*props->LayoutRule, ruleID);
+
+    // Replace the old layout. Since recordConflict() marks the older rule,
+    // this ensures that if we process multiple conflicting layout
+    // requirements, all but the final one will be marked conflicting.
+    props->Layout = newLayout;
+    props->LayoutRule = ruleID;
     return;
   }
 

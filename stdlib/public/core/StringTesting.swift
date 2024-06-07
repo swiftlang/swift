@@ -18,6 +18,10 @@ struct _StringRepresentation {
   public var _count: Int
   public var _capacity: Int
 
+  #if $Embedded
+    public typealias AnyObject = Builtin.NativeObject
+  #endif
+
   public enum _Form {
     case _small
     case _cocoa(object: AnyObject)
@@ -29,17 +33,34 @@ struct _StringRepresentation {
 
   public var _objectIdentifier: ObjectIdentifier? {
     switch _form {
-      case ._cocoa(let object): return ObjectIdentifier(object)
-      case ._native(let object): return ObjectIdentifier(object)
+      case ._cocoa(let object):
+        #if !$Embedded
+        return ObjectIdentifier(object)
+        #else
+        return ObjectIdentifier(_nativeObject(toNative: object))
+        #endif
+      case ._native(let object):
+        #if !$Embedded
+        return ObjectIdentifier(object)
+        #else
+        return ObjectIdentifier(_nativeObject(toNative: object))
+        #endif
       default: return nil
     }
   }
 }
 
+@available(*, unavailable)
+extension _StringRepresentation: Sendable {}
+
+@available(*, unavailable)
+extension _StringRepresentation._Form: Sendable {}
+
 extension String {
   public // @testable
   func _classify() -> _StringRepresentation { return _guts._classify() }
 
+#if !$Embedded
   @_alwaysEmitIntoClient
   public // @testable
   func _deconstructUTF8<ToPointer: _Pointer>(
@@ -53,6 +74,7 @@ extension String {
   ) {
     _guts._deconstructUTF8(scratch: scratch)
   }
+#endif
 }
 
 extension _StringGuts {
@@ -67,10 +89,12 @@ extension _StringGuts {
       result._capacity = _SmallString.capacity
       return result
     }
+    #if !$Embedded
     if _object.largeIsCocoa {
       result._form = ._cocoa(object: _object.cocoaObject)
       return result
     }
+    #endif
 
     // TODO: shared native
     _internalInvariant(_object.providesFastUTF8)
@@ -81,12 +105,17 @@ extension _StringGuts {
     }
     if _object.hasNativeStorage {
       _internalInvariant(_object.largeFastIsTailAllocated)
+      #if !$Embedded
       result._form = ._native(object: _object.nativeStorage)
+      #else
+      result._form = ._native(object: Builtin.unsafeCastToNativeObject(_object.nativeStorage))
+      #endif
       return result
     }
     fatalError()
   }
 
+#if !$Embedded
 
 /*
 
@@ -174,4 +203,7 @@ extension _StringGuts {
     // Array's owner cannot be nil, even though it is declared optional...
     return (owner: owner!, ptr, length: utf8.count - 1)
   }
+
+#endif
+
 }

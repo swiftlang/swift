@@ -258,7 +258,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 }
 
 std::string ide::demangleUSR(StringRef mangled) {
-  if (mangled.startswith(getUSRSpacePrefix())) {
+  if (mangled.starts_with(getUSRSpacePrefix())) {
     mangled = mangled.substr(getUSRSpacePrefix().size());
   }
   SmallString<128> buffer;

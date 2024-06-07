@@ -78,11 +78,10 @@ func foo() {
 
 // CHECK-DAG: ![[ADD]] = !DILocation(line: 6, scope:
 // CHECK-DAG: ![[DIV]] = !DILocation(line: 7, scope:
-// FIXME: The location of ``@llvm.trap`` should be in Integers.swift.gyb
-//        instead of being artificial.
-// CHECK: ![[INLINEDADD]] = !DILocation(line: 0, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
+
+// CHECK: ![[INLINEDADD]] = !DILocation(line: 6, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
 // CHECK-DAG: !{{.*}} = distinct !DISubprogram(name: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
-// CHECK-DAG: ![[INLINELOC]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
+// CHECK-DAG: ![[INLINELOC]] = distinct !DILocation(line: 6, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
 
 // NOTE: These prologue instructions are given artificial line locations for
 //       LLDB, but for CodeView they should have the location of the function

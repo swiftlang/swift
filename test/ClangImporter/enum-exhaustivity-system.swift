@@ -1,9 +1,13 @@
-// RUN: %target-swift-frontend -typecheck %s -Xcc -isystem -Xcc %S/Inputs/custom-modules -verify -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %target-swift-frontend -typecheck %s -Xcc -isystem -Xcc %S/Inputs/custom-modules -verify -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -typecheck %s -Xcc -isystem -Xcc %S/Inputs/custom-modules -verify -swift-version 6 -verify-additional-prefix swift6-
 
 import EnumExhaustivity
 
 func test(_ value: RegularEnum, _ exhaustiveValue: ExhaustiveEnum) {
-  switch value { // expected-warning {{switch covers known cases, but 'RegularEnum' may have additional unknown values, possibly added in future versions}} expected-note {{handle unknown values using "@unknown default"}}
+  switch value {
+  // expected-swift5-warning@-1 {{switch covers known cases, but 'RegularEnum' may have additional unknown values, possibly added in future versions}}
+  // expected-swift6-error@-2 {{switch covers known cases, but 'RegularEnum' may have additional unknown values, possibly added in future versions}}
+  // expected-note@-3 {{handle unknown values using "@unknown default"}}
   case .A: break
   case .B: break
   }
@@ -29,7 +33,11 @@ func testAttributes(
   case .A, .B: break
   }
 
-  switch retetb { // expected-warning {{switch covers known cases, but 'RegularEnumTurnedExhaustiveThenBackViaAPINotes' may have additional unknown values, possibly added in future versions}} expected-note {{handle unknown values using "@unknown default"}}
+  switch retetb {
+  // expected-swift5-warning@-1 {{switch covers known cases, but 'RegularEnumTurnedExhaustiveThenBackViaAPINotes' may have additional unknown values, possibly added in future versions}}
+  // expected-swift6-error@-2 {{switch covers known cases, but 'RegularEnumTurnedExhaustiveThenBackViaAPINotes' may have additional unknown values, possibly added in future versions}}
+  // expected-note@-3 {{handle unknown values using "@unknown default"}}
+
   case .A, .B: break
   }
 

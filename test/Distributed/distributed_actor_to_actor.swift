@@ -6,6 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+import Swift
 import _Concurrency
 import Distributed
 
@@ -34,9 +35,23 @@ func getAnyActor(distributedActor: isolated some DistributedActor) -> any Actor 
 // CHECK-IR: [[CONDITIONAL_REQ_GEP:%[0-9]+]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-IR-NEXT: [[SELF_DA_REQ:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQ_GEP]], i32 0
 // CHECK-IR-NEXT: store ptr %"some DistributedActor.DistributedActor", ptr [[SELF_DA_REQ]]
-// CHECK-IR-NEXT: call ptr @swift_getWitnessTable(ptr @"$sxScA11DistributedMc", ptr %"some DistributedActor", ptr [[CONDITIONAL_REQ_GEP]])
+// CHECK-IR-NEXT: call ptr @swift_getWitnessTable(ptr @"$sxScA11DistributedMc{{(.ptrauth)?}}", ptr %"some DistributedActor", ptr [[CONDITIONAL_REQ_GEP]])
 
-// CHECK-SIL-LABEL: sil_witness_table shared <Self where Self : DistributedActor> T: Actor module Distributed {
-// CHECK-SIL-NEXT: method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$sxScA11DistributedScA15unownedExecutorScevgTW
-// CHECK-SIL-NEXT: conditional_conformance (Self: DistributedActor): dependent
-// CHECK-SIL-NEXT: }
+distributed actor WorkerPool<Worker, ActorSystem: DistributedActorSystem>: AsyncSequence, AsyncIteratorProtocol {
+  var level: Int
+  public init(actorSystem system: ActorSystem) async throws {
+    self.actorSystem = system
+    self.level = 0
+
+    // CHECK-SIL: sil private @$s021distributed_actor_to_B010WorkerPoolC0B6SystemACyxq_Gq__tYaKcfcyyYaYbcfU_ : $@convention(thin) @Sendable @async <Worker, ActorSystem where ActorSystem : DistributedActorSystem> (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed WorkerPool<Worker, ActorSystem>) -> @out
+    // CHECK-SIL: hop_to_executor {{%.*}} : $WorkerPool<Worker, ActorSystem>
+    _ = Task {
+      for await x in self {
+        print(x)
+      }
+    }
+  }
+
+  nonisolated func makeAsyncIterator() -> WorkerPool { self }
+  nonisolated func next() async -> Int? { nil }
+}

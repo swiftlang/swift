@@ -1849,12 +1849,10 @@ class TailAllocatedDebugVariable {
       int_type HasValue : 1;
       /// True if this is a let-binding.
       int_type Constant : 1;
-      /// True if this variable is created by compiler
-      int_type Implicit : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      int_type NameLength : 13;
+      int_type NameLength : 14;
       /// The source function argument position from left to right
       /// starting with 1 or 0 if this is a local variable.
       int_type ArgNo : 16;
@@ -1876,13 +1874,10 @@ public:
   StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
 
-  bool isImplicit() const { return Bits.Data.Implicit; }
-  void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
-
   std::optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType = {},
-      std::optional<SILLocation> DeclLoc = {},
-      const SILDebugScope *DeclScope = nullptr,
+  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType,
+      std::optional<SILLocation> DeclLoc,
+      const SILDebugScope *DeclScope,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return std::nullopt;
@@ -1890,8 +1885,8 @@ public:
     StringRef name = getName(buf);
     if (VD && name.empty())
       name = VD->getName().str();
-    return SILDebugVariable(name, isLet(), getArgNo(), isImplicit(), AuxVarType,
-                            DeclLoc, DeclScope, DIExprElements);
+    return SILDebugVariable(name, isLet(), getArgNo(), AuxVarType, DeclLoc,
+                            DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
@@ -1963,6 +1958,31 @@ public:
 
 class DeallocStackInst;
 
+enum UsesMoveableValueDebugInfo_t : bool {
+  DoesNotUseMoveableValueDebugInfo = false,
+  UsesMoveableValueDebugInfo = true,
+};
+
+enum HasDynamicLifetime_t : bool {
+  DoesNotHaveDynamicLifetime = false,
+  HasDynamicLifetime = true,
+};
+
+enum IsLexical_t : bool {
+  IsNotLexical = false,
+  IsLexical = true,
+};
+
+enum HasPointerEscape_t : bool {
+  DoesNotHavePointerEscape = false,
+  HasPointerEscape = true,
+};
+
+enum IsFromVarDecl_t : bool {
+  IsNotFromVarDecl = false,
+  IsFromVarDecl = true,
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1981,14 +2001,16 @@ class AllocStackInst final
 
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-                 std::optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical, bool usesMoveableValueDebugInfo);
+                 std::optional<SILDebugVariable> Var,
+                 HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
+                 IsFromVarDecl_t isFromVarDecl,
+                 UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo);
 
-  static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
-                                SILFunction &F,
-                                std::optional<SILDebugVariable> Var,
-                                bool hasDynamicLifetime, bool isLexical,
-                                bool usesMoveableValueDebugInfo);
+  static AllocStackInst *
+  create(SILDebugLocation Loc, SILType elementType, SILFunction &F,
+         std::optional<SILDebugVariable> Var,
+         HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
+         IsFromVarDecl_t isFromVarDecl, UsesMoveableValueDebugInfo_t wasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -2006,13 +2028,15 @@ public:
   }
 
   void markUsesMoveableValueDebugInfo() {
-    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo = true;
+    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
+        (bool)UsesMoveableValueDebugInfo;
   }
 
   /// Set to true if this alloc_stack's memory location was passed to _move at
   /// any point of the program.
-  bool getUsesMoveableValueDebugInfo() const {
-    return sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo;
+  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo() const {
+    return UsesMoveableValueDebugInfo_t(
+        sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo);
   }
 
   /// Set to true that this alloc_stack contains a value whose lifetime can not
@@ -2020,28 +2044,61 @@ public:
   ///
   /// As an example if an alloc_stack is known to be only conditionally
   /// initialized.
-  void setDynamicLifetime() { sharedUInt8().AllocStackInst.dynamicLifetime = true; }
+  void setDynamicLifetime() {
+    sharedUInt8().AllocStackInst.dynamicLifetime = (bool)HasDynamicLifetime;
+  }
 
   /// Returns true if the alloc_stack's initialization can not be ascertained
   /// from uses directly (so should be treated conservatively).
   ///
   /// An example of an alloc_stack with dynamic lifetime is an alloc_stack that
   /// is conditionally initialized.
-  bool hasDynamicLifetime() const { return sharedUInt8().AllocStackInst.dynamicLifetime; }
+  HasDynamicLifetime_t hasDynamicLifetime() const {
+    return HasDynamicLifetime_t(sharedUInt8().AllocStackInst.dynamicLifetime);
+  }
 
-  /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
-  bool isLexical() const { return sharedUInt8().AllocStackInst.lexical; }
+  /// Whether the alloc_stack instruction has a lexical lifetime.
+  IsLexical_t isLexical() const {
+    return IsLexical_t(sharedUInt8().AllocStackInst.lexical);
+  }
 
   /// If this is a lexical alloc_stack, eliminate the lexical bit. If this
   /// alloc_stack doesn't have a lexical bit, do not do anything.
-  void removeIsLexical() { sharedUInt8().AllocStackInst.lexical = false; }
+  void removeIsLexical() {
+    sharedUInt8().AllocStackInst.lexical = (bool)IsNotLexical;
+  }
 
   /// If this is not a lexical alloc_stack, set the lexical bit. If this
   /// alloc_stack is already lexical, this does nothing.
-  void setIsLexical() { sharedUInt8().AllocStackInst.lexical = true; }
+  void setIsLexical() {
+    sharedUInt8().AllocStackInst.lexical = (bool)IsLexical;
+  }
+
+  /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().AllocStackInst.fromVarDecl);
+  }
+
+  /// Set that the alloc_stack instruction corresponds to a source-level
+  /// VarDecl.
+  void setIsFromVarDecl() { sharedUInt8().AllocStackInst.fromVarDecl = true; }
+
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc().strippedForDebugVariable();
+  }
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location, scope, and element type. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     // If we used to have debug info attached but our debug info is now
     // invalidated, just bail.
     if (sharedUInt8().AllocStackInst.hasInvalidatedVarInfo) {
@@ -2053,11 +2110,18 @@ public:
     const SILDebugScope *VarDeclScope = nullptr;
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    else if (complete)
+      AuxVarType = getElementType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -2415,16 +2479,18 @@ class AllocBoxInst final
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               std::optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false, bool usesMoveableValueDebugInfo = false,
-               bool hasPointerEscape = false);
+               std::optional<SILDebugVariable> Var,
+               HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
+               UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
+                   DoesNotUseMoveableValueDebugInfo,
+               HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape);
 
-  static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
-                              SILFunction &F,
-                              std::optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime, bool reflection = false,
-                              bool usesMoveableValueDebugInfo = false,
-                              bool hasPointerEscape = false);
+  static AllocBoxInst *create(
+      SILDebugLocation Loc, CanSILBoxType boxType, SILFunction &F,
+      std::optional<SILDebugVariable> Var,
+      HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -2432,19 +2498,19 @@ public:
   }
 
   void setDynamicLifetime() {
-    sharedUInt8().AllocBoxInst.dynamicLifetime = true;
+    sharedUInt8().AllocBoxInst.dynamicLifetime = (bool)HasDynamicLifetime;
   }
 
-  bool hasDynamicLifetime() const {
-    return sharedUInt8().AllocBoxInst.dynamicLifetime;
+  HasDynamicLifetime_t hasDynamicLifetime() const {
+    return HasDynamicLifetime_t(sharedUInt8().AllocBoxInst.dynamicLifetime);
   }
 
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().AllocBoxInst.pointerEscape = pointerEscape;
   }
 
-  bool hasPointerEscape() const {
-    return sharedUInt8().AllocBoxInst.pointerEscape;
+  HasPointerEscape_t hasPointerEscape() const {
+    return HasPointerEscape_t(sharedUInt8().AllocBoxInst.pointerEscape);
   }
 
   /// True if the box should be emitted with reflection metadata for its
@@ -2457,16 +2523,23 @@ public:
   SILType getAddressType() const;
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+    if (complete)
+      return VarInfo.get(getDecl(), getTrailingObjects<char>(),
+                         getAddressType().getObjectType(),
+                         getLoc().strippedForDebugVariable(),
+                         getDebugScope());
+    return VarInfo.get(getDecl(), getTrailingObjects<char>(), {}, {}, nullptr);
   };
 
   void setUsesMoveableValueDebugInfo() {
-    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
+    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
+        (bool)UsesMoveableValueDebugInfo;
   }
 
-  bool getUsesMoveableValueDebugInfo() const {
-    return sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo;
+  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo() const {
+    return UsesMoveableValueDebugInfo_t(
+        sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo);
   }
 };
 
@@ -2899,14 +2972,15 @@ private:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
 public:
-  using super::getCallee;
-  using super::getSubstCalleeType;
-  using super::getSubstCalleeConv;
-  using super::hasSubstitutions;
-  using super::getNumArguments;
   using super::getArgument;
-  using super::getArguments;
   using super::getArgumentOperands;
+  using super::getArguments;
+  using super::getCallee;
+  using super::getCalleeOperand;
+  using super::getNumArguments;
+  using super::getSubstCalleeConv;
+  using super::getSubstCalleeType;
+  using super::hasSubstitutions;
 
   /// The collection of following routines wrap the representation difference in
   /// between the self substitution being first, but the self parameter of a
@@ -2991,6 +3065,21 @@ public:
     return getSubstCalleeType()->hasSelfParam();
   }
 
+  Operand *getIsolatedArgumentOperandOrNullPtr() {
+    SILFunctionConventions conv = getSubstCalleeConv();
+    for (Operand &argOp : getOperandsWithoutIndirectResults()) {
+      // Skip the callee.
+      if (getCalleeOperand() == &argOp)
+        continue;
+
+      auto opNum = argOp.getOperandNumber() - 1;
+      auto paramInfo = conv.getParamInfoForSILArg(opNum);
+      if (paramInfo.getOptions().contains(SILParameterInfo::Isolated))
+        return &argOp;
+    }
+    return nullptr;
+  }
+
   bool hasGuaranteedSelfArgument() const {
     auto C = getSubstCalleeType()->getSelfParameter().getConvention();
     return C == ParameterConvention::Direct_Guaranteed;
@@ -3004,7 +3093,7 @@ public:
     return getArguments().slice(getNumIndirectResults());
   }
 
-  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() {
     return getArgumentOperands().slice(getNumIndirectResults());
   }
 
@@ -3116,6 +3205,7 @@ public:
 
 class EndApplyInst;
 class AbortApplyInst;
+class EndBorrowInst;
 
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
@@ -3169,10 +3259,13 @@ public:
 
   void getCoroutineEndPoints(
       SmallVectorImpl<EndApplyInst *> &endApplyInsts,
-      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const;
+      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
+      SmallVectorImpl<EndBorrowInst *> *endBorrowInsts = nullptr) const;
 
-  void getCoroutineEndPoints(SmallVectorImpl<Operand *> &endApplyInsts,
-                             SmallVectorImpl<Operand *> &abortApplyInsts) const;
+  void getCoroutineEndPoints(
+      SmallVectorImpl<Operand *> &endApplyInsts,
+      SmallVectorImpl<Operand *> &abortApplyInsts,
+      SmallVectorImpl<Operand *> *endBorrowInsts = nullptr) const;
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
@@ -3201,11 +3294,12 @@ public:
 /// normally.
 class EndApplyInst
     : public UnaryInstructionBase<SILInstructionKind::EndApplyInst,
-                                  NonValueInstruction> {
+                                  SingleValueInstruction> {
   friend SILBuilder;
 
-  EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
-      : UnaryInstructionBase(debugLoc, beginApplyToken) {
+  EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken,
+               SILType Ty)
+    : UnaryInstructionBase(debugLoc, beginApplyToken, Ty) {
     assert(isaResultOf<BeginApplyInst>(beginApplyToken) &&
            isaResultOf<BeginApplyInst>(beginApplyToken)->isBeginApplyToken());
   }
@@ -4103,6 +4197,12 @@ public:
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
   }
+  ArrayRef<Operand> getArgumentOperands() const {
+    return getAllOperands();
+  }
+  MutableArrayRef<Operand> getArgumentOperands() {
+    return getAllOperands();
+  }
 };
 
 /// Increments a given profiler counter for a given PGO function name. This is
@@ -4485,8 +4585,6 @@ public:
   }
 };
 
-class EndBorrowInst;
-
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
@@ -4519,14 +4617,22 @@ class BeginBorrowInst
 
   USE_SHARED_UINT8;
 
-  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical,
-                  bool hasPointerEscape, bool fromVarDecl, bool fixed)
+public:
+  enum IsFixed_t : bool {
+    IsNotFixed = false,
+    IsFixed = true,
+  };
+
+private:
+  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue,
+                  IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
+                  IsFromVarDecl_t fromVarDecl, IsFixed_t fixed)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
-    sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
-    sharedUInt8().BeginBorrowInst.fixed = fixed;
+    sharedUInt8().BeginBorrowInst.fromVarDecl = (bool)fromVarDecl;
+    sharedUInt8().BeginBorrowInst.fixed = (bool)fixed;
   }
 
 public:
@@ -4541,28 +4647,32 @@ public:
 
   /// Whether the borrow scope introduced by this instruction corresponds to a
   /// source-level lexical scope.
-  bool isLexical() const { return sharedUInt8().BeginBorrowInst.lexical; }
+  IsLexical_t isLexical() const {
+    return IsLexical_t(sharedUInt8().BeginBorrowInst.lexical);
+  }
 
   /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
   /// doesn't have a lexical bit, do not do anything.
-  void removeIsLexical() { sharedUInt8().BeginBorrowInst.lexical = false; }
+  void removeIsLexical() {
+    sharedUInt8().BeginBorrowInst.lexical = (bool)IsNotLexical;
+  }
 
   /// WARNING: this flag is not yet implemented!
-  bool hasPointerEscape() const {
-    return sharedUInt8().BeginBorrowInst.pointerEscape;
+  HasPointerEscape_t hasPointerEscape() const {
+    return HasPointerEscape_t(sharedUInt8().BeginBorrowInst.pointerEscape);
   }
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().BeginBorrowInst.pointerEscape = pointerEscape;
   }
 
-  bool isFromVarDecl() const {
-    return sharedUInt8().BeginBorrowInst.fromVarDecl;
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().BeginBorrowInst.fromVarDecl);
   }
 
   /// Whether the borrow scope is fixed during move checking and should be
   /// treated as an opaque use of the value.
-  bool isFixed() const {
-    return sharedUInt8().BeginBorrowInst.fixed;
+  IsFixed_t isFixed() const {
+    return IsFixed_t(sharedUInt8().BeginBorrowInst.fixed);
   }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
@@ -4575,6 +4685,37 @@ public:
   /// Useful for matching common SILGen patterns that emit one borrow per use,
   /// and simplifying pass logic.
   Operand *getSingleNonEndingUse() const;
+};
+
+/// BorrowedFromInst - Establishes borrow relations.
+class BorrowedFromInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::BorrowedFromInst, BorrowedFromInst,
+                             OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  /// Because of the storage requirements of BorrowedFromInst, object
+  /// creation goes through 'create()'.
+  BorrowedFromInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> operands);
+
+  /// Construct a BorrowedFromInst.
+  static BorrowedFromInst *create(SILDebugLocation DebugLoc, SILValue borrowedValue,
+                                  ArrayRef<SILValue> enclosingValues, SILModule &M);
+
+public:
+
+  SILValue getBorrowedValue() {
+    return getAllOperands()[0].get();
+  }
+
+  /// The elements referenced by this StructInst.
+  ArrayRef<Operand> getEnclosingValueOperands() const {
+    return getAllOperands().drop_front();
+  }
+
+  /// The elements referenced by this StructInst.
+  OperandValueArrayRef getEnclosingValues() const {
+    return OperandValueArrayRef(getEnclosingValueOperands());
+  }
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
@@ -5239,15 +5380,17 @@ class DebugValueInst final
   USE_SHARED_UINT8;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, bool poisonRefs, bool operandWasMoved,
-                 bool trace);
+                 SILDebugVariable Var, bool poisonRefs,
+                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                bool poisonRefs, bool operandWasMoved,
+                                bool poisonRefs,
+                                UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
   static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
                                     SILModule &M, SILDebugVariable Var,
-                                    bool operandWasMoved, bool trace);
+                                    UsesMoveableValueDebugInfo_t wasMoved,
+                                    bool trace);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -5256,33 +5399,62 @@ class DebugValueInst final
 public:
   /// Sets a bool that states this debug_value is supposed to use the
   void setUsesMoveableValueDebugInfo() {
-    sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo = true;
+    sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo =
+        (bool)UsesMoveableValueDebugInfo;
   }
 
   /// True if this debug_value is on an SSA value that was moved.
   ///
   /// IRGen uses this information to determine if we should use llvm.dbg.addr or
   /// llvm.dbg.declare.
-  bool getUsesMoveableValueDebugInfo() const {
-    return sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo;
+  UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo() const {
+    return UsesMoveableValueDebugInfo_t(
+        sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo);
   }
 
   /// Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
 
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc().strippedForDebugVariable();
+  }
+
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  ///
+  /// \note The type is not included because it can change during a pass.
+  /// Passes must make sure to not lose the type information.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
+
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    // TODO: passes break if we set the type here, as the type of the operand
+    // can be changed during a pass.
+    // else if (complete)
+    //   AuxVarType = getOperand()->getType().getObjectType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -5666,6 +5838,9 @@ public:
   /// argument and return types, as well as all other attributes, after substitution,
   /// such as converting `$<A, B> in (A) -> B for <Int, String>` to `(Int) -> String`.
   bool onlyConvertsSubstitutions() const;
+
+  /// Returns true if the source and destination types only differ by `@Sendable`.
+  bool onlyConvertsSendable() const;
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -5719,6 +5894,10 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
                                                       TypeDependentOperands, Ty,
                                                       forwardingOwnershipKind) {
   }
+
+  static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILModule &Mod,
+                            ValueOwnershipKind forwardingOwnershipKind);
 
   static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                             SILType Ty, SILFunction &F,
@@ -5805,6 +5984,10 @@ class UncheckedRefCastInst final
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, ValueOwnershipKind forwardingOwnershipKind);
+
+  static UncheckedRefCastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
@@ -8352,6 +8535,16 @@ class EndLifetimeInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
+/// Mark the end of the linear live range of a value without destroying it.
+class ExtendLifetimeInst
+    : public UnaryInstructionBase<SILInstructionKind::ExtendLifetimeInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  ExtendLifetimeInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
+};
+
 /// An unsafe conversion in between ownership kinds.
 ///
 /// This is used today in destructors where due to Objective-C legacy
@@ -8469,8 +8662,9 @@ public:
   }
 
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
-  bool visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand*)> func)
-    const;
+  bool visitNonEscapingLifetimeEnds(
+    llvm::function_ref<bool (Operand*)> visitScopeEnd,
+    llvm::function_ref<bool (Operand*)> visitUnknownUse) const;
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply
@@ -8600,6 +8794,11 @@ class DestroyValueInst
   }
 
 public:
+  /// True if this destroy fully deinitializes the type by invoking the
+  /// user-defined deinitializer if present. This returns false if a prior
+  /// drop_deinit is present.
+  bool isFullDeinitialization();
+
   /// If true, then all references within the destroyed value will be
   /// overwritten with a sentinel. This is used in debug builds when shortening
   /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
@@ -8626,12 +8825,13 @@ class MoveValueInst
 
   USE_SHARED_UINT8;
 
-  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical,
-                bool hasPointerEscape, bool fromVarDecl)
+  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                IsLexical_t isLexical, HasPointerEscape_t hasPointerEscape,
+                IsFromVarDecl_t fromVarDecl)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
-    sharedUInt8().MoveValueInst.lexical = isLexical;
-    sharedUInt8().MoveValueInst.pointerEscape = hasPointerEscape;
-    sharedUInt8().MoveValueInst.fromVarDecl = fromVarDecl;
+    sharedUInt8().MoveValueInst.lexical = (bool)isLexical;
+    sharedUInt8().MoveValueInst.pointerEscape = (bool)hasPointerEscape;
+    sharedUInt8().MoveValueInst.fromVarDecl = (bool)fromVarDecl;
   }
 
 public:
@@ -8645,17 +8845,23 @@ public:
     sharedUInt8().MoveValueInst.allowDiagnostics = newValue;
   }
 
-  bool isLexical() const { return sharedUInt8().MoveValueInst.lexical; }
-  void removeIsLexical() { sharedUInt8().MoveValueInst.lexical = false; }
+  IsLexical_t isLexical() const {
+    return IsLexical_t(sharedUInt8().MoveValueInst.lexical);
+  }
+  void removeIsLexical() {
+    sharedUInt8().MoveValueInst.lexical = (bool)IsNotLexical;
+  }
 
-  bool hasPointerEscape() const {
-    return sharedUInt8().MoveValueInst.pointerEscape;
+  HasPointerEscape_t hasPointerEscape() const {
+    return HasPointerEscape_t(sharedUInt8().MoveValueInst.pointerEscape);
   }
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().MoveValueInst.pointerEscape = pointerEscape;
   }
 
-  bool isFromVarDecl() const { return sharedUInt8().MoveValueInst.fromVarDecl; }
+  IsFromVarDecl_t isFromVarDecl() const {
+    return IsFromVarDecl_t(sharedUInt8().MoveValueInst.fromVarDecl);
+  }
 };
 
 /// Drop the user-defined deinitializer from a struct or enum. Takes either an
@@ -8663,11 +8869,12 @@ public:
 /// for details. See SILVerifier.cpp for constraints on valid uses.
 class DropDeinitInst
     : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
-                                  SingleValueInstruction> {
+                                  OwnershipForwardingSingleValueInstruction> {
   friend class SILBuilder;
 
   DropDeinitInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+    : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
+                           OwnershipKind::Owned) {}
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
@@ -10138,7 +10345,7 @@ public:
   std::optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
     for (unsigned i = 0; i < getNumCases(); ++i) {
       if (getCase(i).second == bb) {
-        return i + 1;
+        return i;
       }
     }
     return std::nullopt;
@@ -11048,6 +11255,8 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::FunctionExtractIsolationInst:
+  case SILInstructionKind::DropDeinitInst:
+  case SILInstructionKind::BorrowedFromInst:
     return true;
   default:
     return false;

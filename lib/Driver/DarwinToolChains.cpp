@@ -112,6 +112,10 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
     return "watchos";
   case DarwinPlatformKind::WatchOSSimulator:
     return "watchossim";
+  case DarwinPlatformKind::VisionOS:
+    return "xros";
+  case DarwinPlatformKind::VisionOSSimulator:
+    return "xrossim";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -157,7 +161,7 @@ static void addLinkRuntimeLibRPath(const ArgList &Args,
   // so we should make sure we add the rpaths last, after all user-specified
   // rpaths. This is currently true from this place, but we need to be
   // careful if this function is ever called before user's rpaths are emitted.
-  assert(DarwinLibName.endswith(".dylib") && "must be a dynamic library");
+  assert(DarwinLibName.ends_with(".dylib") && "must be a dynamic library");
 
   // Add @executable_path to rpath to support having the dylib copied with
   // the executable.
@@ -502,6 +506,8 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
         RT = "ios";
     } else if (Triple.isWatchOS()) {
       RT = "watchos";
+    } else if (Triple.isXROS()) {
+      RT = "xros";
     } else {
       assert(Triple.isMacOSX());
       RT = "osx";
@@ -563,6 +569,12 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::WatchOSSimulator:
         platformName = "watchos-simulator";
         break;
+      case DarwinPlatformKind::VisionOS:
+        platformName = "xros";
+        break;
+      case DarwinPlatformKind::VisionOSSimulator:
+        platformName = "xros-simulator";
+        break;
       }
     }
 
@@ -611,6 +623,17 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::WatchOS:
       case DarwinPlatformKind::WatchOSSimulator:
         osVersion = triple.getOSVersion();
+        break;
+      case DarwinPlatformKind::VisionOS:
+      case DarwinPlatformKind::VisionOSSimulator:
+        osVersion = triple.getOSVersion();
+
+        // The first deployment of 64-bit xrOS simulator is version 1.0.
+        if (triple.isArch64Bit() && triple.isSimulatorEnvironment() &&
+            osVersion.getMajor() < 1) {
+          osVersion = llvm::VersionTuple(/*Major=*/1, /*Minor=*/0);
+        }
+
         break;
       }
     }
@@ -727,7 +750,7 @@ void toolchains::Darwin::addPlatformSpecificPluginFrontendArgs(
     llvm::sys::path::remove_filename(platformPath); // Developer
 
     StringRef platformName = llvm::sys::path::filename(platformPath);
-    if (platformName.endswith("Simulator.platform")){
+    if (platformName.ends_with("Simulator.platform")){
       StringRef devicePlatformName =
           platformName.drop_back(strlen("Simulator.platform"));
       llvm::sys::path::remove_filename(platformPath); // Platform

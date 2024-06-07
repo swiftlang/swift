@@ -30,6 +30,12 @@
 
 namespace swift {
 
+enum class TransitiveAddressWalkerTransitiveUseVisitation : uint8_t {
+  OnlyUses,
+  OnlyUser,
+  BothUserAndUses,
+};
+
 /// A state structure for findTransitiveUsesForAddress. Intended to be only used
 /// a single time. Please always use a new one for every call to
 /// findTransitiveUsesForAddress.
@@ -61,11 +67,16 @@ protected:
   /// understand. These cause us to return AddressUseKind::Unknown.
   void onError(Operand *use) {}
 
+  using TransitiveUseVisitation =
+      TransitiveAddressWalkerTransitiveUseVisitation;
+
   /// Customization point that causes the walker to treat a specific transitive
   /// use as an end point use.
   ///
   /// Example: Visiting a mutable or immutable open_existential_addr.
-  bool visitTransitiveUseAsEndPointUse(Operand *use) { return false; }
+  TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+    return TransitiveUseVisitation::OnlyUses;
+  }
 
   void meet(AddressUseKind other) {
     assert(!didInvalidate);
@@ -105,15 +116,19 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
   }
 
   // Record all uses that aren't transitively followed. These are either
-  // instanteneous uses of the addres, or cause a pointer escape.
+  // instantaneous uses of the address, or cause a pointer escape.
   auto transitiveResultUses = [&](Operand *use) {
     auto *svi = cast<SingleValueInstruction>(use->getUser());
     if (svi->use_empty()) {
       return callVisitUse(use);
     }
 
-    if (asImpl().visitTransitiveUseAsEndPointUse(use))
-      return callVisitUse(use);
+    auto visitation = asImpl().visitTransitiveUseAsEndPointUse(use);
+    if (visitation != TransitiveUseVisitation::OnlyUses)
+      callVisitUse(use);
+
+    if (visitation == TransitiveUseVisitation::OnlyUser)
+      return;
 
     for (auto *use : svi->getUses())
       addToWorklist(use);
@@ -236,7 +251,6 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::TSanInoutAccess:
         case BuiltinValueKind::ResumeThrowingContinuationReturning:
         case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
-        case BuiltinValueKind::Copy:
         case BuiltinValueKind::GenericAdd:
         case BuiltinValueKind::GenericFAdd:
         case BuiltinValueKind::GenericAnd:
@@ -261,6 +275,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::ZeroInitializer:
         case BuiltinValueKind::GetEnumTag:
         case BuiltinValueKind::InjectEnumTag:
+        case BuiltinValueKind::AddressOfRawLayout:
           callVisitUse(op);
           continue;
         default:

@@ -496,9 +496,6 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
   Tok.setKind(tok::NUM_TOKENS);
-
-  EnabledNoncopyableGenerics =
-      Context.LangOpts.hasFeature(Feature::NoncopyableGenerics);
 }
 
 Parser::~Parser() {
@@ -638,7 +635,7 @@ bool Parser::startsWithEllipsis(Token Tok) {
   if (!Tok.isAnyOperator() && !Tok.isPunctuation())
     return false;
 
-  return Tok.getText().startswith("...");
+  return Tok.getText().starts_with("...");
 }
 
 SourceLoc Parser::consumeStartingEllipsis() {
@@ -868,7 +865,7 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 //===----------------------------------------------------------------------===//
 
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
-                             const Diagnostic &D, bool diagnoseDollarPrefix) {
+                             DiagRef D, bool diagnoseDollarPrefix) {
   switch (Tok.getKind()) {
   case tok::kw_self:
   case tok::kw_Self:
@@ -883,7 +880,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
-                                     const Diagnostic &D) {
+                                     DiagRef D) {
   if (Tok.getText() != expected) {
     diagnose(Tok, D);
     return true;
@@ -895,8 +892,7 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
-                                const Diagnostic &D,
-                                bool diagnoseDollarPrefix) {
+                                DiagRef D, bool diagnoseDollarPrefix) {
   if (Tok.is(tok::identifier)) {
     Loc = consumeIdentifier(Result, diagnoseDollarPrefix);
     return false;
@@ -935,7 +931,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
 /// consumed and false is returned.
 ///
 /// If the input is malformed, this emits the specified error diagnostic.
-bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
+bool Parser::parseToken(tok K, SourceLoc &TokLoc, DiagRef D) {
   if (Tok.is(K)) {
     TokLoc = consumeToken(K);
     return false;
@@ -946,7 +942,7 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
+bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
   switch (K) {
@@ -966,7 +962,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
 }
 
 bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                                  const Diagnostic &D) {
+                                  DiagRef D) {
   auto IntTok = Tok;
   if (parseToken(tok::integer_literal, Loc, D))
     return true;
@@ -1058,7 +1054,7 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  bool AllowSepAfterLast, Diag<> ErrorDiag,
+                  bool AllowSepAfterLast, DiagRef ErrorDiag,
                   llvm::function_ref<ParserStatus()> callback) {
   if (Tok.is(RightK)) {
     RightLoc = consumeToken(RightK);
@@ -1288,11 +1284,11 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 
   // If the base name is prefixed by "getter:" or "setter:", it's an
   // accessor.
-  if (baseName.startswith("getter:")) {
+  if (baseName.starts_with("getter:")) {
     result.IsGetter = true;
     result.IsFunctionName = false;
     baseName = baseName.substr(7);
-  } else if (baseName.startswith("setter:")) {
+  } else if (baseName.starts_with("setter:")) {
     result.IsSetter = true;
     result.IsFunctionName = false;
     baseName = baseName.substr(7);

@@ -6,6 +6,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// rdar://124277662
+// XFAIL: freestanding
+
 // CHECK: Setting field Field(rawValue: "fxxxxxxx/0")
 // CHECK: Setting field Field(rawValue: "fxxxxxxx/1")
 // CHECK: Setting field Field(rawValue: "fxxxxxxx/2")

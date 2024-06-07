@@ -10,7 +10,7 @@ open class Cache<T> {
       let value = try creationBlock()
       return value
     } catch {
-      // CHECK:   debug_value {{.*}} : $any Error, let, name "error", implicit, loc "{{.*}}":[[@LINE-1]]:13, scope [[SCOPE:[0-9]+]]
+      // CHECK:   debug_value {{.*}} : $any Error, let, name "error", loc "{{.*}}":[[@LINE-1]]:13, scope [[SCOPE:[0-9]+]]
       // CHECK: alloc_stack $@opened({{.*}}, any Error) Self, loc{{.*}}, scope [[SCOPE]]
 
       _negativeCache.setObject(error, forKey: NSNumber(1))

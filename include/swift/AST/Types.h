@@ -128,10 +128,9 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains a context-dependent archetype, either a
-    /// \c PrimaryArchetypeType, \c OpenedArchetypeType,
-    /// \c ElementArchetypeType, or \c PackArchetype.
-    HasArchetype         = 0x02,
+    /// This type expression contains a PrimaryArchetypeType
+    /// or PackArchetypeType.
+    HasPrimaryArchetype  = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter     = 0x04,
@@ -171,7 +170,7 @@ public:
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
 
-    /// This type contains an ElementArchetype.
+    /// This type contains an ElementArchetypeType.
     HasElementArchetype = 0x4000,
 
     /// Whether the type is allocated in the constraint solver arena. This can
@@ -183,7 +182,7 @@ public:
     /// Contains a PackType.
     HasPack = 0x10000,
 
-    /// Contains a PackArchetypeType.
+    /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
     HasPackArchetype = 0x20000,
 
     Last_Property = HasPackArchetype
@@ -205,9 +204,10 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain a
-  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
-  bool hasArchetype() const { return Bits & HasArchetype; }
+  /// Does a type with these properties structurally contain a primary
+  /// or pack archetype? These are the archetypes instantiated from a
+  /// primary generic environment.
+  bool hasPrimaryArchetype() const { return Bits & HasPrimaryArchetype; }
 
   /// Does a type with these properties structurally contain an
   /// archetype from an opaque type declaration?
@@ -383,7 +383,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 15 };
-  enum { NumSILExtInfoBits = 15 };
+  enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -696,9 +696,23 @@ public:
     return getRecursiveProperties().hasPlaceholder();
   }
 
-  /// Determine whether the type involves a context-dependent archetype.
+  /// Determine whether the type involves a PrimaryArchetypeType *or* a
+  /// PackArchetypeType. These are the archetypes instantiated from a
+  /// primary generic environment.
+  bool hasPrimaryArchetype() const {
+    return getRecursiveProperties().hasPrimaryArchetype();
+  }
+
+  /// Whether the type contains a PackArchetypeType.
+  bool hasPackArchetype() const {
+    return getRecursiveProperties().hasPackArchetype();
+  }
+
+  /// Determine whether the type involves a primary, pack or local archetype.
+  ///
+  /// FIXME: Replace all remaining callers with a more precise check.
   bool hasArchetype() const {
-    return getRecursiveProperties().hasArchetype();
+    return hasPrimaryArchetype() || hasLocalArchetype();
   }
   
   /// Determine whether the type involves an opened existential archetype.
@@ -725,11 +739,6 @@ public:
   /// Whether the type contains a PackType.
   bool hasPack() const {
     return getRecursiveProperties().hasPack();
-  }
-
-  /// Whether the type contains a PackArchetypeType.
-  bool hasPackArchetype() const {
-    return getRecursiveProperties().hasPackArchetype();
   }
 
   /// Whether the type has any flavor of pack.
@@ -2217,9 +2226,8 @@ class ParameterTypeFlags {
     NoDerivative = 1 << 6,
     Isolated = 1 << 7,
     CompileTimeConst = 1 << 8,
-    ResultDependsOn = 1 << 9,
-    Transferring = 1 << 10,
-    NumBits = 11
+    Sending = 1 << 9,
+    NumBits = 10
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2234,22 +2242,20 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst, bool hasResultDependsOn,
-                     bool isTransferring)
+                     bool compileTimeConst, bool isSending)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
-              (hasResultDependsOn ? ResultDependsOn : 0) |
-              (isTransferring ? Transferring : 0)) {}
+              (isSending ? Sending : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeConst,
-                    bool hasResultDependsOn, bool isTransferring);
+                    bool isSending);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2261,8 +2267,7 @@ public:
   bool isIsolated() const { return value.contains(Isolated); }
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
-  bool hasResultDependsOn() const { return value.contains(ResultDependsOn); }
-  bool isTransferring() const { return value.contains(Transferring); }
+  bool isSending() const { return value.contains(Sending); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2325,10 +2330,10 @@ public:
                                   : value - ParameterTypeFlags::NoDerivative);
   }
 
-  ParameterTypeFlags withTransferring(bool withTransferring) const {
-    return ParameterTypeFlags(withTransferring
-                                  ? value | ParameterTypeFlags::Transferring
-                                  : value - ParameterTypeFlags::Transferring);
+  ParameterTypeFlags withSending(bool withSending) const {
+    return ParameterTypeFlags(withSending
+                                  ? value | ParameterTypeFlags::Sending
+                                  : value - ParameterTypeFlags::Sending);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2424,7 +2429,6 @@ public:
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
                               /*compileTimeConst*/ false,
-                              /*hasResultDependsOn*/ false,
                               /*is transferring*/ false);
   }
 
@@ -3433,7 +3437,14 @@ public:
   Type getGlobalActor() const;
   Type getThrownError() const;
 
-  LifetimeDependenceInfo getLifetimeDependenceInfo() const;
+  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const;
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
+      return *depInfo;
+    }
+    return LifetimeDependenceInfo();
+  }
 
   FunctionTypeIsolation getIsolation() const {
     if (hasExtInfo())
@@ -3627,17 +3638,13 @@ public:
     return getExtInfo().isNoEscape();
   }
 
-  bool isSendable() const {
-    return getExtInfo().isSendable();
-  }
+  bool isSendable() const;
 
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
 
-  bool hasTransferringResult() const {
-    return getExtInfo().hasTransferringResult();
-  }
+  bool hasSendingResult() const { return getExtInfo().hasSendingResult(); }
 
   bool hasEffect(EffectKind kind) const;
 
@@ -3765,14 +3772,22 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
 
-  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
+      return *depInfo;
+    }
+    return LifetimeDependenceInfo();
+  }
+
+  /// Returns nullptr for an empty dependence list.
+  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const {
     if (!hasLifetimeDependenceInfo()) {
-      return LifetimeDependenceInfo();
+      return nullptr;
     }
     auto *info = getTrailingObjects<LifetimeDependenceInfo>();
     assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
                              "shouldn't have stored it.");
-    return *info;
+    return info;
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -3914,14 +3929,22 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
 
-  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
+      return *depInfo;
+    }
+    return LifetimeDependenceInfo();
+  }
+
+  /// Returns nullptr for an empty dependence list.
+  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const {
     if (!hasLifetimeDependenceInfo()) {
-      return LifetimeDependenceInfo();
+      return nullptr;
     }
     auto *info = getTrailingObjects<LifetimeDependenceInfo>();
     assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
                              "shouldn't have stored it.");
-    return *info;
+    return info;
   }
 
   /// Retrieve the generic signature of this function type.
@@ -4132,6 +4155,25 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+inline bool isMutatingParameter(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Pack_Inout:
+    return true;
+
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Pack_Owned:
+    return false;
+  }
+  llvm_unreachable("bad convention kind");
+}
+
 /// Returns true if conv indicates a pack parameter.
 inline bool isPackParameter(ParameterConvention conv) {
   switch (conv) {
@@ -4152,6 +4194,8 @@ inline bool isPackParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+StringRef getStringForParameterConvention(ParameterConvention conv);
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
 public:
@@ -4170,8 +4214,8 @@ public:
     ///   differentiable with respect to this parameter.
     NotDifferentiable = 0x1,
 
-    /// Set if the given parameter is transferring.
-    Transferring = 0x2,
+    /// Set if the given parameter is sending.
+    Sending = 0x2,
 
     /// Set if the given parameter is isolated.
     Isolated = 0x4,
@@ -4439,6 +4483,11 @@ public:
     /// - The function type is `@differentiable`, the function is
     ///   differentiable with respect to this result.
     NotDifferentiable = 0x1,
+
+    /// Set if a return type is sending. This means that the returned value
+    /// must be disconnected and not in any strongly structured regions like an
+    /// actor or a task isolated variable.
+    IsSending = 0x2,
   };
 
   using Options = OptionSet<Flag>;
@@ -4740,24 +4789,27 @@ public:
   using Representation = SILExtInfoBuilder::Representation;
 
 private:
-  unsigned NumParameters;
+  unsigned NumParameters = 0;
 
-  // These are *normal* results if this is not a coroutine and *yield* results
-  // otherwise.
-  unsigned NumAnyResults;         // Not including the ErrorResult.
-  unsigned NumAnyIndirectFormalResults; // Subset of NumAnyResults.
-  unsigned NumPackResults; // Subset of NumAnyIndirectFormalResults.
+  // These are *normal* results
+  unsigned NumAnyResults = 0;         // Not including the ErrorResult.
+  unsigned NumAnyIndirectFormalResults = 0; // Subset of NumAnyResults.
+  unsigned NumPackResults = 0; // Subset of NumAnyIndirectFormalResults.
+  // These are *yield* results
+  unsigned NumAnyYieldResults = 0;  // Not including the ErrorResult.
+  unsigned NumAnyIndirectFormalYieldResults = 0; // Subset of NumAnyYieldResults.
+  unsigned NumPackYieldResults = 0; // Subset of NumAnyIndirectFormalYieldResults.
 
   // [NOTE: SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
-  //   SILResultInfo[isCoroutine() ? 0 : NumAnyResults]
+  //   SILResultInfo[NumAnyResults]
   //   SILResultInfo?    // if hasErrorResult()
-  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
+  //   SILYieldInfo[NumAnyYieldResults]
   //   SubstitutionMap[HasPatternSubs + HasInvocationSubs]
-  //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
-  //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
+  //   CanType?          // if NumAnyResults > 1, formal result cache
+  //   CanType?          // if NumAnyResults > 1, all result cache
 
   CanGenericSignature InvocationGenericSig;
   ProtocolConformanceRef WitnessMethodConformance;
@@ -4796,7 +4848,7 @@ private:
 
   /// Do we have slots for caches of the normal-result tuple type?
   bool hasResultCache() const {
-    return NumAnyResults > 1 && !isCoroutine();
+    return NumAnyResults > 1;
   }
 
   CanType &getMutableFormalResultsCache() const {
@@ -4883,22 +4935,27 @@ public:
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();
   }
-  bool hasTransferringResult() const {
-    return getExtInfo().hasTransferringResult();
+
+  /// Return true if all results are 'sending'.
+  bool hasSendingResult() const {
+    // For now all functions either have all sending results or no
+    // sending results. This is validated with a SILVerifier check.
+    return getNumResults() &&
+           getResults().front().hasOption(SILResultInfo::IsSending);
   }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {
     return const_cast<SILFunctionType *>(this)->getMutableYields();
   }
-  unsigned getNumYields() const { return isCoroutine() ? NumAnyResults : 0; }
+  unsigned getNumYields() const { return NumAnyYieldResults; }
 
   /// Return the array of all result information. This may contain inter-mingled
   /// direct and indirect results.
   ArrayRef<SILResultInfo> getResults() const {
     return const_cast<SILFunctionType *>(this)->getMutableResults();
   }
-  unsigned getNumResults() const { return isCoroutine() ? 0 : NumAnyResults; }
+  unsigned getNumResults() const { return NumAnyResults; }
 
   ArrayRef<SILResultInfo> getResultsWithError() const {
     return const_cast<SILFunctionType *>(this)->getMutableResultsWithError();
@@ -4935,17 +4992,17 @@ public:
   // indirect property, not the SIL indirect property, should be consulted to
   // determine whether function reabstraction is necessary.
   unsigned getNumIndirectFormalResults() const {
-    return isCoroutine() ? 0 : NumAnyIndirectFormalResults;
+    return NumAnyIndirectFormalResults;
   }
   /// Does this function have any formally indirect results?
   bool hasIndirectFormalResults() const {
     return getNumIndirectFormalResults() != 0;
   }
   unsigned getNumDirectFormalResults() const {
-    return isCoroutine() ? 0 : NumAnyResults - NumAnyIndirectFormalResults;
+    return NumAnyResults - NumAnyIndirectFormalResults;
   }
   unsigned getNumPackResults() const {
-    return isCoroutine() ? 0 : NumPackResults;
+    return NumPackResults;
   }
   bool hasIndirectErrorResult() const {
     return hasErrorResult() && getErrorResult().isFormalIndirect();
@@ -5003,17 +5060,17 @@ public:
                                      TypeExpansionContext expansion);
 
   unsigned getNumIndirectFormalYields() const {
-    return isCoroutine() ? NumAnyIndirectFormalResults : 0;
+    return NumAnyIndirectFormalYieldResults;
   }
   /// Does this function have any formally indirect yields?
   bool hasIndirectFormalYields() const {
     return getNumIndirectFormalYields() != 0;
   }
   unsigned getNumDirectFormalYields() const {
-    return isCoroutine() ? NumAnyResults - NumAnyIndirectFormalResults : 0;
+    return NumAnyYieldResults - NumAnyIndirectFormalYieldResults;
   }
   unsigned getNumPackYields() const {
-    return isCoroutine() ? NumPackResults : 0;
+    return NumPackYieldResults;
   }
 
   struct IndirectFormalYieldFilter {
@@ -5117,8 +5174,11 @@ public:
   /// Returns the number of function potential semantic results:
   ///  * Usual results
   ///  * Inout parameters
+  ///  * yields
   unsigned getNumAutoDiffSemanticResults() const {
-    return getNumResults() + getNumAutoDiffSemanticResultsParameters();
+    return getNumResults() +
+           getNumAutoDiffSemanticResultsParameters() +
+           getNumYields();
   }
 
   /// Get the generic signature that the component types are specified
@@ -6007,6 +6067,7 @@ public:
   }
 
   InvertibleProtocolSet getInverses() const { return Inverses; }
+  bool hasInverse() const { return !Inverses.empty(); }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getMembers(), getInverses(), hasExplicitAnyObject());
@@ -6025,6 +6086,10 @@ public:
   bool hasExplicitAnyObject() const {
     return Bits.ProtocolCompositionType.HasExplicitAnyObject;
   }
+
+  /// Produce a new type (potentially not be a protoocl composition)
+  /// which drops all of the marker protocol types associated with this one.
+  Type withoutMarkerProtocols() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -6551,6 +6616,8 @@ enum class OpaqueSubstitutionKind {
   // Can be done if the underlying type is accessible from the context we
   // substitute into. Private types cannot be accessed from a different TU.
   SubstituteSameModuleMaximalResilience,
+  // Same as previous but with package and above visibility.
+  SubstituteSamePackageMaximalResilience,
   // Substitute in a different module from the opaque defining decl. Can only
   // be done if the underlying type is public.
   SubstituteNonResilientModule
@@ -7699,7 +7766,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool hasResultDependsOn, bool isTransferring) {
+    bool compileTimeConst, bool isSending) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -7709,9 +7776,8 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
            ownership == ParamSpecifier::InOut);
     ownership = ParamSpecifier::InOut;
   }
-  return {isVariadic,       isAutoClosure,      isNonEphemeral,
-          ownership,        isolated,           isNoDerivative,
-          compileTimeConst, hasResultDependsOn, isTransferring};
+  return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
+          isolated,   isNoDerivative, compileTimeConst, isSending};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
+// RUN: %target-swift-frontend -application-extension -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.51 -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx14 -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
 // REQUIRES: OS=macosx
@@ -23,6 +24,10 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:  case introduced10_50
   @available(macOS, introduced: 10.50)
   case introduced10_50
+  // CHECK:       @available(macOSApplicationExtension, unavailable)
+  // CHECK-NEXT:  case unavailableMacOSAppExtension
+  @available(macOSApplicationExtension, unavailable)
+  case unavailableMacOSAppExtension
 
   // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasElementsWithAvailability, _ b: HasElementsWithAvailability) -> Bool {
   // CHECK-NEXT:    var index_a: Int
@@ -39,6 +44,8 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      index_a = 1
   // CHECK-NEXT:    case .introduced10_50:
   // CHECK-NEXT:      index_a = 2
+  // CHECK-NEXT:    case .unavailableMacOSAppExtension:
+  // CHECK-NEXT:      index_a = 3
   // CHECK-NEXT:    }
   // CHECK-NEXT:    var index_b: Int
   // CHECK-NEXT:    switch b {
@@ -54,6 +61,8 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      index_b = 1
   // CHECK-NEXT:    case .introduced10_50:
   // CHECK-NEXT:      index_b = 2
+  // CHECK-NEXT:    case .unavailableMacOSAppExtension:
+  // CHECK-NEXT:      index_b = 3
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_a == index_b
   // CHECK-NEXT:  }
@@ -73,6 +82,8 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      discriminator = 1
   // CHECK-NEXT:    case .introduced10_50:
   // CHECK-NEXT:      discriminator = 2
+  // CHECK-NEXT:    case .unavailableMacOSAppExtension:
+  // CHECK-NEXT:      discriminator = 3
   // CHECK-NEXT:    }
   // CHECK-NEXT:    hasher.combine(discriminator)
   // CHECK-NEXT:  }

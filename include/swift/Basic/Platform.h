@@ -33,7 +33,9 @@ namespace swift {
     TvOS,
     TvOSSimulator,
     WatchOS,
-    WatchOSSimulator
+    WatchOSSimulator,
+    VisionOS,
+    VisionOSSimulator
   };
 
   /// Returns true if the given triple represents iOS running in a simulator.
@@ -47,6 +49,9 @@ namespace swift {
 
   /// Returns true if the given triple represents a macCatalyst environment.
   bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
+
+  /// Returns true if the given triple represents visionOS running in a simulator.
+  bool tripleIsVisionSimulator(const llvm::Triple &triple);
 
   /// Determine whether the triple infers the "simulator" environment.
   bool tripleInfersSimulatorEnvironment(const llvm::Triple &triple);

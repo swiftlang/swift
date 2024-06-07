@@ -144,7 +144,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // Otherwise, we have a program argument. If it looks like an option or a
   // path, then invoke in interactive mode with the arguments as given.
   StringRef FirstArg(Args[1]);
-  if (FirstArg.startswith("-") || FirstArg.contains('.') ||
+  if (FirstArg.starts_with("-") || FirstArg.contains('.') ||
       FirstArg.contains('/'))
     return false;
 
@@ -293,7 +293,7 @@ static int run_driver(StringRef ExecName,
 
     // Run the integrated Swift frontend when called as "swift-frontend" but
     // without a leading "-frontend".
-    if (!FirstArg.startswith("--driver-mode=")
+    if (!FirstArg.starts_with("--driver-mode=")
         && ExecName == "swift-frontend") {
       return performFrontend(
           llvm::ArrayRef(argv.data() + 1, argv.data() + argv.size()), argv[0],
@@ -303,7 +303,7 @@ static int run_driver(StringRef ExecName,
     if (FirstArg == "repl") {
       isRepl = true;
       argv = argv.drop_front();
-    } else if (FirstArg.startswith("--driver-mode=")) {
+    } else if (FirstArg.starts_with("--driver-mode=")) {
       DriverModeArg = FirstArg;
     }
   }

@@ -190,7 +190,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   assert(BufferStart + EndOffset <= BufferEnd);
 
   // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
-  size_t BOMLength = contents.startswith("\xEF\xBB\xBF") ? 3 : 0;
+  size_t BOMLength = contents.starts_with("\xEF\xBB\xBF") ? 3 : 0;
 
   // Keep information about existence of UTF-8 BOM for transparency source code
   // editing with libSyntax.
@@ -1832,6 +1832,12 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
       OutputPtr = Ptr;
       // Escape double quotes.
       replacement.append("\\\"");
+    } else if (Ptr[-1] == 0) {
+      // The string literal might contain a null byte if the code completion
+      // position is inside the string literal. Don't include the null byte in
+      // the replacement string.
+      replacement.append(OutputPtr, Ptr - 1);
+      OutputPtr = Ptr;
     }
   }
   assert(Ptr == TokEnd && Ptr[-1] == '\'');
@@ -2277,7 +2283,7 @@ bool Lexer::tryLexConflictMarker(bool EatNewline) {
   
   // Check to see if we have <<<<<<< or >>>>.
   StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
-  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+  if (!restOfBuffer.starts_with("<<<<<<< ") && !restOfBuffer.starts_with(">>>> "))
     return false;
   
   ConflictMarkerKind Kind = *Ptr == '<' ? ConflictMarkerKind::Normal
@@ -3108,7 +3114,7 @@ bool tryAdvanceToEndOfConflictMarker(const char *&CurPtr,
 
   // Check to see if we have <<<<<<< or >>>>.
   StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
-  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+  if (!restOfBuffer.starts_with("<<<<<<< ") && !restOfBuffer.starts_with(">>>> "))
     return false;
 
   ConflictMarkerKind Kind =

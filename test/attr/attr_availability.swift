@@ -146,6 +146,15 @@ let _: Int
 @available(OSX, introduced: 1.0.0x4) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
+@available(OSX, introduced: 0) // expected-warning{{expected version number in 'available' attribute; this is an error in the Swift 6 language mode}}
+let _: Int
+
+@available(OSX, introduced: 0.0) // expected-warning{{expected version number in 'available' attribute; this is an error in the Swift 6 language mode}}
+let _: Int
+
+@available(OSX, introduced: 0.0.0) // expected-warning{{expected version number in 'available' attribute; this is an error in the Swift 6 language mode}}
+let _: Int
+
 @available(*, renamed: "bad name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 

@@ -30,6 +30,7 @@ class ModuleDependenciesCache;
 class SwiftDependencyScanningService;
 
 namespace dependencies {
+class DependencyScanDiagnosticCollector;
 
 using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::tuple<std::unique_ptr<CompilerInstance>,
@@ -59,16 +60,19 @@ bool batchScanDependencies(CompilerInstance &instance,
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 performModuleScan(CompilerInstance &instance,
+                  DependencyScanDiagnosticCollector *diagnostics,
                   ModuleDependenciesCache &cache);
 
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
 performModulePrescan(CompilerInstance &instance,
+                     DependencyScanDiagnosticCollector *diagnostics,
                      ModuleDependenciesCache &cache);
 
 /// Batch scan the dependencies for modules specified in \c batchInputFile.
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 performBatchModuleScan(CompilerInstance &invocationInstance,
+                       DependencyScanDiagnosticCollector *diagnostics,
                        ModuleDependenciesCache &invocationCache,
                        CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
                        llvm::StringSaver &saver,

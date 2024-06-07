@@ -269,7 +269,7 @@ static void
 prepareForDeletion(SILInstruction *inst,
                    SmallVectorImpl<SILInstruction *> &instructionsToDelete) {
   for (auto &operand : inst->getAllOperands()) {
-    operand.set(SILUndef::get(operand.get()->getType(), *inst->getFunction()));
+    operand.set(SILUndef::get(operand.get()));
   }
   instructionsToDelete.push_back(inst);
 }
@@ -299,63 +299,6 @@ replaceDestroy(DestroyAddrInst *dai, SILValue newValue, SILBuilderContext &ctx,
                                        expansionKind);
 
   prepareForDeletion(dai, instructionsToDelete);
-}
-
-/// Whether the specified debug_value's operand names the address at the
-/// indicated alloc_stack.
-///
-/// If it's a guaranteed alloc_stack (i.e. a store_borrow location), that
-/// includes the values produced by any store_borrows whose destinations are the
-/// alloc_stack since those values amount to aliases for the alloc_stack's
-/// storage.
-static bool isDebugValueOfAllocStack(DebugValueInst *dvi, AllocStackInst *asi) {
-  auto value = dvi->getOperand();
-  if (value == asi)
-    return true;
-  auto *sbi = dyn_cast<StoreBorrowInst>(value);
-  if (!sbi)
-    return false;
-  return sbi->getDest() == asi;
-}
-
-/// Promote a DebugValue w/ address value to a DebugValue of non-address value.
-static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
-                                  SILBuilderContext &ctx,
-                                  InstructionDeleter &deleter) {
-  assert(dvai->getOperand()->getType().isLoadable(*dvai->getFunction()) &&
-         "Unexpected promotion of address-only type!");
-  assert(value && "Expected valid value");
-
-  // Avoid inserting the same debug_value twice.
-  //
-  // We remove the di expression when comparing since:
-  //
-  // 1. dvai is on will always have the deref diexpr since it is on addresses.
-  //
-  // 2. We are only trying to delete debug_var that are on values... values will
-  //    never have an op_deref meaning that the comparison will always fail and
-  //    not serve out purpose here.
-  auto dvaiWithoutDIExpr = dvai->getVarInfo()->withoutDIExpr();
-  for (auto *use : value->getUses()) {
-    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
-      if (!dvi->hasAddrVal() && *dvi->getVarInfo() == dvaiWithoutDIExpr) {
-        deleter.forceDelete(dvai);
-        return;
-      }
-    }
-  }
-
-  // Drop op_deref if dvai is actually a debug_value instruction
-  auto varInfo = *dvai->getVarInfo();
-  if (isa<DebugValueInst>(dvai)) {
-    auto &diExpr = varInfo.DIExpr;
-    if (diExpr)
-      diExpr.eraseElement(diExpr.element_begin());
-  }
-
-  SILBuilderWithScope b(dvai, ctx);
-  b.createDebugValue(dvai->getLoc(), value, std::move(varInfo));
-  deleter.forceDelete(dvai);
 }
 
 /// Returns true if \p I is a load which loads from \p ASI.
@@ -679,43 +622,6 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
   }
 }
 
-/// Instantiate the specified type by recursively tupling and structing the
-/// unique instances of the empty types and undef "instances" of the non-empty
-/// types aggregated together at each level.
-static SILValue createEmptyAndUndefValue(SILType ty,
-                                         SILInstruction *insertionPoint,
-                                         SILBuilderContext &ctx) {
-  auto *function = insertionPoint->getFunction();
-  if (auto tupleTy = ty.getAs<TupleType>()) {
-    SmallVector<SILValue, 4> elements;
-    for (unsigned idx : range(tupleTy->getNumElements())) {
-      SILType elementTy = ty.getTupleElementType(idx);
-      auto element = createEmptyAndUndefValue(elementTy, insertionPoint, ctx);
-      elements.push_back(element);
-    }
-    SILBuilderWithScope builder(insertionPoint, ctx);
-    return builder.createTuple(insertionPoint->getLoc(), ty, elements);
-  } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
-    TypeExpansionContext tec = *function;
-    auto &module = function->getModule();
-    if (decl->isResilient(tec.getContext()->getParentModule(),
-                          tec.getResilienceExpansion())) {
-      llvm::errs() << "Attempting to create value for illegal empty type:\n";
-      ty.print(llvm::errs());
-      llvm::report_fatal_error("illegal empty type: resilient struct");
-    }
-    SmallVector<SILValue, 4> elements;
-    for (auto *field : decl->getStoredProperties()) {
-      auto elementTy = ty.getFieldType(field, module, tec);
-      auto element = createEmptyAndUndefValue(elementTy, insertionPoint, ctx);
-      elements.push_back(element);
-    }
-    SILBuilderWithScope builder(insertionPoint, ctx);
-    return builder.createStruct(insertionPoint->getLoc(), ty, elements);
-  } else {
-    return SILUndef::get(ty, *insertionPoint->getFunction());
-  }
-}
 
 /// Whether lexical lifetimes should be added for the values stored into the
 /// alloc_stack.
@@ -777,7 +683,7 @@ beginOwnedLexicalLifetimeAfterStore(AllocStackInst *asi, StoreInst *inst) {
 
   MoveValueInst *mvi = nullptr;
   SILBuilderWithScope::insertAfter(inst, [&](SILBuilder &builder) {
-    mvi = builder.createMoveValue(loc, stored, /*isLexical*/ true);
+    mvi = builder.createMoveValue(loc, stored, IsLexical);
   });
   StorageStateTracking<LiveValues> vals = {LiveValues::forOwned(stored, mvi),
                                            /*isStorageValid=*/true};
@@ -798,7 +704,7 @@ beginGuaranteedLexicalLifetimeAfterStore(AllocStackInst *asi,
     return {LiveValues::forGuaranteed(stored, {}), /*isStorageValid*/ true};
   }
   auto *borrow = SILBuilderWithScope(inst->getNextInstruction())
-                     .createBeginBorrow(loc, stored, /*isLexical*/ true);
+                     .createBeginBorrow(loc, stored, IsLexical);
   return {LiveValues::forGuaranteed(stored, borrow), /*isStorageValid*/ true};
 }
 
@@ -1204,14 +1110,8 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       continue;
     }
 
-    // Replace debug_value w/ address value with debug_value of
-    // the promoted value.
-    // if we have a valid value to use at this point. Otherwise we'll
-    // promote this when we deal with hooking up phis.
+    // Debug values will automatically be salvaged, we can ignore them.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
-      if (isDebugValueOfAllocStack(dvi, asi) && runningVals)
-        promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
-                              ctx, deleter);
       continue;
     }
 
@@ -1310,7 +1210,7 @@ LiveValues StackAllocationPromoter::getEffectiveLiveOutValues(
   if (auto values = getLiveOutValues(phiBlocks, startBlock)) {
     return *values;
   }
-  auto *undef = SILUndef::get(asi->getElementType(), *asi->getFunction());
+  auto *undef = SILUndef::get(asi->getFunction(), asi->getElementType());
   return LiveValues::forOwned(undef, undef);
 }
 
@@ -1345,7 +1245,7 @@ LiveValues StackAllocationPromoter::getEffectiveLiveInValues(
   if (auto values = getLiveInValues(phiBlocks, block)) {
     return *values;
   }
-  auto *undef = SILUndef::get(asi->getElementType(), *asi->getFunction());
+  auto *undef = SILUndef::get(asi->getFunction(), asi->getElementType());
   // TODO: Add another kind of LiveValues for undef.
   return LiveValues::forOwned(undef, undef);
 }
@@ -1464,12 +1364,8 @@ void StackAllocationPromoter::fixBranchesAndUses(
     // on.
     SILBasicBlock *userBlock = user->getParent();
 
+    // Debug values will automatically be salvaged, we can ignore them.
     if (auto *dvi = DebugValueInst::hasAddrVal(user)) {
-      // Replace debug_value w/ address-type value with
-      // a new debug_value w/ promoted value.
-      auto def = getEffectiveLiveInValues(phiBlocks, userBlock);
-      promoteDebugValueAddr(dvi, def.replacement(asi, dvi), ctx, deleter);
-      ++NumInstRemoved;
       continue;
     }
 
@@ -1858,7 +1754,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   for (auto it : valuesToComplete) {
     // Set forceBoundaryCompletion as true so that we complete at boundary for
     // lexical values as well.
-    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
+    completion.completeOSSALifetime(it,
+                                    OSSALifetimeCompletion::Boundary::Liveness);
   }
 }
 
@@ -2068,20 +1965,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       continue;
     }
 
-    // Replace debug_value w/ address value with debug_value of
-    // the promoted value.
+    // Debug values will automatically be salvaged, we can ignore them.
     if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
-      if (isDebugValueOfAllocStack(dvi, asi)) {
-        if (runningVals) {
-          promoteDebugValueAddr(dvi, runningVals->value.replacement(asi, dvi),
-                                ctx, deleter);
-        } else {
-          // Drop debug_value of uninitialized void values.
-          assert(asi->getElementType().isVoid() &&
-                 "Expected initialization of non-void type!");
-          deleter.forceDelete(dvi);
-        }
-      }
       continue;
     }
 
@@ -2186,7 +2071,7 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
     }
   }
   CanonicalizeOSSALifetime canonicalizer(
-      /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
+      PruneDebugInsts, MaximizeLifetime_t(!f.shouldOptimize()), &f,
       accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())

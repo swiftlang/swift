@@ -373,3 +373,52 @@ public func testKlassEnumPairWithDeinit() {
         consumeKlassEnumPairWithDeinit(f)
     }
 }
+
+struct EmptyMoveOnlyWithDeinit: ~Copyable {
+  deinit {}
+}
+
+struct EnclosesEmptyMoveOnlyWithDeinit: ~Copyable {
+  var stored: EmptyMoveOnlyWithDeinit
+}
+
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits35testEnclosesEmptyMoveOnlyWithDeinityyF"()
+func testEnclosesEmptyMoveOnlyWithDeinit() {
+  // CHECK-NOT: ret
+  // CHECK: call swiftcc void @"$s16moveonly_deinits23EmptyMoveOnlyWithDeinitVfD"()
+  _ = EnclosesEmptyMoveOnlyWithDeinit(stored: EmptyMoveOnlyWithDeinit())
+}
+
+enum ESingle: ~Copyable {
+  case a(EmptyMoveOnlyWithDeinit)
+}
+
+struct OtherEmptyMoveOnlyWithDeinit: ~Copyable {
+  deinit {}
+}
+
+enum EMulti: ~Copyable {
+  case a(EmptyMoveOnlyWithDeinit)
+  case b(OtherEmptyMoveOnlyWithDeinit)
+}
+
+
+// IR-LABEL: define {{.*}} swiftcc void @"$s16moveonly_deinits14testSingleEnumyyF"()
+func testSingleEnum() {
+  // IR: call swiftcc void @"$s16moveonly_deinits23EmptyMoveOnlyWithDeinitVfD"()
+  _ = ESingle.a(EmptyMoveOnlyWithDeinit())
+}
+
+
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits13testMultiEnumyyF"()
+func testMultiEnum() {
+  // IR: call void @"$s16moveonly_deinits6EMultiOWOe"(i1 true)
+  _ = EMulti.b(OtherEmptyMoveOnlyWithDeinit())
+}
+
+// IR-LABEL: define {{.*}}void @"$s16moveonly_deinits6EMultiOWOe"
+// IR: br i1
+// IR: 1:
+// IR:  call swiftcc void @"$s16moveonly_deinits23EmptyMoveOnlyWithDeinitVfD"()
+// IR: 2:
+// IR:  call swiftcc void @"$s16moveonly_deinits28OtherEmptyMoveOnlyWithDeinitVfD"()

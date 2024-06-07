@@ -53,8 +53,6 @@ distributed actor ProtocolWithChecksSeqReqDA_MissingSystem: ProtocolWithChecksSe
   // expected-error@-4{{distributed actor 'ProtocolWithChecksSeqReqDA_MissingSystem' does not declare ActorSystem it can be used with}}
   //
   // expected-error@-6{{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'DistributedActor'}}
-  // expected-error@-7{{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'Encodable'}}
-  // expected-error@-8{{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'Decodable'}}
 
   // Entire conformance is doomed, so we didn't proceed to checking the functions; that's fine
   distributed func testAT() async throws -> NotCodable { .init() }
@@ -85,7 +83,7 @@ extension NoSerializationRequirementYet
 
 extension NoSerializationRequirementYet
   where SerializationRequirement: Codable {
-  // expected-error@+1{{result type 'NotCodable' of distributed instance method 'test4' does not conform to serialization requirement 'Decodable'}}
+  // expected-error@+1{{result type 'NotCodable' of distributed instance method 'test4' does not conform to serialization requirement 'Codable'}}
   distributed func test4() -> NotCodable {
     .init()
   }

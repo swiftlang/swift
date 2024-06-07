@@ -1,9 +1,11 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics)
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NoncopyableGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
 
 // REQUIRES: executable_test
 // REQUIRES: asserts
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // Needed due to limitations of autoclosures and noncopyable types.
 func eagerAssert(_ b: Bool, _ line: Int = #line) {

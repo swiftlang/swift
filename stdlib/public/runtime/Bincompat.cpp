@@ -20,6 +20,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Threading/Once.h"
 #include "swift/shims/RuntimeShims.h"
+#include "swift/shims/Target.h"
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules
@@ -247,6 +248,32 @@ bool useLegacySwiftValueUnboxingInCasting() {
 bool useLegacySwiftObjCHashing() {
 #if BINARY_COMPATIBILITY_APPLE
   return true; // For now, legacy behavior on Apple OSes
+#elif SWIFT_TARGET_OS_DARWIN
+  return true; // For now, use legacy behavior on open-source builds for Apple platforms
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
+// Controls legacy mode for the 'swift_task_isCurrentExecutorImpl' runtime function.
+//
+// In "legacy" / "no crash" mode:
+// * The `swift_task_isCurrentExecutorImpl` cannot crash
+// * This means cases where no "current" executor is present cannot be diagnosed correctly
+//    * The runtime can NOT use 'SerialExecutor/checkIsolated'
+//    * The runtime can NOT use 'dispatch_precondition' which is able ot handle some dispatch and main actor edge cases
+//
+// New behavior in "swift6" "crash" mode:
+// * The 'swift_task_isCurrentExecutorImpl' will CRASH rather than return 'false'
+// * This allows the method to invoke 'SerialExecutor/checkIsolated'
+//   * Which is allowed to call 'dispatch_precondition' and handle "on dispatch queue but not on Swift executor" cases
+//
+// FIXME(concurrency): Once the release is announced, adjust the logic detecting the SDKs
+bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+#if BINARY_COMPATIBILITY_APPLE
+  return true; // For now, legacy behavior on Apple OSes
+#elif SWIFT_TARGET_OS_DARWIN
+  return true; // For now, use legacy behavior on open-source builds for Apple platforms
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif

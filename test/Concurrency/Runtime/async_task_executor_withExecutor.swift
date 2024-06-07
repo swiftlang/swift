@@ -33,11 +33,10 @@ nonisolated func nonisolatedAsyncMethod(expectedOn executor: MyTaskExecutor) asy
   dispatchPrecondition(condition: .onQueue(executor.queue))
 }
 
-@MainActor
 func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
                                       _ secondExecutor: MyTaskExecutor) async {
-  MainActor.preconditionIsolated()
-  dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+  dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
+  dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 
   await withTaskExecutorPreference(firstExecutor) {
     // the block immediately hops to the expected executor
@@ -45,7 +44,6 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
     print("OK: withTaskExecutor body")
     await nonisolatedAsyncMethod(expectedOn: firstExecutor)
   }
-  MainActor.preconditionIsolated()
 
   await withTaskExecutorPreference(firstExecutor) {
     await withTaskExecutorPreference(secondExecutor) {
@@ -56,7 +54,6 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
       await nonisolatedAsyncMethod(expectedOn: secondExecutor)
     }
   }
-  MainActor.preconditionIsolated()
 
   await withTaskExecutorPreference(firstExecutor) {
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
@@ -78,8 +75,6 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
   }
 
-  MainActor.preconditionIsolated()
-  dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
   dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
   dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 }

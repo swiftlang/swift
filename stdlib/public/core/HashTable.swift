@@ -65,6 +65,9 @@ internal struct _HashTable {
   }
 }
 
+@available(*, unavailable)
+extension _HashTable: Sendable {}
+
 extension _HashTable {
   /// The inverse of the maximum hash table load factor.
   private static var maxLoadFactor: Double {
@@ -271,6 +274,9 @@ extension _HashTable: Sequence {
     return Iterator(self)
   }
 }
+
+@available(*, unavailable)
+extension _HashTable.Iterator: Sendable {}
 
 extension _HashTable {
   @inlinable

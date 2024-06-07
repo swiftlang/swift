@@ -799,11 +799,15 @@ public:
 
   bool shouldLog(ASTNode node) {
     // Don't try to log ~Copyable types, as we can't pass them to the generic logging functions yet.
-    if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>()))
-      return VD->hasInterfaceType() ? !VD->getInterfaceType()->isNoncopyable() : true;
-    if (auto *E = node.dyn_cast<Expr *>())
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>())) {
+      auto interfaceTy = VD->getInterfaceType();
+      auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoContext(interfaceTy);
+      return !contextualTy->isNoncopyable();
+    } else if (auto *E = node.dyn_cast<Expr *>()) {
       return !E->getType()->isNoncopyable();
-    return true;
+    } else {
+      return true;
+    }
   }
 
   Added<Stmt *> buildLoggerCall(Added<Expr *> E, SourceRange SR,

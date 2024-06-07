@@ -1056,7 +1056,7 @@ public struct DistributedActorCodingError: DistributedActorSystemError {
 /// as a stub always should be used as "remote" and therefore no local calls
 /// are performed on them. Seeing this fatal error means a problem in the Swift
 /// Distributed runtime, please report an issue.
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.0, *)
 public // COMPILER_INTRINSIC
 func _diagnoseDistributedStubMethodCalled(
   className: StaticString,

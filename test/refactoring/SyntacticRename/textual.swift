@@ -41,4 +41,5 @@ _ = /*MyClass:unknown*/MyClass()
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="foo" -is-function-like -old-name "foo()" >> %t.ranges/textual_foo.swift
 // RUN: diff -u %S/Outputs/textual/foo.swift.expected %t.ranges/textual_foo.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="MyClass" -is-non-protocol-type -old-name "MyClass" -new-name "YourClass" >> %t.ranges/textual_MyClass.swift
-// RUN: diff -u %S/Outputs/textual/MyClass.swift.expected %t.ranges/textual_MyClass.swift
+// All occcurrences of MyClass are outside of comments and string literals, so there's nothing to rename. swift-refactor indicates this by outputing empty results.
+// RUN: diff -u %t.ranges/textual_MyClass.swift -

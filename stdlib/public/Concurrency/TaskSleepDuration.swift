@@ -21,13 +21,9 @@ extension Task where Success == Never, Failure == Never {
     tolerance: Duration?,
     clock: _ClockID
   ) async throws {
-    // Allocate storage for the storage word.
-    let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
-
-    // Initialize the flag word to "not started", which means the continuation
-    // has neither been created nor completed.
-    Builtin.atomicstore_seqcst_Word(
-        wordPtr._rawValue, SleepState.notStarted.word._builtinWordValue)
+    // Create a token which will initially have the value "not started", which
+    // means the continuation has neither been created nor completed.
+    let token = UnsafeSleepStateToken()
 
     do {
       // Install a cancellation handler to resume the continuation by
@@ -35,19 +31,12 @@ extension Task where Success == Never, Failure == Never {
       try await withTaskCancellationHandler {
         let _: () = try await withUnsafeThrowingContinuation { continuation in
           while true {
-            let state = SleepState(loading: wordPtr)
+            let state = token.load()
             switch state {
             case .notStarted:
-              // The word that describes the active continuation state.
-              let continuationWord =
-                SleepState.activeContinuation(continuation).word
-
               // Try to swap in the continuation word.
-              let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
-                  wordPtr._rawValue,
-                  state.word._builtinWordValue,
-                  continuationWord._builtinWordValue)
-              if !Bool(_builtinBooleanLiteral: won) {
+              let newState = SleepState.activeContinuation(continuation)
+              if !token.exchange(expected: state, desired: newState) {
                 // Keep trying!
                 continue
               }
@@ -61,7 +50,7 @@ extension Task where Success == Never, Failure == Never {
                 addPendingGroupTaskUnconditionally: false,
                 isDiscardingTask: false)
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
-                onSleepWake(wordPtr)
+                onSleepWake(token)
               }
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
@@ -94,12 +83,12 @@ extension Task where Success == Never, Failure == Never {
         }
         }
       } onCancel: {
-        onSleepCancel(wordPtr)
+        onSleepCancel(token)
       }
 
       // Determine whether we got cancelled before we even started.
       let cancelledBeforeStarted: Bool
-      switch SleepState(loading: wordPtr) {
+      switch token.load() {
       case .notStarted, .activeContinuation, .cancelled:
         fatalError("Invalid state for non-cancelled sleep task")
 
@@ -112,7 +101,7 @@ extension Task where Success == Never, Failure == Never {
 
       // We got here without being cancelled, so deallocate the storage for
       // the flag word and continuation.
-      wordPtr.deallocate()
+      token.deallocate()
 
       // If we got cancelled before we even started, through the cancellation
       // error now.

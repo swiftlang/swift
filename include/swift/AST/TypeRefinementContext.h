@@ -193,8 +193,8 @@ private:
 public:
   
   /// Create the root refinement context for the given SourceFile.
-  static TypeRefinementContext *createRoot(SourceFile *SF,
-                                           const AvailabilityContext &Info);
+  static TypeRefinementContext *
+  createForSourceFile(SourceFile *SF, const AvailabilityContext &Info);
 
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,

@@ -624,19 +624,26 @@ bool ConcreteContraction::performConcreteContraction(
 
     auto superclassTy = *found->second.begin();
 
-    for (const auto *proto : pair.second) {
-      if (auto otherSuperclassTy = proto->getSuperclass()) {
-        if (Debug) {
-          llvm::dbgs() << "@ Subject type of superclass requirement "
-                       << subjectType << " : " << superclassTy
-                       << " conforms to "<< proto->getName()
-                       << " which has a superclass bound "
-                       << otherSuperclassTy << "\n";
-        }
+    for (auto *proto : pair.second) {
+      auto *module = proto->getParentModule();
+      if (module->lookupConformance(superclassTy, proto)) {
+        auto genericSig = proto->getGenericSignature();
+        // FIXME: If we end up here while building the requirement
+        // signature of `proto`, we will hit a request cycle.
+        if (auto otherSuperclassTy = genericSig->getSuperclassBound(
+                proto->getSelfInterfaceType())) {
+          if (Debug) {
+            llvm::dbgs() << "@ Subject type of superclass requirement "
+                         << subjectType << " : " << superclassTy
+                         << " conforms to "<< proto->getName()
+                         << " which has a superclass bound "
+                         << otherSuperclassTy << "\n";
+          }
 
-        if (superclassTy->isEqual(otherSuperclassTy)) {
-          Superclasses.erase(subjectType);
-          break;
+          if (superclassTy->isEqual(otherSuperclassTy)) {
+            Superclasses.erase(subjectType);
+            break;
+          }
         }
       }
     }

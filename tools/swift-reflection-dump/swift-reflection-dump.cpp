@@ -157,7 +157,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       if (Line.empty())
         continue;
 
-      if (StringRef(Line).startswith("//"))
+      if (StringRef(Line).starts_with("//"))
         continue;
 
       Demangle::Demangler Dem;

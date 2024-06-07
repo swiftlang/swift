@@ -150,7 +150,7 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-LABEL: @$s4main15callCopyAndBind4argsyxxQp_tRvzlF
 //   Set up the result pack to initialize the elements of the tuple
 //   we're going to bind the local variable to.
-// CHECK:         [[TUPLE:%.*]] = alloc_stack [lexical] $(repeat each T), let, name "result"
+// CHECK:         [[TUPLE:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T), let, name "result"
 // CHECK-NEXT:    [[RESULT_PACK:%.*]] = alloc_pack $Pack{repeat each T}
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
@@ -217,7 +217,7 @@ struct Wrapper<Value> {
 // CHECK-LABEL: @$s4main17wrapTupleElementsyAA7WrapperVyxGxQp_txxQpRvzlF
 // CHECK-SAME: $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> @pack_out Pack{repeat Wrapper<each T>}
 func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T>) {
-// CHECK:         [[VALUES:%.*]] = alloc_stack [lexical] $(repeat Wrapper<each T>), let,
+// CHECK:         [[VALUES:%.*]] = alloc_stack [lexical] [var_decl] $(repeat Wrapper<each T>), let,
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}

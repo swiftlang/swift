@@ -87,11 +87,11 @@ extension GenericS: BaseP1 where T == Int {}
 
 func testConditionalConformanceNo(arg: GenericS<String>) {
   arg.#^TestConditionalConformanceNo^#
-// TestConditionalConformanceNo: LookedupTypeNames: ['Mod.GenericS', 'Swift.Sendable']
+// TestConditionalConformanceNo: LookedupTypeNames: ['Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
 }
 
 func testConditionalConformanceYes(arg: GenericS<Int>) {
   arg.#^TestConditionalConformanceYes^#
-// TestConditionalConformanceYes: LookedupTypeNames: ['Mod.BaseP1', 'Mod.GenericS', 'Swift.Sendable']
+// TestConditionalConformanceYes: LookedupTypeNames: ['Mod.BaseP1', 'Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
 
 }

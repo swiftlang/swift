@@ -1,5 +1,4 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
-// RUN: %target-run-simple-swift -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 
 // REQUIRES: executable_test
 

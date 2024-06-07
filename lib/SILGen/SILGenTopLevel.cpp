@@ -335,6 +335,9 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
 }
 
 void SILGenModule::emitEntryPoint(SourceFile *SF) {
+  if (getASTContext().SILOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return;
+
   assert(!M.lookUpFunction(getASTContext().getEntryPointFunctionName()) &&
          "already emitted toplevel?!");
 
@@ -366,9 +369,16 @@ void SILGenFunction::emitMarkFunctionEscapeForTopLevelCodeGlobals(
 /// uninitialized global variable
 static void emitMarkFunctionEscape(SILGenFunction &SGF,
                                    AbstractFunctionDecl *AFD) {
+  auto &Ctx = SGF.getASTContext();
+  if (Ctx.TypeCheckerOpts.DeferToRuntime &&
+      Ctx.LangOpts.hasFeature(Feature::LazyImmediate))
+    return;
+
   if (AFD->getDeclContext()->isLocalContext())
     return;
   auto CaptureInfo = AFD->getCaptureInfo();
+  if (!CaptureInfo.hasBeenComputed())
+    return;
   SGF.emitMarkFunctionEscapeForTopLevelCodeGlobals(AFD, std::move(CaptureInfo));
 }
 

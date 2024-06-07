@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s -target %target-swift-abi-5.5-triple | %FileCheck %s
 // REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=xros
 
 public protocol P<A> {
   associatedtype A

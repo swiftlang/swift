@@ -35,9 +35,9 @@ func test() {
   // CHECK-NEXT:     {
   // CHECK-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
   // CHECK-NEXT:       key.name: "foo()",
-  // CHECK-NEXT:       key.sourcetext: "foo()",
   // CHECK-NEXT:       key.description: "foo()",
   // CHECK-NEXT:       key.typename: "Void",
   // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.foo",
+  // CHECK:            key.sourcetext: "foo()"
   // CHECK:          }
 }

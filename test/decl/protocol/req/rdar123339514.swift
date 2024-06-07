@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-experimental-associated-type-inference
-// RUN: %target-swift-frontend -emit-silgen %s -enable-experimental-associated-type-inference
+// RUN: %target-swift-frontend -emit-silgen %s
 
 public struct G<A, B, C>: P {
   public typealias D = G<A, C, B>

@@ -126,6 +126,14 @@ public:
   /// Controls whether cross module optimization is enabled.
   CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
 
+  /// Optimization to perform default CMO within a package boundary.
+  /// Unlike the existing CMO, package CMO can be built with
+  /// -enable-library-evolution since package modules are required
+  /// to be built in the same project. To enable this optimization, the
+  /// module also needs to opt in to allow non-resilient access with
+  /// -experimental-allow-non-resilient-access.
+  bool EnableSerializePackage = false;
+
   /// Enables the emission of stack protectors in functions.
   bool EnableStackProtection = true;
 
@@ -136,6 +144,9 @@ public:
   /// Enables codegen support for clang imported ptrauth qualified field
   /// function pointers.
   bool EnableImportPtrauthFieldFunctionPointers = false;
+
+  /// Enables SIL-level diagnostics for NonescapableTypes.
+  bool EnableLifetimeDependenceDiagnostics = true;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
@@ -173,6 +184,9 @@ public:
 
   /// Require linear OSSA lifetimes after SILGen
   bool OSSACompleteLifetimes = false;
+
+  /// Verify linear OSSA lifetimes after SILGen
+  bool OSSAVerifyComplete = false;
 
   /// Enable pack metadata stack "promotion".
   ///
@@ -276,6 +290,10 @@ public:
   /// Are we building in embedded Swift + -no-allocations?
   bool NoAllocations = false;
 
+  /// Should we use the experimental Swift based closure-specialization
+  /// optimization pass instead of the existing C++ one.
+  bool EnableExperimentalSwiftBasedClosureSpecialization = false;
+
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
@@ -286,6 +304,10 @@ public:
 
   /// The format used for serializing remarks (default: YAML)
   llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
+
+  /// Are there any options that indicate that functions should not be preserved
+  /// for the debugger?
+  bool ShouldFunctionsBePreservedToDebugger = true;
 
   SILOptions() {}
 

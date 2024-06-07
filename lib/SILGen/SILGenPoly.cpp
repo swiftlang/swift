@@ -241,23 +241,23 @@ namespace {
   };
 } // end anonymous namespace
 
-static ManagedValue emitTransformExistential(SILGenFunction &SGF,
-                                             SILLocation loc,
-                                             ManagedValue input,
-                                             CanType inputType,
-                                             CanType outputType,
-                                             SGFContext ctxt) {
+ManagedValue
+SILGenFunction::emitTransformExistential(SILLocation loc,
+                                         ManagedValue input,
+                                         CanType inputType,
+                                         CanType outputType,
+                                         SGFContext ctxt) {
   assert(inputType != outputType);
 
-  FormalEvaluationScope scope(SGF);
+  FormalEvaluationScope scope(*this);
 
   if (inputType->isAnyExistentialType()) {
     CanType openedType = OpenedArchetypeType::getAny(inputType,
-                                                     SGF.F.getGenericSignature());
-    SILType loweredOpenedType = SGF.getLoweredType(openedType);
+                                                     F.getGenericSignature());
+    SILType loweredOpenedType = getLoweredType(openedType);
 
-    input = SGF.emitOpenExistential(loc, input,
-                                    loweredOpenedType, AccessKind::Read);
+    input = emitOpenExistential(loc, input,
+                                loweredOpenedType, AccessKind::Read);
     inputType = openedType;
   }
 
@@ -276,20 +276,20 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
 
   assert(!fromInstanceType.isAnyExistentialType());
   ArrayRef<ProtocolConformanceRef> conformances =
-      SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+      SGM.M.getSwiftModule()->collectExistentialConformances(
                                      fromInstanceType,
                                      toInstanceType,
                                      /*allowMissing=*/true);
 
   // Build result existential
   AbstractionPattern opaque = AbstractionPattern::getOpaque();
-  const TypeLowering &concreteTL = SGF.getTypeLowering(opaque, inputType);
-  const TypeLowering &expectedTL = SGF.getTypeLowering(outputType);
-  return SGF.emitExistentialErasure(
+  const TypeLowering &concreteTL = getTypeLowering(opaque, inputType);
+  const TypeLowering &expectedTL = getTypeLowering(outputType);
+  return emitExistentialErasure(
                    loc, inputType, concreteTL, expectedTL,
                    conformances, ctxt,
                    [&](SGFContext C) -> ManagedValue {
-                     return SGF.manageOpaqueValue(input, loc, C);
+                     return manageOpaqueValue(input, loc, C);
                    });
 }
 
@@ -628,9 +628,9 @@ ManagedValue Transform::transform(ManagedValue v,
     // We have to re-abstract payload if its a metatype or a function
     v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
                                  inputSubstType);
-    return emitTransformExistential(SGF, Loc, v,
-                                    inputSubstType, outputSubstType,
-                                    ctxt);
+    return SGF.emitTransformExistential(Loc, v,
+                                        inputSubstType, outputSubstType,
+                                        ctxt);
   }
 
   // - upcasting class-constrained existentials or metatypes thereof
@@ -5546,8 +5546,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   ManagedValue erasedIsolation;
   if (toType->hasErasedIsolation()) {
     auto inputIsolation = inputSubstType->getIsolation();
-    erasedIsolation = SGF.emitLoadOfFunctionIsolation(loc, inputIsolation, fn)
-                         .ensurePlusOne(SGF, loc);
+    erasedIsolation = SGF.emitFunctionTypeIsolation(loc, inputIsolation, fn);
   }
 
   auto thunkedFn =
@@ -6240,7 +6239,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->isSerialized(),
+      customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),
@@ -6306,10 +6305,13 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     arguments.push_back(indErrorRes.getLValueAddress());
   forwardFunctionArguments(thunkSGF, loc, fnRefType, params, arguments);
 
+  SubstitutionMap subs = thunk->getForwardingSubstitutionMap();
+  SILType substFnType = fnRef->getType().substGenericArgs(
+      M, subs, thunk->getTypeExpansionContext());
+
   // Apply function argument.
-  auto apply = thunkSGF.emitApplyWithRethrow(
-      loc, fnRef, /*substFnType*/ fnRef->getType(),
-      thunk->getForwardingSubstitutionMap(), arguments);
+  auto apply =
+      thunkSGF.emitApplyWithRethrow(loc, fnRef, substFnType, subs, arguments);
 
   // Self reordering thunk is necessary if wrt at least two parameters,
   // including self.
@@ -7022,8 +7024,10 @@ void SILGenFunction::emitProtocolWitness(
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
-      auto executor = emitExecutor(loc, *enterIsolation, actorSelf);
-      emitPreconditionCheckExpectedExecutor(loc, *executor);
+
+      if (getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled()) {
+        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+      }
     } else {
       emitHopToTargetActor(loc, enterIsolation, actorSelf);
     }
@@ -7248,12 +7252,10 @@ ManagedValue SILGenFunction::emitActorIsolationErasureThunk(
 
     buildThunkBody(
         thunkSGF, loc, AbstractionPattern(isolatedType), isolatedType,
-        AbstractionPattern(nonIsolatedType), nonIsolatedType,
-        expectedType, dynamicSelfType,
-        [&loc, &globalActor](SILGenFunction &thunkSGF) {
-          auto expectedExecutor =
-              thunkSGF.emitLoadGlobalActorExecutor(globalActor);
-          thunkSGF.emitPreconditionCheckExpectedExecutor(loc, expectedExecutor);
+        AbstractionPattern(nonIsolatedType), nonIsolatedType, expectedType,
+        dynamicSelfType, [&loc, &globalActor](SILGenFunction &thunkSGF) {
+          thunkSGF.emitPreconditionCheckExpectedExecutor(
+              loc, ActorIsolation::forGlobalActor(globalActor), std::nullopt);
         });
 
     SGM.emitLazyConformancesForFunction(thunk);

@@ -20,4 +20,4 @@
 // when automatically evolving the standard library.
 // UNSUPPORTED: swift_evolve
 
-// XFAIL: noncopyable_generics
+

@@ -689,6 +689,40 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     }
     }
   }
+
+  case MetadataKind::ExtendedExistential: {
+    auto *existentialType = cast<ExtendedExistentialTypeMetadata>(type);
+
+    switch (existentialType->Shape->Flags.getSpecialKind()) {
+    case ExtendedExistentialTypeShape::SpecialKind::None: {
+      auto opaqueContainer =
+	reinterpret_cast<OpaqueExistentialContainer *>(value);
+      auto innerValue = const_cast<OpaqueValue *>(opaqueContainer->projectValue());
+      auto innerType = opaqueContainer->Type;
+      return findDynamicValueAndType(innerValue, innerType,
+                                     outValue, outType, inoutCanTake, false,
+                                     isTargetExistentialMetatype);
+    }
+    case ExtendedExistentialTypeShape::SpecialKind::Class: {
+      auto classContainer =
+        reinterpret_cast<ClassExistentialContainer *>(value);
+      outType = swift_getObjectType((HeapObject *)classContainer->Value);
+      outValue = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
+      return;
+    }
+    case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+      auto srcExistentialContainer =
+        reinterpret_cast<ExistentialMetatypeContainer *>(value);
+      outType = swift_getMetatypeMetadata(srcExistentialContainer->Value);
+      outValue = reinterpret_cast<OpaqueValue *>(&srcExistentialContainer->Value);
+      return;
+    }
+    case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout: {
+      swift_unreachable("Extended Existential with explicit layout not yet implemented");
+      return;
+    }
+    }
+  }
     
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype: {

@@ -13,7 +13,7 @@
 // Tty ioctl request constants, needed only on Darwin and FreeBSD.
 
 // Constants available on all platforms, also available on Linux.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(FreeBSD) || os(Haiku)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(FreeBSD) || os(Haiku)
 
 /// Set exclusive use of tty.
 public var TIOCEXCL: UInt { return 0x2000740d }
@@ -115,7 +115,7 @@ public var TIOCGLTC: UInt { return 0x40067474 }
 
 
 // Darwin only constants, also available on Linux.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
 
 /// Get termios struct.
 public var TIOCGETA: UInt { return 0x40487413 }
