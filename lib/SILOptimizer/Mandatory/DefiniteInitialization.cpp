@@ -491,6 +491,7 @@ namespace {
     void handleTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
+    void handleFlowSensitiveActorIsolationUse(const DIMemoryUse &Use);
 
     bool diagnoseReturnWithoutInitializingStoredProperties(
         const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use);
@@ -565,6 +566,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::LoadForTypeOfSelf:
     case DIUseKind::TypeOfSelf:
     case DIUseKind::Escape:
+    case DIUseKind::FlowSensitiveSelfIsolation:
       continue;
     case DIUseKind::Assign:
     case DIUseKind::Set:
@@ -1160,6 +1162,10 @@ void LifetimeChecker::doIt() {
     case DIUseKind::BadExplicitStore:
       diagnoseBadExplicitStore(Inst);
       break;
+
+    case DIUseKind::FlowSensitiveSelfIsolation:
+      handleFlowSensitiveActorIsolationUse(Use);
+      break;
     }
   }
 
@@ -1342,6 +1348,47 @@ void LifetimeChecker::handleTypeOfSelfUse(DIMemoryUse &Use) {
     // Clear the Inst pointer just to be sure to avoid use-after-free.
     Use.Inst = nullptr;
   }
+}
+
+void LifetimeChecker::handleFlowSensitiveActorIsolationUse(
+    const DIMemoryUse &Use) {
+  bool IsSuperInitComplete, FailedSelfUse;
+
+  ASTContext &ctx = F.getASTContext();
+  auto builtinInst = cast<BuiltinInst>(Use.Inst);
+  SILBuilderWithScope B(builtinInst);
+  SILValue replacement;
+  SILType optExistentialType = builtinInst->getType();
+  SILLocation loc = builtinInst->getLoc();
+  if (isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    // 'self' is initialized, so replace this builtin with an injection of the
+    // argument into (any Actor)?.
+
+    // Create a copy of the actor argument, which we intentionally did not
+    // copy in SILGen.
+    SILValue actor = B.createCopyValue(loc, builtinInst->getArguments()[0]);
+
+    // Inject 'self' into 'any Actor'.
+    ProtocolConformanceRef conformances[1] = {
+      builtinInst->getSubstitutions().getConformances()[0]
+    };
+    SILType existentialType = optExistentialType.getOptionalObjectType();
+    SILValue existentialBox = B.createInitExistentialRef(
+        loc, existentialType, actor->getType().getASTType(), actor,
+        ctx.AllocateCopy(conformances));
+
+    // Then, wrap it in an optional.
+    replacement = B.createEnum(
+        loc, existentialBox, ctx.getOptionalSomeDecl(), optExistentialType);
+  } else {
+    // 'self' is not initialized yet, so use 'nil'.
+    replacement = B.createEnum(
+        loc, SILValue(), ctx.getOptionalNoneDecl(), optExistentialType);
+  }
+
+  // Introduce the replacement.
+  InstModCallbacks callbacks;
+  replaceAllUsesAndErase(builtinInst, replacement, callbacks);
 }
 
 void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
