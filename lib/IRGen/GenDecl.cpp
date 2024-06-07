@@ -1117,9 +1117,9 @@ void IRGenModule::emitGlobalLists() {
     if (IRGen.Opts.EmitGenericRODatas) {
       emitGlobalList(
           *this, GenericRODatas, "generic_ro_datas",
-          GetObjCSectionName("__swift_rodatas", "regular"),
+          GetObjCSectionName("__objc_clsrolist", "regular"),
           llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ true);
+          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ false);
     }
 
     // Objective-C class references go in a variable with a meaningless
