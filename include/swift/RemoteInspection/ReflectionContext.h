@@ -365,8 +365,6 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
-    auto MPEnumMdSec = findMachOSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -374,8 +372,7 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr &&
-        MPEnumMdSec.first == nullptr)
+        ConformMdSec.first == nullptr)
       return {};
 
     ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
@@ -385,7 +382,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
 
     auto InfoID = this->addReflectionInfo(info);
@@ -493,8 +489,6 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
-    auto MPEnumMdSec = findCOFFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -502,8 +496,7 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr &&
-        MPEnumMdSec.first == nullptr)
+        ConformMdSec.first == nullptr)
       return {};
 
     ReflectionInfo Info = {{FieldMdSec.first, FieldMdSec.second},
@@ -513,7 +506,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
     return this->addReflectionInfo(Info);
   }
@@ -1030,7 +1022,8 @@ public:
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
         ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
-        ReflectionSectionKind::conform, ReflectionSectionKind::mpenum};
+        ReflectionSectionKind::conform
+    };
 
     llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
     for (auto Section : Sections) {
@@ -1056,7 +1049,6 @@ public:
                            {Pairs[4].first, Pairs[4].second},
                            {Pairs[5].first, Pairs[5].second},
                            {Pairs[6].first, Pairs[6].second},
-                           {Pairs[7].first, Pairs[7].second},
                            PotentialModuleNames};
     return addReflectionInfo(Info);
   }
