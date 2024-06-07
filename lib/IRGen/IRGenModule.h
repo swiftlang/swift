@@ -1396,7 +1396,6 @@ public:
   std::string CaptureDescriptorSection;
   std::string ReflectionStringsSection;
   std::string ReflectionTypeRefSection;
-  std::string MultiPayloadEnumDescriptorSection;
 
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
@@ -1476,7 +1475,6 @@ public:
   const char *getCaptureDescriptorMetadataSectionName();
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
-  const char *getMultiPayloadEnumDescriptorSectionName();
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
