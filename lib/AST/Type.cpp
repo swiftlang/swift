@@ -1301,6 +1301,7 @@ ParameterListInfo::ParameterListInfo(
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
+  isSending.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1364,6 +1365,10 @@ ParameterListInfo::ParameterListInfo(
     if (param->getInterfaceType()->is<PackExpansionType>()) {
       variadicGenerics.set(i);
     }
+
+    if (param->isSending()) {
+      isSending.set(i);
+    }
   }
 }
 
@@ -1404,6 +1409,9 @@ bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
       : false;
 }
 
+bool ParameterListInfo::isSendingParameter(unsigned paramIdx) const {
+  return paramIdx < isSending.size() ? isSending[paramIdx] : false;
+}
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (_:, b:, c:)

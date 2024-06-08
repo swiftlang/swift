@@ -5922,23 +5922,25 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyContextualClosureFlags(
-      Expr *expr, bool implicitSelfCapture, bool inheritActorContext) {
+static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
+                                        bool inheritActorContext,
+                                        bool isSendingParameter) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
+    closure->setSendingParameter(isSendingParameter);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyContextualClosureFlags(
-        captureList->getClosureBody(), implicitSelfCapture,
-        inheritActorContext);
+    applyContextualClosureFlags(captureList->getClosureBody(),
+                                implicitSelfCapture, inheritActorContext,
+                                isSendingParameter);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
-    applyContextualClosureFlags(
-        identity->getSubExpr(), implicitSelfCapture, inheritActorContext);
+    applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
+                                inheritActorContext, isSendingParameter);
   }
 }
 
@@ -6166,8 +6168,10 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // implicit self capture or inheriting actor context.
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    applyContextualClosureFlags(
-        argExpr, isImplicitSelfCapture, inheritsActorContext);
+    bool isSendingParameter = paramInfo.isSendingParameter(paramIdx);
+
+    applyContextualClosureFlags(argExpr, isImplicitSelfCapture,
+                                inheritsActorContext, isSendingParameter);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
