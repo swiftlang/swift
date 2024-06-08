@@ -915,6 +915,7 @@ private:
                   MarkUnresolvedNonCopyableValueInst::CheckKind::
                       ConsumableAndAssignable);
               break;
+            case SILArgumentConvention::Indirect_In_CXX:
             case SILArgumentConvention::Indirect_In_Guaranteed:
               argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
                   loc, argrv,
@@ -1245,6 +1246,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       case SILArgumentConvention::Indirect_InoutAliasable:
       case SILArgumentConvention::Indirect_In:
       case SILArgumentConvention::Indirect_In_Guaranteed:
+      case SILArgumentConvention::Indirect_In_CXX:
       case SILArgumentConvention::Pack_Inout:
       case SILArgumentConvention::Pack_Owned:
       case SILArgumentConvention::Pack_Guaranteed:

@@ -689,6 +689,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
         case ParameterConvention::Indirect_In_Guaranteed:
         case ParameterConvention::Indirect_Inout:
         case ParameterConvention::Indirect_InoutAliasable:
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Direct_Unowned:
         case ParameterConvention::Direct_Guaranteed:
         case ParameterConvention::Pack_Guaranteed:
@@ -1031,7 +1032,7 @@ struct ConcreteArgumentCopy {
     assert(!paramInfo.isIndirectMutating()
            && "A mutated opened existential value can't be replaced");
 
-    if (!paramInfo.isConsumed())
+    if (!paramInfo.isConsumedInCaller())
       return std::nullopt;
 
     SILValue origArg = apply.getArgument(argIdx);

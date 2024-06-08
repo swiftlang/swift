@@ -543,6 +543,7 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In_CXX:
       return true;
 
     case SILArgumentConvention::Direct_Unowned:
@@ -2194,7 +2195,7 @@ public:
           "applied argument types do not match suffix of function type's "
           "inputs");
       if (PAI->isOnStack()) {
-        require(!substConv.getSILArgumentConvention(argIdx).isOwnedConvention(),
+        require(!substConv.getSILArgumentConvention(argIdx).isOwnedConventionInCaller(),
           "on-stack closures do not support owned arguments");
       }
     }
@@ -6462,6 +6463,7 @@ public:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
+                         case ParameterConvention::Indirect_In_CXX:
                          case ParameterConvention::Pack_Owned:
                          case ParameterConvention::Pack_Guaranteed:
                          case ParameterConvention::Pack_Inout:

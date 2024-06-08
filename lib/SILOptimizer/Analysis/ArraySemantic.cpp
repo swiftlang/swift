@@ -815,7 +815,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
     SILValue Args[] = {AllocStackInst, ArrRef};
     Builder.createApply(Loc, FnRef, Subs, Args);
     Builder.createDeallocStack(Loc, AllocStackInst);
-    if (!isConsumedParameter(AppendFnTy->getParameters()[0].getConvention())) {
+    if (!isConsumedParameterInCaller(AppendFnTy->getParameters()[0].getConvention())) {
       ValLowering.emitDestroyValue(Builder, Loc, CopiedVal);
     }
   }
