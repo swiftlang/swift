@@ -1023,7 +1023,8 @@ class SomeClassWithInits {
 
   func hasDetached() {
     Task.detached {
-      // okay
+      // This is main actor isolated even though we are detached since the
+      // closure.
       await self.isolated()
       self.isolated()
       // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}

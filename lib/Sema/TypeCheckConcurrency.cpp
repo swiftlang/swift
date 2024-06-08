@@ -33,6 +33,8 @@
 
 using namespace swift;
 
+#pragma clang optimize off
+
 /// Determine whether it makes sense to infer an attribute in the given
 /// context.
 static bool shouldInferAttributeInContext(const DeclContext *dc) {
@@ -4180,6 +4182,24 @@ namespace {
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
         return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
+
+      // If we have a non-Sendable explicit closure that is used as a sending
+      // parameter, make it nonisolated.
+      if (auto *applyExpr = getImmediateApply()) {
+        for (auto pair : llvm::enumerate(*applyExpr->getArgs())) {
+          auto arg = pair.value();
+          auto *semanticExpr = arg.getExpr()->getSemanticsProvidingExpr();
+          if (auto *fce = dyn_cast<FunctionConversionExpr>(semanticExpr))
+            semanticExpr = fce->getSubExpr();
+          if (semanticExpr == closure) {
+            if (auto *funcTy = applyExpr->getSemanticFn()->getType()->getAs<AnyFunctionType>()) {
+              if (funcTy->getParams()[pair.index()].getParameterFlags().isSending())
+                return ActorIsolation::forNonisolated(/*unsafe=*/false)
+                  .withPreconcurrency(preconcurrency);        
+            }
+          }
+        }
+      }
 
       // A non-Sendable closure gets its isolation from its context.
       auto parentIsolation = getActorIsolationOfContext(
