@@ -96,6 +96,19 @@ private func isNotReferenceCounted(value: Value) -> Bool {
         if let atp = rptr.pointer as? AddressToPointerInst {
           return atp.address is GlobalAddrInst
         }
+
+        // The new pattern generated for empty collection singletons is:
+        //     %0 = function_ref @_swift_stdlib_getEmptyArrayStorage
+        //     %1 = apply %0()
+        //     %2 = struct_extract %2 : $UnsafeRawPointer, #UnsafeRawPointer._rawValue
+        //     %3 = raw_pointer_to_ref %2
+        if let sei = rptr.pointer as? StructExtractInst,
+           let apply = sei.struct as? ApplyInst,
+           let function = apply.referencedFunction {
+          return function.name == "_swift_stdlib_getEmptyArrayStorage" ||
+                 function.name == "_swift_stdlib_getEmptyDictionarySingleton" ||
+                 function.name == "_swift_stdlib_getEmptySetSingleton"
+        }
       }
       return false
     case // Thin functions are not reference counted.

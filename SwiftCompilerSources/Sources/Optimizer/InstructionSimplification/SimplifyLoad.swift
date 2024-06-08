@@ -125,6 +125,20 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     // Find the root object of the load-address.
     while true {
       switch addr {
+      case let ai as ApplyInst:
+        guard let fri = ai.referencedFunction else {
+          return false
+        }
+
+        switch fri.name {
+        case "_swift_stdlib_getEmptyArrayStorage",
+             "_swift_stdlib_getEmptyDictionarySingleton",
+             "_swift_stdlib_getEmptySetSingleton":
+          return true
+
+        default:
+          return false
+        }
       case let ga as GlobalAddrInst:
         switch ga.global.name {
         case "_swiftEmptyArrayStorage",
@@ -177,7 +191,8 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
            is AddressToPointerInst,
            is BeginBorrowInst,
            is CopyValueInst,
-           is EndCOWMutationInst:
+           is EndCOWMutationInst,
+           is StructExtractInst:
         addr = (addr as! UnaryInstruction).operand.value
       case let mviResult as MultipleValueInstructionResult:
         guard let bci = mviResult.parentInstruction as? BeginCOWMutationInst else {

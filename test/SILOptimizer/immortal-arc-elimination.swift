@@ -12,7 +12,7 @@
 // But only with a Swift 5.1 runtime (which supports immortal objects).
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test10emptyArraySaySiGyF
-// CHECK:       global_addr
+// CHECK:       function_ref @_swift_stdlib_getEmptyArrayStorage
 // CHECK-NOT:   retain
 // CHECK: } // end sil function '$s4test10emptyArraySaySiGyF'
 @inline(never)

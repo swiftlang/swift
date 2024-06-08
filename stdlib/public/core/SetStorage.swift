@@ -153,7 +153,6 @@ public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, U
       /*rawElements*/1, 
       /*metadata*/~1
     )
-#endif
 
 extension __RawSetStorage {
   /// The empty singleton that is used for every single Set that is created
@@ -161,10 +160,20 @@ extension __RawSetStorage {
   @inlinable
   @nonobjc
   internal static var empty: __EmptySetSingleton {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptySetSingleton))
+    Builtin.bridgeFromRawPointer(Builtin.addressof(&_swiftEmptySetSingleton))
   }
 }
+#else
+extension __RawSetStorage {
+  /// The empty singleton that is used for every single Set that is created
+  /// without any elements. The contents of the storage must never be mutated.
+  @inlinable
+  @nonobjc
+  internal static var empty: __EmptySetSingleton {
+    Builtin.bridgeFromRawPointer(_swift_stdlib_getEmptySetSingleton()._rawValue)
+  }
+}
+#endif
 
 extension __EmptySetSingleton: _NSSetCore {
 #if _runtime(_ObjC)

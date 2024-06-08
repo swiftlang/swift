@@ -6,7 +6,10 @@
 // Test optimal code generation for creating empty sets.
 
 // CHECK-LABEL: sil {{.*}}@$s4test30createEmptySetFromArrayLiteralShySiGyF
-// CHECK:         global_addr @_swiftEmptySetSingleton
+// CHECK:         [[ARRAY:%.*]] = function_ref @_swift_stdlib_getEmptyArrayStorage
+// CHECK:         apply [[ARRAY]]
+// CHECK:         [[SET:%.*]] = function_ref @_swift_stdlib_getEmptySetSingleton
+// CHECK:         apply [[SET]]
 // CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4test30createEmptySetFromArrayLiteralShySiGyF'
 public func createEmptySetFromArrayLiteral() -> Set<Int> {
@@ -14,7 +17,8 @@ public func createEmptySetFromArrayLiteral() -> Set<Int> {
 }
 
 // CHECK-LABEL: sil {{.*}}@$s4test29createEmptySetWithInitializerShySiGyF
-// CHECK:         global_addr @_swiftEmptySetSingleton
+// CHECK:         [[SET:%.*]] = function_ref @_swift_stdlib_getEmptySetSingleton
+// CHECK:         apply [[SET]]
 // CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4test29createEmptySetWithInitializerShySiGyF'
 public func createEmptySetWithInitializer() -> Set<Int> {

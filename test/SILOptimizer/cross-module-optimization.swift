@@ -28,8 +28,6 @@
 
 import Test
 
-// CHECK-SIL: sil_global public_external [serialized] @_swiftEmptySetSingleton : $_SwiftEmptySetSingleton
-
 func testNestedTypes() {
   let c = Container()
 
@@ -164,6 +162,8 @@ func testImplementationOnly() {
   print(callCImplementationOnly(0))
   // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
 }
+
+// CHECK-SIL: sil shared [clang _swift_stdlib_getEmptySetSingleton] @_swift_stdlib_getEmptySetSingleton : $@convention(c) () -> UnsafeRawPointer
 
 testNestedTypes()
 testClass()

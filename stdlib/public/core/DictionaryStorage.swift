@@ -214,7 +214,6 @@ public var _swiftEmptyDictionarySingleton: (Int, Int, Int, Int, UInt8, UInt8, UI
       /*rawValues*/1,
       /*metadata*/~1
     )
-#endif
 
 extension __RawDictionaryStorage {
   /// The empty singleton that is used for every single Dictionary that is
@@ -223,10 +222,27 @@ extension __RawDictionaryStorage {
   @inlinable
   @nonobjc
   internal static var empty: __EmptyDictionarySingleton {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptyDictionarySingleton))
+    Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmptyDictionarySingleton)
+    )
   }
-  
+}
+#else
+extension __RawDictionaryStorage {
+  /// The empty singleton that is used for every single Dictionary that is
+  /// created without any elements. The contents of the storage should never
+  /// be mutated.
+  @inlinable
+  @nonobjc
+  internal static var empty: __EmptyDictionarySingleton {
+    Builtin.bridgeFromRawPointer(
+      _swift_stdlib_getEmptyDictionarySingleton()._rawValue
+    )
+  }
+}
+#endif
+
+extension __RawDictionaryStorage {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {

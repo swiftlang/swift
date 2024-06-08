@@ -235,7 +235,7 @@ func closueWhichModifiesLocalVar() -> Int {
 
 @_noAllocation
 func createEmptyArray() {
-  _ = [Int]() // expected-error {{ending the lifetime of a value of type}}
+  _ = [Int]() // expected-error {{called function is not available in this module and can have unpredictable performance}}
 }
 
 struct Buffer {
