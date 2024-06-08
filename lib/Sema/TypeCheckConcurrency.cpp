@@ -4183,6 +4183,16 @@ namespace {
         return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
 
+      // If the explicit closure is used as a non-Sendable sending parameter,
+      // make it nonisolated by default instead of inferring its isolation from
+      // the context.
+      if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (!explicitClosure->inheritsActorContext() &&
+            explicitClosure->isSendingParameter())
+          return ActorIsolation::forNonisolated(/*unsafe=*/false)
+              .withPreconcurrency(preconcurrency);
+      }
+
       // A non-Sendable closure gets its isolation from its context.
       auto parentIsolation = getActorIsolationOfContext(
           closure->getParent(), getClosureActorIsolation);
