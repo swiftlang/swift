@@ -2152,7 +2152,11 @@ namespace {
                   .limitBehaviorUntilSwiftVersion(behavior, 6);
             }
 
-            // Always emit the note with fix-it.
+            // Overrides cannot be isolated to a global actor; the isolation
+            // must match the overridden decl.
+            if (fn->getOverriddenDecl())
+              return false;
+
             fn->diagnose(diag::add_globalactor_to_function,
                          globalActor->getWithoutParens().getString(),
                          fn, globalActor)
@@ -4941,6 +4945,7 @@ static OverrideIsolationResult validOverrideIsolation(
     ValueDecl *overridden, ActorIsolation overriddenIsolation) {
   ConcreteDeclRef valueRef = getDeclRefInContext(value);
   auto declContext = value->getInnermostDeclContext();
+  auto &ctx = declContext->getASTContext();
 
   auto refResult = ActorReferenceResult::forReference(
       valueRef, SourceLoc(), declContext, std::nullopt, std::nullopt, isolation,
@@ -4964,8 +4969,10 @@ static OverrideIsolationResult validOverrideIsolation(
 
     // If the overridden declaration is from Objective-C with no actor
     // annotation, allow it.
-    if (overridden->hasClangNode() && !overriddenIsolation)
+    if (ctx.LangOpts.StrictConcurrencyLevel != StrictConcurrency::Complete &&
+        overridden->hasClangNode() && !overriddenIsolation) {
       return OverrideIsolationResult::Allowed;
+    }
 
     return OverrideIsolationResult::Disallowed;
   }

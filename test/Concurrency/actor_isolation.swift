@@ -1492,9 +1492,6 @@ class None {
 // try to add inferred isolation while overriding
 @MainActor
 class MA_None1: None {
-
-  // FIXME: bad note, since the problem is a mismatch in overridden vs inferred isolation; this wont help.
-  // expected-note@+1 {{add '@MainActor' to make instance method 'method()' part of global actor 'MainActor'}}
   override func method() {
     beets_ma() // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }
