@@ -136,6 +136,7 @@ $ ld ... -o binary output.o $(dirname `which swiftc`)/../lib/swift/embedded/armv
 **Unicode data tables are required for (list not exhaustive):**
 
 - Comparing String objects for equality
+- Sorting Strings
 - Using String's hash values, and in particular using String as dictionary keys
 - Using String's .count property
 - Using Unicode-aware string processing APIs (.split(), iterating characters, indexing)
