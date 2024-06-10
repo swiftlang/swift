@@ -5557,7 +5557,6 @@ namespace {
       assert(OpenedExistentials.empty());
 
       auto &ctx = cs.getASTContext();
-      auto *module = dc->getParentModule();
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
