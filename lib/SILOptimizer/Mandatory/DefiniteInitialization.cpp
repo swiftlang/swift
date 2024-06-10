@@ -15,6 +15,7 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1361,25 +1362,51 @@ void LifetimeChecker::handleFlowSensitiveActorIsolationUse(
   SILType optExistentialType = builtinInst->getType();
   SILLocation loc = builtinInst->getLoc();
   if (isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
-    // 'self' is initialized, so replace this builtin with an injection of the
-    // argument into (any Actor)?.
+    // 'self' is initialized, so replace this builtin with the appropriate
+    // operation to produce `any Actor.
 
-    // Create a copy of the actor argument, which we intentionally did not
-    // copy in SILGen.
-    SILValue actor = B.createCopyValue(loc, builtinInst->getArguments()[0]);
+    SILValue anyActorValue;
+    auto conformance = builtinInst->getSubstitutions().getConformances()[0];
+    if (builtinInst->getBuiltinKind() == BuiltinValueKind::FlowSensitiveSelfIsolation) {
+      // Create a copy of the actor argument, which we intentionally did not
+      // copy in SILGen.
+      SILValue actor = B.createCopyValue(loc, builtinInst->getArguments()[0]);
 
-    // Inject 'self' into 'any Actor'.
-    ProtocolConformanceRef conformances[1] = {
-      builtinInst->getSubstitutions().getConformances()[0]
-    };
-    SILType existentialType = optExistentialType.getOptionalObjectType();
-    SILValue existentialBox = B.createInitExistentialRef(
-        loc, existentialType, actor->getType().getASTType(), actor,
-        ctx.AllocateCopy(conformances));
+      // Inject 'self' into 'any Actor'.
+      ProtocolConformanceRef conformances[1] = { conformance };
+      SILType existentialType = optExistentialType.getOptionalObjectType();
+      anyActorValue = B.createInitExistentialRef(
+          loc, existentialType, actor->getType().getASTType(), actor,
+          ctx.AllocateCopy(conformances));
+    } else {
+      // Borrow the actor argument, which we need to form the appropriate
+      // call to the asLocalActor getter.
+      SILValue actor = B.createBeginBorrow(loc, builtinInst->getArguments()[0]);
+
+      // Dig out the getter for asLocalActor.
+      auto asLocalActorDecl = getDistributedActorAsLocalActorComputedProperty(
+          F.getDeclContext()->getParentModule());
+      auto asLocalActorGetter = asLocalActorDecl->getAccessor(AccessorKind::Get);
+      SILDeclRef asLocalActorRef = SILDeclRef(
+          asLocalActorGetter, SILDeclRef::Kind::Func);
+      SILFunction *asLocalActorFunc = F.getModule()
+          .lookUpFunction(asLocalActorRef);
+      SILValue asLocalActorValue = B.createFunctionRef(loc, asLocalActorFunc);
+
+      // Call asLocalActor. It produces an 'any Actor'.
+      anyActorValue = B.createApply(
+          loc,
+          asLocalActorValue,
+          SubstitutionMap::get(asLocalActorGetter->getGenericSignature(),
+                               { actor->getType().getASTType() },
+                               { conformance }),
+                               { actor });
+      B.createEndBorrow(loc, actor);
+    }
 
     // Then, wrap it in an optional.
     replacement = B.createEnum(
-        loc, existentialBox, ctx.getOptionalSomeDecl(), optExistentialType);
+        loc, anyActorValue, ctx.getOptionalSomeDecl(), optExistentialType);
   } else {
     // 'self' is not initialized yet, so use 'nil'.
     replacement = B.createEnum(

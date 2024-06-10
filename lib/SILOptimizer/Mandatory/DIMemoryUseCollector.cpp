@@ -1714,7 +1714,9 @@ void ElementUseCollector::collectClassSelfUses(
     // they have a fully-formed 'self' to use.
     if (auto builtin = dyn_cast<BuiltinInst>(User)) {
       if (auto builtinKind = builtin->getBuiltinKind()) {
-        if (*builtinKind == BuiltinValueKind::FlowSensitiveSelfIsolation) {
+        if (*builtinKind == BuiltinValueKind::FlowSensitiveSelfIsolation ||
+            *builtinKind ==
+              BuiltinValueKind::FlowSensitiveDistributedSelfIsolation) {
           Kind = DIUseKind::FlowSensitiveSelfIsolation;
         }
       }
