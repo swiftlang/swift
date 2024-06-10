@@ -123,7 +123,7 @@ import Swift
 /// And using it like this:
 ///
 /// ```
-/// await Actor().start()
+/// await Worker().start()
 /// ```
 ///
 /// Note that the actor is only retained by the start() method's use of `self`,
