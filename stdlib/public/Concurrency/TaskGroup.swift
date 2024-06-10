@@ -545,7 +545,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// to wait for all the child tasks to complete,
   /// collecting the values they returned:
   ///
-  ///     while let first = try await group.next() {
+  ///     while let value = try await group.next() {
   ///        collected += value
   ///     }
   ///     return collected
