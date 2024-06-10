@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s %S/Inputs/EnumFromOtherFile.swift -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion %S/Inputs/EnumFromOtherFile.swift
 
 // NOCRASH: Token
 
