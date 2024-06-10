@@ -2089,6 +2089,20 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getFlowSensitiveSelfIsolation(
+  ASTContext &ctx, Identifier id, bool isDistributed
+) {
+  BuiltinFunctionBuilder builder(ctx);
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _generics(_unrestricted,
+                _conformsToDefaults(0),
+                _conformsTo(_typeparam(0),
+                            isDistributed ? _distributedActor : _actor)),
+      _parameters(_typeparam(0)),
+      _optional(_existential(_actor)));
+}
+
 static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto *distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
@@ -3190,6 +3204,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
+
+  case BuiltinValueKind::FlowSensitiveSelfIsolation:
+    return getFlowSensitiveSelfIsolation(Context, Id, false);
+
+  case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
+    return getFlowSensitiveSelfIsolation(Context, Id, true);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     return getAutoDiffCreateLinearMapContext(Context, Id);

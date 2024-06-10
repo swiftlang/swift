@@ -31,6 +31,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -6743,6 +6744,56 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
+  // If we are in an actor initializer that is isolated to, the current context
+  // isolation flow-sensitive: before 'self' has been initialized, it will be
+  // nil. After 'self' has been initialized, it will be 'self'. Introduce a
+  // custom builtin that Definite Initialization will rewrite appropriately.
+  if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
+          SGF.F.getDeclRef().getDecl())) {
+    auto isolation = getActorIsolation(ctor);
+    if (ctor->isDesignatedInit() &&
+        isolation == ActorIsolation::ActorInstance &&
+        isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+      ASTContext &ctx = SGF.getASTContext();
+      auto builtinName = ctx.getIdentifier(
+          isolation.isDistributedActor()
+              ? getBuiltinName(BuiltinValueKind::FlowSensitiveDistributedSelfIsolation)
+              : getBuiltinName(BuiltinValueKind::FlowSensitiveSelfIsolation));
+      SILType resultTy = SGF.getLoweredType(E->getType());
+
+      auto injection = cast<InjectIntoOptionalExpr>(E->getActor());
+      ProtocolConformanceRef conformance;
+      Expr *origActorExpr;
+      if (isolation.isDistributedActor()) {
+        // Create a reference to the asLocalActor getter.
+        auto asLocalActorDecl = getDistributedActorAsLocalActorComputedProperty(
+            SGF.F.getDeclContext()->getParentModule());
+        auto asLocalActorGetter = asLocalActorDecl->getAccessor(AccessorKind::Get);
+        SILDeclRef asLocalActorRef = SILDeclRef(
+            asLocalActorGetter, SILDeclRef::Kind::Func);
+        SGF.emitGlobalFunctionRef(E, asLocalActorRef);
+
+        // Extract the base ('self') and the DistributedActor conformance.
+        auto memberRef = cast<MemberRefExpr>(injection->getSubExpr());
+        conformance = memberRef->getDecl().getSubstitutions()
+            .getConformances()[0];
+        origActorExpr = memberRef->getBase();
+      } else {
+        auto erasure = cast<ErasureExpr>(injection->getSubExpr());
+        conformance = erasure->getConformances()[0];
+        origActorExpr = erasure->getSubExpr();
+      }
+      SGF.SGM.useConformance(conformance);
+
+      SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
+          conformance.getRequirement(), origActorExpr->getType(), conformance);
+      auto origActor = SGF.maybeEmitValueOfLocalVarDecl(
+          ctor->getImplicitSelfDecl(), AccessKind::Read).getValue();
+      auto call = SGF.B.createBuiltin(E, builtinName, resultTy, subs, origActor);
+      return RValue(SGF, E, ManagedValue::forForwardedRValue(SGF, call));
+    }
+  }
+
   return visit(E->getActor(), C);
 }
 
