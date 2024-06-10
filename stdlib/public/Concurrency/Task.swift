@@ -134,7 +134,7 @@ import Swift
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
-/// ```
+/// ```other
 /// start task work
 /// completed task work
 /// deinit actor
