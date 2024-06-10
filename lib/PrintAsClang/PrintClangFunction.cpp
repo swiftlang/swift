@@ -713,15 +713,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     if (kind == FunctionSignatureKind::CxxInlineThunk)
       ClangSyntaxPrinter(os).printGenericSignature(Signature);
   }
-  if (const auto *enumDecl = FD->getDeclContext()->getSelfEnumDecl())
-  {
+  if (const auto *enumDecl = FD->getDeclContext()->getSelfEnumDecl()) {
     // We cannot emit functions with the same name as an enum case yet, the resulting header
     // does not compiler.
     // FIXME: either do not emit cases as inline members, or rename the cases or the
     //        colliding functions.
     for (const auto *enumElement : enumDecl->getAllElements()) {
       auto elementName = enumElement->getName();
-      if (!elementName.isSpecial() && elementName.getBaseIdentifier().str() == name)
+      if (!elementName.isSpecial() && elementName.getBaseIdentifier().is(name))
         return ClangRepresentation::unsupported;
     }
   }
