@@ -1526,7 +1526,14 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(
+  // Note: we cannot 'just 'hasTaskExecutor ? ... : ...' the different synthesizer
+  // since templates need the full type of the synthesizer, and then they'd be
+  // different based on the condition, so we have to replicate the getBuiltin calls.
+  auto hasTaskExecutorTy =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
+  if (hasTaskExecutorTy) {
+    return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
         _label("flags", _swiftInt),
@@ -1537,17 +1544,49 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _typeparam(0), _parameters()))),
       _tuple(_nativeObject, _rawPointer));
+  }
+
+  return getBuiltinFunction(
+      ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
+      _parameters(
+        _label("flags", _swiftInt),
+        _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        /* fallback type when _taskExecutor is not available */
+        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_executor)), _nil)),
+        _label("operation", _function(_async(_throws(_sendable(_thick))),
+                                      _typeparam(0), _parameters()))),
+      _tuple(_nativeObject, _rawPointer));
 }
 
 static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+  auto hasTaskExecutorTy =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
+  if (hasTaskExecutorTy) {
+    return getBuiltinFunction(
+        ctx, id, _thin,
+        _parameters(
+          _label("flags", _swiftInt),
+          _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
+          _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+          /* deprecated */_label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+          _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_existential(_taskExecutor))), _nil)),
+          _label("operation", _function(_async(_throws(_sendable(_thick))),
+                                        _void, _parameters()))),
+        _tuple(_nativeObject, _rawPointer));
+  }
+
   return getBuiltinFunction(
       ctx, id, _thin,
       _parameters(
         _label("flags", _swiftInt),
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
-        /* deprecated */_label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_existential(_taskExecutor))), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        /* fallback type when _taskExecutor is not available */
+        _label("initialTaskExecutorConsuming", _defaulted(_consuming(_optional(_executor)), _nil)),
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _void, _parameters()))),
       _tuple(_nativeObject, _rawPointer));
