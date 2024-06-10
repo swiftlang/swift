@@ -6858,22 +6858,21 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
   if (shouldLoadBaseAddress()) {
-    if (selfParam.isConsumed() ||
-        (base.getType().isAddressOnly(SGF.F)
-         // If a move-only base is borrowed, then we have to try our best to
-         // borrow it in-place without copying.
-         // TODO: Can we avoid copying a non-move-only value too in this
-         // circumstance?
-         && !base.getType().isMoveOnly())) {
+    if (selfParam.isConsumed() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
+      auto isGuaranteed = selfParam.isGuaranteed();
+
+      auto context =
+          isGuaranteed ? SGFContext::AllowImmediatePlusZero : SGFContext();
+
       base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
                                       SGF.getTypeLowering(baseLoweredType),
-                                      SGFContext(), shouldTake);
+                                      context, shouldTake, isGuaranteed);
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
     }
-    
+
     // If the type is address-only, we can borrow the memory location as is.
     if (base.getType().isAddressOnly(SGF.F)) {
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
