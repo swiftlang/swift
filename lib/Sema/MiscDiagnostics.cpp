@@ -1745,7 +1745,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       ASTContext &ctx = inClosure->getASTContext();
 
       auto requiresSelfQualification =
-          isClosureRequiringSelfQualification(inClosure, ctx);
+          isClosureRequiringSelfQualification(inClosure);
 
       // Metatype self captures don't extend the lifetime of an object.
       if (captureType->is<MetatypeType>()) {
@@ -1783,7 +1783,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //    that defines self if present.
       if (validateSelfRebindings) {
         if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
-          if (!hasValidSelfRebinding(conditionalStmt, inClosure)) {
+          if (!hasValidSelfRebinding(conditionalStmt, ctx)) {
             return false;
           }
         }
@@ -1793,7 +1793,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // closure unwraps self. If not, implicit self is not allowed
       // in this closure or in any nested closure.
       if (closureHasWeakSelfCapture(inClosure) &&
-          !hasValidSelfRebinding(parentConditionalStmt(selfDecl), inClosure)) {
+          !hasValidSelfRebinding(parentConditionalStmt(selfDecl), ctx)) {
         return false;
       }
 
@@ -1967,7 +1967,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     static bool
     hasValidSelfRebinding(const LabeledConditionalStmt *conditionalStmt,
-                          const AbstractClosureExpr *inClosure) {
+                          ASTContext &ctx) {
       if (!conditionalStmt) {
         return false;
       }
@@ -1980,8 +1980,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //   guard let self = self else { return }
       //   method() // <- implicit self is not allowed
       //
-      return conditionalStmt->rebindsSelf(inClosure->getASTContext(),
-                                          /*requiresCaptureListRef*/ true);
+      return conditionalStmt->rebindsSelf(ctx, /*requiresCaptureListRef*/ true);
     }
 
     /// The `LabeledConditionalStmt` that contains the given `ValueDecl` if
@@ -2064,8 +2063,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     /// Return true if this is a closure expression that will require explicit
     /// use or capture of "self." for qualification of member references.
     static bool
-    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
-                                        ASTContext &Ctx) {
+    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE) {
       if (closureHasWeakSelfCapture(CE)) {
         return true;
       }
@@ -2245,7 +2243,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // to use implicit self, even after fixing any invalid parents.
         auto isEscapingAutoclosure =
             isa<AutoClosureExpr>(ACE) &&
-            isClosureRequiringSelfQualification(ACE, Ctx);
+            isClosureRequiringSelfQualification(ACE);
         if (!isEscapingAutoclosure) {
           closureForDiagnostics = parentDisallowingImplicitSelf;
         }
@@ -2382,7 +2380,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return true;
       }
 
-      if (isUsageAlwaysPreviouslyRejected(selfDecl, ACE)) {
+      if (isUsageAlwaysPreviouslyRejected(selfDecl)) {
         return false;
       }
 
@@ -2429,7 +2427,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       }
 
       if (auto condStmt = parentConditionalStmt(selfDecl)) {
-        auto isValidSelfRebinding = hasValidSelfRebinding(condStmt, ACE);
+        auto isValidSelfRebinding = hasValidSelfRebinding(condStmt, Ctx);
 
         // Swfit 5.8 permitted implicit self without validating any
         // parent closures. If implicit self is only disallowed due to
@@ -2443,8 +2441,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // If the binding is valid when only checking for a load expr,
         // then we must only warn.
         auto usesLoadExpr =
-            condStmt->rebindsSelf(ACE->getASTContext(),
-                                  /*requiresCaptureListRef*/ false,
+            condStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
                                   /*requireLoadExpr*/ true);
 
         if (!isValidSelfRebinding && usesLoadExpr) {
@@ -2457,12 +2454,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     /// Checks if this implicit self usage was always previously rejected as
     /// invalid, so can continue to be treated an error.
-    bool isUsageAlwaysPreviouslyRejected(ValueDecl *selfDecl,
-                                         AbstractClosureExpr *ACE) {
+    bool isUsageAlwaysPreviouslyRejected(ValueDecl *selfDecl) {
       // If the self decl refers to a weak self unwrap condition
       // in some parent closure, then there is no source-compatibility
       // requirement to avoid an error.
-      return hasValidSelfRebinding(parentConditionalStmt(selfDecl), ACE);
+      return hasValidSelfRebinding(parentConditionalStmt(selfDecl), Ctx);
     }
 
     /// Checks if this is a usage of implicit self in a strong self closure
@@ -2499,7 +2495,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
-        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
+        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
           ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
