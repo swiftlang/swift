@@ -450,6 +450,11 @@ bool SILType::isAddressOnly(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isAddressOnly();
 }
 
+bool SILType::isFixedABI(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  return F.getTypeLowering(contextType).isFixedABI();
+}
+
 SILType SILType::substGenericArgs(SILModule &M, SubstitutionMap SubMap,
                                   TypeExpansionContext context) const {
   auto fnTy = castTo<SILFunctionType>();
