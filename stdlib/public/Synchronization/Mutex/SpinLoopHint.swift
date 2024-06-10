@@ -17,6 +17,8 @@ var _tries: Int {
   100
 }
 
+#if arch(arm)
+
 // The following are acceptable operands to the aarch64 hint intrinsic from
 // 'llvm-project/llvm/lib/Target/ARM/ARMInstrInfo.td':
 //
@@ -28,8 +30,26 @@ var _tries: Int {
 // `sevl`  = 5
 //
 // There are others, but for the sake of spin loops, we only care about 'wfe'.
+@_extern(c, "llvm.arm.hint")
+func _hint(_: UInt32)
+
+#else
+
+// The following are acceptable operands to the aarch64 hint intrinsic from
+// 'llvm-project/llvm/lib/Target/AArch64/AArch64InstrInfo.td':
+//
+// `nop`   = 0
+// `yield` = 1
+// `wfe`   = 2
+// `wfi`   = 3
+// `sev`   = 4
+// `sevl`  = 5
+//
+// There are others, but for the sake of spin loops, we only care about 'wfe'.
 @_extern(c, "llvm.aarch64.hint")
 func _hint(_: UInt32)
+
+#endif
 
 @inline(__always)
 func _wfe() {
