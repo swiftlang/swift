@@ -1740,6 +1740,8 @@ checkWitnessAvailability(ValueDecl *requirement,
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
                                               const RequirementMatch &match) {
+  auto &ctx = getASTContext();
+
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
@@ -1769,7 +1771,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     return RequirementCheck(CheckKind::Availability, requiredAvailability);
   }
 
-  if (requirement->getAttrs().isUnavailable(getASTContext()) &&
+  if (requirement->getAttrs().isUnavailable(ctx) &&
       match.Witness->getDeclContext() == DC) {
     return RequirementCheck(CheckKind::Unavailable);
   }
@@ -1792,11 +1794,11 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     }
   }
 
-  if (match.Witness->getAttrs().isUnavailable(getASTContext()) &&
-      !requirement->getAttrs().isUnavailable(getASTContext())) {
+  if (match.Witness->getAttrs().isUnavailable(ctx) &&
+      !requirement->getAttrs().isUnavailable(ctx)) {
     auto nominalOrExtensionIsUnavailable = [&]() {
       if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
-        if (extension->getAttrs().isUnavailable(getASTContext()))
+        if (extension->getAttrs().isUnavailable(ctx))
           return true;
       }
 
@@ -1811,6 +1813,20 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     // Allow unavailable nominals or extension to have unavailable witnesses.
     if (!nominalOrExtensionIsUnavailable())
       return CheckKind::WitnessUnavailable;
+  }
+
+  // Warn about deprecated default implementations if the requirement is
+  // not deprecated, and the conformance is not deprecated.
+  bool isDefaultWitness = false;
+  if (auto *nominal = match.Witness->getDeclContext()->getSelfNominalTypeDecl())
+    isDefaultWitness = isa<ProtocolDecl>(nominal);
+  if (isDefaultWitness &&
+      match.Witness->getAttrs().isDeprecated(ctx) &&
+      !requirement->getAttrs().isDeprecated(ctx)) {
+    auto conformanceContext = ExportContext::forConformance(DC, Proto);
+    if (!conformanceContext.isDeprecated()) {
+      return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
+    }
   }
 
   return CheckKind::Success;
@@ -4374,6 +4390,25 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          requirement->getName());
         });
       break;
+
+      case CheckKind::DefaultWitnessDeprecated:
+        getASTContext().addDelayedConformanceDiag(
+          Conformance, /*isError=*/false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            auto &ctx = witness->getASTContext();
+            auto &diags = ctx.Diags;
+            SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
+            auto *attr = witness->getAttrs().getDeprecated(ctx);
+            EncodedDiagnosticMessage EncodedMessage(attr->Message);
+            diags.diagnose(diagLoc, diag::witness_deprecated,
+                           witness, conformance->getProtocol()->getName(),
+                           EncodedMessage.Message);
+            emitDeclaredHereIfNeeded(diags, diagLoc, witness);
+            diags.diagnose(requirement, diag::kind_declname_declared_here,
+                           DescriptiveDeclKind::Requirement,
+                           requirement->getName());
+          });
+        break;
     }
 
     if (auto *classDecl = DC->getSelfClassDecl()) {
