@@ -101,7 +101,6 @@ import Swift
 ///     var result: Work?
 ///
 ///     deinit {
-///         assert(work != nil)
 ///         // even though the task is still retained,
 ///         // once it completes it no longer causes a reference cycle with the actor
 ///
