@@ -899,6 +899,25 @@ BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuff
 /// This is only supported under the task-to-thread concurrency model.
 BUILTIN_MISC_OPERATION(TaskRunInline, "taskRunInline", "", Special)
 
+/// flowSensitiveSelfIsolation<T: Actor>(_ actor: T) -> (any Actor)?
+///
+/// Used only in actor initializers, this builtin lowers to either 'actor'
+/// (wrapped in an optional) or 'nil' depending on whether 'self' has been
+/// initialized at this point. 'actor' is always an alias for the 'self'
+/// being initialized.
+BUILTIN_MISC_OPERATION(FlowSensitiveSelfIsolation, "flowSensitiveSelfIsolation", "", Special)
+
+/// flowSensitiveDistributedSelfIsolation<T: DistributedActor>(
+///   _ actor: T
+/// ) -> (any Actor)?
+///
+/// Used only in distributed actor initializers, this builtin lowers to either
+/// 'actor.asLocalActor' or 'nil' depending on whether 'self' has been
+/// initialized at this point. 'actor' is always an alias for the 'self'
+/// being initialized.
+BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
+                       "flowSensitiveDistributedSelfIsolation", "", Special)
+
 /// endAsyncLet(): (Builtin.RawPointer) -> Void
 ///
 /// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
