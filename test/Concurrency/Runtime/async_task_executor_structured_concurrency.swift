@@ -215,8 +215,8 @@ func expect(_ expected: MyTaskExecutor) {
 
     await testTaskGroup(firstExecutor, secondExecutor)
 
-//    await testAsyncLet(firstExecutor, secondExecutor)
-//
-//    await testGroupAsyncLet(firstExecutor, secondExecutor)
+    await testAsyncLet(firstExecutor, secondExecutor)
+
+    await testGroupAsyncLet(firstExecutor, secondExecutor)
   }
 }

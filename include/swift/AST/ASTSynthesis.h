@@ -178,6 +178,28 @@ Type synthesizeType(SynthesisContext &SC,
   return ExistentialType::get(synthesizeType(SC, M.Sub));
 }
 
+/// A synthesizer which generates an existential type from a requirement type.
+template <class S, class FallbackS>
+struct BincompatIfTypeAvailableTypeSynthesizer {
+  bool condition;
+  S Sub;
+  FallbackS FallbackSub;
+};
+template <class S, class FallbackS>
+constexpr BincompatIfTypeAvailableTypeSynthesizer<S, FallbackS> _bincompatType(
+    bool bincompatCondition, S sub, FallbackS fallbackSub) {
+  return {bincompatCondition, sub, {fallbackSub}};
+}
+template <class S, class FallbackS>
+Type synthesizeType(SynthesisContext &SC,
+                    const BincompatIfTypeAvailableTypeSynthesizer<S, FallbackS> &M) {
+  if (M.condition) {
+    return synthesizeType(SC, M.Sub);
+  } else {
+    return synthesizeType(SC, M.FallbackSub);
+  }
+}
+
 MetatypeRepresentation
 inline synthesizeMetatypeRepresentation(RepresentationSynthesizer rep) {
   switch (rep) {
