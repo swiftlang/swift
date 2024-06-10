@@ -323,7 +323,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
 
       // PatternBindingBecls represent local variable bindings that execute
       // as part of the function's execution.
-      if (!isa<PatternBindingDecl>(D)) {
+      if (!isa<PatternBindingDecl>(D) && !isa<VarDecl>(D)) {
         // Other decls define entities that may be used by the program, such as
         // local function declarations. So handle them here, before checking for
         // reachability, and then continue looping.
@@ -429,12 +429,9 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       SGF.emitIgnoredExpr(E);
     } else {
       auto *D = ESD.get<Decl*>();
-
-      // Only PatternBindingDecls should be emitted here.
-      // Other decls were handled above.
-      auto PBD = cast<PatternBindingDecl>(D);
-
-      SGF.visit(PBD);
+      assert((isa<PatternBindingDecl>(D) || isa<VarDecl>(D)) &&
+             "other decls should be handled before the reachability check");
+      SGF.visit(D);
     }
   }
 }
