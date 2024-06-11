@@ -22,7 +22,7 @@ A typical setup and build + run cycle for an embedded development board involves
 - (1) Getting an SDK with the C compilers, headers and libraries for the target
 - (2) Building the C source code, and Swift source code into object files.
 - (3) Linking all the libraries, C object files, and Swift object files.
-- (4) Post-processing the linked firmware into a flashable format (UD2, BIN, or bespoke formats)
+- (4) Post-processing the linked firmware into a flashable format (UF2, BIN, or bespoke formats)
 - (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool or by copying it to a fake USB Mass Storage volume presented by the board.
 - (6) Restarting the board, observing physical effects of the firmware (LEDs light up) or UART output over USB, or presence on network, etc.
 
@@ -41,7 +41,7 @@ $ swiftc -target <target triple> -enable-experimental-feature Embedded -wmo \
 
 ### Building Swift firmware for an embedded target
 
-To build Swift firmware (for now ingnoring integration with SDKs, libraries and other pre-existing C code), we can use the `-target` argument to specify the CPU architecture. The target triple also decides whether the output object file will be an ELF file, or a Mach-O. For example:
+To build Swift firmware (for now ignoring integration with SDKs, libraries and other pre-existing C code), we can use the `-target` argument to specify the CPU architecture. The target triple also decides whether the output object file will be an ELF file, or a Mach-O. For example:
 
 ```bash
 # To build an ARMv7 Mach-O object file:
@@ -185,7 +185,7 @@ Features that are not available:
 - **Not available**: Runtime reflection (`Mirror` APIs).
 - **Not available**: Values of protocol types ("existentials"), e.g. `let a: Hashable = ...`, are not allowed. `Any` and `AnyObject` are also not allowed.
 - **Not available**: Metatypes, e.g. `let t = SomeClass.Type` or `type(of: value)` are not allowed.
-- **Not available**: Printing and stringifation of arbitrary types (archieved via reflection in desktop Swift).
+- **Not available**: Printing and stringification of arbitrary types (achieved via reflection in desktop Swift).
 - **Not available yet (under development)**: Swift Concurrency.
 
 For a more complete list of supported features in Embedded Swift, see [Embedded Swift -- Status](EmbeddedSwiftStatus.md).
