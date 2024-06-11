@@ -307,7 +307,11 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
     for (auto *use : value->getNonTypeDependentUses())
       touchedInsts.insert(use->getUser());
 
-    value->unsafelyEliminateMoveOnlyWrapper(fn);
+    if (isa<SILUndef>(value))
+      value->replaceAllUsesWith(
+          SILUndef::get(fn, value->getType().removingAnyMoveOnlyWrapping(fn)));
+    else
+      value->unsafelyEliminateMoveOnlyWrapper(fn);
 
     return true;
   };
@@ -341,6 +345,16 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
 
       madeChange = true;
     }
+  }
+  // SILFunction::undefValues may grow during the loop.
+  SmallVector<std::pair<SILType, SILUndef *>, 4> originalUndefs(
+      fn->getUndefValues());
+  for (auto pair : originalUndefs) {
+    bool relevant = visitValue(pair.second);
+    if (!relevant)
+      continue;
+
+    madeChange = true;
   }
 
   SILMoveOnlyWrappedTypeEliminatorVisitor visitor;
