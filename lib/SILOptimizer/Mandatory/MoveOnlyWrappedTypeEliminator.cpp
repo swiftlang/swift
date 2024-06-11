@@ -51,12 +51,6 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorVisitor
     : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
-  const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs;
-
-  SILMoveOnlyWrappedTypeEliminatorVisitor(
-      const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs)
-      : touchedArgs(touchedArgs) {}
-
   bool visitSILInstruction(SILInstruction *inst) {
     llvm::errs() << "Unhandled SIL Instruction: " << *inst;
     llvm_unreachable("error");
@@ -295,7 +289,6 @@ static bool isMoveOnlyWrappedTrivial(SILValue value) {
 bool SILMoveOnlyWrappedTypeEliminator::process() {
   bool madeChange = true;
 
-  llvm::SmallSetVector<SILArgument *, 8> touchedArgs;
   llvm::SmallSetVector<SILInstruction *, 8> touchedInsts;
 
   // For each value whose type is move-only wrapped:
@@ -328,7 +321,6 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
       // None. Otherwise, preserve the ownership kind of the argument.
       if (arg->getType().isTrivial(*fn))
         arg->setOwnershipKind(OwnershipKind::None);
-      touchedArgs.insert(arg);
 
       madeChange = true;
     }
@@ -350,7 +342,7 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
     }
   }
 
-  SILMoveOnlyWrappedTypeEliminatorVisitor visitor(touchedArgs);
+  SILMoveOnlyWrappedTypeEliminatorVisitor visitor;
   while (!touchedInsts.empty()) {
     visitor.visit(touchedInsts.pop_back_val());
   }
