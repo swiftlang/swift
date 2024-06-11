@@ -680,9 +680,11 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     // This is a temporary limitation.
     auto ClosureCallee = FRI->getReferencedFunction();
     auto ClosureCalleeConv = ClosureCallee->getConventions();
-    unsigned ClosureArgIdx =
+    unsigned ClosureArgIdxBase =
         ClosureCalleeConv.getNumSILArguments() - PAI->getNumArguments();
-    for (auto Arg : PAI->getArguments()) {
+    for (auto pair : llvm::enumerate(PAI->getArguments())) {
+      auto Arg = pair.value();
+      auto ClosureArgIdx = pair.index() + ClosureArgIdxBase;
       SILType ArgTy = Arg->getType();
       // If our argument is an object, continue...
       if (ArgTy.isObject()) {
