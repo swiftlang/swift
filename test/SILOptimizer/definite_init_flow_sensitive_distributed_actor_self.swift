@@ -27,7 +27,7 @@ distributed actor NotCodableDA<ActorSystem>
 
     // Second use of #isolation, which uses 'self.asLocalActor''
     // CHECK: function_ref @$s11Distributed0A5ActorPAAE07asLocalB0ScA_pvg : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor> (@sil_isolated @guaranteed τ_0_0) -> @owned any Actor
-    // CHECK-NEXT: [[ACTOR_EXISTENTIAL:%.*]] =  apply [[AS_LOCAL_ACTOR_FN:%.*]]<NotCodableDA<ActorSystem>>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor> (@sil_isolated @guaranteed τ_0_0) -> @owned any Actor
+    // CHECK: [[ACTOR_EXISTENTIAL:%.*]] =  apply [[AS_LOCAL_ACTOR_FN:%.*]]<NotCodableDA<ActorSystem>>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor> (@sil_isolated @guaranteed τ_0_0) -> @owned any Actor
     // CHECK: [[ISOLATION_2:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ACTOR_EXISTENTIAL]]
     // CHECK: [[F_2:%.*]] = function_ref @$s4test1f10isolatedToSiScA_pSgYi_tYaF
     // CHECK-NEXT: apply [[F_2]]([[ISOLATION_2]])
