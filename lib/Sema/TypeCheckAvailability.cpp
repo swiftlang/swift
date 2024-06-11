@@ -198,7 +198,7 @@ computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
   if (D->isImplicit() && !isDeferBody)
     *implicit = true;
 
-  if (D->getAttrs().getDeprecated(Ctx))
+  if (D->getAttrs().isDeprecated(Ctx))
     *deprecated = true;
 
   if (auto *A = D->getAttrs().getUnavailable(Ctx)) {
