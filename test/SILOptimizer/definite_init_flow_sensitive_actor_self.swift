@@ -21,8 +21,7 @@ actor A {
     self.number = await f(isolatedTo: #isolation)
 
     // Second use of #isolation, which uses 'self' injected into (any Actor)?.
-    // CHECK: [[ACTOR_COPY:%.*]] = end_init_let_ref %0 : $A
-    // CHECK: strong_retain [[ACTOR_COPY]] : $A 
+    // CHECK: strong_retain [[ACTOR_COPY:%.*]] : $A
     // CHECK: [[ACTOR_EXISTENTIAL:%.*]] = init_existential_ref [[ACTOR_COPY]] : $A : $A, $any Actor
     // CHECK: [[ISOLATION_2:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ACTOR_EXISTENTIAL]]
     // CHECK: [[F_2:%.*]] = function_ref @$s4test1f10isolatedToSiScA_pSgYi_tYaF
