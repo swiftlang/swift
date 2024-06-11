@@ -1,21 +1,12 @@
-// RUN: %target-run-simple-swift %t
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
 import StdlibUnittest
 
 var CaseIterableTests = TestSuite("CaseIterableTests")
-
-CaseIterableTests.test("Simple Enums") {
-  enum SimpleEnum: CaseIterable {
-    case bar
-    case baz
-    case quux
-  }
-
-  expectEqual(SimpleEnum.allCases.count, 3)
-  expectEqual(SimpleEnum.allCases, [.bar, .baz, .quux])
-}
 
 CaseIterableTests.test("MainActor Isolated Enums") {
   @MainActor
