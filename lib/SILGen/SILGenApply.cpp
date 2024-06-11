@@ -1886,6 +1886,11 @@ static void emitRawApply(SILGenFunction &SGF,
                          SILValue indirectErrorAddr,
                          SmallVectorImpl<SILValue> &rawResults,
                          ExecutorBreadcrumb prevExecutor) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
   // Get the callee value.
   bool isConsumed = substFnType->isCalleeConsumed();
@@ -5857,6 +5862,11 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                               SILType substFnType,
                                               SubstitutionMap subs,
                                               ArrayRef<SILValue> args) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
   SILType resultType = fnConv.getSILResultType(getTypeExpansionContext());

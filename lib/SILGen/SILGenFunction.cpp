@@ -987,7 +987,13 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         constant, loweredCaptureInfo, subs);
   }
 
-  if (subs) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (!pft->isPolymorphic()) {
+    subs = SubstitutionMap();
+  } else {
+    assert(!subs.getGenericSignature()->areAllParamsConcrete());
+
     auto specialized =
         pft->substGenericArgs(F.getModule(), subs, getTypeExpansionContext());
     functionTy = SILType::getPrimitiveObjectType(specialized);
