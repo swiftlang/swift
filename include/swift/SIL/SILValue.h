@@ -603,7 +603,7 @@ public:
       Type = Type.removingMoveOnlyWrapper();
     } else {
       assert(Type.isBoxedMoveOnlyWrappedType(fn));
-      Type = Type.removingMoveOnlyWrapperToBoxedType(fn);
+      Type = Type.removingMoveOnlyWrapperFromBoxedType(fn);
     }
     return true;
   }
