@@ -874,6 +874,11 @@ public:
       // Emit an unavailable stub for a Swift type.
       if (auto *nmtd = dyn_cast<NominalTypeDecl>(vd)) {
         auto representation = cxx_translation::getDeclRepresentation(vd);
+        if (nmtd->isGeneric()) {
+          auto genericSignature =
+              nmtd->getGenericSignature().getCanonicalSignature();
+          ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+        }
         os << "class ";
         ClangSyntaxPrinter(os).printBaseName(vd);
         os << " { } SWIFT_UNAVAILABLE_MSG(\"";
