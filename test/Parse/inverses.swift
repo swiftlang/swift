@@ -52,7 +52,7 @@ protocol Rope<Element>: Hashable, ~Copyable {  // expected-error {{'Self' requir
   associatedtype Element: ~Copyable
 }
 
-extension S: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension S: ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 
 struct S: ~U, // expected-error {{type 'U' cannot be suppressed}}
           ~Copyable {}
@@ -129,4 +129,8 @@ func param2(_ t: ~Copyable.Type) {} // expected-error{{constraint that suppresse
 func param3(_ t: borrowing any ~Copyable) {}
 func param4(_ t: any ~Copyable.Type) {}
 
-func param3(_ t: borrowing ExtraNoncopyProto & ~Copyable) {} // expected-error{{constraint that suppresses conformance requires 'any'}}{{28-28=any }}
+protocol P: ~Copyable {}
+protocol Q: ~Copyable {}
+protocol R: ~Copyable {}
+struct Blooper<T: ~Copyable>: ~Copyable {}
+extension Blooper: (Q & (R & (~Copyable & P))) {} // expected-error {{cannot suppress 'Copyable' in extension}}
