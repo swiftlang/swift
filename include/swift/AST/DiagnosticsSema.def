@@ -7981,6 +7981,8 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "cannot infer lifetime dependence on a self which is BitwiseCopyable & "
        "Escapable",
        ())
+ERROR(lifetime_dependence_immortal_conflict_name, none,
+      "conflict between the parameter name and immortal keyword", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring
