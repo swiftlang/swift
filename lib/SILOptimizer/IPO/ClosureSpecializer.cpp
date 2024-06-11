@@ -1374,7 +1374,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         //   foo({ c() })
         // }
         //
-        // A limit of 2 is good enough and will not be exceed in "regular"
+        // A limit of 2 is good enough and will not be exceeded in "regular"
         // optimization scenarios.
         if (getSpecializationLevel(getClosureCallee(ClosureInst))
             > SpecializationLevelLimit) {
