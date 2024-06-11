@@ -5122,10 +5122,16 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
             Identifier paramName;
             auto paramLoc =
                 consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::
-                    getNamedLifetimeDependenceSpecifier(
-                        paramLoc, lifetimeDependenceKind, paramName));
+            if (paramName.is("immortal")) {
+              specifierList.push_back(
+                  LifetimeDependenceSpecifier::
+                      getImmortalLifetimeDependenceSpecifier(paramLoc));
+            } else {
+              specifierList.push_back(
+                  LifetimeDependenceSpecifier::
+                      getNamedLifetimeDependenceSpecifier(
+                          paramLoc, lifetimeDependenceKind, paramName));
+            }
             break;
           }
           case tok::integer_literal: {
