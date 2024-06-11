@@ -4020,6 +4020,9 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
+ERROR(escaping_inout_parameter,none,
+      "inout expression is implicitly escaping", ())
+
 ERROR(escaping_optional_type_argument, none,
       "closure is already escaping in optional type argument", ())
 
