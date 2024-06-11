@@ -287,6 +287,9 @@ public:
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::CXXMethodDecl *clangOperator);
 
+  FuncDecl *makeInstanceToStaticOperatorCallMethod(
+      const clang::CXXMethodDecl *clangMethodDecl);
+
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
 

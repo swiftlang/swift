@@ -68,4 +68,15 @@ struct HasOperatorPlusEqual {
 
 using HasOperatorPlusEqualInt = HasOperatorPlusEqual<int>;
 
+<<<<<<< HEAD
+=======
+struct HasVirtualMethod {
+  virtual int return42() { return 42; } 
+};
+
+struct HasStaticOperatorCall {
+  static int operator()(int x) { return x * 2; }
+};
+
+>>>>>>> 2039b8d25418 ([cxx-interop] import static operator call from C++23 as member callAsFunction functions in Swift to preserve source compatibility)
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

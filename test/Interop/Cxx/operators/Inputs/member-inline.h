@@ -418,4 +418,61 @@ struct DerivedFromConstIterator : public ConstIterator {};
 
 struct DerivedFromConstIteratorPrivately : private ConstIterator {};
 
+<<<<<<< HEAD
+=======
+class SubscriptSetterConst {
+public:
+  using T = int;
+
+  SubscriptSetterConst() : p(new T[10]) {}
+
+  T& operator[](int i) const {
+    return p[i];
+  }
+private:
+  T *p;
+};
+
+struct DerivedFromConstIteratorPrivatelyWithUsingDecl : private ConstIterator {
+  using ConstIterator::operator*;
+};
+
+struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl
+    : private AmbiguousOperatorStar {
+  using AmbiguousOperatorStar::operator*;
+};
+
+struct DerivedFromLoadableIntWrapperWithUsingDecl : private LoadableIntWrapper {
+  using LoadableIntWrapper::operator-;
+  using LoadableIntWrapper::operator+=;
+
+  int getValue() const {
+    return value;
+  }
+  void setValue(int v) {
+    this->value = v;
+  }
+};
+
+struct HasOperatorCallWithDefaultArg {
+  int value;
+  int operator()(int x = 0) const { return value + x; }
+};
+
+class HasStaticOperatorCallBase {
+public:
+  static int operator()(int x) { return x + 42; }
+};
+
+class HasStaticOperatorCallDerived : public HasStaticOperatorCallBase {};
+
+class HasStaticOperatorCallWithConstOperator {
+public:
+  inline int operator()(int x, int y) const { return x + y; }
+  static int operator()(int x) {
+        return x - 1;
+   }
+};
+
+>>>>>>> 2039b8d25418 ([cxx-interop] import static operator call from C++23 as member callAsFunction functions in Swift to preserve source compatibility)
 #endif

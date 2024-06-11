@@ -242,3 +242,58 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT: }
+<<<<<<< HEAD
+=======
+
+// CHECK: struct DerivedFromConstIterator {
+// CHECK-NEXT:   init()
+// TODO:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// TODO: `var pointee` should be printed here
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromConstIteratorPrivatelyWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var pointee: Int32 { get }
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var pointee: Int32
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromLoadableIntWrapperWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   static func - (lhs: inout DerivedFromLoadableIntWrapperWithUsingDecl, rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT:   @available(*, unavailable, message: "use - instead")
+// CHECK-NEXT:   mutating func __operatorMinus(_ rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT:   static func += (lhs: inout DerivedFromLoadableIntWrapperWithUsingDecl, rhs: LoadableIntWrapper)
+// CHECK-NEXT:   @available(*, unavailable, message: "use += instead")
+// CHECK-NEXT:   mutating func __operatorPlusEqual(_ rhs: LoadableIntWrapper)
+// CHECK-NEXT:   func getValue() -> Int32
+// CHECK-NEXT:   mutating func setValue(_ v: Int32)
+// CHECK-NEXT: }
+
+// CHECK: struct HasOperatorCallWithDefaultArg {
+// CHECK:   func callAsFunction(_ x: Int32 = cxxDefaultArg) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallBase {
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallDerived {
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallWithConstOperator {
+// CHECK:   func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+>>>>>>> 2039b8d25418 ([cxx-interop] import static operator call from C++23 as member callAsFunction functions in Swift to preserve source compatibility)
