@@ -1284,6 +1284,17 @@ SILType SILType::removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn) {
   return SILType::getPrimitiveObjectType(newBoxType);
 }
 
+SILType SILType::removingAnyMoveOnlyWrapping(const SILFunction *fn) {
+  if (!isMoveOnlyWrapped() && !isBoxedMoveOnlyWrappedType(fn))
+    return *this;
+
+  if (isMoveOnlyWrapped())
+    return removingMoveOnlyWrapper();
+
+  assert(isBoxedMoveOnlyWrappedType(fn));
+  return removingMoveOnlyWrapperFromBoxedType(fn);
+}
+
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType();
 }
