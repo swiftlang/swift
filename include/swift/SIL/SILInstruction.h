@@ -2679,6 +2679,8 @@ protected:
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs) {
+    assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
+        ->getInvocationGenericSignature());
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
