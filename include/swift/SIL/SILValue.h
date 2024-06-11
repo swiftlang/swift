@@ -597,7 +597,7 @@ public:
   /// NOTE: Please do not use this directly! It is only meant to be used by the
   /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
   bool unsafelyEliminateMoveOnlyWrapper(const SILFunction *fn) {
-    if (!Type.isMoveOnlyWrapped() && !Type.isBoxedMoveOnlyWrappedType(fn))
+    if (!Type.hasAnyMoveOnlyWrapping(fn))
       return false;
     if (Type.isMoveOnlyWrapped()) {
       Type = Type.removingMoveOnlyWrapper();

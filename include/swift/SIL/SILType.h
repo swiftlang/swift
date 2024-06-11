@@ -857,6 +857,11 @@ public:
   /// requires a SILFunction * and is specialized.
   SILType removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn);
 
+  /// Whether there's a direct wrapper or a wrapper inside a box.
+  bool hasAnyMoveOnlyWrapping(const SILFunction *fn) {
+    return isMoveOnlyWrapped() || isBoxedMoveOnlyWrappedType(fn);
+  }
+
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
 

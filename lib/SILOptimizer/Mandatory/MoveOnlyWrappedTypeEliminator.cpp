@@ -301,8 +301,7 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
 
   for (auto &bb : *fn) {
     for (auto *arg : bb.getArguments()) {
-      if (!arg->getType().isMoveOnlyWrapped() &&
-          !arg->getType().isBoxedMoveOnlyWrappedType(fn))
+      if (!arg->getType().hasAnyMoveOnlyWrapping(fn))
         continue;
 
       // If we are looking at trivial only, skip non-trivial function args.
@@ -323,8 +322,7 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
 
     for (auto &ii : bb) {
       for (SILValue v : ii.getResults()) {
-        if (!v->getType().isMoveOnlyWrapped() &&
-            !v->getType().isBoxedMoveOnlyWrappedType(fn))
+        if (!v->getType().hasAnyMoveOnlyWrapping(fn))
           continue;
 
         if (trivialOnly &&
