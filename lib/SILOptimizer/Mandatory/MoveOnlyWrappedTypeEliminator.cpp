@@ -288,7 +288,7 @@ static bool isMoveOnlyWrappedTrivial(SILValue value) {
 }
 
 bool SILMoveOnlyWrappedTypeEliminator::process() {
-  bool madeChange = true;
+  bool madeChange = false;
 
   llvm::SmallSetVector<SILInstruction *, 8> touchedInsts;
 
