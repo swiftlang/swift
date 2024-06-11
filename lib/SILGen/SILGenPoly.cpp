@@ -6347,13 +6347,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     arguments.push_back(indErrorRes.getLValueAddress());
   forwardFunctionArguments(thunkSGF, loc, fnRefType, params, arguments);
 
-  SubstitutionMap subs = thunk->getForwardingSubstitutionMap();
-  SILType substFnType = fnRef->getType().substGenericArgs(
-      M, subs, thunk->getTypeExpansionContext());
-
   // Apply function argument.
-  auto apply =
-      thunkSGF.emitApplyWithRethrow(loc, fnRef, substFnType, subs, arguments);
+  auto apply = thunkSGF.emitApplyWithRethrow(
+      loc, fnRef, /*substFnType*/ fnRef->getType(),
+      thunk->getForwardingSubstitutionMap(), arguments);
 
   // Self reordering thunk is necessary if wrt at least two parameters,
   // including self.
