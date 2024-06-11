@@ -3137,6 +3137,11 @@ ERROR(witness_unavailable,none,
         "unavailable %kind0 was used to satisfy a requirement of protocol %1%select{|: %2}2",
         (const ValueDecl *, Identifier, StringRef))
 
+WARNING(witness_deprecated,none,
+        "deprecated default implementation is used to satisfy %kind0 required by "
+        "protocol %1%select{|: %2}2",
+        (const ValueDecl *, Identifier, StringRef))
+
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, Identifier))
 ERROR(redundant_conformance_conditional,none,

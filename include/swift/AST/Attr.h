@@ -2705,6 +2705,10 @@ public:
     return getUnavailable(ctx) != nullptr;
   }
 
+  bool isDeprecated(const ASTContext &ctx) const {
+    return getDeprecated(ctx) != nullptr;
+  }
+
   /// Determine whether there is a swiftVersionSpecific attribute that's
   /// unavailable relative to the provided language version.
   bool
