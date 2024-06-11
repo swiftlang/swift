@@ -188,11 +188,11 @@ class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Co
 
 
 struct Extendo: ~Copyable {}
-extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 // expected-error@-1 {{struct 'Extendo' required to be 'Copyable' but is marked with '~Copyable'}}
 
 enum EnumExtendo {}
-extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 
 extension NeedsCopyable where Self: ~Copyable {}
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}

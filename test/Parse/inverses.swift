@@ -52,7 +52,7 @@ protocol Rope<Element>: Hashable, ~Copyable {  // expected-error {{'Self' requir
   associatedtype Element: ~Copyable
 }
 
-extension S: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension S: ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 
 struct S: ~U, // expected-error {{type 'U' cannot be suppressed}}
           ~Copyable {}
@@ -123,3 +123,9 @@ func typeInExpression() {
 
 func param3(_ t: borrowing any ~Copyable) {}
 func param4(_ t: any ~Copyable.Type) {}
+
+protocol P: ~Copyable {}
+protocol Q: ~Copyable {}
+protocol R: ~Copyable {}
+struct Blooper<T: ~Copyable>: ~Copyable {}
+extension Blooper: (Q & (R & (~Copyable & P))) {} // expected-error {{cannot suppress 'Copyable' in extension}}
