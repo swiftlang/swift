@@ -601,12 +601,7 @@ public:
   bool unsafelyEliminateMoveOnlyWrapper(const SILFunction *fn) {
     if (!Type.hasAnyMoveOnlyWrapping(fn))
       return false;
-    if (Type.isMoveOnlyWrapped()) {
-      Type = Type.removingMoveOnlyWrapper();
-    } else {
-      assert(Type.isBoxedMoveOnlyWrappedType(fn));
-      Type = Type.removingMoveOnlyWrapperFromBoxedType(fn);
-    }
+    Type = Type.removingAnyMoveOnlyWrapping(fn);
     return true;
   }
 
