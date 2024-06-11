@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
 
@@ -513,4 +513,17 @@ struct NonCopyableStruct: ~Copyable {
 func testNonCopyable() {
   let t = NonCopyableStruct()
   t.foo()
+}
+
+public struct RawLayoutWrapper: ~Copyable {
+  private let x = RawLayout<Int>()
+
+  @_noLocks func testit() {
+    x.test()
+  }
+}
+
+@_rawLayout(like: T)
+public struct RawLayout<T>: ~Copyable {
+  public func test() {}
 }
