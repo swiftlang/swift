@@ -1266,7 +1266,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   return SILType::getPrimitiveObjectType(newBoxType);
 }
 
-SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+SILType SILType::removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn) {
   auto boxTy = castTo<SILBoxType>();
   auto *oldLayout = boxTy->getLayout();
   auto oldField = oldLayout->getFields()[0];

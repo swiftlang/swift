@@ -868,7 +868,7 @@ public:
   ///
   /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
   /// requires a SILFunction * and is specialized.
-  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+  SILType removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;

@@ -9160,7 +9160,7 @@ class MoveOnlyWrapperToCopyableBoxInst
                                    ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(
             DebugLoc, operand,
-            operand->getType().removingMoveOnlyWrapperToBoxedType(
+            operand->getType().removingMoveOnlyWrapperFromBoxedType(
                 operand->getFunction()),
             forwardingOwnershipKind) {
     assert(
