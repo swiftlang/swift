@@ -369,18 +369,22 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
     return nullptr;
   }
 
-  auto selfDecl = ASTScope::lookupSingleLocalDecl(
-      DC->getParentSourceFile(), DeclName(Ctx.Id_self), Loc);
-
-  if (!selfDecl) {
-    return nullptr;
-  }
-
   bool capturesSelfWeakly = false;
   if (auto decl = closureExpr->getCapturedSelfDecl()) {
     if (auto a = decl->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
       capturesSelfWeakly = a->get() == ReferenceOwnership::Weak;
     }
+  }
+
+  // Previously we didn't perform the lookup of 'self' for anything outside
+  // of a '[weak self]' closure, maintain that behavior until Swift 6 mode.
+  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6) && !capturesSelfWeakly)
+    return nullptr;
+
+  auto selfDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                                  DeclName(Ctx.Id_self), Loc);
+  if (!selfDecl) {
+    return nullptr;
   }
 
   // In Swift 5 mode, implicit self is allowed within non-escaping
@@ -407,7 +411,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   // In these cases, using the Swift 6 lookup behavior doesn't affect
   // how the body is type-checked, so it can be used in Swift 5 mode
   // without breaking source compatibility for non-escaping closures.
-  if (capturesSelfWeakly && !Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
       !implicitSelfReferenceIsUnwrapped(selfDecl)) {
     return nullptr;
   }
