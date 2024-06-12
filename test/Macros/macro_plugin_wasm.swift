@@ -5,18 +5,18 @@
 // RUN: split-file %s %t
 
 //#-- Prepare the Wasm macro plugin.
-// RUN: /Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swiftc \
+// RUN: %swiftc_driver_plain \
 // RUN:   -swift-version 5 -static-stdlib -parse-as-library \
 // RUN:   -o %t/Plugin.wasm \
 // RUN:   -module-name MacroDefinition \
 // RUN:   %t/MacroDefinition.swift \
 // RUN:   %S/Inputs/wasm_plugin.swift \
 // RUN:   -g -target wasm32-unknown-wasi \
-// RUN:   -sdk ~/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi/wasm32-unknown-wasi/WASI.sdk \
-// RUN:   -resource-dir ~/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi/wasm32-unknown-wasi/swift.xctoolchain/usr/lib/swift_static \
-// RUN:   -Xcc --sysroot -Xcc ~/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi/wasm32-unknown-wasi/WASI.sdk \
-// RUN:   -Xcc -resource-dir -Xcc ~/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi/wasm32-unknown-wasi/swift.xctoolchain/usr/lib/swift_static/clang \
-// RUN:   -Xclang-linker -resource-dir -Xclang-linker ~/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-04-19-a-wasm32-unknown-wasi/wasm32-unknown-wasi/swift.xctoolchain/usr/lib/swift_static/clang
+// RUN:   -sdk %wasm-sdk-root/WASI.sdk \
+// RUN:   -resource-dir %wasm-sdk-root/swift.xctoolchain/usr/lib/swift_static \
+// RUN:   -Xcc --sysroot -Xcc %wasm-sdk-root/WASI.sdk \
+// RUN:   -Xcc -resource-dir -Xcc %wasm-sdk-root/swift.xctoolchain/usr/lib/swift_static/clang \
+// RUN:   -Xclang-linker -resource-dir -Xclang-linker %wasm-sdk-root/swift.xctoolchain/usr/lib/swift_static/clang
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck \
