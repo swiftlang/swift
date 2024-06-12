@@ -582,6 +582,12 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
   worklist.pushUsesOfValueIfNotVisited(selfParam);
 
   while (Operand *operand = worklist.pop()) {
+    // A type-dependent use of `self` is an instruction that contains the
+    // DynamicSelfType. These instructions do not access any protected
+    // state.
+    if (operand->isTypeDependent())
+      continue;
+
     SILInstruction *user = operand->getUser();
 
     // First, check if this is an apply that involves `self`
