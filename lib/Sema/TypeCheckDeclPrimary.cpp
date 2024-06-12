@@ -154,6 +154,28 @@ public:
   }
 };
 
+/// If the extension adds a conformance to an invertible protocol, ensure that
+/// it does not add a conformance to any other protocol. So these are illegal:
+///
+///     extension S: Copyable & P {}
+///     extension S: Q, Copyable {}
+///
+/// This policy is in place because extensions adding a conformance to an
+/// invertible protocol do _not_ add default requirements on generic parameters,
+/// so it would be confusing to mix them together in the same extension.
+static void checkExtensionAddsSoloInvertibleProtocol(const ExtensionDecl *ext) {
+  auto localConfs = ext->getLocalConformances();
+  if (localConfs.size() <= 1)
+    return;
+
+  for (auto *conf : localConfs) {
+    if (auto ip = conf->getProtocol()->getInvertibleProtocolKind()) {
+      ext->diagnose(diag::extension_conforms_to_invertible_and_others,
+                    getInvertibleProtocolKindName(*ip));
+    }
+  }
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -3976,6 +3998,8 @@ public:
     diagnoseExtensionOfMarkerProtocol(ED);
 
     checkTupleExtension(ED);
+
+    checkExtensionAddsSoloInvertibleProtocol(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

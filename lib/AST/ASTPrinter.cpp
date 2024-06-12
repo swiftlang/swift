@@ -2920,6 +2920,7 @@ static bool isExtensionAddingInvertibleConformance(const ExtensionDecl *ext) {
   auto conformances = ext->getLocalConformances();
   for (auto *conf : conformances) {
     if (conf->getProtocol()->getInvertibleProtocolKind()) {
+      assert(conformances.size() == 1 && "expected solo conformance");
       return true;
     }
   }

@@ -7750,6 +7750,9 @@ ERROR(suppress_nonsuppressable_protocol,none,
       "conformance to %0 cannot be suppressed", (const ProtocolDecl *))
 WARNING(suppress_already_suppressed_protocol,none,
       "already suppressed conformance to %0", (const ProtocolDecl *))
+ERROR(extension_conforms_to_invertible_and_others, none,
+      "conformance to '%0' must be declared in a separate extension",
+      (StringRef))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
