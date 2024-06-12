@@ -4971,7 +4971,8 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  if (!options.is(TypeResolverContext::FunctionResult) &&
+  if (!options.is(TypeResolverContext::ClosureExpr) &&
+      !options.is(TypeResolverContext::FunctionResult) &&
       (!options.is(TypeResolverContext::FunctionInput) ||
        options.hasBase(TypeResolverContext::EnumElementDecl))) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),

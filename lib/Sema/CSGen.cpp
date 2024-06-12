@@ -1636,10 +1636,9 @@ namespace {
     }
 
     Type
-    resolveTypeReferenceInExpression(TypeRepr *repr, TypeResolverContext resCtx,
+    resolveTypeReferenceInExpression(TypeRepr *repr,
+                                     TypeResolutionOptions options,
                                      const ConstraintLocatorBuilder &locator) {
-      TypeResolutionOptions options(resCtx);
-
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
@@ -2528,9 +2527,11 @@ namespace {
             return declaredTy;
           }
 
+          auto options =
+              TypeResolutionOptions(TypeResolverContext::InExpression);
+          options.setContext(TypeResolverContext::ClosureExpr);
           const auto resolvedTy = resolveTypeReferenceInExpression(
-              closure->getExplicitResultTypeRepr(),
-              TypeResolverContext::InExpression, resultLocator);
+              closure->getExplicitResultTypeRepr(), options, resultLocator);
           if (resolvedTy)
             return resolvedTy;
         }
