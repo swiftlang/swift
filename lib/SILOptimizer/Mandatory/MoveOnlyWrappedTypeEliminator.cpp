@@ -51,12 +51,6 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorVisitor
     : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
-  const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs;
-
-  SILMoveOnlyWrappedTypeEliminatorVisitor(
-      const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs)
-      : touchedArgs(touchedArgs) {}
-
   bool visitSILInstruction(SILInstruction *inst) {
     llvm::errs() << "Unhandled SIL Instruction: " << *inst;
     llvm_unreachable("error");
@@ -294,56 +288,76 @@ static bool isMoveOnlyWrappedTrivial(SILValue value) {
 }
 
 bool SILMoveOnlyWrappedTypeEliminator::process() {
-  bool madeChange = true;
+  bool madeChange = false;
 
-  llvm::SmallSetVector<SILArgument *, 8> touchedArgs;
   llvm::SmallSetVector<SILInstruction *, 8> touchedInsts;
+
+  // For each value whose type is move-only wrapped:
+  // - rewrite the value's type
+  // - record its users for later visitation
+  auto visitValue = [&touchedInsts, fn = fn,
+                     trivialOnly = trivialOnly](SILValue value) -> bool {
+    if (!value->getType().hasAnyMoveOnlyWrapping(fn))
+      return false;
+
+    // If we are looking at trivial only, skip non-trivial function args.
+    if (trivialOnly && !isMoveOnlyWrappedTrivial(value))
+      return false;
+
+    for (auto *use : value->getNonTypeDependentUses())
+      touchedInsts.insert(use->getUser());
+
+    if (isa<SILUndef>(value))
+      value->replaceAllUsesWith(
+          SILUndef::get(fn, value->getType().removingAnyMoveOnlyWrapping(fn)));
+    else
+      value->unsafelyEliminateMoveOnlyWrapper(fn);
+
+    return true;
+  };
 
   for (auto &bb : *fn) {
     for (auto *arg : bb.getArguments()) {
-      if (!arg->getType().isMoveOnlyWrapped() &&
-          !arg->getType().isBoxedMoveOnlyWrappedType(fn))
+      bool relevant = visitValue(arg);
+      if (!relevant)
         continue;
-
-      // If we are looking at trivial only, skip non-trivial function args.
-      if (trivialOnly &&
-          !arg->getType().removingMoveOnlyWrapper().isTrivial(*fn))
-        continue;
-
-      arg->unsafelyEliminateMoveOnlyWrapper(fn);
 
       // If our new type is trivial, convert the arguments ownership to
       // None. Otherwise, preserve the ownership kind of the argument.
       if (arg->getType().isTrivial(*fn))
         arg->setOwnershipKind(OwnershipKind::None);
-      touchedArgs.insert(arg);
-      for (auto *use : arg->getNonTypeDependentUses())
-        touchedInsts.insert(use->getUser());
+
+      madeChange = true;
     }
 
     for (auto &ii : bb) {
-      for (SILValue v : ii.getResults()) {
-        if (!v->getType().isMoveOnlyWrapped() &&
-            !v->getType().isBoxedMoveOnlyWrappedType(fn))
+      bool touched = false;
+      for (SILValue value : ii.getResults()) {
+        bool relevant = visitValue(value);
+        if (!relevant)
           continue;
 
-        if (trivialOnly &&
-            !isMoveOnlyWrappedTrivial(v))
-          continue;
-
-        v->unsafelyEliminateMoveOnlyWrapper(fn);
-        touchedInsts.insert(&ii);
-
-        // Add all users as well. This ensures we visit things like
-        // destroy_value and end_borrow.
-        for (auto *use : v->getNonTypeDependentUses())
-          touchedInsts.insert(use->getUser());
-        madeChange = true;
+        touched = true;
       }
+      if (!touched)
+        continue;
+      touchedInsts.insert(&ii);
+
+      madeChange = true;
     }
   }
+  // SILFunction::undefValues may grow during the loop.
+  SmallVector<std::pair<SILType, SILUndef *>, 4> originalUndefs(
+      fn->getUndefValues());
+  for (auto pair : originalUndefs) {
+    bool relevant = visitValue(pair.second);
+    if (!relevant)
+      continue;
 
-  SILMoveOnlyWrappedTypeEliminatorVisitor visitor(touchedArgs);
+    madeChange = true;
+  }
+
+  SILMoveOnlyWrappedTypeEliminatorVisitor visitor;
   while (!touchedInsts.empty()) {
     visitor.visit(touchedInsts.pop_back_val());
   }
