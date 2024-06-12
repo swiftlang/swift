@@ -6658,6 +6658,16 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
 }
 #endif
 
+ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
+  if (auto *expr = getAsExpr(node)) {
+    if (auto apply = getAsExpr<ApplyExpr>(getParentExpr(expr))) {
+      if (apply->getFn() == expr)
+        return apply;
+    }
+  }
+  return node;
+}
+
 Type Solution::resolveInterfaceType(Type type) const {
   auto resolvedType = type.transform([&](Type type) -> Type {
     if (auto *tvt = type->getAs<TypeVariableType>()) {
