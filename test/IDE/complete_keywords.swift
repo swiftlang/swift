@@ -23,6 +23,8 @@
 // KW_DECL-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL-DAG: Keyword/None: consuming{{; name=.+$}}
+// KW_DECL-DAG: Keyword/None: borrowing{{; name=.+$}}
 // KW_DECL-DAG: Keyword[operator]/None: operator{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: optional{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: override{{; name=.+$}}
@@ -58,6 +60,8 @@
 // KW_DECL_PROTOCOL-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: consuming{{; name=.+$}}
+// KW_DECL_PROTOCOL-DAG: Keyword/None: borrowing{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword[operator]/None/Flair[RareKeyword]: operator{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: optional{{; name=.+$}}
 // KW_DECL_PROTOCOL-DAG: Keyword/None: override{{; name=.+$}}
@@ -93,6 +97,8 @@
 // KW_DECL_TYPECONTEXT-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: consuming{{; name=.+$}}
+// KW_DECL_TYPECONTEXT-DAG: Keyword/None: borrowing{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword[operator]/None/Flair[RareKeyword]: operator{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: optional{{; name=.+$}}
 // KW_DECL_TYPECONTEXT-DAG: Keyword/None: override{{; name=.+$}}
@@ -132,6 +138,8 @@
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: consuming{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: borrowing{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[operator]/None: operator{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: optional{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: override{{; name=.+$}}
@@ -198,6 +206,8 @@
 // KW_DECL_STMT-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: nonmutating{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: consuming{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: borrowing{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[operator]/None/Flair[RareKeyword]: operator{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: optional{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None/Flair[RareKeyword]: override{{; name=.+$}}
