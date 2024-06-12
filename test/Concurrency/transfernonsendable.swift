@@ -1688,6 +1688,19 @@ func initAccessorTests() {
       get { fatalError() }
       set { fatalError() }
     }
+
+    @MainActor
+    var third: NonSendableKlass
+    @MainActor
+    var fourth: NonSendableKlass? = nil {
+      @storageRestrictions(initializes: third)
+      init(initialValue)  {
+        third = initialValue!
+      }
+
+      get { fatalError() }
+      set { fatalError() }
+    }
   }
 }
 
