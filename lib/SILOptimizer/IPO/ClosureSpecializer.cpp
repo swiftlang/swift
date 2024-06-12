@@ -675,22 +675,30 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     return false;
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
-    // Bail if any of the arguments are passed by address and
-    // are not @inout.
-    // This is a temporary limitation.
+    // Check whether each argument is supported.
     auto ClosureCallee = FRI->getReferencedFunction();
     auto ClosureCalleeConv = ClosureCallee->getConventions();
-    unsigned ClosureArgIdx =
+    unsigned ClosureArgIdxBase =
         ClosureCalleeConv.getNumSILArguments() - PAI->getNumArguments();
-    for (auto Arg : PAI->getArguments()) {
+    for (auto pair : llvm::enumerate(PAI->getArguments())) {
+      auto Arg = pair.value();
+      auto ClosureArgIdx = pair.index() + ClosureArgIdxBase;
+      auto ArgConvention =
+          ClosureCalleeConv.getSILArgumentConvention(ClosureArgIdx);
+
       SILType ArgTy = Arg->getType();
+      // Specializing (currently) always produces a retain in the caller.
+      // That's not allowed for values of move-only type.
+      if (ArgTy.isMoveOnly()) {
+        return false;
+      }
+
+      // Only @inout/@inout_aliasable addresses are (currently) supported.
       // If our argument is an object, continue...
       if (ArgTy.isObject()) {
         ++ClosureArgIdx;
         continue;
       }
-      auto ArgConvention =
-          ClosureCalleeConv.getSILArgumentConvention(ClosureArgIdx);
       if (ArgConvention != SILArgumentConvention::Indirect_Inout &&
           ArgConvention != SILArgumentConvention::Indirect_InoutAliasable)
         return false;
@@ -1394,7 +1402,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         //   foo({ c() })
         // }
         //
-        // A limit of 2 is good enough and will not be exceed in "regular"
+        // A limit of 2 is good enough and will not be exceeded in "regular"
         // optimization scenarios.
         if (getSpecializationLevel(getClosureCallee(ClosureInst))
             > SpecializationLevelLimit) {
