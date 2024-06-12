@@ -1408,6 +1408,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
+  $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
   $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
   $ShortArch = $Arch.LLVMName
 
@@ -1450,6 +1451,10 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ShortArch\zlibstatic.lib";
         ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3\usr\include";
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
+        SwiftSyntax_DIR = "$SwiftSyntaxDir";
+        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
       } + $TestingDefines)
   }
 }
