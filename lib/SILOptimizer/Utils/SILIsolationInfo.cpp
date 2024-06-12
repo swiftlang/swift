@@ -813,26 +813,31 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     }
   }
 
-  // Otherwise, see if we have an allocator decl ref. If we do and we have an
-  // actor instance isolation, then we know that we are actively just calling
-  // the initializer. To just make region isolation work, treat this as
-  // disconnected so we can construct the actor value. Users cannot write
-  // allocator functions so we just need to worry about compiler generated
-  // code. In the case of a non-actor, we can only have an allocator that is
-  // global actor isolated, so we will never hit this code path.
+  // Otherwise, see if we need to handle this isolation computation specially
+  // due to information from the decl ref if we have one.
   if (auto declRef = fArg->getFunction()->getDeclRef()) {
+    // First check if we have an allocator decl ref. If we do and we have an
+    // actor instance isolation, then we know that we are actively just calling
+    // the initializer. To just make region isolation work, treat this as
+    // disconnected so we can construct the actor value. Users cannot write
+    // allocator functions so we just need to worry about compiler generated
+    // code. In the case of a non-actor, we can only have an allocator that is
+    // global actor isolated, so we will never hit this code path.
     if (declRef.kind == SILDeclRef::Kind::Allocator) {
       if (fArg->getFunction()->getActorIsolation().isActorInstanceIsolated()) {
         return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
 
+    // Then see if we have an init accessor that is isolated to an actor
+    // instance, but for which we have not actually passed self. In such a case,
+    // we need to pass in a "fake" ActorInstance that users know is a sentinel
+    // for the self value.
     if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
-      if (declRef.getDecl()) {
+      if (functionIsolation.isActorInstanceIsolated() && declRef.getDecl()) {
         if (auto *accessor =
                 dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
           if (accessor->isInitAccessor()) {
-            assert(functionIsolation.isActorInstanceIsolated());
             return SILIsolationInfo::getActorInstanceIsolated(
                 fArg, ActorInstance::getForActorAccessorInit(),
                 functionIsolation.getActor());
