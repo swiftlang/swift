@@ -6548,9 +6548,11 @@ public:
             "Operand value should be an object");
     require(cvt->getOperand()->getType().isBoxedMoveOnlyWrappedType(cvt->getFunction()),
             "Operand should be move only wrapped");
-    require(cvt->getType() ==
-            cvt->getOperand()->getType().removingMoveOnlyWrapperToBoxedType(cvt->getFunction()),
-            "Result and operand must have the same type, today.");
+    require(
+        cvt->getType() ==
+            cvt->getOperand()->getType().removingMoveOnlyWrapperFromBoxedType(
+                cvt->getFunction()),
+        "Result and operand must have the same type, today.");
   }
 
   void checkCopyableToMoveOnlyWrapperValueInst(

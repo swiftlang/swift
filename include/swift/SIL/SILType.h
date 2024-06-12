@@ -871,7 +871,15 @@ public:
   ///
   /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
   /// requires a SILFunction * and is specialized.
-  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+  SILType removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn);
+
+  /// Whether there's a direct wrapper or a wrapper inside a box.
+  bool hasAnyMoveOnlyWrapping(const SILFunction *fn) {
+    return isMoveOnlyWrapped() || isBoxedMoveOnlyWrappedType(fn);
+  }
+
+  /// Removes a direct wrapper from a type or a wrapper from a type in a box.
+  SILType removingAnyMoveOnlyWrapping(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;

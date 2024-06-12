@@ -562,3 +562,19 @@ bb3(%result : @owned $@moveOnly FakeOptional<Klass>):
   %result2 = moveonlywrapper_to_copyable [owned] %result : $@moveOnly FakeOptional<Klass>
   return %result2 : $FakeOptional<Klass>
 }
+
+// CHECK-LABEL: sil [ossa] @debug_value_undef : {{.*}} {
+// CHECK:         debug_value [moveable_value_debuginfo] undef : $*Klass, var, name "s"
+// CHECK-LABEL: } // end sil function 'debug_value_undef'
+sil  [ossa] @debug_value_undef : $@convention(thin) (@owned Klass) -> () {
+bb0(%x : @owned $Klass):
+  %addr = alloc_stack $@moveOnly Klass
+  %unwrapped_addr = moveonlywrapper_to_copyable_addr %addr : $*@moveOnly Klass
+  store %x to [init] %unwrapped_addr : $*Klass
+  debug_value %addr : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  destroy_addr %addr : $*@moveOnly Klass
+  debug_value undef : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  dealloc_stack %addr : $*@moveOnly Klass
+  %retval = tuple ()
+  return %retval : $()
+}
