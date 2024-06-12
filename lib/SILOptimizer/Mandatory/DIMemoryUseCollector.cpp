@@ -1709,6 +1709,19 @@ void ElementUseCollector::collectClassSelfUses(
       Kind = DIUseKind::Escape;
     }
 
+    // Track flow-sensitive 'self' isolation builtins separately, because they
+    // aren't really uses of 'self' until after DI, once we've decided whether
+    // they have a fully-formed 'self' to use.
+    if (auto builtin = dyn_cast<BuiltinInst>(User)) {
+      if (auto builtinKind = builtin->getBuiltinKind()) {
+        if (*builtinKind == BuiltinValueKind::FlowSensitiveSelfIsolation ||
+            *builtinKind ==
+              BuiltinValueKind::FlowSensitiveDistributedSelfIsolation) {
+          Kind = DIUseKind::FlowSensitiveSelfIsolation;
+        }
+      }
+    }
+
     trackUse(DIMemoryUse(User, Kind, 0, TheMemory.getNumElements()));
   }
 }

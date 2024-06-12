@@ -56,6 +56,7 @@ enum SingletonTypeSynthesizer {
   _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
   _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
   _actor,          // the '_Concurrency.Actor' protocol
+  _distributedActor,  // the 'Distributed.DistributedActor' protocol
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -81,6 +82,9 @@ inline Type synthesizeType(SynthesisContext &SC,
       ->getDeclaredInterfaceType();
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
+      ->getDeclaredInterfaceType();
+  case _distributedActor:
+    return SC.Context.getProtocol(KnownProtocolKind::DistributedActor)
       ->getDeclaredInterfaceType();
   case _copyable:
     return SC.Context.getProtocol(KnownProtocolKind::Copyable)
