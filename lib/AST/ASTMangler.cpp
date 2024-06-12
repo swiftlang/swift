@@ -3842,8 +3842,11 @@ CanType ASTMangler::getDeclTypeForMangling(
   parentGenericSig = GenericSignature();
 
   auto &C = decl->getASTContext();
-  if (decl->isInvalid()) {
-    if (isa<AbstractFunctionDecl>(decl)) {
+
+  auto ty = decl->getInterfaceType()->getReferenceStorageReferent();
+  if (ty->hasError()) {
+    if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl) ||
+        isa<SubscriptDecl>(decl)) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
@@ -3851,8 +3854,6 @@ CanType ASTMangler::getDeclTypeForMangling(
     }
     return C.TheErrorType;
   }
-
-  Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
   // If this declaration predates concurrency, adjust its type to not
   // contain type features that were not available pre-concurrency. This
