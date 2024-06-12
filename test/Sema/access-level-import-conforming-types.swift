@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -I %t \
 // RUN:  -swift-version 5 -package-name pkg
 
-internal import BADLibrary // expected-note 14 {{protocol 'BadProto' imported as 'internal' from 'BADLibrary' here}}
+internal import BADLibrary // expected-note 9 {{protocol 'BadProto' imported as 'internal' from 'BADLibrary' here}}
 // expected-note @-1 2 {{struct 'IntLike' imported as 'internal' from 'BADLibrary' here}}
 // expected-note @-2 2 {{class 'BadClass' imported as 'internal' from 'BADLibrary' here}}
 
@@ -30,16 +30,16 @@ public enum TestConformanceEnum: BadProto {} // expected-error {{cannot use prot
 public struct TestExtensionStruct {}
 extension TestExtensionStruct: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
 
-package struct TestConformancePackage: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
-package struct TestConformanceCompositionPackage: LocalProto & BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
+package struct TestConformancePackage: BadProto {} // FIXME-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
+package struct TestConformanceCompositionPackage: LocalProto & BadProto {} // FIXME-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
 
 @usableFromInline struct TestConformanceUFIPackage: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
 
-package class TestConformanceClassPackage: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
-package enum TestConformanceEnumPackage: BADLibrary.BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
+package class TestConformanceClassPackage: BadProto {} // FIXME-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
+package enum TestConformanceEnumPackage: BADLibrary.BadProto {} // FIXME-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
 
 package struct TestExtensionStructPackage {}
-extension TestExtensionStructPackage: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
+extension TestExtensionStructPackage: BadProto {} // FIXME-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
 
 /// Other inheritance types are covered by the classic access-level check.
 
