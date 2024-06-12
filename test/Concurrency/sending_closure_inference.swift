@@ -42,3 +42,7 @@ func testNamedTypeParameterSendingInference() {
 func testSendingResultInference() {
   let _: () -> sending String = { "" }
 }
+
+func testSendingResultOnClosure() {
+  let _ = { (x: String) -> sending String in x }
+}
