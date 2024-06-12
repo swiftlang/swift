@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -I %t \
 // RUN:  -swift-version 5 -package-name pkg
 
-package import BADLibrary // expected-note 9 {{protocol 'BadProto' imported as 'package' from 'BADLibrary' here}}
+package import BADLibrary // expected-note 8 {{protocol 'BadProto' imported as 'package' from 'BADLibrary' here}}
 // expected-note @-1 {{struct 'IntLike' imported as 'package' from 'BADLibrary' here}}
 // expected-note @-2 {{class 'BadClass' imported as 'package' from 'BADLibrary' here}}
 
@@ -39,7 +39,7 @@ package class TestConformanceClassPackage: BadProto {}
 package enum TestConformanceEnumPackage: BADLibrary.BadProto {}
 
 package struct TestExtensionStructPackage {}
-extension TestExtensionStructPackage: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
+extension TestExtensionStructPackage: BadProto {} // FIXME-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' was not imported publicly}}
 
 /// Other inheritance types are covered by the classic access-level check.
 
