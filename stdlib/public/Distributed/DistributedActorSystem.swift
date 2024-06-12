@@ -357,6 +357,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  @available(SwiftStdlib 6.0, *)
   func remoteCallVoid<Act, Err>(
       on actor: Act,
       target: RemoteCallTarget,
