@@ -905,6 +905,8 @@ void swift::ide::addExprKeywords(CodeCompletionResultSink &Sink,
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try, "", flair);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try, "", flair);
   addKeyword(Sink, "await", CodeCompletionKeywordKind::None, "", flair);
+  addKeyword(Sink, "consume", CodeCompletionKeywordKind::None, "", flair);
+  addKeyword(Sink, "copy", CodeCompletionKeywordKind::None, "", flair);
 }
 
 void swift::ide::addSuperKeyword(CodeCompletionResultSink &Sink,
