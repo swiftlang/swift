@@ -6,6 +6,8 @@
 // KW_IN: Keyword[in]/None: in{{; name=.+$}}
 // KW_NO_IN-NOT: Keyword[in]
 
+// KW_NO_INOUT-NOT: Keyword[inout]
+
 // KW_DECL-DAG: Keyword[class]/None: class{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: actor{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: convenience{{; name=.+$}}
@@ -293,7 +295,7 @@
 // KW_EXPR_NEG-NOT: Keyword{{.*}}catch
 // KW_EXPR_NEG-NOT: Keyword{{.*}}break
 
-#^TOP_LEVEL_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN^#
+#^TOP_LEVEL_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN;check=KW_NO_INOUT^#
 
 for _ in 1...10 {
   #^TOP_LEVEL_2?check=KW_DECL_STMT;check=KW_NO_RETURN;check=KW_NO_IN^#
@@ -367,19 +369,19 @@ struct InInit {
 }
 
 struct InStruct {
-  #^IN_NOMINAL_DECL_1?check=KW_DECL_TYPECONTEXT^#
+  #^IN_NOMINAL_DECL_1?check=KW_DECL_TYPECONTEXT;check=KW_NO_INOUT^#
 }
 
 enum InEnum {
-  #^IN_NOMINAL_DECL_2?check=KW_DECL_TYPECONTEXT^#
+  #^IN_NOMINAL_DECL_2?check=KW_DECL_TYPECONTEXT;check=KW_NO_INOUT^#
 }
 
 class InClass {
-  #^IN_NOMINAL_DECL_3?check=KW_DECL_TYPECONTEXT^#
+  #^IN_NOMINAL_DECL_3?check=KW_DECL_TYPECONTEXT;check=KW_NO_INOUT^#
 }
 
 protocol InProtocol {
-  #^IN_NOMINAL_DECL_4?check=KW_DECL_PROTOCOL^#
+  #^IN_NOMINAL_DECL_4?check=KW_DECL_PROTOCOL;check=KW_NO_INOUT^#
 }
 
 struct AfterOtherKeywords1 {
