@@ -18,11 +18,18 @@ func f<S: AsyncSequence>(s: S) async throws {
 // Make sure we don't complain about crossing a concurrency boundary here.
 @MainActor
 class Store<Action: Sendable> {
-    private func intercept(_ action: Action) async {
+    private func intercept(_ action: Action) async throws {
         await withTaskGroup(of: Optional<Action>.self) { group in
             for await case let nextAction? in group {
                 _ = nextAction
             }
         }
+
+        try await withThrowingTaskGroup(of: Optional<Action>.self) { group in
+            for try await case let nextAction? in group {
+                _ = nextAction
+            }
+        }
+
     }
 }
