@@ -14,7 +14,7 @@ import WASI
 import WasmTypes
 import SystemPackage
 
-typealias WasmFunction = ([UInt32]) throws -> [UInt32]
+typealias WasmFunction = () throws -> Void
 
 protocol WasmEngine {
   init(path: FilePath, imports: WASIBridgeToHost) throws
@@ -53,7 +53,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     guard let start = try engine.function(named: "_start") else {
       throw WasmEngineError(message: "Wasm plugin does not have a '_start' entrypoint")
     }
-    _ = try start([])
+    try start()
   }
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8] {
@@ -62,7 +62,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     }
     try hostToPlugin.writeAll(json)
 
-    _ = try pumpFunction([])
+    try pumpFunction()
 
     let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
       let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
