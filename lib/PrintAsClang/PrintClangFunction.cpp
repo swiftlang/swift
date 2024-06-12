@@ -525,10 +525,10 @@ private:
 
 ClangRepresentation
 DeclAndTypeClangFunctionPrinter::printClangFunctionReturnType(
-    Type ty, OptionalTypeKind optKind, ModuleDecl *moduleContext,
-    OutputLanguageMode outputLang) {
+    raw_ostream &stream, Type ty, OptionalTypeKind optKind,
+    ModuleDecl *moduleContext, OutputLanguageMode outputLang) {
   CFunctionSignatureTypePrinter typePrinter(
-      os, cPrologueOS, typeMapping, outputLang, interopContext,
+      stream, cPrologueOS, typeMapping, outputLang, interopContext,
       CFunctionSignatureTypePrinterModifierDelegate(), moduleContext,
       declPrinter, FunctionSignatureTypeUse::ReturnType);
   // Param for indirect return cannot be marked as inout
@@ -697,12 +697,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef name, Type resultTy, FunctionSignatureKind kind,
     FunctionSignatureModifiers modifiers) {
+  std::string functionSignature;
+  llvm::raw_string_ostream functionSignatureOS(functionSignature);
   // Print any template and requires clauses for the
   // C++ class context to which this C++ member will belong to.
   if (const auto *typeDecl = modifiers.qualifierContext) {
     assert(kind == FunctionSignatureKind::CxxInlineThunk);
-    ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclTemplateSpecifiers(
-        typeDecl);
+    ClangSyntaxPrinter(functionSignatureOS)
+        .printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl);
   }
   if (FD->isGeneric()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
@@ -711,7 +713,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 
     // Print the template and requires clauses for this function.
     if (kind == FunctionSignatureKind::CxxInlineThunk)
-      ClangSyntaxPrinter(os).printGenericSignature(Signature);
+      ClangSyntaxPrinter(functionSignatureOS).printGenericSignature(Signature);
   }
   if (const auto *enumDecl = FD->getDeclContext()->getSelfEnumDecl()) {
     // We cannot emit functions with the same name as an enum case yet, the resulting header
@@ -737,13 +739,13 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     // FIXME: add support for noescape and PrintMultiPartType,
     // see DeclAndTypePrinter::print.
     CFunctionSignatureTypePrinter typePrinter(
-        os, cPrologueOS, typeMapping, outputLang, interopContext, delegate,
-        emittedModule, declPrinter);
+        functionSignatureOS, cPrologueOS, typeMapping, outputLang,
+        interopContext, delegate, emittedModule, declPrinter);
     auto result = typePrinter.visit(ty, optionalKind, isInOutParam);
 
     if (!name.empty()) {
-      os << ' ';
-      ClangSyntaxPrinter(os).printIdentifier(name);
+      functionSignatureOS << ' ';
+      ClangSyntaxPrinter(functionSignatureOS).printIdentifier(name);
     }
     return result;
   };
@@ -751,17 +753,17 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   // Print any modifiers before the signature.
   if (modifiers.isStatic) {
     assert(!modifiers.isConst);
-    os << "static ";
+    functionSignatureOS << "static ";
   }
   if (modifiers.isInline)
-    ClangSyntaxPrinter(os).printInlineForThunk();
+    ClangSyntaxPrinter(functionSignatureOS).printInlineForThunk();
 
   ClangRepresentation resultingRepresentation =
       ClangRepresentation::representable;
 
   // Print out the return type.
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
-    os << "swift::ThrowingResult<";
+    functionSignatureOS << "swift::ThrowingResult<";
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ return type is representable.
     {
@@ -788,11 +790,11 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       return ClangRepresentation::unsupported;
 
     if (!directResultType) {
-      os << "void";
+      functionSignatureOS << "void";
     } else {
       if (!printDirectReturnOrParamCType(
-              *directResultType, resultTy, emittedModule, os, cPrologueOS,
-              typeMapping, interopContext, [&]() {
+              *directResultType, resultTy, emittedModule, functionSignatureOS,
+              cPrologueOS, typeMapping, interopContext, [&]() {
                 OptionalTypeKind retKind;
                 Type objTy;
                 std::tie(objTy, retKind) =
@@ -800,7 +802,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                                                                     resultTy);
 
                 auto s = printClangFunctionReturnType(
-                    objTy, retKind, emittedModule, outputLang);
+                    functionSignatureOS, objTy, retKind, emittedModule,
+                    outputLang);
                 assert(!s.isUnsupported());
               }))
         return ClangRepresentation::unsupported;
@@ -811,19 +814,19 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     std::tie(objTy, retKind) =
         DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
     if (resultingRepresentation
-            .merge(printClangFunctionReturnType(objTy, retKind, emittedModule,
-                                                outputLang))
+            .merge(printClangFunctionReturnType(
+                functionSignatureOS, objTy, retKind, emittedModule, outputLang))
             .isUnsupported())
       return resultingRepresentation;
   }
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
-    os << ">";
-  os << ' ';
+    functionSignatureOS << ">";
+  functionSignatureOS << ' ';
   if (const auto *typeDecl = modifiers.qualifierContext)
-    ClangSyntaxPrinter(os).printNominalTypeQualifier(
-        typeDecl, typeDecl->getModuleContext());
-  ClangSyntaxPrinter(os).printIdentifier(name);
-  os << '(';
+    ClangSyntaxPrinter(functionSignatureOS)
+        .printNominalTypeQualifier(typeDecl, typeDecl->getModuleContext());
+  ClangSyntaxPrinter(functionSignatureOS).printIdentifier(name);
+  functionSignatureOS << '(';
 
   bool HasParams = false;
 
@@ -849,7 +852,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     bool needsComma = false;
     auto emitNewParam = [&]() {
       if (needsComma)
-        os << ", ";
+        functionSignatureOS << ", ";
       needsComma = true;
     };
     auto printParamName = [&](const ParamDecl &param) {
@@ -858,8 +861,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       if (param.isSelfParameter())
         paramName = "_self";
       if (!paramName.empty()) {
-        os << ' ';
-        ClangSyntaxPrinter(os).printIdentifier(paramName);
+        functionSignatureOS << ' ';
+        ClangSyntaxPrinter(functionSignatureOS).printIdentifier(paramName);
       }
     };
     auto printParamCType = [&](const ParamDecl &param) {
@@ -869,9 +872,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           DeclAndTypePrinter::getObjectTypeAndOptionality(
               &param, param.getInterfaceType());
       CFunctionSignatureTypePrinter typePrinter(
-          os, cPrologueOS, typeMapping, outputLang, interopContext,
-          CFunctionSignatureTypePrinterModifierDelegate(), emittedModule,
-          declPrinter);
+          functionSignatureOS, cPrologueOS, typeMapping, outputLang,
+          interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+          emittedModule, declPrinter);
       auto s = typePrinter.visit(ty, optionalKind, param.isInOut());
       assert(!s.isUnsupported());
     };
@@ -880,22 +883,22 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                 &indirectResult) {
           emitNewParam();
           if (indirectResult.hasSRet())
-            os << "SWIFT_INDIRECT_RESULT ";
+            functionSignatureOS << "SWIFT_INDIRECT_RESULT ";
           // FIXME: it would be nice to print out the C struct type here.
-          os << "void * _Nonnull";
+          functionSignatureOS << "void * _Nonnull";
         },
         [&](const LoweredFunctionSignature::DirectParameter &param) {
           emitNewParam();
           printDirectReturnOrParamCType(
-              param, param.getParamDecl().getInterfaceType(), emittedModule, os,
-              cPrologueOS, typeMapping, interopContext,
+              param, param.getParamDecl().getInterfaceType(), emittedModule,
+              functionSignatureOS, cPrologueOS, typeMapping, interopContext,
               [&]() { printParamCType(param.getParamDecl()); });
           printParamName(param.getParamDecl());
         },
         [&](const LoweredFunctionSignature::IndirectParameter &param) {
           emitNewParam();
           if (param.getParamDecl().isSelfParameter())
-            os << "SWIFT_CONTEXT ";
+            functionSignatureOS << "SWIFT_CONTEXT ";
           bool isConst =
               !param.getParamDecl().isInOut() &&
               !(param.getParamDecl().isSelfParameter() &&
@@ -904,7 +907,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                     .getInterfaceType()
                     ->isAnyClassReferenceType());
           if (isConst)
-            os << "const ";
+            functionSignatureOS << "const ";
           if (isKnownCType(param.getParamDecl().getInterfaceType(),
                            typeMapping) ||
               (!param.getParamDecl().getInterfaceType()->hasTypeParameter() &&
@@ -913,36 +916,40 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                    ->isAnyClassReferenceType()))
             printParamCType(param.getParamDecl());
           else
-            os << "void * _Nonnull";
+            functionSignatureOS << "void * _Nonnull";
           printParamName(param.getParamDecl());
         },
         [&](const LoweredFunctionSignature::GenericRequirementParameter
                 &genericRequirementParam) {
           emitNewParam();
-          os << "void * _Nonnull ";
+          functionSignatureOS << "void * _Nonnull ";
           auto reqt = genericRequirementParam.getRequirement();
           if (reqt.isAnyWitnessTable())
-            ClangSyntaxPrinter(os).printBaseName(reqt.getProtocol());
+            ClangSyntaxPrinter(functionSignatureOS)
+                .printBaseName(reqt.getProtocol());
           else
             assert(reqt.isAnyMetadata());
         },
         [&](const LoweredFunctionSignature::MetadataSourceParameter
                 &metadataSrcParam) {
           emitNewParam();
-          os << "void * _Nonnull ";
+          functionSignatureOS << "void * _Nonnull ";
         },
         [&](const LoweredFunctionSignature::ContextParameter &) {
           emitNewParam();
-          os << "SWIFT_CONTEXT void * _Nonnull _ctx";
+          functionSignatureOS << "SWIFT_CONTEXT void * _Nonnull _ctx";
         },
         [&](const LoweredFunctionSignature::ErrorResultValue &) {
           emitNewParam();
-          os << "SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error";
+          functionSignatureOS
+              << "SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error";
         });
     if (needsComma == false)
       // Emit 'void' in an empty parameter list for C function declarations.
-      os << "void";
-    os << ')';
+      functionSignatureOS << "void";
+    functionSignatureOS << ')';
+    if (!resultingRepresentation.isUnsupported())
+      os << functionSignatureOS.str();
     return resultingRepresentation;
   }
 
@@ -950,39 +957,45 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   auto params = FD->getParameters();
   if (params->size()) {
     if (HasParams)
-      os << ", ";
+      functionSignatureOS << ", ";
     HasParams = true;
     size_t paramIndex = 1;
-    llvm::interleaveComma(*params, os, [&](const ParamDecl *param) {
-      OptionalTypeKind argKind;
-      Type objTy;
-      std::tie(objTy, argKind) =
-          DeclAndTypePrinter::getObjectTypeAndOptionality(
-              param, param->getInterfaceType());
-      std::string paramName =
-          param->getName().empty() ? "" : param->getName().str().str();
-      renameCxxParameterIfNeeded(FD, paramName);
-      // Always emit a named parameter for the C++ inline thunk to ensure it
-      // can be referenced in the body.
-      if (kind == FunctionSignatureKind::CxxInlineThunk && paramName.empty()) {
-        llvm::raw_string_ostream os(paramName);
-        os << "_" << paramIndex;
-      }
-      resultingRepresentation.merge(
-          print(objTy, argKind, paramName, param->isInOut()));
-      ++paramIndex;
-    });
-    if (resultingRepresentation.isUnsupported())
+    llvm::interleaveComma(
+        *params, functionSignatureOS, [&](const ParamDecl *param) {
+          OptionalTypeKind argKind;
+          Type objTy;
+          std::tie(objTy, argKind) =
+              DeclAndTypePrinter::getObjectTypeAndOptionality(
+                  param, param->getInterfaceType());
+          std::string paramName =
+              param->getName().empty() ? "" : param->getName().str().str();
+          renameCxxParameterIfNeeded(FD, paramName);
+          // Always emit a named parameter for the C++ inline thunk to ensure it
+          // can be referenced in the body.
+          if (kind == FunctionSignatureKind::CxxInlineThunk &&
+              paramName.empty()) {
+            llvm::raw_string_ostream os(paramName);
+            os << "_" << paramIndex;
+          }
+          resultingRepresentation.merge(
+              print(objTy, argKind, paramName, param->isInOut()));
+          ++paramIndex;
+        });
+    if (resultingRepresentation.isUnsupported()) {
       return resultingRepresentation;
+    }
   }
-  os << ')';
+  functionSignatureOS << ')';
   if (modifiers.isConst)
-    os << " const";
+    functionSignatureOS << " const";
   if (modifiers.isNoexcept)
-    os << " noexcept";
+    functionSignatureOS << " noexcept";
   if (modifiers.hasSymbolUSR)
-    ClangSyntaxPrinter(os).printSymbolUSRAttribute(
-        modifiers.symbolUSROverride ? modifiers.symbolUSROverride : FD);
+    ClangSyntaxPrinter(functionSignatureOS)
+        .printSymbolUSRAttribute(
+            modifiers.symbolUSROverride ? modifiers.symbolUSROverride : FD);
+  if (!resultingRepresentation.isUnsupported())
+    os << functionSignatureOS.str();
   return resultingRepresentation;
 }
 
@@ -1468,8 +1481,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
             std::tie(objTy, retKind) =
                 DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
 
-            auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
-                                                  OutputLanguageMode::Cxx);
+            auto s = printClangFunctionReturnType(
+                os, objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                OutputLanguageMode::Cxx);
             os << ">(swift::Error(opaqueError));\n";
             os << "#endif\n";
 
@@ -1478,7 +1492,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
               os << "\n";
               os << "  return SWIFT_RETURN_THUNK(";
               printClangFunctionReturnType(
-                  objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
+                  os, objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
                   OutputLanguageMode::Cxx);
               os << ", returnValue);\n";
             }
