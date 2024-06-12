@@ -362,6 +362,7 @@ extension DistributedActor {
   /// state.
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
+  @_alwaysEmitIntoClient
   public nonisolated func whenLocal<T: Sendable, E>(
     _ body: @Sendable (isolated Self) async throws(E) -> T
   ) async throws(E) -> T? {
