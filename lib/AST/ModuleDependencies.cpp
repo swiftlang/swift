@@ -668,7 +668,7 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
     case PluginSearchOption::Kind::LoadPlugin: {
       auto &val = entry.get<PluginSearchOption::LoadPlugin>();
       FS->status(val.LibraryPath);
-      // TODO: what else do we need?
+      FS->status(val.ServerPath);
       break;
     }
     }
