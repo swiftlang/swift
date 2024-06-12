@@ -411,3 +411,10 @@ actor NonSendableInit {
     set { fatalError() }
   }
 }
+
+func testNoCrashWhenSendingNoEscapeClosure() async {
+  func test(_ x: sending () -> ()) async {}
+
+  let c = Klass()
+  await test { print(c) }
+}

@@ -79,11 +79,14 @@ extension SendingProtocol {
   // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingResult() -> sending_mangling.NonSendableKlass : $@convention(method) <Self where Self : SendingProtocol> (@in_guaranteed Self) -> @sil_sending @owned NonSendableKlass {
   func sendingResult() -> sending NonSendableKlass { fatalError() }
 
-  // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingArg(__owned (sending __owned sending_mangling.NonSendableKlass) -> ()) -> () : $@convention(method) <Self where Self : SendingProtocol> (@sil_sending @owned @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> (), @in_guaranteed Self) -> () {
+  // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingArg((sending __owned sending_mangling.NonSendableKlass) -> ()) -> () : $@convention(method) <Self where Self : SendingProtocol> (@sil_sending @guaranteed @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> (), @in_guaranteed Self) -> () {
   func sendingArgWithFunctionSendingArg(_ x: sending (sending NonSendableKlass) -> ()) {}
 
   // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingResult() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(method) <Self where Self : SendingProtocol> (@in_guaranteed Self) -> @sil_sending @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
   func sendingArgWithFunctionSendingResult() -> sending (sending NonSendableKlass) -> () { fatalError() }
+
+  // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithEscapingFunctionSendingArg(__owned (sending __owned sending_mangling.NonSendableKlass) -> ()) -> () : $@convention(method) <Self where Self : SendingProtocol> (@sil_sending @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> (), @in_guaranteed Self) -> () {
+  func sendingArgWithEscapingFunctionSendingArg(_ x: sending @escaping (sending NonSendableKlass) -> ()) {}
 }
 
 // Make sure we only do not mangle in __shared if we are borrowed by default and
