@@ -474,6 +474,9 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
   assert(classDecl && derived.Nominal->isDistributedActor());
 
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
   // ```
   // nonisolated let actorSystem: ActorSystem
   // ```
