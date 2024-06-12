@@ -18,20 +18,22 @@ import SystemPackage
 typealias DefaultWasmEngine = WasmKitEngine
 
 struct WasmKitEngine: WasmEngine {
-  private let module: Module
-  private let instance: ModuleInstance
   private let runtime: Runtime
+  private let functions: [String: (Function)]
 
   init(path: FilePath, imports: WASIBridgeToHost) throws {
-    module = try parseWasm(filePath: path)
     runtime = Runtime(hostModules: imports.hostModules)
-    instance = try runtime.instantiate(module: module)
+
+    let module = try parseWasm(filePath: path)
+    let instance = try runtime.instantiate(module: module)
+    functions = instance.exports.compactMapValues { export in
+      guard case let .function(function) = export else { return nil }
+      return function
+    }
   }
 
   func function(named name: String) throws -> WasmFunction? {
-    guard case let .function(function) = instance.exportInstances.first(where: { $0.name == name })?.value else {
-      return nil
-    }
-    return { args in try function.invoke(args.map(Value.i32), runtime: runtime).map(\.i32) }
+    guard let (function) = functions[name] else { return nil }
+    return { _ = try function.invoke(runtime: runtime) }
   }
 }
