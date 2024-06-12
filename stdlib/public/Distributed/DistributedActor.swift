@@ -197,7 +197,7 @@ import _Concurrency
 /// - SeeAlso: ``Actor``
 /// - SeeAlso: ``AnyActor``
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedActor: AnyActor, Identifiable, Hashable
+public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   where ID == ActorSystem.ActorID,
         SerializationRequirement == ActorSystem.SerializationRequirement {
   

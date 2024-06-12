@@ -433,6 +433,34 @@ extension Type {
 //                          Builder initialization
 //===----------------------------------------------------------------------===//
 
+private extension Instruction {
+  /// Returns self, unless self is a meta instruction, in which case the next
+  /// non-meta instruction is returned. Returns nil if there are no non-meta
+  /// instructions in the basic block.
+  var nextNonMetaInstruction: Instruction? {
+    for inst in InstructionList(first: self) where !(inst is MetaInstruction) {
+      return inst
+    }
+    return nil
+  }
+
+  /// Returns the next interesting location. As it is impossible to set a
+  /// breakpoint on a meta instruction, those are skipped.
+  /// However, we don't want to take a location with different inlining
+  /// information than this instruction, so in that case, we will return the
+  /// location of the meta instruction. If the meta instruction is the only
+  /// instruction in the basic block, we also take its location.
+  var locationOfNextNonMetaInstruction: Location {
+    let location = self.location
+    guard !location.isInlined,
+          let nextLocation = nextNonMetaInstruction?.location,
+          !nextLocation.isInlined else {
+      return location
+    }
+    return nextLocation
+  }
+}
+
 extension Builder {
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
@@ -441,8 +469,23 @@ extension Builder {
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
-  /// Creates a builder which inserts _before_ `insPnt`, using the location of `insPnt`.
+  /// Creates a builder which inserts before `insPnt`, using `insPnt`'s next
+  /// non-meta instruction's location.
+  /// This function should be used when moving code to an unknown insert point,
+  /// when we want to inherit the location of the closest non-meta instruction.
+  /// For replacing an existing meta instruction with another, use
+  /// ``Builder.init(replacing:_:)``.
   init(before insPnt: Instruction, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
+    self.init(insertAt: .before(insPnt),
+              location: insPnt.locationOfNextNonMetaInstruction,
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+  }
+
+  /// Creates a builder which inserts _before_ `insPnt`, using the exact location of `insPnt`,
+  /// for the purpose of replacing that meta instruction with an equivalent instruction.
+  /// This function does not delete `insPnt`.
+  init(replacing insPnt: MetaInstruction, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
     self.init(insertAt: .before(insPnt), location: insPnt.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
@@ -460,10 +503,10 @@ extension Builder {
     }
   }
 
-  /// Creates a builder which inserts _after_ `insPnt`, using the location of `insPnt`.
+  /// Creates a builder which inserts _after_ `insPnt`, using `insPnt`'s next
+  /// non-meta instruction's location.
   init(after insPnt: Instruction, _ context: some MutatingContext) {
-    context.verifyIsTransforming(function: insPnt.parentFunction)
-    self.init(after: insPnt, location: insPnt.location, context)
+    self.init(after: insPnt, location: insPnt.locationOfNextNonMetaInstruction, context)
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
@@ -482,11 +525,12 @@ extension Builder {
   }
 
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
-  /// instruction of `block`.
+  /// non-meta instruction of `block`.
   init(atBeginOf block: BasicBlock, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
-    self.init(insertAt: .before(firstInst), location: firstInst.location,
+    self.init(insertAt: .before(firstInst),
+              location: firstInst.locationOfNextNonMetaInstruction,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 

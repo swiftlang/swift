@@ -406,12 +406,6 @@ extension AdditiveArithmetic {
   }
 }
 
-#if !$Embedded
-public typealias _CustomStringConvertibleOrNone = CustomStringConvertible
-#else
-public typealias _CustomStringConvertibleOrNone = Any
-#endif
-
 //===----------------------------------------------------------------------===//
 //===--- BinaryInteger ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -573,7 +567,7 @@ public typealias _CustomStringConvertibleOrNone = Any
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, _CustomStringConvertibleOrNone, Strideable
+  Hashable, Numeric, CustomStringConvertible, Strideable
   where Magnitude: BinaryInteger, Magnitude.Magnitude == Magnitude
 {
   /// A Boolean value indicating whether this type is a signed integer type.
@@ -1499,7 +1493,6 @@ extension BinaryInteger {
 //===--- CustomStringConvertible conformance ------------------------------===//
 //===----------------------------------------------------------------------===//
 
-@_unavailableInEmbedded
 extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")

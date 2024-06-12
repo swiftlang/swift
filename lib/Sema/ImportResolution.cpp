@@ -574,6 +574,10 @@ UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
 // MARK: Import validation (except for scoped imports)
 //===----------------------------------------------------------------------===//
 
+ImportOptions getImportOptions(ImportDecl *ID) {
+  return ImportOptions();
+}
+
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : import(UnloadedImportedModule(ID->getImportPath(), ID->getImportKind()),
@@ -1083,6 +1087,13 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       return;
 
     auto otherAccessLevel = otherImport->getAccessLevel();
+
+    // Only report ambiguities with non-public imports as bare imports are
+    // public when this diagnostic is active. Do not report ambiguities
+    // between implicitly vs explicitly public.
+    if (otherAccessLevel == AccessLevel::Public)
+      return;
+
     auto &diags = mod->getDiags();
     {
       InFlightDiagnostic error =

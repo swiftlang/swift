@@ -87,7 +87,7 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
     return;
   }
 
-  assert(F->isNotSerialized() == Mod.isSerialized() &&
+  assert(!F->isAnySerialized() == Mod.isSerialized() &&
          "the de-serializer did set the wrong serialized flag");
   
   F->setBare(IsBare);
@@ -105,7 +105,6 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
           F->hasValidLinkageForFragileRef(callerSerializedKind) ||
          hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
          "called function has wrong linkage for serialized function");
-                                         
   if (!F->isExternalDeclaration()) {
     // The function is already in the module, so no need to de-serialized it.
     // But check if we need to set the IsSerialized flag.
@@ -186,8 +185,8 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   for (auto &entry : Vtbl->getEntries()) {
     SILFunction *impl = entry.getImplementation();
-    if (!Vtbl->isSerialized() ||
-        impl->hasValidLinkageForFragileRef()) {
+    if (!Vtbl->isAnySerialized() ||
+        impl->hasValidLinkageForFragileRef(Vtbl->getSerializedKind())) {
       // Deserialize and recursively walk any vtable entries that do not have
       // bodies yet.
       maybeAddFunctionToWorklist(impl, 

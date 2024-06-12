@@ -193,6 +193,12 @@ def no_strict_implicit_module_context :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
+def compiler_assertions :
+  Flag<["-"], "compiler-assertions">,
+  Group<internal_debug_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
+  HelpText<"Enable internal self-checks while compiling">;
+
 def validate_clang_modules_once :
   Flag<["-"], "validate-clang-modules-once">,
   Flags<[FrontendOption]>,
@@ -758,7 +764,7 @@ def enable_experimental_cxx_interop :
 
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
 def experimental_c_foreign_reference_types :
@@ -1369,6 +1375,10 @@ def disable_clang_target : Flag<["-"], "disable-clang-target">,
 def explain_module_dependency : Separate<["-"], "explain-module-dependency">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Emit remark/notes describing why compilation may depend on a module with a given name.">;
+
+def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,

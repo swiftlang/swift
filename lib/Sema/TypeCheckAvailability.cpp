@@ -44,12 +44,10 @@ using namespace swift;
 
 ExportContext::ExportContext(
     DeclContext *DC, AvailabilityContext runningOSVersion,
-    FragileFunctionKind kind, bool spi, bool isPackage,
-    bool exported, bool implicit, bool deprecated,
-    std::optional<PlatformKind> unavailablePlatformKind)
+    FragileFunctionKind kind, bool spi, bool exported, bool implicit,
+    bool deprecated, std::optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
-  IsPackage = isPackage;
   Exported = exported;
   Implicit = implicit;
   Deprecated = deprecated;
@@ -74,7 +72,7 @@ bool swift::isExported(const ValueDecl *VD) {
   AccessScope accessScope =
       VD->getFormalAccessScope(nullptr,
                                /*treatUsableFromInlineAsPublic*/true);
-  if (accessScope.isPublicOrPackage())
+  if (accessScope.isPublic())
     return true;
 
   // Is this a stored property in a @frozen struct or class?
@@ -85,13 +83,13 @@ bool swift::isExported(const ValueDecl *VD) {
   return false;
 }
 
-static bool hasConformancesToPublicOrPackageProtocols(const ExtensionDecl *ED) {
+static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
   auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
   for (const ProtocolDecl *PD : protocols) {
     AccessScope scope =
         PD->getFormalAccessScope(/*useDC*/ nullptr,
                                  /*treatUsableFromInlineAsPublic*/ true);
-    if (scope.isPublicOrPackage())
+    if (scope.isPublic())
       return true;
   }
 
@@ -113,7 +111,7 @@ bool swift::isExported(const ExtensionDecl *ED) {
 
   // If the extension declares a conformance to a public protocol then the
   // extension is exported.
-  if (hasConformancesToPublicOrPackageProtocols(ED))
+  if (hasConformancesToPublicProtocols(ED))
     return true;
 
   return false;
@@ -186,19 +184,12 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
 }
 
 static void
-computeExportContextBits(ASTContext &Ctx, Decl *D, 
-                         bool *spi, bool *isPackage,
-                         bool *implicit, bool *deprecated,
+computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
+                         bool *deprecated,
                          std::optional<PlatformKind> *unavailablePlatformKind) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
-
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    *isPackage = VD->getFormalAccessScope(nullptr, true).isPackage();
-  } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    *isPackage = ED->getDefaultAccessLevel() == AccessLevel::Package;
-  }
 
   // Defer bodies are desugared to an implicit closure expression. We need to
   // dilute the meaning of "implicit" to make sure we're still checking
@@ -207,7 +198,7 @@ computeExportContextBits(ASTContext &Ctx, Decl *D,
   if (D->isImplicit() && !isDeferBody)
     *implicit = true;
 
-  if (D->getAttrs().getDeprecated(Ctx))
+  if (D->getAttrs().isDeprecated(Ctx))
     *deprecated = true;
 
   if (auto *A = D->getAttrs().getUnavailable(Ctx)) {
@@ -217,8 +208,8 @@ computeExportContextBits(ASTContext &Ctx, Decl *D,
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
       if (auto *VD = PBD->getAnchoringVarDecl(i))
-        computeExportContextBits(Ctx, VD, spi, isPackage, implicit,
-                                 deprecated, unavailablePlatformKind);
+        computeExportContextBits(Ctx, VD, spi, implicit, deprecated,
+                                 unavailablePlatformKind);
     }
   }
 }
@@ -233,25 +224,23 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(), DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
-  bool isPackage = false;
   bool implicit = false;
   bool deprecated = false;
   std::optional<PlatformKind> unavailablePlatformKind;
-  computeExportContextBits(Ctx, D, &spi, &isPackage, &implicit,
-                           &deprecated, &unavailablePlatformKind);
-
+  computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
+                           &unavailablePlatformKind);
   forEachOuterDecl(D->getDeclContext(),
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &isPackage, &implicit,
-                                              &deprecated, &unavailablePlatformKind);
+                                              &spi, &implicit, &deprecated,
+                                              &unavailablePlatformKind);
                    });
 
   bool exported = ::isExported(D);
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, isPackage, exported, implicit,
-                       deprecated, unavailablePlatformKind);
+                       spi, exported, implicit, deprecated,
+                       unavailablePlatformKind);
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
@@ -266,20 +255,19 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
-  bool isPackage = false;
   std::optional<PlatformKind> unavailablePlatformKind;
   forEachOuterDecl(DC,
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &isPackage, &implicit,
-                                              &deprecated, &unavailablePlatformKind);
+                                              &spi, &implicit, &deprecated,
+                                              &unavailablePlatformKind);
                    });
 
   bool exported = false;
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, isPackage, exported, implicit,
-                       deprecated, unavailablePlatformKind);
+                       spi, exported, implicit, deprecated,
+                       unavailablePlatformKind);
 }
 
 ExportContext ExportContext::forConformance(DeclContext *DC,
@@ -288,7 +276,7 @@ ExportContext ExportContext::forConformance(DeclContext *DC,
   auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
 
   where.Exported &= proto->getFormalAccessScope(
-      DC, /*usableFromInlineAsPublic*/true).isPublicOrPackage();
+      DC, /*usableFromInlineAsPublic*/true).isPublic();
 
   return where;
 }
@@ -4487,7 +4475,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    auto hasProtocols = hasConformancesToPublicOrPackageProtocols(extension);
+    auto hasProtocols = hasConformancesToPublicProtocols(extension);
 
     if (!hasMembers && !hasProtocols) return;
 

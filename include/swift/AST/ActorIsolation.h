@@ -170,6 +170,8 @@ public:
     return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
   }
 
+  bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
+
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
   /// Parameter 0 is `self`.

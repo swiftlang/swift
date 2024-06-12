@@ -20,6 +20,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 
@@ -519,6 +520,14 @@ public:
   /// import overlay files that associate with that module.
   using CrossImportMap = llvm::StringMap<std::vector<std::string>>;
   CrossImportMap CrossImportInfo;
+
+  /// CanImport information passed from scanning.
+  struct CanImportInfo {
+    std::string ModuleName;
+    llvm::VersionTuple Version;
+    llvm::VersionTuple UnderlyingVersion;
+  };
+  std::vector<CanImportInfo> CanImportModuleInfo;
 
   /// Whether to search for cross import overlay on file system.
   bool DisableCrossImportOverlaySearch = false;

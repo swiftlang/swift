@@ -116,29 +116,29 @@ public:
   }
 };
 
-/// Returns `true` if `ED` is an extension of `PD` that binds `Self` to a
-/// concrete type, like `extension MyProto where Self == MyStruct {}`.
+/// Returns `true` if `ED` is an extension that binds `Self` to a
+/// concrete type, like `extension MyProto where Self == MyStruct {}`. The
+/// protocol being extended must either be `PD`, or `Self` must be a type
+/// that conforms to `PD`.
 ///
 /// In these cases, it is possible to access static members defined in the
 /// extension when perfoming unresolved member lookup in a type context of
 /// `PD`.
 static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
                                      ProtocolDecl *PD) {
-  if (!ED || !PD) {
+  if (!ED || !PD)
     return false;
-  }
-  if (ED->getExtendedNominal() != PD) {
-    return false;
-  }
+
   GenericSignature genericSig = ED->getGenericSignature();
   Type selfType = genericSig->getConcreteType(ED->getSelfInterfaceType());
-  if (!selfType) {
+  if (!selfType)
     return false;
-  }
-  if (selfType->is<ExistentialType>()) {
+
+  if (selfType->is<ExistentialType>())
     return false;
-  }
-  return true;
+
+  auto *M = ED->getParentModule();
+  return ED->getExtendedNominal() == PD || M->checkConformance(selfType, PD);
 }
 
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
@@ -246,10 +246,14 @@ IsDeclApplicableRequest::evaluate(Evaluator &evaluator,
 bool
 TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                    TypeRelationCheckInput Owner) const {
-  std::optional<constraints::ConstraintKind> CKind;
+  using namespace constraints;
+  std::optional<ConstraintKind> CKind;
   switch (Owner.Relation) {
   case TypeRelation::ConvertTo:
-    CKind = constraints::ConstraintKind::Conversion;
+    CKind = ConstraintKind::Conversion;
+    break;
+  case TypeRelation::SubtypeOf:
+    CKind = ConstraintKind::Subtype;
     break;
   }
   assert(CKind.has_value());

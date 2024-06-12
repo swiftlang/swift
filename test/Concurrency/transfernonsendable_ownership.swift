@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-experimental-feature TransferringArgsAndResults %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s -o /dev/null
 
 // This test validates the behavior of transfer non sendable around ownership
 // constructs like non copyable types, consuming/borrowing parameters, and inout

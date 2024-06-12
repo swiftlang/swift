@@ -2301,32 +2301,32 @@ ERROR(pattern_type_not_usable_from_inline,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
-      (bool, bool, /*ignored*/bool))
+      (bool, bool))
 WARNING(pattern_type_not_usable_from_inline_warn,none,
         "type referenced from a '@usableFromInline' "
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
-        (bool, bool, /*ignored*/bool))
+        (bool, bool))
 ERROR(pattern_type_not_usable_from_inline_frozen,none,
-      "type referenced from a stored property in a '@frozen%select{| package}2' struct must "
-      "be '@usableFromInline'%select{ or public|, public, or package}2",
-      (/*ignored*/bool, /*ignored*/bool, bool))
+      "type referenced from a stored property in a '@frozen' struct must "
+      "be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
       "with inferred type %2 "
       "must be '@usableFromInline' or public",
-      (bool, bool, Type, /*ignored*/bool))
+      (bool, bool, Type))
 WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "type referenced from a '@usableFromInline' "
         "%select{%select{variable|constant}0|property}1 "
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
-        (bool, bool, Type, /*ignored*/bool))
+        (bool, bool, Type))
 ERROR(pattern_type_not_usable_from_inline_inferred_frozen,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "'@frozen%select{| package}3' struct must be '@usableFromInline'%select{ or public|, public, or package}3",
-      (/*ignored*/bool, /*ignored*/bool, Type, bool))
+      "'@frozen' struct must be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
@@ -3137,6 +3137,11 @@ ERROR(witness_unavailable,none,
         "unavailable %kind0 was used to satisfy a requirement of protocol %1%select{|: %2}2",
         (const ValueDecl *, Identifier, StringRef))
 
+WARNING(witness_deprecated,none,
+        "deprecated default implementation is used to satisfy %kind0 required by "
+        "protocol %1%select{|: %2}2",
+        (const ValueDecl *, Identifier, StringRef))
+
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, Identifier))
 ERROR(redundant_conformance_conditional,none,
@@ -3643,8 +3648,6 @@ ERROR(decl_from_hidden_module,none,
       "cannot use %kind0 %select{here|as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances|"
-      "in an extension with public, package, or '@usableFromInline' members|"
       "in an extension with conditional conformances}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
@@ -3652,17 +3655,13 @@ ERROR(decl_from_hidden_module,none,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
-      "%2 was not imported publicly|"
-      "%2 was imported as package}3"
-      "%select{||||| or as package| or as package}1",
+      "%2 was not imported publicly}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
       "as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances|"
-      "in an extension with public, package, or '@usableFromInline' members|"
       "in an extension with conditional conformances}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
@@ -3670,8 +3669,7 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
-      "%4 was not imported publicly|"
-      "%4 was imported as package}5",
+      "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -3684,8 +3682,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "%3 was imported for SPI only|"
       "%3 was not imported by this file|"
       "C++ types from imported module %3 do not support library evolution|"
-      "%3 was not imported publicly|"
-      "%3 was imported as package}4",
+      "%3 was not imported publicly}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
@@ -4014,6 +4011,9 @@ ERROR(autoclosure_function_input_nonunit,none,
 
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
+
+ERROR(escaping_inout_parameter,none,
+      "inout expression is implicitly escaping", ())
 
 ERROR(escaping_optional_type_argument, none,
       "closure is already escaping in optional type argument", ())
@@ -6920,8 +6920,7 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
-      "%2 was not imported publicly|"
-      "%2 was imported as package}3",
+      "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
@@ -6939,8 +6938,7 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
-      "%4 was not imported publicly|"
-      "%4 was imported as package}5",
+      "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 NOTE(missing_import_inserted,
@@ -6954,8 +6952,8 @@ ERROR(availability_macro_in_inlinable, none,
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here,
-     none, "%kind0 is not '@usableFromInline'%select{ or public|, public, or package}1",
-     (const ValueDecl *, bool))
+     none, "%kind0 is not '@usableFromInline' or public",
+     (const ValueDecl *))
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
@@ -7811,33 +7809,15 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics, none,
-      "noncopyable type %0 cannot be used with generics yet",
-      (Type))
 ERROR(noncopyable_generics_variadic, none,
       "noncopyable type %0 cannot be used within a variadic type yet",
       (Type))
-ERROR(noncopyable_generics_specific, none,
-      "noncopyable type %0 cannot be used with generic type %1 yet",
-      (Type, Type))
-ERROR(noncopyable_generics_erasure, none,
-      "noncopyable type %0 cannot be erased to copyable existential type %1",
-      (Type, Type))
-ERROR(noncopyable_generics_metatype_cast, none,
-      "metatype %0 cannot be cast to %1 because %2 is noncopyable",
-      (Type, Type, Type))
-ERROR(noncopyable_generics_generic_param, none,
-      "noncopyable type %0 cannot be substituted for copyable %1 %2 in %3",
-      (Type, DescriptiveDeclKind, Type, DeclName))
-ERROR(noncopyable_generics_generic_param_metatype, none,
-      "metatype %4 of noncopyable type %0 cannot be substituted for copyable %1 %2 in %3",
-      (Type, DescriptiveDeclKind, Type, DeclName, Type))
-NOTE(noncopyable_generics_implicit_copyable, none,
-      "%0 %1 has an implicit Copyable requirement",
-      (DescriptiveDeclKind, Type))
-ERROR(noncopyable_element_of_pack_not_supported,none,
-      "parameter pack containing noncopyable element %0 is not supported",
-      (Type))
+NOTE(noncopyable_generics_implicit_conformance_req, none,
+     "'where %noformat0: %noformat1' is implicit here",
+     (Type, Type))
+NOTE(noncopyable_generics_implicit_composition, none,
+     "'%noformat0 & %noformat1' is implicit here",
+     (Type, Type))
 ERROR(noncopyable_effectful_getter,none,
       "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noncopyable_enums_do_not_support_indirect,none,
@@ -7848,6 +7828,10 @@ ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
+ERROR(consume_expression_needed_for_cast,none,
+      "implicit conversion to %0 is consuming", (Type))
+NOTE(add_consume_to_silence,none,
+     "add 'consume' to make consumption explicit", ())
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(consume_expression_partial_copyable,none,
@@ -7932,13 +7916,6 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
       "%0 bindings must be bound to an lvalue", (StringRef))
 
 //------------------------------------------------------------------------------
-// MARK: resultDependsOn Errors
-//------------------------------------------------------------------------------
-
-ERROR(result_depends_on_no_result,none,
-      "Incorrect use of %0 with no result", (StringRef))
-
-//------------------------------------------------------------------------------
 // MARK: Pack Iteration Diagnostics
 //------------------------------------------------------------------------------
 
@@ -7994,6 +7971,8 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "cannot infer lifetime dependence on a self which is BitwiseCopyable & "
        "Escapable",
        ())
+ERROR(lifetime_dependence_immortal_conflict_name, none,
+      "conflict between the parameter name and immortal keyword", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring

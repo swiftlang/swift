@@ -1105,8 +1105,7 @@ actor A: Actor { // ok
 @available(SwiftStdlib 5.1, *)
 class C: Actor, UnsafeSendable {
   // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}}
-  // expected-error@-2{{non-actor type 'C' cannot conform to the 'AnyActor' protocol}}
-  // expected-warning@-3{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
@@ -1493,9 +1492,6 @@ class None {
 // try to add inferred isolation while overriding
 @MainActor
 class MA_None1: None {
-
-  // FIXME: bad note, since the problem is a mismatch in overridden vs inferred isolation; this wont help.
-  // expected-note@+1 {{add '@MainActor' to make instance method 'method()' part of global actor 'MainActor'}}
   override func method() {
     beets_ma() // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }

@@ -2156,10 +2156,9 @@ namespace {
                                               TypeResolutionOptions options);
     NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
                                          TypeResolutionOptions options);
-    NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
-                                                  TypeResolutionOptions options);
-    NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
-                                                 TypeResolutionOptions options);
+    NeverNullType
+    resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
+                                    TypeResolutionOptions options);
     NeverNullType resolveLifetimeDependentReturnTypeRepr(
         LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
@@ -2768,10 +2767,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
-
-  case TypeReprKind::ResultDependsOn:
-    return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
-                                          options);
 
   case TypeReprKind::LifetimeDependentReturn:
     return resolveLifetimeDependentReturnTypeRepr(
@@ -3398,6 +3393,10 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
           diagnoseInvalid(repr, repr->getLoc(),
                           diag::escaping_optional_type_argument)
               .fixItRemove(attrRange);
+        } else if (options.is(TypeResolverContext::InoutFunctionInput)) {
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_inout_parameter)
+              .fixItRemove(attrRange);
         } else {
           diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
               .fixItRemove(attrRange);
@@ -3645,7 +3644,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
-    bool hasResultDependsOn = false;
     bool isSending = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
@@ -3669,10 +3667,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
-          nestedRepr = specifierRepr->getBase();
-          continue;
-        case TypeReprKind::ResultDependsOn:
-          hasResultDependsOn = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3777,8 +3771,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, hasResultDependsOn,
-        isSending);
+        isolated, noDerivative, compileTimeConst, isSending);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -5047,31 +5040,6 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   return ArraySliceType::get(baseTy);
 }
 
-NeverNullType
-TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
-                                             TypeResolutionOptions options) {
-  // _resultDependsOn is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
-
-    decltype(diag::attr_only_on_parameters) diagID;
-    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
-        options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagID = diag::attr_only_valid_on_func_or_init_params;
-    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
-      diagID = diag::attr_not_on_variadic_parameters;
-    } else {
-      diagID = diag::attr_only_on_parameters;
-    }
-
-    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
-    return ErrorType::get(getASTContext());
-  }
-  return resolveType(repr->getBase(), options);
-}
-
 NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
     LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
   if (options.is(TypeResolverContext::TupleElement)) {
@@ -5980,31 +5948,6 @@ public:
     if (T->isInvalid())
       return Action::SkipNode();
 
-    // Arbitrary protocol constraints are OK on opaque types.
-    if (isa<OpaqueReturnTypeRepr>(T))
-      return Action::SkipNode();
-
-    // Arbitrary protocol constraints are okay for 'any' types.
-    if (isa<ExistentialTypeRepr>(T))
-      return Action::SkipNode();
-
-    // Suppressed conformance needs to be within any/some.
-    if (auto inverse = dyn_cast<InverseTypeRepr>(T)) {
-      // Find an enclosing protocol composition, if there is one, so we
-      // can insert 'any' before that.
-      SourceLoc anyLoc = inverse->getTildeLoc();
-      if (!reprStack.empty()) {
-        if (isa<CompositionTypeRepr>(reprStack.back())) {
-          anyLoc = reprStack.back()->getStartLoc();
-        }
-      }
-
-      Ctx.Diags.diagnose(inverse->getTildeLoc(), diag::inverse_requires_any)
-        .highlight(inverse->getConstraint()->getSourceRange())
-        .fixItInsert(anyLoc, "any ");
-      return Action::SkipNode();
-    }
-
     reprStack.push_back(T);
 
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
@@ -6057,9 +6000,12 @@ public:
   }
 
 private:
-  bool existentialNeedsParens(TypeRepr *parent) const {
+  /// Returns a Boolean value indicating whether the insertion of `any` before
+  /// a type representation with the given parent requires paretheses.
+  static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
     case TypeReprKind::Optional:
+    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Protocol:
       return true;
     case TypeReprKind::Metatype:
@@ -6074,7 +6020,6 @@ private:
     case TypeReprKind::UnqualifiedIdent:
     case TypeReprKind::QualifiedIdent:
     case TypeReprKind::Dictionary:
-    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Inverse:
     case TypeReprKind::Tuple:
     case TypeReprKind::Fixed:
@@ -6090,33 +6035,50 @@ private:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
-    case TypeReprKind::ResultDependsOn:
     case TypeReprKind::LifetimeDependentReturn:
       return false;
     }
   }
 
   void emitInsertAnyFixit(InFlightDiagnostic &diag, DeclRefTypeRepr *T) const {
-    TypeRepr *replaceRepr = T;
+    TypeRepr *replacementT = T;
 
     // Insert parens in expression context for '(any P).self'
     bool needsParens = (exprCount != 0);
+
+    // Compute the replacement node (the node to which to apply `any`).
     if (reprStack.size() > 1) {
-      auto parentIt = reprStack.end() - 2;
-      needsParens = existentialNeedsParens(*parentIt);
+      auto it = reprStack.end() - 1;
+      auto replacementIt = it;
 
-      // Expand to include parenthesis before checking if the parent needs
-      // to be replaced.
-      while (parentIt != reprStack.begin() &&
-             (*parentIt)->getWithoutParens() != *parentIt)
-        parentIt -= 1;
+      // Backtrack the stack and expand the replacement range to any parent
+      // inverses, compositions or `.Type` metatypes, skipping only parentheses.
+      //
+      // E.g. `(X & ~P).Type` → `any (X & ~P).Type`.
+      //             ↑
+      //             We're here
+      do {
+        --it;
+        if ((*it)->isParenType()) {
+          continue;
+        }
 
-      // For existential metatypes, 'any' is applied to the metatype.
-      if ((*parentIt)->getKind() == TypeReprKind::Metatype) {
-        replaceRepr = *parentIt;
-        if (parentIt != reprStack.begin())
-          needsParens = existentialNeedsParens(*(parentIt - 1));
+        if (isa<InverseTypeRepr>(*it) || isa<CompositionTypeRepr>(*it) ||
+            isa<MetatypeTypeRepr>(*it)) {
+          replacementIt = it;
+          continue;
+        }
+
+        break;
+      } while (it != reprStack.begin());
+
+      // Whether parentheses are necessary is determined by the immediate parent
+      // of the replacement node.
+      if (replacementIt != reprStack.begin()) {
+        needsParens = anySyntaxNeedsParens(*(replacementIt - 1));
       }
+
+      replacementT = *replacementIt;
     }
 
     llvm::SmallString<64> fix;
@@ -6124,13 +6086,49 @@ private:
       llvm::raw_svector_ostream OS(fix);
       if (needsParens)
         OS << "(";
-      ExistentialTypeRepr existential(SourceLoc(), replaceRepr);
+      ExistentialTypeRepr existential(SourceLoc(), replacementT);
       existential.print(OS);
       if (needsParens)
         OS << ")";
     }
 
-    diag.fixItReplace(replaceRepr->getSourceRange(), fix);
+    diag.fixItReplace(replacementT->getSourceRange(), fix);
+  }
+
+  /// Returns a Boolean value indicating whether the type representation being
+  /// visited, assuming it is a constraint type demanding `any` or `some`, is
+  /// missing either keyword.
+  bool isAnyOrSomeMissing() const {
+    assert(isa<DeclRefTypeRepr>(reprStack.back()));
+
+    if (reprStack.size() < 2) {
+      return true;
+    }
+
+    auto it = reprStack.end() - 1;
+    while (true) {
+      --it;
+      if (it == reprStack.begin()) {
+        break;
+      }
+
+      // Look through parens, inverses, metatypes, and compositions.
+      if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
+          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
+        continue;
+      }
+
+      // Look through '?' and '!' too; `any P?` et al. is diagnosed in the
+      // type resolver.
+      if (isa<OptionalTypeRepr>(*it) ||
+          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
+        continue;
+      }
+
+      break;
+    }
+
+    return !(isa<OpaqueReturnTypeRepr>(*it) || isa<ExistentialTypeRepr>(*it));
   }
 
   void checkDeclRefTypeRepr(DeclRefTypeRepr *T) const {
@@ -6140,13 +6138,32 @@ private:
       return;
     }
 
+    // Backtrack the stack, looking just through parentheses and metatypes. If
+    // we find an inverse (which always requires `any`), diagnose it specially.
+    if (reprStack.size() > 1) {
+      auto it = reprStack.end() - 2;
+      while (it != reprStack.begin() &&
+             ((*it)->isParenType() || isa<MetatypeTypeRepr>(*it))) {
+        --it;
+        continue;
+      }
+
+      if (auto *inverse = dyn_cast<InverseTypeRepr>(*it);
+          inverse && isAnyOrSomeMissing()) {
+        auto diag = Ctx.Diags.diagnose(inverse->getTildeLoc(),
+                                       diag::inverse_requires_any);
+        emitInsertAnyFixit(diag, T);
+        return;
+      }
+    }
+
     auto *decl = T->getBoundDecl();
     if (!decl) {
       return;
     }
 
     if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-      if (proto->existentialRequiresAny()) {
+      if (proto->existentialRequiresAny() && isAnyOrSomeMissing()) {
         auto diag =
             Ctx.Diags.diagnose(T->getNameLoc(), diag::existential_requires_any,
                                proto->getDeclaredInterfaceType(),
@@ -6176,7 +6193,7 @@ private:
         if (auto *PCT = type->getAs<ProtocolCompositionType>())
           diagnose |= !PCT->getInverses().empty();
 
-        if (diagnose) {
+        if (diagnose && isAnyOrSomeMissing()) {
           auto diag = Ctx.Diags.diagnose(
               T->getNameLoc(), diag::existential_requires_any,
               alias->getDeclaredInterfaceType(),

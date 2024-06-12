@@ -657,27 +657,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     fn->setSerializedKind(SerializedKind_t(serializedKind));
 
-    // pcmo TODO: check if this can be deleted
-    // If fn was serialized in a module with package serialization
-    // enabled, a new attribute [serialized_for_package] was added
-    // to its definition. Preserve the attribute here if the current
-    // module is in the same package, and use it to determine the
-    // resilience expansion for this function.
-    auto loadedModule = getFile()->getParentModule();
-    if (SerializedKind_t(serializedKind) == IsSerializedForPackage &&
-        loadedModule->isResilient() &&
-        loadedModule != SILMod.getSwiftModule() &&
-        loadedModule->serializePackageEnabled() &&
-        loadedModule->inSamePackage(SILMod.getSwiftModule()))
-      fn->setSerializedKind(IsSerializedForPackage);
-
     // If the serialized function comes from the same module, we're merging
     // modules, and can update the linkage directly. This is needed to
     // correctly update the linkage for forward declarations to entities defined
     // in another file of the same module – we want to ensure the linkage
     // reflects the fact that the entity isn't really external and shouldn't be
     // dropped from the resulting merged module.
-    if (loadedModule == SILMod.getSwiftModule())
+    if (getFile()->getParentModule() == SILMod.getSwiftModule())
       fn->setLinkage(linkage);
 
     // Don't override the transparency or linkage of a function with
@@ -981,7 +967,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
   if (!MF->isSIB() && !SILMod.isSerialized()) {
-    assert((!fn->isNotSerialized() || fn->empty()) &&
+    assert((fn->isAnySerialized() || fn->empty()) &&
            "deserialized function must have the IsSerialized or IsSerializedForPackage flag set");
   }
   return fn;
@@ -2272,6 +2258,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(ValueToBridgeObject)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(EndLifetime)
+  UNARY_INSTRUCTION(ExtendLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
   UNARY_INSTRUCTION(EndInitLetRef)

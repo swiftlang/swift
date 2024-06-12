@@ -242,7 +242,6 @@ public func _withUnprotectedUnsafePointer<
 #endif
 }
 
-#if !$Embedded
 extension String {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.
@@ -264,7 +263,6 @@ extension String {
     return try _guts.withCString(body)
   }
 }
-#endif
 
 @available(*, deprecated, message: "Use the copy operator")
 @_alwaysEmitIntoClient

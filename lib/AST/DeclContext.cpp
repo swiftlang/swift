@@ -486,7 +486,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       auto effectiveAccess =
           VD->getFormalAccessScope(/*useDC=*/nullptr,
                                    /*treatUsableFromInlineAsPublic=*/true);
-      if (effectiveAccess.isPublicOrPackage()) {
+      if (effectiveAccess.isPublic()) {
         return {FragileFunctionKind::DefaultArgument};
       }
 
@@ -518,7 +518,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
 
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!funcAccess.isPublicOrPackage()) {
+      if (!funcAccess.isPublic()) {
         return {FragileFunctionKind::None};
       }
 

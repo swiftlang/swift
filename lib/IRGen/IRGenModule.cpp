@@ -1583,7 +1583,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     }
   }
 
-  if (linkLib.shouldForceLoad()) {
+  if (!IRGen.Opts.DisableForceLoadSymbols && linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk = cast<llvm::Function>(
@@ -1865,6 +1865,11 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
 }
 
 void IRGenModule::emitAutolinkInfo() {
+  if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
+    // We're asked to emit an empty IR module
+    return;
+  }
+
   auto Autolink =
       AutolinkKind::create(TargetInfo, Triple, IRGen.Opts.LLVMLTOKind);
 

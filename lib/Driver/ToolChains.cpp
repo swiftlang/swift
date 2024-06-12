@@ -343,6 +343,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
+  inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

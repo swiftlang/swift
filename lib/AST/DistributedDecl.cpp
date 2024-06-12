@@ -61,7 +61,7 @@
 using namespace swift;
 
 /******************************************************************************/
-/************* Implicit Distributed Actor Codable Conformance *****************/
+/******************* Distributed Actor Conformances ***************************/
 /******************************************************************************/
 
 bool swift::canSynthesizeDistributedActorCodableConformance(NominalTypeDecl *actor) {
@@ -76,6 +76,68 @@ bool swift::canSynthesizeDistributedActorCodableConformance(NominalTypeDecl *act
       false);
 }
 
+ExtensionDecl *
+swift::findDistributedActorAsActorExtension(
+    ProtocolDecl *distributedActorProto, ModuleDecl *module) {
+  ASTContext &C = distributedActorProto->getASTContext();
+  auto name = C.getIdentifier("__actorUnownedExecutor");
+  auto results = distributedActorProto->lookupDirect(
+      name, SourceLoc(),
+      NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
+  for (auto result : results) {
+    if (auto var = dyn_cast<VarDecl>(result)) {
+      return dyn_cast<ExtensionDecl>(var->getDeclContext());
+    }
+  }
+
+  return nullptr;
+}
+
+bool swift::isDistributedActorAsLocalActorComputedProperty(VarDecl *var) {
+  auto &C = var->getASTContext();
+  return var->getName() == C.Id_asLocalActor &&
+         var->getDeclContext()->getSelfProtocolDecl() &&
+         var->getDeclContext()->getSelfProtocolDecl()->isSpecificProtocol(
+             KnownProtocolKind::DistributedActor);
+}
+
+VarDecl *
+swift::getDistributedActorAsLocalActorComputedProperty(ModuleDecl *module) {
+  auto &C = module->getASTContext();
+  auto DA = C.getDistributedActorDecl();
+  auto extension = findDistributedActorAsActorExtension(DA, module);
+
+  if (!extension)
+    return nullptr;
+
+  for (auto decl : extension->getMembers()) {
+    if (auto var = dyn_cast<VarDecl>(decl)) {
+      if (isDistributedActorAsLocalActorComputedProperty(var)) {
+        return var;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+ProtocolConformanceRef
+swift::getDistributedActorAsActorConformanceRef(ASTContext &C) {
+  auto distributedActorAsActorConformance =
+      getDistributedActorAsActorConformance(C);
+
+  auto actorProto = C.getProtocol(KnownProtocolKind::Actor);
+  return ProtocolConformanceRef(actorProto, distributedActorAsActorConformance);
+}
+NormalProtocolConformance *
+swift::getDistributedActorAsActorConformance(ASTContext &C) {
+  auto distributedActorProtocol = C.getProtocol(KnownProtocolKind::DistributedActor);
+
+  return evaluateOrDefault(
+      C.evaluator,
+      GetDistributedActorAsActorConformanceRequest{distributedActorProtocol},
+      nullptr);
+}
 
 /******************************************************************************/
 /************** Distributed Actor System Associated Types *********************/

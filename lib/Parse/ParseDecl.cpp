@@ -2901,13 +2901,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     DiscardAttribute = true;
   }
 
-  if (DK == DeclAttrKind::ResultDependsOnSelf &&
-      !Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnose(Loc, diag::requires_experimental_feature, AttrName, true,
-             getFeatureName(Feature::NonescapableTypes));
-    DiscardAttribute = true;
-  }
-
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
@@ -3989,6 +3982,16 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       if (likeType.isNull()) {
         return makeParserSuccess();
       }
+
+      bool movesAsLike = false;
+
+      // @_rawLayout(like: T, movesAsLike)
+      if (consumeIf(tok::comma) && Tok.isAny(tok::identifier) &&
+          !parseSpecificIdentifier("movesAsLike",
+            diag::attr_rawlayout_expected_label, "movesAsLike")) {
+        movesAsLike = true;
+      }
+
       SourceLoc rParenLoc;
       if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
@@ -3996,7 +3999,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
 
-      attr = new (Context) RawLayoutAttr(likeType.get(),
+      attr = new (Context) RawLayoutAttr(likeType.get(), movesAsLike,
                                          AtLoc, SourceRange(Loc, rParenLoc));
     } else if (firstLabel.is("likeArrayOf")) {
       // @_rawLayout(likeArrayOf: T, count: N)
@@ -5119,10 +5122,16 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
             Identifier paramName;
             auto paramLoc =
                 consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::
-                    getNamedLifetimeDependenceSpecifier(
-                        paramLoc, lifetimeDependenceKind, paramName));
+            if (paramName.is("immortal")) {
+              specifierList.push_back(
+                  LifetimeDependenceSpecifier::
+                      getImmortalLifetimeDependenceSpecifier(paramLoc));
+            } else {
+              specifierList.push_back(
+                  LifetimeDependenceSpecifier::
+                      getNamedLifetimeDependenceSpecifier(
+                          paramLoc, lifetimeDependenceKind, paramName));
+            }
             break;
           }
           case tok::integer_literal: {
@@ -5442,26 +5451,12 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
-    if (Tok.isContextualKeyword("_resultDependsOn")) {
-      if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, "resultDependsOn",
-                   false, getFeatureName(Feature::NonescapableTypes));
-      }
-      ResultDependsOnLoc = P.consumeToken();
-      continue;
-    }
-
     // Perform an extra check for transferring. Since it is a specifier, we use
     // the actual parsing logic below.
     if (Tok.isContextualKeyword("transferring")) {
-      if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::TransferringArgsAndResults));
-      } else {
-        // Now that we have sending, warn users to convert 'transferring' to
-        // 'sendable'.
-        P.diagnose(Tok, diag::transferring_is_now_sendable);
-      }
+      // Now that we have sending, warn users to convert 'transferring' to
+      // 'sendable'.
+      P.diagnose(Tok, diag::transferring_is_now_sendable);
 
       // Do not allow for transferring to be parsed after a specifier has been
       // parsed.
@@ -5510,6 +5505,14 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
             .fixItRemove(TransferringLoc);
       }
 
+      // If we already saw a specifier, check if we have borrowing. In such a
+      // case, emit an error.
+      if (SpecifierLoc.isValid() &&
+          Specifier == ParamDecl::Specifier::Borrowing) {
+        P.diagnose(Tok, diag::sending_cannot_be_used_with_borrowing,
+                   "sending");
+      }
+
       SendingLoc = P.consumeToken();
       continue;
     }
@@ -5547,6 +5550,13 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (bool(Specifier) && SendingLoc.isValid()) {
         P.diagnose(Tok, diag::sending_before_parameter_specifier,
                    getNameForParamSpecifier(Specifier));
+      }
+
+      // We cannot use transferring with borrowing.
+      if (TransferringLoc.isValid() &&
+          Specifier == ParamDecl::Specifier::Borrowing) {
+        P.diagnose(TransferringLoc, diag::sending_cannot_be_used_with_borrowing,
+                   "transferring");
       }
     }
     Tok.setKind(tok::contextual_keyword);

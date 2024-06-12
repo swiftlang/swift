@@ -14,6 +14,7 @@
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
 // DEP: _free
+// DEP: _memmove
 // DEP: _memset
 // DEP: _putchar
 // DEP: _posix_memalign

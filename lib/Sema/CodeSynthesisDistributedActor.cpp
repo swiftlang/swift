@@ -14,7 +14,6 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -82,15 +81,15 @@ static VarDecl*
 // what already has a witness.
 static VarDecl *addImplicitDistributedActorIDProperty(
     ClassDecl *nominal) {
-  if (!nominal)
-    return nullptr;
-  if (!nominal->isDistributedActor())
+  if (!nominal || !nominal->isDistributedActor())
     return nullptr;
 
   auto &C = nominal->getASTContext();
 
   // ==== Synthesize and add 'id' property to the actor decl
   Type propertyType = getDistributedActorIDType(nominal);
+  if (!propertyType || propertyType->hasError())
+    return nullptr;
 
   auto *propDecl = new (C)
       VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
@@ -693,7 +692,8 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
 
-    paramDecl->setImplicit(true);
+    paramDecl->setImplicit();
+    paramDecl->setSending();
     paramDecl->setSpecifier(funcParam->getSpecifier());
     paramDecl->setInterfaceType(funcParam->getInterfaceType());
 
@@ -1065,4 +1065,31 @@ bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
              idTy, KnownProtocolKind::Decodable, actor->getParentModule()) &&
          TypeChecker::conformsToKnownProtocol(
              idTy, KnownProtocolKind::Encodable, actor->getParentModule());
+}
+
+NormalProtocolConformance *
+GetDistributedActorAsActorConformanceRequest::evaluate(
+    Evaluator &evaluator, ProtocolDecl *distributedActorProto) const {
+  auto &ctx = distributedActorProto->getASTContext();
+  auto swiftModule = ctx.getStdlibModule();
+
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+
+  auto ext = findDistributedActorAsActorExtension(
+      distributedActorProto, swiftModule);
+  if (!ext)
+    return nullptr;
+
+  auto genericParam = GenericTypeParamType::get(/*isParameterPack=*/false,
+                                                /*depth=*/0, /*index=*/0, ctx);
+
+  auto distributedActorAsActorConformance = ctx.getNormalConformance(
+      Type(genericParam), actorProto, SourceLoc(), ext,
+      ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
+      /*isPreconcurrency=*/false);
+  // NOTE: Normally we "register" a conformance, but here we don't
+  // because we cannot (currently) register them in a protocol,
+  // since they do not have conformance tables.
+
+  return distributedActorAsActorConformance;
 }

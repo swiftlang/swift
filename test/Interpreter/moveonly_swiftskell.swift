@@ -19,6 +19,9 @@
 
 // REQUIRES: executable_test
 
+// Temporarily disable for back-deployment (rdar://128544927)
+// UNSUPPORTED: back_deployment_runtime
+
 import Swiftskell
 
 /// Basic noncopyable type for testing.
