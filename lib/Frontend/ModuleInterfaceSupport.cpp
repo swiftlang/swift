@@ -240,7 +240,8 @@ static void printImports(raw_ostream &out,
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter = {
       ModuleDecl::ImportFilterKind::Exported,
-      ModuleDecl::ImportFilterKind::Default};
+      ModuleDecl::ImportFilterKind::Default,
+      ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
 
   // With -experimental-spi-imports:
   // When printing the private or package swiftinterface file, print implementation-only
