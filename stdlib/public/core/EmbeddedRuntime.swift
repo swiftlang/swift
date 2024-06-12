@@ -165,6 +165,20 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
 public func swift_setDeallocating(object: Builtin.RawPointer) {
 }
 
+@_cdecl("swift_dynamicCastClass")
+public func swift_dynamicCastClass(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer) -> UnsafeMutableRawPointer? {
+  let sourceObj = object.assumingMemoryBound(to: HeapObject.self)
+  var type = _swift_embedded_get_heap_object_metadata_pointer(sourceObj).assumingMemoryBound(to: ClassMetadata.self)
+  let targetType = targetMetadata.assumingMemoryBound(to: ClassMetadata.self)
+  while type != targetType {
+    guard let superType = type.pointee.superclassMetadata else {
+      return nil
+    }
+    type = UnsafeMutablePointer(superType)
+  }
+  return object
+}
+
 @_cdecl("swift_isUniquelyReferenced_native")
 public func swift_isUniquelyReferenced_native(object: Builtin.RawPointer) -> Bool {
   if Int(Builtin.ptrtoint_Word(object)) == 0 { return false }
