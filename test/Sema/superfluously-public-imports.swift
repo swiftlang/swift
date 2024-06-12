@@ -235,9 +235,7 @@ internal func internalFunc(a: NotAnAPIType = notAnAPIFunc()) {}
 func implicitlyInternalFunc(a: NotAnAPIType = notAnAPIFunc()) {}
 
 // For package decls we only remark on types used in signatures, not for inlinable code.
-package func packageFunc(a: PackageType = packageFunc()) {} 
-// expected-remark@-1 {{struct 'PackageType' is imported via 'ImportUsedInPackage'}}
-// expected-remark@-2 {{global function 'packageFunc()' is imported via 'ImportUsedInPackage'}}
+package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {{struct 'PackageType' is imported via 'ImportUsedInPackage'}}
 
 @_spi(X)
 public func spiFunc(a: ToUseFromSPI) {} // expected-remark {{struct 'ToUseFromSPI' is imported via 'SPIOnlyUsedInSPI'}}
@@ -249,7 +247,7 @@ public protocol Countable {
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
 }
 
-extension ExtendedPackageType { // expected-remark 2 {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
+extension ExtendedPackageType { // expected-remark {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
   package func useExtendedPackageType() { }
 }
 
