@@ -19,7 +19,7 @@ typealias DefaultWasmEngine = WasmKitEngine
 
 struct WasmKitEngine: WasmEngine {
   private let runtime: Runtime
-  private let functions: [String: (Function)]
+  private let functions: [String: Function]
 
   init(path: FilePath, imports: WASIBridgeToHost) throws {
     runtime = Runtime(hostModules: imports.hostModules)
@@ -33,7 +33,7 @@ struct WasmKitEngine: WasmEngine {
   }
 
   func function(named name: String) throws -> WasmFunction? {
-    guard let (function) = functions[name] else { return nil }
+    guard let function = functions[name] else { return nil }
     return { _ = try function.invoke(runtime: runtime) }
   }
 }
