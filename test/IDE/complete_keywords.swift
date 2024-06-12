@@ -182,6 +182,9 @@
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try?{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: await{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: consume{{; name=.+$}}
+// KW_DECL_STMT_TOPLEVEL-DAG: Keyword/None: copy{{; name=.+$}}
 //
 // Literals
 //
@@ -250,6 +253,9 @@
 // KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: await{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: consume{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: copy{{; name=.+$}}
 //
 // Literals
 //
@@ -264,6 +270,9 @@
 // KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: await{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: consume{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: copy{{; name=.+$}}
 //
 // let and var
 //
