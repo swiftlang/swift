@@ -4299,11 +4299,12 @@ static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
   // The ABI IR types for the entrypoint might differ from the
   // Swift IR types for the body of the function.
 
+  bool IsDirectFlattened = AI.isDirect() && AI.getCanBeFlattened();
+
   llvm::Type *coercionTy = AI.getCoerceToType();
 
   ArrayRef<llvm::Type*> expandedTys;
-  if (AI.isDirect() && AI.getCanBeFlattened() &&
-      isa<llvm::StructType>(coercionTy)) {
+  if (IsDirectFlattened && isa<llvm::StructType>(coercionTy)) {
     const auto *ST = cast<llvm::StructType>(coercionTy);
     expandedTys = llvm::ArrayRef(ST->element_begin(), ST->getNumElements());
   } else if (coercionTy == paramTI.getStorageType()) {
@@ -4344,7 +4345,8 @@ static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
   Address coercedAddr = IGF.Builder.CreateElementBitCast(temporary, coercionTy);
 
   // Break down a struct expansion if necessary.
-  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
+  if (IsDirectFlattened && isa<llvm::StructType>(coercionTy)) {
+    auto expansionTy = cast<llvm::StructType>(coercionTy);
     auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
     for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
       auto fieldOffset = Size(layout->getElementOffset(i));
