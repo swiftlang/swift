@@ -1365,6 +1365,13 @@ UnboundImport::UnboundImport(
   if (declaringOptions.contains(ImportFlags::ImplementationOnly) ||
       bystandingOptions.contains(ImportFlags::ImplementationOnly))
     import.options |= ImportFlags::ImplementationOnly;
+  if (declaringOptions.contains(ImportFlags::SPIOnly) ||
+      bystandingOptions.contains(ImportFlags::SPIOnly))
+    import.options |= ImportFlags::SPIOnly;
+
+  // Pick the most restrictive access level.
+  import.accessLevel = std::min(declaringImport.accessLevel,
+                                bystandingImport.accessLevel);
 
   // If either have a `@_documentation(visibility: <access>)` attribute, the
   // cross-import has the more restrictive of the two.
