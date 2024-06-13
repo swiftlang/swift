@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 %s
+// RUN: %target-typecheck-verify-swift -swift-version 6
 
 // READ THIS! This file only contains tests that validate that the relevant
 // function subtyping rules for sending work. Please do not put other tests in
@@ -38,7 +38,8 @@ func takeFnWithoutSendingParam(_ fn: (NonSendableKlass) -> ()) {}
 
 func testFunctionMatching() {
   let _: (NonSendableKlass) -> () = functionWithSendingParameter
-  // expected-error @-1 {{cannot convert value of type '@Sendable (sending NonSendableKlass) -> ()' to specified type '(NonSendableKlass) -> ()'}}
+  // expected-error @-1 {{converting a value of type '@Sendable (sending NonSendableKlass) -> ()' to type '(NonSendableKlass) -> ()' risks causing data races}}
+  // expected-note @-2 {{converting a function typed value with a sending parameter to one without risks allowing actor-isolated values to escape their isolation domain as an argument to an invocation of value}}
   let _: (sending NonSendableKlass) -> () = functionWithSendingParameter
 
   let _: (NonSendableKlass) -> () = functionWithoutSendingParameter
@@ -46,7 +47,8 @@ func testFunctionMatching() {
 
   takeFnWithSendingParam(functionWithSendingParameter)
   takeFnWithoutSendingParam(functionWithSendingParameter)
-  // expected-error @-1 {{@Sendable (sending NonSendableKlass) -> ()' to expected argument type '(NonSendableKlass) -> ()}}
+  // expected-error @-1 {{converting a value of type '@Sendable (sending NonSendableKlass) -> ()' to type '(NonSendableKlass) -> ()' risks causing data races}}
+  // expected-note @-2 {{converting a function typed value with a sending parameter to one without risks allowing actor-isolated values to escape their isolation domain as an argument to an invocation of value}}
   takeFnWithSendingParam(functionWithoutSendingParameter)
   takeFnWithoutSendingParam(functionWithoutSendingParameter)
 }
@@ -56,14 +58,17 @@ func testReturnValueMatching() {
   let _: () -> sending NonSendableKlass = functionWithSendingResult
   let _: () -> NonSendableKlass = functionWithoutSendingResult
   let _: () -> sending NonSendableKlass = functionWithoutSendingResult
-  // expected-error @-1 {{cannot convert value of type '@Sendable () -> NonSendableKlass' to specified type '() -> sending NonSendableKlass'}}
+  // expected-error @-1 {{converting a value of type '@Sendable () -> NonSendableKlass' to type '() -> sending NonSendableKlass' risks causing data races}}
+  // expected-note @-2 {{converting a function typed value without a sending result as one with risks allowing actor-isolated values to escape their isolation domain through a result of an invocation of value}}
 
   takeFnWithSendingResult(functionWithSendingResult)
   takeFnWithSendingResult(functionWithoutSendingResult)
-  // expected-error @-1 {{cannot convert value of type '@Sendable () -> NonSendableKlass' to expected argument type '() -> sending NonSendableKlass'}}
+  // expected-error @-1 {{converting a value of type '@Sendable () -> NonSendableKlass' to type '() -> sending NonSendableKlass' risks causing data races}}
+  // expected-note @-2 {{converting a function typed value without a sending result as one with risks allowing actor-isolated values to escape their isolation domain through a result of an invocation of value}}
   let x: () -> NonSendableKlass = { fatalError() }
   takeFnWithSendingResult(x)
-  // expected-error @-1 {{cannot convert value of type '() -> NonSendableKlass' to expected argument type '() -> sending NonSendableKlass'}}
+  // expected-error @-1 {{converting a value of type '() -> NonSendableKlass' to type '() -> sending NonSendableKlass' risks causing data races}}
+  // expected-note @-2 {{converting a function typed value without a sending result as one with risks allowing actor-isolated values to escape their isolation domain through a result of an invocation of value}}
 
   takeFnWithoutSendingResult(functionWithSendingResult)
   takeFnWithoutSendingResult(functionWithoutSendingResult)
