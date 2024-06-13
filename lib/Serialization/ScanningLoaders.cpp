@@ -153,7 +153,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
       StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
-          ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+          ArrayRef<StringRef> PCMArgs, ArrayRef<std::string> PublicLinkLibs, StringRef Hash) {
+
         assert(mainMod);
         std::string InPath = moduleInterfacePath.str();
         auto compiledCandidates =
@@ -241,6 +242,12 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
                                    isFramework ? LibraryKind::Framework : LibraryKind::Library,
                                    true});
         }
+
+        // Register libraries specified by `-public-autolink-library`
+        for (auto publicLinkLibrary : PublicLinkLibs) {
+          linkLibraries.push_back(LinkLibrary(publicLinkLibrary, LibraryKind::Library));
+        }
+
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(

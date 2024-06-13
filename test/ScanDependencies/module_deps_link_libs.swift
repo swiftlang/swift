@@ -9,6 +9,7 @@ import C
 import E
 import G
 import SubE
+import HasLinkDependency
 
 // CHECK: "mainModuleName": "deps"
 
@@ -26,6 +27,10 @@ import SubE
 // CHECK-NEXT:          "shouldForceLoad": true
 
 // CHECK-DAG:           "linkName": "swiftCompatibilityPacks",
+// CHECK-NEXT:          "isFramework": false,
+// CHECK-NEXT:          "shouldForceLoad": false
+
+// CHECK-DAG:           "linkName": "linkDep",
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": false
 
