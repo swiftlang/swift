@@ -1576,8 +1576,6 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 done:
 #endif
-  // Balances with the retain taken in ProcessOutOfLineJob::process
-  swift_release(actor);
 }
 
 SWIFT_CC(swiftasync)
@@ -1586,9 +1584,6 @@ void ProcessOutOfLineJob::process(Job *job) {
   DefaultActorImpl *actor = self->Actor;
 
   delete self;
-
-  // Balances with the swift_release in defaultActorDrain()
-  swift_retain(actor);
   return defaultActorDrain(actor); // 'return' forces tail call
 }
 
