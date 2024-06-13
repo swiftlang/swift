@@ -3305,7 +3305,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       
       RawLayoutDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-        typeID, rawSize, rawAlign);
+        typeID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
     }
     }
   }
