@@ -1714,7 +1714,8 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
       DC = FD->getDeclContext();
     } else if (auto EED = dyn_cast<EnumElementDecl>(decl)) {
-      if (EED->hasAssociatedValues()) {
+      if (EED->hasAssociatedValues() &&
+          !locator.endsWith<LocatorPathElt::PatternMatch>()) {
         DC = EED->getDeclContext();
       }
     }
