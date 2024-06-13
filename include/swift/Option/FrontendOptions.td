@@ -207,9 +207,6 @@ def no_serialize_debugging_options :
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
-def public_autolink_library : Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">, Flags<[FrontendOption]>;
-
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
@@ -369,6 +366,10 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
+
+def public_autolink_library :
+  Separate<["-"], "public-autolink-library">,
+  HelpText<"Add public dependent library">;
 }
 
 // HIDDEN FLAGS
