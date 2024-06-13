@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend -interpret %s
-// REQUIRES: executable_test
+// RUN: %target-swift-frontend -emit-ir -g %s > /dev/null
 
-// This only reproduced if you provide the -interpret flag!
 // https://github.com/apple/swift/issues/72719
 
 protocol D {}
