@@ -2080,12 +2080,98 @@ bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
                                          closureConsumes);
 }
 
+struct MoveConstraint {
+  enum Value : uint8_t {
+    None,
+    RequiresReinit,
+    Illegal,
+  } value;
+
+  operator Value() { return value; }
+  MoveConstraint(Value value) : value(value) {}
+
+  static MoveConstraint forGuaranteed(bool guaranteed) {
+    return guaranteed ? Illegal : None;
+  }
+
+  bool isIllegal() { return value == Illegal; }
+};
+
+static MoveConstraint getMoveConstraint(SILValue addr) {
+  assert(addr->getType().isAddress());
+  auto access = AccessPathWithBase::computeInScope(addr);
+  auto base = access.getAccessBase();
+  switch (access.accessPath.getStorage().getKind()) {
+  case AccessRepresentation::Kind::Box:
+    // Even if the box is guaranteed, it may be permitted to consume its
+    // storage.
+    return MoveConstraint::None;
+  case AccessRepresentation::Kind::Stack: {
+    // An alloc_stack is guaranteed if it's a "store_borrow destination".
+    auto *asi = cast<AllocStackInst>(base.getBaseAddress());
+    return MoveConstraint::forGuaranteed(
+        !asi->getUsersOfType<StoreBorrowInst>().empty());
+  }
+  case AccessRepresentation::Kind::Global:
+    // A global can be consumed if it's reinitialized.
+    return MoveConstraint::RequiresReinit;
+  case AccessRepresentation::Kind::Class:
+    // A class field can be consumed if it's reinitialized.
+    return MoveConstraint::RequiresReinit;
+  case AccessRepresentation::Kind::Tail:
+    // A class field can be consumed if it's reinitialized.
+    return MoveConstraint::RequiresReinit;
+  case AccessRepresentation::Kind::Argument: {
+    // An indirect argument is guaranteed if it's @in_guaranteed.
+    auto *arg = base.getArgument();
+    return MoveConstraint::forGuaranteed(
+        arg->getArgumentConvention().isGuaranteedConvention());
+  }
+  case AccessRepresentation::Kind::Yield: {
+    auto baseAddr = base.getBaseAddress();
+    auto *bai = cast<BeginApplyInst>(
+        cast<MultipleValueInstructionResult>(baseAddr)->getParent());
+    auto index = *bai->getIndexOfResult(baseAddr);
+    auto info = bai->getSubstCalleeConv().getYieldInfoForOperandIndex(index);
+    return MoveConstraint::forGuaranteed(!info.isConsumed());
+  }
+  case AccessRepresentation::Kind::Nested: {
+    auto *bai = cast<BeginAccessInst>(base.getBaseAddress());
+    if (bai->getAccessKind() == SILAccessKind::Init ||
+        bai->getAccessKind() == SILAccessKind::Read)
+      return MoveConstraint::Illegal;
+    // Allow moves from both modify and deinit.
+    return MoveConstraint::None;
+  }
+  case AccessRepresentation::Kind::Unidentified:
+    // Conservatively reject for now.
+    return MoveConstraint::Illegal;
+  }
+}
+
 // Returns true if we emitted a diagnostic and handled the single block
 // case. Returns false if we visited all of the uses and seeded the UseState
 // struct with the information needed to perform our interprocedural dataflow.
 bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     SILValue address, DebugVarCarryingInst addressDebugInst,
     MarkUnresolvedMoveAddrInst *mvi) {
+  if (getMoveConstraint(mvi->getSrc()).isIllegal()) {
+    auto &astCtx = mvi->getFunction()->getASTContext();
+    StringRef name = getDebugVarName(address);
+    diagnose(astCtx, getSourceLocFromValue(address),
+             diag::sil_movechecking_guaranteed_value_consumed, name);
+    diagnose(astCtx, mvi->getLoc().getSourceLoc(),
+             diag::sil_movechecking_consuming_use_here);
+
+    // Replace the marker instruction with a copy_addr to avoid subsequent
+    // diagnostics.
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                           IsNotTake, IsInitialization);
+    mvi->eraseFromParent();
+
+    return true;
+  }
   // First scan downwards to make sure we are move out of this block.
   auto &useState = dataflowState.useState;
   auto &applySiteToPromotedArgIndices =
