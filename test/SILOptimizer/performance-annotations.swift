@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
@@ -541,4 +541,17 @@ extension G where T == Int {
       takesGInt(self)
     }
   }
+}
+
+public struct RawLayoutWrapper: ~Copyable {
+  private let x = RawLayout<Int>()
+
+  @_noLocks func testit() {
+    x.test()
+  }
+}
+
+@_rawLayout(like: T)
+public struct RawLayout<T>: ~Copyable {
+  public func test() {}
 }
