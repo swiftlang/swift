@@ -1747,8 +1747,17 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
       });
 
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    DeclContext *DC = nullptr;
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
-      auto *DC = FD->getDeclContext();
+      DC = FD->getDeclContext();
+    } else if (auto EED = dyn_cast<EnumElementDecl>(decl)) {
+      if (EED->hasAssociatedValues() &&
+          !locator.endsWith<LocatorPathElt::PatternMatch>()) {
+        DC = EED->getDeclContext();
+      }
+    }
+
+    if (DC) {
       // All global functions should be @Sendable
       if (DC->isModuleScopeContext()) {
         if (!adjustedTy->getExtInfo().isSendable()) {
