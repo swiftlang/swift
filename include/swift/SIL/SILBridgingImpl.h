@@ -1942,8 +1942,14 @@ BridgedInstruction BridgedBuilder::createCopyValue(BridgedValue op) const {
   return {unbridged().createCopyValue(regularLoc(), op.getSILValue())};
 }
 
-BridgedInstruction BridgedBuilder::createBeginBorrow(BridgedValue op) const {
-  return {unbridged().createBeginBorrow(regularLoc(), op.getSILValue())};
+BridgedInstruction BridgedBuilder::createBeginBorrow(BridgedValue op,
+                                                     bool isLexical,
+                                                     bool hasPointerEscape,
+                                                     bool isFromVarDecl) const {
+  return {unbridged().createBeginBorrow(regularLoc(), op.getSILValue(),
+                                        swift::IsLexical_t(isLexical),
+                                        swift::HasPointerEscape_t(hasPointerEscape),
+                                        swift::IsFromVarDecl_t(isFromVarDecl))};
 }
 
 BridgedInstruction BridgedBuilder::createBorrowedFrom(BridgedValue borrowedValue,
