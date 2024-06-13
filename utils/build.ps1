@@ -836,11 +836,11 @@ function Build-CMakeProject {
     }
 
     if ($Platform -eq "Android") {
-      $vsWherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-      $vsInstallPath = & $vsWherePath -latest -property installationPath
-      if (Test-Path "${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
-        $env:Path = "${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
-        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "${vsInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+      $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+      $VSInstallPath = & $vswhere -nologo -latest -products * -property installationPath
+      if (Test-Path "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
+        $env:Path = "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
+        TryAdd-KeyValue $Defines CMAKE_MAKE_PROGRAM "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
       } else {
         throw "Missing CMake and Ninja in the visual studio installation that are needed to build Android"
       }
