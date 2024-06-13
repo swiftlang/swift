@@ -147,6 +147,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case .IsNotSerialized: return .notSerialized
     case .IsSerialized: return .serialized
     case .IsSerializedForPackage: return .serializedForPackage
+    @unknown default: fatalError()
     }
   }
 
