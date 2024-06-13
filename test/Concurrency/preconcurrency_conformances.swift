@@ -182,3 +182,19 @@ do {
     func test() {}
   }
 }
+
+// https://github.com/apple/swift/issues/74294
+protocol Parent {
+  func a()
+}
+
+protocol Child: Parent {
+  func b()
+}
+
+do {
+    actor Test: @preconcurrency Child {
+      func a() {} // Ok
+      func b() {} // Ok
+    }
+}
