@@ -624,13 +624,9 @@ public:
 
 } // end anonymous namespace
 
-/// Perform top-down syntactic disambiguation of a pattern. Where ambiguous
-/// expr/pattern productions occur (tuples, function calls, etc.), favor the
-/// pattern interpretation if it forms a valid pattern; otherwise, leave it as
-/// an expression. This does no type-checking except for the bare minimum to
-/// disambiguate semantics-dependent pattern forms.
-Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
-                                     bool isStmtCondition) {
+Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
+                                         DeclContext *DC,
+                                         bool isStmtCondition) const {
   P = ResolvePattern(DC).visit(P);
 
   TypeChecker::diagnoseDuplicateBoundVars(P);
@@ -689,6 +685,13 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   }
 
   return P;
+}
+
+Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
+                                     bool isStmtCondition) {
+  auto &eval = DC->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ResolvePatternRequest{P, DC, isStmtCondition},
+                           nullptr);
 }
 
 static Type
