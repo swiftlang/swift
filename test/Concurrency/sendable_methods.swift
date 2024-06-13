@@ -279,3 +279,10 @@ func acceptSendableFunc<T, U>(_: @Sendable (T) -> U) { }
 acceptSendableFunc(InferredSendableE.c)
 acceptSendableFunc(GenericE<Int>.b)
 acceptSendableFunc(GenericE<NonSendable>.b)
+
+// Make sure pattern matching isn't affected by @Sendable on cases.
+func testPatternMatch(ge: [GenericE<Int>]) {
+  if case .b(let a) = ge.first {
+    _ = a
+  }
+}
