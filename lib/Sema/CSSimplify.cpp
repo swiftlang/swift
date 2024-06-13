@@ -3239,7 +3239,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
   if (func1->hasSendingResult() != func2->hasSendingResult() &&
       (!func1->hasSendingResult() || kind < ConstraintKind::Subtype)) {
-    return getTypeMatchFailure(locator);
+    auto *fix = AllowSendingMismatch::create(
+        *this, getConstraintLocator(locator), func1, func2,
+        AllowSendingMismatch::Kind::Result);
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
   }
 
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
@@ -3676,7 +3680,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // with a function that expects a non-sending parameter.
       if (func1Param.getParameterFlags().isSending() &&
           !func2Param.getParameterFlags().isSending()) {
-        return getTypeMatchFailure(argumentLocator);
+        auto *fix = AllowSendingMismatch::create(
+            *this, getConstraintLocator(argumentLocator), func1, func2,
+            AllowSendingMismatch::Kind::Parameter);
+        if (recordFix(fix))
+          return getTypeMatchFailure(argumentLocator);
       }
 
       // FIXME: We should check value ownership too, but it's not completely
@@ -15117,6 +15125,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     }
   }
 
+  case FixKind::AllowSendingMismatch:
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
