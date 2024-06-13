@@ -2934,13 +2934,13 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
           continue;
         case IsLive::LiveOut: {
           LLVM_DEBUG(llvm::dbgs() << "    Live out block!\n");
-          // If we see a live out block that is also a def block, we need to fa
-#ifndef NDEBUG
+          // If we see a live out block that is also a def block, skip.
           SmallBitVector defBits(addressUseState.getNumSubelements());
           liveness.isDefBlock(block, errorSpan, defBits);
-          assert((defBits & errorSpan).none() &&
-                 "If in def block... we are in liveness block");
-#endif
+          if (!(defBits & errorSpan).none()) {
+            LLVM_DEBUG(llvm::dbgs() << "    Also a def block; skipping!\n");
+            continue;
+          }
           [[clang::fallthrough]];
         }
         case IsLive::LiveWithin:
