@@ -2716,6 +2716,26 @@ void SourceFile::registerAccessLevelUsingImport(
     ImportsUseAccessLevel[mod] = accessLevel;
   else
     ImportsUseAccessLevel[mod] = std::max(accessLevel, known->second);
+
+  // Also register modules triggering the import of cross-import overlays.
+  auto declaringMod = mod->getDeclaringModuleIfCrossImportOverlay();
+  if (!declaringMod)
+    return;
+
+  SmallVector<Identifier, 1> bystanders;
+  auto bystandersValid =
+    mod->getRequiredBystandersIfCrossImportOverlay(declaringMod, bystanders);
+  if (!bystandersValid)
+    return;
+
+  for (auto &otherImport : *Imports) {
+    auto otherImportMod = otherImport.module.importedModule;
+    auto otherImportModName = otherImportMod->getName();
+    if (otherImportMod == declaringMod ||
+        llvm::find(bystanders, otherImportModName) != bystanders.end()) {
+      registerAccessLevelUsingImport(otherImport, accessLevel);
+    }
+  }
 }
 
 bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,
