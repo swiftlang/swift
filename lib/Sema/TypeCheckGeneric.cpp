@@ -684,6 +684,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   SmallVector<TypeBase *, 2> inferenceSources;
   SmallVector<Requirement, 2> extraReqs;
   SourceLoc loc;
+  bool inferInvertibleReqs = true;
 
   if (auto VD = dyn_cast<ValueDecl>(GC->getAsDecl())) {
     loc = VD->getLoc();
@@ -781,6 +782,35 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
 
+    // The inherited entries influence the generic signature of the extension,
+    // because if it introduces conformance to invertible protocol IP, we do not
+    // we do not infer any requirements that the generic parameters to conform
+    // to invertible protocols. This forces people to write out the conditions.
+    const unsigned numEntries = ext->getInherited().size();
+    for (unsigned i = 0; i < numEntries; ++i) {
+      InheritedTypeRequest request{ext, i, TypeResolutionStage::Structural};
+      auto result = evaluateOrDefault(ctx.evaluator, request,
+                                      InheritedTypeResult::forDefault());
+      Type inheritedTy;
+      switch (result) {
+      case InheritedTypeResult::Inherited:
+        inheritedTy = result.getInheritedType();
+        break;
+      case InheritedTypeResult::Suppressed:
+      case InheritedTypeResult::Default:
+        continue;
+      }
+
+      if (inheritedTy) {
+        if (auto kp = inheritedTy->getKnownProtocol()) {
+          if (getInvertibleProtocolKind(*kp)) {
+            inferInvertibleReqs = false;
+            break;
+          }
+        }
+      }
+    }
+
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();
@@ -800,7 +830,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       genericParams, WhereClauseOwner(GC),
       extraReqs, inferenceSources, loc,
       /*isExtension=*/isa<ExtensionDecl>(GC),
-      /*allowInverses=*/true};
+      /*allowInverses=*/inferInvertibleReqs};
   return evaluateOrDefault(ctx.evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

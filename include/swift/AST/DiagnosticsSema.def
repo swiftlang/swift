@@ -7728,8 +7728,8 @@ ERROR(inverse_conflicts_explicit_composition, none,
       "composition cannot contain '~%0' when another member requires '%0'",
       (StringRef))
 ERROR(inverse_extension, none,
-      "cannot suppress %0 in extension",
-      (Type))
+      "cannot suppress '%0' in extension",
+      (StringRef))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))
@@ -7799,6 +7799,9 @@ ERROR(suppress_nonsuppressable_protocol,none,
       "conformance to %0 cannot be suppressed", (const ProtocolDecl *))
 WARNING(suppress_already_suppressed_protocol,none,
       "already suppressed conformance to %0", (const ProtocolDecl *))
+ERROR(extension_conforms_to_invertible_and_others, none,
+      "conformance to '%0' must be declared in a separate extension",
+      (StringRef))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,

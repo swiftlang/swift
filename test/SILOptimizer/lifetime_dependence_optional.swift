@@ -21,9 +21,9 @@ public enum Nillable<Wrapped: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
   case some(Wrapped)
 }
 
-extension Nillable: Copyable where Wrapped: ~Escapable /* & Copyable */ {}
+extension Nillable: Copyable where Wrapped: Copyable {}
 
-extension Nillable: Escapable where Wrapped: ~Copyable /* & Escapable */ {}
+extension Nillable: Escapable where Wrapped: Escapable {}
 
 extension Nillable: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable { }
 
