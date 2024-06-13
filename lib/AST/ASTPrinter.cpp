@@ -4083,7 +4083,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
       {
-        if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
+        if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
                 decl->getResultTypeRepr())) {
           for (auto &dep : typeRepr->getLifetimeDependencies()) {
             Printer << " " << dep.getLifetimeDependenceSpecifierString() << " ";
@@ -4321,7 +4321,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       if (decl->hasLifetimeDependentReturn()) {
         Printer << " -> ";
         auto *typeRepr =
-            cast<LifetimeDependentReturnTypeRepr>(decl->getResultTypeRepr());
+            cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
         for (auto &dep : typeRepr->getLifetimeDependencies()) {
           Printer << dep.getLifetimeDependenceSpecifierString() << " ";
         }

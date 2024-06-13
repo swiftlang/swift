@@ -193,7 +193,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
                       ? (afd->getParameters()->size() + 1)
                       : afd->getParameters()->size();
   auto lifetimeDependentRepr =
-      cast<LifetimeDependentReturnTypeRepr>(afd->getResultTypeRepr());
+      cast<LifetimeDependentTypeRepr>(afd->getResultTypeRepr());
 
   if (hasEscapableResultOrYield(afd)) {
     diags.diagnose(lifetimeDependentRepr->getLoc(),
@@ -337,7 +337,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
 // LifetimeDependenceInfo from the swift decl. Reason for duplicated code is the
 // apis on type and ownership is different in SIL compared to Sema.
 std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(
-    LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
+    LifetimeDependentTypeRepr *lifetimeDependentRepr,
     SmallVectorImpl<SILParameterInfo> &params, DeclContext *dc) {
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
@@ -530,7 +530,7 @@ std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::get(AbstractFunctionDecl *afd) {
   assert(isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd));
   auto *returnTypeRepr = afd->getResultTypeRepr();
-  if (isa_and_nonnull<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
+  if (isa_and_nonnull<LifetimeDependentTypeRepr>(returnTypeRepr)) {
     return LifetimeDependenceInfo::fromTypeRepr(afd);
   }
   return LifetimeDependenceInfo::infer(afd);

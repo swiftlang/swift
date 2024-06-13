@@ -2156,8 +2156,9 @@ namespace {
     NeverNullType
     resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                     TypeResolutionOptions options);
-    NeverNullType resolveLifetimeDependentReturnTypeRepr(
-        LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
+    NeverNullType
+    resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2762,9 +2763,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
 
-  case TypeReprKind::LifetimeDependentReturn:
-    return resolveLifetimeDependentReturnTypeRepr(
-        cast<LifetimeDependentReturnTypeRepr>(repr), options);
+  case TypeReprKind::LifetimeDependent:
+    return resolveLifetimeDependentTypeRepr(
+        cast<LifetimeDependentTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -4397,8 +4398,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
   std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
   if (auto *lifetimeDependentTypeRepr =
-          dyn_cast<LifetimeDependentReturnTypeRepr>(
-              repr->getResultTypeRepr())) {
+          dyn_cast<LifetimeDependentTypeRepr>(repr->getResultTypeRepr())) {
     lifetimeDependenceInfo = LifetimeDependenceInfo::fromTypeRepr(
         lifetimeDependentTypeRepr, params, getDeclContext());
     if (lifetimeDependenceInfo.has_value()) {
@@ -4525,7 +4525,7 @@ bool TypeResolver::resolveSingleSILResult(
   // LifetimeDependentReturnTypeRepr will be processed separately when building
   // SILFunctionType.
   if (auto *lifetimeDependentTypeRepr =
-          dyn_cast<LifetimeDependentReturnTypeRepr>(repr)) {
+          dyn_cast<LifetimeDependentTypeRepr>(repr)) {
     repr = lifetimeDependentTypeRepr->getBase();
   }
 
@@ -5003,8 +5003,9 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   return ArraySliceType::get(baseTy);
 }
 
-NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
-    LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
+                                               TypeResolutionOptions options) {
   if (options.is(TypeResolverContext::TupleElement)) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
                     diag::lifetime_dependence_cannot_be_applied_to_tuple_elt);
@@ -5996,7 +5997,7 @@ private:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
-    case TypeReprKind::LifetimeDependentReturn:
+    case TypeReprKind::LifetimeDependent:
       return false;
     }
   }

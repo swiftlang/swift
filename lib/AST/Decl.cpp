@@ -10794,7 +10794,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 }
 
 bool ConstructorDecl::hasLifetimeDependentReturn() const {
-  return isa_and_nonnull<LifetimeDependentReturnTypeRepr>(getResultTypeRepr());
+  return isa_and_nonnull<LifetimeDependentTypeRepr>(getResultTypeRepr());
 }
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)

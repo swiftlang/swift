@@ -30,7 +30,7 @@
 namespace swift {
 
 class AbstractFunctionDecl;
-class LifetimeDependentReturnTypeRepr;
+class LifetimeDependentTypeRepr;
 class SILParameterInfo;
 
 enum class ParsedLifetimeDependenceKind : uint8_t {
@@ -216,7 +216,7 @@ public:
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<LifetimeDependenceInfo>
-  fromTypeRepr(LifetimeDependentReturnTypeRepr *lifetimeDependentRepr,
+  fromTypeRepr(LifetimeDependentTypeRepr *lifetimeDependentRepr,
                SmallVectorImpl<SILParameterInfo> &params, DeclContext *dc);
 };
 
