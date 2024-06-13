@@ -1083,12 +1083,20 @@ bool BridgedInstruction::BeginBorrow_isLexical() const {
   return getAs<swift::BeginBorrowInst>()->isLexical();
 }
 
+bool BridgedInstruction::BeginBorrow_hasPointerEscape() const {
+  return getAs<swift::BeginBorrowInst>()->hasPointerEscape();
+}
+
 bool BridgedInstruction::BeginBorrow_isFromVarDecl() const {
   return getAs<swift::BeginBorrowInst>()->isFromVarDecl();
 }
 
 bool BridgedInstruction::MoveValue_isLexical() const {
   return getAs<swift::MoveValueInst>()->isLexical();
+}
+
+bool BridgedInstruction::MoveValue_hasPointerEscape() const {
+  return getAs<swift::MoveValueInst>()->hasPointerEscape();
 }
 
 bool BridgedInstruction::MoveValue_isFromVarDecl() const {
