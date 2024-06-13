@@ -52,7 +52,7 @@ protocol Rope<Element>: Hashable, ~Copyable {  // expected-error {{'Self' requir
   associatedtype Element: ~Copyable
 }
 
-extension S: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension S: ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 
 struct S: ~U, // expected-error {{type 'U' cannot be suppressed}}
           ~Copyable {}
@@ -123,3 +123,26 @@ func typeInExpression() {
 
 func param3(_ t: borrowing any ~Copyable) {}
 func param4(_ t: any ~Copyable.Type) {}
+
+protocol P: ~Copyable {}
+protocol Q: ~Copyable {}
+protocol R: ~Copyable {}
+struct Blooper<T: ~Copyable>: ~Copyable {}
+extension Blooper: (Q & (R & (~Copyable & P))) {} // expected-error {{cannot suppress 'Copyable' in extension}}
+
+protocol Edible {}
+protocol Portable {}
+typealias Alias = Portable & Copyable
+
+struct Burrito<Filling: ~Copyable>: ~Copyable {}
+extension Burrito: Alias {} // expected-error {{conformance to 'Copyable' must be declared in a separate extension}}
+// expected-note@-1 {{'Burrito<Filling>' declares conformance to protocol 'Copyable' here}}
+
+extension Burrito: Copyable & Edible & P {} // expected-error {{redundant conformance of 'Burrito<Filling>' to protocol 'Copyable'}}
+
+struct Blah<T: ~Copyable>: ~Copyable {}
+extension Blah: P, Q, Copyable, R {} // expected-error {{generic struct 'Blah' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-1 {{conformance to 'Copyable' must be declared in a separate extension}}
+
+enum Hello<Gesture: ~Copyable>: ~Copyable {}
+extension Hello: Copyable & Edible & P {} // expected-error {{conformance to 'Copyable' must be declared in a separate extension}}

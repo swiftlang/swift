@@ -154,6 +154,28 @@ public:
   }
 };
 
+/// If the extension adds a conformance to an invertible protocol, ensure that
+/// it does not add a conformance to any other protocol. So these are illegal:
+///
+///     extension S: Copyable & P {}
+///     extension S: Q, Copyable {}
+///
+/// This policy is in place because extensions adding a conformance to an
+/// invertible protocol do _not_ add default requirements on generic parameters,
+/// so it would be confusing to mix them together in the same extension.
+static void checkExtensionAddsSoloInvertibleProtocol(const ExtensionDecl *ext) {
+  auto localConfs = ext->getLocalConformances();
+  if (localConfs.size() <= 1)
+    return;
+
+  for (auto *conf : localConfs) {
+    if (auto ip = conf->getProtocol()->getInvertibleProtocolKind()) {
+      ext->diagnose(diag::extension_conforms_to_invertible_and_others,
+                    getInvertibleProtocolKindName(*ip));
+    }
+  }
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -295,10 +317,15 @@ static void checkInheritanceClause(
       auto layout = inheritedTy->getExistentialLayout();
 
       // An inverse on an extension is an error.
-      if (isa<ExtensionDecl>(decl))
-        if (auto pct = inheritedTy->getAs<ProtocolCompositionType>())
-          if (!pct->getInverses().empty())
-            decl->diagnose(diag::inverse_extension, inheritedTy);
+      if (isa<ExtensionDecl>(decl)) {
+        auto canInheritedTy = inheritedTy->getCanonicalType();
+        if (auto pct = canInheritedTy->getAs<ProtocolCompositionType>()) {
+          for (auto inverse : pct->getInverses()) {
+            decl->diagnose(diag::inverse_extension,
+                           getProtocolName(getKnownProtocolKind(inverse)));
+          }
+        }
+      }
 
       // Subclass existentials are not allowed except on classes and
       // non-@objc protocols.
@@ -3974,6 +4001,8 @@ public:
     diagnoseExtensionOfMarkerProtocol(ED);
 
     checkTupleExtension(ED);
+
+    checkExtensionAddsSoloInvertibleProtocol(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

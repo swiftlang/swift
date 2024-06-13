@@ -782,7 +782,6 @@ InferredGenericSignatureRequest::evaluate(
 
   unsigned numOuterParams = genericParams.size();
   if (isExtension) {
-    assert(allowInverses);
     numOuterParams = 0;
   }
 
