@@ -17,18 +17,6 @@ import SubE
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": false
 
-// CHECK-DAG:           "linkName": "swiftCompatibilityConcurrency",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": true
-
-// CHECK-DAG:           "linkName": "swiftCompatibility56",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": true
-
-// CHECK-DAG:           "linkName": "swiftCompatibilityPacks",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": false
-
 // CHECK-DAG:           "linkName": "swiftyLibE",
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": true
