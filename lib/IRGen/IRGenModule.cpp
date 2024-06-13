@@ -1963,11 +1963,13 @@ bool IRGenModule::finalize() {
   }
   emitLazyPrivateDefinitions();
 
-  // Finalize clang IR-generation.
-  finalizeClangCodeGen();
-
+  // Finalize Swift debug info before running Clang codegen, because it may
+  // delete the llvm module.
   if (DebugInfo)
     DebugInfo->finalize();
+
+  // Finalize clang IR-generation.
+  finalizeClangCodeGen();
 
   // If that failed, report failure up and skip the final clean-up.
   if (!ClangCodeGen->GetModule())
