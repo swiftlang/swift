@@ -4294,7 +4294,8 @@ static bool isMacroExpansionNodeKind(Node::Kind kind) {
          kind == Node::Kind::MemberAttachedMacroExpansion ||
          kind == Node::Kind::PeerAttachedMacroExpansion ||
          kind == Node::Kind::ConformanceAttachedMacroExpansion ||
-         kind == Node::Kind::ExtensionAttachedMacroExpansion;
+         kind == Node::Kind::ExtensionAttachedMacroExpansion ||
+         kind == Node::Kind::MacroExpansionLoc;
 }
 
 NodePointer Demangler::demangleMacroExpansion() {
@@ -4322,6 +4323,20 @@ NodePointer Demangler::demangleMacroExpansion() {
     isAttached = false;
     isFreestanding = false;
     break;
+
+  case 'X': {
+    kind = Node::Kind::MacroExpansionLoc;
+
+    int line = demangleIndex();
+    int col = demangleIndex();
+
+    auto lineNode = createNode(Node::Kind::Index, line);
+    auto colNode = createNode(Node::Kind::Index, col);
+
+    NodePointer buffer = popNode(Node::Kind::Identifier);
+    NodePointer module = popNode(Node::Kind::Identifier);
+    return createWithChildren(kind, module, buffer, lineNode, colNode);
+  }
 
   default:
     return nullptr;
