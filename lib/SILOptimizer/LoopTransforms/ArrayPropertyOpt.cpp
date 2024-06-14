@@ -64,6 +64,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallSet.h"
@@ -834,6 +835,8 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
       // Verify that no illegal critical edges were created.
       if (getFunction()->getModule().getOptions().VerifyAll)
         getFunction()->verifyCriticalEdges();
+
+      updateBorrowedFrom(getPassManager(), Fn);
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.
