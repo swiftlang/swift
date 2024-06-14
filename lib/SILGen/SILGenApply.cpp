@@ -6872,7 +6872,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
-      auto isGuaranteed = selfParam.isGuaranteed();
+      auto isGuaranteed = selfParam.isGuaranteedInCaller();
 
       auto context =
           isGuaranteed ? SGFContext::AllowImmediatePlusZero : SGFContext();
