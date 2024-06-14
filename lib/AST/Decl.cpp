@@ -3060,9 +3060,6 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Maximal:
     if (M == getModuleContext())
       return false;
-    // Access non-resiliently if package optimization is enabled
-    if (bypassResilienceInPackage(M))
-      return false;
     return isResilient();
   }
   llvm_unreachable("bad resilience expansion");
