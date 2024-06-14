@@ -1650,11 +1650,6 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
         action != ActionType::ScanDependencies) {
       opts |= ParsingFlags::DisablePoundIfEvaluation;
     }
-
-    // If we need to dump the parse tree, disable delayed bodies as we want to
-    // show everything.
-    if (action == ActionType::DumpParse)
-      opts |= ParsingFlags::DisableDelayedBodies;
   }
 
   const auto &typeOpts = getASTContext().TypeCheckerOpts;
