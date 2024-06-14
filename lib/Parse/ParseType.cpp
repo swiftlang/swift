@@ -1551,6 +1551,8 @@ bool Parser::canParseType() {
     consumeToken();
   } else if (Tok.isContextualKeyword("each")) {
     consumeToken();
+  } else if (Tok.isContextualKeyword("sending")) {
+    consumeToken();
   }
 
   switch (Tok.getKind()) {
