@@ -464,7 +464,9 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return Limit::OnDemand;
 
   case Kind::GlobalAccessor:
-    return cast<VarDecl>(d)->isStrictlyResilient() ? Limit::NeverPublic : Limit::None;
+    // global unsafeMutableAddressor should be kept hidden if its decl
+    // is resilient.
+    return cast<VarDecl>(d)->isResilient() ? Limit::NeverPublic : Limit::None;
 
   case Kind::DefaultArgGenerator:
     // If the default argument is to be serialized, only use non-ABI public

@@ -96,7 +96,7 @@ import Lib
 // CHECK-MAIN-COMMON: [[FNL_PUB_REF:%.*]] = ref_element_addr [[FNL_PUB_GET]] : $FinalPubKlass, #FinalPubKlass.data
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_ACCESS:%.*]] = begin_access {{.*}} [[FNL_PUB_REF]] : $*Int
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_LOAD:%.*]] = load [[FNL_PUB_ACCESS]] : $*Int
-// CHECK-MAIN-COMMON-NEXT: store [[FNL_PUB_LOAD]] to {{.*}} : $*Int
+// CHECK-MAIN-COMMON: store [[FNL_PUB_LOAD]] to {{.*}} : $*Int
   
 // CHECK-MAIN-COMMON: [[FNL_PKG_ALLOC:%.*]] = alloc_ref $FinalPkgKlass
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_INIT:%.*]] = end_init_let_ref [[FNL_PKG_ALLOC]] : $FinalPkgKlass
@@ -108,7 +108,7 @@ import Lib
 // CHECK-MAIN-COMMON: [[FNL_PKG_REF:%.*]] = ref_element_addr [[FNL_PKG_GET]] : $FinalPkgKlass, #FinalPkgKlass.data
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_ACCESS:%.*]] = begin_access {{.*}} [[FNL_PKG_REF]] : $*Int
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_LOAD:%.*]] = load [[FNL_PKG_ACCESS]] : $*Int
-// CHECK-MAIN-COMMON-NEXT: store [[FNL_PKG_LOAD]] to {{.*}} : $*Int
+// CHECK-MAIN-COMMON: store [[FNL_PKG_LOAD]] to {{.*}} : $*Int
   
 // CHECK-MAIN-RES-DAG: sil public_external @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
 // CHECK-MAIN-NONRES-DAG: sil public_external @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
@@ -176,53 +176,6 @@ public func mainPub() {
 
 //--- Lib.swift
 
-
-// pcmo TODO: check for Fr public fields serialized kind
-// and add silgen of pkg static pts.
-
-// FIXME: serialize closure pointers?
-// static PkgStruct.pkgStaticSimpleFuncPtr
-// CHECK-RES-DAG: sil_global package [serialized_for_package] @$s3Lib9PkgStructV22pkgStaticSimpleFuncPtryS2icvpZ
-// CHECK-NONRES-DAG: sil_global package [serialized] @$s3Lib9PkgStructV22pkgStaticSimpleFuncPtryS2icvpZ
-
-// static FrPubStruct.pubStaticClosurePtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib11FrPubStructV19pubStaticClosurePtrySiAA0cD0VcvpZ
-
-// static PkgStruct.pkgStaticClosurePtr
-// CHECK-COMMON-DAG: sil_global package @$s3Lib9PkgStructV19pkgStaticClosurePtrySiACcvpZ
-
-// static PkgStruct.pkgStaticSimpleClosurePtr
-// CHECK-COMMON-DAG: sil_global package @$s3Lib9PkgStructV25pkgStaticSimpleClosurePtryS2icvpZ
-
-// static PkgStruct.pkgStaticFuncPtr
-// CHECK-RES-DAG: sil_global package [serialized_for_package] @$s3Lib9PkgStructV16pkgStaticFuncPtrySiACcvpZ
-// CHECK-NONRES-DAG: sil_global package [serialized] @$s3Lib9PkgStructV16pkgStaticFuncPtrySiACcvpZ
-
-// static PubStruct.pubStaticClosurePtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvpZ
-
-// static FrPubStruct.pubStaticSimpleFuncPtr
-// CHECK-RES-DAG: sil_global [serialized_for_package] @$s3Lib11FrPubStructV22pubStaticSimpleFuncPtryS2icvpZ
-// CHECK-NONRES-DAG: sil_global [serialized] @$s3Lib11FrPubStructV22pubStaticSimpleFuncPtryS2icvpZ
-
-// static FrPubStruct.pubStaticFuncPtr
-// CHECK-RES-DAG: sil_global [serialized_for_package] @$s3Lib11FrPubStructV16pubStaticFuncPtrySiAA0cD0VcvpZ
-// CHECK-NONRES-DAG: sil_global [serialized] @$s3Lib11FrPubStructV16pubStaticFuncPtrySiAA0cD0VcvpZ
-
-// static PubStruct.pubStaticSimpleClosurePtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvpZ
-
-// static PubStruct.pubStaticSimpleFuncPtr
-// CHECK-RES-DAG: sil_global [serialized_for_package] @$s3Lib9PubStructV22pubStaticSimpleFuncPtryS2icvpZ
-// CHECK-NONRES-DAG: sil_global [serialized] @$s3Lib9PubStructV22pubStaticSimpleFuncPtryS2icvpZ
-
-// static PubStruct.pubStaticFuncPtr
-// CHECK-RES-DAG: sil_global [serialized_for_package] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ
-// CHECK-NONRES-DAG: sil_global [serialized] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ
-
-// static FrPubStruct.pubStaticSimpleClosurePtr
-// CHECK-COMMON-DAG: sil_global @$s3Lib11FrPubStructV25pubStaticSimpleClosurePtryS2icvpZ
-
 public struct PubStruct {
   // PubStruct.foovar.getter
   // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib9PubStructV6fooVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int {
@@ -252,44 +205,32 @@ public struct PubStruct {
   public static var pubStaticVar: String { "StaticPubVar" }
 
   // static PubStruct.pubStaticSimpleFuncPtr.modify
-  // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib9PubStructV22pubStaticSimpleFuncPtryS2icvMZ : $@yield_once @convention(method) (@thin PubStruct.Type) -> @yields @inout @callee_guaranteed (Int) -> Int {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib9PubStructV22pubStaticSimpleFuncPtryS2icvMZ : $@yield_once @convention(method) (@thin PubStruct.Type) -> @yields @inout @callee_guaranteed (Int) -> Int {
   public static var pubStaticSimpleFuncPtr: (Int) -> (Int) = runPubSimple
 
   // static PubStruct.pubStaticFuncPtr.modify
-  // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvsZ : $@convention(method) (@owned @callee_guaranteed (@in_guaranteed PubStruct) -> Int, @thin PubStruct.Type) -> () {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvsZ : $@convention(method) (@owned @callee_guaranteed (PubStruct) -> Int, @thin PubStruct.Type) -> () {
-  // CHECK-RES-DAG: global_addr @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ : $*@callee_guaranteed (@in_guaranteed PubStruct) -> Int
   // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer
   
   // PubStruct.pubStaticFuncPtr.unsafeMutableAddressor
-  // CHECK-RES-DAG: sil [serialized_for_package] [global_init] [canonical] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer
-  // CHECK-RES-DAG: global_addr @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ : $*@callee_guaranteed (@in_guaranteed PubStruct) -> Int
   // CHECK-NONRES-DAG: sil [serialized] [global_init] [canonical] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer
   // CHECK-NONRES-DAG: global_addr @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ : $*@callee_guaranteed (PubStruct) -> Int
   public static var pubStaticFuncPtr: (PubStruct) -> (Int) = runPub
 
   // static PubStruct.pubStaticSimpleClosurePtr.setter
-  // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvsZ : $@convention(method) (@owned @callee_guaranteed (Int) -> Int, @thin PubStruct.Type) -> () {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvsZ : $@convention(method) (@owned @callee_guaranteed (Int) -> Int, @thin PubStruct.Type) -> () {
-  // CHECK-RES-DAG: global_addr @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvpZ
   // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvau : $@convention(thin) () -> Builtin.RawPointer
 
   // PubStruct.pubStaticSimpleClosurePtr.unsafeMutableAddressor
-  // CHECK-RES-DAG: sil [serialized_for_package] [global_init] [canonical] @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvau : $@convention(thin) () -> Builtin.RawPointer {
   // CHECK-NONRES-DAG: sil [serialized] [global_init] [canonical] @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvau : $@convention(thin) () -> Builtin.RawPointer {
-  // CHECK-COMMON-DAG: global_addr @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvpZ : $*@callee_guaranteed (Int) -> Int
+  // CHECK-NONRES-DAG: global_addr @$s3Lib9PubStructV25pubStaticSimpleClosurePtryS2icvpZ : $*@callee_guaranteed (Int) -> Int
   public static var pubStaticSimpleClosurePtr: (Int) -> (Int) = { return $0 }
 
   // static PubStruct.pubStaticClosurePtr.setter
-  // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvsZ : $@convention(method) (@owned @callee_guaranteed (@in_guaranteed PubStruct) -> Int, @thin PubStruct.Type) -> () {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvsZ : $@convention(method) (@owned @callee_guaranteed (PubStruct) -> Int, @thin PubStruct.Type) -> () {
-  // CHECK-RES-DAG: global_addr @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvpZ
   // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer
   
   // PubStruct.pubStaticClosurePtr.unsafeMutableAddressor
-  // CHECK-RES-DAG: sil [serialized_for_package] [global_init] [canonical] @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer {
-  // CHECK-RES-DAG: global_addr @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvpZ : $*@callee_guaranteed (@in_guaranteed PubStruct) -> Int
   // CHECK-NONRES-DAG: sil [serialized] [global_init] [canonical] @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer {
   // CHECK-NONRES-DAG: global_addr @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvpZ : $*@callee_guaranteed (PubStruct) -> Int
   public static var pubStaticClosurePtr: (PubStruct) -> (Int) = { return $0.fooVar }
@@ -345,12 +286,10 @@ public struct FrPubStruct {
   public static var pubStaticSimpleFuncPtr: (Int) -> (Int) = runPubSimple
   public static var pubStaticFuncPtr: (PubStruct) -> (Int) = runPub
   // static FrPubStruct.pubStaticSimpleClosurePtr.setter
-  // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib11FrPubStructV25pubStaticSimpleClosurePtryS2icvsZ : $@convention(method) (@owned @callee_guaranteed (Int) -> Int, @thin FrPubStruct.Type) -> () {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib11FrPubStructV25pubStaticSimpleClosurePtryS2icvsZ : $@convention(method) (@owned @callee_guaranteed (Int) -> Int, @thin FrPubStruct.Type) -> () {
   public static var pubStaticSimpleClosurePtr: (Int) -> (Int) = { return $0 }
 
   // static FrPubStruct.pubStaticClosurePtr.setter
-  // CHECK-RES-DAG: sil [serialized_for_package] [canonical] @$s3Lib11FrPubStructV19pubStaticClosurePtrySiAA0cD0VcvsZ : $@convention(method) (@owned @callee_guaranteed (@in_guaranteed PubStruct) -> Int, @thin FrPubStruct.Type) -> () {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib11FrPubStructV19pubStaticClosurePtrySiAA0cD0VcvsZ : $@convention(method) (@owned @callee_guaranteed (PubStruct) -> Int, @thin FrPubStruct.Type) -> () {
   public static var pubStaticClosurePtr: (PubStruct) -> (Int) = { return $0.fooVar }
 
