@@ -17,8 +17,8 @@
 
 /// To bypass resilience at use site, Client needs to be in the same package as its
 /// loaded module and also opt in with -experimental-package-bypass-resilience.
-// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience | %FileCheck %s --check-prefixes=CHECK,CHECK-BYPASS
-// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK,CHECK-BYPASS
+// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience | %FileCheck %s --check-prefixes=CHECK,CHECK-ACCESS
+// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK,CHECK-ACCESS
 
 /// Utils can be built with both -enable-testing and -experimental-allow-non-resilient-access.
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -158,7 +158,7 @@ func foo() {
 // CHECK: sil hidden [ossa] @$s6Client3fooyyF : $@convention(thin) () -> () {
 // CHECK-DEFAULT: function_ref @$s5Utils9PkgStructV6pkgVarSivg : $@convention(method) (@in_guaranteed PkgStruct) -> Int
 // CHECK-DEFAULT: sil package_external @$s5Utils9PkgStructV6pkgVarSivg : $@convention(method) (@in_guaranteed PkgStruct) -> Int
-// CHECK-BYPASS:  struct_element_addr {{.*}} : $*PkgStruct, #PkgStruct.pkgVar
+// CHECK-ACCESS:  function_ref @$s5Utils9PkgStructV6pkgVarSivg
 // CHECK-NONRES: struct_extract {{.*}} : $PkgStruct, #PkgStruct.pkgVar
 
 func bar() {
@@ -168,5 +168,5 @@ func bar() {
 // CHECK: sil hidden [ossa] @$s6Client3baryyF : $@convention(thin) () -> () {
 // CHECK-DEFAULT: function_ref @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
 // CHECK-DEFAULT: sil @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
-// CHECK-BYPASS:  struct_element_addr {{.*}} : $*PubStruct, #PubStruct.pubVar
+// CHECK-ACCESS: function_ref @$s5Utils9PubStructV6pubVarSivg
 // CHECK-NONRES: struct_extract {{.*}} : $PubStruct, #PubStruct.pubVar

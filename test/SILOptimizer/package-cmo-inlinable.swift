@@ -41,7 +41,8 @@ public func inUsePubStruct(_ arg: Int) -> PubStruct {
 // CHECK-MAIN: sil [ossa] @$s4Main12usePubStructy3Lib0cD0VSiF : $@convention(thin) (Int) -> @out PubStruct {
 public func usePubStruct(_ arg: Int) -> PubStruct {
   var p = PubStruct(1)
-  // CHECK-MAIN: struct_element_addr {{.*}} : $*PubStruct, #PubStruct.pub
+  // CHECK-MAIN: function_ref @$s3Lib9PubStructVyACSicfC
+  // CHECK-MAIN: function_ref @$s3Lib9PubStructV3pubSivM
   p.pub += arg
   return p
 }
@@ -58,7 +59,8 @@ package func inUseUfiPkgStruct(_ arg: Int) -> UfiPkgStruct {
 // CHECK-MAIN: sil package [ossa] @$s4Main15useUfiPkgStructy3Lib0cdE0VSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
 package func useUfiPkgStruct(_ arg: Int) -> UfiPkgStruct {
   var p = UfiPkgStruct(1)
-  // CHECK-MAIN: struct_element_addr {{.*}} : $*UfiPkgStruct, #UfiPkgStruct.ufiPkg
+  // CHECK-MAIN: function_ref @$s3Lib12UfiPkgStructVyACSicfC
+  // CHECK-MAIN: function_ref @$s3Lib12UfiPkgStructV03ufiC0SivM
   p.ufiPkg += arg
   return p
 }
@@ -66,7 +68,8 @@ package func useUfiPkgStruct(_ arg: Int) -> UfiPkgStruct {
 // CHECK-MAIN: sil package [ossa] @$s4Main12usePkgStructy3Lib0cD0VSiF : $@convention(thin) (Int) -> @out PkgStruct {
 package func usePkgStruct(_ arg: Int) -> PkgStruct {
   var p = PkgStruct(1)
-  // CHECK-MAIN: struct_element_addr {{.*}} : $*PkgStruct, #PkgStruct.pkg
+  // CHECK-MAIN: function_ref @$s3Lib9PkgStructVyACSicfC
+  // CHECK-MAIN: function_ref @$s3Lib9PkgStructV3pkgSivM
   p.pkg += arg
   return p
 }
