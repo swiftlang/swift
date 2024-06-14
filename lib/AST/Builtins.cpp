@@ -1534,6 +1534,9 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
+  auto taskExecutorIsAvailable =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
@@ -1541,12 +1544,21 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
         _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("operation", _function(_async(_throws(_sendable(_thick))),
+        _label("initialTaskExecutorConsuming",
+                 _defaulted(_consuming(_optional(_bincompatType(
+                                /*if*/ taskExecutorIsAvailable,
+                                _existential(_taskExecutor),
+                                /*else*/ _executor))),
+                            _nil)),
+          _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _typeparam(0), _parameters()))),
       _tuple(_nativeObject, _rawPointer));
 }
 
 static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+  auto taskExecutorIsAvailable =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
   return getBuiltinFunction(
       ctx, id, _thin,
       _parameters(
@@ -1554,11 +1566,18 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
         _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutorConsuming",
+               _defaulted(_consuming(_optional(_bincompatType(
+                              /*if*/ taskExecutorIsAvailable,
+                              _existential(_taskExecutor),
+                              /*else*/ _executor))),
+                          _nil)),
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _void, _parameters()))),
       _tuple(_nativeObject, _rawPointer));
 }
 
+// Legacy entry point, prefer `createAsyncTask`
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
                                      bool inGroup, bool withTaskExecutor,
                                      bool isDiscarding) {
@@ -1568,6 +1587,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
   if (inGroup) {
     builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
   }
+
   if (withTaskExecutor) {
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
@@ -3003,7 +3023,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
-      
+
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
       

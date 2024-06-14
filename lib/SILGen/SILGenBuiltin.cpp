@@ -1595,12 +1595,25 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
-  ManagedValue taskExecutor = [&] {
+  ManagedValue taskExecutorDeprecated = [&] {
     if (options & CreateTaskOptions::OptionalEverything) {
       return nextArg().getAsSingleValue(SGF);
     } else if (options & CreateTaskOptions::TaskExecutor) {
       return emitOptionalSome(nextArg());
     } else {
+      return emitOptionalNone(ctx.TheExecutorType);
+    }
+  }();
+  ManagedValue taskExecutorConsuming = [&] {
+    if (options & CreateTaskOptions::OptionalEverything) {
+      return nextArg().getAsSingleValue(SGF);
+    } else if (auto theTaskExecutorProto = ctx.getProtocol(KnownProtocolKind::TaskExecutor)) {
+      return emitOptionalNone(theTaskExecutorProto->getDeclaredExistentialType()
+                                  ->getCanonicalType());
+    } else {
+      // This builtin executor type here is just a placeholder type for being
+      // able to pass 'nil' for it with SDKs which do not have the TaskExecutor
+      // type.
       return emitOptionalNone(ctx.TheExecutorType);
     }
   }();
@@ -1659,7 +1672,8 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     flags.getUnmanagedValue(),
     initialExecutor.getUnmanagedValue(),
     taskGroup.getUnmanagedValue(),
-    taskExecutor.getUnmanagedValue(),
+    taskExecutorDeprecated.getUnmanagedValue(),
+    taskExecutorConsuming.forward(SGF),
     functionValue.forward(SGF)
   };
 
