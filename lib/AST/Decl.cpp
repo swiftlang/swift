@@ -1827,6 +1827,7 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   // If the type has no inverse requirements, there are no extra constraints
   // to write.
   if (typeInverseReqs.empty()) {
+    assert(extInverseReqs.empty() && "extension retroactively added inverse?");
     return false;
   }
 
