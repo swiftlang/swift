@@ -457,6 +457,7 @@ private:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
     case Node::Kind::Macro:
+    case Node::Kind::MacroExpansionLoc:
     case Node::Kind::MacroExpansionUniqueName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MemberAttributeAttachedMacroExpansion:
@@ -1544,6 +1545,24 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MacroExpansionLoc:
+    if (Node->getNumChildren() > 0) {
+      Printer << "module ";
+      print(Node->getChild(0), depth + 1);
+    }
+    if (Node->getNumChildren() > 1) {
+      Printer << " file ";
+      print(Node->getChild(1), depth + 1);
+    }
+    if (Node->getNumChildren() > 2) {
+      Printer << " line ";
+      print(Node->getChild(2), depth + 1);
+    }
+    if (Node->getNumChildren() > 3) {
+      Printer << " column ";
+      print(Node->getChild(3), depth + 1);
+    }
+    return nullptr;
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "unique name #",
