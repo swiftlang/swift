@@ -2668,9 +2668,11 @@ ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
   auto &ctx = sf->getASTContext();
   auto imports = sf->getImports();
 
+  auto mutModule = const_cast<ModuleDecl *>(module);
   // Look to see if the owning module was directly imported.
   for (const auto &import : imports) {
-    if (import.module.importedModule == module)
+    if (import.module.importedModule
+            ->isSameModuleLookingThroughOverlays(mutModule))
       return import;
   }
 
@@ -2679,7 +2681,8 @@ ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
   for (const auto &import : imports) {
     auto &importSet = importCache.getImportSet(import.module.importedModule);
     for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == module) {
+      if (transitive.importedModule
+              ->isSameModuleLookingThroughOverlays(mutModule)) {
         return import;
       }
     }
