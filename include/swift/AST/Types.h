@@ -3232,6 +3232,9 @@ public:
     /// Whether the parameter is 'isolated'.
     bool isIsolated() const { return Flags.isIsolated(); }
 
+    /// Whether or not the parameter is 'sending'.
+    bool isSending() const { return Flags.isSending(); }
+
     /// Whether the parameter is 'isCompileTimeConst'.
     bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }
 
