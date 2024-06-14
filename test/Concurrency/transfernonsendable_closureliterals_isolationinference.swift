@@ -368,11 +368,11 @@ func test_CallerAsyncInheritsActorContext_CalleeAsyncNonisolated() async {
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncInheritsActorContext_CalleeAsyncNonisolated()
     // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
-    await asyncInheritActorContextAcceptsSendingAsyncClosure { @CustomActor in } // expected-error {{global actor 'CustomActor'-isolated value of type '@CustomActor () async -> ()' passed as a strongly transferred parameter; later accesses could race}}
+    await asyncInheritActorContextAcceptsSendingAsyncClosure { @CustomActor in }
 
     // CHECK-LABEL: // closure #4 in test_CallerAsyncInheritsActorContext_CalleeAsyncNonisolated()
     // CHECK-NEXT: // Isolation: global_actor. type: MainActor
-    await asyncInheritActorContextAcceptsSendingAsyncClosure { @MainActor in } // expected-error {{main actor-isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter; later accesses could race}}
+    await asyncInheritActorContextAcceptsSendingAsyncClosure { @MainActor in }
 
     // CHECK-LABEL: // closure #5 in test_CallerAsyncInheritsActorContext_CalleeAsyncNonisolated()
     // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
@@ -410,7 +410,7 @@ func test_CallerAsyncInheritsActorContext_CalleeAsyncMainActorIsolated() async {
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncInheritsActorContext_CalleeAsyncMainActorIsolated()
     // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
-    await asyncInheritActorContextGlobalActorAcceptsSendingAsyncClosure { @CustomActor in } // expected-error {{global actor 'CustomActor'-isolated value of type '@CustomActor () async -> ()' passed as a strongly transferred parameter}}
+    await asyncInheritActorContextGlobalActorAcceptsSendingAsyncClosure { @CustomActor in }
 
     // CHECK-LABEL: // closure #4 in test_CallerAsyncInheritsActorContext_CalleeAsyncMainActorIsolated()
     // CHECK-NEXT: // Isolation: global_actor. type: MainActor
