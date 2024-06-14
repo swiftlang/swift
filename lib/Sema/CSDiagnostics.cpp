@@ -7918,6 +7918,24 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool SendingOnFunctionParameterMismatchFail::diagnoseAsError() {
+  emitDiagnosticAt(getLoc(), diag::sending_function_wrong_sending,
+                   getFromType(), getToType())
+      .warnUntilSwiftVersion(6);
+  emitDiagnosticAt(getLoc(),
+                   diag::sending_function_param_with_sending_param_note);
+  return true;
+}
+
+bool SendingOnFunctionResultMismatchFailure::diagnoseAsError() {
+  emitDiagnosticAt(getLoc(), diag::sending_function_wrong_sending,
+                   getFromType(), getToType())
+      .warnUntilSwiftVersion(6);
+  emitDiagnosticAt(getLoc(),
+                   diag::sending_function_result_with_sending_param_note);
+  return true;
+}
+
 bool AssignmentTypeMismatchFailure::diagnoseMissingConformance() const {
   auto srcType = getFromType();
   auto dstType = getToType()->lookThroughAllOptionalTypes();
