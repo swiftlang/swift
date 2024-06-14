@@ -2826,6 +2826,10 @@ public:
   /// Associate an argument list with a call at a given locator.
   void associateArgumentList(ConstraintLocator *locator, ArgumentList *args);
 
+  /// If the given node is a function expression with a parent ApplyExpr,
+  /// returns the apply, otherwise returns the node itself.
+  ASTNode includingParentApply(ASTNode node);
+
   std::optional<SelectedOverload>
   findSelectedOverloadFor(ConstraintLocator *locator) const {
     auto result = ResolvedOverloads.find(locator);
