@@ -1433,7 +1433,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -InstallTo "$($Arch.SDKInstallRoot)\usr" `
       -Arch $Arch `
       -Platform $Platform `
-      -UseBuiltCompilers ASM,C,Swift `
+      -UseBuiltCompilers ASM,C,CXX,Swift `
       -BuildTargets $Targets `
       -Defines (@{
         # Turn off safeseh for lld as it has safeseh enabled by default
