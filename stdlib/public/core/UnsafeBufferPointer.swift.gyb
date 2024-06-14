@@ -527,6 +527,25 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
     extracting(bounds.relative(to: Range(uncheckedBounds: (0, count))))
   }
+
+  /// Extracts and returns a copy of the entire buffer.
+  ///
+  /// When `Element` is copyable, the `extracting` operation is equivalent to
+  /// slicing the buffer then rebasing the resulting buffer slice:
+  ///
+  ///     let a = buffer
+  ///     let b = buffer.extracting(...)
+  ///     let c = UnsafeBufferPointer(rebasing: buffer[...])
+  ///     // `a`, `b` and `c` are now all referring to the same buffer
+  ///
+  /// Note that unlike slicing, the `extracting` operation remains available
+  /// even if `Element` happens to be noncopyable.
+  //
+  /// - Returns: The same buffer as `self`.
+  @_alwaysEmitIntoClient
+  public func extracting(_ bounds: UnboundedRange) -> Self {
+    self
+  }
 }
 
 @_disallowFeatureSuppression(NoncopyableGenerics)
