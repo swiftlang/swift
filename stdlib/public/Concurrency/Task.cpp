@@ -693,10 +693,14 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       break;
 
     case TaskOptionRecordKind::InitialTaskExecutorOwned:
+      #if SWIFT_CONCURRENCY_EMBEDDED
+      swift_unreachable("owned TaskExecutor cannot be used in embedded Swift");
+      #else
       taskExecutor = cast<InitialTaskExecutorOwnedPreferenceTaskOptionRecord>(option)
                          ->getExecutorRefFromUnownedTaskExecutor();
       taskExecutorIsOwned = true;
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
+      #endif
       break;
 
     case TaskOptionRecordKind::TaskGroup:
