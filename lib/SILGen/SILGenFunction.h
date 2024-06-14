@@ -22,6 +22,7 @@
 #include "SILGen.h"
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/NoDiscard.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
@@ -727,6 +728,10 @@ public:
   /// This matches the type that `emitRValue` etc. are expected to produce
   /// without any contextual overrides.
   FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
+
+  /// A helper method that calls getFunctionTypeInfo that also marks global
+  /// actor isolated async closures that are not sendable as sendable.
+  FunctionTypeInfo getClosureTypeInfo(AbstractClosureExpr *expr);
 
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
   void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }

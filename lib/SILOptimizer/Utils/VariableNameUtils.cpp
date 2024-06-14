@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-variable-name-inference"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/Test.h"

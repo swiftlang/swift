@@ -28,6 +28,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -2036,13 +2037,12 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     assert(!type->hasLocalArchetype() ||
            (genericSig && origGenericSig &&
             !genericSig->isEqual(origGenericSig)));
-    type = mapTypeOutOfContext(type);
 
-    auto canType = type->getReducedType(
+    auto interfaceType = mapTypeOutOfContext(type)->getReducedType(
         genericSig ? genericSig : origGenericSig);
     auto &loweredTL =
-        TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
-                           expansion);
+        TC.getTypeLowering(AbstractionPattern(genericSig, interfaceType),
+                           interfaceType, expansion);
     auto loweredTy = loweredTL.getLoweredType();
     switch (TC.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
@@ -2065,12 +2065,13 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
       // The type in the box is lowered in the minimal context.
       auto minimalLoweredTy =
-          TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+          TC.getTypeLowering(AbstractionPattern(type), type,
                              TypeExpansionContext::minimal())
               .getLoweredType();
       // Lvalues are captured as a box that owns the captured value.
       auto boxTy = TC.getInterfaceBoxTypeForCapture(
           varDecl, minimalLoweredTy.getASTType(),
+          genericSig, capturedEnvs,
           /*mutable*/ true);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention, options);
@@ -2084,12 +2085,13 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
       // The type in the box is lowered in the minimal context.
       auto minimalLoweredTy =
-          TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+          TC.getTypeLowering(AbstractionPattern(type), type,
                              TypeExpansionContext::minimal())
               .getLoweredType();
       // Lvalues are captured as a box that owns the captured value.
       auto boxTy = TC.getInterfaceBoxTypeForCapture(
           varDecl, minimalLoweredTy.getASTType(),
+          genericSig, capturedEnvs,
           /*mutable*/ false);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention, options);

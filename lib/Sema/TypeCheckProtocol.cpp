@@ -48,6 +48,7 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -743,6 +744,15 @@ RequirementMatch swift::matchWitness(
           reqTypeIsIUO != witnessTypeIsIUO)
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
+      // If our requirement says that it has a sending result, then our witness
+      // must also have a sending result since otherwise, in generic contexts,
+      // we would be returning non-disconnected values as disconnected.
+      if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6)) {
+        if (reqFnType->hasExtInfo() && reqFnType->hasSendingResult() &&
+            (!witnessFnType->hasExtInfo() || !witnessFnType->hasSendingResult()))
+          return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      }
+
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.value());
       }
@@ -774,6 +784,14 @@ RequirementMatch swift::matchWitness(
 
       if (reqParams[i].isInOut() != witnessParams[i].isInOut())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+
+      // If we have a requirement without sending and our witness expects a
+      // sending parameter, error.
+      if (dc->getASTContext().isSwiftVersionAtLeast(6)) {
+        if (!reqParams[i].getParameterFlags().isSending() &&
+            witnessParams[i].getParameterFlags().isSending())
+          return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      }
 
       auto reqParamDecl = reqParamList->get(i);
       auto witnessParamDecl = witnessParamList->get(i);
@@ -1740,6 +1758,8 @@ checkWitnessAvailability(ValueDecl *requirement,
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
                                               const RequirementMatch &match) {
+  auto &ctx = getASTContext();
+
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
@@ -1769,7 +1789,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     return RequirementCheck(CheckKind::Availability, requiredAvailability);
   }
 
-  if (requirement->getAttrs().isUnavailable(getASTContext()) &&
+  if (requirement->getAttrs().isUnavailable(ctx) &&
       match.Witness->getDeclContext() == DC) {
     return RequirementCheck(CheckKind::Unavailable);
   }
@@ -1792,11 +1812,11 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     }
   }
 
-  if (match.Witness->getAttrs().isUnavailable(getASTContext()) &&
-      !requirement->getAttrs().isUnavailable(getASTContext())) {
+  if (match.Witness->getAttrs().isUnavailable(ctx) &&
+      !requirement->getAttrs().isUnavailable(ctx)) {
     auto nominalOrExtensionIsUnavailable = [&]() {
       if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
-        if (extension->getAttrs().isUnavailable(getASTContext()))
+        if (extension->getAttrs().isUnavailable(ctx))
           return true;
       }
 
@@ -1811,6 +1831,20 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     // Allow unavailable nominals or extension to have unavailable witnesses.
     if (!nominalOrExtensionIsUnavailable())
       return CheckKind::WitnessUnavailable;
+  }
+
+  // Warn about deprecated default implementations if the requirement is
+  // not deprecated, and the conformance is not deprecated.
+  bool isDefaultWitness = false;
+  if (auto *nominal = match.Witness->getDeclContext()->getSelfNominalTypeDecl())
+    isDefaultWitness = isa<ProtocolDecl>(nominal);
+  if (isDefaultWitness &&
+      match.Witness->getAttrs().isDeprecated(ctx) &&
+      !requirement->getAttrs().isDeprecated(ctx)) {
+    auto conformanceContext = ExportContext::forConformance(DC, Proto);
+    if (!conformanceContext.isDeprecated()) {
+      return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
+    }
   }
 
   return CheckKind::Success;
@@ -4374,6 +4408,25 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          requirement->getName());
         });
       break;
+
+      case CheckKind::DefaultWitnessDeprecated:
+        getASTContext().addDelayedConformanceDiag(
+          Conformance, /*isError=*/false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            auto &ctx = witness->getASTContext();
+            auto &diags = ctx.Diags;
+            SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
+            auto *attr = witness->getAttrs().getDeprecated(ctx);
+            EncodedDiagnosticMessage EncodedMessage(attr->Message);
+            diags.diagnose(diagLoc, diag::witness_deprecated,
+                           witness, conformance->getProtocol()->getName(),
+                           EncodedMessage.Message);
+            emitDeclaredHereIfNeeded(diags, diagLoc, witness);
+            diags.diagnose(requirement, diag::kind_declname_declared_here,
+                           DescriptiveDeclKind::Requirement,
+                           requirement->getName());
+          });
+        break;
     }
 
     if (auto *classDecl = DC->getSelfClassDecl()) {

@@ -207,9 +207,6 @@ def no_serialize_debugging_options :
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
-def public_autolink_library : Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">, Flags<[FrontendOption]>;
-
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
@@ -369,6 +366,10 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
+
+def public_autolink_library :
+  Separate<["-"], "public-autolink-library">,
+  HelpText<"Add public dependent library">;
 }
 
 // HIDDEN FLAGS
@@ -1369,11 +1370,6 @@ def platform_c_calling_convention_EQ :
 def disable_experimental_parser_round_trip : Flag<["-"],
   "disable-experimental-parser-round-trip">,
   HelpText<"Disable round trip through the new swift parser">;
-
-def disable_strict_concurrency_region_based_isolation : Flag<["-"],
-  "disable-region-based-isolation-with-strict-concurrency">,
-  HelpText<"Disable region based isolation when running with strict concurrency enabled. Only enabled with asserts">,
-  Flags<[HelpHidden]>;
 
 def disable_transferring_args_and_results_with_region_isolation : Flag<["-"],
   "disable-transferring-args-and-results-with-region-based-isolation">,

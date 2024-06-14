@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"

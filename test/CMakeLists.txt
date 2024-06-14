@@ -215,6 +215,9 @@ normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
 normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
+normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
+normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
 normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
@@ -431,6 +434,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_SYNCHRONIZATION)
           list(APPEND LIT_ARGS "--param" "synchronization")
+        endif()
+
+        if(SWIFT_ENABLE_VOLATILE)
+          list(APPEND LIT_ARGS "--param" "volatile")
         endif()
 
         if(SWIFT_BUILD_REMOTE_MIRROR)

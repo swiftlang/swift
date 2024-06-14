@@ -7,7 +7,7 @@
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
-// Test the SIL representation for lifetime depenence.
+// Test the SIL representation for lifetime dependence.
 
 sil_stage raw
 
@@ -18,6 +18,7 @@ class C {}
 struct Nonescapable: ~Escapable {}
 
 sil @c_dependence : $@convention(thin) (@guaranteed C) -> _scope(0) @owned Nonescapable
+sil @immortal_dependence : $@convention(thin) () -> _scope(immortal) @owned Nonescapable
 
 // Test that SILType.isEscpable does not crash on a generic box when NoncopyableGenerics is enabled.
 sil shared [serialized] [ossa] @testLocalFunc : $@convention(thin) <T, U> (@guaranteed <τ_0_0> { var τ_0_0 } <U>) -> () {
@@ -41,4 +42,13 @@ bb0(%0 : @owned $C):
   destroy_value %0 : $C
   %28 = tuple ()
   return %28 : $()
+}
+
+sil [ossa] @test_immortal_dependence : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @immortal_dependence : $@convention(thin) () -> _scope(immortal) @owned Nonescapable
+  %c = apply %f() : $@convention(thin) () -> _scope(immortal) @owned Nonescapable
+  destroy_value %c : $Nonescapable
+  %t = tuple ()
+  return %t : $()
 }

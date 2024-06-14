@@ -16,6 +16,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS
     CxxRandomAccessCollection.swift
     CxxSequence.swift
     CxxVector.swift
+    CxxSpan.swift
     UnsafeCxxIterators.swift
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

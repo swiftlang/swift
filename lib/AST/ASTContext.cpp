@@ -55,6 +55,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -1340,6 +1341,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
+  case KnownProtocolKind::CxxSpan:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
@@ -2404,10 +2406,11 @@ void ASTContext::addSucceededCanImportModule(
   }
 }
 
-bool ASTContext::canImportModuleImpl(
-    ImportPath::Module ModuleName, llvm::VersionTuple version,
-    bool underlyingVersion, bool updateFailingList,
-    llvm::VersionTuple &foundVersion) const {
+bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
+                                     SourceLoc loc, llvm::VersionTuple version,
+                                     bool underlyingVersion,
+                                     bool updateFailingList,
+                                     llvm::VersionTuple &foundVersion) const {
   SmallString<64> FullModuleName;
   ModuleName.getString(FullModuleName);
   auto ModuleNameStr = FullModuleName.str().str();
@@ -2448,7 +2451,7 @@ bool ASTContext::canImportModuleImpl(
 
     // Otherwise, ask whether any module loader can load the module.
     for (auto &importer : getImpl().ModuleLoaders) {
-      if (importer->canImportModule(ModuleName, nullptr))
+      if (importer->canImportModule(ModuleName, loc, nullptr))
         return true;
     }
 
@@ -2465,7 +2468,7 @@ bool ASTContext::canImportModuleImpl(
   for (auto &importer : getImpl().ModuleLoaders) {
     ModuleLoader::ModuleVersionInfo versionInfo;
 
-    if (!importer->canImportModule(ModuleName, &versionInfo))
+    if (!importer->canImportModule(ModuleName, loc, &versionInfo))
       continue; // The loader can't find the module.
 
     if (!versionInfo.isValid())
@@ -2505,11 +2508,11 @@ void ASTContext::forEachCanImportVersionCheck(
     Callback(entry.first, entry.second.Version, entry.second.UnderlyingVersion);
 }
 
-bool ASTContext::canImportModule(ImportPath::Module moduleName,
+bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
-  if (!canImportModuleImpl(moduleName, version, underlyingVersion, true,
+  if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
                            versionInfo))
     return false;
 
@@ -2523,8 +2526,8 @@ bool ASTContext::testImportModule(ImportPath::Module ModuleName,
                                   llvm::VersionTuple version,
                                   bool underlyingVersion) const {
   llvm::VersionTuple versionInfo;
-  return canImportModuleImpl(ModuleName, version, underlyingVersion, false,
-                             versionInfo);
+  return canImportModuleImpl(ModuleName, SourceLoc(), version,
+                             underlyingVersion, false, versionInfo);
 }
 
 ModuleDecl *

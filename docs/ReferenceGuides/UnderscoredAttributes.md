@@ -591,11 +591,14 @@ class C {
 
 (Note that it is "inherit", not "inherits", unlike below.)
 
-Marks that a `@Sendable async` closure argument should inherit the actor
-context (i.e. what actor it should be run on) based on the declaration site
-of the closure. This is different from the typical behavior, where the closure
-may be runnable anywhere unless its type specifically declares that it will
-run on a specific actor.
+Marks that a `@Sendable async` or `sendable async` closure argument should
+inherit the actor context (i.e. what actor it should be run on) based on the
+declaration site of the closure rather than be non-Sendable. This does not do
+anything if the closure is synchronous.
+
+DISCUSSION: The reason why this does nothing when the closure is synchronous is
+since it does not have the ability to hop to the appropriate executor before it
+is run, so we may create concurrency errors.
 
 ## `@_inheritsConvenienceInitializers`
 

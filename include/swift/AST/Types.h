@@ -3232,6 +3232,9 @@ public:
     /// Whether the parameter is 'isolated'.
     bool isIsolated() const { return Flags.isIsolated(); }
 
+    /// Whether or not the parameter is 'sending'.
+    bool isSending() const { return Flags.isSending(); }
+
     /// Whether the parameter is 'isCompileTimeConst'.
     bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }
 
@@ -3829,6 +3832,7 @@ struct ParameterListInfo {
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
   SmallBitVector variadicGenerics;
+  SmallBitVector isPassedToSending;
 
 public:
   ParameterListInfo() { }
@@ -3859,6 +3863,9 @@ public:
   bool anyContextualInfo() const;
 
   bool isVariadicGenericParameter(unsigned paramIdx) const;
+
+  /// Returns true if this is a sending parameter.
+  bool isPassedToSendingParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
@@ -4114,7 +4121,9 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
   }
   llvm_unreachable("covered switch isn't covered?!");
 }
-inline bool isConsumedParameter(ParameterConvention conv) {
+
+template <bool InCallee>
+bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Owned:
@@ -4133,10 +4142,19 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+inline bool isConsumedParameterInCallee(ParameterConvention conv) {
+  return isConsumedParameter<true>(conv);
+}
+
+inline bool isConsumedParameterInCaller(ParameterConvention conv) {
+  return isConsumedParameter<false>(conv);
+}
+
 /// Returns true if conv is a guaranteed parameter. This may look unnecessary
 /// but this will allow code to generalize to handle Indirect_Guaranteed
 /// parameters when they are added.
-inline bool isGuaranteedParameter(ParameterConvention conv) {
+template <bool InCallee>
+bool isGuaranteedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -4153,6 +4171,14 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
     return false;
   }
   llvm_unreachable("bad convention kind");
+}
+
+inline bool isGuaranteedParameterInCallee(ParameterConvention conv) {
+  return isGuaranteedParameter<true>(conv);
+}
+
+inline bool isGuaranteedParameterInCaller(ParameterConvention conv) {
+  return isGuaranteedParameter<false>(conv);
 }
 
 inline bool isMutatingParameter(ParameterConvention conv) {
@@ -4282,14 +4308,22 @@ public:
 
   /// True if this parameter is consumed by the callee, either
   /// indirectly or directly.
-  bool isConsumed() const {
-    return isConsumedParameter(getConvention());
+  bool isConsumedInCallee() const {
+    return isConsumedParameterInCallee(getConvention());
+  }
+
+  bool isConsumedInCaller() const {
+    return isConsumedParameterInCaller(getConvention());
   }
 
   /// Returns true if this parameter is guaranteed, either indirectly or
   /// directly.
-  bool isGuaranteed() const {
-    return isGuaranteedParameter(getConvention());
+  bool isGuaranteedInCallee() const {
+    return isGuaranteedParameterInCallee(getConvention());
+  }
+
+  bool isGuaranteedInCaller() const {
+    return isGuaranteedParameterInCaller(getConvention());
   }
 
   bool hasOption(Flag flag) const { return options.contains(flag); }

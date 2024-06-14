@@ -145,7 +145,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
 }
 
-extension A: Copyable {}
+extension A: Copyable where T: Copyable {}
 
 // <T: ~Copyable>
 extension A where T: ~Copyable {

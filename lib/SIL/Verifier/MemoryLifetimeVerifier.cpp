@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memory-lifetime-verifier"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/CalleeCache.h"
@@ -849,10 +850,10 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
               fnType->getYields()[index].getConvention());
           if (argConv.isIndirectConvention()) {
             if (argConv.isInoutConvention() ||
-                argConv.isGuaranteedConvention()) {
+                argConv.isGuaranteedConventionInCaller()) {
               requireBitsSet(bits | ~nonTrivialLocations, yieldedValues[index],
                              &I);
-            } else if (argConv.isOwnedConvention()) {
+            } else if (argConv.isOwnedConventionInCaller()) {
               requireBitsClear(bits & nonTrivialLocations, yieldedValues[index],
                                &I);
             }

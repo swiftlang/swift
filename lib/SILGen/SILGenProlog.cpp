@@ -23,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
@@ -1539,6 +1540,8 @@ uint16_t SILGenFunction::emitBasicProlog(
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getReducedType(genericSig);
+  if (errorType)
+    errorType = (*errorType)->getReducedType(genericSig);
 
   std::optional<AbstractionPattern> origClosureType;
   if (TypeContext) origClosureType = TypeContext->OrigType;

@@ -192,6 +192,27 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   }
 }
 
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _task_taskExecutor_getTaskExecutorRef(
+    HeapObject *executor, const Metadata *selfType,
+    const TaskExecutorWitnessTable *wtable);
+#pragma clang diagnostic pop
+
+TaskExecutorRef
+InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTaskExecutor() const {
+  TaskExecutorRef executorRef = _task_taskExecutor_getTaskExecutorRef(
+      Identity,
+      /*selfType=*/swift_getObjectType(Identity),
+      /*wtable=*/WitnessTable);
+    return executorRef;
+}
+
+
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
@@ -652,6 +673,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Collect the options we know about.
   SerialExecutorRef serialExecutor = SerialExecutorRef::generic();
   TaskExecutorRef taskExecutor = TaskExecutorRef::undefined();
+  bool taskExecutorIsOwned = false;
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
@@ -663,10 +685,22 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
                           ->getExecutorRef();
       break;
 
-    case TaskOptionRecordKind::InitialTaskExecutor:
-      taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
+    case TaskOptionRecordKind::InitialTaskExecutorUnowned:
+      taskExecutor = cast<InitialTaskExecutorRefPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
+      taskExecutorIsOwned = false;
+      break;
+
+    case TaskOptionRecordKind::InitialTaskExecutorOwned:
+      #if SWIFT_CONCURRENCY_EMBEDDED
+      swift_unreachable("owned TaskExecutor cannot be used in embedded Swift");
+      #else
+      taskExecutor = cast<InitialTaskExecutorOwnedPreferenceTaskOptionRecord>(option)
+                         ->getExecutorRefFromUnownedTaskExecutor();
+      taskExecutorIsOwned = true;
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
+      #endif
       break;
 
     case TaskOptionRecordKind::TaskGroup:
@@ -1078,7 +1112,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
     // because the group takes a fast-path when attaching the child record.
     assert(jobFlags.task_hasInitialTaskExecutorPreference());
-    task->pushInitialTaskExecutorPreference(taskExecutor);
+    task->pushInitialTaskExecutorPreference(
+        taskExecutor, /*owned=*/taskExecutorIsOwned);
   }
 
   // If we're supposed to enqueue the task, do so now.

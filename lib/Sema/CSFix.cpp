@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/RequirementSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -1843,6 +1844,34 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
   name += "treat ephemeral as non-ephemeral for ";
   name += ::getName(ConversionKind);
   return name;
+}
+
+bool AllowSendingMismatch::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  switch (kind) {
+  case Kind::Parameter: {
+    SendingOnFunctionParameterMismatchFail failure(
+        solution, getFromType(), getToType(), getLocator(), fixBehavior);
+    return failure.diagnose(asNote);
+  }
+  case Kind::Result: {
+    SendingOnFunctionResultMismatchFailure failure(
+        solution, getFromType(), getToType(), getLocator(), fixBehavior);
+    return failure.diagnose(asNote);
+  }
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator,
+                                                   Type srcType, Type dstType,
+                                                   Kind kind) {
+  auto fixBehavior = cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+                         ? FixBehavior::Error
+                         : FixBehavior::DowngradeToWarning;
+  return new (cs.getAllocator())
+      AllowSendingMismatch(cs, srcType, dstType, locator, kind, fixBehavior);
 }
 
 bool SpecifyBaseTypeForContextualMember::diagnose(const Solution &solution,

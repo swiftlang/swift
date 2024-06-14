@@ -30,6 +30,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
@@ -312,7 +313,7 @@ static void copyParameterArgumentsForApply(
     auto argConv = applySite.getArgumentConvention(argOperand);
     auto collectNewArg = [&](SILValue newArg) {
       copiedArgs.push_back(newArg);
-      if (argConv.isGuaranteedConvention() &&
+      if (argConv.isGuaranteedConventionInCaller() &&
           argConv != SILArgumentConvention::Indirect_InoutAliasable)
         newArgsToDestroy.push_back(newArg);
     };

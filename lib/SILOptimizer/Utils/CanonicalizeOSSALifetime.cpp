@@ -65,6 +65,7 @@
 
 #define DEBUG_TYPE "copy-propagation"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
@@ -274,8 +275,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   }
 
   OSSALifetimeCompletion::visitAvailabilityBoundary(
-      getCurrentDef(), OSSALifetimeCompletion::DoNotAllowLeaks,
-      completeLiveness, [&](auto *unreachable, auto end) {
+      getCurrentDef(), completeLiveness, [&](auto *unreachable, auto end) {
         if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
           recordUnreachableLifetimeEnd(unreachable);
         }

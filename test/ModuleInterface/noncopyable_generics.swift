@@ -77,18 +77,18 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public struct ExplicitHello<T> : ~Swift.Copyable where T : ~Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable where T : Swift.Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public struct Hello<T> : ~Swift.Copyable, ~Swift.Escapable where T : ~Copyable, T : ~Escapable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : ~Copyable {
+// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : Swift.Escapable {
 // CHECK-MISC-NEXT: }
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : ~Escapable {
+// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : Swift.Copyable {
 // CHECK-MISC-NEXT: }
 // CHECK-MISC: #endif
 
@@ -121,19 +121,19 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC:   public struct InnerVariation2<D> : ~Swift.Copyable, ~Swift.Escapable where D : ~Escapable
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Outer : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.Outer : Swift.Copyable where A : Swift.Copyable {
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerStruct : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerStruct : Swift.Copyable where A : Swift.Copyable, C : Swift.Copyable {
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerVariation1 : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerVariation1 : Swift.Copyable where A : Swift.Copyable, D : Swift.Copyable {
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where A : ~Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where D : Swift.Escapable {
 // CHECK-MISC: #endif
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
@@ -250,7 +250,7 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Pair : Swift.Copyable {
+// CHECK-NEXT: extension Swiftskell.Pair : Swift.Copyable where L : Swift.Copyable, R : Swift.Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
@@ -258,7 +258,7 @@ import Swiftskell
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swift.Copyable {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swift.Copyable where Wrapped : Swift.Copyable {
 // CHECK: #endif
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics

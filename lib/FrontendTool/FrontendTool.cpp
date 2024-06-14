@@ -35,6 +35,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
@@ -598,6 +599,8 @@ mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
         return "backend";
       else
         return "compile";
+    case FrontendOptions::ActionType::EmitModuleOnly:
+      return "emit-module";
     default:
       return "compile";
   }
@@ -634,7 +637,8 @@ static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
 static DetailedTaskDescription
 constructDetailedTaskDescription(const CompilerInvocation &Invocation,
                                  ArrayRef<InputFile> PrimaryInputs,
-                                 ArrayRef<const char *> Args) {
+                                 ArrayRef<const char *> Args,
+                                 bool isEmitModuleOnly = false) {
   // Command line and arguments
   std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
   SmallVector<std::string, 16> Arguments;
@@ -653,10 +657,12 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
   }
 
   for (const auto &input : PrimaryInputs) {
-    // Main outputs
-    auto OutputFile = input.outputFilename();
-    if (!OutputFile.empty())
-      Outputs.push_back(OutputPair(computeFileTypeForPath(OutputFile), OutputFile));
+    if (!isEmitModuleOnly) {
+      // Main per-input outputs
+      auto OutputFile = input.outputFilename();
+      if (!OutputFile.empty())
+        Outputs.push_back(OutputPair(computeFileTypeForPath(OutputFile), OutputFile));
+    }
 
     // Supplementary outputs
     const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
@@ -2335,10 +2341,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
         return false;
       });
     } else {
-      // If no primary inputs are present, we are in WMO.
+      // If no primary inputs are present, we are in WMO or EmitModule.
+      bool isEmitModule =
+        Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::EmitModuleOnly;
       emitBeganMessage(llvm::errs(),
                        mapFrontendInvocationToAction(Invocation),
-                       constructDetailedTaskDescription(Invocation, IO.getAllInputs(), Args),
+                       constructDetailedTaskDescription(Invocation, IO.getAllInputs(),
+                                                        Args, isEmitModule),
                        OSPid, ProcInfo);
     }
   };

@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -659,23 +660,40 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
 static unsigned getDWARFVersionForTriple(const llvm::Triple &triple) {
   llvm::VersionTuple osVersion;
   const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
+  // Default to DWARF 2 on OS X 10.10 / iOS 8 and lower.
+  // Default to DWARF 4 on OS X 10.11 - macOS 14 / iOS - iOS 17.
   switch (kind) {
   case DarwinPlatformKind::MacOS:
     triple.getMacOSXVersion(osVersion);
     if (osVersion < llvm::VersionTuple(10, 11))
       return 2;
-    return 4;
+    if (osVersion < llvm::VersionTuple(15))
+      return 4;
+    return 5;
   case DarwinPlatformKind::IPhoneOSSimulator:
   case DarwinPlatformKind::IPhoneOS:
   case DarwinPlatformKind::TvOS:
   case DarwinPlatformKind::TvOSSimulator:
     osVersion = triple.getiOSVersion();
-    if (osVersion < llvm::VersionTuple(9))
-      return 2;
-    return 4;
-  default:
-    return 4;
+   if (osVersion < llvm::VersionTuple(9))
+     return 2;
+    if (osVersion < llvm::VersionTuple(18))
+      return 4;
+    return 5;
+  case DarwinPlatformKind::WatchOS:
+  case DarwinPlatformKind::WatchOSSimulator:
+    osVersion = triple.getWatchOSVersion();
+    if (osVersion < llvm::VersionTuple(11))
+      return 4;
+    return 5;
+  case DarwinPlatformKind::VisionOS:
+  case DarwinPlatformKind::VisionOSSimulator:
+    osVersion = triple.getOSVersion();
+    if (osVersion < llvm::VersionTuple(2))
+      return 4;
+    return 5;
   }
+  llvm_unreachable("unsupported platform kind");
 }
 
 void toolchains::Darwin::addCommonFrontendArgs(

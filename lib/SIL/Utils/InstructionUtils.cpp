@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/STLExtras.h"
@@ -618,7 +619,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::IndexAddrInst:
     // TODO: hasArchetype() ?
-    if (!inst->getOperand(0)->getType().isLoadable(*inst->getFunction())) {
+    if (!inst->getOperand(0)->getType().isFixedABI(*inst->getFunction())) {
       impactType = inst->getOperand(0)->getType();
       return RuntimeEffect::MetaData;
     }
