@@ -72,7 +72,8 @@ enum class ExportabilityReason : unsigned {
   PropertyWrapper,
   ResultBuilder,
   ExtensionWithPublicMembers,
-  ExtensionWithConditionalConformances
+  ExtensionWithConditionalConformances,
+  Inheritance
 };
 
 /// A description of the restrictions on what declarations can be referenced
