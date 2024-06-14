@@ -783,8 +783,18 @@ Type ASTBuilder::createConstrainedExistentialType(
     }
     args.push_back(argTy->getSecond());
   }
-  Type constrainedBase =
-      ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+
+  Type constrainedBase;
+
+  // We may not have any arguments because the constrained existential is a
+  // plain protocol with an inverse requirement.
+  if (args.empty()) {
+    constrainedBase =
+        ProtocolType::get(baseDecl, baseTy, base->getASTContext());
+  } else {
+    constrainedBase =
+        ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+  }
 
   // Handle inverse requirements.
   if (!inverseRequirements.empty()) {
