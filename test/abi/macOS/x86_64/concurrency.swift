@@ -66,6 +66,10 @@ Added: _$sScS8IteratorV4next9isolationxSgScA_pSgYi_tYaF
 // async function pointer to Swift.AsyncStream.Iterator.next(isolation: isolated Swift.Actor?) async -> A?
 Added: _$sScS8IteratorV4next9isolationxSgScA_pSgYi_tYaFTu
 
+// Swift.TaskGroup.Iterator.next(isolation: isolated Swift.Actor?) async -> A?
+Added: _$sScG8IteratorV4next9isolationxSgScA_pSgYi_tYaF
+Added: _$sScG8IteratorV4next9isolationxSgScA_pSgYi_tYaFTu
+
 // Swift.ThrowingTaskGroup.Iterator.next(isolation: isolated Swift.Actor?) async throws(B) -> A?
 Added: _$sScg8IteratorV4next9isolationxSgScA_pSgYi_tYaq_YKF
 
