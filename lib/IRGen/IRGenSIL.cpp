@@ -3559,6 +3559,11 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
     result = IGF.Builder.CreateMul(capacity, stride);
   }
 
+  if (auto constResult = dyn_cast<llvm::ConstantInt>(result)) {
+    if (!constResult->getUniqueInteger().isZero())
+      return constResult;
+  }
+
   // If the caller requests a zero-byte allocation, allocate one byte instead
   // to ensure that the resulting pointer is valid and unique on the stack.
   return IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::umax,
@@ -3601,6 +3606,14 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
     IGF, i->getOperand(0), i->getOperand(1), loc);
   auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
 
+  // Emit a static alloca if the size is constant.
+  if (auto *constSize = dyn_cast<llvm::ConstantInt>(size)) {
+    auto stackAddress = IGF.createAlloca(IGF.IGM.Int8Ty, constSize, align,
+                                         "temp_alloc");
+    IGF.setLoweredStackAddress(i, {stackAddress});
+    return;
+  }
+
   auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
                                             false, "temp_alloc");
   IGF.setLoweredStackAddress(i, stackAddress);
@@ -3620,14 +3633,18 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
 
 static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
                                        swift::BuiltinInst *i) {
+  assert(i->getOperandValues().size() == 6 &&
+         "createAsyncTask needs 6 operands");
   auto flags = IGF.getLoweredSingletonExplosion(i->getOperand(0));
   auto serialExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(1));
   auto taskGroup = IGF.getLoweredOptionalExplosion(i->getOperand(2));
-  auto taskExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(3));
-  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(4));
+  auto taskExecutorUnowned = IGF.getLoweredOptionalExplosion(i->getOperand(3));
+  auto taskExecutorOwned = IGF.getLoweredOptionalExplosion(i->getOperand(4));
+  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(5));
 
   auto taskAndContext =
-    emitTaskCreate(IGF, flags, serialExecutor, taskGroup, taskExecutor,
+    emitTaskCreate(IGF, flags, serialExecutor, taskGroup,
+                   taskExecutorUnowned, taskExecutorOwned,
                    taskFunction, i->getSubstitutions());
   Explosion out;
   out.add(taskAndContext.first);
