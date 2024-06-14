@@ -3559,6 +3559,11 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
     result = IGF.Builder.CreateMul(capacity, stride);
   }
 
+  if (auto constResult = dyn_cast<llvm::ConstantInt>(result)) {
+    if (!constResult->getUniqueInteger().isZero())
+      return constResult;
+  }
+
   // If the caller requests a zero-byte allocation, allocate one byte instead
   // to ensure that the resulting pointer is valid and unique on the stack.
   return IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::umax,
@@ -3600,6 +3605,14 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
   auto size = getStackAllocationSize(
     IGF, i->getOperand(0), i->getOperand(1), loc);
   auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
+
+  // Emit a static alloca if the size is constant.
+  if (auto *constSize = dyn_cast<llvm::ConstantInt>(size)) {
+    auto stackAddress = IGF.createAlloca(IGF.IGM.Int8Ty, constSize, align,
+                                         "temp_alloc");
+    IGF.setLoweredStackAddress(i, {stackAddress});
+    return;
+  }
 
   auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
                                             false, "temp_alloc");
