@@ -1809,18 +1809,25 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   typeSig->getRequirementsWithInverses(typeReqs, typeInverseReqs);
 
   // If the (non-inverse) requirements are different between the extension and
-  // the original type, it's written with constraints. Note that
-  // the extension can only add requirements, so we need only check the size
-  // (not the specific requirements).
-  if (extReqs.size() > typeReqs.size()) {
+  // the original type, it's written with constraints.
+  if (extReqs.size() != typeReqs.size()) {
     return true;
   }
 
-  assert(extReqs.size() == typeReqs.size());
+  // In case of equal number of constraints, we have to check the specific
+  // requirements. Extensions can end up with fewer requirements than the type
+  // extended, due to a same-type requirement in the extension.
+  //
+  // This mirrors the 'same' check in `ASTMangler::gatherGenericSignatureParts`
+  for (size_t i = 0; i < extReqs.size(); i++) {
+    if (extReqs[i] != typeReqs[i])
+      return true;
+  }
 
   // If the type has no inverse requirements, there are no extra constraints
   // to write.
   if (typeInverseReqs.empty()) {
+    assert(extInverseReqs.empty() && "extension retroactively added inverse?");
     return false;
   }
 
