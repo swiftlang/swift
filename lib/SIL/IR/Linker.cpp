@@ -59,6 +59,7 @@
 #include "llvm/Support/Debug.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Require.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -101,9 +102,9 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
 void SILLinkerVisitor::maybeAddFunctionToWorklist(
     SILFunction *F, SerializedKind_t callerSerializedKind) {
   SILLinkage linkage = F->getLinkage();
-  assert((callerSerializedKind == IsNotSerialized ||
-          F->hasValidLinkageForFragileRef(callerSerializedKind) ||
-         hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
+  require(callerSerializedKind == IsNotSerialized ||
+            F->hasValidLinkageForFragileRef(callerSerializedKind) ||
+            hasSharedVisibility(linkage) || F->isExternForwardDeclaration(),
          "called function has wrong linkage for serialized function");
   if (!F->isExternalDeclaration()) {
     // The function is already in the module, so no need to de-serialized it.
