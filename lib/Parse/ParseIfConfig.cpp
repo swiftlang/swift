@@ -843,10 +843,16 @@ Result Parser::parseIfConfigRaw(
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
-      } else if (!foundActive && shouldEvaluate) {
+      } else if (!foundActive) {
         // Evaluate the condition only if we haven't found any active one and
         // we're not in parse-only mode.
-        isActive = evaluateIfConfigCondition(Condition, Context);
+        if (shouldEvaluate) {
+          isActive = evaluateIfConfigCondition(Condition, Context);
+        }
+        // Determine isVersionCondition regardless of whether we're active.
+        // This is necessary in some edge cases, e.g. where we're in a nested,
+        // inactive #if block, and we encounter an inactive `#if compiler` check,
+        // as we have to explicitly skip parsing in such edge cases.
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
     }
