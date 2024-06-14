@@ -1656,7 +1656,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -InstallTo $InstallPath `
       -Arch $Arch `
       -Platform $Platform `
-      -UseBuiltCompilers ASM,C,Swift `
+      -UseBuiltCompilers ASM,C,CXX,Swift `
       -BuildTargets $Targets `
       -Defines (@{
         FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
