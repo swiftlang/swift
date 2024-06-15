@@ -5786,6 +5786,9 @@ ERROR(distributed_property_cannot_be_static,none,
 ERROR(distributed_property_can_only_be_computed,none,
       "%kind0 cannot be 'distributed', only computed properties can",
       (const ValueDecl *))
+ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
+      "only getters may be 'distributed'",
+      ())
 NOTE(distributed_actor_isolated_property,none,
       "access to %kind0 is only permitted within distributed actor %1",
       (const ValueDecl *, DeclName))
@@ -7543,7 +7546,7 @@ ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
 ERROR(let_accessor_expansion,none,
-      "cannot expand accessors on variable declared with 'let'",
+      "cannot expand Macros on variable declared with 'let'",
       ())
 ERROR(invalid_main_type_in_macro_expansion,none,
       "macro expansion cannot introduce '@main' type",
@@ -7563,14 +7566,13 @@ ERROR(invalid_macro_role_for_macro_syntax,none,
 ERROR(macro_cannot_introduce_names,none,
       "'%0' macros are not allowed to introduce names", (StringRef))
 ERROR(macro_nonobserving_accessor_missing_from_expansion,none,
-      "expansion of macro %0 did not produce a non-observing accessor "
-      "(such as 'get') as expected",
+      "expansion of macro %0 did not produce a getter or a setter as expected",
       (DeclName))
 ERROR(macro_nonobserver_unexpected_in_expansion,none,
       "expansion of macro %0 produced an unexpected %1",
       (DeclName, DescriptiveDeclKind))
 ERROR(macro_init_accessor_not_documented,none,
-      "expansion of macro %0 produced an unexpected 'init' accessor",
+      "expansion of macro %0 produced an unexpected 'init' member",
       (DeclName))
 ERROR(global_arbitrary_name,none,
       "'%0' macros are not allowed to introduce arbitrary names "
@@ -7612,7 +7614,7 @@ NOTE(macro_expand_circular_reference_unnamed_through, none,
      "circular reference expanding %0 macros", (StringRef))
 
 ERROR(accessor_macro_not_single_var, none,
-      "accessor macro %0 can only apply to a single variable", (DeclName))
+      "macro %0 can only apply to a single variable", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
@@ -7778,7 +7780,7 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
       "supported",
       (const ValueDecl *))
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
-      "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
+      "noncopyable %select{variable|subscript}0 cannot provide a read and set member",
       (unsigned))
 
 ERROR(nonescapable_types_attr_disabled,none,
@@ -7789,22 +7791,22 @@ ERROR(nonescapable_types_attr_disabled,none,
 //------------------------------------------------------------------------------
 
 ERROR(init_accessor_can_refer_only_to_properties,none,
-      "init accessor cannot refer to %0 %1; init accessors can refer only"
+      "init function cannot refer to %0 %1; init functions can refer only"
       " to stored properties",
       (DescriptiveDeclKind, DeclNameRef))
 
 ERROR(storage_restrictions_attribute_not_on_init_accessor,none,
-      "@storageRestrictions attribute could only be used with init accessors",
+      "@storageRestrictions attribute could only be used with init functions",
       ())
 ERROR(init_accessor_property_both_init_and_accessed,none,
       "property %0 cannot be both initialized and accessed",
       (DeclName))
 ERROR(invalid_use_of_self_in_init_accessor,none,
-      "'self' within init accessors can only be used to reference "
+      "'self' within init function can only be used to reference "
       "properties listed in 'initializes' and 'accesses'; "
-      "init accessors are run before 'self' is fully available", ())
+      "init function are run before 'self' is fully available", ())
 ERROR(init_accessor_invalid_member_ref,none,
-      "cannot reference instance member %0; init accessors can only "
+      "cannot reference instance member %0; init function can only "
       "refer to instance properties listed in 'initializes' and "
       "'accesses' attributes",
       (DeclNameRef))
@@ -7812,7 +7814,7 @@ ERROR(cannot_synthesize_memberwise_due_to_property_init_order,none,
       "cannot synthesize memberwise initializer",
       ())
 NOTE(out_of_order_access_in_init_accessor,none,
-     "init accessor for %0 cannot access stored property %1 because it "
+     "init function for %0 cannot access stored property %1 because it "
      "is called before %1 is initialized",
      (Identifier, Identifier))
 
