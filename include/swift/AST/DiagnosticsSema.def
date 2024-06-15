@@ -3952,8 +3952,8 @@ ERROR(attr_incompatible_with_objc,none,
       (DeclAttribute, DescriptiveDeclKind))
 
 ERROR(final_not_on_accessors,none,
-      "'final' cannot be applied to accessors, it must be put on the "
-      "%select{var|let|subscript}0", (unsigned))
+      "'final' cannot be applied to %1, it must be put on the "
+      "%select{var|let|subscript}0", (unsigned, DescriptiveDeclKind))
 
 ERROR(override_rethrows_with_non_rethrows,none,
       "override of 'rethrows' %select{method|initializer}0 should also "
@@ -7133,7 +7133,7 @@ ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
 ERROR(property_wrapper_effectful,none,
-    "property wrappers currently cannot define an 'async' or 'throws' accessor",
+    "property wrappers currently cannot define an 'async' or 'throws'",
     ())
 
 ERROR(property_with_wrapper_conflict_attribute,none,
