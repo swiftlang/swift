@@ -26,6 +26,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
 #include "swift/RemoteInspection/Records.h"
+#include "swift/Sema/CheckAvailability.h"
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
@@ -227,17 +228,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     }
 
     // Any nominal type that has an inverse requirement in its generic signature
-    // uses NoncopyableGenerics. Since inverses are mangled into symbols,
-    // a Swift 6.0+ runtime is needed to demangle them.
+    // uses NoncopyableGenerics. We can support some cases where the type has
+    // bound generic arguments that conform to all invertible protocols.
     if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
-      auto *nom = nominalTy->getDecl();
-      if (auto sig = nom->getGenericSignature()) {
-        SmallVector<InverseRequirement, 2> inverses;
-        SmallVector<Requirement, 2> reqs;
-        sig->getRequirementsWithInverses(reqs, inverses);
-        if (!inverses.empty())
-          return addRequirement(Swift_6_0);
-      }
+      if (requiresNoncopyableGenericsAvailabilityCheck(nominalTy))
+        return addRequirement(Swift_6_0);
     }
 
     return false;
