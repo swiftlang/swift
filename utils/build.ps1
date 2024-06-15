@@ -1777,6 +1777,7 @@ function Install-Platform([Platform]$Platform, $Arch) {
       Copy-File "$PlatformLibSrc\$($Arch.LLVMName)\*.lib" "$PlatformLibDst\$($Arch.LLVMName)\"
     }
     Android {
+      Copy-File "$PlatformLibSrc\*.a" "$PlatformLibDst\$($Arch.LLVMName)\"
       Copy-File "$PlatformLibSrc\*.so" "$PlatformLibDst\$($Arch.LLVMName)\"
     }
   }
