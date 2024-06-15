@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift  %s -o %t/bin
+// RUN: %target-build-swift -g %s -o %t/bin
 // RUN: %target-codesign %t/bin
 // RUN: %target-run %t/bin | %FileCheck %s
 
