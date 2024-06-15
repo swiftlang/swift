@@ -4985,8 +4985,8 @@ NOTE(candidate_is_not_assignable,none,
      (const ValueDecl *))
 
 NOTE(change_to_mutating,none,
-     "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
-     (bool))
+     "mark %select{method|%1}0 'mutating' to make 'self' mutable",
+     (bool, StringRef))
 NOTE(masked_mutable_property,none,
      "add explicit '%0' to refer to mutable %1 of %2",
      (StringRef, DescriptiveDeclKind, Type))
