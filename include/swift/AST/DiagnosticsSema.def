@@ -7546,7 +7546,7 @@ ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
 ERROR(let_accessor_expansion,none,
-      "cannot expand Macros on variable declared with 'let'",
+      "cannot expand macros on variable declared with 'let'",
       ())
 ERROR(invalid_main_type_in_macro_expansion,none,
       "macro expansion cannot introduce '@main' type",

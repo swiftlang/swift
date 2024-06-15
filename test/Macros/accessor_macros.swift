@@ -147,7 +147,7 @@ struct HasStoredTests {
 
 #if TEST_DIAGNOSTICS
   @AddWillSetSneakily var y: Int = 0
-  // expected-error@-1{{expansion of macro 'AddWillSetSneakily()' did not produce a non-observing accessor (such as 'get') as expected}}
+  // expected-error@-1{{expansion of macro 'AddWillSetSneakily()' did not produce a getter or a setter as expected}}
 
   @MakeComputedSneakily var z: Int = 0
   // expected-error@-1{{expansion of macro 'MakeComputedSneakily()' produced an unexpected getter}}
@@ -171,6 +171,6 @@ macro addGetterMacro() =
 #if TEST_DIAGNOSTICS
 struct S {
   @addGetterMacro let x: Int
-  // expected-warning@-1 {{cannot expand accessors on variable declared with 'let'; this is an error in the Swift 6 language mode}}
+  // expected-warning@-1 {{cannot expand macros on variable declared with 'let'; this is an error in the Swift 6 language mode}}
 }
 #endif
