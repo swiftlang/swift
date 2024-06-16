@@ -5129,6 +5129,8 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
   bool doDiag = false;
   switch (options.getContext()) {
+  case TypeResolverContext::ExistentialConstraint:
+    break ;
   case TypeResolverContext::None:
   case TypeResolverContext::InoutFunctionInput:
     if (!isDirect || !(options & allowIUO))
@@ -5154,7 +5156,6 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
-  case TypeResolverContext::ExistentialConstraint:
   case TypeResolverContext::SameTypeRequirement:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::MetatypeBase:
