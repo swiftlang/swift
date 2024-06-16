@@ -15229,7 +15229,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                locator.endsWith<LocatorPathElt::SubscriptMember>())
                   ? 1
                   : 0;
-
+    // An overload choice that isn't settable is least interesting for diagnosis.
+    if (auto overload = findSelectedOverloadFor(getCalleeLocator(fix->getLocator()))) {
+      if (auto *var = dyn_cast_or_null<VarDecl>(overload->choice.getDeclOrNull())) {
+         impact += !var->isSettableInSwift(DC) ? 1 : 0;
+      }
+    }
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature FullTypedThrows
 
+// REQUIRES: asserts
+
 enum MyError: Error {
 case failed
 case epicFailed
