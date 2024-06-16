@@ -6639,19 +6639,20 @@ NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
      (const ValueDecl *, StringRef, llvm::VersionTuple))
 
-WARNING(availability_deprecated, Deprecation,
-        "%0 %select{is|%select{is|was}3}1 "
-        "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
-        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
-         StringRef))
+GROUPED_WARNING(availability_deprecated, availability_deprecated, Deprecation,
+                "%0 %select{is|%select{is|was}3}1 "
+                "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
+                (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
+                 StringRef))
 
-WARNING(availability_deprecated_rename, Deprecation,
-        "%0 %select{is|%select{is|was}3}1 "
-        "deprecated%select{| in %2%select{| %4}3}1: "
-        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
-        "'%7'",
-        (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
-         unsigned, StringRef))
+GROUPED_WARNING(
+      availability_deprecated_rename, availability_deprecated, Deprecation,
+      "%0 %select{is|%select{is|was}3}1 "
+      "deprecated%select{| in %2%select{| %4}3}1: "
+      "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
+      "'%7'",
+      (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
+       unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,

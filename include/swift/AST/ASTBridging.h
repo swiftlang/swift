@@ -379,7 +379,7 @@ struct BridgedPatternBindingEntry {
 // NOTE: This must be the same underlying value as C++ 'swift::DiagID' defined
 // in 'DiagnosticList.cpp'.
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) BridgedDiagID_##ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) BridgedDiagID_##ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
 

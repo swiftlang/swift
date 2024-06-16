@@ -34,13 +34,13 @@
 namespace {
 
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
 
 static constexpr const char *const diagnosticNameStrings[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) " [" #ID "]",
+#define DIAG(KIND, ID, Group, Options, Text, Signature) " [" #ID "]",
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
@@ -206,7 +206,7 @@ void StringsLocalizationProducer::forEachAvailable(
 void StringsLocalizationProducer::readStringsFile(
     llvm::MemoryBuffer *in, std::vector<std::string> &diagnostics) {
   std::map<std::string, unsigned> diagLocs;
-#define DIAG(KIND, ID, Options, Text, Signature)                               \
+#define DIAG(KIND, ID, Group, Options, Text, Signature)                        \
   diagLocs[#ID] = static_cast<unsigned>(LocalDiagID::ID);
 #include "swift/AST/DiagnosticsAll.def"
 #undef DIAG

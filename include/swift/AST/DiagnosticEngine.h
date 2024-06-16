@@ -24,6 +24,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/WarningAsErrorRule.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -851,8 +852,8 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// Emit all warnings as errors
-    bool warningsAsErrors = false;
+    /// Treat these warnings as errors. Indicies here corespond to DiagID enum
+    llvm::BitVector warningsAsErrors;
 
     /// Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
@@ -893,9 +894,22 @@ namespace swift {
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
 
-    /// Whether to treat warnings as errors
-    void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
-    bool getWarningsAsErrors() const { return warningsAsErrors; }
+    /// Whether a warning should be upgraded to an error or not
+    void setWarningAsErrorForDiagID(DiagID id, bool value) {
+      warningsAsErrors[(unsigned)id] = value;
+    }
+    bool getWarningAsErrorForDiagID(DiagID id) {
+      return warningsAsErrors[(unsigned)id];
+    }
+
+    /// Whether all warnings should be upgraded to errors or not
+    void setAllWarningsAsErrors(bool value) {
+      if (value) {
+        warningsAsErrors.set();
+      } else {
+        warningsAsErrors.reset();
+      }
+    }
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
@@ -1105,11 +1119,13 @@ namespace swift {
       return state.getSuppressRemarks();
     }
 
-    /// Whether to treat warnings as errors
-    void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
-    bool getWarningsAsErrors() const {
-      return state.getWarningsAsErrors();
-    }
+    /// Apply rules specifing what warnings should or shouldn't be treated as
+    /// errors. For group rules the string is either a group name defined by
+    /// DiagnosticGroups.def
+    /// Rules are applied in order they appear in the vector.
+    /// In case the vector contains rules affecting the same diagnostic ID
+    /// the last rule wins.
+    void setWarningsAsErrorsRules(const std::vector<WarningAsErrorRule> &rules);
 
     /// Whether to print diagnostic names after their messages
     void setPrintDiagnosticNames(bool val) {

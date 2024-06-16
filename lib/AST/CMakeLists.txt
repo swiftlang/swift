@@ -41,6 +41,7 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
+  DiagnosticGroups.cpp
   DiagnosticList.cpp
   DistributedDecl.cpp
   DocComment.cpp
