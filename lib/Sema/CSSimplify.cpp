@@ -6545,6 +6545,9 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       return true;
 
+    if (repairByInsertingExplicitCall(lhs, rhs))
+      return true;
+
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
