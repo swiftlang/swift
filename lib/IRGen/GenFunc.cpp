@@ -2590,8 +2590,9 @@ IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
 }
 
 llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
-  // The prologue version lacks artificial debug info as this would cause
-  // verification errors when it gets inlined.
+  // Never emit debug info for these alwaysinline functions, as it would create
+  // an inline frame without any user code. These can also be involved in tail
+  // calls, which confuse the debugger.
   auto name = forPrologue ? "__swift_async_resume_project_context_prologue"
                           : "__swift_async_resume_project_context";
   auto Fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
@@ -2603,7 +2604,7 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
         auto callerContext = IGF.emitAsyncResumeProjectContext(addr);
         Builder.CreateRet(callerContext);
       },
-      false /*isNoInline*/, forPrologue));
+      false /*isNoInline*/, true/*for prologue*/));
   Fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return Fn;
 }
@@ -2694,6 +2695,9 @@ void IRGenFunction::emitSuspensionPoint(Explosion &toExecutor,
 }
 
 llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
+  // Never emit debug info for these alwaysinline functions, as it would create
+  // an inline frame without any user code. These can also be involved in tail
+  // calls, which confuse the debugger.
   auto name = "__swift_async_resume_get_context";
   auto fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
@@ -2701,7 +2705,7 @@ llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
         auto &Builder = IGF.Builder;
         Builder.CreateRet(&*IGF.CurFn->arg_begin());
       },
-      false /*isNoInline*/));
+      false /*isNoInline*/, true /*forPrologue*/));
   fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return fn;
 }

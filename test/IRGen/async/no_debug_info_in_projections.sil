@@ -1,0 +1,48 @@
+// RUN: %target-swift-frontend %s -g -emit-irgen | %IRGenFileCheck %s
+
+// We don't want any debug info for these helper functions:
+
+// CHECK: define {{.*}} @__swift_async_resume_project_context
+// CHECK-NOT: !dbg
+// CHECK-SAME: {
+// CHECK: define {{.*}} @__swift_async_resume_get_context
+// CHECK-NOT: !dbg
+// CHECK-SAME: {
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@_silgen_name("some_async_func")
+public func some_async_func() async -> Int
+
+func foo() async -> Int
+
+sil_scope 1 {  parent @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 }
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0, scope 1 // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32), scope 1 // user: %4
+  return %3 : $Int32, scope 1                     // id: %4
+}
+
+sil_scope 2 { loc "test.swift":4:6 parent @$s4test3fooSiyYaF : $@convention(thin) @async () -> Int }
+sil_scope 3 { loc "test.swift":5:16 parent 2 }
+sil_scope 4 { loc "test.swift":5:7 parent 2 }
+
+sil @$s4test3fooSiyYaF : $@convention(thin) @async () -> Int {
+bb0:
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt, loc * "test.swift":4:6, scope 2 // user: %3
+  // function_ref some_async_func
+  %1 = function_ref @some_async_func : $@convention(thin) @async () -> Int, loc "test.swift":5:22, scope 3 // user: %2
+  %2 = apply %1() : $@convention(thin) @async () -> Int, loc "test.swift":5:22, scope 3 // users: %6, %4
+  hop_to_executor %0 : $Optional<Builtin.Executor>, loc * "test.swift":5:22, scope 3 // id: %3
+  debug_value %2 : $Int, let, name "result", loc "test.swift":5:7, scope 4 // id: %4
+  return %2 : $Int, loc "test.swift":6:3, scope 4 // id: %13
+}
+
+
+sil @some_async_func : $@convention(thin) @async () -> Int
