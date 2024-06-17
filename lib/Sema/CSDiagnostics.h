@@ -2291,6 +2291,28 @@ private:
   void emitSuggestionNotes() const;
 };
 
+class SendingOnFunctionParameterMismatchFail final : public ContextualFailure {
+public:
+  SendingOnFunctionParameterMismatchFail(const Solution &solution, Type srcType,
+                                         Type dstType,
+                                         ConstraintLocator *locator,
+                                         FixBehavior fixBehavior)
+      : ContextualFailure(solution, srcType, dstType, locator, fixBehavior) {}
+
+  bool diagnoseAsError() override;
+};
+
+class SendingOnFunctionResultMismatchFailure final : public ContextualFailure {
+public:
+  SendingOnFunctionResultMismatchFailure(const Solution &solution, Type srcType,
+                                         Type dstType,
+                                         ConstraintLocator *locator,
+                                         FixBehavior fixBehavior)
+      : ContextualFailure(solution, srcType, dstType, locator, fixBehavior) {}
+
+  bool diagnoseAsError() override;
+};
+
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
 public:
   AssignmentTypeMismatchFailure(const Solution &solution,

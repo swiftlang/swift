@@ -3236,6 +3236,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
+  // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
+  if (func1->hasSendingResult() != func2->hasSendingResult() &&
+      (!func1->hasSendingResult() || kind < ConstraintKind::Subtype)) {
+    auto *fix = AllowSendingMismatch::create(
+        *this, getConstraintLocator(locator), func1, func2,
+        AllowSendingMismatch::Kind::Result);
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
+  }
+
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
 
@@ -3664,6 +3674,17 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (func1->isDifferentiable() && func2->isDifferentiable() &&
           func1Param.isNoDerivative() && !func2Param.isNoDerivative()) {
         return getTypeMatchFailure(argumentLocator);
+      }
+
+      // Do not allow for functions that expect a sending parameter to match
+      // with a function that expects a non-sending parameter.
+      if (func1Param.getParameterFlags().isSending() &&
+          !func2Param.getParameterFlags().isSending()) {
+        auto *fix = AllowSendingMismatch::create(
+            *this, getConstraintLocator(argumentLocator), func1, func2,
+            AllowSendingMismatch::Kind::Parameter);
+        if (recordFix(fix))
+          return getTypeMatchFailure(argumentLocator);
       }
 
       // FIXME: We should check value ownership too, but it's not completely
@@ -11770,10 +11791,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
           isolatedParams.insert(paramDecl);
 
-        param =
-            param.withFlags(flags.withInOut(contextualParam->isInOut())
-                                 .withVariadic(contextualParam->isVariadic())
-                                 .withIsolated(contextualParam->isIsolated()));
+        param = param.withFlags(flags.withInOut(contextualParam->isInOut())
+                                    .withVariadic(contextualParam->isVariadic())
+                                    .withIsolated(contextualParam->isIsolated())
+                                    .withSending(contextualParam->isSending()));
       }
     }
 
@@ -11898,6 +11919,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->isSendable())
       closureExtInfo = closureExtInfo.withSendable();
+  }
+
+  // Propagate sending result from the contextual type to the closure.
+  if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
+    if (contextualFnType->hasExtInfo() && contextualFnType->hasSendingResult())
+      closureExtInfo = closureExtInfo.withSendingResult();
   }
 
   // Isolated parameters override any other kind of isolation we might infer.
@@ -15098,6 +15125,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     }
   }
 
+  case FixKind::AllowSendingMismatch:
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
