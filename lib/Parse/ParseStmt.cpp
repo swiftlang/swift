@@ -1793,8 +1793,12 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     auto declRefExpr = new (Context) UnresolvedDeclRefExpr(bindingName,
                                                            DeclRefKind::Ordinary,
                                                            loc);
-    
-    declRefExpr->setImplicit();
+    // We do NOT mark this declRefExpr as implicit because that'd avoid
+    // reporting errors if it were used in a synchronous context in
+    // 'diagnoseUnhandledAsyncSite'. There may be other ways to resolve the
+    // reporting issue that we could explore in the future.
+    //
+    // Even though implicit, the ast node has correct source location.
     Init = makeParserResult(declRefExpr);
   } else if (BindingKindStr != "case") {
     // If the pattern is present but isn't an identifier, the user wrote
