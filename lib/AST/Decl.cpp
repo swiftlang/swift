@@ -1768,6 +1768,8 @@ bool ExtensionDecl::hasValidParent() const {
   return getDeclContext()->canBeParentOfExtension();
 }
 
+/// Does the extension's generic signature impose additional generic requirements
+/// not stated on the extended nominal type itself?
 bool ExtensionDecl::isConstrainedExtension() const {
   auto nominal = getExtendedNominal();
   if (!nominal)
@@ -1786,12 +1788,26 @@ bool ExtensionDecl::isConstrainedExtension() const {
   return !typeSig->isEqual(extSig);
 }
 
+/// Is the extension written as an unconstrained extension? This is not the same
+/// as isConstrainedExtension() in the case where the extended nominal type has
+/// inverse requirements, because an extension of such a type introduces default
+/// conformance requirements unless they're suppressed on the extension.
+///
+/// enum Optional<Wrapped> where Wrapped: ~Copyable {}
+///
+/// extension Optional {}
+///   --> isConstrainedExtension(): true
+///   --> isWrittenWithConstraints(): false
+///
+/// extension Optional where Wrapped: ~Copyable {}
+///   --> isConstrainedExtension(): false
+///   --> isWrittenWithConstraints(): true
 bool ExtensionDecl::isWrittenWithConstraints() const {
   auto nominal = getExtendedNominal();
   if (!nominal)
     return false;
 
-  // If there's no generic signature, then it's written without constraints.
+  // If there's no generic signature, then it's unconstrained.
   CanGenericSignature extSig = getGenericSignature().getCanonicalSignature();
   if (!extSig)
     return false;
@@ -1808,37 +1824,18 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   SmallVector<InverseRequirement, 2> typeInverseReqs;
   typeSig->getRequirementsWithInverses(typeReqs, typeInverseReqs);
 
-  // If the (non-inverse) requirements are different between the extension and
+  // If the non-inverse requirements are different between the extension and
   // the original type, it's written with constraints.
-  if (extReqs.size() != typeReqs.size()) {
+  if (extReqs != typeReqs)
     return true;
-  }
 
-  // In case of equal number of constraints, we have to check the specific
-  // requirements. Extensions can end up with fewer requirements than the type
-  // extended, due to a same-type requirement in the extension.
-  //
-  // This mirrors the 'same' check in `ASTMangler::gatherGenericSignatureParts`
-  for (size_t i = 0; i < extReqs.size(); i++) {
-    if (extReqs[i] != typeReqs[i])
-      return true;
-  }
+  // If the extension has inverse requirements, then it's written with
+  // constraints.
+  if (!extInverseReqs.empty())
+    return true;
 
-  // If the type has no inverse requirements, there are no extra constraints
-  // to write.
-  if (typeInverseReqs.empty()) {
-    assert(extInverseReqs.empty() && "extension retroactively added inverse?");
-    return false;
-  }
-
-  // If the extension has no inverse requirements, then there are no constraints
-  // that need to be written down.
-  if (extInverseReqs.empty()) {
-    return false;
-  }
-
-  // We have inverses that need to be written out.
-  return true;
+  // Otherwise, the extension is written as an unconstrained extension.
+  return false;
 }
 
 bool ExtensionDecl::isInSameDefiningModule() const {
