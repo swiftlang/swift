@@ -1170,8 +1170,8 @@ static ManagedValue emitCBridgedToNativeValue(
               .getAsSingleValue(SGF, loc);
     
     // Convert to the marker existential if necessary.
-    auto anyType = SGF.getASTContext().getAnyExistentialType();
-    if (nativeType != anyType) {
+    if (!v.isInContext()) {
+      auto anyType = SGF.getASTContext().getAnyExistentialType();
       v = SGF.emitTransformedValue(loc, v, anyType, nativeType);
     }
 
