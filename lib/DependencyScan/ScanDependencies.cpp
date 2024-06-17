@@ -579,54 +579,26 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
   }
 }
 
-static swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
-    const SourceManager &SM,
-    const DependencyScanDiagnosticCollector *diagnosticCollector) {
-  auto collectedDiagnostics = diagnosticCollector->getDiagnostics();
-  auto numDiagnostics = collectedDiagnostics.size();
-  swiftscan_diagnostic_set_t *diagnosticOutput = new swiftscan_diagnostic_set_t;
-  diagnosticOutput->count = numDiagnostics;
-  diagnosticOutput->diagnostics =
-      new swiftscan_diagnostic_info_t[numDiagnostics];
-  for (size_t i = 0; i < numDiagnostics; ++i) {
-    const auto &Diagnostic = collectedDiagnostics[i];
-    swiftscan_diagnostic_info_s *diagnosticInfo =
-        new swiftscan_diagnostic_info_s;
-    diagnosticInfo->message =
-        swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
-    switch (Diagnostic.Severity) {
-    case llvm::SourceMgr::DK_Error:
-      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR;
-      break;
-    case llvm::SourceMgr::DK_Warning:
-      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING;
-      break;
-    case llvm::SourceMgr::DK_Note:
-      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE;
-      break;
-    case llvm::SourceMgr::DK_Remark:
-      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK;
-      break;
-    }
-
-    if (Diagnostic.ImportLocation.has_value()) {
-      auto importLocation = Diagnostic.ImportLocation.value();
-      swiftscan_source_location_s *sourceLoc = new swiftscan_source_location_s;
-      if (importLocation.bufferIdentifier.empty())
-        sourceLoc->buffer_identifier = swift::c_string_utils::create_null();
-      else
-        sourceLoc->buffer_identifier = swift::c_string_utils::create_clone(
-            importLocation.bufferIdentifier.c_str());
-      sourceLoc->line_number = importLocation.lineNumber;
-      sourceLoc->column_number = importLocation.columnNumber;
-      diagnosticInfo->source_location = sourceLoc;
-    } else {
-      diagnosticInfo->source_location = nullptr;
-    }
-
-    diagnosticOutput->diagnostics[i] = diagnosticInfo;
+static swiftscan_macro_dependency_set_t *createMacroDependencySet(
+    const std::map<std::string, MacroPluginDependency> &macroDeps) {
+  swiftscan_macro_dependency_set_t *set = new swiftscan_macro_dependency_set_t;
+  if (macroDeps.empty()) {
+    set->count = 0;
+    set->macro_dependencies = nullptr;
+    return set;
   }
-  return diagnosticOutput;
+  set->count = macroDeps.size();
+  set->macro_dependencies = new swiftscan_macro_dependency_t[set->count];
+  unsigned SI = 0;
+  for (auto &entry : macroDeps) {
+    set->macro_dependencies[SI] = new swiftscan_macro_dependency_s;
+    set->macro_dependencies[SI]->moduleName = create_clone(entry.first.c_str());
+    set->macro_dependencies[SI]->libraryPath =
+        create_clone(entry.second.LibraryPath.c_str());
+    set->macro_dependencies[SI]->executablePath =
+        create_clone(entry.second.ExecutablePath.c_str());
+  }
+  return set;
 }
 
 static swiftscan_dependency_graph_t
@@ -811,8 +783,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
   result->dependencies = dependencySet;
   result->diagnostics =
               diagnosticCollector
-              ? mapCollectedDiagnosticsForOutput(instance.getSourceMgr(),
-                                                 diagnosticCollector)
+              ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
               : nullptr;
   return result;
 }
@@ -1484,13 +1455,11 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance,
   importSet->imports = create_set(importIdentifiers);
   importSet->diagnostics =
       diagnosticCollector
-          ? mapCollectedDiagnosticsForOutput(instance.getSourceMgr(),
-                                             diagnosticCollector)
+          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
           : nullptr;
   importSet->diagnostics =
       diagnosticCollector
-          ? mapCollectedDiagnosticsForOutput(instance.getSourceMgr(),
-                                             diagnosticCollector)
+          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
           : nullptr;
   return importSet;
 }
