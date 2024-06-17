@@ -68,7 +68,7 @@ import Swift
 @_unsafeInheritExecutor
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
-  of childTaskResultType: ChildTaskResult.Type,
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
@@ -171,7 +171,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 @_unsafeInheritExecutor
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
-  of childTaskResultType: ChildTaskResult.Type,
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
 ) async rethrows -> GroupResult {
