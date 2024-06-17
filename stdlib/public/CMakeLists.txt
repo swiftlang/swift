@@ -148,6 +148,10 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       "Enable build of the embedded Swift standard library and runtime"
       TRUE)
 
+option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
+      "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
+      FALSE)
+
 # Temporarily, by default only build embedded stdlib when building the compiler, to
 # unblock CI jobs that run against old(er) toolchains.
 option(SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER
@@ -163,8 +167,9 @@ elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 endif()
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  set(EMBEDDED_STDLIB_TARGET_TRIPLES)
+set(EMBEDDED_STDLIB_TARGET_TRIPLES)
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       # arch    module_name               target triple
@@ -218,7 +223,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
     )
   endif()
+endif()
 
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
       "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
