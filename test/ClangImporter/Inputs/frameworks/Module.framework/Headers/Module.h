@@ -3,7 +3,9 @@
 #define MODULE_H
 const char *getModuleVersion(void);
 
-@interface Module
+@interface ModuleRoot @end
+
+@interface Module : ModuleRoot
 +(const char *)version; // retrieve module version
 +alloc;
 @end

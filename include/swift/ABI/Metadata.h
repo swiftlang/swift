@@ -297,7 +297,6 @@ public:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
-    case MetadataKind::ForeignReferenceType:
       return true;
 
     default:

@@ -42,6 +42,7 @@ namespace swift {
     llvm::VersionTuple UserModuleVersion;
     std::set<std::string> AllowableClients;
     std::string SDKName;
+    std::string SDKVersion;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;

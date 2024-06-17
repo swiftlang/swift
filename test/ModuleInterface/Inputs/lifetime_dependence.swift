@@ -1,8 +1,7 @@
 public struct AnotherView : ~Escapable {
   @usableFromInline let _ptr: UnsafeRawBufferPointer
   @usableFromInline let _count: Int
-  @_unsafeNonescapableResult
-  internal init(_ ptr: UnsafeRawBufferPointer, _ count: Int) {
+  internal init(_ ptr: UnsafeRawBufferPointer, _ count: Int) -> dependsOn(ptr) Self {
     self._ptr = ptr
     self._count = count
   }
@@ -11,9 +10,8 @@ public struct AnotherView : ~Escapable {
 public struct BufferView : ~Escapable {
   @usableFromInline let _ptr: UnsafeRawBufferPointer
   @usableFromInline let _count: Int
-  @_unsafeNonescapableResult
   @usableFromInline 
-  internal init(_ ptr: UnsafeRawBufferPointer, _ count: Int) {
+  internal init(_ ptr: UnsafeRawBufferPointer, _ count: Int) -> dependsOn(ptr) Self  {
     self._ptr = ptr
     self._count = count
   }

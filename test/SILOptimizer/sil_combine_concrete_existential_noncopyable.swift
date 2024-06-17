@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 protocol P: ~Copyable {}
 

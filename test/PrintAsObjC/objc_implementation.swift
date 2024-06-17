@@ -2,6 +2,9 @@
 
 // REQUIRES: objc_interop
 
+// Temporarily disable on arm64e (rdar://127675057)
+// UNSUPPORTED: CPU=arm64e
+
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
@@ -11,8 +14,8 @@
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -enable-experimental-feature CImplementation -I %S/Inputs/custom-modules -import-underlying-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/objc_implementation.swiftmodule -typecheck -enable-experimental-feature CImplementation -I %S/Inputs/custom-modules -emit-objc-header-path %t/objc_implementation-Swift.h -import-underlying-module -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -enable-experimental-feature CImplementation -I %S/Inputs/custom-modules -import-underlying-module -o %t %s -disable-objc-attr-requires-foundation-module -target %target-stable-abi-triple
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/objc_implementation.swiftmodule -typecheck -enable-experimental-feature CImplementation -I %S/Inputs/custom-modules -emit-objc-header-path %t/objc_implementation-Swift.h -import-underlying-module -disable-objc-attr-requires-foundation-module -target %target-stable-abi-triple
 // RUN: %FileCheck %s --input-file %t/objc_implementation-Swift.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s --input-file %t/objc_implementation-Swift.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/objc_implementation-Swift.h

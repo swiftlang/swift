@@ -21,6 +21,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar127008956
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -90,12 +91,7 @@ func TestHashableEquals<T: Equatable>(_ e1: T, _ e2: T) {
 // This has not always been true for Equatable value types
 func TestEquatableEquals<T: Equatable>(_ e1: T, _ e2: T) {
   if e1 == e2 {
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-    // Legacy: Swift Equatable is not used in ObjC
-    TestSwiftValueNSObjectNotEquals(e1 as AnyObject, e2 as AnyObject)
-#else
     TestSwiftValueNSObjectEquals(e1 as AnyObject, e2 as AnyObject)
-#endif
   } else {
     TestSwiftValueNSObjectNotEquals(e1 as AnyObject, e2 as AnyObject)
   }
@@ -114,14 +110,8 @@ func TestHashable<T: Hashable>(_ h: T)
 // Test Obj-C hashValue for Swift types that are Equatable but not Hashable
 func TestEquatableHash<T: Equatable>(_ e: T)
 {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-  // Legacy behavior used the pointer value, which is
-  // incompatible with user-defined equality.
-  TestSwiftValueNSObjectDefaultHashValue(e as AnyObject)
-#else
   // New behavior uses a constant hash value in this case
   TestSwiftValueNSObjectHashValue(e as AnyObject, 1)
-#endif
 }
 
 func TestNonEquatableHash<T>(_ e: T)

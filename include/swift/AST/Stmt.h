@@ -709,9 +709,13 @@ public:
   }
 
   /// Whether or not this conditional stmt rebinds self with a `let self`
-  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
-  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
-  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
+  /// or `let self = self` condition.
+  ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
+  ///    RHS of the self condition references a var defined in a capture list.
+  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+  ///    the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
+                   bool requireLoadExpr = false) const;
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
@@ -817,9 +821,13 @@ public:
   StmtCondition *getCondPointer() { return &Cond; }
 
   /// Whether or not this conditional stmt rebinds self with a `let self`
-  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
-  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
-  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
+  /// or `let self = self` condition.
+  ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
+  ///    RHS of the self condition references a var defined in a capture list.
+  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+  ///    the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
+                   bool requireLoadExpr = false) const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
@@ -1297,7 +1305,9 @@ public:
   SourceLoc getStartLoc() const {
     if (UnknownAttrLoc.isValid())
       return UnknownAttrLoc;
-    return getLoc();
+    if (ItemIntroducerLoc.isValid())
+      return ItemIntroducerLoc;
+    return getBody()->getStartLoc();
   }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
 

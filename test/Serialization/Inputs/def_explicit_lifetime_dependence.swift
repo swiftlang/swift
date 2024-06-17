@@ -1,16 +1,14 @@
 public struct AnotherView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
-  public init(_ ptr: UnsafeRawBufferPointer) {
+  public init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
 }
 
 public struct BufferView : ~Escapable {
   public let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
   @inlinable
-  public init(_ ptr: UnsafeRawBufferPointer) {
+  public init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
   public init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> dependsOn(a) Self {
@@ -29,8 +27,7 @@ public struct BufferView : ~Escapable {
 
 public struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
-  @_unsafeNonescapableResult
-  public init(_ ptr: UnsafeMutableRawBufferPointer) {
+  public init(_ ptr: UnsafeMutableRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
 }
@@ -71,3 +68,16 @@ public struct Wrapper : ~Escapable {
     }
   }
 }
+
+public enum FakeOptional<Wrapped: ~Escapable>: ~Escapable {
+  case none, some(Wrapped)
+}
+
+extension FakeOptional: Escapable where Wrapped: Escapable {}
+
+extension FakeOptional where Wrapped: ~Escapable {
+  public init(_ nilLiteral: ()) -> dependsOn(immortal) Self {
+    self = .none
+  }
+}
+

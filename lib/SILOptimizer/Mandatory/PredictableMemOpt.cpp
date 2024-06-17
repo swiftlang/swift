@@ -2673,10 +2673,12 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     // Lexical enums can have incomplete lifetimes in non payload paths that
     // don't end in unreachable. Force their lifetime to end immediately after
     // the last use instead.
-    bool forceBoundaryCompletion = v->getType().isOrHasEnum();
+    auto boundary = v->getType().isOrHasEnum()
+                        ? OSSALifetimeCompletion::Boundary::Liveness
+                        : OSSALifetimeCompletion::Boundary::Availability;
     LLVM_DEBUG(llvm::dbgs() << "Completing lifetime of: ");
     LLVM_DEBUG(v->dump());
-    completion.completeOSSALifetime(v, forceBoundaryCompletion);
+    completion.completeOSSALifetime(v, boundary);
   }
 
   return true;

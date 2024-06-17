@@ -646,7 +646,7 @@ void importer::getNormalInvocationArguments(
     // using Glibc or a libc that respects that flag. This will cause some
     // source breakage however (specifically with strerror_r()) on Linux
     // without a workaround.
-    if (triple.isOSFuchsia() || triple.isAndroid()) {
+    if (triple.isOSFuchsia() || triple.isAndroid() || triple.isMusl()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
       invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -679,6 +679,8 @@ void importer::getNormalInvocationArguments(
   // is supported.
   if (LangOpts.hasFeature(Feature::TransferringArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_TRANSFERRING=1");
+  if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
+    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
 
   if (searchPathOpts.getSDKPath().empty()) {
     invocationArgStrs.push_back("-Xclang");
@@ -1214,7 +1216,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     ClangImporter *importer, const ClangImporterOptions &importerOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-    std::vector<std::string> &CC1Args) {
+    const std::vector<std::string> &CC1Args) {
   std::vector<const char *> invocationArgs;
   invocationArgs.reserve(CC1Args.size());
   llvm::for_each(CC1Args, [&](const std::string &Arg) {
@@ -1686,11 +1688,24 @@ bool ClangImporter::Implementation::importHeader(
 
   // We can't do this as we're parsing because we may want to resolve naming
   // conflicts between the things we've parsed.
-  for (auto group : allParsedDecls)
-    for (auto *D : group)
-      if (auto named = dyn_cast<clang::NamedDecl>(D))
-        addEntryToLookupTable(*BridgingHeaderLookupTable, named,
+
+  std::function<void(clang::Decl *)> visit = [&](clang::Decl *decl) {
+    // Iterate into extern "C" {} type declarations.
+    if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
+      for (auto *decl : linkageDecl->noload_decls()) {
+        visit(decl);
+      }
+    }
+    if (auto named = dyn_cast<clang::NamedDecl>(decl)) {
+      addEntryToLookupTable(*BridgingHeaderLookupTable, named,
                               getNameImporter());
+    }
+  };
+  for (auto group : allParsedDecls) {
+    for (auto *D : group) {
+      visit(D);
+    }
+  }
 
   pp.EndSourceFile();
   bumpGeneration();
@@ -2105,7 +2120,8 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
-static llvm::VersionTuple getCurrentVersionFromTBD(StringRef path,
+static llvm::VersionTuple getCurrentVersionFromTBD(llvm::vfs::FileSystem &FS,
+                                                   StringRef path,
                                                    StringRef moduleName) {
   std::string fwName = (moduleName + ".framework").str();
   auto pos = path.find(fwName);
@@ -2115,7 +2131,7 @@ static llvm::VersionTuple getCurrentVersionFromTBD(StringRef path,
   llvm::sys::path::append(buffer, moduleName + ".tbd");
   auto tbdPath = buffer.str();
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> tbdBufOrErr =
-      llvm::MemoryBuffer::getFile(tbdPath);
+      FS.getBufferForFile(tbdPath);
   // .tbd file doesn't exist, exit.
   if (!tbdBufOrErr)
     return {};
@@ -2178,8 +2194,8 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
 
   // Look for the .tbd file inside .framework dir to get the project version
   // number.
-  llvm::VersionTuple currentVersion =
-      getCurrentVersionFromTBD(path, topModule.Item.str());
+  llvm::VersionTuple currentVersion = getCurrentVersionFromTBD(
+      Impl.Instance->getVirtualFileSystem(), path, topModule.Item.str());
   versionInfo->setVersion(currentVersion,
                           ModuleVersionSourceKind::ClangModuleTBD);
   return true;
@@ -5784,16 +5800,9 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     auto oldContext = var->getDeclContext();
     auto oldTypeDecl = oldContext->getSelfNominalTypeDecl();
-    // If the base type is non-copyable, and non-copyable generics are disabled,
-    // we cannot synthesize the accessor, because its implementation would use
-    // `UnsafePointer<BaseTy>`.
-    // We cannot use `ty->isNoncopyable()` here because that would create a
-    // cyclic dependency between ModuleQualifiedLookupRequest and
-    // LookupConformanceInModuleRequest, so we check for the presence of
-    // move-only attribute that is implicitly added to non-copyable C++ types by
-    // ClangImporter.
+    // FIXME: this is a workaround for rdar://128013193
     if (oldTypeDecl->getAttrs().hasAttribute<MoveOnlyAttr>() &&
-        !context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+        context.LangOpts.CxxInteropUseOpaquePointerForMoveOnly)
       return nullptr;
 
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
@@ -5969,26 +5978,6 @@ struct OrderDecls {
 };
 }
 
-Identifier ExtensionDecl::getObjCCategoryName() const {
-  // Could it be an imported category?
-  if (!hasClangNode())
-    // Nope, not imported.
-    return Identifier();
-
-  auto category = dyn_cast<clang::ObjCCategoryDecl>(getClangDecl());
-  if (!category)
-    // Nope, not a category.
-    return Identifier();
-
-  // We'll look for an implementation with this category name.
-  auto clangCategoryName = category->getName();
-  if (clangCategoryName.empty())
-    // Class extension (has an empty name).
-    return Identifier();
-  
-  return getASTContext().getIdentifier(clangCategoryName);
-}
-
 static ObjCInterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
                 llvm::TinyPtrVector<Decl *> &impls,
@@ -6002,16 +5991,35 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
       auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
-      attr->setCategoryNameInvalid();
+      attr->setInvalid();
 
-      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
-                     categoryName, diagnoseOn)
-        .fixItRemove(attr->getRangeWithAt());
-      diags.diagnose(impls.front(), diag::previous_objc_implementation);
+      // @objc @implementations for categories are diagnosed as category
+      // conflicts, so we're only concerned with main class bodies and
+      // non-category implementations here.
+      if (categoryName.empty() || !isa<ExtensionDecl>(impls.front())) {
+        diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
+                       diagnoseOn)
+          .fixItRemove(attr->getRangeWithAt());
+        diags.diagnose(impls.front(), diag::previous_objc_implementation);
+      }
     }
   }
 
   return ObjCInterfaceAndImplementation(interfaces, impls.front());
+}
+
+static bool isImplValid(ExtensionDecl *ext) {
+  auto attr = ext->getAttrs().getAttribute<ObjCImplementationAttr>();
+
+  if (!attr)
+    return false;
+
+  // Clients using the stable syntax shouldn't have a category name on the attr.
+  // This is diagnosed in AttributeChecker::visitObjCImplementationAttr().
+  if (!attr->isEarlyAdopter() && !attr->CategoryName.empty())
+    return false;
+  
+  return !attr->isCategoryNameInvalid();
 }
 
 static ObjCInterfaceAndImplementation
@@ -6028,16 +6036,11 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   Identifier categoryName;
 
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->hasClangNode()) {
-      // This is either an interface, or it's not objcImpl at all.
-      categoryName = ext->getObjCCategoryName();
-    } else {
-      // This is either the implementation, or it's not objcImpl at all.
-      if (auto name = ext->getCategoryNameForObjCImplementation())
-        categoryName = *name;
-      else
-        return {};
-    }
+    assert(ext);
+    if (!ext->hasClangNode() && !isImplValid(ext))
+      return {};
+
+    categoryName = ext->getObjCCategoryName();
   } else {
     // Must be an imported class. Look for its main implementation.
     assert(isa_and_nonnull<ClassDecl>(dc));
@@ -6051,7 +6054,8 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   llvm::TinyPtrVector<Decl *> implDecls;
   for (ExtensionDecl *ext : classDecl->getExtensions()) {
     if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == categoryName)
+          && ext->getObjCCategoryName() == categoryName
+          && isImplValid(ext))
       implDecls.push_back(ext);
   }
 
@@ -6157,15 +6161,15 @@ evaluate(Evaluator &evaluator, Decl *decl) const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ObjCInterfaceAndImplementation &pair) {
-  if (!pair) {
+  if (pair.empty()) {
     out << "no clang interface or @_objcImplementation";
     return;
   }
 
-  out << "clang interface ";
-  simple_display(out, pair.interfaceDecls);
-  out << " with @_objcImplementation ";
+  out << "@implementation ";
   simple_display(out, pair.implementationDecl);
+  out << " matches clang interfaces ";
+  simple_display(out, pair.interfaceDecls);
 }
 
 SourceLoc
@@ -6181,7 +6185,8 @@ llvm::TinyPtrVector<Decl *> Decl::getAllImplementedObjCDecls() const {
     return {};
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {}).interfaceDecls;
+  auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return result.interfaceDecls;
 }
 
 DeclContext *DeclContext::getImplementedObjCContext() const {
@@ -6197,8 +6202,8 @@ Decl *Decl::getObjCImplementationDecl() const {
     return nullptr;
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {})
-             .implementationDecl;
+  auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return result.implementationDecl;
 }
 
 llvm::TinyPtrVector<Decl *>
@@ -7886,14 +7891,20 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
 }
 
 bool importer::isCxxStdModule(const clang::Module *module) {
-  if (module->getTopLevelModuleName() == "std")
+  return isCxxStdModule(module->getTopLevelModuleName(),
+                        module->getTopLevelModule()->IsSystem);
+}
+
+bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
+  if (moduleName == "std")
     return true;
   // In recent libc++ versions the module is split into multiple top-level
   // modules (std_vector, std_utility, etc).
-  if (module->getTopLevelModule()->IsSystem &&
-      module->getTopLevelModuleName().starts_with("std_"))
+  if (IsSystem && moduleName.starts_with("std_")) {
+    if (moduleName == "std_errno_h")
+      return false;
     return true;
-
+  }
   return false;
 }
 

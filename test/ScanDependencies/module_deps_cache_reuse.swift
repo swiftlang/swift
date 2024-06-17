@@ -94,6 +94,8 @@ import SubE
 // CHECK-DAG:   "swift": "Swift"
 // CHECK-DAG:   "swift": "SwiftOnoneSupport"
 // CHECK: ],
+// CHECK-NEXT: "linkLibraries": [
+// CHECK-NEXT: ],
 // CHECK-NEXT: "details": {
 
 // CHECK: "commandLine": [

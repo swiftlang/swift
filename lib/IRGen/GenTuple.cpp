@@ -523,7 +523,7 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
     auto *bitwiseCopyableProtocol =
         IGM.getSwiftModule()->getASTContext().getProtocol(
             KnownProtocolKind::BitwiseCopyable);
-    if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
+    if (bitwiseCopyableProtocol && IGM.getSwiftModule()->checkConformance(
                                        tuple, bitwiseCopyableProtocol)) {
       return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, IsABIAccessible);
     }

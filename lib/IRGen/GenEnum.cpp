@@ -2668,7 +2668,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongRetain(IGF, e, IGF.getDefaultAtomicity());
+          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRetain(
+              IGF, e, /*needsNullCheck*/ true);
           return;
         }
 
@@ -2704,7 +2705,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongRelease(IGF, e, IGF.getDefaultAtomicity());
+          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRelease(
+              IGF, e, /*needsNullCheck*/ true);
           return;
         }
 
@@ -7303,17 +7305,19 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
+  auto cp = !theEnum->canBeCopyable()
+    ? IsNotCopyable : IsCopyable;
   auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   auto *bitwiseCopyableProtocol =
       IGM.getSwiftModule()->getASTContext().getProtocol(
           KnownProtocolKind::BitwiseCopyable);
   if (bitwiseCopyableProtocol &&
-      IGM.getSwiftModule()->lookupConformance(
-          theEnum->getDeclaredInterfaceType(), bitwiseCopyableProtocol)) {
+      IGM.getSwiftModule()->checkConformance(Type.getASTType(),
+                                             bitwiseCopyableProtocol)) {
     return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
   }
   return registerEnumTypeInfo(
-                       new ResilientEnumTypeInfo(*this, enumTy, Copyable,
+                       new ResilientEnumTypeInfo(*this, enumTy, cp,
                                                  abiAccessible));
 }
 

@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend \
 // RUN:    -emit-ir %s -swift-version 5 \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -module-name existential_shape_metadata | %IRGenFileCheck %s
 

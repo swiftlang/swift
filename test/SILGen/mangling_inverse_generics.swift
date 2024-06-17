@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   > %t/test.silgen
@@ -146,7 +145,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
 }
 
-extension A: Copyable {}
+extension A: Copyable where T: Copyable {}
 
 // <T: ~Copyable>
 extension A where T: ~Copyable {

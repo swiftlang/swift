@@ -66,6 +66,9 @@ class ModuleFileSharedCore {
   /// The canonical name of the SDK the module was built with.
   StringRef SDKName;
 
+  /// Version string of the SDK against which the module was built.
+  StringRef SDKVersion;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.
@@ -603,6 +606,21 @@ public:
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
+  }
+
+  /// Returns the list of modules this module depends on.
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return LinkLibraries;
+  }
+
+  /// Does this module correspond to a framework.
+  bool isFramework() const {
+    return Bits.IsFramework;
+  }
+
+  /// Does this module correspond to a static archive.
+  bool isStaticLibrary() const {
+    return Bits.IsStaticLibrary;
   }
 
   /// Returns \c true if this module file contains a section with incremental

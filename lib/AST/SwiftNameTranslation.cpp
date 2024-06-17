@@ -215,6 +215,8 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
     return {Unsupported, UnrepresentableObjC};
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
+  if (isa<MacroDecl>(VD))
+    return {Unsupported, UnrepresentableMacro};
   GenericSignature genericSignature;
   // Don't expose @_alwaysEmitIntoClient decls as they require their
   // bodies to be emitted into client.
@@ -382,5 +384,7 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_move_only_to_cxx, vd);
   case UnrepresentableNested:
     return Diagnostic(diag::expose_nested_type_to_cxx, vd);
+  case UnrepresentableMacro:
+    return Diagnostic(diag::expose_macro_to_cxx, vd);
   }
 }

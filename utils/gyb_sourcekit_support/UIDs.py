@@ -116,6 +116,7 @@ UID_KEYS = [
     KEY('Introduced', 'key.introduced'),
     KEY('Deprecated', 'key.deprecated'),
     KEY('Obsoleted', 'key.obsoleted'),
+    KEY('CancelBuilds', 'key.cancel_builds'),
     KEY('RemoveCache', 'key.removecache'),
     KEY('TypeUsr', 'key.typeusr'),
     KEY('ContainerTypeUsr', 'key.containertypeusr'),

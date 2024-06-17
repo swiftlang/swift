@@ -9,11 +9,11 @@
 @_section("__DATA,__mysection") public var g3: Bool = true
 @_section("__DATA,__mysection") var g4: UnsafeMutablePointer<Int>? = nil
 @_section("__DATA,__mysection") var g5: UnsafeMutablePointer<Int>? = UnsafeMutablePointer(bitPattern: 0x42424242)
-@_section("__TEXT,__mysection") func foo() {}
+@_section("__TEXT,__mysection") @_used func foo() {}
 
 struct MyStruct {
 	@_section("__DATA,__mysection") static var static0: Int = 1
-	@_section("__TEXT,__mysection") func foo() {}
+	@_section("__TEXT,__mysection") @_used func foo() {}
 }
 
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g0: Int { get set }
@@ -22,10 +22,10 @@ struct MyStruct {
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue public var g3: Bool { get set }
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g4: UnsafeMutablePointer<Int>? { get set }
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g5: UnsafeMutablePointer<Int>? { get set }
-// SIL: @_section("__TEXT,__mysection") func foo()
+// SIL: @_section("__TEXT,__mysection") @_used func foo()
 // SIL: struct MyStruct {
 // SIL:   @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue static var static0: Int { get set }
-// SIL:   @_section("__TEXT,__mysection") func foo()
+// SIL:   @_section("__TEXT,__mysection") @_used func foo()
 
 // SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g0Sivau : $@convention(thin)
@@ -39,10 +39,10 @@ struct MyStruct {
 // SIL: sil hidden [global_init] @$s7section2g4SpySiGSgvau : $@convention(thin)
 // SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g5_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g5SpySiGSgvau : $@convention(thin)
-// SIL: sil hidden [section "__TEXT,__mysection"] @$s7section3fooyyF : $@convention(thin)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section3fooyyF : $@convention(thin)
 // SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section8MyStructV7static0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section8MyStructV7static0Sivau : $@convention(thin)
-// SIL: sil hidden [section "__TEXT,__mysection"] @$s7section8MyStructV3fooyyF : $@convention(method)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section8MyStructV3fooyyF : $@convention(method)
 
 // IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ {{(i64|i32)}} 42 }>, %TSi <{ {{(i64|i32)}} 43 }> }>, section "__DATA,__mysection"

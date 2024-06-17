@@ -69,20 +69,51 @@ getDiagnosticBehaviorLimitForValue(SILValue value) {
     return {};
 
   auto *fromDC = declRef.getInnermostDeclContext();
-  auto attributedImport = nom->findImport(fromDC);
-  if (!attributedImport ||
-      !attributedImport->options.contains(ImportFlags::Preconcurrency))
+  return getConcurrencyDiagnosticBehaviorLimit(nom, fromDC);
+}
+
+static std::optional<SILDeclRef> getDeclRefForCallee(SILInstruction *inst) {
+  auto fas = FullApplySite::isa(inst);
+  if (!fas)
     return {};
 
-  if (auto *sourceFile = fromDC->getParentSourceFile())
-    sourceFile->setImportUsedPreconcurrency(*attributedImport);
+  SILValue calleeOrigin = fas.getCalleeOrigin();
 
-  if (hasExplicitSendableConformance(nom))
-    return DiagnosticBehavior::Warning;
+  while (true) {
+    // Intentionally don't lookup through dynamic_function_ref and
+    // previous_dynamic_function_ref as the target of those functions is not
+    // statically known.
+    if (auto *fri = dyn_cast<FunctionRefInst>(calleeOrigin)) {
+      if (auto *callee = fri->getReferencedFunctionOrNull()) {
+        if (auto declRef = callee->getDeclRef())
+          return declRef;
+      }
+    }
 
-  return attributedImport->module.importedModule->isConcurrencyChecked()
-             ? DiagnosticBehavior::Warning
-             : DiagnosticBehavior::Ignore;
+    if (auto *mi = dyn_cast<MethodInst>(calleeOrigin)) {
+      return mi->getMember();
+    }
+
+    if (auto *pai = dyn_cast<PartialApplyInst>(calleeOrigin)) {
+      calleeOrigin = pai->getCalleeOrigin();
+      continue;
+    }
+
+    return {};
+  }
+}
+
+static std::optional<std::pair<DescriptiveDeclKind, DeclName>>
+getTransferringApplyCalleeInfo(SILInstruction *inst) {
+  auto declRef = getDeclRefForCallee(inst);
+  if (!declRef)
+    return {};
+
+  auto *decl = declRef->getDecl();
+  if (!decl->hasName())
+    return {};
+
+  return {{decl->getDescriptiveKind(), decl->getName()}};
 }
 
 static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
@@ -407,17 +438,17 @@ struct TransferredNonTransferrableInfo {
   ///
   /// This is equal to the merge of the IsolationRegionInfo from all elements in
   /// nonTransferrable's region when the error was diagnosed.
-  SILIsolationInfo isolationRegionInfo;
+  SILDynamicMergedIsolationInfo isolationRegionInfo;
 
-  TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILValue nonTransferrableValue,
-                                  SILIsolationInfo isolationRegionInfo)
+  TransferredNonTransferrableInfo(
+      Operand *transferredOperand, SILValue nonTransferrableValue,
+      SILDynamicMergedIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableValue),
         isolationRegionInfo(isolationRegionInfo) {}
-  TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILInstruction *nonTransferrableInst,
-                                  SILIsolationInfo isolationRegionInfo)
+  TransferredNonTransferrableInfo(
+      Operand *transferredOperand, SILInstruction *nonTransferrableInst,
+      SILDynamicMergedIsolationInfo isolationRegionInfo)
       : transferredOperand(transferredOperand),
         nonTransferrable(nonTransferrableInst),
         isolationRegionInfo(isolationRegionInfo) {}
@@ -472,6 +503,12 @@ public:
     return getDiagnosticBehaviorLimitForValue(transferOp->get());
   }
 
+  /// If we can find a callee decl name, return that. None otherwise.
+  std::optional<std::pair<DescriptiveDeclKind, DeclName>>
+  getTransferringCalleeInfo() const {
+    return getTransferringApplyCalleeInfo(transferOp->getUser());
+  }
+
   void
   emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
                                   SILIsolationInfo namedValuesIsolationInfo,
@@ -485,13 +522,55 @@ public:
     // Then emit the note with greater context.
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      namedValuesIsolationInfo.printForDiagnostics(os);
+      if (!namedValuesIsolationInfo.isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        namedValuesIsolationInfo.printForDiagnostics(os);
+        os << ' ';
+      }
     }
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc,
+          diag::regionbasedisolation_named_info_transfer_yields_race_callee,
+          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+          calleeInfo->first, calleeInfo->second,
+          isolationCrossing.getCallerIsolation());
+    } else {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_named_info_transfer_yields_race, name,
+          descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+          isolationCrossing.getCallerIsolation());
+    }
+    emitRequireInstDiagnostics();
+  }
+
+  void
+  emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
+                                  SILIsolationInfo namedValuesIsolationInfo,
+                                  ApplyIsolationCrossing isolationCrossing,
+                                  DeclName calleeDeclName,
+                                  DescriptiveDeclKind calleeDeclKind) {
+    // Emit the short error.
+    diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
+                  name)
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+
+    // Then emit the note with greater context.
+    SmallString<64> descriptiveKindStr;
+    {
+      if (!namedValuesIsolationInfo.isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        namedValuesIsolationInfo.printForDiagnostics(os);
+        os << ' ';
+      }
+    }
+
     diagnoseNote(
-        loc, diag::regionbasedisolation_named_info_transfer_yields_race, name,
-        descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-        isolationCrossing.getCallerIsolation());
+        loc, diag::regionbasedisolation_named_info_transfer_yields_race_callee,
+        name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
+        calleeDeclKind, calleeDeclName, isolationCrossing.getCallerIsolation());
     emitRequireInstDiagnostics();
   }
 
@@ -516,7 +595,8 @@ public:
 
     // Then emit the note with greater context.
     diagnoseNote(
-        loc, diag::regionbasedisolation_named_stronglytransferred_binding, name)
+        loc, diag::regionbasedisolation_named_value_used_after_explicit_sending,
+        name)
         .highlight(loc.getSourceRange());
 
     // Finally the require points.
@@ -557,8 +637,11 @@ public:
 
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      namedValuesIsolationInfo.printForDiagnostics(os);
+      if (!namedValuesIsolationInfo.isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        namedValuesIsolationInfo.printForDiagnostics(os);
+        os << ' ';
+      }
     }
 
     diagnoseNote(
@@ -711,7 +794,7 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
             VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
       diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
-          state.isolationInfo, std::get<2>(p));
+          state.isolationInfo.getIsolationInfo(), std::get<2>(p));
       continue;
     }
 
@@ -806,6 +889,38 @@ struct UseAfterTransferDiagnosticInferrer::AutoClosureWalker : ASTWalker {
             if (declRef->getDecl() == targetDecl) {
               // Found our target!
               visitedCallExprDeclRefExprs.insert(declRef);
+
+              // See if we can find a valueDecl/name for our callee so we can
+              // emit a nicer error.
+              ConcreteDeclRef concreteDecl =
+                  callExpr->getDirectCallee()->getReferencedDecl();
+
+              // If we do not find a direct one, see if we are calling a method
+              // on a nominal type.
+              if (!concreteDecl) {
+                if (auto *dot = dyn_cast<DotSyntaxCallExpr>(
+                        callExpr->getDirectCallee())) {
+                  concreteDecl = dot->getSemanticFn()->getReferencedDecl();
+                }
+              }
+
+              if (concreteDecl) {
+                auto *valueDecl = concreteDecl.getDecl();
+                assert(valueDecl &&
+                       "Should be non-null if concreteDecl is valid");
+                if (valueDecl->hasName()) {
+                  foundTypeInfo.diagnosticEmitter
+                      .emitNamedIsolationCrossingError(
+                          foundTypeInfo.baseLoc,
+                          targetDecl->getBaseIdentifier(),
+                          targetDeclIsolationInfo, *isolationCrossing,
+                          valueDecl->getName(),
+                          valueDecl->getDescriptiveKind());
+                  return Action::Continue(expr);
+                }
+              }
+
+              // Otherwise default back to the "callee" error.
               foundTypeInfo.diagnosticEmitter.emitNamedIsolationCrossingError(
                   foundTypeInfo.baseLoc, targetDecl->getBaseIdentifier(),
                   targetDeclIsolationInfo, *isolationCrossing);
@@ -826,7 +941,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
     assert(!fas.getArgumentConvention(*transferOp).isIndirectOutParameter() &&
            "We should never transfer an indirect out parameter");
     if (fas.getArgumentParameterInfo(*transferOp)
-            .hasOption(SILParameterInfo::Transferring)) {
+            .hasOption(SILParameterInfo::Sending)) {
 
       // First try to do the named diagnostic if we can find a name.
       if (auto rootValueAndName =
@@ -860,7 +975,8 @@ void UseAfterTransferDiagnosticInferrer::infer() {
             VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
       auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
-          baseLoc, rootValueAndName->first, state.isolationInfo,
+          baseLoc, rootValueAndName->first,
+          state.isolationInfo.getIsolationInfo(),
           *sourceApply->getIsolationCrossing());
     }
 
@@ -888,7 +1004,8 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   auto captureInfo =
       autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
   auto *captureDecl = captureInfo.getDecl();
-  AutoClosureWalker walker(*this, captureDecl, state.isolationInfo);
+  AutoClosureWalker walker(*this, captureDecl,
+                           state.isolationInfo.getIsolationInfo());
   autoClosureExpr->walk(walker);
 }
 
@@ -987,8 +1104,14 @@ public:
     return getDiagnosticBehaviorLimitForValue(info.transferredOperand->get());
   }
 
+  /// If we can find a callee decl name, return that. None otherwise.
+  std::optional<std::pair<DescriptiveDeclKind, DeclName>>
+  getTransferringCalleeInfo() const {
+    return getTransferringApplyCalleeInfo(info.transferredOperand->getUser());
+  }
+
   /// Return the isolation region info for \p getNonTransferrableValue().
-  SILIsolationInfo getIsolationRegionInfo() const {
+  SILDynamicMergedIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
   }
 
@@ -1013,8 +1136,7 @@ public:
       getIsolationRegionInfo().printForDiagnostics(os);
     }
     diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
-                  StringRef(descriptiveKindStr), type,
-                  crossing.getCalleeIsolation())
+                  descriptiveKindStr, type, crossing.getCalleeIsolation())
         .highlight(getOperand()->getUser()->getLoc().getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
   }
@@ -1024,8 +1146,11 @@ public:
     emitNamedOnlyError(loc, name);
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        getIsolationRegionInfo().printForDiagnostics(os);
+        os << ' ';
+      }
     }
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
@@ -1059,13 +1184,30 @@ public:
                           ApplyIsolationCrossing isolationCrossing) {
     emitNamedOnlyError(loc, name);
     SmallString<64> descriptiveKindStr;
+    SmallString<64> descriptiveKindStrWithSpace;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        {
+          llvm::raw_svector_ostream os(descriptiveKindStr);
+          getIsolationRegionInfo().printForDiagnostics(os);
+        }
+        descriptiveKindStrWithSpace = descriptiveKindStr;
+        descriptiveKindStrWithSpace.push_back(' ');
+      }
     }
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_transfer_non_transferrable, name,
-        descriptiveKindStr, isolationCrossing.getCalleeIsolation());
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc,
+          diag::regionbasedisolation_named_transfer_non_transferrable_callee,
+          name, descriptiveKindStrWithSpace,
+          isolationCrossing.getCalleeIsolation(), calleeInfo->first,
+          calleeInfo->second, descriptiveKindStr);
+    } else {
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_named_transfer_non_transferrable,
+                   name, descriptiveKindStrWithSpace,
+                   isolationCrossing.getCalleeIsolation(), descriptiveKindStr);
+    }
   }
 
   void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,
@@ -1073,24 +1215,34 @@ public:
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        llvm::raw_svector_ostream os(descriptiveKindStr);
+        getIsolationRegionInfo().printForDiagnostics(os);
+        os << ' ';
+      }
     }
-    auto diag =
-        diag::regionbasedisolation_named_transfer_into_transferring_param;
+    auto diag = diag::regionbasedisolation_named_transfer_into_sending_param;
     diagnoseNote(loc, diag, descriptiveKindStr, varName);
   }
 
   void emitNamedTransferringReturn(SILLocation loc, Identifier varName) {
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
+    SmallString<64> descriptiveKindStrWithSpace;
     {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      if (!getIsolationRegionInfo().isDisconnected()) {
+        {
+          llvm::raw_svector_ostream os(descriptiveKindStr);
+          getIsolationRegionInfo().printForDiagnostics(os);
+        }
+        descriptiveKindStrWithSpace = descriptiveKindStr;
+        descriptiveKindStrWithSpace.push_back(' ');
+      }
     }
     auto diag =
         diag::regionbasedisolation_named_notransfer_transfer_into_result;
-    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+    diagnoseNote(loc, diag, descriptiveKindStrWithSpace, varName,
+                 descriptiveKindStr);
   }
 
 private:
@@ -1199,7 +1351,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     // First see if we have a transferring argument.
     if (auto fas = FullApplySite::isa(op->getUser())) {
       if (fas.getArgumentParameterInfo(*op).hasOption(
-              SILParameterInfo::Transferring)) {
+              SILParameterInfo::Sending)) {
 
         // See if we can infer a name from the value.
         SmallString<64> resultingName;
@@ -1282,11 +1434,11 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   if (auto *ri = dyn_cast<ReturnInst>(op->getUser())) {
     auto fType = ri->getFunction()->getLoweredFunctionType();
     if (fType->getNumResults() &&
-        fType->getResults()[0].hasOption(SILResultInfo::IsTransferring)) {
+        fType->getResults()[0].hasOption(SILResultInfo::IsSending)) {
       assert(llvm::all_of(fType->getResults(),
                           [](SILResultInfo resultInfo) {
                             return resultInfo.hasOption(
-                                SILResultInfo::IsTransferring);
+                                SILResultInfo::IsSending);
                           }) &&
              "All result info must be the same... if that changes... update "
              "this code!");
@@ -1299,7 +1451,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       assert(llvm::none_of(fType->getResults(),
                            [](SILResultInfo resultInfo) {
                              return resultInfo.hasOption(
-                                 SILResultInfo::IsTransferring);
+                                 SILResultInfo::IsSending);
                            }) &&
              "All result info must be the same... if that changes... update "
              "this code!");
@@ -1364,8 +1516,8 @@ struct DiagnosticEvaluator final
     if (auto *svi =
             dyn_cast<SingleValueInstruction>(partitionOp.getSourceInst())) {
       if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
-          !regionanalysisimpl::isNonSendableType(svi->getType(),
-                                                 svi->getFunction())) {
+          !SILIsolationInfo::isNonSendableType(svi->getType(),
+                                               svi->getFunction())) {
         bool isCapture = operandState.isClosureCaptured;
         if (!isCapture) {
           return;
@@ -1386,10 +1538,9 @@ struct DiagnosticEvaluator final
                                            partitionOp.getSourceInst());
   }
 
-  void
-  handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                 Element transferredVal,
-                                 SILIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &partitionOp, Element transferredVal,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1406,11 +1557,10 @@ struct DiagnosticEvaluator final
         partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
   }
 
-  void
-  handleTransferNonTransferrable(const PartitionOp &partitionOp,
-                                 Element transferredVal,
-                                 Element actualNonTransferrableValue,
-                                 SILIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(
+      const PartitionOp &partitionOp, Element transferredVal,
+      Element actualNonTransferrableValue,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
     LLVM_DEBUG(llvm::dbgs()
                    << "    Emitting TransferNonTransferrable Error!\n"
                    << "        ID:  %%" << transferredVal << "\n"
@@ -1450,6 +1600,11 @@ struct DiagnosticEvaluator final
     }
   }
 
+  void handleUnknownCodePattern(const PartitionOp &op) const {
+    diagnoseError(op.getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern);
+  }
+
   bool isActorDerived(Element element) const {
     return info->getValueMap().getIsolationRegion(element).isActorIsolated();
   }
@@ -1464,6 +1619,17 @@ struct DiagnosticEvaluator final
 
   SILIsolationInfo getIsolationRegionInfo(Element element) const {
     return info->getValueMap().getIsolationRegion(element);
+  }
+
+  std::optional<Element> getElement(SILValue value) const {
+    return info->getValueMap().getTrackableValue(value).getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .getRepresentative()
+        .maybeGetValue();
   }
 
   bool isClosureCaptured(Element element, Operand *op) const {

@@ -288,6 +288,10 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64", "arm64"])
 
+    LinuxStatic = Platform('linux-static', sdk_name='LINUX_STATIC', archs=[
+        'x86_64',
+        'aarch64'])
+
     OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
@@ -309,6 +313,7 @@ class StdlibDeploymentTarget(object):
         XROS, XROSSimulator,
         Freestanding,
         Linux,
+        LinuxStatic,
         FreeBSD,
         OpenBSD,
         Cygwin,

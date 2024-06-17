@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution %S/Inputs/exhaustive_switch_testable_helper.swift -emit-module -o %t
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -I %t
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-upcoming-feature NonfrozenEnumExhaustivity -I %t
 
 import exhaustive_switch_testable_helper
 

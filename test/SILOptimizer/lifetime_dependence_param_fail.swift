@@ -3,7 +3,6 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
@@ -13,8 +12,7 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
-  @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ c: Int) {
+  init(_ p: UnsafeRawPointer, _ c: Int) -> dependsOn(p) Self {
     self.p = p
     self.c = c
   }

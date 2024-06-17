@@ -237,6 +237,14 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
+  auto &attrs = nominal->getAttrs();
+  if (attrs.hasAttribute<SensitiveAttr>()) {
+    if (!isImplicit(check)) {
+      conformanceDecl->diagnose(diag::non_bitwise_copyable_type_sensitive);
+    }
+    return true;
+  }
+
   if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
           ->isNoncopyable()) {
     // Already separately diagnosed when explicit.

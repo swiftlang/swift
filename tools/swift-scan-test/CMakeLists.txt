@@ -9,4 +9,5 @@ add_swift_host_tool(swift-scan-test
 target_link_libraries(swift-scan-test
                       PRIVATE
                       swiftBasic
+                      swiftDependencyScanImpl
                       libSwiftScan)

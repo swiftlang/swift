@@ -6,7 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
-struct Bar {
+struct Bar { // expected-note*{{consider making struct 'Bar' conform to the 'Sendable' protocol}}
   lazy var foo = { // expected-error {{escaping closure captures mutating 'self' parameter}}
     self.x() // expected-note {{captured here}}
   }

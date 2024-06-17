@@ -2,7 +2,6 @@
 // RUN:   -Xllvm -sil-print-after=lifetime-dependence-insertion \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
@@ -13,8 +12,7 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ i: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
   }

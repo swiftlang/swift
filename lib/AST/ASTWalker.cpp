@@ -2340,11 +2340,11 @@ bool Traversal::visitTransferringTypeRepr(TransferringTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
+bool Traversal::visitSendingTypeRepr(SendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitResultDependsOnTypeRepr(ResultDependsOnTypeRepr *T) {
+bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
   return doIt(T->getBase());
 }
 

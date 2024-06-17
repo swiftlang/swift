@@ -753,9 +753,9 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   if (CalleeFunction->empty())
     return nullptr;
 
-  if (F->isSerialized() &&
-      !CalleeFunction->hasValidLinkageForFragileInline()) {
-    if (!CalleeFunction->hasValidLinkageForFragileRef()) {
+  if (!CalleeFunction->canBeInlinedIntoCaller(F->getSerializedKind())) {
+    if (F->isAnySerialized() &&
+        !CalleeFunction->hasValidLinkageForFragileRef(F->getSerializedKind())) {
       llvm::errs() << "caller: " << F->getName() << "\n";
       llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
       llvm_unreachable("Should never be inlining a resilient function into "

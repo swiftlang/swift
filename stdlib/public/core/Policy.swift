@@ -61,7 +61,9 @@
 @frozen
 public enum Never {}
 
-extension Never: Sendable { }
+extension Never: BitwiseCopyable {}
+
+extension Never: Sendable {}
 
 extension Never: Error {}
 

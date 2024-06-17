@@ -36,6 +36,7 @@ benefit of all Swift developers.
         - [Bisecting on SIL optimizer pass counts to identify optimizer bugs](#bisecting-on-sil-optimizer-pass-counts-to-identify-optimizer-bugs)
         - [Using git-bisect in the presence of branch forwarding/feature branches](#using-git-bisect-in-the-presence-of-branch-forwardingfeature-branches)
         - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bug_reducer)
+    - [Disabling PCH Verification](#disabling-pch-verification)
 - [Debugging the Compiler Build](#debugging-the-compiler-build)
     - [Build Dry Run](#build-dry-run)
 - [Debugging the Compiler Driver](#debugging-the-compiler-driver-build)
@@ -260,7 +261,7 @@ If one builds swift using ninja and wants to dump the SIL of the
 stdlib using some of the SIL dumping options from the previous
 section, one can use the following one-liner:
 
-    ninja -t commands | grep swiftc | grep Swift.o | grep " -c "
+    ninja -t commands | grep swiftc | grep 'Swift\.o'
 
 This should give one a single command line that one can use for
 Swift.o, perfect for applying the previous sections options to.
@@ -301,6 +302,13 @@ swift/Basic/Debug.h includes macros to help contributors declare these methods
 with the proper attributes to ensure they'll be available in the debugger. In
 particular, if you see `SWIFT_DEBUG_DUMP` in a class declaration, that class
 has a `dump()` method you can call.
+
+### Pass statistics
+
+There are options to output a lot of different statistics, including about
+SIL passes. More information is available in
+[Compiler Performance](CompilerPerformance.md) for the unified statistics, and
+[Optimizer Counter Analysis](OptimizerCountersAnalysis.md) for pass counters.
 
 ## Debugging and Profiling on SIL level
 
@@ -824,6 +832,19 @@ When bisecting it might be necessary to run the `update-checkout` script
 each time you change shas. To do this you can pass `--match-timestamp`
 to automatically checkout match the timestamp of the `apple/swift` repo
 across the other repos.
+
+## Disabling PCH Verification
+
+Sometimes one needs to try to compile against PCH modules where the PCH version
+verification checking is too strict. To work around this, one can disable the
+checking by passing in to swift:
+
+```sh
+-Xcc -Xclang -Xcc -fno-validate-pch
+```
+
+NOTE: If there are actual differences in between the on disk PCH format and the
+format expected by the compiler crashes and undefined behavior may result.
 
 # Debugging the Compiler Build
 

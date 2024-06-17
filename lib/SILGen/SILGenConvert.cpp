@@ -199,9 +199,8 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   auto someDecl = getASTContext().getOptionalSomeDecl();
   auto noneDecl = getASTContext().getOptionalNoneDecl();
 
-  // If we have an object, make sure the object is at +1. All switch_enum of
-  // objects is done at +1.
   bool isAddress = optional.getType().isAddress();
+  bool isBorrow = !optional.isPlusOneOrTrivial(*this);
   SwitchEnumInst *switchEnum = nullptr;
   if (isAddress) {
     // We forward in the creation routine for
@@ -209,6 +208,12 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     B.createSwitchEnumAddr(loc, optional.getValue(),
                            /*defaultDest*/ nullptr,
                            {{someDecl, contBB}, {noneDecl, failBB}});
+  } else if (isBorrow) {
+    hadCleanup = false;
+    hadLValue = false;
+    switchEnum = B.createSwitchEnum(loc, optional.getValue(),
+                                    /*defaultDest*/ nullptr,
+                                    {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
     optional = optional.ensurePlusOne(*this, loc);
     hadCleanup = true;

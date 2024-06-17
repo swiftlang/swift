@@ -807,32 +807,6 @@ void CompletionLookup::analyzeActorIsolation(
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
-
-  // If the reference is 'async', all types must be 'Sendable'.
-  if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete &&
-      implicitlyAsync && T) {
-    if (isa<VarDecl>(VD)) {
-      if (!T->isSendableType()) {
-        NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
-      }
-    } else {
-      assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
-      // Check if the result and the param types are all 'Sendable'.
-      auto *AFT = T->castTo<AnyFunctionType>();
-      if (!AFT->getResult()->isSendableType()) {
-        NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
-      } else {
-        for (auto &param : AFT->getParams()) {
-          Type paramType = param.getPlainType();
-          if (!paramType->isSendableType()) {
-            NotRecommended =
-                ContextualNotRecommendedReason::CrossActorReference;
-            break;
-          }
-        }
-      }
-    }
-  }
 }
 
 void CompletionLookup::addVarDeclRef(const VarDecl *VD,
@@ -864,14 +838,9 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   }
   bool implicitlyAsync = false;
   analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
-  bool explicitlyAsync = false;
-  if (auto accessor = VD->getEffectfulGetAccessor()) {
-    explicitlyAsync = accessor->hasAsync();
-  }
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(VD, Reason, dynamicLookupInfo));
-  Builder.setIsAsync(explicitlyAsync || implicitlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
   addLeadingDot(Builder);
@@ -1272,7 +1241,6 @@ void CompletionLookup::addFunctionCallPattern(
     else
       addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-    Builder.setIsAsync(AFT->hasExtInfo() && AFT->isAsync());
     Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
@@ -1394,7 +1362,6 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     CodeCompletionResultBuilder Builder =
         makeResultBuilder(CodeCompletionResultKind::Declaration,
                           getSemanticContext(FD, Reason, dynamicLookupInfo));
-    Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
     Builder.setHasAsyncAlternative(
         FD->getAsyncAlternative() &&
         !FD->getAsyncAlternative()->shouldHideFromEditor());
@@ -1591,8 +1558,6 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
       addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
     }
 
-    Builder.setIsAsync(ConstructorType->hasExtInfo() &&
-                       ConstructorType->isAsync());
     Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
@@ -1655,7 +1620,6 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(SD, Reason, dynamicLookupInfo));
-  Builder.setIsAsync(implictlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(SD);
 

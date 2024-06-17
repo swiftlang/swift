@@ -341,9 +341,8 @@ option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
     debugging Swift)"
     FALSE)
 
-option(BOOTSTRAPPING_MODE [=[
+set(BOOTSTRAPPING_MODE HOSTTOOLS CACHE STRING [=[
 How to build the swift compiler modules. Possible values are
-    OFF:           build without swift modules
     HOSTTOOLS:     build with a pre-installed toolchain
     BOOTSTRAPPING: build with a 2-stage bootstrapping process
     BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
@@ -352,7 +351,7 @@ How to build the swift compiler modules. Possible values are
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
     CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
                                    compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
-]=] OFF)
+]=])
 
 option(BRIDGING_MODE [=[
 How swift-C++ bridging code is compiled:
@@ -478,6 +477,21 @@ set(SWIFT_MIN_RUNTIME_VERSION "${DEFAULT_SWIFT_MIN_RUNTIME_VERSION}" CACHE STRIN
   "Specify the minimum version of the runtime that we target when building \
 the compiler itself. This is used on non-Darwin platforms to ensure \
 that it's possible to build the compiler using host tools.")
+
+#
+# User-configurable Linux specific options.
+#
+
+set(SWIFT_MUSL_PATH "/usr/local/musl" CACHE STRING
+  "Path to the directory that contains the Musl headers and libraries. \
+This is only required if we have been asked to build the Musl SDK, and \
+defaults to the default install location for Musl.")
+
+set(SWIFT_SDK_LINUX_STATIC_ARCHITECTURES "" CACHE STRING
+  "The architectures to configure when using the static Linux SDK.")
+
+set(SWIFT_SDK_LINUX_ARCHITECTURES "" CACHE STRING
+  "The architectures to configure when using the Linux SDK.")
 
 #
 # User-configurable Android specific options.
@@ -617,6 +631,9 @@ endif()
 option(SWIFT_STDLIB_ENABLE_OBJC_INTEROP
        "Should stdlib be built with Obj-C interop."
        "${SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default}")
+
+set(SWIFT_DEBUGINFO_NON_LTO_ARGS "-g" CACHE STRING
+    "Compiler options to use when building the compiler in debug or debuginfo mode. These do not apply when linking with LTO")
 
 #
 # User-configurable experimental options.  Do not use in production builds.
@@ -898,12 +915,20 @@ set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
 set(SWIFT_SHIMS_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/stdlib/public/SwiftShims")
 set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 
+if (NOT BOOTSTRAPPING_MODE)
+  message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
+endif()
+
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   # This is the normal case. We are not cross-compiling.
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
+  if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
+    message(WARNING "BOOSTRAPPING set to OFF because no Swift compiler is defined")
+    set(BOOTSTRAPPING_MODE "OFF")
+  endif()
 elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   # If cross-compiling, we don't have to bootstrap. We can just use the previously
   # built native swiftc to build the swift compiler modules.
@@ -983,6 +1008,8 @@ endif()
 # Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
 # our own defaults. This should only be possible in a unified (not stand alone)
 # build environment.
+include(GoldVersion)
+
 if(LLVM_USE_LINKER)
   set(SWIFT_USE_LINKER_default "${LLVM_USE_LINKER}")
 elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
@@ -994,7 +1021,17 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 elseif(DISTRO_NAME STREQUAL "Amazon Linux 2023")
   set(SWIFT_USE_LINKER_default "lld")
 else()
-  set(SWIFT_USE_LINKER_default "gold")
+  get_gold_version(gold_version)
+  if(NOT gold_version)
+    message(STATUS "GNU Gold not found; using lld instead")
+    set(SWIFT_USE_LINKER_default "lld")
+  elseif(gold_version VERSION_LESS "2.36")
+    message(STATUS "GNU Gold is too old (${gold_version}); using lld instead")
+    set(SWIFT_USE_LINKER_default "lld")
+  else()
+    message(STATUS "Using GNU Gold ${gold_version}")
+    set(SWIFT_USE_LINKER_default "gold")
+  endif()
 endif()
 set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
     "Build Swift with a non-default linker")
@@ -1076,12 +1113,26 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
-  # Should we build the standard library for the host?
   is_sdk_requested(LINUX swift_build_linux)
   if(swift_build_linux)
-    configure_sdk_unix("Linux" "${SWIFT_HOST_VARIANT_ARCH}")
-    set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+    if("${SWIFT_SDK_LINUX_ARCHITECTURES}" STREQUAL "")
+      set(SWIFT_SDK_LINUX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
+    endif()
+
+    configure_sdk_unix("Linux" "${SWIFT_SDK_LINUX_ARCHITECTURES}")
+  endif()
+
+  is_sdk_requested(LINUX_STATIC swift_build_linux_static)
+  if(swift_build_linux_static)
+    if("${SWIFT_MUSL_PATH}" STREQUAL "")
+      message(FATAL_ERROR "You must set SWIFT_MUSL_PATH to point to the Musl libraries and headers.  Specifically, we expect to find Musl at <SWIFT_MUSL_PATH>/<arch> for each requested architecture.")
+    endif()
+
+    if("${SWIFT_SDK_LINUX_STATIC_ARCHITECTURES}" STREQUAL "")
+      set(SWIFT_SDK_LINUX_STATIC_ARCHITECTURES "aarch64;x86_64")
+    endif()
+
+    configure_sdk_unix("Linux_Static" "${SWIFT_SDK_LINUX_STATIC_ARCHITECTURES}")
   endif()
 
   is_sdk_requested(FREESTANDING swift_build_freestanding)
@@ -1089,6 +1140,10 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
     # TODO
     # configure_sdk_unix("FREESTANDING" "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
+
+  # Default is Linux SDK for host
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
 

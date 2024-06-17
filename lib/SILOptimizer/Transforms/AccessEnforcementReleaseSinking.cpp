@@ -159,6 +159,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
     case BuiltinValueKind::ExtractFunctionIsolation:
+    case BuiltinValueKind::FlowSensitiveSelfIsolation:
+    case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
     case BuiltinValueKind::AddressOfRawLayout:
       return false;
 
@@ -183,7 +185,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
-    case BuiltinValueKind::Copy:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:

@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Sema/IDETypeChecking.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -25,20 +26,30 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Sema/IDETypeChecking.h"
-#include "swift/Sema/IDETypeCheckingRequests.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/IDERequests.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 
-void
-swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
-                                  SmallVectorImpl<Decl*> &Results,
-                                  bool Recursive) {
+void swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
+                                       SmallVectorImpl<Decl *> &Results,
+                                       bool Recursive) {
+  auto getDisplayDeclsForModule =
+      [Recursive](ModuleDecl *M, SmallVectorImpl<Decl *> &Results) {
+        M->getDisplayDecls(Results, Recursive);
+      };
+  getTopLevelDeclsForDisplay(M, Results, std::move(getDisplayDeclsForModule));
+}
+
+void swift::getTopLevelDeclsForDisplay(
+    ModuleDecl *M, SmallVectorImpl<Decl *> &Results,
+    llvm::function_ref<void(ModuleDecl *, SmallVectorImpl<Decl *> &)>
+        getDisplayDeclsForModule) {
   auto startingSize = Results.size();
-  M->getDisplayDecls(Results, Recursive);
+  getDisplayDeclsForModule(M, Results);
 
   // Force Sendable on all public types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
@@ -48,20 +59,20 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
       // Restrict this logic to public and package types. Non-public types
       // may refer to implementation details and fail at deserialization.
       auto accessScope = NTD->getFormalAccessScope();
-      if (!M->isMainModule() &&
-          !accessScope.isPublic() && !accessScope.isPackage())
+      if (!M->isMainModule() && !accessScope.isPublic() &&
+          !accessScope.isPackage())
         continue;
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void) M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void)M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
   // Remove what we fetched and fetch again, possibly now with additional
   // extensions.
   Results.resize(startingSize);
-  M->getDisplayDecls(Results, Recursive);
+  getDisplayDeclsForModule(M, Results);
 }
 
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
@@ -930,11 +941,56 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
     IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
 }
 
+Type swift::tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2,
+                                                DeclContext *dc) {
+  // Easy case, equivalent so just pick one.
+  if (ty1->isEqual(ty2))
+    return ty1;
+
+  // Check to see if one is an optional of another. In that case, prefer the
+  // optional since we can unwrap a single level when doing a lookup.
+  {
+    SmallVector<Type, 4> ty1Optionals;
+    SmallVector<Type, 4> ty2Optionals;
+    auto ty1Unwrapped = ty1->lookThroughAllOptionalTypes(ty1Optionals);
+    auto ty2Unwrapped = ty2->lookThroughAllOptionalTypes(ty2Optionals);
+
+    if (ty1Unwrapped->isEqual(ty2Unwrapped)) {
+      // We currently only unwrap a single level of optional, so if the
+      // difference is greater, don't merge.
+      if (ty1Optionals.size() == 1 && ty2Optionals.empty())
+        return ty1;
+      if (ty2Optionals.size() == 1 && ty1Optionals.empty())
+        return ty2;
+    }
+    // We don't want to consider subtyping for optional mismatches since
+    // optional promotion is modelled as a subtype, which isn't useful for us
+    // (i.e if we have T? and U, preferring U would miss members on T?).
+    if (ty1Optionals.size() != ty2Optionals.size())
+      return Type();
+  }
+
+  // In general we want to prefer a subtype over a supertype.
+  if (isSubtypeOf(ty1, ty2, dc))
+    return ty1;
+  if (isSubtypeOf(ty2, ty1, dc))
+    return ty2;
+
+  // Incomparable, return null.
+  return Type();
+}
+
 bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
                             DeclContext &DC) {
   return evaluateOrDefault(DC.getASTContext().evaluator,
     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
       TypeRelation::ConvertTo, openArchetypes)), false);
+}
+
+bool swift::isSubtypeOf(Type T1, Type T2, DeclContext *DC) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    TypeRelationCheckRequest(TypeRelationCheckInput(DC, T1, T2,
+      TypeRelation::SubtypeOf, /*openArchetypes*/ false)), false);
 }
 
 Type swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *SD) {

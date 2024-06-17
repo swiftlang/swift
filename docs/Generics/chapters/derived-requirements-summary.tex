@@ -5,41 +5,84 @@
 \chapter{Derived Requirements Summary}\label{derived summary}
 
 \index{$\vdash$}
-\IndexStep{GenSig}
-\IndexStep{ReqSig}
-\IndexStep{AssocType}
-\IndexStep{Conf}
-\IndexStep{Equiv}
-\IndexStep{Same}
-\IndexStep{Member}
-\IndexStep{Concrete}
 
+Let $G$ be a \index{generic signature!summary}generic signature. We generate the theory of~$G$ by repeated application of inference rules, starting from a finite set of elementary statements. A derivation proves that some element belongs to this set by giving a list of derivation steps where the assumptions in each step are conclusions of previous steps. Nomenclature:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Symbol}&\textbf{Description}\\
+\midrule
+\texttt{T}, \texttt{U}, and \texttt{V}&\index{type parameter!summary}type parameters\\
+\texttt{Self.U} and \texttt{Self.V}&type parameters rooted in the \index{protocol Self type!summary}protocol \texttt{Self} type\\
+\texttt{X}&a concrete type\\
+\texttt{C}&a concrete \index{class type!summary}class type\\
+$\Xprime$ and $\Cprime$&obtained from \texttt{X} and \texttt{C} by replacing \texttt{Self} with \texttt{T}\\
+\texttt{P} and \texttt{Q}&protocols\\
+\texttt{A}&the name of an \index{associated type declaration!summary}associated type of \texttt{P}\\
+\texttt{[P]A}&an associated type declaration of \texttt{P}\\
+\texttt{T.[P]A} and \texttt{T.A}&\index{bound dependent member type!summary}bound and \index{unbound dependent member type!summary}unbound dependent member type\\
+$\ConfReq{T}{P}$&a \index{conformance requirement!summary}conformance requirement\\
+$\SameReq{T}{U}$&a \index{same-type requirement!summary}same-type requirement between type parameters\\
+$\SameReq{T}{X}$&a concrete same-type requirement\\
+$\ConfReq{T}{C}$&a \index{superclass requirement!summary}superclass requirement\\
+$\ConfReq{T}{AnyObject}$&a \index{layout requirement!summary}layout requirement\\
+$\ConfReq{Self.U}{Q}_\texttt{P}$&an \index{associated requirement!summary}associated requirement of protocol \texttt{P}\\
+\bottomrule
+\end{tabular}
+\end{center}
+See \index{derived requirement!summary}\index{valid type parameter!summary}\SecRef{derived req} and \SecRef{type params} for details.
+
+\index{elementary derivation step!summary}\paragraph{Elementary statements.}
+For \IndexStepTwo{Generic}{summary}each generic parameter \ttgp{d}{i} of~$G$:
 \begin{gather*}
-\vdash\ConfReq{T}{P}\tag{\textsc{GenSig}}\\
-\vdash\ConfReq{T}{C}\\
-\vdash\ConfReq{T}{AnyObject}\\
-\vdash\FormalReq{T == U}\\[\medskipamount]
-\ConfReq{T}{P}\vdash\texttt{T.A}\tag{\textsc{AssocType}}\\
-\ConfReq{T}{P}\vdash\texttt{T.[P]A}\\
-\ConfReq{T}{P}\vdash\FormalReq{T.[P]A == T.A}\\[\medskipamount]
-\vdash\ConfReq{Self.U}{Q}_\texttt{P}\tag{\textsc{ReqSig}}\\
-\vdash\ConfReq{Self.U}{C}_\texttt{P}\\
-\vdash\ConfReq{Self.U}{AnyObject}_\texttt{P}\\
-\vdash\FormalReq{Self.U == Self.V}_\texttt{P}\\[\medskipamount]
-\ConfReq{T}{P},\,\ConfReq{Self.U}{Q}\vdash\ConfReq{T.U}{Q}\tag{\textsc{Conf}}\\
-\ConfReq{T}{P},\,\ConfReq{Self.U}{C}\vdash\ConfReq{T.U}{C}\\
-\ConfReq{T}{P},\,\ConfReq{Self.U}{AnyObject}\vdash\ConfReq{T.U}{AnyObject}\\
-\ConfReq{T}{P},\,\FormalReq{Self.U == Self.V}\vdash\FormalReq{T.U == T.V}\\[\medskipamount]
-\texttt{T}\vdash\FormalReq{T == T}\tag{\textsc{Equiv}}\\
-\FormalReq{T == U}\vdash\FormalReq{U == T}\\
-\FormalReq{T == U},\,\FormalReq{U == V}\vdash\FormalReq{T == V}\\[\medskipamount]
-\ConfReq{U}{P},\,\FormalReq{T == U}\vdash\ConfReq{T}{P}\tag{\textsc{Same}}\\
-\ConfReq{U}{C},\,\FormalReq{T == U}\vdash\ConfReq{T}{C}\\
-\ConfReq{U}{AnyObject},\,\FormalReq{T == U}\vdash\ConfReq{T}{AnyObject}\\[\medskipamount]
-\ConfReq{U}{P},\,\FormalReq{T == U}\vdash\FormalReq{T.A == U.A}\tag{\textsc{Member}}\\
-\ConfReq{U}{P},\,\FormalReq{T == U}\vdash\FormalReq{T.[P]A == U.[P]A}\\[\medskipamount]
-\FormalReq{T == U}\vdash\FormalReq{G<T> == G<U>}\qquad\mbox{(arbitrary type constructor \texttt{G<>})}\tag{\textsc{Concrete}}\\
-\FormalReq{G<T> == G<U>}\vdash\FormalReq{T == U}\qquad\mbox{(arbitrary type constructor \texttt{G<>})}
+\GenericStepDef
+\end{gather*}
+For \IndexStepTwo{Conf}{summary}\IndexStepTwo{Same}{summary}\IndexStepTwo{Concrete}{summary}\IndexStepTwo{Super}{summary}\IndexStepTwo{Layout}{summary}each explicit requirement of~$G$ by \index{requirement kind!summary}kind:
+\begin{gather*}
+\ConfStepDef\\
+\SameStepDef\\
+\ConcreteStepDef\\
+\SuperStepDef\\
+\LayoutStepDef
+\end{gather*}
+
+\index{requirement signature!summary}
+\paragraph{Requirement signatures.}
+Assume $G\vdash\ConfReq{T}{P}$. For \IndexStepTwo{AssocName}{summary}\IndexStepTwo{AssocDecl}{summary}\IndexStepTwo{AssocBind}{summary}each associated type~\texttt{A} of~\texttt{P}:
+\begin{gather*}
+\AssocNameStepDef\\
+\AssocDeclStepDef\\
+\AssocBindStepDef
+\end{gather*}
+For each \IndexStepTwo{AssocConf}{summary}\IndexStepTwo{AssocSame}{summary}\IndexStepTwo{AssocConcrete}{summary}\IndexStepTwo{AssocSuper}{summary}\IndexStepTwo{AssocLayout}{summary}associated requirement of~\texttt{P} by kind:
+\begin{gather*}
+\AssocConfStepDef\\
+\AssocSameStepDef\\
+\AssocConcreteStepDef\\
+\AssocSuperStepDef\\
+\AssocLayoutStepDef
+\end{gather*}
+
+\paragraph{Equivalence.}
+Same-type requirements \IndexStepTwo{Reflex}{summary}\IndexStepTwo{Sym}{summary}\IndexStepTwo{Trans}{summary}generate an equivalence relation:
+\begin{gather*}
+\ReflexStepDef\\
+\SymStepDef\\
+\TransStepDef
+\end{gather*}
+
+\paragraph{Compatibility.}
+A derived conformance, superclass or layout requirement \IndexStepTwo{SameConf}{summary}\IndexStepTwo{SameSuper}{summary}\IndexStepTwo{SameLayout}{summary}\IndexStepTwo{SameName}{summary}\IndexStepTwo{SameDecl}{summary}applies to all type parameters in an equivalence class:
+\begin{gather*}
+\SameConfStepDef\\
+\SameConcreteStepDef\\
+\SameSuperStepDef\\
+\SameLayoutStepDef
+\end{gather*}
+If two type parameters are equivalent, so are \IndexStepTwo{SameName}{summary}\IndexStepTwo{SameDecl}{summary}all corresponding member types:
+\begin{gather*}
+\SameNameStepDef\\
+\SameDeclStepDef
 \end{gather*}
 
 \end{document}

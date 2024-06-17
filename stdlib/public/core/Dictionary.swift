@@ -1702,9 +1702,15 @@ extension Collection {
       } else {
         result += ", "
       }
+      #if !$Embedded
       debugPrint(k, terminator: "", to: &result)
       result += ": "
       debugPrint(v, terminator: "", to: &result)
+      #else
+      "(cannot print value in embedded Swift)".write(to: &result)
+      result += ": "
+      "(cannot print value in embedded Swift)".write(to: &result)
+      #endif
     }
     result += "]"
     return result

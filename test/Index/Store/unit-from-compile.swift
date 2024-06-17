@@ -16,6 +16,7 @@
 
 // CHECK: DEPEND START
 // CHECK: Unit | system | {{.*}}{{/|\\}}Swift.swiftmodule
-// CHECK: DEPEND END (1)
+// CHECK: Record | user | {{.*}}{{/|\\}}unit-from-compile.swift
+// CHECK: DEPEND END (2)
 
 // OPT: is-debug: 1

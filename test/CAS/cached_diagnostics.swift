@@ -58,3 +58,10 @@ let _ : MyEnum? = .none // expected-warning {{assuming you mean 'Optional<MyEnum
 
 /// Verify the serialized diags have the right magic at the top.
 // CHECK-SERIALIZED: DIA
+
+// RUN: %target-swift-frontend -c -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %s \
+// RUN:   -typecheck -serialize-diagnostics -serialize-diagnostics-path %t/test.diag -Rcache-compile-job 2>&1 | %FileCheck %s -check-prefix CACHE-MISS
+// RUN: %target-swift-frontend -c -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %s \
+// RUN:   -typecheck -serialize-diagnostics -serialize-diagnostics-path %t/test.diag -Rcache-compile-job 2>&1 | %FileCheck %s -check-prefix CACHE-HIT
+// CACHE-MISS: remark: cache miss
+// CACHE-HIT: remark: replay output file '<cached-diagnostics>'

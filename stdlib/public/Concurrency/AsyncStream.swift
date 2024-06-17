@@ -192,7 +192,7 @@ public struct AsyncStream<Element> {
     /// This can be called more than once and returns to the caller immediately
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
-    public func yield(_ value: __owned Element) -> YieldResult {
+    public func yield(_ value: sending Element) -> YieldResult {
       storage.yield(value)
     }
 
@@ -330,20 +330,10 @@ public struct AsyncStream<Element> {
   ///     }
   ///
   ///
-  @_alwaysEmitIntoClient
+  @_silgen_name("$sScS9unfolding8onCancelScSyxGxSgyYac_yyYbcSgtcfC")
+  @preconcurrency // Original API had `@Sendable` only on `onCancel`
   public init(
     unfolding produce: @escaping @Sendable () async -> Element?,
-    onCancel: (@Sendable () -> Void)? = nil
-  ) {
-    self.init(
-      unfolding: produce as () async -> Element?,
-      onCancel: onCancel
-    )
-  }
-
-  @usableFromInline
-  internal init(
-    unfolding produce: @escaping () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
@@ -432,11 +422,11 @@ extension AsyncStream.Continuation {
   /// blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield(
-    with result: Result<Element, Never>
+    with result: __shared sending Result<Element, Never>
   ) -> YieldResult {
     switch result {
-      case .success(let val):
-        return storage.yield(val)
+    case .success(let val):
+      return storage.yield(val)
     }
   }
 
@@ -511,7 +501,7 @@ public struct AsyncStream<Element> {
     @discardableResult
     @available(SwiftStdlib 5.1, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-    public func yield(_ value: __owned Element) -> YieldResult {
+    public func yield(_ value: sending Element) -> YieldResult {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
     @available(SwiftStdlib 5.1, *)
@@ -581,7 +571,7 @@ extension AsyncStream.Continuation {
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public func yield(
-    with result: Result<Element, Never>
+    with result: __shared sending Result<Element, Never>
   ) -> YieldResult {
     fatalError("Unavailable in task-to-thread concurrency model")
   }

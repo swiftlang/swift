@@ -415,7 +415,7 @@ Type ASTBuilder::createFunctionType(
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative())
                               .withIsolated(flags.isIsolated())
-                              .withTransferring(flags.isTransferring());
+                              .withSending(flags.isSending());
 
     hasIsolatedParameter |= flags.isIsolated();
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
@@ -473,7 +473,7 @@ Type ASTBuilder::createFunctionType(
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
-                   LifetimeDependenceInfo(), extFlags.hasTransferringResult())
+                   LifetimeDependenceInfo(), extFlags.hasSendingResult())
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();
@@ -518,9 +518,9 @@ getParameterOptions(ImplParameterInfoOptions implOptions) {
     result |= SILParameterInfo::NotDifferentiable;
   }
 
-  if (implOptions.contains(ImplParameterInfoFlags::Transferring)) {
-    implOptions -= ImplParameterInfoFlags::Transferring;
-    result |= SILParameterInfo::Transferring;
+  if (implOptions.contains(ImplParameterInfoFlags::Sending)) {
+    implOptions -= ImplParameterInfoFlags::Sending;
+    result |= SILParameterInfo::Sending;
   }
 
   // If we did not handle all flags in implOptions, this code was not updated
@@ -558,9 +558,9 @@ getResultOptions(ImplResultInfoOptions implOptions) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
-  if (implOptions.contains(ImplResultInfoFlags::IsTransferring)) {
-    implOptions -= ImplResultInfoFlags::IsTransferring;
-    result |= SILResultInfo::IsTransferring;
+  if (implOptions.contains(ImplResultInfoFlags::IsSending)) {
+    implOptions -= ImplResultInfoFlags::IsSending;
+    result |= SILResultInfo::IsSending;
   }
 
   // If we did not remove all of the options from implOptions, someone forgot to
@@ -755,36 +755,53 @@ Type ASTBuilder::createExistentialMetatypeType(
 Type ASTBuilder::createConstrainedExistentialType(
     Type base, ArrayRef<BuiltRequirement> constraints,
     ArrayRef<BuiltInverseRequirement> inverseRequirements) {
-  // FIXME: Generalize to other kinds of bases.
-  if (!base->getAs<ProtocolType>())
-    return Type();
-  auto baseTy = base->castTo<ProtocolType>();
-  auto baseDecl = baseTy->getDecl();
-  llvm::SmallDenseMap<Identifier, Type> cmap;
-  for (const auto &req : constraints) {
-    switch (req.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::Layout:
-      continue;
+  Type constrainedBase;
 
-    case RequirementKind::SameType:
-      if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
-        cmap[DMT->getName()] = req.getSecondType();
+  if (auto baseTy = base->getAs<ProtocolType>()) {
+    auto baseDecl = baseTy->getDecl();
+    llvm::SmallDenseMap<Identifier, Type> cmap;
+    for (const auto &req : constraints) {
+      switch (req.getKind()) {
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::Layout:
+        continue;
+
+      case RequirementKind::SameType:
+        if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
+          cmap[DMT->getName()] = req.getSecondType();
+      }
     }
-  }
-  llvm::SmallVector<Type, 4> args;
-  for (auto *assocTy : baseDecl->getPrimaryAssociatedTypes()) {
-    auto argTy = cmap.find(assocTy->getName());
-    if (argTy == cmap.end()) {
-      return Type();
+    llvm::SmallVector<Type, 4> args;
+    for (auto *assocTy : baseDecl->getPrimaryAssociatedTypes()) {
+      auto argTy = cmap.find(assocTy->getName());
+      if (argTy == cmap.end()) {
+        return Type();
+      }
+      args.push_back(argTy->getSecond());
     }
-    args.push_back(argTy->getSecond());
+
+    // We may not have any arguments because the constrained existential is a
+    // plain protocol with an inverse requirement.
+    if (args.empty()) {
+      constrainedBase =
+          ProtocolType::get(baseDecl, baseTy, base->getASTContext());
+    } else {
+      constrainedBase =
+          ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+    }
+  } else if (base->isAny()) {
+    // The only other case should be that we got an empty PCT, which is equal to
+    // the Any type. The other constraints should have been encoded in the
+    // existential's generic signature (and arrive as BuiltInverseRequirement).
+    constrainedBase = base;
+  } else {
+    return Type();
   }
-  Type constrainedBase =
-      ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+
+  assert(constrainedBase);
 
   // Handle inverse requirements.
   if (!inverseRequirements.empty()) {

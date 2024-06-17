@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -verify -typecheck %s -debug-generic-signatures \

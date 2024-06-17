@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics) | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 struct A: ~Copyable {

@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-sil \
 // RUN:     %s \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -sil-verify-all \
 // RUN:     -verify
 

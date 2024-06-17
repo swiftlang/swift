@@ -75,13 +75,6 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-
-  bool hasType() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasInterfaceType();
-    return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
-  }
-
   ParameterList *getParameters() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getParameters();
@@ -174,20 +167,8 @@ public:
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
 
-  /// Return true if this closure is passed as an argument to a function and is
-  /// known not to escape from that function.  In this case, captures can be
-  /// more efficient.
-  bool isKnownNoEscape() const {
-    if (hasType() && !getType()->hasError())
-      return getType()->castTo<AnyFunctionType>()->isNoEscape();
-    return false;
-  }
-
   /// Whether this function is @Sendable.
   bool isSendable() const {
-    if (!hasType())
-      return false;
-
     if (auto *fnType = getType()->getAs<AnyFunctionType>())
       return fnType->isSendable();
 

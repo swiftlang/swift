@@ -545,7 +545,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// to wait for all the child tasks to complete,
   /// collecting the values they returned:
   ///
-  ///     while let first = try await group.next() {
+  ///     while let value = try await group.next() {
   ///        collected += value
   ///     }
   ///     return collected
@@ -574,10 +574,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
   }
 
-  @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$sScG4nextxSgyYaF")
-  internal mutating func __abi_next() async -> ChildTaskResult? {
+  @_disfavoredOverload
+  public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
@@ -1035,10 +1034,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     return try await _taskGroupWaitNext(group: _group)
   }
 
-  @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  @_silgen_name("$sScg4nextxSgyYaKF")
-  internal mutating func __abi_next() async throws -> ChildTaskResult? {
+  @_disfavoredOverload
+  public mutating func next() async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
 
@@ -1213,6 +1211,29 @@ extension TaskGroup: AsyncSequence {
       return element
     }
 
+    /// Advances to and returns the result of the next child task.
+    ///
+    /// The elements returned from this method
+    /// appear in the order that the tasks *completed*,
+    /// not in the order that those tasks were added to the task group.
+    /// After this method returns `nil`,
+    /// this iterator is guaranteed to never produce more values.
+    ///
+    /// For more information about the iteration order and semantics,
+    /// see `TaskGroup.next()`.
+    ///
+    /// - Returns: The value returned by the next child task that completes,
+    ///   or `nil` if there are no remaining child tasks,
+    @available(SwiftStdlib 6.0, *)
+    public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
+      guard !finished else { return nil }
+      guard let element = await group.next(isolation: actor) else {
+        finished = true
+        return nil
+      }
+      return element
+    }
+
     public mutating func cancel() {
       finished = true
       group.cancelAll()
@@ -1326,7 +1347,7 @@ extension ThrowingTaskGroup: AsyncSequence {
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
       guard !finished else { return nil }
       do {
-        guard let element = try await group.next() else {
+        guard let element = try await group.next(isolation: actor) else {
           finished = true
           return nil
         }

@@ -19,6 +19,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -554,19 +555,7 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
 }
 
 Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
-  // Currently, the only case in which this function can fail (return an error)
-  // is when reading a pattern for a single variable declaration.
-
   using namespace decls_block;
-
-  auto readPatternUnchecked = [this](DeclContext *owningDC) -> Pattern * {
-    Expected<Pattern *> deserialized = readPattern(owningDC);
-    if (!deserialized) {
-      fatal(deserialized.takeError());
-    }
-    assert(deserialized.get());
-    return deserialized.get();
-  };
 
   SmallVector<uint64_t, 8> scratch;
 
@@ -588,7 +577,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
-    Pattern *subPattern = readPatternUnchecked(owningDC);
+    Pattern *subPattern;
+    UNWRAP(readPattern(owningDC), subPattern);
 
     auto result = ParenPattern::createImplicit(getContext(), subPattern);
 
@@ -621,12 +611,15 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
-      Pattern *subPattern = readPatternUnchecked(owningDC);
+      Pattern *subPattern;
+      UNWRAP(readPattern(owningDC), subPattern);
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
     auto result = TuplePattern::createImplicit(getContext(), elements);
-    recordPatternType(result, getType(tupleTypeID));
+    Type tupleType;
+    UNWRAP(getTypeChecked(tupleTypeID), tupleType);
+    recordPatternType(result, tupleType);
     restoreOffset.reset();
     return result;
   }
@@ -685,7 +678,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     unsigned rawIntroducer;
     BindingPatternLayout::readRecord(scratch, rawIntroducer);
 
-    Pattern *subPattern = readPatternUnchecked(owningDC);
+    Pattern *subPattern;
+    UNWRAP(readPattern(owningDC), subPattern);
 
     auto introducer = getActualVarDeclIntroducer(
         (serialization::VarDeclIntroducer) rawIntroducer);
@@ -1011,6 +1005,29 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
       isUnchecked, isPreconcurrency);
+
+  if (conformance->isConformanceOfProtocol()) {
+    auto &C = dc->getASTContext();
+
+    // Currently this should only be happening for the
+    // "DistributedActor as Actor" SILGen generated conformance.
+    // See `isConformanceOfProtocol` for details, if adding more such
+    // conformances, consider changing the way we structure their construction.
+    assert(conformance->getProtocol()->getInterfaceType()->isEqual(
+               C.getProtocol(KnownProtocolKind::Actor)->getInterfaceType()) &&
+           "Only expected to 'skip' finishNormalConformance for manually "
+           "created DistributedActor-as-Actor conformance.");
+
+    // Swap the conformance for the special conjured up one.
+    // We do NOT 'registerProtocolConformance' it because it is a
+    // protocol-to-protocol conformance, and we cannot register those since
+    // protocols do not have a conformance table which registration requires.
+    conformance = getDistributedActorAsActorConformance(C);
+    conformanceEntry = conformance; // record it
+
+    return conformance;
+  }
+
   // Record this conformance.
   if (conformanceEntry.isComplete()) {
     assert(conformanceEntry.get() == conformance);
@@ -1020,8 +1037,6 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
-  // Note: the DistributedActor -> Actor pseudo-conformance can be deserialized
-  // but must not be registered, so don't register it here.
   if (!dc->getSelfProtocolDecl())
     dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
 
@@ -1030,6 +1045,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
     return conformance;
 
   conformance->setState(ProtocolConformanceState::Complete);
+
   conformance->setLazyLoader(&MF, offset);
   return conformance;
 }
@@ -3932,7 +3948,7 @@ public:
     bool isAutoClosure;
     bool isIsolated;
     bool isCompileTimeConst;
-    bool isTransferring;
+    bool isSending;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -3943,7 +3959,7 @@ public:
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
-                                         isTransferring,
+                                         isSending,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -3985,7 +4001,7 @@ public:
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
     param->setCompileTimeConst(isCompileTimeConst);
-    param->setTransferring(isTransferring);
+    param->setSending(isSending);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -4050,7 +4066,7 @@ public:
     DeclID opaqueReturnTypeID;
     bool isUserAccessible;
     bool isDistributedThunk;
-    bool hasTransferringResult = false;
+    bool hasSendingResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -4070,7 +4086,7 @@ public:
                                           opaqueReturnTypeID,
                                           isUserAccessible,
                                           isDistributedThunk,
-                                          hasTransferringResult,
+                                          hasSendingResult,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -4290,8 +4306,8 @@ public:
 
     fn->setDistributedThunk(isDistributedThunk);
 
-    if (hasTransferringResult)
-      fn->setTransferringResult();
+    if (hasSendingResult)
+      fn->setSendingResult();
 
     return fn;
   }
@@ -6292,8 +6308,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         TypeID typeID;
         uint32_t rawSize;
         uint8_t rawAlign;
+        bool movesAsLike;
         serialization::decls_block::RawLayoutDeclAttrLayout::
-          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign);
+          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign, movesAsLike);
         
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
@@ -6303,6 +6320,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           auto typeRepr = new (ctx) FixedTypeRepr(type.get(), SourceLoc());
           if (rawAlign == 0) {
             Attr = new (ctx) RawLayoutAttr(typeRepr,
+                                           movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;
@@ -6612,9 +6630,9 @@ getActualSILParameterOptions(uint8_t raw) {
     result |= SILParameterInfo::Isolated;
   }
 
-  if (options.contains(serialization::SILParameterInfoFlags::Transferring)) {
-    options -= serialization::SILParameterInfoFlags::Transferring;
-    result |= SILParameterInfo::Transferring;
+  if (options.contains(serialization::SILParameterInfoFlags::Sending)) {
+    options -= serialization::SILParameterInfoFlags::Sending;
+    result |= SILParameterInfo::Sending;
   }
 
   // Check if we have any remaining options and return none if we do. We found
@@ -6660,9 +6678,9 @@ getActualSILResultOptions(uint8_t raw) {
     result |= SILResultInfo::NotDifferentiable;
   }
 
-  if (options.contains(serialization::SILResultInfoFlags::IsTransferring)) {
-    options -= serialization::SILResultInfoFlags::IsTransferring;
-    result |= SILResultInfo::IsTransferring;
+  if (options.contains(serialization::SILResultInfoFlags::IsSending)) {
+    options -= serialization::SILResultInfoFlags::IsSending;
+    result |= SILResultInfo::IsSending;
   }
 
   // Check if we have any remaining options and return none if we do. We found
@@ -6895,7 +6913,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasTransferringResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -6905,12 +6923,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasTransferringResult);
+        hasSendingResult);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasTransferringResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -6961,7 +6979,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation, LifetimeDependenceInfo(),
-                  hasTransferringResult)
+                  hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -6990,13 +7008,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst, hasResultDependsOn;
-    bool isNoDerivative, isTransferring;
+        isCompileTimeConst;
+    bool isNoDerivative, isSending;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, hasResultDependsOn, isTransferring);
+        isCompileTimeConst, isSending);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7011,8 +7029,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         ParameterTypeFlags(isVariadic, isAutoClosure,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
-                                           isCompileTimeConst,
-                                           hasResultDependsOn, isTransferring),
+                                           isCompileTimeConst, isSending),
                         MF.getIdentifier(internalLabelID));
   }
 
@@ -8335,7 +8352,6 @@ Type ModuleFile::loadTypeEraserType(const TypeEraserAttr *TRA,
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                          uint64_t contextData) {
   using namespace decls_block;
-
   PrettyStackTraceModuleFile traceModule(*this);
   PrettyStackTraceConformance trace("finishing conformance for",
                                     conformance);
@@ -8841,12 +8857,13 @@ ModuleFile::maybeReadLifetimeDependenceInfo(unsigned numParams) {
     return std::nullopt;
   }
 
+  bool isImmortal;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
-  LifetimeDependenceLayout::readRecord(scratch, hasInheritLifetimeParamIndices,
-                                       hasScopeLifetimeParamIndices,
-                                       lifetimeDependenceData);
+  LifetimeDependenceLayout::readRecord(
+      scratch, isImmortal, hasInheritLifetimeParamIndices,
+      hasScopeLifetimeParamIndices, lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(numParams, false);
   SmallBitVector scopeLifetimeParamIndices(numParams, false);
@@ -8875,5 +8892,6 @@ ModuleFile::maybeReadLifetimeDependenceInfo(unsigned numParams) {
           : nullptr,
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
-          : nullptr);
+          : nullptr,
+      isImmortal);
 }

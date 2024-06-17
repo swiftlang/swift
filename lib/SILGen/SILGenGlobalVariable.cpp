@@ -42,6 +42,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
   // Get the linkage for SILGlobalVariable.
   FormalLinkage formalLinkage;
+  // sil_global linkage should be kept private if its decl is resilient.
   if (gDecl->isResilient())
     formalLinkage = FormalLinkage::Private;
   else

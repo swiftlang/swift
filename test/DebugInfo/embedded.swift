@@ -6,5 +6,6 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: embedded_stdlib
 
 // CHECK:          !DICompileUnit({{.*}}flags: "-enable-embedded-swift"

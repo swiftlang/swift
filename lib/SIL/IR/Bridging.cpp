@@ -138,7 +138,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   if (nativeBoolTy && t->isEqual(nativeBoolTy)) {
     // If we have a Clang type that was imported as Bool, it had better be
     // one of a small set of types.
-    if (clangTy) {
+    if (clangTy && clangTy->isBuiltinType()) {
       auto builtinTy = clangTy->castAs<clang::BuiltinType>();
       if (builtinTy->getKind() == clang::BuiltinType::Bool)
         return t;

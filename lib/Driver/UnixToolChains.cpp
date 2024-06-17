@@ -127,7 +127,9 @@ bool isAmazonLinux2023Host() {
     }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  if (getTriple().isAndroid() || isAmazonLinux2023Host())
+  if (getTriple().isAndroid() || isAmazonLinux2023Host()
+      || (getTriple().isMusl()
+          && getTriple().getVendor() == llvm::Triple::Swift))
     return "lld";
 
   switch (getTriple().getArch()) {
@@ -231,17 +233,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 #else
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 #endif
-    // Starting with lld 13, Swift stopped working with the lld --gc-sections
-    // implementation for ELF, unless -z nostart-stop-gc is also passed to lld:
-    //
-    // https://reviews.llvm.org/D96914
-    if (Linker == "lld" || (Linker.length() > 5 &&
-                            Linker.substr(Linker.length() - 6) == "ld.lld")) {
-      Arguments.push_back("-Xlinker");
-      Arguments.push_back("-z");
-      Arguments.push_back("-Xlinker");
-      Arguments.push_back("nostart-stop-gc");
-    }
   }
 
   // Configure the toolchain.
@@ -296,7 +287,8 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  getResourceDirPath(SharedResourceDirPath, context.Args,
+                     /*Shared=*/!(staticExecutable || staticStdlib));
 
   SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,

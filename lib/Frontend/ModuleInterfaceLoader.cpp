@@ -1765,6 +1765,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
     genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
+    genericSubInvocation.getCASOptions().HasImmutableFileSystem =
+        casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
         [&](StringRef Arg) { GenericArgs.push_back(ArgSaver.save(Arg)); });
     // ClangIncludeTree is default on when caching is enabled.
@@ -1906,16 +1908,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     // explicit Swift module build tasks will not rely on them and they may be
     // source-target-context-specific and hinder module sharing across
     // compilation source targets.
-    // If using DirectCC1Scan, the command-line reduction is handled inside
-    // `getSwiftExplicitModuleDirectCC1Args()`, there is no need to inherit
-    // anything here as the ExtraArgs from the invocation are clang driver
-    // options, not cc1 options.
     // Clang module dependecies of this Swift dependency will be distinguished
     // by their context hash for different variants, so would still cause a
     // difference in the Swift compile commands, when different.
-    if (!clangImporterOpts.ClangImporterDirectCC1Scan)
-      inheritedParentContextClangArgs =
-          clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
+    inheritedParentContextClangArgs =
+        clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
     genericSubInvocation.getFrontendOptions()
         .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext ||
@@ -1929,9 +1926,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     inheritedParentContextClangArgs = clangImporterOpts.ExtraArgs;
   }
   subClangImporterOpts.ExtraArgs = inheritedParentContextClangArgs;
-  for (auto arg : subClangImporterOpts.ExtraArgs) {
-    GenericArgs.push_back("-Xcc");
-    GenericArgs.push_back(ArgSaver.save(arg));
+  // If using DirectCC1Scan, the command-line reduction is handled inside
+  // `getSwiftExplicitModuleDirectCC1Args()`, there is no need to inherit
+  // anything here as the ExtraArgs from the invocation are clang driver
+  // options, not cc1 options.
+  if (!clangImporterOpts.ClangImporterDirectCC1Scan) {
+    for (auto arg : subClangImporterOpts.ExtraArgs) {
+      GenericArgs.push_back("-Xcc");
+      GenericArgs.push_back(ArgSaver.save(arg));
+    }
   }
 
   subClangImporterOpts.EnableClangSPI = clangImporterOpts.EnableClangSPI;
@@ -1968,6 +1971,33 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   for (auto &blocklist: langOpts.BlocklistConfigFilePaths) {
     GenericArgs.push_back("-blocklist-file");
     GenericArgs.push_back(blocklist);
+  }
+
+  // For now, we only inherit the C++ interoperability mode in
+  // Explicit Module Builds.
+  if (langOpts.EnableCXXInterop &&
+      (frontendOpts.DisableImplicitModules ||
+       LoaderOpts.requestedAction ==
+           FrontendOptions::ActionType::ScanDependencies)) {
+    // Modelled after a reverse of validateCxxInteropCompatibilityMode
+    genericSubInvocation.getLangOptions().EnableCXXInterop = true;
+    genericSubInvocation.getLangOptions().cxxInteropCompatVersion =
+        langOpts.cxxInteropCompatVersion;
+    std::string compatVersion;
+    if (langOpts.cxxInteropCompatVersion.empty())
+      compatVersion = "default";
+    else if (langOpts.cxxInteropCompatVersion[0] == 5)
+      compatVersion = "swift-5.9";
+    else if (langOpts.cxxInteropCompatVersion[0] == 6)
+      compatVersion = "swift-6";
+    else if (langOpts.cxxInteropCompatVersion[0] ==
+             version::getUpcomingCxxInteropCompatVersion())
+      compatVersion = "upcoming-swift";
+    else // TODO: This may need to be updated once more versions are added
+      compatVersion = "default";
+
+    GenericArgs.push_back(
+        ArgSaver.save("-cxx-interoperability-mode=" + compatVersion));
   }
 }
 

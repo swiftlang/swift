@@ -156,8 +156,8 @@ class ReabstractionInfo {
   bool isPrespecialization = false;
 
   // Is the generated specialization going to be serialized?
-  IsSerialized_t Serialized = IsNotSerialized;
-  
+  SerializedKind_t Serialized = IsNotSerialized;
+
   enum TypeCategory {
     NotLoadable,
     Loadable,
@@ -201,13 +201,10 @@ public:
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(ModuleDecl *targetModule,
-                    bool isModuleWholeModule,
+  ReabstractionInfo(ModuleDecl *targetModule, bool isModuleWholeModule,
                     ApplySite Apply, SILFunction *Callee,
-                    SubstitutionMap ParamSubs,
-                    IsSerialized_t Serialized,
-                    bool ConvertIndirectToDirect,
-                    bool dropMetatypeArgs,
+                    SubstitutionMap ParamSubs, SerializedKind_t Serialized,
+                    bool ConvertIndirectToDirect, bool dropMetatypeArgs,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
@@ -226,9 +223,8 @@ public:
 
   bool isPrespecialized() const { return isPrespecialization; }
 
-  IsSerialized_t isSerialized() const {
-    return Serialized;
-  }
+  bool isSerialized() const { return Serialized == IsSerialized; }
+  SerializedKind_t getSerializedKind() const { return Serialized; }
 
   unsigned param2ArgIndex(unsigned ParamIdx) const  {
     return ParamIdx + NumFormalIndirectResults + (hasIndirectErrorResult ? 1: 0);

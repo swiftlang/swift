@@ -1209,10 +1209,10 @@ bb3:
   br bb3
 }
 
-// CHECK-LABEL: sil @inner_liferange_jumps_to_outer_in_header_block
+// CHECK-LABEL: sil @inner_liverange_jumps_to_outer_in_header_block
 // CHECK:         alloc_ref $XX
-// CHECK-LABEL: } // end sil function 'inner_liferange_jumps_to_outer_in_header_block'
-sil @inner_liferange_jumps_to_outer_in_header_block : $@convention(thin) (@owned XX) -> () {
+// CHECK-LABEL: } // end sil function 'inner_liverange_jumps_to_outer_in_header_block'
+sil @inner_liverange_jumps_to_outer_in_header_block : $@convention(thin) (@owned XX) -> () {
 bb0(%0 : $XX):
   %1 = alloc_stack $XX
   br bb1(%0 : $XX)

@@ -82,6 +82,10 @@ internal struct _StringObject {
     internal init(zero: ()) { self._storage = 0 }
   }
 
+#if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+#endif
+
 #if _pointerBitWidth(_64)
 
   //
@@ -102,7 +106,7 @@ internal struct _StringObject {
   }
 
 #elseif _pointerBitWidth(_32)
-
+ 
   @usableFromInline @frozen
   internal enum Variant {
     case immortal(UInt)
@@ -976,7 +980,11 @@ extension _StringObject {
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
+    #if !$Embedded
     return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
+    #else
+    return Builtin.castFromNativeObject(storage)
+    #endif
 #else
 #error("Unknown platform")
 #endif
@@ -1011,7 +1019,11 @@ extension _StringObject {
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
+    #if !$Embedded
     return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
+    #else
+    return Builtin.castFromNativeObject(storage)
+    #endif
 #else
 #error("Unknown platform")
 #endif
@@ -1035,8 +1047,11 @@ extension _StringObject {
   }
 
   @inline(__always)
+  @_unavailableInEmbedded
   internal var cocoaObject: AnyObject {
-#if _pointerBitWidth(_64)
+#if $Embedded
+    fatalError("unreachable in embedded Swift")
+#elseif _pointerBitWidth(_64)
     _internalInvariant(largeIsCocoa && !isImmortal)
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
@@ -1053,10 +1068,13 @@ extension _StringObject {
   /// Call `body` with the bridged Cocoa object in `self`, without retaining
   /// it.
   @inline(__always)
+  @_unavailableInEmbedded
   internal func withCocoaObject<R>(
     _ body: (AnyObject) -> R
   ) -> R {
-#if _pointerBitWidth(_64)
+#if $Embedded
+    fatalError("unreachable in embedded Swift")
+#elseif _pointerBitWidth(_64)
     _internalInvariant(largeIsCocoa && !isImmortal)
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged._withUnsafeGuaranteedRef { body($0) }
@@ -1071,10 +1089,15 @@ extension _StringObject {
   @_alwaysEmitIntoClient
   @inlinable
   @inline(__always)
+  @_unavailableInEmbedded
   internal var owner: AnyObject? {
     guard self.isMortal else { return nil }
+    #if !$Embedded
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
+    #else
+    fatalError("unreachable in embedded Swift")
+    #endif
   }
 }
 
@@ -1151,10 +1174,15 @@ extension _StringObject {
 
   // Fetch the stored subclass of NSString for bridging
   @inline(__always)
+  @_unavailableInEmbedded
   internal var objCBridgeableObject: AnyObject {
+#if $Embedded
+    fatalError("unreachable in embedded Swift")
+#else
     _internalInvariant(hasObjCBridgeableObject)
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
+#endif
   }
 
   // Whether the object provides fast UTF-8 contents that are nul-terminated
@@ -1201,14 +1229,19 @@ extension _StringObject {
 
   @inline(__always)
   internal init(_ storage: __StringStorage) {
+#if $Embedded
+    let castStorage = Builtin.unsafeCastToNativeObject(storage)
+#else
+    let castStorage = storage
+#endif
 #if _pointerBitWidth(_64)
     self.init(
-      object: storage,
+      object: castStorage,
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
 #elseif _pointerBitWidth(_32)
     self.init(
-      variant: .native(storage),
+      variant: .native(castStorage),
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
 #else
@@ -1217,14 +1250,19 @@ extension _StringObject {
   }
 
   internal init(_ storage: __SharedStringStorage) {
+#if $Embedded
+    let castStorage = Builtin.unsafeCastToNativeObject(storage)
+#else
+    let castStorage = storage
+#endif
 #if _pointerBitWidth(_64)
     self.init(
-      object: storage,
+      object: castStorage,
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
 #elseif _pointerBitWidth(_32)
     self.init(
-      variant: .native(storage),
+      variant: .native(castStorage),
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
 #else
@@ -1232,12 +1270,15 @@ extension _StringObject {
 #endif
   }
 
+  @_unavailableInEmbedded
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
-#if _pointerBitWidth(_64)
+#if $Embedded
+    fatalError("unreachable in embedded Swift")
+#elseif _pointerBitWidth(_64)
     self.init(
       object: cocoa, discriminator: discriminator, countAndFlags: countAndFlags)
     _internalInvariant(self.largeAddressBits == Builtin.reinterpretCast(cocoa))
@@ -1327,9 +1368,11 @@ extension _StringObject {
         }
       }
       if _countAndFlags.isNativelyStored {
+        #if !$Embedded
         let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
         let anyObj = unmanaged.takeUnretainedValue()
         _internalInvariant(anyObj is __StringStorage)
+        #endif
       }
     }
 

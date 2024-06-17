@@ -194,7 +194,7 @@ public:
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        std::vector<std::string> &CC1Args);
+                        const std::vector<std::string> &CC1Args);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -665,6 +665,11 @@ bool requiresCPlusPlus(const clang::Module *module);
 /// (std_vector, std_iosfwd, etc).
 bool isCxxStdModule(const clang::Module *module);
 
+/// Returns true if the given module is one of the C++ standard library modules.
+/// This could be the top-level std module, or any of the libc++ split modules
+/// (std_vector, std_iosfwd, etc).
+bool isCxxStdModule(StringRef moduleName, bool IsSystem);
+
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.
 std::optional<clang::QualType>
@@ -673,6 +678,12 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
+/// Determine whether this typedef is a CF type.
+bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
+
+/// Determine the imported CF type for the given typedef-name, or the empty
+/// string if this is not an imported CF type name.
+llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

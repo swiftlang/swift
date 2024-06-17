@@ -478,7 +478,7 @@ bb0(%0 : $*FakeOptional<Klass>):
 // CHECK: Name: 'myname.some'
 // CHECK: Root: %0 = argument of bb0
 // CHECK: end running test 1 of 1 on handle_diamond: variable-name-inference with: @trace[0]
-sil [ossa] @handle_diamond : $@convention(method) (@guaranteed FirstSecondEnum<Klass>) -> @sil_transferring @owned FakeOptional<Klass> {
+sil [ossa] @handle_diamond : $@convention(method) (@guaranteed FirstSecondEnum<Klass>) -> @sil_sending @owned FakeOptional<Klass> {
 bb0(%0 : @guaranteed $FirstSecondEnum<Klass>):
   specify_test "variable-name-inference @trace[0]"
   debug_value %0 : $FirstSecondEnum<Klass>, var, name "myname"
@@ -509,7 +509,7 @@ bb3(%4 : @owned $FakeOptional<Klass>):
 // CHECK: Name: 'myname.some.third'
 // CHECK: Root: %0 = argument of bb0
 // CHECK: end running test 1 of 1 on handle_loop: variable-name-inference with: @trace[0]
-sil [ossa] @handle_loop : $@convention(method) (@guaranteed FirstSecondThirdEnum<Klass>) -> @sil_transferring @owned FirstSecondThirdEnum<Klass> {
+sil [ossa] @handle_loop : $@convention(method) (@guaranteed FirstSecondThirdEnum<Klass>) -> @sil_sending @owned FirstSecondThirdEnum<Klass> {
 bb0(%0 : @guaranteed $FirstSecondThirdEnum<Klass>):
   specify_test "variable-name-inference @trace[0]"
   debug_value %0 : $FirstSecondThirdEnum<Klass>, var, name "myname"
@@ -557,7 +557,7 @@ bb8:
 // CHECK: Name: 'myname.some.third'
 // CHECK: Root: %0 = argument of bb0
 // CHECK: end running test 1 of 1 on handle_loop_other_order: variable-name-inference with: @trace[0]
-sil [ossa] @handle_loop_other_order : $@convention(method) (@guaranteed FirstSecondThirdEnum<Klass>) -> @sil_transferring @owned FirstSecondThirdEnum<Klass> {
+sil [ossa] @handle_loop_other_order : $@convention(method) (@guaranteed FirstSecondThirdEnum<Klass>) -> @sil_sending @owned FirstSecondThirdEnum<Klass> {
 bb0(%0 : @guaranteed $FirstSecondThirdEnum<Klass>):
   specify_test "variable-name-inference @trace[0]"
   debug_value %0 : $FirstSecondThirdEnum<Klass>, var, name "myname"

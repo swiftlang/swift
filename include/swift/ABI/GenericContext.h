@@ -23,6 +23,7 @@
 #include "swift/ABI/MetadataRef.h"
 #include "swift/ABI/InvertibleProtocols.h"
 #include "swift/ABI/TrailingObjects.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Demangling/Demangle.h"
 
 namespace swift {
@@ -696,7 +697,7 @@ protected:
     if (!asSelf()->hasConditionalInvertedProtocols())
       return 0;
 
-    return countBitsUsed(getConditionalInvertedProtocols().rawBits());
+    return popcount(getConditionalInvertedProtocols().rawBits());
   }
 
   size_t numTrailingObjects(

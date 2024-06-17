@@ -1102,9 +1102,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
       assert(type->hasUnboundGenericType());
     }
 
-    if (type->isForeignReferenceType())
-      return MetadataAccessStrategy::PublicUniqueAccessor;
-
     if (requiresForeignTypeMetadata(nominal))
       return MetadataAccessStrategy::ForeignAccessor;
 
@@ -1374,7 +1371,7 @@ ParameterFlags irgen::getABIParameterFlags(ParameterTypeFlags flags) {
       .withAutoClosure(flags.isAutoClosure())
       .withNoDerivative(flags.isNoDerivative())
       .withIsolated(flags.isIsolated())
-      .withTransferring(flags.isTransferring());
+      .withSending(flags.isSending());
 }
 
 static std::pair<FunctionTypeFlags, ExtendedFunctionTypeFlags>
@@ -1433,7 +1430,7 @@ getFunctionTypeFlags(CanFunctionType type) {
 
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
-                      .withTransferringResult(type->hasTransferringResult())
+                      .withSendingResult(type->hasSendingResult())
                       .withInvertedProtocols(InvertedProtocols);
 
   if (isolation.isErased())
@@ -1979,6 +1976,16 @@ namespace {
       
     MetadataResponse visitExistentialType(CanExistentialType type,
                                           DynamicMetadataRequest request) {
+      if (auto *PCT =
+              type->getConstraintType()->getAs<ProtocolCompositionType>()) {
+        auto constraintTy = PCT->withoutMarkerProtocols();
+        if (constraintTy->getClassOrBoundGenericClass()) {
+          auto response = IGF.emitTypeMetadataRef(
+              constraintTy->getCanonicalType(), request);
+          return setLocal(type, response);
+        }
+      }
+
       if (auto metadata = tryGetLocal(type, request))
         return metadata;
 

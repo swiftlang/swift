@@ -1,10 +1,10 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule -enable-experimental-feature BitwiseCopyable) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature BuiltinModule) | %FileCheck %s
 
 // REQUIRES: executable_test
 
 // Execute an unaligned load of SIMD16<UInt8> which conforms to a protocol derived from BitwiseCopyable.
 
-public protocol MyBitwiseCopyable : _BitwiseCopyable {}
+public protocol MyBitwiseCopyable : BitwiseCopyable {}
 
 extension SIMD16 : MyBitwiseCopyable where Scalar.SIMD16Storage : MyBitwiseCopyable {}
 extension UInt8.SIMD16Storage : MyBitwiseCopyable {}

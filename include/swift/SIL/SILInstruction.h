@@ -1875,9 +1875,9 @@ public:
   bool isLet() const { return Bits.Data.Constant; }
 
   std::optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType = {},
-      std::optional<SILLocation> DeclLoc = {},
-      const SILDebugScope *DeclScope = nullptr,
+  get(VarDecl *VD, const char *buf, std::optional<SILType> AuxVarType,
+      std::optional<SILLocation> DeclLoc,
+      const SILDebugScope *DeclScope,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return std::nullopt;
@@ -2083,8 +2083,22 @@ public:
   /// VarDecl.
   void setIsFromVarDecl() { sharedUInt8().AllocStackInst.fromVarDecl = true; }
 
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc().strippedForDebugVariable();
+  }
+
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location, scope, and element type. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     // If we used to have debug info attached but our debug info is now
     // invalidated, just bail.
     if (sharedUInt8().AllocStackInst.hasInvalidatedVarInfo) {
@@ -2096,11 +2110,18 @@ public:
     const SILDebugScope *VarDeclScope = nullptr;
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    else if (complete)
+      AuxVarType = getElementType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -2502,8 +2523,13 @@ public:
   SILType getAddressType() const;
 
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+    if (complete)
+      return VarInfo.get(getDecl(), getTrailingObjects<char>(),
+                         getAddressType().getObjectType(),
+                         getLoc().strippedForDebugVariable(),
+                         getDebugScope());
+    return VarInfo.get(getDecl(), getTrailingObjects<char>(), {}, {}, nullptr);
   };
 
   void setUsesMoveableValueDebugInfo() {
@@ -2652,6 +2678,8 @@ protected:
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs) {
+    assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
+        ->getInvocationGenericSignature());
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
@@ -2946,14 +2974,15 @@ private:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
 public:
-  using super::getCallee;
-  using super::getSubstCalleeType;
-  using super::getSubstCalleeConv;
-  using super::hasSubstitutions;
-  using super::getNumArguments;
   using super::getArgument;
-  using super::getArguments;
   using super::getArgumentOperands;
+  using super::getArguments;
+  using super::getCallee;
+  using super::getCalleeOperand;
+  using super::getNumArguments;
+  using super::getSubstCalleeConv;
+  using super::getSubstCalleeType;
+  using super::hasSubstitutions;
 
   /// The collection of following routines wrap the representation difference in
   /// between the self substitution being first, but the self parameter of a
@@ -3038,6 +3067,21 @@ public:
     return getSubstCalleeType()->hasSelfParam();
   }
 
+  Operand *getIsolatedArgumentOperandOrNullPtr() {
+    SILFunctionConventions conv = getSubstCalleeConv();
+    for (Operand &argOp : getOperandsWithoutIndirectResults()) {
+      // Skip the callee.
+      if (getCalleeOperand() == &argOp)
+        continue;
+
+      auto opNum = argOp.getOperandNumber() - 1;
+      auto paramInfo = conv.getParamInfoForSILArg(opNum);
+      if (paramInfo.getOptions().contains(SILParameterInfo::Isolated))
+        return &argOp;
+    }
+    return nullptr;
+  }
+
   bool hasGuaranteedSelfArgument() const {
     auto C = getSubstCalleeType()->getSelfParameter().getConvention();
     return C == ParameterConvention::Direct_Guaranteed;
@@ -3051,7 +3095,7 @@ public:
     return getArguments().slice(getNumIndirectResults());
   }
 
-  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() {
     return getArgumentOperands().slice(getNumIndirectResults());
   }
 
@@ -5374,18 +5418,45 @@ public:
   /// or null if we don't have one.
   VarDecl *getDecl() const;
 
+  /// Return the SILLocation for the debug variable.
+  SILLocation getVarLoc() const {
+    if (hasAuxDebugLocation())
+      return *getTrailingObjects<SILLocation>();
+    return getLoc().strippedForDebugVariable();
+  }
+
   /// Return the debug variable information attached to this instruction.
-  std::optional<SILDebugVariable> getVarInfo() const {
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  ///
+  /// \note The type is not included because it can change during a pass.
+  /// Passes must make sure to not lose the type information.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
+
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
+    // TODO: passes break if we set the type here, as the type of the operand
+    // can be changed during a pass.
+    // else if (complete)
+    //   AuxVarType = getOperand()->getType().getObjectType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
+    else if (complete)
+      VarDeclLoc = getLoc().strippedForDebugVariable();
+
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
+    else if (complete)
+      VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
@@ -5827,6 +5898,10 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
   }
 
   static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILModule &Mod,
+                            ValueOwnershipKind forwardingOwnershipKind);
+
+  static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                             SILType Ty, SILFunction &F,
                             ValueOwnershipKind forwardingOwnershipKind);
 };
@@ -5911,6 +5986,10 @@ class UncheckedRefCastInst final
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, ValueOwnershipKind forwardingOwnershipKind);
+
+  static UncheckedRefCastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
@@ -8458,6 +8537,16 @@ class EndLifetimeInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
+/// Mark the end of the linear live range of a value without destroying it.
+class ExtendLifetimeInst
+    : public UnaryInstructionBase<SILInstructionKind::ExtendLifetimeInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  ExtendLifetimeInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
+};
+
 /// An unsafe conversion in between ownership kinds.
 ///
 /// This is used today in destructors where due to Objective-C legacy
@@ -9073,7 +9162,7 @@ class MoveOnlyWrapperToCopyableBoxInst
                                    ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(
             DebugLoc, operand,
-            operand->getType().removingMoveOnlyWrapperToBoxedType(
+            operand->getType().removingMoveOnlyWrapperFromBoxedType(
                 operand->getFunction()),
             forwardingOwnershipKind) {
     assert(

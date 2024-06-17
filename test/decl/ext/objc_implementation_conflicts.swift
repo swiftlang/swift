@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h
-// RUN: %target-typecheck-verify-swift -DPRIVATE_MODULE -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap
+// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -DPRIVATE_MODULE -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple
 
 // REQUIRES: objc_interop
 

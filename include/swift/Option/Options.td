@@ -193,6 +193,12 @@ def no_strict_implicit_module_context :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
+def compiler_assertions :
+  Flag<["-"], "compiler-assertions">,
+  Group<internal_debug_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
+  HelpText<"Enable internal self-checks while compiling">;
+
 def validate_clang_modules_once :
   Flag<["-"], "validate-clang-modules-once">,
   Flags<[FrontendOption]>,
@@ -403,7 +409,7 @@ def remark_module_recovery : Flag<["-"], "Rmodule-recovery">,
   HelpText<"Emit remarks about contextual inconsistencies in loaded modules">;
 def remark_module_api_import : Flag<["-"], "Rmodule-api-import">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit remarks about the import briging in each element composing the API">;
+  HelpText<"Emit remarks about the import bridging in each element composing the API">;
 
 def remark_macro_loading : Flag<["-"], "Rmacro-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -541,6 +547,11 @@ def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
          SwiftSymbolGraphExtractOption]>,
   HelpText<"Name of the module to build">;
+def project_name : Separate<["-"], "project-name">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption]>,
+  HelpText<"Name of the project this module to build belongs to">;
+
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
@@ -753,13 +764,13 @@ def enable_experimental_cxx_interop :
 
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C foreign references types (with reference coutning).">;
+  HelpText<"Enable experimental C foreign references types (with reference counting).">;
 
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
@@ -991,7 +1002,7 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+  HelpText<"Enable optimization to perform default CMO within a package boundary">;
 
 def EnbaleDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
@@ -1363,7 +1374,11 @@ def disable_clang_target : Flag<["-"], "disable-clang-target">,
 
 def explain_module_dependency : Separate<["-"], "explain-module-dependency">,
   Flags<[NewDriverOnlyOption]>,
-  HelpText<"Emit remark/notes describing why compilaiton may depend on a module with a given name.">;
+  HelpText<"Emit remark/notes describing why compilation may depend on a module with a given name.">;
+
+def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -1573,6 +1588,10 @@ def output_dir : Separate<["-"], "output-dir">,
   HelpText<"Output directory">,
   MetaVarName<"<dir>">;
 
+def experimental_allowed_reexported_modules: CommaJoined<["-"], "experimental-allowed-reexported-modules=">,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
+  HelpText<"Allow reexporting symbols from the provided modules if they are themselves exported from the main module. This is a comma separated list of module names.">;
+
 def skip_synthesized_members: Flag<[ "-" ], "skip-synthesized-members">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Skip members inherited through classes or default implementations">;
@@ -1596,7 +1615,7 @@ def include_spi_symbols : Flag<["-"], "include-spi-symbols">,
 def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">,
   Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
-  HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocl extensions">;
+  HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocol extensions">;
 
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,

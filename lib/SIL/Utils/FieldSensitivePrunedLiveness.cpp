@@ -158,6 +158,18 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    if (auto *oea =
+            dyn_cast<OpenExistentialAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = oea->getOperand();
+      continue;
+    }
+
+    if (auto *iea =
+            dyn_cast<InitExistentialAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = iea->getOperand();
+      continue;
+    }
+
     if (auto *teai =
             dyn_cast<TupleElementAddrInst>(projectionDerivedFromRoot)) {
       SILType tupleType = teai->getOperand()->getType();
@@ -1137,9 +1149,18 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
         for (SILBasicBlock *succBB : block->getSuccessors()) {
           if (FieldSensitivePrunedLiveBlocks::isDead(
                 getBlockLiveness(succBB, index))) {
-            PRUNED_LIVENESS_LOG(llvm::dbgs() << "Marking succBB as boundary edge: bb"
-                                    << succBB->getDebugID() << '\n');
-            boundary.getBoundaryEdgeBits(succBB).set(index);
+            // If the basic block ends in unreachable, don't consider it a
+            // boundary.
+            // TODO: Should also do this if the block's successors all always
+            // end in unreachable too.
+            if (isa<UnreachableInst>(succBB->getTerminator())) {
+              PRUNED_LIVENESS_LOG(llvm::dbgs() << "succBB ends in unreachable, skipping as boundary edge: bb"
+                                      << succBB->getDebugID() << '\n');
+            } else {
+              PRUNED_LIVENESS_LOG(llvm::dbgs() << "Marking succBB as boundary edge: bb"
+                                      << succBB->getDebugID() << '\n');
+              boundary.getBoundaryEdgeBits(succBB).set(index);
+            }
           }
         }
         asImpl().findBoundariesInBlock(block, index, /*isLiveOut*/ true,

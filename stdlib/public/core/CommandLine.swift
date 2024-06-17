@@ -19,17 +19,9 @@ internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
 /// Command-line arguments for the current process.
-#if $BitwiseCopyable && $ConformanceSuppression
 @frozen // namespace
-public enum CommandLine : ~_BitwiseCopyable {
+public enum CommandLine : ~BitwiseCopyable {
 }
-#else
-@frozen // namespace
-public enum CommandLine {
-}
-@available(*, unavailable)
-extension CommandLine : _BitwiseCopyable {}
-#endif
 
 extension CommandLine {
   /// The backing static variable for argument count may come either from the

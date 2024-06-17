@@ -100,6 +100,11 @@ template<typename T,
          typename = typename std::enable_if<
              canExtractNearestSourceLoc<T>()>::type>
 SourceLoc maybeExtractNearestSourceLoc(const T& value) {
+  if constexpr (std::is_pointer_v<T>) {
+    if (value == nullptr) {
+      return SourceLoc();
+    }
+  }
   return extractNearestSourceLoc(value);
 }
 

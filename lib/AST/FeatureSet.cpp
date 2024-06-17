@@ -415,6 +415,7 @@ static bool usesFeatureCodeItemMacros(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BodyMacros)
+UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
 
 static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
@@ -506,6 +507,21 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 
+static bool disallowFeatureSuppression(StringRef featureName, Decl *decl);
+
+static bool allSubstTypesAreCopyable(Type type, DeclContext *context) {
+  assert(type->getAnyNominal());
+  auto bgt = type->getAs<BoundGenericType>();
+  if (!bgt)
+    return false;  // nothing is bound.
+
+  for (auto argInterfaceTy : bgt->getGenericArgs())
+    if (context->mapTypeIntoContext(argInterfaceTy)->isNoncopyable())
+      return false;
+
+  return true;
+}
+
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>())
     return true;
@@ -523,15 +539,32 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
 
     if (isa<AbstractFunctionDecl>(valueDecl) ||
         isa<AbstractStorageDecl>(valueDecl)) {
-      if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
-            if (auto *nominalDecl = type->getAnyNominal()) {
-              if (isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
-                return usesFeatureNoncopyableGenerics(nominalDecl);
-            }
-            return false;
-          })) {
+      auto *context = decl->getInnermostDeclContext();
+      auto usesFeature = valueDecl->getInterfaceType().findIf(
+          [&](Type type) -> bool {
+        auto *nominalDecl = type->getAnyNominal();
+        if (!nominalDecl || !isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
+          return false;
+
+        if (!usesFeatureNoncopyableGenerics(nominalDecl))
+          return false;
+
+        // If we only _refer_ to a TypeDecl that uses NoncopyableGenerics,
+        // and a suppressed version of that decl is in the interface, and
+        // if we only substitute Copyable types for the generic parameters,
+        // then we can say this decl is not "using" the feature such that
+        // a feature guard is required. In other words, this reference to the
+        // type will always be valid, regardless of whether the feature is
+        // enabled or not. (rdar://127389991)
+        if (!disallowFeatureSuppression("NoncopyableGenerics", nominalDecl)
+            && allSubstTypesAreCopyable(type, context)) {
+          return false;
+        }
+
         return true;
-      }
+      });
+      if (usesFeature)
+        return true;
     }
   }
 
@@ -589,14 +622,6 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
       decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return true;
   }
-  auto *fd = dyn_cast<FuncDecl>(decl);
-  if (fd && fd->getAttrs().getAttribute(DeclAttrKind::ResultDependsOnSelf)) {
-    return true;
-  }
-  auto *pd = dyn_cast<ParamDecl>(decl);
-  if (pd && pd->hasResultDependsOn()) {
-    return true;
-  }
   return false;
 }
 
@@ -612,30 +637,60 @@ UNINTERESTING_FEATURE(BitwiseCopyable)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
-static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
-  if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->isTransferring())
-      return true;
+UNINTERESTING_FEATURE(TransferringArgsAndResults)
+static bool usesFeatureSendingArgsAndResults(Decl *decl) {
+  auto isFunctionTypeWithSending = [](Type type) {
+      auto fnType = type->getAs<AnyFunctionType>();
+      if (!fnType)
+        return false;
 
-  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
-    auto fnTy = fDecl->getInterfaceType();
-    bool hasTransferring = false;
-    if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    } else if (auto *ft =
-                   llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
-      if (ft->hasExtInfo())
-        hasTransferring = ft->hasTransferringResult();
-    }
-    if (hasTransferring)
+      if (fnType->hasExtInfo() && fnType->hasSendingResult())
+        return true;
+
+      return llvm::any_of(fnType->getParams(),
+                          [](AnyFunctionType::Param param) {
+                            return param.getParameterFlags().isSending();
+                          });
+  };
+  auto declUsesFunctionTypesThatUseSending = [&](Decl *decl) {
+    return usesTypeMatching(decl, isFunctionTypeWithSending);
+  };
+
+  if (auto *pd = dyn_cast<ParamDecl>(decl)) {
+    if (pd->isSending()) {
       return true;
+    }
+
+    if (declUsesFunctionTypesThatUseSending(pd))
+      return true;
+  }
+
+  if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+    // First check for param decl results.
+    if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
+          return usesFeatureSendingArgsAndResults(pd);
+        }))
+      return true;
+    if (declUsesFunctionTypesThatUseSending(decl))
+      return true;
+  }
+
+  // Check if we have a pattern binding decl for a function that has sending
+  // parameters and results.
+  if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    for (auto index : range(pbd->getNumPatternEntries())) {
+      auto *pattern = pbd->getPattern(index);
+      if (pattern->hasType() && isFunctionTypeWithSending(pattern->getType()))
+        return true;
+    }
   }
 
   return false;
 }
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
+
+UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
@@ -677,6 +732,19 @@ static bool usesFeatureConformanceSuppression(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBitwiseCopyable2(Decl *decl) {
+  if (!decl->getModuleContext()->isStdlibModule()) {
+    return false;
+  }
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    return proto->getNameStr() == "BitwiseCopyable";
+  }
+  if (auto *typealias = dyn_cast<TypeAliasDecl>(decl)) {
+    return typealias->getNameStr() == "_BitwiseCopyable";
+  }
+  return false;
+}
+
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
     if (auto fnType = type->getAs<AnyFunctionType>()) {
@@ -694,6 +762,7 @@ static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(ObjCImplementation)
+UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 UNINTERESTING_FEATURE(CImplementation)
 
 static bool usesFeatureSensitive(Decl *decl) {
@@ -701,6 +770,7 @@ static bool usesFeatureSensitive(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
+UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

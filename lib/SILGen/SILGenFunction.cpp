@@ -569,10 +569,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       continue;
     }
 
-    if (capture.isOpaqueValue()) {
-      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+    if (capture.isOpaqueValue() || capture.isPackElement()) {
       capturedArgs.push_back(
-          emitRValueAsSingleValue(opaqueValue).ensurePlusOne(*this, loc));
+          emitRValueAsSingleValue(capture.getExpr()).ensurePlusOne(*this, loc));
       continue;
     }
 
@@ -977,27 +976,31 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // Apply substitutions.
   auto pft = constantInfo.SILFnType;
 
-  auto closure = *constant.getAnyFunctionRef();
-  auto *dc = closure.getAsDeclContext()->getParent();
-  if (dc->isLocalContext() && !loweredCaptureInfo.hasGenericParamCaptures()) {
-    // If the lowered function type is not polymorphic but we were given
-    // substitutions, we have a closure in a generic context which does not
-    // capture generic parameters. Just drop the substitutions.
-    subs = { };
-  } else if (closure.getAbstractClosureExpr()) {
+  if (constant.getAbstractClosureExpr()) {
     // If we have a closure expression in generic context, Sema won't give
     // us substitutions, so we just use the forwarding substitutions from
     // context.
-    subs = getForwardingSubstitutionMap();
+    std::tie(std::ignore, std::ignore, subs)
+        = SGM.Types.getForwardingSubstitutionsForLowering(constant);
+  } else {
+    subs = SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+        constant, loweredCaptureInfo, subs);
   }
 
-  bool wasSpecialized = false;
-  if (!subs.empty()) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (!pft->isPolymorphic()) {
+    subs = SubstitutionMap();
+  } else {
+    assert(!subs.getGenericSignature()->areAllParamsConcrete());
+
     auto specialized =
         pft->substGenericArgs(F.getModule(), subs, getTypeExpansionContext());
     functionTy = SILType::getPrimitiveObjectType(specialized);
-    wasSpecialized = true;
   }
+
+  auto closure = *constant.getAnyFunctionRef();
+  auto *dc = closure.getAsDeclContext()->getParent();
 
   // If we're in top-level code, we don't need to physically capture script
   // globals, but we still need to mark them as escaping so that DI can flag
@@ -1011,7 +1014,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     typeContext.ExpectedLoweredType->hasErasedIsolation();
 
   ManagedValue result;
-  if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized &&
+  if (loweredCaptureInfo.getCaptures().empty() && !subs &&
       !hasErasedIsolation) {
     result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
   } else {

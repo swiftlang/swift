@@ -477,6 +477,11 @@ public:
   /// This should only be the case during parsing or deserialization.
   bool hasUnresolvedLocalArchetypeDefinitions();
 
+  /// If we added any instructions that reference unresolved local archetypes
+  /// and then deleted those instructions without resolving those archetypes,
+  /// we must reclaim those unresolved local archetypes.
+  void reclaimUnresolvedLocalArchetypeDefinitions();
+
   /// Get a unique index for a struct or class field in layout order.
   ///
   /// Precondition: \p decl must be a non-resilient struct or class.

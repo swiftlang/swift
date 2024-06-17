@@ -31,6 +31,7 @@
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -273,8 +274,13 @@ public:
                  bool isInOutParam) {
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
-      ClangSyntaxPrinter(os).printClangTypeReference(cd->getClangDecl());
-      os << " *"
+      const auto *clangDecl = cd->getClangDecl();
+      ClangSyntaxPrinter(os).printClangTypeReference(clangDecl);
+      bool alreadyPointer = false;
+      if (const auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl))
+        if (importer::isCFTypeDecl(typedefDecl))
+          alreadyPointer = true;
+      os << (alreadyPointer ? " " : " *")
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
       if (isInOutParam) {
@@ -712,6 +718,17 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     // Print the template and requires clauses for this function.
     if (kind == FunctionSignatureKind::CxxInlineThunk)
       ClangSyntaxPrinter(os).printGenericSignature(Signature);
+  }
+  if (const auto *enumDecl = FD->getDeclContext()->getSelfEnumDecl()) {
+    // We cannot emit functions with the same name as an enum case yet, the resulting header
+    // does not compiler.
+    // FIXME: either do not emit cases as inline members, or rename the cases or the
+    //        colliding functions.
+    for (const auto *enumElement : enumDecl->getAllElements()) {
+      auto elementName = enumElement->getName();
+      if (!elementName.isSpecial() && elementName.getBaseIdentifier().is(name))
+        return ClangRepresentation::unsupported;
+    }
   }
   auto emittedModule = FD->getModuleContext();
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
@@ -1521,7 +1538,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   auto result = printFunctionSignature(
       FD, signature, cxx_translation::getNameForCxx(FD), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);
-  assert(!result.isUnsupported() && "C signature should be unsupported too");
+  if (result.isUnsupported())
+    return;
 
   declAndTypePrinter.printAvailability(os, FD);
   if (!isDefinition) {

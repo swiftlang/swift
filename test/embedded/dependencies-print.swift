@@ -15,6 +15,7 @@
 // DEP: ___stack_chk_guard
 // DEP: ___divti3
 // DEP: ___modti3
+// DEP: _memmove
 // DEP: _memset
 // DEP: _putchar
 

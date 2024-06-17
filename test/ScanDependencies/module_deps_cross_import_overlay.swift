@@ -30,5 +30,12 @@ import SubEWrapper
 // CHECK-NOT:   "clang": "X"
 // CHECK: ],
 
+// CHECK: "swift": {
+// CHECK-NEXT: "commandLine": [
+// CHECK-NEXT: "-disable-cross-import-overlay-search",
+// CHECK-NEXT: "-swift-module-cross-import",
+// CHECK-NEXT: "E",
+// CHECK-NEXT: SubE.swiftoverlay
+
 // Ensure a transitive dependency via "_cross_import_E" is recorded in the graph still
 // CHECK:   "clang": "X"

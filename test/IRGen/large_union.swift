@@ -7,13 +7,13 @@ public func test1(_ s: some_struct) -> some_struct {
 }
 // CHECK: sil @$s1t5test1ySo11some_structaADF : $@convention(thin) (@in_guaranteed some_struct) -> @out some_struct {
 // CHECK-NOT: unchecked_trivial_bitcast
-// CHECK: unchecked_addr_cast {{.*}} : $*some_struct.__Unnamed_struct_out to $*some_struct
+// CHECK: unchecked_addr_cast {{.*}} : $*some_struct to $*some_struct.__Unnamed_struct_out
 // CHECK-NOT: unchecked_trivial_bitcast
 // CHECK: } // end sil function '$s1t5test1ySo11some_structaADF'
 
 // CHECK: sil @$s1t5test2yySo11some_structazF : $@convention(thin) (@inout some_struct) -> () {
 // CHECK-NOT: unchecked_trivial_bitcast
-// CHECK: unchecked_addr_cast {{.*}} : $*some_struct.__Unnamed_struct_out to $*some_struct
+// CHECK: unchecked_addr_cast {{.*}} : $*some_struct to $*some_struct.__Unnamed_struct_out
 // CHECK-NOT: unchecked_trivial_bitcast
 // CHECK: } // end sil function '$s1t5test2yySo11some_structazF'
 

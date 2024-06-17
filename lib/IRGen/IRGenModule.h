@@ -821,7 +821,8 @@ public:
   llvm::StructType  *SwiftTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialSerialExecutorTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
-  llvm::StructType  *SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskExecutorUnownedPreferenceTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
@@ -837,8 +838,8 @@ public:
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
-  llvm::GlobalVariable *swiftImmortalRefCount = nullptr;
-  llvm::GlobalVariable *swiftStaticArrayMetadata = nullptr;
+  llvm::Constant *swiftImmortalRefCount = nullptr;
+  llvm::Constant *swiftStaticArrayMetadata = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.

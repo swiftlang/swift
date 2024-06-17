@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowingSwitch -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 struct Payload: ~Copyable {
     var x: Int
@@ -38,16 +38,19 @@ func testBorrowingPatterns(bar: borrowing Bar) {
     case borrowing (): // parses as `borrowing()` as before
         break
 
-    case borrowing x: 
+    case borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
         useBorrowBar(x)
 
-    case .payload(borrowing x):
+    case .payload(borrowing x): // expected-warning{{'borrowing' in pattern matches is deprecated}} {{19-28=let}}
         useBorrowFoo(x)
 
-    case borrowing x.member: // expected-error{{'borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
+    case borrowing x.member: // expected-warning{{deprecated}} expected-error{{'borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
         break
 
-    case _borrowing x: // expected-warning{{'_borrowing' spelling is deprecated}} {{10-20=borrowing}}
+    case borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
+        useBorrowBar(x)
+
+    case _borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-20=let}}
         useBorrowBar(x)
 
     default:

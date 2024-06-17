@@ -1671,6 +1671,16 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       break;
     }
 
+    case ConstraintKind::OptionalObject: {
+      // Type variable that represents an object type of
+      // an un-inferred optional is adjacent to a type
+      // variable that presents such optional (`bindingTypeVar`
+      // in this case).
+      if (kind == AllowedBindingKind::Supertypes)
+        AdjacentVars.insert({bindingTypeVar, constraint});
+      break;
+    }
+
     default:
       break;
     }
@@ -1713,26 +1723,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// those types should be opened.
 void PotentialBindings::infer(Constraint *constraint) {
   switch (constraint->getKind()) {
-  case ConstraintKind::OptionalObject: {
-    // Inference through optional object is allowed if
-    // one of the types is resolved or "optional" type variable
-    // cannot be bound to l-value, otherwise there is a
-    // risk of binding "optional" to an optional type (inferred from
-    // the "object") and discovering an l-value binding for it later.
-    auto optionalType = constraint->getFirstType();
-
-    if (auto *optionalVar = optionalType->getAs<TypeVariableType>()) {
-      if (optionalVar->getImpl().canBindToLValue()) {
-        auto objectType =
-            constraint->getSecondType()->lookThroughAllOptionalTypes();
-        if (objectType->isTypeVariableOrMember())
-          return;
-      }
-    }
-
-    LLVM_FALLTHROUGH;
-  }
-
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
@@ -1742,6 +1732,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedMemberChainBase: {
     auto binding = inferFromRelational(constraint);
     if (!binding)

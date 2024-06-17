@@ -1,14 +1,14 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics -enable-builtin-module
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -enable-builtin-module
 // REQUIRES: asserts
 
 import Builtin
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeRawBufferPointer) {
+  init(_ ptr: UnsafeRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
+  // TODO:  -> dependsOn(ptr) Self
   @_unsafeNonescapableResult
   init?(_ ptr: UnsafeRawBufferPointer, _ i: Int) {
     if (i % 2 == 0) {
@@ -45,8 +45,7 @@ struct BufferView : ~Escapable {
 
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
-  @_unsafeNonescapableResult
-  init(_ ptr: UnsafeMutableRawBufferPointer) {
+  init(_ ptr: UnsafeMutableRawBufferPointer) -> dependsOn(ptr) Self {
     self.ptr = ptr
   }
 }
@@ -152,5 +151,17 @@ struct Wrapper : ~Escapable {
 
   borrowing func getView4() -> dependsOn(self) BufferView {
     return view
+  }
+}
+
+enum FakeOptional<Wrapped: ~Escapable>: ~Escapable {
+  case none, some(Wrapped)
+}
+
+extension FakeOptional: Escapable where Wrapped: Escapable {}
+
+extension FakeOptional where Wrapped: ~Escapable {
+  init(nilLiteral: ()) -> dependsOn(immortal) Self {
+    self = .none
   }
 }

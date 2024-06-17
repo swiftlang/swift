@@ -1,9 +1,6 @@
 // RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
 // RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
-
 // This file contains specific SIL test cases that we expect to emit
 // diagnostics. These are cases where we want to make it easy to validate
 // independent of potential changes in the frontend's emission that this

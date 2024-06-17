@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -verify %s
+// RUN: %target-swift-frontend -emit-sil -parse-stdlib -module-name Swift -verify %s
 
 @_marker protocol Copyable {}
 @_marker protocol Escapable {}

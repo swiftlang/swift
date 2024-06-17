@@ -56,11 +56,12 @@ extension Parser.ExperimentalFeatures {
         insert(feature)
       }
     }
+
     mapFeature(.ThenStatements, to: .thenStatements)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TransferringArgsAndResults, to: .transferringArgsAndResults)
-    mapFeature(.BorrowingSwitch, to: .borrowingSwitch)
+    mapFeature(.SendingArgsAndResults, to: .sendingArgsAndResults)
   }
 }
 

@@ -877,7 +877,9 @@ BridgedParamDecl BridgedParamDecl_createParsed(
         else if (isa<CompileTimeConstTypeRepr>(STR))
           paramDecl->setCompileTimeConst(true);
         else if (isa<TransferringTypeRepr>(STR))
-          paramDecl->setTransferring(true);
+          paramDecl->setSending(true);
+        else if (isa<SendingTypeRepr>(STR))
+          paramDecl->setSending(true);
 
         unwrappedType = STR->getBase();
         continue;
@@ -2225,14 +2227,14 @@ BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
   case BridgedAttributedTypeSpecifierTransferring: {
     return new (context) TransferringTypeRepr(baseType, loc);
   }
+  case BridgedAttributedTypeSpecifierSending: {
+    return new (context) SendingTypeRepr(baseType, loc);
+  }
   case BridgedAttributedTypeSpecifierConst: {
     return new (context) CompileTimeConstTypeRepr(baseType, loc);
   }
   case BridgedAttributedTypeSpecifierIsolated: {
     return new (context) IsolatedTypeRepr(baseType, loc);
-  }
-  case BridgedAttributedTypeSpecifierResultDependsOn: {
-    return new (context) ResultDependsOnTypeRepr(baseType, loc);
   }
   }
 }

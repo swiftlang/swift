@@ -60,14 +60,19 @@ final public class FunctionArgument : Argument {
     return index < parentFunction.numIndirectResultArguments
   }
 
-  public var hasResultDependsOn : Bool {
-    return bridged.hasResultDependsOn()
-  }
-
   /// If the function's result depends on this argument, return the
   /// kind of dependence.
   public var resultDependence: LifetimeDependenceConvention? {
     parentFunction.argumentConventions[resultDependsOn: index]
+  }
+
+  /// Copies the following flags from `arg`:
+  /// 1. noImplicitCopy
+  /// 2. lifetimeAnnotation
+  /// 3. closureCapture
+  /// 4. parameterPack
+  public func copyFlags(from arg: FunctionArgument) {
+    bridged.copyFlags(arg.bridged)
   }
 }
 
@@ -441,6 +446,17 @@ public enum ArgumentConvention : CustomStringConvertible {
     case .indirectIn, .directOwned, .directUnowned,
          .indirectInout, .indirectInoutAliasable, .indirectOut,
          .packOut, .packInout, .packOwned:
+      return false
+    }
+  }
+
+  public var isConsumed: Bool {
+    switch self {
+    case .indirectIn, .directOwned, .packOwned:
+      return true
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed,
+          .indirectInout, .indirectInoutAliasable, .indirectOut,
+          .packOut, .packInout, .directUnowned:
       return false
     }
   }

@@ -44,10 +44,10 @@ bb2:
 bb3:
   %transferKlass = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferKlass(%klass) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+  // expected-warning @-1 {{}}
   %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %useKlass(%klass) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
-  // expected-note @-1 {{use here could race}}
+  // expected-note @-1 {{access can happen concurrently}}
   destroy_value %klass : $NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()

@@ -1754,7 +1754,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   for (auto it : valuesToComplete) {
     // Set forceBoundaryCompletion as true so that we complete at boundary for
     // lexical values as well.
-    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
+    completion.completeOSSALifetime(it,
+                                    OSSALifetimeCompletion::Boundary::Liveness);
   }
 }
 
@@ -2070,7 +2071,7 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
     }
   }
   CanonicalizeOSSALifetime canonicalizer(
-      /*pruneDebug=*/true, /*maximizeLifetime=*/!f.shouldOptimize(), &f,
+      PruneDebugInsts, MaximizeLifetime_t(!f.shouldOptimize()), &f,
       accessBlockAnalysis, domInfo, calleeAnalysis, deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())

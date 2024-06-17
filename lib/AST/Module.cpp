@@ -26,6 +26,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -39,6 +40,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -1288,42 +1290,6 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-void swift::collectParsedExportedImports(const ModuleDecl *M,
-                                         SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
-                                         llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport) {
-  for (const FileUnit *file : M->getFiles()) {
-    if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
-      if (source->hasImports()) {
-        for (auto import : source->getImports()) {
-          if (import.options.contains(ImportFlags::Exported) &&
-              (!includeImport || includeImport(import)) &&
-              import.module.importedModule->shouldCollectDisplayDecls()) {
-            auto *TheModule = import.module.importedModule;
-
-            if (import.module.getAccessPath().size() > 0) {
-              if (QualifiedImports.find(TheModule) == QualifiedImports.end()) {
-                QualifiedImports.try_emplace(TheModule);
-              }
-              auto collectDecls = [&](ValueDecl *VD,
-                                      DeclVisibilityKind reason) {
-                if (reason == DeclVisibilityKind::VisibleAtTopLevel)
-                  QualifiedImports[TheModule].insert(VD);
-              };
-              auto consumer = makeDeclConsumer(std::move(collectDecls));
-              TheModule->lookupVisibleDecls(
-                  import.module.getAccessPath(), consumer,
-                  NLKind::UnqualifiedLookup);
-            } else if (!Imports.contains(TheModule)) {
-              Imports.insert(TheModule);
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
 void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   FORWARD(getLocalTypeDecls, (Results));
 }
@@ -1544,40 +1510,101 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   return Result;
 }
 
-void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
-  if (Recursive && isParsedModule(this)) {
-    SmallPtrSet<ModuleDecl *, 4> Modules;
-    llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
-    collectParsedExportedImports(this, Modules, QualifiedImports);
-    for (const auto &QI : QualifiedImports) {
-      auto Module = QI.getFirst();
-      if (Modules.contains(Module)) continue;
+void ModuleDecl::ImportCollector::collect(
+    const ImportedModule &importedModule) {
+  auto *module = importedModule.importedModule;
 
-      auto &Decls = QI.getSecond();
-      Results.append(Decls.begin(), Decls.end());
-    }
-    for (const ModuleDecl *import : Modules) {
-      import->getDisplayDecls(Results, Recursive);
+  if (!module->shouldCollectDisplayDecls())
+    return;
+
+  if (importFilter && !importFilter(module))
+    return;
+
+  if (importedModule.getAccessPath().size() > 0) {
+    auto collectDecls = [&](ValueDecl *VD, DeclVisibilityKind reason) {
+      if (reason == DeclVisibilityKind::VisibleAtTopLevel)
+        this->qualifiedImports[module].insert(VD);
+    };
+    auto consumer = makeDeclConsumer(std::move(collectDecls));
+    module->lookupVisibleDecls(importedModule.getAccessPath(), consumer,
+                               NLKind::UnqualifiedLookup);
+  } else {
+    imports.insert(module);
+  }
+}
+
+static void
+collectExportedImports(const ModuleDecl *module,
+                       ModuleDecl::ImportCollector &importCollector) {
+  for (const FileUnit *file : module->getFiles()) {
+    if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
+      if (source->hasImports()) {
+        for (const auto &import : source->getImports()) {
+          if (import.options.contains(ImportFlags::Exported) &&
+              import.docVisibility.value_or(AccessLevel::Public) >=
+                  importCollector.minimumDocVisibility) {
+            importCollector.collect(import.module);
+            collectExportedImports(import.module.importedModule,
+                                   importCollector);
+          }
+        }
+      }
+    } else {
+      SmallVector<ImportedModule, 8> exportedImports;
+      file->getImportedModules(exportedImports,
+                               ModuleDecl::ImportFilterKind::Exported);
+      for (const auto &im : exportedImports) {
+        // Skip collecting the underlying clang module as we already have the relevant import.
+        if (module->isClangOverlayOf(im.importedModule))
+          continue;
+        importCollector.collect(im);
+        collectExportedImports(im.importedModule, importCollector);
+      }
     }
   }
-  // FIXME: Should this do extra access control filtering?
-  FORWARD(getDisplayDecls, (Results));
+}
+
+void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
+  if (Recursive) {
+    ImportCollector importCollector;
+    this->getDisplayDeclsRecursivelyAndImports(Results, importCollector);
+  } else {
+    // FIXME: Should this do extra access control filtering?
+    FORWARD(getDisplayDecls, (Results));
+  }
+}
+
+void ModuleDecl::getDisplayDeclsRecursivelyAndImports(
+    SmallVectorImpl<Decl *> &results, ImportCollector &importCollector) const {
+  this->getDisplayDecls(results, /*Recursive=*/false);
+
+  // Look up imports recursively.
+  collectExportedImports(this, importCollector);
+  for (const auto &QI : importCollector.qualifiedImports) {
+    auto Module = QI.getFirst();
+    if (importCollector.imports.contains(Module))
+      continue;
+
+    auto &Decls = QI.getSecond();
+    results.append(Decls.begin(), Decls.end());
+  }
+
+  for (const ModuleDecl *import : importCollector.imports)
+    import->getDisplayDecls(results);
 
 #ifndef NDEBUG
-  if (Recursive) {
-    llvm::DenseSet<Decl *> visited;
-    for (auto *D : Results) {
-      // decls synthesized from implicit clang decls may appear multiple times;
-      // e.g. if multiple modules with underlying clang modules are re-exported.
-      // including duplicates of these is harmless, so skip them when counting
-      // this assertion
-      if (const auto *CD = D->getClangDecl()) {
-        if (CD->isImplicit()) continue;
-      }
-
-      auto inserted = visited.insert(D).second;
-      assert(inserted && "there should be no duplicate decls");
+  llvm::DenseSet<Decl *> visited;
+  for (auto *D : results) {
+    // decls synthesized from implicit clang decls may appear multiple times;
+    // e.g. if multiple modules with underlying clang modules are re-exported.
+    // including duplicates of these is harmless, so skip them when counting
+    // this assertion
+    if (const auto *CD = D->getClangDecl()) {
+      if (CD->isImplicit())
+        continue;
     }
+    auto inserted = visited.insert(D).second;
+    assert(inserted && "there should be no duplicate decls");
   }
 #endif
 }
@@ -1690,6 +1717,54 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 void ModuleDecl::getMissingImportedModules(
     SmallVectorImpl<ImportedModule> &imports) const {
   FORWARD(getMissingImportedModules, (imports));
+}
+
+const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
+ModuleDecl::getVisibleClangModules(PrintOptions::InterfaceMode contentMode) {
+  if (CachedVisibleClangModuleSet.find(contentMode) != CachedVisibleClangModuleSet.end())
+    return CachedVisibleClangModuleSet[contentMode];
+  else
+    CachedVisibleClangModuleSet.emplace(contentMode, VisibleClangModuleSet{});
+  VisibleClangModuleSet &result = CachedVisibleClangModuleSet[contentMode];
+
+  // For the current module, consider both private and public imports.
+  ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
+  Filter |= ModuleDecl::ImportFilterKind::Default;
+
+  // For private or package swiftinterfaces, also look through @_spiOnly imports.
+  if (contentMode != PrintOptions::InterfaceMode::Public)
+    Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+  // Consider package import for package interface
+  if (contentMode == PrintOptions::InterfaceMode::Package)
+    Filter |= ModuleDecl::ImportFilterKind::PackageOnly;
+
+  SmallVector<ImportedModule, 32> Imports;
+  getImportedModules(Imports, Filter);
+
+  SmallVector<ModuleDecl *, 32> ModulesToProcess;
+  for (const auto &Import : Imports)
+    ModulesToProcess.push_back(Import.importedModule);
+
+  SmallPtrSet<ModuleDecl *, 32> Processed;
+  while (!ModulesToProcess.empty()) {
+    ModuleDecl *Mod = ModulesToProcess.back();
+    ModulesToProcess.pop_back();
+
+    if (!Processed.insert(Mod).second)
+      continue;
+
+    if (const clang::Module *ClangModule = Mod->findUnderlyingClangModule())
+      result[ClangModule] = Mod;
+
+    // For transitive imports, consider only public imports.
+    Imports.clear();
+    Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Exported);
+    for (const auto &Import : Imports) {
+      ModulesToProcess.push_back(Import.importedModule);
+    }
+  }
+
+  return result;
 }
 
 void
@@ -2394,7 +2469,7 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   return *(declaringModuleAndBystander = {nullptr, Identifier()});
 }
 
-bool ModuleDecl::isClangOverlayOf(ModuleDecl *potentialUnderlying) {
+bool ModuleDecl::isClangOverlayOf(ModuleDecl *potentialUnderlying) const {
   return getUnderlyingModuleIfOverlay() == potentialUnderlying;
 }
 
@@ -2593,9 +2668,11 @@ ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
   auto &ctx = sf->getASTContext();
   auto imports = sf->getImports();
 
+  auto mutModule = const_cast<ModuleDecl *>(module);
   // Look to see if the owning module was directly imported.
   for (const auto &import : imports) {
-    if (import.module.importedModule == module)
+    if (import.module.importedModule
+            ->isSameModuleLookingThroughOverlays(mutModule))
       return import;
   }
 
@@ -2604,7 +2681,8 @@ ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
   for (const auto &import : imports) {
     auto &importSet = importCache.getImportSet(import.module.importedModule);
     for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == module) {
+      if (transitive.importedModule
+              ->isSameModuleLookingThroughOverlays(mutModule)) {
         return import;
       }
     }
@@ -2641,6 +2719,26 @@ void SourceFile::registerAccessLevelUsingImport(
     ImportsUseAccessLevel[mod] = accessLevel;
   else
     ImportsUseAccessLevel[mod] = std::max(accessLevel, known->second);
+
+  // Also register modules triggering the import of cross-import overlays.
+  auto declaringMod = mod->getDeclaringModuleIfCrossImportOverlay();
+  if (!declaringMod)
+    return;
+
+  SmallVector<Identifier, 1> bystanders;
+  auto bystandersValid =
+    mod->getRequiredBystandersIfCrossImportOverlay(declaringMod, bystanders);
+  if (!bystandersValid)
+    return;
+
+  for (auto &otherImport : *Imports) {
+    auto otherImportMod = otherImport.module.importedModule;
+    auto otherImportModName = otherImportMod->getName();
+    if (otherImportMod == declaringMod ||
+        llvm::find(bystanders, otherImportModName) != bystanders.end()) {
+      registerAccessLevelUsingImport(otherImport, accessLevel);
+    }
+  }
 }
 
 bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,

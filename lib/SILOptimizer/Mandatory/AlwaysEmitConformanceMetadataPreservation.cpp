@@ -73,6 +73,10 @@ public:
         AlwaysEmitMetadataConformanceDecls.push_back(ETD->getExtendedNominal());
     }
 
+    // Visit peers expanded from macros
+    D->visitAuxiliaryDecls([&](Decl *decl) { decl->walk(*this); },
+                           /*visitFreestandingExpanded=*/false);
+
     return Action::Continue();
   }
 };
@@ -90,8 +94,12 @@ class AlwaysEmitConformanceMetadataPreservation : public SILModuleTransform {
         for (const auto File : M.getSwiftModule()->getFiles())
           File->getTopLevelDecls(TopLevelDecls);
       } else {
-        for (const auto Primary : M.getSwiftModule()->getPrimarySourceFiles())
+        for (const auto Primary : M.getSwiftModule()->getPrimarySourceFiles()) {
           Primary->getTopLevelDecls(TopLevelDecls);
+	  // Visit macro expanded extensions
+	  if (auto *synthesizedPrimary = Primary->getSynthesizedFile())
+	    synthesizedPrimary->getTopLevelDecls(TopLevelDecls);
+	}
       }
     }
     for (auto *TLD : TopLevelDecls)

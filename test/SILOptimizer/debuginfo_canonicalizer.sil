@@ -118,7 +118,7 @@ bb3:
 // CHECK: } // end sil function 'testUndefDiamond'
 sil @testUndefDiamond : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : $Klass):
-  debug_value [moveable_value_debuginfo] %0 : $Klass, let, name "arg"
+  debug_value [moveable_value_debuginfo] %0 : $Klass, let, (name "arg", loc "debuginfo_canonicalizer.sil":121:3)
   %f = function_ref @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
   (%3, %token) = begin_apply %f(%0) : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
   cond_br undef, bb1, bb2
@@ -128,7 +128,7 @@ bb1:
   br bb3
 
 bb2:
-  debug_value [moveable_value_debuginfo] undef : $Klass, let, name "arg"
+  debug_value [moveable_value_debuginfo] undef : $Klass, let, (name "arg", loc "debuginfo_canonicalizer.sil":121:3)
   abort_apply %token
   br bb3
 

@@ -197,6 +197,11 @@ public:
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
 
+  /// Returns the depth that a generic parameter at the next level of
+  /// nesting would have. This is zero for the empty signature,
+  /// and one plus the depth of the final generic parameter otherwise.
+  unsigned getNextDepth() const;
+
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const;
 
@@ -306,6 +311,9 @@ public:
     assert(Mem);
     return Mem;
   }
+
+  /// Returns the depth of the last generic parameter.
+  unsigned getMaxDepth() const;
 
   /// Transform the requirements into a form where implicit Copyable and
   /// Escapable conformances are omitted, and their absence is explicitly

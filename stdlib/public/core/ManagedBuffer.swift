@@ -170,7 +170,7 @@ extension ManagedBuffer where Element: ~Copyable {
 
 extension ManagedBuffer {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC25withUnsafeMutablePointersyqd__qd__SpyxG_Spyq_GtKXEKlF")
+  @_silgen_name("$ss13ManagedBufferC32withUnsafeMutablePointerToHeaderyqd__qd__SpyxGKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
@@ -179,7 +179,7 @@ extension ManagedBuffer {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC32withUnsafeMutablePointerToHeaderyqd__qd__SpyxGKXEKlF")
+  @_silgen_name("$ss13ManagedBufferC34withUnsafeMutablePointerToElementsyqd__qd__Spyq_GKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
@@ -188,7 +188,7 @@ extension ManagedBuffer {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC34withUnsafeMutablePointerToElementsyqd__qd__Spyq_GKXEKlF")
+  @_silgen_name("$ss13ManagedBufferC25withUnsafeMutablePointersyqd__qd__SpyxG_Spyq_GtKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointers<R>(
     _ body: (

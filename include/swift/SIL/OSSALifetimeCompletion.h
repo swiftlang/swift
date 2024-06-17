@@ -50,22 +50,46 @@ public:
   OSSALifetimeCompletion(SILFunction *function, const DominanceInfo *domInfo)
     : domInfo(domInfo), completedValues(function) {}
 
+  // The kind of boundary at which to complete the lifetime.
+  //
+  // Liveness: "As early as possible."  Consume the value after the last
+  //           non-consuming uses.
+  // Availability: "As late as possible."  Consume the value in the last blocks
+  //               beyond the non-consuming uses in which the value has been
+  //               consumed on no incoming paths.
+  //
+  //                        This boundary works around bugs where SILGen emits
+  //                        illegal OSSA lifetimes.
+  struct Boundary {
+    enum Value : uint8_t {
+      Liveness,
+      Availability,
+    };
+    Value value;
+
+    Boundary(Value value) : value(value){};
+    operator Value() const { return value; }
+  };
+
   /// Insert a lifetime-ending instruction on every path to complete the OSSA
-  /// lifetime of \p value. Lifetime completion is only relevant for owned
+  /// lifetime of \p value along \p boundary.
+  ///
+  /// If \p boundary is not specified, the following boundary will be used:
+  ///   \p value is lexical -> Boundary::Availability
+  ///   \p value is non-lexical -> Boundary::Liveness
+  ///
+  /// Lifetime completion is only relevant for owned
   /// values or borrow introducers.
-  /// For lexical values lifetime is completed at unreachable instructions.
-  /// For non-lexical values lifetime is completed at the lifetime boundary.
-  /// When \p forceBoundaryCompletion is true, the client is able to guarantee
-  /// that lifetime completion of lexical values at the lifetime boundary is
-  /// sufficient.
-  /// Currently \p forceBoundaryCompletion is used by mem2reg and temprvalueopt
-  /// to complete lexical enum values on trivial paths.
+  ///
+  /// Currently \p boundary == {Boundary::Availability} is used by Mem2Reg and
+  /// TempRValueOpt and PredicatbleMemOpt to complete lexical enum values on
+  /// trivial paths.
+  ///
   /// Returns true if any new instructions were created to complete the
   /// lifetime.
   ///
   /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
-  LifetimeCompletion
-  completeOSSALifetime(SILValue value, bool forceBoundaryCompletion = false) {
+  LifetimeCompletion completeOSSALifetime(SILValue value, Boundary boundary) {
     if (value->getOwnershipKind() == OwnershipKind::None)
       return LifetimeCompletion::NoLifetime;
 
@@ -80,17 +104,24 @@ public:
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
 
-    return analyzeAndUpdateLifetime(value, forceBoundaryCompletion)
+    return analyzeAndUpdateLifetime(value, boundary)
                ? LifetimeCompletion::WasCompleted
                : LifetimeCompletion::AlreadyComplete;
   }
 
-  static void visitUnreachableLifetimeEnds(
+  enum class LifetimeEnd : uint8_t {
+    /// The lifetime ends at the boundary.
+    Boundary,
+    /// The lifetime "ends" in a loop.
+    Loop,
+  };
+
+  static void visitAvailabilityBoundary(
       SILValue value, const SSAPrunedLiveness &liveness,
-      llvm::function_ref<void(SILInstruction *)> visit);
+      llvm::function_ref<void(SILInstruction *, LifetimeEnd end)> visit);
 
 protected:
-  bool analyzeAndUpdateLifetime(SILValue value, bool forceBoundaryCompletion);
+  bool analyzeAndUpdateLifetime(SILValue value, Boundary boundary);
 };
 
 //===----------------------------------------------------------------------===//
@@ -134,6 +165,19 @@ public:
   /// region that was previously destroyed in the unreachable region.
   bool completeLifetimes();
 };
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &OS, OSSALifetimeCompletion::Boundary boundary) {
+  switch (boundary) {
+  case OSSALifetimeCompletion::Boundary::Liveness:
+    OS << "liveness";
+    break;
+  case OSSALifetimeCompletion::Boundary::Availability:
+    OS << "availability";
+    break;
+  }
+  return OS;
+}
 
 } // namespace swift
 

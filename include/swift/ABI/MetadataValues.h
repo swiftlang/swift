@@ -1198,7 +1198,7 @@ class TargetExtendedFunctionTypeFlags {
     IsolatedAny            = 0x00000002U,
 
     // Values if we have a transferring result.
-    HasTransferringResult  = 0x00000010U,
+    HasSendingResult  = 0x00000010U,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1228,10 +1228,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withTransferringResult(bool newValue = true) const {
+  withSendingResult(bool newValue = true) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~HasTransferringResult) |
-        (newValue ? HasTransferringResult : 0));
+        (Data & ~HasSendingResult) |
+        (newValue ? HasSendingResult : 0));
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1247,8 +1247,8 @@ public:
     return (Data & IsolationMask) == IsolatedAny;
   }
 
-  bool hasTransferringResult() const {
-    return bool(Data & HasTransferringResult);
+  bool hasSendingResult() const {
+    return bool(Data & HasSendingResult);
   }
 
   int_type getIntValue() const {
@@ -1295,7 +1295,7 @@ class TargetParameterTypeFlags {
     AutoClosureMask       = 0x100,
     NoDerivativeMask      = 0x200,
     IsolatedMask          = 0x400,
-    TransferringMask      = 0x800,
+    SendingMask           = 0x800,
   };
   int_type Data;
 
@@ -1335,9 +1335,9 @@ public:
   }
 
   constexpr TargetParameterTypeFlags<int_type>
-  withTransferring(bool isTransferring) const {
+  withSending(bool isSending) const {
     return TargetParameterTypeFlags<int_type>(
-        (Data & ~TransferringMask) | (isTransferring ? TransferringMask : 0));
+        (Data & ~SendingMask) | (isSending ? SendingMask : 0));
   }
 
   bool isNone() const { return Data == 0; }
@@ -1345,7 +1345,7 @@ public:
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   bool isNoDerivative() const { return Data & NoDerivativeMask; }
   bool isIsolated() const { return Data & IsolatedMask; }
-  bool isTransferring() const { return Data & TransferringMask; }
+  bool isSending() const { return Data & SendingMask; }
 
   ParameterOwnership getOwnership() const {
     return (ParameterOwnership)(Data & OwnershipMask);
@@ -2511,6 +2511,32 @@ inline int descendingPriorityOrder(JobPriority lhs,
   return (lhs == rhs ? 0 : lhs > rhs ? -1 : 1);
 }
 
+enum { PriorityBucketCount = 5 };
+
+inline int getPriorityBucketIndex(JobPriority priority) {
+  // Any unknown priorities will be rounded up to a known one.
+  // Priorities higher than UserInteractive are clamped to UserInteractive.
+  // Jobs of unknown priorities will end up in the same bucket as jobs of a
+  // corresponding known priority. Within the bucket they will be sorted in
+  // FIFO order.
+  if (priority > JobPriority::UserInitiated) {
+    // UserInteractive and higher
+    return 0;
+  } else if (priority > JobPriority::Default) {
+    // UserInitiated
+    return 1;
+  } else if (priority > JobPriority::Utility) {
+    // Default
+    return 2;
+  } else if (priority > JobPriority::Background) {
+    // Utility
+    return 3;
+  } else {
+    // Background and lower
+    return 4;
+  }
+}
+
 inline JobPriority withUserInteractivePriorityDowngrade(JobPriority priority) {
   return (priority == JobPriority::UserInteractive) ? JobPriority::UserInitiated
                                                     : priority;
@@ -2671,7 +2697,8 @@ enum class TaskOptionRecordKind : uint8_t {
   /// Information about the result type of the task, used in embedded Swift.
   ResultTypeInfo = 4,
   /// Set the initial task executor preference of the task.
-  InitialTaskExecutor = 5,
+  InitialTaskExecutorUnowned = 5,
+  InitialTaskExecutorOwned = 6,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

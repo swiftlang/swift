@@ -451,6 +451,9 @@ public:
   /// consumer, removes it from the \c Consumers severed by this build operation
   /// and, if no consumers are left, cancels the AST build of this operation.
   void requestConsumerCancellation(SwiftASTConsumerRef Consumer);
+
+  /// Cancels all consumers for the given operation.
+  void cancelAllConsumers();
 };
 
 using ASTBuildOperationRef = std::shared_ptr<ASTBuildOperation>;
@@ -516,6 +519,9 @@ public:
   void enqueueConsumer(SwiftASTConsumerRef Consumer,
                        IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
                        SwiftASTManagerRef Mgr);
+
+  /// Cancel all currently running build operations.
+  void cancelAllBuilds();
 
   size_t getMemoryCost() const {
     size_t Cost = sizeof(*this);
@@ -631,7 +637,16 @@ struct SwiftASTManager::Implementation {
     });
   }
 
-  ASTProducerRef getASTProducer(SwiftInvocationRef InvokRef);
+  /// Retrieve the ASTProducer for a given invocation, creating one if needed.
+  ASTProducerRef getOrCreateASTProducer(SwiftInvocationRef InvokRef);
+
+  /// Retrieve the ASTProducer for a given invocation, returning \c nullopt if
+  /// not present.
+  std::optional<ASTProducerRef> getASTProducer(SwiftInvocationRef Invok);
+
+  /// Updates the cache entry to account for any changes to the ASTProducer
+  /// for the given invocation.
+  void updateASTProducer(SwiftInvocationRef Invok);
 
   FileContent
   getFileContent(StringRef FilePath, bool IsPrimary,
@@ -780,7 +795,7 @@ void SwiftASTManager::processASTAsync(
     const void *OncePerASTToken, SourceKitCancellationToken CancellationToken,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem) {
   assert(fileSystem);
-  ASTProducerRef Producer = Impl.getASTProducer(InvokRef);
+  ASTProducerRef Producer = Impl.getOrCreateASTProducer(InvokRef);
 
   Impl.cleanDeletedConsumers();
   {
@@ -816,12 +831,39 @@ void SwiftASTManager::processASTAsync(
       });
 }
 
+std::optional<ASTProducerRef>
+SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef Invok) {
+  llvm::sys::ScopedLock L(CacheMtx);
+  return ASTCache.get(Invok->Impl.Key);
+}
+
+void SwiftASTManager::Implementation::updateASTProducer(
+    SwiftInvocationRef Invok) {
+  llvm::sys::ScopedLock L(CacheMtx);
+
+  // Get and set the producer to update its cost in the cache. If we don't
+  // have a value, then this is a race where we've removed the cached AST, but
+  // still have a build waiting to complete after cancellation, we don't need
+  // to do anything in that case.
+  if (auto Producer = ASTCache.get(Invok->Impl.Key))
+    ASTCache.set(Invok->Impl.Key, *Producer);
+}
+
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
+  llvm::sys::ScopedLock L(Impl.CacheMtx);
   Impl.ASTCache.remove(Invok->Impl.Key);
 }
 
-ASTProducerRef
-SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
+void SwiftASTManager::cancelBuildsForCachedAST(SwiftInvocationRef Invok) {
+  auto Result = Impl.getASTProducer(Invok);
+  if (!Result)
+    return;
+
+  (*Result)->cancelAllBuilds();
+}
+
+ASTProducerRef SwiftASTManager::Implementation::getOrCreateASTProducer(
+    SwiftInvocationRef InvokRef) {
   llvm::sys::ScopedLock L(CacheMtx);
   std::optional<ASTProducerRef> OptProducer = ASTCache.get(InvokRef->Impl.Key);
   if (OptProducer.has_value())
@@ -976,6 +1018,24 @@ void ASTBuildOperation::requestConsumerCancellation(
   ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer] {
     Consumer->cancelled();
   });
+}
+
+void ASTBuildOperation::cancelAllConsumers() {
+  if (isFinished())
+    return;
+
+  llvm::sys::ScopedLock L(ConsumersAndResultMtx);
+  CancellationFlag->store(true, std::memory_order_relaxed);
+
+  // Take the consumers, and notify them of the cancellation.
+  decltype(this->Consumers) Consumers;
+  std::swap(Consumers, this->Consumers);
+
+  ASTManager->Impl.ConsumerNotificationQueue.dispatch(
+      [Consumers = std::move(Consumers)] {
+        for (auto &Consumer : Consumers)
+          Consumer->cancelled();
+      });
 }
 
 static void collectModuleDependencies(ModuleDecl *TopMod,
@@ -1302,6 +1362,15 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
   return LatestUsableOp;
 }
 
+void ASTProducer::cancelAllBuilds() {
+  // Cancel all build operations, cleanup will happen when each operation
+  // terminates.
+  BuildOperationsQueue.dispatch([This = shared_from_this()] {
+    for (auto &BuildOp : This->BuildOperations)
+      BuildOp->cancelAllConsumers();
+  });
+}
+
 void ASTProducer::enqueueConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -1342,7 +1411,7 @@ void ASTProducer::enqueueConsumer(
               [This]() { This->cleanBuildOperations(); });
           // Re-register the object with the cache to update its memory
           // cost.
-          Mgr->Impl.ASTCache.set(This->InvokRef->Impl.Key, This);
+          Mgr->Impl.updateASTProducer(This->InvokRef);
         }
       };
 

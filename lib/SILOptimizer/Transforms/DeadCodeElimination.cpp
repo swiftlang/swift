@@ -63,6 +63,11 @@ static bool seemsUseful(SILInstruction *I) {
   if (I->mayHaveSideEffects())
     return true;
 
+  if (llvm::any_of(I->getResults(),
+                   [](auto result) { return result->isLexical(); })) {
+    return true;
+  }
+
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     // Although the onFastPath builtin has no side-effects we don't want to
     // remove it.
@@ -77,8 +82,16 @@ static bool seemsUseful(SILInstruction *I) {
   }
 
   // Is useful if it's associating with a function argument
+  // If undef, it is useful and it doesn't cost anything.
   if (isa<DebugValueInst>(I))
-    return isa<SILFunctionArgument>(I->getOperand(0));
+    return isa<SILFunctionArgument>(I->getOperand(0))
+      || isa<SILUndef>(I->getOperand(0));
+  
+
+  // Don't delete allocation instructions in DCE.
+  if (isa<AllocRefInst>(I) || isa<AllocRefDynamicInst>(I)) {
+    return true;
+  }
 
   return false;
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -disable-availability-checking %s -enable-builtin-module -enable-experimental-feature RawLayout -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -disable-availability-checking %s -enable-builtin-module -enable-experimental-feature RawLayout | %FileCheck %s
 
 import Builtin
 

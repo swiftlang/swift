@@ -23,11 +23,11 @@ bb0(%0 : $Int64, %1 : $Int64):
   // Make sure SROA propagate the debug info to the splitted alloc_stack instructions
   // CHECK-SROA: alloc_stack $Builtin.Int64, var
   // CHECK-SROA-SAME:        (name "my_tup", loc "sroa.swift":2:7
-  // CHECK-SROA-SAME:        type $*(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
+  // CHECK-SROA-SAME:        type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
   // CHECK-SROA: alloc_stack $Builtin.Int64, var
   // CHECK-SROA-SAME:        (name "my_tup", loc "sroa.swift":2:7
-  // CHECK-SROA-SAME:        type $*(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
+  // CHECK-SROA-SAME:        type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
 
   // Make sure the struct fields' SSA values are properly connected to the source variables via op_fragment
@@ -36,12 +36,12 @@ bb0(%0 : $Int64, %1 : $Int64):
   %7 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":2:20, scope 4
   %8 = struct $Int64 (%7 : $Builtin.Int64), loc "sroa.swift":2:20, scope 4
   // CHECK-MEM2REG: %[[FIELD_X:[0-9]+]] = struct_extract %[[INT_X:[0-9]+]] : $Int64, #Int64._value, loc "sroa.swift":2:20
-  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $*(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
+  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
   store %8 to %5 : $*Int64, loc "sroa.swift":2:20, scope 4
   %10 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":2:26, scope 4
   %11 = struct $Int64 (%10 : $Builtin.Int64), loc "sroa.swift":2:26, scope 4
   // CHECK-MEM2REG: %[[FIELD_Y:[0-9]+]] = struct_extract %[[INT_Y:[0-9]+]] : $Int64, #Int64._value, loc "sroa.swift":2:26
-  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $*(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
+  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
   store %11 to %6 : $*Int64, loc "sroa.swift":2:26, scope 4
 
   %14 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 0, loc "sroa.swift":3:12, scope 3

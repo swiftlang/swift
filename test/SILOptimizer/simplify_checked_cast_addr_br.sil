@@ -129,3 +129,14 @@ bb2:
   unreachable
 }
 
+// Check that we don't crash on this
+sil @success_but_different_operand_type : $@convention(thin) (@in D) -> @out X {
+bb0(%0 : $*X, %1 : $*D):
+  checked_cast_addr_br copy_on_success D in %1 : $*D to X in %0 : $*X, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+

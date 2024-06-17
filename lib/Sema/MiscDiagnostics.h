@@ -70,6 +70,9 @@ namespace swift {
                    AccessLevel desiredAccess, bool isForSetter = false,
                    bool shouldUseDefaultAccess = false);
 
+  /// Compute the location of the 'var' keyword for a 'var'-to-'let' Fix-It.
+  SourceLoc getFixItLocForVarToLet(VarDecl *var);
+
   /// Describes the context of a parameter, for use in diagnosing argument
   /// label problems.
   enum class ParameterContext : unsigned {
@@ -158,6 +161,29 @@ namespace swift {
     static bool shouldWalkIntoDeclInClosureContext(Decl *D);
   };
 
+  // A simple, deferred diagnostic container.
+  struct DeferredDiag {
+    SourceLoc loc;
+    ZeroArgDiagnostic diag;
+    DeferredDiag(SourceLoc loc, ZeroArgDiagnostic diag)
+      : loc(loc), diag(diag) {}
+
+    // Emits this diagnostic.
+    void emit(ASTContext &ctx);
+  };
+
+  using DeferredDiags = SmallVector<DeferredDiag, 2>;
+
+  /// Search for syntactic errors in the given sub-expression of a ConsumeExpr,
+  /// collecting them without actually emitting them.
+  ///
+  /// \param loc corresponds to the location of the 'consume' for which
+  ///            diagnostics should be collected, if any.
+  ///
+  /// \returns an empty collection if there are no errors.
+  DeferredDiags findSyntacticErrorForConsume(ModuleDecl *module,
+                                             SourceLoc loc,
+                                             Expr *subExpr);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

@@ -642,7 +642,7 @@ bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
     addToWorklist(S);
 
   LLVM_DEBUG(llvm::dbgs() << "remove dead bb" << BB->getDebugID() << '\n');
-  removeDeadBlock(BB);
+  BB->removeDeadBlock();
   ++NumBlocksDeleted;
   return true;
 }
@@ -1782,7 +1782,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     addToWorklist(SEI->getParent());
     SILBuilderWithScope(SEI).createUnreachable(SEI->getLoc());
     for (auto &succ : SEI->getSuccessors()) {
-      removeDeadBlock(succ.getBB());
+      succ.getBB()->removeDeadBlock();
     }
     SEI->eraseFromParent();
     return true;

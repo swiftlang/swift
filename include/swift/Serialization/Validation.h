@@ -103,6 +103,7 @@ struct ValidationInfo {
   version::Version compatibilityVersion = {};
   llvm::VersionTuple userModuleVersion;
   StringRef sdkName = {};
+  StringRef sdkVersion = {};
   StringRef problematicRevision = {};
   StringRef problematicChannel = {};
   size_t bytes = 0;

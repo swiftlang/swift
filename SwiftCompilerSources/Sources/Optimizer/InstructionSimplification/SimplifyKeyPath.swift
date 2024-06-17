@@ -34,6 +34,7 @@ fileprivate func allUsesRemovable(instruction: Instruction) -> Bool {
       switch use.instruction {
       case is UpcastInst,
            is DestroyValueInst,
+           is StrongReleaseInst,
            is BeginBorrowInst,
            is EndBorrowInst,
            is MoveValueInst,

@@ -18,7 +18,10 @@ extension CheckedCastAddrBranchInst : OnoneSimplifyable {
       return
     }
     if castWillSucceed {
-      replaceSuccess(context)
+      // TODO: handle cases where the operand address types are different.
+      if source.type == destination.type {
+        replaceSuccess(context)
+      }
     } else {
       replaceFailure(context)
     }

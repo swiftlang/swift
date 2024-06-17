@@ -278,12 +278,13 @@ def default_stdlib_deployment_targets(args):
     if host_target is None:
         return None
 
+    targets = [host_target]
+
     # OS X build machines configure all Darwin platforms by default.
     # Put iOS native targets last so that we test them last
     # (it takes a long time).
     if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
             host_target == StdlibDeploymentTarget.OSX.arm64:
-        targets = [host_target]
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
         if args.build_ios and args.build_ios_device:
@@ -304,9 +305,12 @@ def default_stdlib_deployment_targets(args):
            args.build_xros and args.build_xros_device:
             targets.extend(StdlibDeploymentTarget.XROS.targets)
         return targets
-    else:
-        # All other machines only configure their host stdlib by default.
-        return [host_target]
+    elif host_target.platform.name == 'linux':
+        if args.build_linux_static:
+            targets.append(getattr(StdlibDeploymentTarget.Musl,
+                                   host_target.arch))
+
+    return targets
 
 
 def apply_default_arguments(toolchain, args):

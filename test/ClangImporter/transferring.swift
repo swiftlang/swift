@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature TransferringArgsAndResults -verify -import-objc-header %S/Inputs/transferring.h
+// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -verify -import-objc-header %S/Inputs/transferring.h
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -27,14 +27,14 @@ func funcTestTransferringResult() async {
   // Just to show that without the transferring param, we generate diagnostics.
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
-  await transferToMain(x2) // expected-error {{transferring 'x2' may cause a data race}}
-  // expected-note @-1 {{transferring disconnected 'x2' to main actor-isolated callee could cause races in between callee main actor-isolated and local nonisolated uses}}
-  useValue(y2) // expected-note {{use here could race}}
+  await transferToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
+  // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestTransferringArg() async {
   let x = NonSendableCStruct()
-  transferUserDefinedIntoGlobalFunction(x) // expected-error {{transferring 'x' may cause a data race}}
-  // expected-note @-1 {{'x' used after being passed as a transferring parameter}}
-  useValue(x) // expected-note {{use here could race}}
+  transferUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }

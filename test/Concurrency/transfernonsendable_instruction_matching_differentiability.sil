@@ -84,13 +84,13 @@ bb0:
   %0 = apply %init() : $@convention(thin) () -> @owned @differentiable(_linear) @callee_guaranteed (Float) -> Float
 
   %transfer = function_ref @transferLinearFunction : $@async @convention(thin) (@guaranteed @differentiable(_linear) @callee_guaranteed (Float) -> Float) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%0) : $@async @convention(thin) (@guaranteed @differentiable(_linear) @callee_guaranteed (Float) -> Float) -> () // expected-warning {{transferring value of non-Sendable type '@differentiable(_linear) @callee_guaranteed (Float) -> Float' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%0) : $@async @convention(thin) (@guaranteed @differentiable(_linear) @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
 
   // No error since this is just look through.
   %1 = begin_borrow %0 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
   %2 = linear_function_extract [original] %1 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
   %f = function_ref @useFunction : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
-  apply %f(%2) : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-note {{use here could race}}
+  apply %f(%2) : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-note {{access can happen concurrently}}
   end_borrow %1 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
   destroy_value %0 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
 
@@ -104,13 +104,13 @@ bb0:
   %0 = apply %init() : $@convention(thin) () -> @owned @differentiable(reverse) @callee_guaranteed (Float) -> Float
 
   %transfer = function_ref @transferDifferentiableFunction : $@async @convention(thin) (@guaranteed @differentiable(reverse) @callee_guaranteed (Float) -> Float) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%0) : $@async @convention(thin) (@guaranteed @differentiable(reverse) @callee_guaranteed (Float) -> Float) -> () // expected-warning {{transferring value of non-Sendable type '@differentiable(reverse) @callee_guaranteed (Float) -> Float' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%0) : $@async @convention(thin) (@guaranteed @differentiable(reverse) @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
 
   // No error since this is just look through.
   %1 = begin_borrow %0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
   %2 = differentiable_function_extract [original] %1 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
   %f = function_ref @useFunction : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
-  apply %f(%2) : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-note {{use here could race}}
+  apply %f(%2) : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-note {{access can happen concurrently}}
   end_borrow %1 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
   destroy_value %0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
 
@@ -124,10 +124,10 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
 
   %transfer = function_ref @transferFunction : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-warning {{transferring value of non-Sendable type '@callee_guaranteed (Float) -> Float' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
 
   %2 = begin_borrow %1 : $@callee_guaranteed (Float) -> Float
-  %3 = linear_function [parameters 0] %2 : $@callee_guaranteed (Float) -> Float // expected-note {{use here could race}}
+  %3 = linear_function [parameters 0] %2 : $@callee_guaranteed (Float) -> Float // expected-note {{access can happen concurrently}}
 
   end_borrow %2 : $@callee_guaranteed (Float) -> Float
   destroy_value %1 : $@callee_guaranteed (Float) -> Float
@@ -145,12 +145,12 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
 
   %transfer = function_ref @transferFunction : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-warning {{transferring value of non-Sendable type '@callee_guaranteed (Float) -> Float' from nonisolated context to global actor '<null>'-isolated context}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
 
   %derivative = function_ref @derivative : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
   %vjp = function_ref @vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
   %2 = begin_borrow %1 : $@callee_guaranteed (Float) -> Float
-  %3 = differentiable_function [parameters 0] [results 0] %2 : $@callee_guaranteed (Float) -> Float with_derivative {%derivative : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)} // expected-note {{use here could race}}
+  %3 = differentiable_function [parameters 0] [results 0] %2 : $@callee_guaranteed (Float) -> Float with_derivative {%derivative : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)} // expected-note {{access can happen concurrently}}
 
   end_borrow %2 : $@callee_guaranteed (Float) -> Float
   destroy_value %1 : $@callee_guaranteed (Float) -> Float

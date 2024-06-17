@@ -913,8 +913,8 @@ static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   if (object & _swift_abi_ObjCReservedBitsMask)
     return;
-  object &= ~_swift_abi_SwiftSpareBitsMask;
   memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(SwiftError *);
   swift_errorRetain((SwiftError *)object);
 }

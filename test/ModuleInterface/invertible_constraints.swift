@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Test -enable-experimental-feature SuppressedAssociatedTypes
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
 // RUN: %FileCheck %s < %t.swiftinterface
 
@@ -26,14 +26,14 @@ public protocol P: ~Copyable {
 public struct X<T: ~Copyable>: ~Copyable { }
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK:      extension Test.X : Swift.Copyable {
+// CHECK:      extension Test.X : Swift.Copyable where T : Swift.Copyable {
 // CHECK-NEXT:   func f()
 // CHECK:      }
 // CHECK: #else
 // CHECK:      extension Test.X {
 // CHECK-NEXT:   func f()
 // CHECK:      }
-extension X: Copyable {
+extension X: Copyable where T: Copyable {
   public func f() { }
 }
 

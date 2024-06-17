@@ -18,34 +18,27 @@ public func forcedCast<NS, T>(_ ns: NS) -> T {
 
 public func forcedCast2<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
-  //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   let x = ns
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:34 {{of 'ns'}}
+                  // expected-note @-4:34 {{of 'ns'}}
+                  // expected-note @-3:7 {{of 'x'}}
 }
 
 public func forcedCast3<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
-  //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:34 {{of 'ns'}}
+                  // expected-note @-4:34 {{of 'ns'}}
+                  // expected-note @-3:7 {{of 'x'}}
 }
 
 public func forcedCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
-  //
-  // Today, we lose that x was assigned ns2. This is flow sensitive information
-  // that we might be able to recover. We still emit that a runtime cast
-  // occurred here, just don't say what the underlying value was.
   var x = ns
   x = ns2
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-9:44 {{of 'ns2'}}
+                  // expected-note @-5:44 {{of 'ns2'}}
+                  // expected-note @-4:7 {{of 'x'}}
 }
 
 public func condCast<NS, T>(_ ns: NS) -> T? {
@@ -56,34 +49,27 @@ public func condCast<NS, T>(_ ns: NS) -> T? {
 
 public func condCast2<NS, T>(_ ns: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
-  //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   let x = ns
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:32 {{of 'ns'}}
+                  // expected-note @-4:32 {{of 'ns'}}
+                  // expected-note @-3:7 {{of 'x'}}
 }
 
 public func condCast3<NS, T>(_ ns: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
-  //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:32 {{of 'ns'}}
+                  // expected-note @-4:32 {{of 'ns'}}
+                  // expected-note @-3:7 {{of 'x'}}
 }
 
 public func condCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
-  //
-  // Today, we lose that x was assigned ns2. This is flow sensitive information
-  // that we might be able to recover. We still emit that a runtime cast
-  // occurred here, just don't say what the underlying value was.
   var x = ns
   x = ns2
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-9:42 {{of 'ns2'}}
+                  // expected-note @-5:42 {{of 'ns2'}}
+                  // expected-note @-4:7 {{of 'x'}}
 }
 
 public func condCast5<NS, T>(_ ns: NS) -> T? {

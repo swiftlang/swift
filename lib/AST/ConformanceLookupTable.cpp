@@ -306,9 +306,9 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             if (!proto)
               continue;
             auto kp = proto->getKnownProtocolKind();
-            assert(!found.isSuppressed ||
-                   kp.has_value() &&
-                       "suppressed conformance for non-known protocol!?");
+           assert(!found.isSuppressed ||
+                  kp.has_value() &&
+                      "suppressed conformance for non-known protocol!?");
             if (!found.isSuppressed) {
               addProtocol(proto, found.Loc,
                           source.withUncheckedLoc(found.uncheckedLoc)
@@ -969,10 +969,11 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     assert(!isa<ProtocolDecl>(conformingDC->getSelfNominalTypeDecl()));
     Type conformingType = conformingDC->getSelfInterfaceType();
 
-    SourceLoc conformanceLoc
-      = conformingNominal == conformingDC
-          ? conformingNominal->getLoc()
-          : cast<ExtensionDecl>(conformingDC)->getLoc();
+    SourceLoc conformanceLoc =
+      entry->getLoc().isValid() ? entry->getLoc()
+        : (conformingNominal == conformingDC
+             ? conformingNominal->getLoc()
+             : cast<ExtensionDecl>(conformingDC)->getLoc());
 
     NormalProtocolConformance *implyingConf = nullptr;
     if (entry->Source.getKind() == ConformanceEntryKind::Implied) {
@@ -989,7 +990,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
         conformingType, protocol, conformanceLoc, conformingDC,
         ProtocolConformanceState::Incomplete,
         entry->Source.getUncheckedLoc().isValid(),
-        entry->Source.getPreconcurrencyLoc().isValid());
+        entry->Source.getPreconcurrencyLoc().isValid(),
+        entry->Source.getPreconcurrencyLoc());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the
     // early return at the start of this function.

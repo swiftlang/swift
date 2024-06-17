@@ -430,10 +430,10 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     }
   }
 
-  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
-    // Legacy behavior only proxies isEqual: for Hashable, not Equatable
-    return NO;
-  }
+//  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+//    // Legacy behavior only proxies isEqual: for Hashable, not Equatable
+//    return NO;
+//  }
 
   if (auto equatableConformance = selfHeader->getEquatableConformance()) {
     if (auto selfEquatableBaseType = selfHeader->getEquatableBaseType()) {
@@ -464,10 +464,10 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
 	    selfHeader->type, hashableConformance);
   }
 
-  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
-    // Legacy behavior doesn't honor Equatable conformance, only Hashable
-    return (NSUInteger)self;
-  }
+//  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+//    // Legacy behavior doesn't honor Equatable conformance, only Hashable
+//    return (NSUInteger)self;
+//  }
 
   // If Swift type is Equatable but not Hashable,
   // we have to return something here that is compatible

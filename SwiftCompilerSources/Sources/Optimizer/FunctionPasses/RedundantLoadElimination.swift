@@ -161,11 +161,11 @@ private extension LoadInst {
     _ context: FunctionPassContext
   ) -> DataflowResult {
 
-    var liferange = Liferange(endBlock: self.parentBlock, context)
-    defer { liferange.deinitialize() }
-    liferange.pushPredecessors(of: self.parentBlock)
+    var liverange = Liverange(endBlock: self.parentBlock, context)
+    defer { liverange.deinitialize() }
+    liverange.pushPredecessors(of: self.parentBlock)
 
-    while let block = liferange.pop() {
+    while let block = liverange.pop() {
       switch scanner.scan(instructions: block.instructions.reversed(),
                           in: block,
                           complexityBudget: &complexityBudget)
@@ -173,18 +173,18 @@ private extension LoadInst {
       case .overwritten:
         return DataflowResult(notRedundantWith: scanner.potentiallyRedundantSubpath)
       case .available:
-        liferange.add(beginBlock: block)
+        liverange.add(beginBlock: block)
       case .transparent:
-        liferange.pushPredecessors(of: block)
+        liverange.pushPredecessors(of: block)
       }
     }
-    if !self.canReplaceWithoutInsertingCopies(liferange: liferange, context) {
+    if !self.canReplaceWithoutInsertingCopies(liverange: liverange, context) {
       return DataflowResult(notRedundantWith: scanner.potentiallyRedundantSubpath)
     }
     return .redundant(scanner.availableValues)
   }
 
-  func canReplaceWithoutInsertingCopies(liferange: Liferange,_ context: FunctionPassContext) -> Bool {
+  func canReplaceWithoutInsertingCopies(liverange: Liverange,_ context: FunctionPassContext) -> Bool {
     switch self.loadOwnership {
     case .trivial, .unqualified:
       return true
@@ -192,7 +192,7 @@ private extension LoadInst {
     case .copy, .take:
       let deadEndBlocks = context.deadEndBlocks
 
-      // The liferange of the value has an "exit", i.e. a path which doesn't lead to the load,
+      // The liverange of the value has an "exit", i.e. a path which doesn't lead to the load,
       // it means that we would have to insert a destroy on that exit to satisfy ownership rules.
       // But an inserted destroy also means that we would need to insert copies of the value which
       // were not there originally. For example:
@@ -201,9 +201,9 @@ private extension LoadInst {
       //     cond_br bb1, bb2
       //   bb1:
       //     %2 = load [take] %addr
-      //   bb2:                      // liferange exit
+      //   bb2:                      // liverange exit
       //
-      // TODO: we could extend OSSA to transfer ownership to support liferange exits without copying. E.g.:
+      // TODO: we could extend OSSA to transfer ownership to support liverange exits without copying. E.g.:
       //
       //     %b = store_and_borrow %1 to [init] %addr   // %b is borrowed from %addr
       //     cond_br bb1, bb2
@@ -213,18 +213,18 @@ private extension LoadInst {
       //   bb2:
       //     end_borrow %b
       //
-      if liferange.hasExits(deadEndBlocks) {
+      if liverange.hasExits(deadEndBlocks) {
         return false
       }
 
-      // Handle a corner case: if the load is in an infinite loop, the liferange doesn't have an exit,
+      // Handle a corner case: if the load is in an infinite loop, the liverange doesn't have an exit,
       // but we still would need to insert a copy. For example:
       //
       //     store %1 to [init] %addr
       //     br bb1
       //   bb1:
       //     %2 = load [copy] %addr   // would need to insert a copy here
-      //    br bb1                    // no exit from the liferange
+      //    br bb1                    // no exit from the liverange
       //
       // For simplicity, we don't handle this in OSSA.
       if deadEndBlocks.isDeadEnd(parentBlock) {
@@ -508,8 +508,8 @@ private struct InstructionScanner {
       break
     }
     if load.loadOwnership == .take {
-      // In case of `take`, don't allow reading instructions in the liferange.
-      // Otherwise we cannot shrink the memory liferange afterwards.
+      // In case of `take`, don't allow reading instructions in the liverange.
+      // Otherwise we cannot shrink the memory liverange afterwards.
       if instruction.mayReadOrWrite(address: load.address, aliasAnalysis) {
         return .overwritten
       }
@@ -522,9 +522,9 @@ private struct InstructionScanner {
   }
 }
 
-/// Represents the liferange (in terms of basic blocks) of the loaded value.
+/// Represents the liverange (in terms of basic blocks) of the loaded value.
 ///
-/// In contrast to a BlockRange, this liferange has multiple begin blocks (containing the
+/// In contrast to a BlockRange, this liverange has multiple begin blocks (containing the
 /// available values) and a single end block (containing the original load). For example:
 ///
 ///   bb1:
@@ -536,7 +536,7 @@ private struct InstructionScanner {
 ///   bb3:
 ///     %3 = load %addr     // end block
 ///
-private struct Liferange {
+private struct Liverange {
   private var worklist: BasicBlockWorklist
   private var containingBlocks: Stack<BasicBlock> // doesn't include the end-block
   private var beginBlocks: BasicBlockSet

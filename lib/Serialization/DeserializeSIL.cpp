@@ -430,10 +430,11 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
         if (auto *decl = dyn_cast_or_null<AbstractFunctionDecl>(dc->getAsDecl()))
           fnName = decl->getNameStr();
       }
-      fn->getModule().getASTContext().Diags.diagnose(
-        fn->getLocation().getSourceLoc(),
-        diag::deserialize_function_type_mismatch,
-        fnName, fnType.getASTType(), type.getASTType());
+      auto &diags = fn->getModule().getASTContext().Diags;
+      diags.diagnose(fn->getLocation().getSourceLoc(),
+                     diag::deserialize_function_type_mismatch,
+                     fnName, fnType.getASTType(), type.getASTType());
+      diags.flushConsumers();
       exit(1);
     }
     return fn;
@@ -563,7 +564,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
-  unsigned rawLinkage, isTransparent, isSerialized, isThunk,
+  unsigned rawLinkage, isTransparent, serializedKind, isThunk,
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
@@ -571,7 +572,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
-      scratch, rawLinkage, isTransparent, isSerialized, isThunk,
+      scratch, rawLinkage, isTransparent, serializedKind, isThunk,
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
@@ -640,7 +641,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // as serialized, since we no longer need to enforce resilience
   // boundaries.
   if (SILMod.isSerialized())
-    isSerialized = IsNotSerialized;
+    serializedKind = IsNotSerialized;
 
   SILSerializationFunctionBuilder builder(SILMod);
 
@@ -654,7 +655,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       return MF->diagnoseFatal(std::move(error));
     }
 
-    fn->setSerialized(IsSerialized_t(isSerialized));
+    fn->setSerializedKind(SerializedKind_t(serializedKind));
 
     // If the serialized function comes from the same module, we're merging
     // modules, and can update the linkage directly. This is needed to
@@ -702,7 +703,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn = builder.createDeclaration(name, ty, loc);
     fn->setLinkage(linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
-    fn->setSerialized(IsSerialized_t(isSerialized));
+    fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutActuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
@@ -966,8 +967,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
   if (!MF->isSIB() && !SILMod.isSerialized()) {
-    assert((fn->isSerialized() || fn->empty()) &&
-           "deserialized function must have the IsSerialized flag set");
+    assert((fn->isAnySerialized() || fn->empty()) &&
+           "deserialized function must have the IsSerialized or IsSerializedForPackage flag set");
   }
   return fn;
 }
@@ -2257,6 +2258,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(ValueToBridgeObject)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(EndLifetime)
+  UNARY_INSTRUCTION(ExtendLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
   UNARY_INSTRUCTION(EndInitLetRef)
@@ -3520,7 +3522,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
-  unsigned rawLinkage, isTransparent, isSerialized, isThunk,
+  unsigned rawLinkage, isTransparent, serializedKind, isThunk,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
@@ -3528,7 +3530,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
-      scratch, rawLinkage, isTransparent, isSerialized, isThunk,
+      scratch, rawLinkage, isTransparent, serializedKind, isThunk,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
@@ -3623,8 +3625,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   TypeID TyID;
   DeclID dID;
-  unsigned rawLinkage, isSerialized, IsDeclaration, IsLet;
-  SILGlobalVarLayout::readRecord(scratch, rawLinkage, isSerialized,
+  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet;
+  SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
                                  IsDeclaration, IsLet, TyID, dID);
   if (TyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
@@ -3640,7 +3642,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-      SILMod, linkage.value(), isSerialized ? IsSerialized : IsNotSerialized,
+      SILMod, linkage.value(), SerializedKind_t(serializedKind),
       Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
       std::nullopt, dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
   v->setLet(IsLet);
@@ -3833,11 +3835,11 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   // as serialized, since we no longer need to enforce resilience
   // boundaries.
   if (SILMod.isSerialized())
-    Serialized = 0;
+    Serialized = unsigned(SerializedKind_t::IsNotSerialized);
 
   SILVTable *vT = SILVTable::create(
       SILMod, theClass,
-      Serialized ? IsSerialized : IsNotSerialized,
+      SerializedKind_t(Serialized),
       vtableEntries);
   vTableOrOffset.set(vT, true /*isFullyDeserialized*/);
 
@@ -3917,7 +3919,7 @@ SILMoveOnlyDeinit *SILDeserializer::readMoveOnlyDeinit(DeclID tableID) {
     rawSerialized = 0;
 
   auto *deinit = SILMoveOnlyDeinit::create(
-      SILMod, theNomDecl, rawSerialized ? IsSerialized : IsNotSerialized,
+      SILMod, theNomDecl, SerializedKind_t(rawSerialized),
       theFunc);
   moveOnlyDeinitOrOffset.set(deinit, true /*isFullyDeserialized*/);
 
@@ -3981,7 +3983,7 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
   DeclID StorageID;
   ArrayRef<uint64_t> ComponentValues;
   PropertyLayout::readRecord(scratch, StorageID, Serialized, ComponentValues);
-  
+
   auto decl = cast<AbstractStorageDecl>(MF->getDecl(StorageID));
   unsigned ComponentValueIndex = 0;
   auto component = readKeyPathComponent(ComponentValues, ComponentValueIndex);
@@ -4139,7 +4141,6 @@ llvm::Expected<SILWitnessTable *>
   ProtocolConformanceID conformance;
   WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
                                  Serialized, conformance);
-
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
@@ -4214,10 +4215,10 @@ llvm::Expected<SILWitnessTable *>
   // as serialized, since we no longer need to enforce resilience
   // boundaries.
   if (SILMod.isSerialized())
-    Serialized = 0;
+    Serialized = unsigned(SerializedKind_t::IsNotSerialized);
 
   wT->convertToDefinition(witnessEntries, conditionalConformances,
-                          Serialized ? IsSerialized : IsNotSerialized);
+                          SerializedKind_t(Serialized));
   wTableOrOffset.set(wT, /*fully deserialized*/ true);
   if (Callback)
     Callback->didDeserializeWitnessTableEntries(MF->getAssociatedModule(), wT);

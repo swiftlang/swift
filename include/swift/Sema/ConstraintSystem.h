@@ -2092,6 +2092,14 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
+/// Determine whether the given expression is part of the left-hand side
+/// of an assignment expression.
+struct IsInLeftHandSideOfAssignment {
+  ConstraintSystem &cs;
+
+  bool operator()(Expr *expr) const;
+};
+
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2228,6 +2236,10 @@ private:
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+
+  /// Maps closures and local functions to the pack expansion expressions they
+  /// capture.
+  llvm::MapVector<AnyFunctionRef, SmallVector<PackExpansionExpr *, 1>> CapturedExpansions;
 
   /// Maps expressions for implied results (e.g implicit 'then' statements,
   /// implicit 'return' statements in single expression body closures) to their
@@ -2814,6 +2826,10 @@ public:
   /// Associate an argument list with a call at a given locator.
   void associateArgumentList(ConstraintLocator *locator, ArgumentList *args);
 
+  /// If the given node is a function expression with a parent ApplyExpr,
+  /// returns the apply, otherwise returns the node itself.
+  ASTNode includingParentApply(ASTNode node);
+
   std::optional<SelectedOverload>
   findSelectedOverloadFor(ConstraintLocator *locator) const {
     auto result = ResolvedOverloads.find(locator);
@@ -3162,6 +3178,19 @@ public:
     if (result != ClosureTypes.end())
       return result->second;
     return nullptr;
+  }
+
+  SmallVector<PackExpansionExpr *, 1> getCapturedExpansions(AnyFunctionRef func) const {
+    auto result = CapturedExpansions.find(func);
+    if (result == CapturedExpansions.end())
+      return {};
+
+    return result->second;
+  }
+
+  void setCapturedExpansions(AnyFunctionRef func, SmallVector<PackExpansionExpr *, 1> exprs) {
+    assert(CapturedExpansions.count(func) == 0 && "Cannot reset captured expansions");
+    CapturedExpansions.insert({func, exprs});
   }
 
   TypeVariableType *getKeyPathValueType(const KeyPathExpr *keyPath) const {
@@ -4398,13 +4427,13 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param memberLocator The locator anchored at this value reference, when
+  /// \param locator The locator anchored at this value reference, when
   /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
-                                  ConstraintLocator *memberLocator = nullptr,
+                                  ConstraintLocator *locator,
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
@@ -4416,7 +4445,7 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param memberLocator The locator anchored at this value reference, when
+  /// \param locator The locator anchored at this value reference, when
   /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
@@ -4426,7 +4455,7 @@ public:
   getUnopenedTypeOfReference(
       VarDecl *value, Type baseType, DeclContext *UseDC,
       llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *memberLocator = nullptr,
+      ConstraintLocator *locator,
       bool wantInterfaceType = false,
       bool adjustForPreconcurrency = true,
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
@@ -4436,7 +4465,10 @@ public:
       llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
         [](const ClosureExpr *closure) {
           return closure->isIsolatedByPreconcurrency();
-        });
+        },
+      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
+        return false;
+      });
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
@@ -6425,6 +6457,7 @@ public:
 ///
 /// This includes:
 /// - Not yet resolved outer VarDecls (including closure parameters)
+/// - Outer pack expansions that are not yet fully resolved
 /// - Return statements with a contextual type that has not yet been resolved
 ///
 /// This is required because isolated conjunctions, just like single-expression
@@ -6446,6 +6479,7 @@ public:
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
+  void inferTypeVars(PackExpansionExpr *);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
@@ -6551,6 +6585,13 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// If the expression has the effect of a forced downcast, find the
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
+
+/// Assuming the expression appears in a consuming context,
+/// if it does not already have an explicit `consume`,
+/// can I add `consume` around this expression?
+///
+/// \param module represents the module in which the expr appears
+bool canAddExplicitConsume(ModuleDecl *module, Expr *expr);
 
 // Count the number of overload sets present
 // in the expression and all of the children.

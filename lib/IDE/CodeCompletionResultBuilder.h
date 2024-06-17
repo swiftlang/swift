@@ -43,7 +43,6 @@ class CodeCompletionResultBuilder {
   CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
-  bool IsAsync = false;
   bool HasAsyncAlternative = false;
   std::optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
@@ -116,7 +115,6 @@ public:
 
   void setAssociatedDecl(const Decl *D);
 
-  void setIsAsync(bool IsAsync) { this->IsAsync = IsAsync; }
   void setHasAsyncAlternative(bool HasAsyncAlternative) {
     this->HasAsyncAlternative = HasAsyncAlternative;
   }

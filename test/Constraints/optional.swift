@@ -598,19 +598,3 @@ do {
   test(x!) // expected-error {{no exact matches in call to local function 'test'}}
   // expected-error@-1 {{cannot force unwrap value of non-optional type 'Double'}}
 }
-
-// Diagnose cases of invalid chaining when parameter is not optional based on context.
-do {
-  class Test {
-    var value: Int = 42
-  }
-
-  class Container {
-    let test: Test = Test()
-
-    func loop() {
-      [test].forEach { $0?.value = 42 }
-      // expected-error@-1 {{cannot use optional chaining on non-optional value of type 'Test'}}
-    }
-  }
-}

@@ -20,6 +20,7 @@
 #include "PrintSwiftToClangCoreScaffold.h"
 #include "SwiftToClangInteropContext.h"
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -671,6 +672,15 @@ public:
         llvm_unreachable("unknown top-level ObjC decl");
       };
 
+      // When we visit a function, we might also generate a thunk that calls into the
+      // implementation of structs/enums to get the opaque pointers. To avoid
+      // referencing these methods before we see the definition for the generated
+      // classes, we want to visit function definitions last.
+      if (isa<AbstractFunctionDecl>(*rhs) && isa<NominalTypeDecl>(*lhs))
+        return Descending;
+      if (isa<AbstractFunctionDecl>(*lhs) && isa<NominalTypeDecl>(*rhs))
+        return Ascending;
+
       // Sort by names.
       int result = getSortName(*rhs).compare(getSortName(*lhs));
       if (result != 0)
@@ -700,9 +710,9 @@ public:
       // even when the variable might not actually be emitted by the emitter.
       // In that case, order the function before the variable.
       if (isa<AbstractFunctionDecl>(*rhs) && isa<VarDecl>(*lhs))
-        return 1;
+        return Descending;
       if (isa<AbstractFunctionDecl>(*lhs) && isa<VarDecl>(*rhs))
-        return -1;
+        return Ascending;
 
       // Prefer value decls to extensions.
       assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));
@@ -874,6 +884,11 @@ public:
       // Emit an unavailable stub for a Swift type.
       if (auto *nmtd = dyn_cast<NominalTypeDecl>(vd)) {
         auto representation = cxx_translation::getDeclRepresentation(vd);
+        if (nmtd->isGeneric()) {
+          auto genericSignature =
+              nmtd->getGenericSignature().getCanonicalSignature();
+          ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+        }
         os << "class ";
         ClangSyntaxPrinter(os).printBaseName(vd);
         os << " { } SWIFT_UNAVAILABLE_MSG(\"";

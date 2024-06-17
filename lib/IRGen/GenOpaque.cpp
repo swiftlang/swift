@@ -656,7 +656,14 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
     auto allocToken = address.getExtraInfo();
-    assert(allocToken && "dynamic alloca in coroutine without alloc token?");
+    if (!allocToken) {
+#ifndef NDEBUG
+      auto *alloca = cast<llvm::AllocaInst>(address.getAddress().getAddress());
+      assert(isa<llvm::ConstantInt>(alloca->getArraySize()) &&
+             "Dynamic alloca without a token?!");
+#endif
+      return;
+    }
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_free, allocToken);
     return;
   }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -disable-availability-checking -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -27,6 +27,8 @@ func useValue<T>(_ t: T) {}
 @MainActor func transferToMain<T>(_ t: T) {}
 @CustomActor func transferToCustom<T>(_ t: T) {}
 
+var boolValue: Bool { false }
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -37,19 +39,26 @@ actor ProtectsNonSendable {
   var ns: NonSendableKlass = .init()
 
   nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
-    // TODO: This is wrong, we should get an error saying that nsArg is task
-    // isolated since this is nonisolated.
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = nsArg // expected-warning {{transferring 'nsArg' may cause a data race}}
+      isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
       // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
+  }
+
+  nonisolated func testParameterOutOfLine2(_ nsArg: NonSendableKlass) async {
+    let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+      isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+    self.assumeIsolated(closure)
+    self.assumeIsolated(closure)
   }
 
   nonisolated func testParameterMergedIntoLocal(_ nsArg: NonSendableKlass) async {
     let l = NonSendableKlass()
     doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a data race}}
+      isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
       // expected-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -68,11 +77,11 @@ actor ProtectsNonSendable {
 
     // This is not safe since we use l later.
     self.assumeIsolated { isolatedSelf in
-      isolatedSelf.ns = l // expected-warning {{transferring 'l' may cause a data race}}
-      // expected-note @-1 {{disconnected 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
+      // expected-note @-1 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
 
-    useValue(l) // expected-note {{use here could race}}
+    useValue(l) // expected-note {{access can happen concurrently}}
   }
 }
 
@@ -86,10 +95,10 @@ func normalFunc_testLocal_1() {
 func normalFunc_testLocal_2() {
   let x = NonSendableKlass()
   let _ = { @MainActor in
-    useValue(x) // expected-warning {{transferring 'x' may cause a data race}}
-    // expected-note @-1 {{disconnected 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    useValue(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
-  useValue(x) // expected-note {{use here could race}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }
 
 // We error here since we are performing a double transfer.
@@ -98,9 +107,63 @@ func normalFunc_testLocal_2() {
 // diagnostic.
 func transferBeforeCaptureErrors() async {
   let x = NonSendableKlass()
-  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a data race}}
-  // expected-note @-1 {{transferring disconnected 'x' to global actor 'CustomActor'-isolated callee could cause races in between callee global actor 'CustomActor'-isolated and local nonisolated uses}}
-  let _ = { @MainActor in // expected-note {{use here could race}}
+  await transferToCustom(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{sending 'x' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and local nonisolated uses}}
+  let _ = { @MainActor in // expected-note {{access can happen concurrently}}
     useValue(x)
   }
+}
+
+// TODO: This should have an error. We aren't disambiguating the actors.
+func testDifferentIsolationFromSameClassKindPartialApply() async {
+  let p1 = ProtectsNonSendable()
+  let p2 = ProtectsNonSendable()
+
+  let x = NonSendableKlass()
+
+  let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+    print(x)
+  }
+
+  await closure(p1)
+  await closure(p2)
+}
+
+// TODO: This should have an error. We aren't disambiguating the actors.
+func testDifferentIsolationFromSameClassKindPartialApplyFlowSensitive() async {
+  let p1 = ProtectsNonSendable()
+  let p2 = ProtectsNonSendable()
+
+  let x = NonSendableKlass()
+
+  let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+    print(x)
+  }
+
+  if await boolValue {
+    await closure(p1)
+    await closure(p1)
+  } else {
+    await closure(p2)
+    await closure(p2)
+  }
+}
+
+// TODO: This should have an error. We aren't disambiguating the actors.
+func testDifferentIsolationFromSameClassKindPartialApplyFlowSensitive2() async {
+  let p1 = ProtectsNonSendable()
+  let p2 = ProtectsNonSendable()
+
+  let x = NonSendableKlass()
+
+  let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
+    print(x)
+  }
+
+  if await boolValue {
+    await closure(p1)
+  } else {
+    await closure(p2)
+  }
+  await closure(p2)
 }

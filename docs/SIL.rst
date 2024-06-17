@@ -692,6 +692,18 @@ autorelease in the callee.
   type behaves like a non-generic type, as if the substitutions were
   actually applied to the underlying function type.
 
+- SIL functions may optionally mark a function parameter as
+  ``@sil_isolated``. An ``@sil_isolated`` parameter must be one of:
+
+  - An actor or any actor type.
+  - A generic type that conforms to Actor or AnyActor.
+
+  and must be the actor instance that a function is isolated to. Importantly
+  this means that global actor isolated nominal types are never
+  ``@sil_isolated``. Only one parameter can ever be marked as ``@sil_isolated``
+  since a function cannot be isolated to multiple actors at the same time.
+
+
 Async Functions
 ```````````````
 
@@ -4669,6 +4681,22 @@ The instruction accepts an object or address type.
 `@owned T`. If its argument is an address type, it's an identity projection.
 This instruction is valid only in OSSA and is lowered to a no-op when lowering
 to non-OSSA.
+
+extend_lifetime
+```````````````
+
+::
+
+   sil-instruction ::= 'extend_lifetime' sil-operand
+
+   // Indicate that %0's linear lifetime extends to this point
+   extend_lifetime %0 : $X
+
+Indicates that a value's linear lifetime extends to this point.  Inserted by
+OSSALifetimeCompletion(AvailabilityBoundary) in order to provide the invariant
+that a value is either consumed OR has an `extend_lifetime` user on all paths
+and furthermore that all uses are within the boundary defined by that set of
+instructions (the consumes and the `extend_lifetime`s).
 
 assign
 ``````

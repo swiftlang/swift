@@ -171,8 +171,8 @@ protected:
     std::string headerImport;
   };
 
-  static BinaryModuleImports
-  getImportsOfModule(const ModuleFileSharedCore &loadedModule,
+  llvm::ErrorOr<BinaryModuleImports>
+  getImportsOfModule(const ModuleFileSharedCore &loadedModuleFile,
                      ModuleLoadingBehavior transitiveBehavior,
                      StringRef packageName, bool isTestableImport);
 

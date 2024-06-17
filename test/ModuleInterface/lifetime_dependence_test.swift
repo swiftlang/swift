@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/lifetime_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_dependence.swiftinterface \
@@ -15,12 +14,10 @@
 // See if we can compile a module through just the interface and typecheck using it.
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:    -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/lifetime_dependence.swiftinterface -o %t/lifetime_dependence.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck -I %t %s \
-// RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:    -enable-experimental-feature NonescapableTypes
 
 import lifetime_dependence

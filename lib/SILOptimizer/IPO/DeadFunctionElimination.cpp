@@ -222,6 +222,8 @@ class DeadFunctionAndGlobalElimination {
         ensureAlive(fRef->getReferencedFunction());
       if (auto *gRef = dyn_cast<GlobalAddrInst>(&initInst))
         ensureAlive(gRef->getReferencedGlobal());
+      if (auto *gVal = dyn_cast<GlobalValueInst>(&initInst))
+        ensureAlive(gVal->getReferencedGlobal());
     }
   }
 

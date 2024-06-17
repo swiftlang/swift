@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -parse-stdlib -module-name Swift \
-// RUN:   -enable-experimental-feature NoncopyableGenerics
+// RUN:   -parse-stdlib -module-name Swift
 
 // NOTE: -parse-stdlib is a transitional workaround and should not be required.
 

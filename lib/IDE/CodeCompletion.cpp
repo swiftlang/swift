@@ -1431,14 +1431,14 @@ void CodeCompletionCallbacksImpl::typeCheckWithLookup(
     /// decl it could be attached to. Type check it standalone.
 
     // First try to check it as an attached macro.
-    auto resolvedMacro = evaluateOrDefault(
+    (void)evaluateOrDefault(
         CurDeclContext->getASTContext().evaluator,
         ResolveMacroRequest{AttrWithCompletion, CurDeclContext},
         ConcreteDeclRef());
 
     // If that fails, type check as a call to the attribute's type. This is
     // how, e.g., property wrappers are modelled.
-    if (!resolvedMacro) {
+    if (!Lookup.gotCallback()) {
       ASTNode Call = CallExpr::create(
           CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
           AttrWithCompletion->getArgs(), /*implicit=*/true);
@@ -1484,7 +1484,8 @@ void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
   // closure. In that case, also suggest labels for additional trailing
   // closures.
   if (auto AE = dyn_cast<ApplyExpr>(ParsedExpr)) {
-    if (AE->getArgs()->hasAnyTrailingClosures()) {
+    if (AE->getArgs()->hasAnyTrailingClosures() &&
+        Kind == CompletionKind::PostfixExpr) {
       ASTContext &Ctx = CurDeclContext->getASTContext();
 
       // Modify the call that has the code completion expression as an

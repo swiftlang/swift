@@ -15,6 +15,11 @@ public func callIntegerTemplates() {
   hasDefaultedNonTypeTemplateParameter()
 }
 
+// CHECK: error: unexpected error produced: cannot pass immutable value as inout argument: literals are not mutable
+public func callLvalueRef() {
+  lvalueReference(true)
+}
+
 // Use protocol composition to create a type that we cannot (yet) turn into a clang::QualType.
 public protocol A { }
 public protocol B { }

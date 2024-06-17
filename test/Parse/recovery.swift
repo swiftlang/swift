@@ -145,17 +145,17 @@ func missingWhileInRepeat() {
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
-  for ; { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for ; { // expected-error {{C-style for statement was removed in Swift 3}}
   }
 
-  for ; // expected-error {{C-style for statement has been removed in Swift 3}}
+  for ; // expected-error {{C-style for statement was removed in Swift 3}}
   { 
   }
 
-  for ; true { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for ; true { // expected-error {{C-style for statement was removed in Swift 3}}
   }
 
-  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for var i = 0; true { // expected-error {{C-style for statement was removed in Swift 3}}
     i += 1
   }
 }

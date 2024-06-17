@@ -136,12 +136,10 @@ WARNING(api_pattern_attr_ignored, none,
         (StringRef, StringRef))
 
 ERROR(objc_implementation_two_impls, none,
-      "duplicate implementation of Objective-C %select{|category %0 on }0"
-      "%kind1",
-      (Identifier, Decl *))
-
+      "duplicate implementation of imported %kind0",
+      (Decl *))
 NOTE(previous_objc_implementation, none,
-     "previously implemented by extension here", ())
+     "previously implemented here", ())
 
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())
 NOTE(macro_not_imported_unsupported_named_operator, none, "operator '%0' not supported in macro arithmetic", (StringRef))

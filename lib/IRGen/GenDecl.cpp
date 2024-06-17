@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -475,61 +476,33 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);
 
-  SF.collectLinkLibraries([this](LinkLibrary linkLib) {
-    this->addLinkLibrary(linkLib);
+  auto registerLinkLibrary = [this](const LinkLibrary &ll) {
+    this->addLinkLibrary(ll);
+  };
+
+  SF.collectLinkLibraries([registerLinkLibrary](LinkLibrary linkLib) {
+    registerLinkLibrary(linkLib);
   });
 
   if (ObjCInterop)
-    this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+    registerLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
   // (std) if available.
   if (Context.LangOpts.EnableCXXInterop) {
-    const llvm::Triple &target = Context.LangOpts.Target;
-    if (target.isOSDarwin())
-      this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
-    else if (target.isOSLinux())
-      this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
-
-    // Do not try to link Cxx with itself.
-    if (!getSwiftModule()->getName().is("Cxx")) {
-      bool isStatic = false;
-      if (const auto *M = Context.getModuleByName("Cxx"))
-        isStatic = M->isStaticLibrary();
-      this->addLinkLibrary(LinkLibrary(target.isOSWindows() && isStatic
-                                          ? "libswiftCxx"
-                                          : "swiftCxx",
-                                       LibraryKind::Library));
-    }
-
-    // Do not try to link CxxStdlib with the C++ standard library, Cxx or
-    // itself.
-    if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
-                      [M = getSwiftModule()->getName().str()](StringRef Name) {
-                        return M == Name;
-                      })) {
-      // Only link with CxxStdlib on platforms where the overlay is available.
-      switch (target.getOS()) {
-      case llvm::Triple::Linux:
-        if (!target.isAndroid())
-          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
-                                           LibraryKind::Library));
-        break;
-      case llvm::Triple::Win32: {
-        bool isStatic = Context.getModuleByName("CxxStdlib")->isStaticLibrary();
-        this->addLinkLibrary(
-            LinkLibrary(isStatic ? "libswiftCxxStdlib" : "swiftCxxStdlib",
-                        LibraryKind::Library));
-        break;
-      }
-      default:
-        if (target.isOSDarwin())
-          this->addLinkLibrary(LinkLibrary("swiftCxxStdlib",
-                                           LibraryKind::Library));
-        break;
-      }
-    }
+    bool hasStaticCxx = false;
+    bool hasStaticCxxStdlib = false;
+    if (const auto *M = Context.getModuleByName("Cxx"))
+      hasStaticCxx = M->isStaticLibrary();
+    if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
+      if (const auto *M = Context.getModuleByName("CxxStdlib"))
+        hasStaticCxxStdlib = M->isStaticLibrary();
+    dependencies::registerCxxInteropLibraries(Context.LangOpts.Target,
+                                              getSwiftModule()->getName().str(),
+                                              hasStaticCxx,
+                                              hasStaticCxxStdlib,
+                                              registerLinkLibrary);
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that
@@ -541,36 +514,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // libraries. This may however cause the library to get pulled in in
   // situations where it isn't useful, such as for dylibs, though this is
   // harmless aside from code size.
-  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded)) {
-    auto addBackDeployLib = [&](llvm::VersionTuple version,
-                                StringRef libraryName, bool forceLoad) {
-      std::optional<llvm::VersionTuple> compatibilityVersion;
-      if (libraryName == "swiftCompatibilityDynamicReplacements") {
-        compatibilityVersion = IRGen.Opts.
-            AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
-      } else if (libraryName == "swiftCompatibilityConcurrency") {
-        compatibilityVersion =
-            IRGen.Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
-      } else {
-        compatibilityVersion = IRGen.Opts.
-            AutolinkRuntimeCompatibilityLibraryVersion;
-      }
-
-      if (!compatibilityVersion)
-        return;
-
-      if (*compatibilityVersion > version)
-        return;
-
-      this->addLinkLibrary(LinkLibrary(libraryName,
-                                       LibraryKind::Library,
-                                       forceLoad));
-    };
-
-#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
-      addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
-    #include "swift/Frontend/BackDeploymentLibs.def"
-  }
+  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded))
+    dependencies::registerBackDeployLibraries(IRGen.Opts, registerLinkLibrary);
 }
 
 /// Emit all the top-level code in the synthesized file unit.
@@ -1035,15 +980,6 @@ bool LinkInfo::isUsed(IRLinkage IRL) {
 ///
 /// This value must have a definition by the time the module is finalized.
 void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-
-  // As of reviews.llvm.org/D97448 "ELF: Create unique SHF_GNU_RETAIN sections
-  // for llvm.used global objects" LLVM creates separate sections for globals in
-  // llvm.used on ELF.  Therefore we use llvm.compiler.used on ELF instead.
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF) {
-    addCompilerUsedGlobal(global);
-    return;
-  }
-
   LLVMUsed.push_back(global);
 }
 
@@ -1181,9 +1117,9 @@ void IRGenModule::emitGlobalLists() {
     if (IRGen.Opts.EmitGenericRODatas) {
       emitGlobalList(
           *this, GenericRODatas, "generic_ro_datas",
-          GetObjCSectionName("__swift_rodatas", "regular"),
+          GetObjCSectionName("__objc_clsrolist", "regular"),
           llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ true);
+          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ false);
     }
 
     // Objective-C class references go in a variable with a meaningless
@@ -2850,6 +2786,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Mark as llvm.used if @_used, set section if @_section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
+    else if (var->shouldBePreservedForDebugger() && forDefinition) 
+      addUsedGlobal(gvar);
     if (auto *sectionAttr = var->getSectionAttr())
       gvar->setSection(sectionAttr->Name);
   }
@@ -3719,7 +3657,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   // Also mark as llvm.used any functions that should be kept for the debugger.
   // Only definitions should be kept.
-  if (f->shouldBePreservedForDebugger() && !fn->isDeclaration())
+  if (f->shouldBePreservedForDebugger() && forDefinition)
     addUsedGlobal(fn);
 
   // If `hasCReferences` is true, then the function is either marked with
@@ -5860,7 +5798,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
 static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
   if (ext->isObjCImplementation()) {
-    assert(ext->getCategoryNameForObjCImplementation() != Identifier());
+    assert(!ext->getObjCCategoryName().empty());
     return true;
   }
 
@@ -5904,8 +5842,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == Identifier()) {
+  if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty()) {
     // This is the @_objcImplementation for the class--generate its class
     // metadata.
     emitClassDecl(origClass);

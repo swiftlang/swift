@@ -107,6 +107,7 @@ public:
   void updateSemaInfo(SourceKitCancellationToken CancellationToken);
 
   void removeCachedAST();
+  void cancelBuildsForCachedAST();
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
@@ -614,7 +615,8 @@ public:
       SourceKitCancellationToken CancellationToken,
       std::shared_ptr<EditorConsumer> Consumer) override;
 
-  void editorClose(StringRef Name, bool RemoveCache) override;
+  void editorClose(StringRef Name, bool CancelBuilds,
+                   bool RemoveCache) override;
 
   void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                          unsigned Offset, unsigned Length,

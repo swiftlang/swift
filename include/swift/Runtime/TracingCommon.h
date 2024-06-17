@@ -22,7 +22,11 @@
 #include "swift/Runtime/Config.h"
 #include <os/signpost.h>
 
-extern const char *__progname;
+extern "C" const char *__progname;
+
+#if SWIFT_USE_OS_TRACE_LAZY_INIT
+extern "C" bool _os_trace_lazy_init_completed_4swift(void);
+#endif
 
 namespace swift {
 namespace runtime {
@@ -37,6 +41,15 @@ static inline bool shouldEnableTracing() {
                      strcmp(__progname, "xpcproxy") == 0 ||
                      strcmp(__progname, "logd_helper") == 0))
     return false;
+  return true;
+}
+
+static inline bool tracingReady() {
+#if SWIFT_USE_OS_TRACE_LAZY_INIT
+  if (!_os_trace_lazy_init_completed_4swift())
+    return false;
+#endif
+
   return true;
 }
 

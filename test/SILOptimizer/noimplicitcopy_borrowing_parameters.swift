@@ -399,7 +399,7 @@ struct LoadableSelfTest {
         // expected-error @-1 {{'self' cannot be captured by an escaping closure since it is a borrowed parameter}}
         var f: () -> () = {}
         f = { // expected-note {{closure capturing 'self' here}}
-            let _ = self
+            let _ = copy self
         }
         f()
     }
@@ -477,7 +477,7 @@ struct AddressOnlySelfTest<T> {
         // TODO: Capture.
         var f: () -> () = {}
         f = { // expected-note {{consumed here}}
-            let _ = self
+            let _ = copy self
         }
         f()
     }

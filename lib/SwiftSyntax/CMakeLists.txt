@@ -38,6 +38,8 @@ set(SWIFT_SYNTAX_MODULES
   # Support for LSP
   SwiftIDEUtils
   SwiftRefactor
+  # For swift-plugin-server
+  SwiftLibraryPluginProvider
 )
 
 # Install shared runtime libraries

@@ -69,6 +69,15 @@ public func testFoldConcat() -> String {
   return "a" + "b" + "c"
 }
 
+// CHECK-LABEL: sil hidden [noinline] @$s4test0A25InterpolationInLongStringSSyF :
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A25InterpolationInLongStringSSyF'
+@inline(never)
+func testInterpolationInLongString() -> String {
+  return "\(#function) used in a veeeeeeeeeeeeeeeeeeeery long string"
+}
+
 // CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF 
 // CHECK-NOT: apply
 // CHECK-NOT: bb1
@@ -140,6 +149,9 @@ printEmbedded(testFoldStaticLet())
 
 // CHECK-OUTPUT: <abc>
 printEmbedded(testFoldConcat())
+
+// CHECK-OUTPUT: <testInterpolationInLongString() used in a veeeeeeeeeeeeeeeeeeeery long string>
+printEmbedded(testInterpolationInLongString())
 
 // CHECK-OUTPUT: <Inner>
 printEmbedded(testUnqualifiedTypeName())

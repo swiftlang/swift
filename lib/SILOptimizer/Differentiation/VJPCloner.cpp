@@ -1301,7 +1301,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto *pullback = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
       pbGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, vjp->isSerialized(),
+      IsNotTransparent, vjp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   pullback->setDebugScope(new (module)

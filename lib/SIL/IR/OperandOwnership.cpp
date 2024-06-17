@@ -225,6 +225,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
+OPERAND_OWNERSHIP(InstantaneousUse, ExtendLifetime)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
@@ -810,6 +811,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Fence)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, Freeze)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Ifdef)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetObjCTypeEncoding)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_EQ)
@@ -899,20 +901,14 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DistributedActorAsAnyActor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfRawLayout)
-OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
-                                                              StringRef) {
-  if (bi->getFunction()->getConventions().useLoweredAddresses()) {
-    return OperandOwnership::UnownedInstantaneousUse;
-  } else {
-    return OperandOwnership::DestroyingConsume;
-  }
-}
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLetLifetime)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroupWithFlags)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FlowSensitiveSelfIsolation)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FlowSensitiveDistributedSelfIsolation)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 
@@ -934,6 +930,12 @@ OperandOwnershipBuiltinClassifier
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
                                                         StringRef attr) {
+  if (&op == &bi->getOperandRef(4)) {
+    // The (any TaskExecutor)? (optional) must be consumed by the builtin,
+    // as we will keep it alive and later destroy it as the task runs to completion.
+    return OperandOwnership::ForwardingConsume;
+  }
+
   // The function operand is consumed by the new task.
   if (&op == &bi->getArgumentOperands().back())
     return OperandOwnership::DestroyingConsume;

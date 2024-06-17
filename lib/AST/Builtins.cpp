@@ -422,13 +422,10 @@ enum class BuiltinThrowsKind : uint8_t {
 }
 
 /// Build a builtin function declaration.
-static FuncDecl *
-getBuiltinGenericFunction(Identifier Id,
-                          ArrayRef<AnyFunctionType::Param> ArgParamTypes,
-                          Type ResType,
-                          GenericParamList *GenericParams,
-                          GenericSignature Sig,
-                          bool Async, BuiltinThrowsKind Throws) {
+static FuncDecl *getBuiltinGenericFunction(
+    Identifier Id, ArrayRef<AnyFunctionType::Param> ArgParamTypes, Type ResType,
+    GenericParamList *GenericParams, GenericSignature Sig, bool Async,
+    BuiltinThrowsKind Throws, bool SendingResult) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -460,6 +457,7 @@ getBuiltinGenericFunction(Identifier Id,
       Throws != BuiltinThrowsKind::None, /*thrownType=*/Type(),
       GenericParams, paramList, ResType, DC);
 
+  func->setSendingResult(SendingResult);
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
   if (Throws == BuiltinThrowsKind::Rethrows)
@@ -681,6 +679,7 @@ namespace {
     Type InterfaceResult;
     bool Async = false;
     BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
+    bool SendingResult = false;
 
     // Accumulate params and requirements here, so that we can call
     // `buildGenericSignature()` when `build()` is called.
@@ -745,16 +744,17 @@ namespace {
       Throws = BuiltinThrowsKind::Rethrows;
     }
 
+    void setSendingResult() { SendingResult = true; }
+
     FuncDecl *build(Identifier name) {
       auto GenericSig = buildGenericSignature(
           Context, GenericSignature(),
           std::move(genericParamTypes),
           std::move(addedRequirements),
           /*allowInverses=*/false);
-      return getBuiltinGenericFunction(name, InterfaceParams,
-                                       InterfaceResult,
-                                       TheGenericParamList, GenericSig,
-                                       Async, Throws);
+      return getBuiltinGenericFunction(name, InterfaceParams, InterfaceResult,
+                                       TheGenericParamList, GenericSig, Async,
+                                       Throws, SendingResult);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -899,14 +899,6 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
                                         _rawPointer,
                                         _word),
                             _void);
-}
-
-static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable),
-                                      _conformsTo(_typeparam(0), _escapable)),
-                            _parameters(_typeparam(0)), _typeparam(0));
 }
 
 static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
@@ -1534,6 +1526,9 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
+  auto taskExecutorIsAvailable =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
@@ -1541,12 +1536,21 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
         _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("operation", _function(_async(_throws(_sendable(_thick))),
+        _label("initialTaskExecutorConsuming",
+                 _defaulted(_consuming(_optional(_bincompatType(
+                                /*if*/ taskExecutorIsAvailable,
+                                _existential(_taskExecutor),
+                                /*else*/ _executor))),
+                            _nil)),
+          _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _typeparam(0), _parameters()))),
       _tuple(_nativeObject, _rawPointer));
 }
 
 static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+  auto taskExecutorIsAvailable =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
   return getBuiltinFunction(
       ctx, id, _thin,
       _parameters(
@@ -1554,11 +1558,18 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
         _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
         _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
         _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutorConsuming",
+               _defaulted(_consuming(_optional(_bincompatType(
+                              /*if*/ taskExecutorIsAvailable,
+                              _existential(_taskExecutor),
+                              /*else*/ _executor))),
+                          _nil)),
         _label("operation", _function(_async(_throws(_sendable(_thick))),
                                       _void, _parameters()))),
       _tuple(_nativeObject, _rawPointer));
 }
 
+// Legacy entry point, prefer `createAsyncTask`
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
                                      bool inGroup, bool withTaskExecutor,
                                      bool isDiscarding) {
@@ -1568,6 +1579,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
   if (inGroup) {
     builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
   }
+
   if (withTaskExecutor) {
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
@@ -1646,22 +1658,22 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   // TaskOptionRecord*
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
-  // If transferring results are enabled, make async let return a transferring
+  // If sending results are enabled, make async let return a set
   // value.
   //
   // NOTE: If our actual returned function does not return something that is
-  // transferring, we will emit an error in Sema. In the case of SILGen, we just
-  // in such a case want to thunk and not emit an error. So in such a case, we
-  // always make this builtin take a transferring result.
-  bool hasTransferringResult =
-      ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults);
+  // sent, we will emit an error in Sema. In the case of SILGen, we just in such
+  // a case want to thunk and not emit an error. So in such a case, we always
+  // make this builtin take a sending result.
+  bool hasSendingResult =
+      ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
 
   // operation async function pointer: () async throws -> transferring T
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
                      .withThrows()
                      .withNoEscape()
-                     .withTransferringResult(hasTransferringResult)
+                     .withSendingResult(hasSendingResult)
                      .build();
   builder.addParameter(
       makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -2081,6 +2093,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   builder.setAsync();
   if (throws)
     builder.setThrows();
+  builder.setSendingResult();
 
   return builder.build(id);
 }
@@ -2094,6 +2107,20 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   builder.addConformanceRequirement(actorParam, actorProto);
   builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
   return builder.build(id);
+}
+
+static ValueDecl *getFlowSensitiveSelfIsolation(
+  ASTContext &ctx, Identifier id, bool isDistributed
+) {
+  BuiltinFunctionBuilder builder(ctx);
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _generics(_unrestricted,
+                _conformsToDefaults(0),
+                _conformsTo(_typeparam(0),
+                            isDistributed ? _distributedActor : _actor)),
+      _parameters(_typeparam(0)),
+      _optional(_existential(_actor)));
 }
 
 static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) {
@@ -2786,11 +2813,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getEndUnpairedAccessOperation(Context, Id);
 
-  case BuiltinValueKind::Copy:
-    if (!Types.empty())
-      return nullptr;
-    return getCopyOperation(Context, Id);
-
   case BuiltinValueKind::AssumeAlignment:
     if (!Types.empty())
       return nullptr;
@@ -2988,7 +3010,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
-      
+
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
       
@@ -3202,6 +3224,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
+
+  case BuiltinValueKind::FlowSensitiveSelfIsolation:
+    return getFlowSensitiveSelfIsolation(Context, Id, false);
+
+  case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
+    return getFlowSensitiveSelfIsolation(Context, Id, true);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     return getAutoDiffCreateLinearMapContext(Context, Id);

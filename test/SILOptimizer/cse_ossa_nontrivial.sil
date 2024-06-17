@@ -723,6 +723,29 @@ bb0(%0 : @guaranteed $WrapperKlass):
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_refelementaddr_loop : {{.*}} {
+// CHECK:         ref_element_addr
+// CHECK:         ref_element_addr
+// CHECK-LABEL: } // end sil function 'test_refelementaddr_loop'
+sil [ossa] @test_refelementaddr_loop : $@convention(thin) () -> () {
+bb0:
+  %2 = apply undef() : $@convention(thin) () -> @owned WrapperKlass
+  %3 = move_value [lexical] [var_decl] %2 : $WrapperKlass
+  br bb1 
+
+bb1:
+  %func  = function_ref @use_object : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  %borrow1 = begin_borrow %3 : $WrapperKlass
+  %ele1 = ref_element_addr %borrow1 : $WrapperKlass, #WrapperKlass.val
+  apply %func(%ele1) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  end_borrow %borrow1 : $WrapperKlass
+  %borrow2 = begin_borrow %3 : $WrapperKlass
+  %ele2 = ref_element_addr %borrow2 : $WrapperKlass, #WrapperKlass.val
+  apply %func(%ele2) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  end_borrow %borrow2 : $WrapperKlass
+  br bb1 
+}
+
 sil [ossa] @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
 
 /*

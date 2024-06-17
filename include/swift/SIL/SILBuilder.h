@@ -423,6 +423,9 @@ public:
 #else
     (void)skipVarDeclAssert;
 #endif
+    // Don't apply location overrides on variables.
+    if (Var && !Var->Loc)
+      Var->Loc = Loc.strippedForDebugVariable();
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc, true), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), dynamic, isLexical,
@@ -1082,7 +1085,7 @@ public:
   }
 
   /// Create a debug_value according to the type of \p src
-  SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
+  DebugValueInst *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
     if (src->getType().isAddress())
       return createDebugValueAddr(Loc, src, Var);
@@ -1248,6 +1251,10 @@ public:
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty,
                            ValueOwnershipKind forwardingOwnershipKind) {
     assert(Ty.isObject());
+    if (isInsertingIntoGlobal()) {
+      return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                       getModule(), forwardingOwnershipKind));
+    }
     return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
                                      getFunction(), forwardingOwnershipKind));
   }
@@ -1276,6 +1283,11 @@ public:
   UncheckedRefCastInst *
   createUncheckedRefCast(SILLocation Loc, SILValue Op, SILType Ty,
                          ValueOwnershipKind forwardingOwnershipKind) {
+    if (isInsertingIntoGlobal()) {
+      return insert(UncheckedRefCastInst::create(
+          getSILDebugLocation(Loc), Op, Ty, getModule(),
+          forwardingOwnershipKind));
+    }
     return insert(UncheckedRefCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(),
         forwardingOwnershipKind));
@@ -2278,6 +2290,11 @@ public:
   EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       EndLifetimeInst(getSILDebugLocation(Loc), Operand));
+  }
+
+  ExtendLifetimeInst *createExtendLifetime(SILLocation Loc, SILValue Operand) {
+    return insert(new (getModule())
+                      ExtendLifetimeInst(getSILDebugLocation(Loc), Operand));
   }
 
   UncheckedOwnershipConversionInst *

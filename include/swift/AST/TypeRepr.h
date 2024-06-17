@@ -184,6 +184,10 @@ public:
   /// opaque return type reprs.
   bool hasOpaque();
 
+  /// Returns a Boolean value indicating whether this written type is
+  /// parenthesized, that is, matches the following grammar: `'(' type ')'`.
+  bool isParenType() const;
+
   /// Retrieve the type repr without any parentheses around it.
   ///
   /// The use of this function must be restricted to contexts where
@@ -1114,9 +1118,9 @@ public:
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst ||
-           T->getKind() == TypeReprKind::ResultDependsOn ||
            T->getKind() == TypeReprKind::LifetimeDependentReturn ||
-           T->getKind() == TypeReprKind::Transferring;
+           T->getKind() == TypeReprKind::Transferring ||
+           T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1187,21 +1191,6 @@ public:
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
 };
 
-/// A lifetime dependent type.
-/// \code
-///   x : _resultDependsOn Int
-/// \endcode
-class ResultDependsOnTypeRepr : public SpecifierTypeRepr {
-public:
-  ResultDependsOnTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-      : SpecifierTypeRepr(TypeReprKind::ResultDependsOn, Base, InOutLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::ResultDependsOn;
-  }
-  static bool classof(const ResultDependsOnTypeRepr *T) { return true; }
-};
-
 /// A transferring type.
 /// \code
 ///   x : transferring Int
@@ -1215,6 +1204,21 @@ public:
     return T->getKind() == TypeReprKind::Transferring;
   }
   static bool classof(const TransferringTypeRepr *T) { return true; }
+};
+
+/// A sending type.
+/// \code
+///   x : sending Int
+/// \endcode
+class SendingTypeRepr : public SpecifierTypeRepr {
+public:
+  SendingTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : SpecifierTypeRepr(TypeReprKind::Sending, Base, Loc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Sending;
+  }
+  static bool classof(const SendingTypeRepr *T) { return true; }
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1618,9 +1622,9 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
   case TypeReprKind::Transferring:
+  case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
-  case TypeReprKind::ResultDependsOn:
   case TypeReprKind::LifetimeDependentReturn:
     return true;
   }

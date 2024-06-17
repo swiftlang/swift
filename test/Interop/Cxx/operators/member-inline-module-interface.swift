@@ -211,6 +211,13 @@
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
 // CHECK: }
 
+// CHECK: struct SubscriptUnnamedParameter {
+// CHECK:   subscript(__index: Int32) -> Int32 { get }
+// CHECK: }
+// CHECK: struct SubscriptUnnamedParameterReadWrite {
+// CHECK:   subscript(__index: Int32) -> Int32
+// CHECK: }
+
 // CHECK: struct Iterator {
 // CHECK:   var pointee: Int32 { mutating get set }
 // CHECK:   @available(*, unavailable, message: "use .pointee property")
@@ -286,4 +293,17 @@
 
 // CHECK: struct HasOperatorCallWithDefaultArg {
 // CHECK:   func callAsFunction(_ x: Int32 = cxxDefaultArg) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallBase {
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallDerived {
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallWithConstOperator {
+// CHECK:   func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
 // CHECK: }

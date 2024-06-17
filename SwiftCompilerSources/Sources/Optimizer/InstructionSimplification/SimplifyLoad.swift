@@ -250,7 +250,7 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   }
   let initFn = initFnRef.referencedFunction
   context.notifyDependency(onBodyOf: initFn)
-  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, allowGlobalValue: true)  else {
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, forStaticInitializer: false, context) else {
     return nil
   }
   return storeToGlobal.source
@@ -281,7 +281,7 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
 
 private extension Value {
   func canBeCopied(into function: Function, _ context: SimplifyContext) -> Bool {
-    if !function.isSerialized {
+    if !function.isAnySerialized {
       return true
     }
 
@@ -297,7 +297,7 @@ private extension Value {
 
     while let value = worklist.pop() {
       if let fri = value as? FunctionRefInst {
-        if !fri.referencedFunction.hasValidLinkageForFragileRef {
+        if !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind) {
           return false
         }
       }

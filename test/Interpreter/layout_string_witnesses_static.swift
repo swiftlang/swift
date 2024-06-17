@@ -1180,6 +1180,30 @@ func testMultiPayloadError() {
 
 testMultiPayloadError()
 
+// Regression test for rdar://127379960
+func testMultiPayloadErrorKeepsTagIntact() {
+    let ptr = UnsafeMutablePointer<MultiPayloadError>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = MultiPayloadError.error2(0, MyError(x: SimpleClass(x: 23)))
+        testInit(ptr, to: x)
+    }
+
+    // CHECK: Got error2!
+    switch ptr.pointee {
+        case .error1: print("Get error1!")
+        case .error2: print("Got error2!")
+        case .empty: print("Got empty!")
+    }
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+    ptr.deallocate()
+}
+
+testMultiPayloadErrorKeepsTagIntact()
+
 func testCTypeAligned() {
     let ptr = UnsafeMutablePointer<CTypeAligned>.allocate(capacity: 1)
 
@@ -1222,6 +1246,49 @@ func testCTypeAligned() {
 }
 
 testCTypeAligned()
+
+func testCTypeUnderAligned() {
+    let ptr = UnsafeMutablePointer<CTypeUnderAligned>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = CTypeUnderAligned(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = CTypeUnderAligned(SimpleClass(x: 1))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = CTypeUnderAligned(SimpleClass(x: 5))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testCTypeUnderAligned()
 
 #if os(macOS)
 func testObjc() {

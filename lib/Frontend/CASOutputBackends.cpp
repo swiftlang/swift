@@ -149,7 +149,10 @@ void SwiftCASOutputBackend::Implementation::initBackend(
   // any commands write output to `-`.
   file_types::ID mainOutputType = InputsAndOutputs.getPrincipalOutputType();
   auto addInput = [&](const InputFile &Input, unsigned Index) {
-    if (!Input.outputFilename().empty())
+    // Ignore the outputFilename for typecheck action since it is not producing
+    // an output file for that.
+    if (!Input.outputFilename().empty() &&
+        Action != FrontendOptions::ActionType::Typecheck)
       OutputToInputMap.insert(
           {Input.outputFilename(), {Index, mainOutputType}});
     Input.getPrimarySpecificPaths()

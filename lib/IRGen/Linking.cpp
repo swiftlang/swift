@@ -642,6 +642,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Shared;
 
   case Kind::TypeMetadata: {
+    if (isForcedShared())
+      return SILLinkage::Shared;
+
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:

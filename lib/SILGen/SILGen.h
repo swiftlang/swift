@@ -83,10 +83,6 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
-  /// The conformance for any DistributedActor to the Actor protocol,
-  /// used only by the `distributedActorAsAnyActor` builtin.
-  NormalProtocolConformance *distributedActorAsActorConformance = nullptr;
-
   size_t anonymousSymbolCounter = 0;
 
   std::optional<SILDeclRef> StringToNSStringFn;
@@ -381,7 +377,7 @@ public:
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
-                      IsSerialized_t isSerialized, SILDeclRef requirement,
+                      SerializedKind_t serializedKind, SILDeclRef requirement,
                       SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
                       Witness witness);
 
@@ -601,15 +597,6 @@ public:
   /// mentioned by the given type.
   void useConformancesFromObjectiveCType(CanType type);
 
-  /// Retrieve a protocol conformance to the `Actor` protocol for a
-  /// distributed actor type that is described via a substitution map for
-  /// the generic signature `<T: DistributedActor>`.
-  ///
-  /// The protocol conformance is a special one that is currently
-  /// only used by the `distributedActorAsAnyActor` builtin.
-  ProtocolConformanceRef
-  getDistributedActorAsActorConformance(SubstitutionMap subs);
-
   /// Make a note of a member reference expression, which allows us
   /// to ensure that the conformance above is emitted wherever it
   /// needs to be.
@@ -624,6 +611,11 @@ public:
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
+
+  /// Replace local archetypes captured from outer AST contexts with primary
+  /// archetypes.
+  void recontextualizeCapturedLocalArchetypes(
+      SILFunction *F, GenericSignatureWithCapturedEnvironments sig);
 
 private:
   /// The most recent declaration we considered for emission.

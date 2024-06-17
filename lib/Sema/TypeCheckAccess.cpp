@@ -404,12 +404,13 @@ static void noteLimitingImport(const Decl *userDecl,
                      limitImport->accessLevel,
                      limitImport->module.importedModule);
 
-    ctx.Diags.diagnose(limitImport->importLoc,
-                       diag::decl_import_via_here,
-                       VD,
-                       limitImport->accessLevel,
-                       limitImport->module.importedModule);
-  } else {
+    if (limitImport->importLoc.isValid())
+      ctx.Diags.diagnose(limitImport->importLoc,
+                         diag::decl_import_via_here,
+                         VD,
+                         limitImport->accessLevel,
+                         limitImport->module.importedModule);
+  } else if (limitImport->importLoc.isValid()) {
     ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
                        limitImport->module.importedModule,
                        limitImport->accessLevel);
@@ -2259,7 +2260,7 @@ public:
 
     for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::General, flags);
+                ExportabilityReason::Inheritance, flags);
     }
   }
 
@@ -2361,7 +2362,7 @@ public:
     // must be exported.
     for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
-                ExportabilityReason::General,
+                ExportabilityReason::Inheritance,
                 DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
     }
 

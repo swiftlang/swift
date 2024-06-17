@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch -parse-as-library %s
+// RUN: %target-swift-frontend -emit-sil -verify -parse-as-library %s
 
 func foo() {
     let node = Node()

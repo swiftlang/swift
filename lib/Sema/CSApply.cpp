@@ -355,6 +355,45 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
   return true;
 }
 
+/// Since a cast to an optional will consume a noncopyable type, check to see
+/// if injecting the value into an optional here will potentially be confusing.
+static bool willHaveConfusingConsumption(Type type,
+                                         ConstraintLocatorBuilder locator,
+                                         ConstraintSystem &cs) {
+  assert(type);
+  if (!type->isNoncopyable())
+    return false; /// If it's a copyable type, there's no confusion.
+
+  auto loc = cs.getConstraintLocator(locator);
+  if (!loc)
+    return true;
+
+  auto path = loc->getPath();
+  if (path.empty())
+    return true;
+
+  switch (loc->getPath().back().getKind()) {
+  case ConstraintLocator::FunctionResult:
+  case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ClosureBody:
+  case ConstraintLocator::ContextualType:
+  case ConstraintLocator::CoercionOperand:
+    return false; // These last-uses won't be confused for borrowing.
+
+  case ConstraintLocator::ApplyArgToParam: {
+    auto argLoc = loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+    auto paramFlags = argLoc.getParameterFlags();
+    if (paramFlags.getOwnershipSpecifier() == ParamSpecifier::Consuming)
+      return false; // Parameter already declares 'consuming'.
+
+    return true;
+  }
+
+  default:
+    return true;
+  }
+}
+
 namespace {
 
   /// Rewrites an expression by applying the solution of a constraint
@@ -655,12 +694,33 @@ namespace {
       }
 
       auto ref = resolveConcreteDeclRef(decl, locator);
+
+      // If we have a variable that's treated as an rvalue but allows
+      // assignment (for initialization) in the current context,
+      // treat it as an rvalue that we immediately load. This is
+      // the AST that's expected by SILGen.
+      bool loadImmediately = false;
+      if (auto var = dyn_cast_or_null<VarDecl>(ref.getDecl())) {
+        if (!fullType->hasLValueType()) {
+          if (var->mutability(dc) == StorageMutability::Initializable) {
+            fullType = LValueType::get(fullType);
+            adjustedFullType = LValueType::get(adjustedFullType);
+            loadImmediately = true;
+          }
+        }
+      }
+
+
       auto declRefExpr =
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
       Expr *result = adjustTypeForDeclReference(
           declRefExpr, fullType, adjustedFullType, locator);
+      // If we have to load, do so now.
+      if (loadImmediately)
+        result = cs.addImplicitLoadExpr(result);
+
       result = forceUnwrapIfExpected(result, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1695,9 +1755,23 @@ namespace {
       // For properties, build member references.
       if (auto *varDecl = dyn_cast<VarDecl>(member)) {
         // \returns result of the given function type
-        auto resultType = [](Type fnTy) -> Type {
-          return fnTy->castTo<FunctionType>()->getResult();
+        bool loadImmediately = false;
+        auto resultType = [&loadImmediately](Type fnTy) -> Type {
+          Type resultTy = fnTy->castTo<FunctionType>()->getResult();
+          if (loadImmediately)
+            return LValueType::get(resultTy);
+          return resultTy;
         };
+
+        // If we have an instance property that's treated as an rvalue
+        // but allows assignment (for initialization) in the current
+        // context, treat it as an rvalue that we immediately load.
+        // This is the AST that's expected by SILGen.
+        if (baseIsInstance && !resultType(refTy)->hasLValueType() &&
+            varDecl->mutability(dc, dyn_cast<DeclRefExpr>(base))
+                == StorageMutability::Initializable) {
+          loadImmediately = true;
+        }
 
         if (isUnboundInstanceMember) {
           assert(memberLocator.getBaseLocator() &&
@@ -1744,6 +1818,12 @@ namespace {
                 result, conversionTy));
           }
         }
+
+        // If we need to load, do so now.
+        if (loadImmediately) {
+          result = cs.addImplicitLoadExpr(result);
+        }
+
         return forceUnwrapIfExpected(result, memberLocator);
       }
 
@@ -3200,9 +3280,11 @@ namespace {
     }
 
   private:
-    /// A list of "suspicious" optional injections that come from
-    /// forced downcasts.
+    /// A list of "suspicious" optional injections.
     SmallVector<InjectIntoOptionalExpr *, 4> SuspiciousOptionalInjections;
+
+    /// A list of implicit coercions of noncopyable types.
+    SmallVector<Expr *, 4> ConsumingCoercions;
 
     /// Create a member reference to the given constructor.
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
@@ -4425,9 +4507,9 @@ namespace {
       if (choice == 0) {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
-
-        sub = solution.coerceToType(sub, expr->getCastType(),
-                                    cs.getConstraintLocator(sub));
+        auto subLoc =
+            cs.getConstraintLocator(sub, ConstraintLocator::CoercionOperand);
+        sub = solution.coerceToType(sub, expr->getCastType(), subLoc);
         if (!sub)
           return nullptr;
 
@@ -5478,38 +5560,65 @@ namespace {
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
-        auto *cast = findForcedDowncast(ctx, injection->getSubExpr());
-        if (!cast)
-          continue;
+        if (auto *cast = findForcedDowncast(ctx, injection->getSubExpr())) {
+          if (!isa<ParenExpr>(injection->getSubExpr())) {
+            ctx.Diags.diagnose(
+                injection->getLoc(), diag::inject_forced_downcast,
+                cs.getType(injection->getSubExpr())->getRValueType());
+            auto exclaimLoc = cast->getExclaimLoc();
+            ctx.Diags
+                .diagnose(exclaimLoc, diag::forced_to_conditional_downcast,
+                          cs.getType(injection)->getOptionalObjectType())
+                .fixItReplace(exclaimLoc, "?");
+            ctx.Diags
+                .diagnose(cast->getStartLoc(),
+                          diag::silence_inject_forced_downcast)
+                .fixItInsert(cast->getStartLoc(), "(")
+                .fixItInsertAfter(cast->getEndLoc(), ")");
+          }
+        }
+      }
 
-        if (isa<ParenExpr>(injection->getSubExpr()))
-          continue;
-
-        ctx.Diags.diagnose(
-            injection->getLoc(), diag::inject_forced_downcast,
-            cs.getType(injection->getSubExpr())->getRValueType());
-        auto exclaimLoc = cast->getExclaimLoc();
+      // Diagnose the implicit coercions of noncopyable values that happen in
+      // a context where it isn't "obviously" consuming already.
+      for (auto *coercion : ConsumingCoercions) {
+        assert(coercion->isImplicit());
         ctx.Diags
-            .diagnose(exclaimLoc, diag::forced_to_conditional_downcast,
-                      cs.getType(injection)->getOptionalObjectType())
-            .fixItReplace(exclaimLoc, "?");
+            .diagnose(coercion->getLoc(),
+                      diag::consume_expression_needed_for_cast,
+                      cs.getType(coercion));
         ctx.Diags
-            .diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
-            .fixItInsert(cast->getStartLoc(), "(")
-            .fixItInsertAfter(cast->getEndLoc(), ")");
+            .diagnose(coercion->getLoc(),
+                      diag::add_consume_to_silence)
+            .fixItInsert(coercion->getStartLoc(), "consume ");
       }
     }
 
     /// Diagnose an optional injection that is probably not what the
-    /// user wanted, because it comes from a forced downcast.
-    void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection) {
+    /// user wanted, because it comes from a forced downcast, or from an
+    /// implicitly consumed noncopyable type.
+    void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection,
+                                   ConstraintLocatorBuilder locator) {
       // Check whether we have a forced downcast.
-      auto *cast =
-          findForcedDowncast(cs.getASTContext(), injection->getSubExpr());
-      if (!cast)
-        return;
-      
-      SuspiciousOptionalInjections.push_back(injection);
+      if (findForcedDowncast(cs.getASTContext(), injection->getSubExpr()))
+        SuspiciousOptionalInjections.push_back(injection);
+
+      /// Check if it needs an explicit consume, due to this being a cast.
+      auto *module = dc->getParentModule();
+      auto origType = cs.getType(injection->getSubExpr());
+      if (willHaveConfusingConsumption(origType, locator, cs) &&
+          canAddExplicitConsume(module, injection->getSubExpr()))
+        ConsumingCoercions.push_back(injection);
+    }
+
+    void diagnoseExistentialErasureOf(Expr *fromExpr, Expr *toExpr,
+                                      ConstraintLocatorBuilder locator) {
+      auto *module = dc->getParentModule();
+      auto fromType = cs.getType(fromExpr);
+      if (willHaveConfusingConsumption(fromType, locator, cs) &&
+          canAddExplicitConsume(module, fromExpr)) {
+        ConsumingCoercions.push_back(toExpr);
+      }
     }
   };
 } // end anonymous namespace
@@ -5780,7 +5889,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
     while (diff--) {
       Type type = toOptionals[diff];
       expr = cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, type));
-      diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr));
+      diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr), locator);
     }
 
     return expr;
@@ -6418,6 +6527,17 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       }
     };
     
+    // Look through a function conversion that only adds or removes
+    // `@Sendable`.
+    if (auto conv = dyn_cast<FunctionConversionExpr>(semanticExpr)) {
+      auto ty1 = conv->getType()->castTo<AnyFunctionType>();
+      auto ty2 = conv->getSubExpr()->getType()->castTo<AnyFunctionType>();
+      if (ty1->withExtInfo(ty1->getExtInfo().withSendable(false))
+             ->isEqual(ty2->withExtInfo(ty2->getExtInfo().withSendable(false)))){
+        semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
+      }
+    }
+    
     if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
       if (auto fn = dyn_cast<FuncDecl>(declRef->getDecl())) {
         return maybeDiagnoseFunctionRef(fn);
@@ -6898,8 +7018,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceSuperclass(expr, toType);
 
     case ConversionRestrictionKind::Existential:
-    case ConversionRestrictionKind::MetatypeToExistentialMetatype:
-      return coerceExistential(expr, toType, locator);
+    case ConversionRestrictionKind::MetatypeToExistentialMetatype: {
+      auto coerced = coerceExistential(expr, toType, locator);
+      diagnoseExistentialErasureOf(expr, coerced, locator);
+      return coerced;
+    }
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(ctx.LangOpts.EnableObjCInterop &&
@@ -6928,7 +7051,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto *result =
           cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, toType));
-      diagnoseOptionalInjection(result);
+      diagnoseOptionalInjection(result, locator);
       return result;
     }
 
@@ -7622,7 +7745,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (!expr) return nullptr;
 
     auto *result = cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, toType));
-    diagnoseOptionalInjection(result);
+    diagnoseOptionalInjection(result, locator);
     return result;
   }
 
@@ -8962,8 +9085,8 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 }
 
 /// Pattern match if an initializer has as its value a callee that returns
-/// transferring.
-static bool isTransferringInitializer(Expr *initializer) {
+/// a sent value.
+static bool isSendingInitializer(Expr *initializer) {
   auto *await = dyn_cast<AwaitExpr>(initializer);
   if (!await)
     return false;
@@ -8976,7 +9099,7 @@ static bool isTransferringInitializer(Expr *initializer) {
   if (!fType)
     return false;
 
-  return fType->hasTransferringResult();
+  return fType->hasSendingResult();
 }
 
 /// For the initializer of an `async let`, wrap it in an autoclosure and then
@@ -8990,14 +9113,17 @@ static Expr *wrapAsyncLetInitializer(
   Type initializerType = initializer->getType();
   bool throws = TypeChecker::canThrow(cs.getASTContext(), initializer)
                   .has_value();
-  bool hasTransferringResult = isTransferringInitializer(initializer);
-  bool isSendable = !cs.getASTContext().LangOpts.hasFeature(
-      Feature::TransferringArgsAndResults);
+  bool hasSendingeResult = isSendingInitializer(initializer);
+  bool isSendable =
+      !cs.getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation);
+  assert((isSendable || cs.getASTContext().LangOpts.hasFeature(
+                            Feature::SendingArgsAndResults)) &&
+         "Region Isolation should imply SendingArgsAndResults");
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
                      .withThrows(throws, /*FIXME:*/ Type())
                      .withSendable(isSendable)
-                     .withTransferringResult(hasTransferringResult)
+                     .withSendingResult(hasSendingeResult)
                      .build();
 
   // Form the autoclosure expression. The actual closure here encapsulates the
@@ -9359,35 +9485,6 @@ static std::optional<PackIterationInfo> applySolutionToForEachStmt(
         std::optional<SyntacticElementTarget>(SyntacticElementTarget)>
         rewriteTarget) {
 
-  // A special walker to record opened element environment for var decls in a
-  // for-each loop.
-  class Walker : public ASTWalker {
-    GenericEnvironment *Environment;
-
-  public:
-    Walker(GenericEnvironment *Environment) { this->Environment = Environment; }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (isa<ForEachStmt>(S)) {
-        return Action::SkipNode(S);
-      }
-      return Action::Continue(S);
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *decl = dyn_cast<VarDecl>(D)) {
-        decl->setOpenedElementEnvironment(Environment);
-      }
-      if (isa<AbstractFunctionDecl>(D)) {
-        return Action::SkipNode();
-      }
-      if (isa<NominalTypeDecl>(D)) {
-        return Action::SkipNode();
-      }
-      return Action::Continue();
-    }
-  };
-
   auto &cs = solution.getConstraintSystem();
   auto *sequenceExpr = stmt->getParsedSequence();
   PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
@@ -9400,11 +9497,6 @@ static std::optional<PackIterationInfo> applySolutionToForEachStmt(
 
   // Simplify the pattern type of the pack expansion.
   info.patternType = solution.simplifyType(info.patternType);
-
-  // Record the opened element environment for the VarDecls inside the loop
-  Walker forEachWalker(expansion->getGenericEnvironment());
-  stmt->getPattern()->walk(forEachWalker);
-  stmt->getBody()->walk(forEachWalker);
 
   return info;
 }

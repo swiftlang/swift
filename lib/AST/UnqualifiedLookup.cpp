@@ -333,8 +333,7 @@ UnqualifiedLookupFactory::getBaseDeclForResult(const DeclContext *baseDC) const 
 /// unwrapping condition (e.g. `guard let self else { return }`).
 /// If this is true, then we know any implicit self reference in the
 /// following scope is guaranteed to be non-optional.
-static bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
-                                             const AbstractClosureExpr *inClosure) {
+static bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl) {
   ASTContext &Ctx = selfDecl->getASTContext();
 
   // Check if the implicit self decl refers to a var in a conditional stmt
@@ -352,39 +351,20 @@ static bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
   return conditionalStmt->rebindsSelf(Ctx);
 }
 
-// Finds the nearest parent closure, which would define the
-// permitted usage of implicit self. In closures this is most
-// often just `dc` itself, but in functions defined in the
-// closure body this would be some parent context.
-static ClosureExpr *closestParentClosure(DeclContext *dc) {
-  if (!dc) {
-    return nullptr;
-  }
-
-  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
-    return closure;
-  }
-
-  // Stop searching if we find a type decl, since types always
-  // redefine what 'self' means, even when nested inside a closure.
-  if (dc->getContextKind() == DeclContextKind::GenericTypeDecl) {
-    return nullptr;
-  }
-
-  return closestParentClosure(dc->getParent());
-}
-
 ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) const {
+  // If the member was not in local context, we're not going to need the
+  // 'self' declaration, so skip all this work to avoid request cycles.
+  if (!baseDC->isLocalContext())
+    return nullptr;
+
+  // If we're only interested in type declarations, we can also skip everything.
+  if (isOriginallyTypeLookup)
+    return nullptr;
+
   // Perform an unqualified lookup for the base decl of this result. This
   // handles cases where self was rebound (e.g. `guard let self = self`)
-  // earlier in the scope.
-  //
-  // Only do this in closures that capture self weakly, since implicit self
-  // isn't allowed to be rebound in other contexts. In other contexts, implicit
-  // self _always_ refers to the context's self `ParamDecl`, even if there
-  // is another local decl with the name `self` that would be found by
-  // `lookupSingleLocalDecl`.
-  auto closureExpr = closestParentClosure(DC);
+  // earlier in this closure or some outer closure.
+  auto closureExpr = DC->getInnermostClosureForSelfCapture();
   if (!closureExpr) {
     return nullptr;
   }
@@ -396,19 +376,20 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
     }
   }
 
-  if (!capturesSelfWeakly) {
+  // Previously we didn't perform the lookup of 'self' for anything outside
+  // of a '[weak self]' closure, maintain that behavior until Swift 6 mode.
+  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6) && !capturesSelfWeakly)
     return nullptr;
-  }
 
-  auto selfDecl = ASTScope::lookupSingleLocalDecl(
-      DC->getParentSourceFile(), DeclName(Ctx.Id_self), Loc);
-
+  auto selfDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                                  DeclName(Ctx.Id_self), Loc);
   if (!selfDecl) {
     return nullptr;
   }
 
   // In Swift 5 mode, implicit self is allowed within non-escaping
-  // closures even before self is unwrapped. For example, this is allowed:
+  // `weak self` closures even before self is unwrapped.
+  // For example, this is allowed:
   //
   //   doVoidStuffNonEscaping { [weak self] in
   //     method() // implicitly `self.method()`
@@ -416,7 +397,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   //
   // To support this, we have to preserve the lookup behavior from
   // Swift 5.7 and earlier where implicit self defaults to the closure's
-  // `ParamDecl`. This causes the closure to capture self strongly, however,
+  // `ParamDecl`. This causes the closure to capture self strongly,
   // which is not acceptable for escaping closures.
   //
   // Escaping closures, however, only need to permit implicit self once
@@ -431,7 +412,28 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   // how the body is type-checked, so it can be used in Swift 5 mode
   // without breaking source compatibility for non-escaping closures.
   if (!Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
-      !implicitSelfReferenceIsUnwrapped(selfDecl, closureExpr)) {
+      !implicitSelfReferenceIsUnwrapped(selfDecl)) {
+    return nullptr;
+  }
+
+  // Closures are only allowed to rebind self in specific circumstances:
+  //  1. In a capture list with an explicit capture.
+  //  2. In a `guard let self = self` / `if let self = self` condition
+  //     in a closure that captures self weakly.
+  //
+  // These rebindings can be done by any parent closure, and apply
+  // to all nested closures. We only need to check these structural
+  // requirements loosely here -- more extensive validation happens
+  // later in MiscDiagnostics::diagnoseImplicitSelfUseInClosure.
+  //
+  // Other types of rebindings, like an arbitrary "let `self` = foo",
+  // are never allowed to rebind self.
+  auto selfVD = dyn_cast<VarDecl>(selfDecl);
+  if (!selfVD) {
+    return nullptr;
+  }
+
+  if (!(selfVD->isCaptureList() || selfVD->getParentPatternStmt())) {
     return nullptr;
   }
 

@@ -404,14 +404,19 @@ func takesClosure(_: (Int) -> Int) {
 
 func updateInt(_ x : inout Int) {}
 
+extension Int {
+  mutating func negateMe() { }
+}
+
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
-  let a : Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  let a : Int       // expected-note 4 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
 
   init(arg : Int) {
     a = arg             // ok, a is mutable in init()
-    updateInt(&a)       // ok, a is mutable in init() and has been initialized
+    a.negateMe()        // expected-error{{cannot use mutating member on immutable value: 'a' is a 'let' constant}}
+    updateInt(&a)       // expected-error{{cannot pass immutable value as inout argument: 'a' is a 'let' constant}}
     b = 17              // ok, b is mutable in init()
   }
 
@@ -422,12 +427,13 @@ class LetClassMembers {
   }
 }
 struct LetStructMembers {
-  let a : Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  let a : Int       // expected-note 4 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
 
   init(arg : Int) {
     a = arg             // ok, a is mutable in init()
-    updateInt(&a)       // ok, a is mutable in init() and has been initialized
+    updateInt(&a)       // expected-error {{cannot pass immutable value as inout argument: 'a' is a 'let' constant}}
+    a += 1              // expected-error {{left side of mutating operator isn't mutable: 'a' is a 'let' constant}}
     b = 17              // ok, b is mutable in init()
   }
 
@@ -754,5 +760,18 @@ struct S2<T> {
     let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
     y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'S2<T>.' to refer to mutable static property of 'S2<T>'}} {{5-5=S2<T>.}}
+  }
+}
+
+// SR-3680, https://github.com/apple/swift/issues/46265
+protocol HasFoo {
+  var foo: String { get }
+}
+protocol CanSetFoo {
+  var foo: String { get set }
+}
+extension HasFoo where Self: CanSetFoo {
+  func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    self.foo = "bar" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }

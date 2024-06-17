@@ -382,6 +382,9 @@ struct PrintOptions {
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
+  /// Suppress 'sending' on arguments and results.
+  bool SuppressSendingArgsAndResults = false;
+
   /// Suppress Noncopyable generics.
   bool SuppressNoncopyableGenerics = false;
 
@@ -390,6 +393,9 @@ struct PrintOptions {
 
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
+
+  /// Replace BitwiseCopyable with _BitwiseCopyable.
+  bool SuppressBitwiseCopyable = false;
 
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {

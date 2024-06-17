@@ -820,6 +820,10 @@ public:
   /// the fields.
   void emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd);
 
+  /// Whether we are inside a constructor whose hops are injected by
+  /// definite initialization.
+  bool isCtorWithHopsInjectedByDefiniteInit();
+
   /// Generates code for a struct constructor.
   /// This allocates the new 'self' value, emits the
   /// body code, then returns the final initialized 'self'.
@@ -2181,9 +2185,8 @@ public:
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
 
-  /// Mapping from active opaque value expressions to their values.
-  llvm::SmallDenseMap<OpaqueValueExpr *, ManagedValue>
-    OpaqueValues;
+  /// Mapping from OpaqueValueExpr/PackElementExpr to their values.
+  llvm::SmallDenseMap<Expr *, ManagedValue> OpaqueValues;
 
   /// A mapping from opaque value expressions to the open-existential
   /// expression that determines them, used while lowering lvalues.

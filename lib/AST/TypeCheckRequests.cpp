@@ -1074,7 +1074,9 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasArchetype() && "Archetype in interface type");
+    assert(!type->hasPrimaryArchetype() && "Archetype in interface type");
+    assert(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
+           "Local archetype in interface type of non-local declaration");
   }
   decl->TypeAndAccess.setPointer(type);
 }
@@ -1731,6 +1733,62 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     }
     break;
   }
+}
+
+void ActorIsolation::print(llvm::raw_ostream &os) const {
+  switch (getKind()) {
+  case Unspecified:
+    os << "unspecified";
+    return;
+  case ActorInstance:
+    os << "actor_instance";
+    if (auto *vd = getActorInstance()) {
+      os << ". name: '" << vd->getBaseIdentifier() << "'";
+    }
+    return;
+  case Nonisolated:
+    os << "nonisolated";
+    return;
+  case NonisolatedUnsafe:
+    os << "nonisolated_unsafe";
+    return;
+  case GlobalActor:
+    os << "global_actor. type: " << getGlobalActor();
+    return;
+  case Erased:
+    os << "erased";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
+  switch (getKind()) {
+  case Unspecified:
+    os << "unspecified";
+    return;
+  case ActorInstance:
+    os << "actor_instance";
+    return;
+  case Nonisolated:
+    os << "nonisolated";
+    return;
+  case NonisolatedUnsafe:
+    os << "nonisolated_unsafe";
+    return;
+  case GlobalActor:
+    os << "global_actor";
+    return;
+  case Erased:
+    os << "erased";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+void ActorIsolation::dump() const {
+  print(llvm::dbgs());
+  llvm::dbgs() << '\n';
 }
 
 void ActorIsolation::dumpForDiagnostics() const {

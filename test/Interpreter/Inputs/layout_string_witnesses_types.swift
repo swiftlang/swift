@@ -49,6 +49,16 @@ public struct CTypeAligned {
     }
 }
 
+public struct CTypeUnderAligned {
+    let w: Int32 = 0
+    let x: UnderAligned? = UnderAligned()
+    let y: SimpleClass
+
+    public init(_ y: SimpleClass) {
+        self.y = y
+    }
+}
+
 public struct GenericStruct<T> {
     let x: Int = 0
     let y: T

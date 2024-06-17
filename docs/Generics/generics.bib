@@ -9,6 +9,45 @@
     year      = {2014}
 }
 
+@book{muchnick1997advanced,
+  title={Advanced Compiler Design and Implementation},
+  author={Muchnick, S.},
+  isbn={9781558603202},
+  lccn={97013063},
+  url={https://www.goodreads.com/en/book/show/887908},
+  year={1997},
+  publisher={Morgan Kaufmann Publishers}
+}
+
+@book{cooper2004engineering,
+  title={Engineering a Compiler},
+  author={Cooper, K.D. and Torczon, L.},
+  isbn={9781558606982},
+  lccn={2004268209},
+  url={https://dl.acm.org/doi/pdf/10.5555/2737838},
+  year={2004},
+  publisher={Elsevier Science}
+}
+
+@book{incrementalracket,
+  title={Essentials of Compilation},
+  subtitle={An incremental approach in {R}acket},
+  author={Jeremy G. Siek},
+  isbn={9780262047760},
+  url={https://mitpress.mit.edu/9780262047760/essentials-of-compilation/},
+  year={2023},
+  publisher={The MIT Press}
+}
+
+@book{craftinginterpreter,
+  title={Crafting Interpreters},
+  author={Robert Nystrom},
+  year={2021},
+  publisher={Genever Benning},
+  isbn={9780990582946},
+  url={https://craftinginterpreters.com}
+}
+
 @book{gregor,
   title={C++ Templates: The Complete Guide},
   author={Vandevoorde, D. and Josuttis, N.M. and Gregor, D.},
@@ -22,6 +61,7 @@
   title={Discrete and Combinatorial Mathematics: An Applied Introduction},
   author={Grimaldi, R.P.},
   year={1998},
+  isbn={9780201199123},
   publisher={Addison-Wesley Longman},
   url={https://www.goodreads.com/en/book/show/1575542}
 }
@@ -40,6 +80,7 @@
   title={Post-Modern Algebra},
   author={Smith, J.D.H. and Romanowska, A.B.},
   year={2011},
+  isbn={9780471127383},
   publisher={Wiley},
   url={https://www.wiley.com/en-us/Post+Modern+Algebra-p-9780471127383}
 }
@@ -56,7 +97,8 @@
 @book{alggraph,
   title={Algebraic Graph Theory: Morphisms, Monoids and Matrices},
   author={Knauer, U.},
-  year={2011},
+  year={2019},
+  isbn={9783110616125},
   publisher={De Gruyter},
   url={https://www.degruyter.com/document/doi/10.1515/9783110617368/html?lang=en}
 }
@@ -77,6 +119,7 @@
   author={Magnus, W. and Karrass, A. and Solitar, D.},
   year={1976},
   publisher={Dover Publications},
+  isbn={9780486438306},
   url={https://www.goodreads.com/book/show/331129.Combinatorial_Group_Theory}
 }
 
@@ -91,8 +134,16 @@
   publisher={Springer New York}
 }
 
-@book{andallthat, place={Cambridge}, title={Term Rewriting and All That}, DOI={10.1017/CBO9781139172752}, publisher={Cambridge University Press}, author={Baader, Franz and Nipkow, Tobias}, year={1998},
-url={https://www21.in.tum.de/~nipkow/TRaAT/}}
+@book{andallthat,
+  place={Cambridge},
+  title={Term Rewriting and All That},
+  DOI={10.1017/CBO9781139172752},
+  publisher={Cambridge University Press},
+  author={Baader, Franz and Nipkow, Tobias},
+  year={1998},
+  isbn={9780521779203},
+  url={https://www21.in.tum.de/~nipkow/TRaAT/}
+}
 
 @book{art1,
   title={The Art of Computer Programming: Volume 1: Fundamental Algorithms},
@@ -116,6 +167,7 @@ url={https://www21.in.tum.de/~nipkow/TRaAT/}}
   title={Theory of Finite and Infinite Graphs},
   author={K{\H{o}}nig, D. and McCoart, R. and Tutte, W.T.},
   year={2013},
+  isbn={9780817633899},
   publisher={Birkh{\"a}user Boston},
   url={https://www.goodreads.com/book/show/3359970-theory-of-finite-and-infinite-graphs}
 }
@@ -124,8 +176,9 @@ url={https://www21.in.tum.de/~nipkow/TRaAT/}}
   title={Computability: An Introduction to Recursive Function Theory},
   author={Nigel Cutland},
   year={1980},
+  isbn={9780521294652},
   publisher={Cambridge University Press},
-  url={https://www.goodreads.com/book/show/1190249.Computability}
+  url={https://www.cambridge.org/us/universitypress/subjects/computer-science/programming-languages-and-applied-logic/computability-introduction-recursive-function-theory?format=PB}
 }
 
 @book{collatzbook,
@@ -135,6 +188,15 @@ url={https://www21.in.tum.de/~nipkow/TRaAT/}}
   year={2010},
   publisher={American Mathematical Society},
   url={https://bookstore.ams.org/mbk-78}
+}
+
+@book{curry,
+  title={Foundations of Mathematical Logic},
+  author={Curry, H.B.},
+  isbn={9780486634623},
+  year={1977},
+  publisher={Dover Publications},
+  url={https://store.doverpublications.com/products/9780486634623}
 }
 
 @book{combinatory,
@@ -836,10 +898,37 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
 }
 
 @misc{rust_chalk,
-  author="",
+  author="{Rust Traits Working Group}",
   title = "The {Chalk} Book",
   url = "https://rust-lang.github.io/chalk/book/",
   year = {2015}
+}
+
+@misc{rust_bug,
+  author = "Aaron Turon",
+  title="{``where''} clauses are only elaborated for supertraits, and not other things",
+  url = "https://github.com/rust-lang/rust/issues/20671",
+  year = {2015}
+}
+@misc{rust_same,
+  author = "Jared Roesch",
+  title="Parse and accept type equality constraints in {``where''} clauses",
+  url = "https://github.com/rust-lang/rust/issues/20041",
+  year = {2014}
+}
+
+@misc{rust_const,
+  title="{Rust} {RFC} 2000: Const Generics",
+  url = "https://rust-lang.github.io/rfcs/1598-generic_associated_types.html",
+  author="{Rust Traits Working Group}",
+  year = {2017}
+}
+
+@misc{rust_gat,
+  title="{Rust} {RFC} 1598: Generic Associated Types",
+  author="{Rust Traits Working Group}",
+  url = "https://rust-lang.github.io/rfcs/1598-generic_associated_types.html",
+  year = {2016}
 }
 
 @misc{llvmtalk,
@@ -848,6 +937,14 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     url       = "https://www.youtube.com/watch?v=ctS8FzqcRug",
     year      = {2017}
 }
+
+@misc{cvwtalk,
+    author    = "Dario Rexin",
+    title     = "Compact value witnesses in {S}wift",
+    url       = "https://www.youtube.com/watch?v=ctS8FzqcRug",
+    year      = {2023}
+}
+
 @misc{siltalk,
     author    = "Joe Groff and Chris Lattner",
     title     = "{S}wift's High-Level {IR}: A Case Study",
@@ -910,6 +1007,13 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
       year = {2016}
 }
 
+@misc{swift57,
+  author = "Holly Borla",
+  title = "Swift 5.7 released",
+  year = {2022},
+  url = {https://www.swift.org/blog/swift-5.7-released/},
+}
+
 @misc{sr617,
     title     = "{SR-617}: \texttt{Self} not always resolved dynamically with Generics",
     url       = "https://github.com/apple/swift/issues/43234",
@@ -936,6 +1040,12 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     year      = {2020}
 }
 
+@misc{evolution,
+    title     = "Swift evolution process",
+    url       = "https://www.swift.org/swift-evolution/",
+    year      = {2016}
+}
+
 @misc{se0011,
     author    = "Loïc Lecrenier",
     title     = "{SE-0011}: Replace \texttt{typealias} keyword with \texttt{associatedtype} for associated type declarations",
@@ -952,6 +1062,12 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     author    = "Chris Lattner",
     title     = "{SE-0029}: Remove implicit tuple splat behavior from function applications",
     url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0029-remove-implicit-tuple-splat.md",
+    year      = {2016}
+}
+@misc{se0035,
+    author    = "Joe Groff",
+    title     = "{SE-0035}: Limiting \texttt{inout} capture to \texttt{@noescape} contexts",
+    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0035-limit-inout-capture.md",
     year      = {2016}
 }
 @misc{se0048,
@@ -1062,6 +1178,12 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0244-opaque-result-types.md",
     year      = {2019}
 }
+@misc{se0254,
+    author    = "Becca Royal-Gordon",
+    title     = "{SE-0254}: Static and class subscripts",
+    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0254-static-subscripts.md",
+    year      = {2019}
+}
 @misc{se0260,
     author    = "Jordan Rose and Ben Cohen",
     title     = "{SE-0260}: Library Evolution for Stable {ABIs}",
@@ -1087,6 +1209,14 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md",
     year      = {2020}
 }
+
+@misc{se0306,
+    author    = "John McCall and Doug Gregor and Konrad Malawski and Chris Lattner",
+    title     = "{SE-0306}: Actors",
+    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md",
+    year      = {2020}
+}
+
 @misc{se0309,
     author    = "Anthony Latsis and Filip Sakel and Suyash Srijan",
     title     = "{SE-0309}: Unlock existentials for all protocols",
@@ -1153,6 +1283,12 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     url = "https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md",
     year      = {2023}
 }
+@misc{se0383,
+      author  = "Robert Widmann",
+      title   = "{SE-0383}: Deprecate {@UIApplicationMain} and {@NSApplicationMain}",
+      url = "https://github.com/apple/swift-evolution/blob/main/proposals/0383-deprecate-uiapplicationmain-and-nsapplicationmain.md",
+      year    = {2023}
+}
 @misc{se0390,
     author    = "Joe Groff and Michael Gottesman and Andrew Trick and Kavon Farvardin",
     title     = "{SE-0390}: Noncopyable structs and enums",
@@ -1182,4 +1318,16 @@ edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 Ap
     title     = "{SE-0404}: Nested protocols",
     url = "https://github.com/apple/swift-evolution/blob/main/proposals/0404-nested-protocols.md",
     year      = {2023}
+}
+@misc{se0413,
+    author    = "Jorge Revuelta and Torsten Lehmann and Doug Gregor",
+    title     = "{SE-0413}: Typed throws",
+    url = "https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md",
+    year      = {2023}
+}
+@misc{se0427,
+    author    = "Kavon Farvardin and Tim Kientzle and Slava Pestov",
+    title     = "{SE-0427}: Noncopyable generics",
+    url = "https://github.com/apple/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md",
+    year      = {2024}
 }

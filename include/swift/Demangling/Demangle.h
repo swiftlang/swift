@@ -63,6 +63,7 @@ struct DemangleOptions {
   bool DisplayObjCModule = true;
   bool PrintForTypeName = false;
   bool ShowAsyncResumePartial = true;
+  bool ShowClosureSignature = true;
 
   /// If this is nonempty, entities in this module name will not be qualified.
   llvm::StringRef HidingCurrentModule;
@@ -601,7 +602,7 @@ struct [[nodiscard]] ManglingError {
     InvalidImplCoroutineKind,
     InvalidImplFunctionAttribute,
     InvalidImplParameterConvention,
-    InvalidImplParameterTransferring,
+    InvalidImplParameterSending,
     InvalidMetatypeRepresentation,
     MultiByteRelatedEntity,
     BadValueWitnessKind,

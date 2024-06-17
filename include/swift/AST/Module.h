@@ -18,6 +18,7 @@
 #define SWIFT_MODULE_H
 
 #include "swift/AST/AccessNotes.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -38,6 +39,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 #include <optional>
+#include <unordered_map>
 #include <set>
 
 namespace clang {
@@ -536,6 +538,11 @@ private:
   std::optional<std::pair<ModuleDecl *, Identifier>>
       declaringModuleAndBystander;
 
+  /// A cache of this module's visible Clang modules
+  /// parameterized by the Swift interface print mode.
+  using VisibleClangModuleSet = llvm::DenseMap<const clang::Module *, ModuleDecl *>;
+  std::unordered_map<PrintOptions::InterfaceMode, VisibleClangModuleSet> CachedVisibleClangModuleSet;
+
   /// If this module is an underscored cross import overlay, gets the underlying
   /// module that declared it (which may itself be a cross-import overlay),
   /// along with the name of the required bystander module. Used by tooling to
@@ -551,7 +558,7 @@ public:
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
 
   /// Returns true if this module is the Clang overlay of \p other.
-  bool isClangOverlayOf(ModuleDecl *other);
+  bool isClangOverlayOf(ModuleDecl *other) const;
 
   /// Returns true if this module is the same module or either module is a clang
   /// overlay of the other.
@@ -577,6 +584,14 @@ public:
   bool getRequiredBystandersIfCrossImportOverlay(
       ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Computes all Clang modules that are visible from this moule.
+  /// This includes any modules that are imported transitively through public
+  /// (`@_exported`) imports.
+  ///
+  /// The computed map associates each visible Clang module with the
+  /// corresponding Swift module.
+  const VisibleClangModuleSet &
+  getVisibleClangModules(PrintOptions::InterfaceMode contentMode);
 
   /// Walks and loads the declared, underscored cross-import overlays of this
   /// module and its underlying clang module, transitively, to find all cross
@@ -776,6 +791,15 @@ public:
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
+  /// True if this module is resilient AND also does _not_ allow
+  /// non-resilient access; the module can allow such access if
+  /// package optimization is enabled so its client modules within
+  /// the same package can have a direct access to decls in this
+  /// module even if it's built resiliently.
+  bool isStrictlyResilient() const {
+    return isResilient() && !allowNonResilientAccess();
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -1094,6 +1118,24 @@ public:
   /// for that.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
+  struct ImportCollector {
+    SmallPtrSet<const ModuleDecl *, 4> imports;
+    llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+        qualifiedImports;
+    AccessLevel minimumDocVisibility = AccessLevel::Private;
+    llvm::function_ref<bool(const ModuleDecl *)> importFilter = nullptr;
+
+    void collect(const ImportedModule &importedModule);
+
+    ImportCollector() = default;
+    ImportCollector(AccessLevel minimumDocVisibility)
+        : minimumDocVisibility(minimumDocVisibility) {}
+  };
+
+  void
+  getDisplayDeclsRecursivelyAndImports(SmallVectorImpl<Decl *> &results,
+                                       ImportCollector &importCollector) const;
+
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
   /// Generate the list of libraries needed to link this module, based on its
@@ -1272,12 +1314,6 @@ inline bool DeclContext::isPackageContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
-
-/// Collects modules that this module imports via `@_exported import`.
-void collectParsedExportedImports(const ModuleDecl *M,
-                                  SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
-                                  llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
 
 /// If the import that would make the given declaration visibile is absent,
 /// emit a diagnostic and a fix-it suggesting adding the missing import.

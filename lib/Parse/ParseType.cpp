@@ -53,12 +53,12 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
   }
 
-  if (ResultDependsOnLoc.isValid()) {
-    ty = new (p.Context) ResultDependsOnTypeRepr(ty, ResultDependsOnLoc);
-  }
-
   if (TransferringLoc.isValid()) {
     ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
+  }
+
+  if (SendingLoc.isValid()) {
+    ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
   if (!lifetimeDependenceSpecifiers.empty()) {
@@ -1550,6 +1550,8 @@ bool Parser::canParseType() {
   } else if (Tok.isContextualKeyword("any")) {
     consumeToken();
   } else if (Tok.isContextualKeyword("each")) {
+    consumeToken();
+  } else if (Tok.isContextualKeyword("sending")) {
     consumeToken();
   }
 

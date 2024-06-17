@@ -1123,11 +1123,9 @@ func rdar17170728() {
   var j: Int?
   var k: Int? = 2
 
-  let _ = [i, j, k].reduce(0 as Int?) {  // expected-error {{missing argument label 'into:' in call}}
-    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout @escaping (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
+  let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
-    // expected-error@-2 4 {{cannot force unwrap value of non-optional type 'Bool'}}
+    // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
@@ -1398,7 +1396,9 @@ do {
   func generic<T>(_ value: inout T, _ closure: (S<T>) -> Void) {}
 
   let arg: Int
+  // expected-note@-1{{change 'let' to 'var' to make it mutable}}
   generic(&arg) { (g: S<Double>) -> Void in } // expected-error {{cannot convert value of type '(S<Double>) -> Void' to expected argument type '(S<Int>) -> Void'}}
+  // expected-error@-1{{cannot pass immutable value as inout argument: 'arg' is a 'let' constant}}
 }
 
 // rdar://problem/62428353 - bad error message for passing `T` where `inout T` was expected

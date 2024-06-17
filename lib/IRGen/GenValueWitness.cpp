@@ -1222,8 +1222,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::GetEnumTag: {
     assert(concreteType.getEnumOrBoundGenericEnum());
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1245,8 +1244,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   }
   case ValueWitness::DestructiveInjectEnumTag: {
     assert(concreteType.getEnumOrBoundGenericEnum());
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;

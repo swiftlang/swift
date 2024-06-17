@@ -5,6 +5,9 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 
+// https://github.com/apple/swift/issues/73249
+// UNSUPPORTED: OS=windows-msvc
+
 class MyClass {}
 
 public func test() {

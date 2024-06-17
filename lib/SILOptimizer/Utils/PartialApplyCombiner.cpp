@@ -90,7 +90,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   if (argsToHandle.empty() && storeBorrowsToHandle.empty()) {
     return true;
   }
-  // Also include all destroys in the liferange for the arguments.
+  // Also include all destroys in the liverange for the arguments.
   // This is needed for later processing in tryDeleteDeadClosure: in case the
   // pai gets dead after this optimization, tryDeleteDeadClosure relies on
   // that we already copied the pai arguments to extend their lifetimes until

@@ -286,10 +286,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
       M = DC->getParentModule();
       SubMap = BaseType->getContextSubstitutionMap(M, DC);
-      if (!SubMap.empty()) {
-        TypeContextDepth = SubMap.getGenericSignature()
-            .getGenericParams().back()->getDepth() + 1;
-      }
+      TypeContextDepth = SubMap.getGenericSignature().getNextDepth();
     }
   }
 
@@ -451,7 +448,7 @@ static bool initDocEntityInfo(const Decl *D,
   }
 
   Info.IsUnavailable = AvailableAttr::isUnavailable(D);
-  Info.IsDeprecated = D->getAttrs().getDeprecated(D->getASTContext()) != nullptr;
+  Info.IsDeprecated = D->getAttrs().isDeprecated(D->getASTContext());
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     Info.IsAsync = AFD->hasAsync();

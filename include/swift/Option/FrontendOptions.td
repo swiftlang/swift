@@ -207,9 +207,6 @@ def no_serialize_debugging_options :
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
-def public_autolink_library : Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">, Flags<[FrontendOption]>;
-
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
@@ -219,6 +216,21 @@ def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules"
 def swift_module_file: Joined<["-"], "swift-module-file=">,
   MetaVarName<"<name>=<path>">,
   HelpText<"Specify Swift module input explicitly built from textual interface">;
+
+def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
+  MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
+  HelpText<"Specify the cross import module">;
+
+def module_can_import: Separate<["-"], "module-can-import">,
+  MetaVarName<"<moduleName>">,
+  HelpText<"Specify canImport module name">;
+
+def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
+  MetaVarName<"<moduleName> <version> <underlyingVersion>">,
+  HelpText<"Specify canImport module and versions">;
+
+def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
+  HelpText<"Disable searching for cross import overlay file">;
 
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
@@ -354,10 +366,18 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
+
+def public_autolink_library :
+  Separate<["-"], "public-autolink-library">,
+  HelpText<"Add public dependent library">;
 }
 
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
+
+def enable_experimental_swift_based_closure_specialization : 
+  Flag<["-"], "experimental-swift-based-closure-specialization">,
+  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">; 
 
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
@@ -498,6 +518,10 @@ def disable_implicit_backtracing_module_import : Flag<["-"],
   "disable-implicit-backtracing-module-import">,
   HelpText<"Disable the implicit import of the _Backtracing module.">;
 
+def disable_implicit_cxx_module_import : Flag<["-"],
+  "disable-implicit-cxx-module-import">,
+  HelpText<"Disable the implicit import of the C++ Standard Library module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
@@ -533,6 +557,10 @@ def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
 
 def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
   HelpText<"Disable all Swift autolink directives">;
+
+def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
@@ -939,6 +967,11 @@ def cxx_interop_disable_requirement_at_import :
   HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_use_opaque_pointer_for_moveonly :
+  Flag<["-"], "cxx-interop-use-opaque-pointer-for-moveonly">,
+  HelpText<"Testing flag that will be eliminated soon. Do not use.">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
@@ -1138,11 +1171,6 @@ def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
 
-def experimental_skip_non_inlinable_function_bodies_is_lazy
-  : Flag<["-"], "experimental-skip-non-inlinable-function-bodies-is-lazy">,
-  HelpText<"Infer lazy typechecking for "
-           "-experimental-skip-non-inlinable-function-bodies">;
-
 def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
   Flags<[HelpHidden]>,
@@ -1292,7 +1320,7 @@ def enable_emit_generic_class_ro_t_list :
 
 def enable_deterministic_check :
   Flag<["-"], "enable-deterministic-check">,
-  HelpText<"Check compiler output determinisim by running it twice">;
+  HelpText<"Check compiler output determinism by running it twice">;
 def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;
@@ -1346,6 +1374,16 @@ def disable_experimental_parser_round_trip : Flag<["-"],
 def disable_strict_concurrency_region_based_isolation : Flag<["-"],
   "disable-region-based-isolation-with-strict-concurrency">,
   HelpText<"Disable region based isolation when running with strict concurrency enabled. Only enabled with asserts">,
+  Flags<[HelpHidden]>;
+
+def disable_transferring_args_and_results_with_region_isolation : Flag<["-"],
+  "disable-transferring-args-and-results-with-region-based-isolation">,
+  HelpText<"Disable transferring args and results when region based isolation is enabled. Only enabled with asserts">,
+  Flags<[HelpHidden]>;
+
+def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
+  "disable-sending-args-and-results-with-region-based-isolation">,
+  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
