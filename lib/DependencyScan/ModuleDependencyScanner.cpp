@@ -207,6 +207,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           ScanASTContext.getModuleInterfaceChecker()),
       &DependencyTracker,
       ScanCompilerInvocation.getSearchPathOptions().ModuleLoadMode);
+
+  llvm::cl::ResetAllOptionOccurrences();
 }
 
 ModuleDependencyVector
