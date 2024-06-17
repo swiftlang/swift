@@ -24,7 +24,7 @@ import Swift
 /// mutually-exclusive access to the declaration.
 ///
 /// ## Custom Actor Executors
-/// A global actor use a custom executor if it needs to customize its execution
+/// A global actor uses a custom executor if it needs to customize its execution
 /// semantics, for example, by making sure all of its invocations are run on a
 /// specific thread or dispatch queue.
 ///
@@ -63,7 +63,7 @@ public protocol GlobalActor {
   /// delegate to the `shared.unownedExecutor`.
   ///
   /// The value of this property must be equivalent to `shared.unownedExecutor`,
-  /// as may be used by the Swift concurrency runtime or explicit user code. with
+  /// as it may be used by the Swift concurrency runtime or explicit user code with
   /// that assumption in mind.
   ///
   /// Returning different executors for different invocations of this computed
