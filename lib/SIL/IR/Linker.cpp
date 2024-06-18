@@ -113,7 +113,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
     if (callerSerializedKind == IsSerialized &&
         hasSharedVisibility(linkage) &&
         !Mod.isSerialized() &&
-        !F->isSerialized()) {
+        !F->isAnySerialized()) {
       F->setSerializedKind(IsSerialized);
 
       // Push the function to the worklist so that all referenced shared functions
