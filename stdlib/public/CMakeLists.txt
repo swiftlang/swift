@@ -282,7 +282,9 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
     add_subdirectory(Synchronization)
   endif()
 
-  add_subdirectory(Volatile)
+  if(SWIFT_ENABLE_VOLATILE)
+    add_subdirectory(Volatile)
+  endif()
 endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
