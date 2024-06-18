@@ -103,6 +103,7 @@ struct SILArgumentConvention {
     llvm_unreachable("covered switch isn't covered?!");
   }
 
+  template <bool InCallee>
   bool isOwnedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
@@ -123,6 +124,11 @@ struct SILArgumentConvention {
     llvm_unreachable("covered switch isn't covered?!");
   }
 
+  bool isOwnedConventionInCallee() const { return isOwnedConvention<true>(); }
+
+  bool isOwnedConventionInCaller() const { return isOwnedConvention<false>(); }
+
+  template <bool InCallee>
   bool isGuaranteedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
@@ -141,6 +147,14 @@ struct SILArgumentConvention {
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");
+  }
+
+  bool isGuaranteedConventionInCallee() const {
+    return isGuaranteedConvention<true>();
+  }
+
+  bool isGuaranteedConventionInCaller() const {
+    return isGuaranteedConvention<false>();
   }
 
   /// Returns true if \p Value is a non-aliasing indirect parameter.
