@@ -1465,6 +1465,10 @@ def create_argument_parser():
            default=True,
            help='Enable Swift Synchronization.')
 
+    option('--enable-volatile', toggle_true,
+           default=True,
+           help='Enable Volatile module.')
+
     option('--enable-experimental-parser-validation', toggle_true,
            default=False,
            help='Enable experimental Swift Parser validation by default.')
