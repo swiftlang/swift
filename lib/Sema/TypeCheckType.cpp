@@ -3927,6 +3927,10 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         globalActorAttr->setInvalid();
       } else {
         isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
+
+        // This inference is currently gated because `@Sendable` impacts mangling.
+        if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability))
+          sendable = true;
       }
     }
 
