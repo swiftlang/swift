@@ -4129,11 +4129,11 @@ template <bool InCallee>
 bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Pack_Owned:
     return true;
-
+  case ParameterConvention::Indirect_In_CXX:
+    return !InCallee;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Direct_Unowned:
@@ -4164,10 +4164,10 @@ bool isGuaranteedParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Pack_Guaranteed:
     return true;
-
+  case ParameterConvention::Indirect_In_CXX:
+    return InCallee;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
