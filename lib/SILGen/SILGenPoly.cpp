@@ -2066,6 +2066,7 @@ private:
       return processIntoGuaranteed(innerOrigType, innerSubstType,
                                    outerOrigType, outerSubstType,
                                    outer, innerTy);
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In: {
       if (SGF.silConv.useLoweredAddresses()) {
         return processIndirect(innerOrigType, innerSubstType,
@@ -2260,6 +2261,7 @@ private:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("not a pack convention");
@@ -2699,6 +2701,7 @@ ManagedValue TranslateArguments::expandPackInnerParam(
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -2845,6 +2848,7 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
   case ParameterConvention::Pack_Inout:
     return ManagedValue::forLValue(value);
   case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(value);
