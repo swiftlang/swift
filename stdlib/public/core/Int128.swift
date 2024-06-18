@@ -304,7 +304,7 @@ extension Int128 {
   public func remainderReportingOverflow(
     dividingBy other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    _precondition(other != .zero, "Division by zero in remainer operation")
+    _precondition(other != .zero, "Division by zero in remainder operation")
     if self == .min && other == -1 { return (0, true) }
     return (Self(Builtin.srem_Int128(self._value, other._value)), false)
   }

@@ -284,7 +284,7 @@ extension UInt128 {
   public func remainderReportingOverflow(
     dividingBy other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    _precondition(other != .zero, "Division by zero in remainer operation")
+    _precondition(other != .zero, "Division by zero in remainder operation")
     // Unsigned divide never overflows.
     return (Self(Builtin.urem_Int128(self._value, other._value)), false)
   }
