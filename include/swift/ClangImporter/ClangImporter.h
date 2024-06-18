@@ -684,6 +684,13 @@ bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
 llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
+
+/// Lookup and return the synthesized conformance operator like '==' '-' or '+='
+/// for the given type.
+ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
+                                     NominalTypeDecl *selfType,
+                                     std::optional<Type> parameterType);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {
