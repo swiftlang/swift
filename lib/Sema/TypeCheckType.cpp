@@ -536,10 +536,10 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       typeDecl->getDeclContext()->getSelfProtocolDecl()) {
     // When looking up a nominal type declaration inside of a
     // protocol extension, always use the nominal type and
-    // not the protocol 'Self' type.
-    if (!foundDC->getDeclaredInterfaceType())
-      return ErrorType::get(ctx);
-
+    // not the protocol 'Self' type. This is invalid and will
+    // be diagnosed anyway, but we want to avoid an invariant
+    // violation from trying to construct a nominal type with
+    // a generic parameter as its parent type.
     selfType = foundDC->getDeclaredInterfaceType();
   } else {
     // Otherwise, we want the protocol 'Self' type for
