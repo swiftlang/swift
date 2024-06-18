@@ -36,6 +36,11 @@ static bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   if (VD->hasClangNode() && !VD->getClangDecl())
     return false;
 
+  // Avoid generating USRs for decls in local contexts, we cannot guarantee
+  // any parent closures will be type-checked, which is needed for mangling.
+  if (VD->getDeclContext()->getLocalContext())
+    return false;
+
   return true;
 }
 
