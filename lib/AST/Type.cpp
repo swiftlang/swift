@@ -3894,11 +3894,6 @@ Type AnyFunctionType::getThrownError() const {
 }
 
 bool AnyFunctionType::isSendable() const {
-  auto &ctx = getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
-    // Global-actor-isolated function types are implicitly Sendable.
-    return getExtInfo().isSendable() || getIsolation().isGlobalActor();
-  }
   return getExtInfo().isSendable();
 }
 
