@@ -19,3 +19,13 @@ import Closure
 public func testClosureToFuncPtr() {
  cfunc2({N in})
 }
+
+// CHECK: sil private [thunk] [ossa] @$s4main36testClosureToFuncPtrReturnNonTrivialyyFSo0hI0VycfU_To : $@convention(c) () -> @out NonTrivial {
+// CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
+// CHECK: %[[V1:.*]] = function_ref @$s4main36testClosureToFuncPtrReturnNonTrivialyyFSo0hI0VycfU_ : $@convention(thin) () -> @out NonTrivial
+// CHECK: %[[V2:.*]] = apply %[[V1]](%[[V0]]) : $@convention(thin) () -> @out NonTrivial
+// CHECK: return %[[V2]] : $()
+
+public func testClosureToFuncPtrReturnNonTrivial() {
+  cfuncReturnNonTrivial2({() -> NonTrivial in return NonTrivial()});
+}
