@@ -450,11 +450,11 @@ extension Int128: BinaryInteger {
   @_transparent
   public var _lowWord: UInt {
 #if _pointerBitWidth(_64)
-    UInt(_low._value)
+    UInt(Builtin.trunc_Int128_Int64(_value))
 #elseif _pointerBitWidth(_32)
-    UInt(Builtin.trunc_Int64_Int32(_low._value))
+    UInt(Builtin.trunc_Int128_Int32(_value))
 #else
-    UInt(truncatingIfNeeded: _low)
+    UInt(truncatingIfNeeded: self)
 #endif
   }
 }
