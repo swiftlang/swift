@@ -3766,8 +3766,9 @@ void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
 
   auto type = closure->getType();
 
-  // FIXME: CodeCompletionResultBuilder calls printValueDeclUSR() but the
-  // closure hasn't been type checked yet.
+  // FIXME: We can end up with a null type here in the presence of invalid
+  // code; the type-checker currently isn't strict about producing typed
+  // expression nodes when it fails. Once we enforce that, we can remove this.
   if (!type)
     type = ErrorType::get(closure->getASTContext());
 
