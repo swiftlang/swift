@@ -2001,12 +2001,13 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     bool inProtocolExt = false;
     bool importedFromClang = false;
     bool isStatic = false;
+    bool isSynthesized = false;
     if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
                                           inProtocolExt, importedFromClang);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                           importedFromClang, isStatic);
+                                           importedFromClang, isStatic, isSynthesized);
 
     DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
@@ -2032,6 +2033,23 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     if (privateDiscriminator) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
+    } else if (isSynthesized && importedFromClang) {
+      ValueDecl *synthesizedResult = nullptr;
+      if (name.isOperator() && filterTy) {
+        // This is a Clang-importer synthesized conformance operator. Resolve it
+        // using clang importer lookup logic for the given type.
+        if (auto *fty = dyn_cast<AnyFunctionType>(filterTy.getPointer())) {
+          if (fty->getNumParams()) {
+            auto p = fty->getParams()[0].getParameterType();
+            if (auto sty = dyn_cast<NominalType>(p.getPointer())) 
+               synthesizedResult = importer::getSynthesizedConformanceOperator(name, sty->getDecl(), fty->getNumParams() > 1 ? fty->getParams()[1].getParameterType() : std::optional<Type>{});
+          }
+        }
+      }
+      if (!synthesizedResult)
+        return llvm::make_error<XRefError>("couldn't find synthesized clang value decl x-ref",
+                                           pathTrace, name);
+      values.push_back(synthesizedResult);
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
                                   SourceLoc(), NL_QualifiedDefault,
@@ -2133,7 +2151,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         IdentifierID IID;
         XRefValuePathPieceLayout::readRecord(scratch, std::nullopt, IID,
                                              std::nullopt, std::nullopt,
-                                             std::nullopt);
+                                             std::nullopt, std::nullopt);
         result = getIdentifier(IID);
         break;
       }
@@ -2200,12 +2218,13 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         bool inProtocolExt = false;
         bool importedFromClang = false;
         bool isStatic = false;
+        bool isSynthesized = false;
         if (isType) {
           XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
                                               inProtocolExt, importedFromClang);
         } else {
           XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                               importedFromClang, isStatic);
+                                               importedFromClang, isStatic, isSynthesized);
         }
 
         DeclBaseName name = getDeclBaseName(IID);
@@ -2378,6 +2397,7 @@ giveUpFastPath:
       bool inProtocolExt = false;
       bool importedFromClang = false;
       bool isStatic = false;
+      bool isSynthesized = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID, discriminatorID;
@@ -2392,7 +2412,7 @@ giveUpFastPath:
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
         XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                             importedFromClang, isStatic);
+                                             importedFromClang, isStatic, isSynthesized);
         memberName = getDeclBaseName(IID);
         break;
       }

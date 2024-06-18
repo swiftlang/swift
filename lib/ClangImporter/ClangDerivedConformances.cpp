@@ -394,6 +394,23 @@ bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
   return getIteratorCategoryDecl(clangDecl);
 }
 
+ValueDecl *swift::importer::getSynthesizedConformanceOperator(const DeclBaseName &name,
+                                             NominalTypeDecl *selfType,
+                                             std::optional<Type> parameterType) {
+  assert (name.isOperator());
+  if (name.getIdentifier() == selfType->getASTContext().Id_EqualsOperator) {
+    return getEqualEqualOperator(selfType);
+  }
+  if (name.getIdentifier() == selfType->getASTContext().getIdentifier("-")) {
+    return getMinusOperator(selfType);
+  }
+  if (name.getIdentifier() == selfType->getASTContext().getIdentifier("+=") &&
+      parameterType) {
+    return getPlusEqualOperator(selfType, *parameterType);
+  }
+  return nullptr;
+}
+
 void swift::conformToCxxIteratorIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl) {
@@ -504,6 +521,8 @@ void swift::conformToCxxIteratorIfNeeded(
         equalEqual = getEqualEqualOperator(decl);
       }
     }
+    if (equalEqual)
+      equalEqual->setSynthesized();
   }
   if (!equalEqual)
     return;
@@ -539,6 +558,8 @@ void swift::conformToCxxIteratorIfNeeded(
         minus = getMinusOperator(decl);
       }
     }
+    if (minus)
+      minus->setSynthesized();
   }
   if (!minus)
     return;
@@ -562,6 +583,8 @@ void swift::conformToCxxIteratorIfNeeded(
         plusEqual = getPlusEqualOperator(decl, distanceTy);
       }
     }
+    if (plusEqual)
+      plusEqual->setSynthesized();
   }
   if (!plusEqual)
     return;

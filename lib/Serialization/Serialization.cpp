@@ -2198,7 +2198,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty), SUBSCRIPT_ID,
                                          isProtocolExt, SD->hasClangNode(),
-                                         SD->isStatic());
+                                         SD->isStatic(), SD->isSynthesized());
     break;
   }
 
@@ -2215,7 +2215,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
                                            addTypeRef(ty), nameID,
                                            isProtocolExt,
                                            storage->hasClangNode(),
-                                           storage->isStatic());
+                                           storage->isStatic(), storage->isSynthesized());
 
       abbrCode =
         DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
@@ -2250,7 +2250,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
                                          addTypeRef(ty),
                                          addDeclBaseNameRef(fn->getBaseName()),
                                          isProtocolExt, fn->hasClangNode(),
-                                         fn->isStatic());
+                                         fn->isStatic(), fn->isSynthesized());
 
     if (fn->isOperator()) {
       // Encode the fixity as a filter on the func decls, to distinguish prefix
@@ -2357,7 +2357,7 @@ void Serializer::writeCrossReference(const Decl *D) {
   IdentifierID iid = addDeclBaseNameRef(val->getBaseName());
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty), iid, isProtocolExt,
-                                       D->hasClangNode(), val->isStatic());
+                                       D->hasClangNode(), val->isStatic(), val->isSynthesized());
 }
 
 /// Translate from the AST associativity enum to the Serialization enum

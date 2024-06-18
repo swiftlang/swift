@@ -2089,7 +2089,8 @@ namespace decls_block {
     IdentifierIDField, // name
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>,        // imported from Clang?
-    BCFixed<1>         // static?
+    BCFixed<1>,        // static?
+    BCFixed<1>         // synthesized?
   >;
 
   using XRefInitializerPathPieceLayout = BCRecordLayout<
