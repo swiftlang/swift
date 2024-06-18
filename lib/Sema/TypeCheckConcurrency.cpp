@@ -2706,7 +2706,7 @@ namespace {
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // Skip expressions that didn't make it to solution application
       // because the constraint system diagnosed an error.
-      if (!expr->getType())
+      if (!expr->getType() || expr->getType()->hasError())
         return Action::SkipNode(expr);
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {

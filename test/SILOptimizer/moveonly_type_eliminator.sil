@@ -578,3 +578,24 @@ bb0(%x : @owned $Klass):
   %retval = tuple ()
   return %retval : $()
 }
+
+// SILGen occasionally uses dealloc_box instead of destroy_value. dealloc_box is needed when we don't want to destroy
+// the contents of the box. It seems to happen with property wrappers.
+//
+// CHECK-LABEL: sil [ossa] @dealoc_box : $@convention(thin) (@owned Klass) -> () {
+// CHECK:           [[BOX:%.*]] = alloc_box [moveable_value_debuginfo] ${ var Klass }
+// CHECK:           dealloc_box [[BOX]] : ${ var Klass }
+// CHECK-LABEL: } // end sil function 'dealoc_box'
+sil [ossa] @dealoc_box : $@convention(thin) (@owned Klass) -> () {
+bb0(%x : @owned $Klass):
+  %box = alloc_box ${ var @moveOnly Klass }
+  %addr = project_box %box : ${ var @moveOnly Klass }, 0
+  %unwrapped_addr = moveonlywrapper_to_copyable_addr %addr : $*@moveOnly Klass
+  store %x to [init] %unwrapped_addr : $*Klass
+  debug_value %addr : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  destroy_addr %addr : $*@moveOnly Klass
+  debug_value undef : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  dealloc_box %box : ${ var @moveOnly Klass }
+  %retval = tuple ()
+  return %retval : $()
+}
