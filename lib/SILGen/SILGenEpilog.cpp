@@ -65,6 +65,7 @@ void SILGenFunction::prepareEpilog(
 
   if (errorType) {
     auto genericSig = DC->getGenericSignatureOfContext();
+    errorType = (*errorType)->getReducedType(genericSig);
     AbstractionPattern origErrorType = TypeContext
       ? *TypeContext->OrigType.getFunctionThrownErrorType()
       : AbstractionPattern(genericSig.getCanonicalSignature(),
