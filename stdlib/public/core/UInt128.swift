@@ -31,13 +31,14 @@ public struct UInt128: Sendable {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public var _low: UInt64 {
-    UInt64(truncatingIfNeeded: self)
+    UInt64(Builtin.trunc_Int128_Int64(_value))
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_transparent @usableFromInline
+  @_transparent
   public var _high: UInt64 {
-    UInt64(truncatingIfNeeded: self &>> 64)
+    let shifted: UInt128 = self &>> 64
+    return UInt64(Builtin.trunc_Int128_Int64(shifted._value))
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -385,7 +386,7 @@ extension UInt128: BinaryInteger {
 
     @available(SwiftStdlib 6.0, *)
     @_transparent
-    init(_value: UInt128) {
+    public init(_value: UInt128) {
       self._value = _value
     }
   }
@@ -442,7 +443,7 @@ extension UInt128: BinaryInteger {
 #elseif _pointerBitWidth(_32)
     UInt(Builtin.trunc_Int128_Int32(_value))
 #else
-    UInt(truncatingIfNeeded: self)
+#error("Unsupported platform")
 #endif
   }
 }
