@@ -159,6 +159,8 @@ if "@SWIFT_ENABLE_VOLATILE@" == "TRUE":
     config.available_features.add('volatile')
 if "@SWIFT_ENABLE_SYNCHRONIZATION@" == "TRUE":
     config.available_features.add('synchronization')
+if "@SWIFT_ENABLE_VOLATILE@" == "TRUE":
+    config.available_features.add('volatile')
 if "@SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB@" == "TRUE":
     config.available_features.add('embedded_stdlib')
 if "@SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING@" == "TRUE":
