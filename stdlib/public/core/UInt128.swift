@@ -30,19 +30,19 @@ public struct UInt128: Sendable {
 
   @available(SwiftStdlib 6.0, *)
   @_transparent
-  internal var _low: UInt64 {
+  public var _low: UInt64 {
     UInt64(truncatingIfNeeded: self)
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_transparent
-  internal var _high: UInt64 {
+  @_transparent @usableFromInline
+  public var _high: UInt64 {
     UInt64(truncatingIfNeeded: self &>> 64)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_transparent
-  internal init(_low: UInt64, _high: UInt64) {
+  public init(_low: UInt64, _high: UInt64) {
 #if _endian(little)
     self = unsafeBitCast((_low, _high), to: Self.self)
 #else
@@ -57,21 +57,17 @@ public struct UInt128: Sendable {
   //  out the type as two `UInt64` fields--note that we have to be careful
   //  about endianness in this case.
 #if _endian(little)
-  @usableFromInline
-  internal var _low: UInt64
+  public var _low: UInt64
 
-  @usableFromInline
-  internal var _high: UInt64
+  public var _high: UInt64
 #else
-  @usableFromInline
-  internal var _high: UInt64
+  public var _high: UInt64
 
-  @usableFromInline
-  internal var _low: UInt64
+  public var _low: UInt64
 #endif
   @available(SwiftStdlib 6.0, *)
   @_transparent
-  internal init(_low: UInt64, _high: UInt64) {
+  public init(_low: UInt64, _high: UInt64) {
     self._low = _low
     self._high = _high
   }
