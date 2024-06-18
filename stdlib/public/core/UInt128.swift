@@ -313,7 +313,7 @@ extension UInt128: Numeric {
 // MARK: - BinaryInteger conformance
 @available(SwiftStdlib 6.0, *)
 extension UInt128: BinaryInteger {
-  
+  @frozen
   public struct Words {
     @usableFromInline
     let _value: UInt128
