@@ -378,3 +378,12 @@ struct GSF2<F: Error, T>: P2 {
 struct GSA<T>: P2 {
   typealias Failure = any Error
 }
+
+struct ReducedError<T: Error> {}
+
+extension ReducedError where T == MyError {
+  // CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic12ReducedErrorVA2A02MyE0ORszrlE05throwfE0yyAEYKF : $@convention(method) (ReducedError<MyError>) -> @error MyError {
+  func throwMyError() throws(T) {
+    throw MyError.fail
+  }
+}
