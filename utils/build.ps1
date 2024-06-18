@@ -150,8 +150,8 @@ if ($null -eq $BuildArchName) { $BuildArchName = $env:PROCESSOR_ARCHITECTURE }
 if ($PinnedBuild -eq "") {
   switch ($BuildArchName) {
     "AMD64" {
-      $PinnedBuild = "https://download.swift.org/swift-5.10-branch/windows10/swift-5.10-DEVELOPMENT-SNAPSHOT-2024-01-18-a/swift-5.10-DEVELOPMENT-SNAPSHOT-2024-01-18-a-windows10.exe"
-      $PinnedSHA256 = "006266d8c2a6a9c70e21b9d161ec35c07bcbb8a452b17e145899d814d07a29e7"
+      $PinnedBuild = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
+      $PinnedSHA256 = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
     }
     "ARM64" {
       # TODO(hjyamauchi) once we have an arm64 release, fill in PinnedBuild and PinnedSHA256.
