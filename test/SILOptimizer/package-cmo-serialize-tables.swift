@@ -9,8 +9,8 @@
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
 // RUN: -enable-library-evolution -wmo
 
-// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-sil-opt.sil
-// RUN: %FileCheck %s < %t/Lib-sil-opt.sil
+// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
+// RUN: %FileCheck %s < %t/Lib.sil
 
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -enable-library-evolution -I%t -emit-sil %t/main.swift -o %t/Main.sil
 // RUN: %FileCheck %s --check-prefix=CHECK-MAIN < %t/Main.sil
@@ -240,12 +240,12 @@ public protocol PubProto {
 
 /// NOTE: witness thunks get `shared` linkage
 public class PubKlassZ: PubProto {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW
   public static let root: UInt16 = 1 << 0
 
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvsTW
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvMTW
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvsTW
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP3envs6UInt16VvMTW
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC3envs6UInt16Vvg
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC3envs6UInt16Vvs
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC3envs6UInt16VvM
@@ -255,13 +255,13 @@ public class PubKlassZ: PubProto {
   public let rawValue: UInt16
 
   required public init(rawValue: UInt16) {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW
     // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC8rawValueACs6UInt16V_tcfc
     self.rawValue = rawValue
     self.env = 1 << rawValue
   }
   public func pubFunc() {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP7pubFuncyyFTW
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP7pubFuncyyFTW
     // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC7pubFuncyyF 
     print(env)
   }
@@ -269,14 +269,14 @@ public class PubKlassZ: PubProto {
 
 public struct PubStruct: PubProto {
   // protocol witness for static PubProto.root.getter in conformance PubStruct
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PubProto) (@thick PubStruct.Type) -> UInt16 {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PubProto) (@thick PubStruct.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PubStructV4roots6UInt16VvgZ : $@convention(method) (@thin PubStruct.Type) -> UInt16
   // CHECK-DAG: sil [canonical] @$s3Lib9PubStructV4roots6UInt16VvgZ : $@convention(method) (@thin PubStruct.Type) -> UInt16
   public static let root: UInt16 = 1 << 0
 
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvgTW : $@convention(witness_method: PubProto) (@in_guaranteed PubStruct) -> UInt16 {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PubProto) (UInt16, @inout PubStruct) -> () {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvMTW : $@yield_once @convention(witness_method: PubProto) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout UInt16 for <PubStruct> {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvgTW : $@convention(witness_method: PubProto) (@in_guaranteed PubStruct) -> UInt16 {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PubProto) (UInt16, @inout PubStruct) -> () {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvMTW : $@yield_once @convention(witness_method: PubProto) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout UInt16 for <PubStruct> {
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubStructV3envs6UInt16Vvg
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubStructV3envs6UInt16Vvs
   public var env: UInt16
@@ -285,14 +285,14 @@ public struct PubStruct: PubProto {
   public let rawValue: UInt16
 
   public init(rawValue: UInt16) {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW : $@convention(witness_method: PubProto) (UInt16, @thick PubStruct.Type) -> @out PubStruct {
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW : $@convention(witness_method: PubProto) (UInt16, @thick PubStruct.Type) -> @out PubStruct {
     // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubStructV8rawValueACs6UInt16V_tcfC
     self.rawValue = rawValue
     self.env = 1 << rawValue
   }
 
   public func pubFunc() {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP7pubFuncyyFTW
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP7pubFuncyyFTW
     // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubStructV7pubFuncyyF
     print(env)
   }
@@ -314,9 +314,9 @@ protocol InternalProto {
 
 public struct PubStructX: PubSimpleProto, InternalProto { /// NOTE: witness table serialized only for PubSimpleProto
 
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivgTW : $@convention(witness_method: PubSimpleProto) (@in_guaranteed PubStructX) -> Int {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivsTW : $@convention(witness_method: PubSimpleProto) (Int, @inout PubStructX) -> () {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivMTW : $@yield_once @convention(witness_method: PubSimpleProto) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <PubStructX> {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivgTW : $@convention(witness_method: PubSimpleProto) (@in_guaranteed PubStructX) -> Int {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivsTW : $@convention(witness_method: PubSimpleProto) (Int, @inout PubStructX) -> () {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PubStructXVAA0B11SimpleProtoA2aDP6pubVarSivMTW : $@yield_once @convention(witness_method: PubSimpleProto) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <PubStructX> {
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib10PubStructXV6pubVarSivg
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib10PubStructXV6pubVarSivs
   // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib10PubStructXV6pubVarSivM
@@ -359,13 +359,13 @@ package protocol PkgProto {
 /// NOTE: witness thunks get `shared` linkage
 package class PkgKlassZ: PkgProto {
   // protocol witness for static PkgProto.root.getter in conformance PkgKlassZ
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PkgProto) (@thick PkgKlassZ.Type) -> UInt16 {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PkgProto) (@thick PkgKlassZ.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PkgKlassZC4roots6UInt16VvgZ : $@convention(method) (@thick PkgKlassZ.Type) -> UInt16
   // CHECK-DAG: sil package_external [canonical] @$s3Lib9PkgKlassZC4roots6UInt16VvgZ : $@convention(method) (@thick PkgKlassZ.Type) -> UInt16
   package static let root: UInt16 = 1 << 0
 
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW : $@convention(witness_method: PkgProto) (@in_guaranteed PkgKlassZ) -> UInt16 {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PkgProto) (UInt16, @inout PkgKlassZ) -> () {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW : $@convention(witness_method: PkgProto) (@in_guaranteed PkgKlassZ) -> UInt16 {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PkgProto) (UInt16, @inout PkgKlassZ) -> () {
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgKlassZC3envs6UInt16Vvg
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgKlassZC3envs6UInt16Vvs
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgKlassZC3envs6UInt16VvM
@@ -375,13 +375,13 @@ package class PkgKlassZ: PkgProto {
   package let rawValue: UInt16
 
   required package init(rawValue: UInt16) {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW : $@convention(witness_method: PkgProto) (UInt16, @thick PkgKlassZ.Type) -> @out PkgKlassZ {
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW : $@convention(witness_method: PkgProto) (UInt16, @thick PkgKlassZ.Type) -> @out PkgKlassZ {
     // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgKlassZC8rawValueACs6UInt16V_tcfc : $@convention(method) (UInt16, @owned PkgKlassZ) -> @owned PkgKlassZ {
     self.rawValue = rawValue
     self.env = 1 << rawValue
   }
   package func pkgFunc() {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP7pkgFuncyyFTW
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP7pkgFuncyyFTW
     // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgKlassZC7pkgFuncyyF
     print(env)
   }
@@ -389,13 +389,13 @@ package class PkgKlassZ: PkgProto {
 
 package struct PkgStruct: PkgProto { /// NOTE: witness thunks get `shared` linkage
   // protocol witness for static PkgProto.root.getter in conformance PkgStruct
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PkgProto) (@thick PkgStruct.Type) -> UInt16 {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PkgProto) (@thick PkgStruct.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PkgStructV4roots6UInt16VvgZ : $@convention(method) (@thin PkgStruct.Type)
   // static PkgStruct.root.getter
   // CHECK-DAG: sil package_external [canonical] @$s3Lib9PkgStructV4roots6UInt16VvgZ : $@convention(method) (@thin PkgStruct.Type) -> UInt16
   package static let root: UInt16 = 1 << 0
 
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PkgProto) (UInt16, @inout PkgStruct) -> () {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PkgProto) (UInt16, @inout PkgStruct) -> () {
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgStructV3envs6UInt16Vvs
   package var env: UInt16
 
@@ -403,7 +403,7 @@ package struct PkgStruct: PkgProto { /// NOTE: witness thunks get `shared` linka
   package let rawValue: UInt16
 
   package init(rawValue: UInt16) {
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW : $@convention(witness_method: PkgProto) (UInt16, @thick PkgStruct.Type) -> @out PkgStruct {
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP8rawValuexs6UInt16V_tcfCTW : $@convention(witness_method: PkgProto) (UInt16, @thick PkgStruct.Type) -> @out PkgStruct {
     // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgStructV8rawValueACs6UInt16V_tcfC
     self.rawValue = rawValue
     self.env = 1 << rawValue
@@ -421,9 +421,9 @@ package protocol PkgSimpleProto {
 
 /// NOTE: only witness table of conformance to PkgSimpleProto is serialized.
 package struct PkgStructX: PkgSimpleProto, InternalProto {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivgTW : $@convention(witness_method: PkgSimpleProto) (@in_guaranteed PkgStructX) -> Int {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivsTW : $@convention(witness_method: PkgSimpleProto) (Int, @inout PkgStructX) -> () {
-  // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivMTW : $@yield_once @convention(witness_method: PkgSimpleProto) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <PkgStructX> {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivgTW : $@convention(witness_method: PkgSimpleProto) (@in_guaranteed PkgStructX) -> Int {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivsTW : $@convention(witness_method: PkgSimpleProto) (Int, @inout PkgStructX) -> () {
+  // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivMTW : $@yield_once @convention(witness_method: PkgSimpleProto) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <PkgStructX> {
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib10PkgStructXV6pkgVarSivM
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib10PkgStructXV6pkgVarSivg
   // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib10PkgStructXV6pkgVarSivs
@@ -434,7 +434,7 @@ package struct PkgStructX: PkgSimpleProto, InternalProto {
     self.pkgVar = arg
   }
   package func pkgFunc() -> Int { 
-    // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP7pkgFuncSiyFTW
+    // CHECK-DAG: sil shared [transparent] [serialized_for_package] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP7pkgFuncSiyFTW
     // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib10PkgStructXV7pkgFuncSiyF
     return pkgVar
   }
@@ -472,6 +472,19 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-NEXT:  #ParentPubKlass.parentPubFunc: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC4FuncyyF // ParentPubKlass.parentPubFunc()
 // CHECK-NEXT:  #ParentPubKlass.deinit!deallocator: @$s3Lib14ParentPubKlassCfD  // ParentPubKlass.__deallocating_deinit
 
+// CHECK-LABEL: sil_vtable [serialized_for_package] PubKlass {
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!getter: (ParentPubKlass) -> () -> Int : @$s3Lib14ParentPubKlassC06parentC3VarSivg [inherited]  // ParentPubKlass.parentPubVar.getter
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!setter: (ParentPubKlass) -> (Int) -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivs [inherited]  // ParentPubKlass.parentPubVar.setter
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!modify: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivM [inherited]  // ParentPubKlass.parentPubVar.modify
+// CHECK-NEXT:  #ParentPubKlass.init!allocator: (ParentPubKlass.Type) -> (Int) -> ParentPubKlass : @$s3Lib8PubKlassCyACSicfC [override]  // PubKlass.__allocating_init(_:)
+// CHECK-NEXT:  #ParentPubKlass.parentPubFunc: (ParentPubKlass) -> () -> () : @$s3Lib8PubKlassC06parentB4FuncyyF [override]  // PubKlass.parentPubFunc()
+// CHECK-NEXT:  #PubKlass.pubVar!getter: (PubKlass) -> () -> String : @$s3Lib8PubKlassC6pubVarSSvg  // PubKlass.pubVar.getter
+// CHECK-NEXT:  #PubKlass.pubVar!setter: (PubKlass) -> (String) -> () : @$s3Lib8PubKlassC6pubVarSSvs  // PubKlass.pubVar.setter
+// CHECK-NEXT:  #PubKlass.pubVar!modify: (PubKlass) -> () -> () : @$s3Lib8PubKlassC6pubVarSSvM  // PubKlass.pubVar.modify
+// CHECK-NEXT:  #PubKlass.init!allocator: (PubKlass.Type) -> (String) -> PubKlass : @$s3Lib8PubKlassCyACSScfC  // PubKlass.__allocating_init(_:)
+// CHECK-NEXT:  #PubKlass.pubFunc: (PubKlass) -> () -> () : @$s3Lib8PubKlassC7pubFuncyyF  // PubKlass.pubFunc()
+// CHECK-NEXT:  #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD  // PubKlass.__deallocating_deinit
+// CHECK-NEXT:  #PubKlass!ivardestroyer: @$s3Lib8PubKlassCfE  // PubKlass.__ivar_destroyer
 
 // CHECK-LABEL: sil_vtable [serialized_for_package] ParentPkgKlass {
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!getter: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivg  // ParentPkgKlass.parentPkgVar.getter
@@ -481,6 +494,19 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgFunc: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC4FuncSiyF // ParentPkgKlass.parentPkgFunc()
 // CHECK-NEXT:  #ParentPkgKlass.deinit!deallocator: @$s3Lib14ParentPkgKlassCfD  // ParentPkgKlass.__deallocating_deinit
 
+// CHECK-LABEL: sil_vtable [serialized_for_package] PkgKlass {
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!getter: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivg [inherited]  // ParentPkgKlass.parentPkgVar.getter
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!setter: (ParentPkgKlass) -> (Int) -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivs [inherited]  // ParentPkgKlass.parentPkgVar.setter
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!modify: (ParentPkgKlass) -> () -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivM [inherited]  // ParentPkgKlass.parentPkgVar.modify
+// CHECK-NEXT:  #ParentPkgKlass.init!allocator: (ParentPkgKlass.Type) -> (Int) -> ParentPkgKlass : @$s3Lib8PkgKlassCyACSicfC [override]  // PkgKlass.__allocating_init(_:)
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgFunc: (ParentPkgKlass) -> () -> Int : @$s3Lib8PkgKlassC06parentB4FuncSiyF [override]  // PkgKlass.parentPkgFunc()
+// CHECK-NEXT:  #PkgKlass.pkgVar!getter: (PkgKlass) -> () -> String : @$s3Lib8PkgKlassC6pkgVarSSvg  // PkgKlass.pkgVar.getter
+// CHECK-NEXT:  #PkgKlass.pkgVar!setter: (PkgKlass) -> (String) -> () : @$s3Lib8PkgKlassC6pkgVarSSvs  // PkgKlass.pkgVar.setter
+// CHECK-NEXT:  #PkgKlass.pkgVar!modify: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC6pkgVarSSvM  // PkgKlass.pkgVar.modify
+// CHECK-NEXT:  #PkgKlass.init!allocator: (PkgKlass.Type) -> (String) -> PkgKlass : @$s3Lib8PkgKlassCyACSScfC  // PkgKlass.__allocating_init(_:)
+// CHECK-NEXT:  #PkgKlass.pkgFunc: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC7pkgFuncyyF  // PkgKlass.pkgFunc()
+// CHECK-NEXT:  #PkgKlass.deinit!deallocator: @$s3Lib8PkgKlassCfD  // PkgKlass.__deallocating_deinit
+// CHECK-NEXT:  #PkgKlass!ivardestroyer: @$s3Lib8PkgKlassCfE  // PkgKlass.__ivar_destroyer
 
 // CHECK-LABEL: sil_vtable [serialized_for_package] PubKlassZ {
 // CHECK-NEXT:  #PubKlassZ.env!getter: (PubKlassZ) -> () -> UInt16 : @$s3Lib9PubKlassZC3envs6UInt16Vvg  // PubKlassZ.env.getter
