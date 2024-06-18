@@ -766,7 +766,7 @@ bool FilterCandidates::rewritableArgumentIndicesForApply(
       if (apply.isArgumentOperand(operand)) {
         auto convention = apply.getArgumentConvention(operand);
         if (isSimpleExtendedIntroducerDef(operand.get()) &&
-            convention.isOwnedConvention()) {
+            convention.isOwnedConventionInCaller()) {
           indices.push_back(apply.getCalleeArgIndex(operand));
         } else {
           // This argument is a use of %lifetime but not an owned use that we

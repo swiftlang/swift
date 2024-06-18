@@ -189,7 +189,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   auto argType = loweredParamTypes.claimNext();
 
   auto *arg = SGF.F.begin()->createFunctionArgument(argType, VD);
-  bool argIsConsumed = origParamInfo.isConsumed();
+  bool argIsConsumed = origParamInfo.isConsumedInCallee();
 
   // If the lowered parameter is a pack expansion, copy/move the pack
   // into the initialization, which we assume is there.

@@ -258,7 +258,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
     }
   }
 
-  if (param.isConsumed() &&
+  if (param.isConsumedInCaller() &&
       value.getOwnershipKind() == OwnershipKind::Guaranteed) {
     return value.copyUnmanaged(SGF, loc);
   }
@@ -1926,7 +1926,7 @@ static void emitRawApply(SILGenFunction &SGF,
     auto inputTy =
         substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
 
-    if (inputParams[i].isConsumed()) {
+    if (inputParams[i].isConsumedInCaller()) {
       argValue = args[i].forward(SGF);
       if (argValue->getType().isMoveOnlyWrapped() &&
           !inputTy.isMoveOnlyWrapped()) {
@@ -3539,7 +3539,7 @@ private:
     }
 
     // If we have a guaranteed +0 parameter...
-    if (param.isGuaranteed() || isShared) {
+    if (param.isGuaranteedInCaller() || isShared) {
       // And this is a yield, emit a borrowed r-value.
       if (IsYield) {
         if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
@@ -3561,7 +3561,7 @@ private:
         return;
     }
 
-    if (param.isConsumed() || isOwned) {
+    if (param.isConsumedInCaller() || isOwned) {
       if (tryEmitConsumedMoveOnly(std::move(arg), loweredSubstArgType,
                                   loweredSubstParamType, origParamType,
                                   paramSlice))
@@ -3762,7 +3762,7 @@ private:
                     ClaimedParamsRef claimedParams) {
     auto emissionKind = SGFAccessKind::BorrowedObjectRead;
     for (auto param : claimedParams) {
-      assert(!param.isConsumed());
+      assert(!param.isConsumedInCaller());
       if (param.isIndirectInGuaranteed() && SGF.silConv.useLoweredAddresses()) {
         emissionKind = SGFAccessKind::BorrowedAddressRead;
         break;
@@ -3886,7 +3886,7 @@ private:
       // happen outside of the formal-evaluation scope we pushed for the
       // expression evaluation, but any copies to be done inside of it.
       // Copies are only done if the parameter is consumed.
-      if (!param.isConsumed())
+      if (!param.isConsumedInCaller())
         S.pop();
 
       Args.push_back(convertOwnershipConvention(value));
@@ -4359,7 +4359,7 @@ private:
     bool requiresReabstraction = loweredArgType.getASTType()
       != param.getInterfaceType();
     // If the parameter is consumed, we have to emit at +1.
-    if (param.isConsumed()) {
+    if (param.isConsumedInCaller()) {
       return {SGFContext(), requiresReabstraction};
     }
 
@@ -5053,7 +5053,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
          MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
       }
       yields.push_back(ManagedValue::forLValue(value));
-    } else if (info.isConsumed()) {
+    } else if (info.isConsumedInCaller()) {
       if (value->getType().isMoveOnly()) {
         value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
          MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
@@ -5061,7 +5061,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
       !useLoweredAddresses && value->getType().isTrivial(getFunction())
           ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
           : yields.push_back(emitManagedRValueWithCleanup(value));
-    } else if (info.isGuaranteed()) {
+    } else if (info.isGuaranteedInCaller()) {
       if (value->getType().isMoveOnly()) {
         if (!value->getType().isAddress()) {
           // The move checker uses the lifetime of the "copy" for borrow checking.
@@ -6868,11 +6868,11 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
   if (shouldLoadBaseAddress()) {
-    if (selfParam.isConsumed() || base.getType().isAddressOnly(SGF.F)) {
+    if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
-      auto isGuaranteed = selfParam.isGuaranteed();
+      auto isGuaranteed = selfParam.isGuaranteedInCaller();
 
       auto context =
           isGuaranteed ? SGFContext::AllowImmediatePlusZero : SGFContext();
@@ -6921,7 +6921,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
   assert(!base.isLValue());
 
   // We need to produce the value at +1 if it's going to be consumed.
-  if (selfParam.isConsumed() && !base.hasCleanup()) {
+  if (selfParam.isConsumedInCaller() && !base.hasCleanup()) {
     base = base.copyUnmanaged(SGF, loc);
   }
   // If the parameter is indirect, we'll need to drop the value into
