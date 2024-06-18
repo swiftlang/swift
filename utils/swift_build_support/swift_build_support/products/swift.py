@@ -72,6 +72,9 @@ class Swift(product.Product):
         # Add synchronization flag.
         self.cmake_options.extend(self._enable_synchronization)
 
+        # Add volatile flag.
+        self.cmake_options.extend(self._enable_volatile)
+
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
 
@@ -218,6 +221,11 @@ updated without updating swift.py?")
     def _enable_synchronization(self):
         return [('SWIFT_ENABLE_SYNCHRONIZATION:BOOL',
                  self.args.enable_synchronization)]
+
+    @property
+    def _enable_volatile(self):
+        return [('SWIFT_ENABLE_VOLATILE:BOOL',
+                 self.args.enable_volatile)]
 
     @property
     def _enable_stdlib_static_vprintf(self):
