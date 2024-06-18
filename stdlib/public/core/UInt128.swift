@@ -505,7 +505,7 @@ extension UInt128.Words: RandomAccessCollection {
   public subscript(position: Int) -> UInt {
     @inlinable
     get {
-      precondition(position >= 0 && position < count)
+      _precondition(position >= 0 && position < count, "Index out of bounds")
       var value = _value
 #if _endian(little)
       let index = position
