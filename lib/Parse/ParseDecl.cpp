@@ -2549,7 +2549,7 @@ Parser::parseMacroRoleAttribute(
   SmallVector<MacroIntroducedDeclName, 2> names;
   SmallVector<TypeExpr *, 2> conformances;
   auto argumentsStatus = parseList(tok::r_paren, lParenLoc, rParenLoc,
-                                   /*AllowSepAfterLast=*/false,
+                                   /*AllowSepAfterLast=*/Context.LangOpts.hasFeature(Feature::TrailingComma),
                                    diag::expected_rparen_expr_list,
                                    [&] {
     ParserStatus status;
@@ -9351,6 +9351,10 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     if (!Tok.is(tok::comma))
       break;
     CommaLoc = consumeToken(tok::comma);
+    if (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
+        (Tok.isAtStartOfLine() || Tok.is(tok::r_brace) || Tok.is(tok::semi))) {
+      break;
+    }
   }
 
   if (!(Flags & PD_AllowEnumElement)) {
