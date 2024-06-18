@@ -1331,8 +1331,8 @@ static SILFunctionType *
 emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
                        SmallVectorImpl<SILValue> &args,
                        SILValue &foreignErrorSlot, SILValue &foreignAsyncSlot,
-                       std::optional<ForeignErrorConvention> &foreignError,
-                       std::optional<ForeignAsyncConvention> &foreignAsync,
+                       std::optional<ForeignErrorConvention> foreignError,
+                       std::optional<ForeignAsyncConvention> foreignAsync,
                        CanType &nativeFormalResultTy,
                        CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
@@ -1354,18 +1354,6 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
 
   SmallVector<ManagedValue, 8> bridgedArgs;
   bridgedArgs.reserve(objcFnTy->getParameters().size());
-
-  // Find the foreign error and async conventions if we have one.
-  if (thunk.hasDecl()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(thunk.getDecl())) {
-      foreignError = func->getForeignErrorConvention();
-      foreignAsync = func->getForeignAsyncConvention();
-    }
-  }
-
-  // We don't know what to do with indirect results from the Objective-C side.
-  assert(objcFnTy->getNumIndirectFormalResults() == 0
-         && "Objective-C methods cannot have indirect results");
 
   auto bridgedFormalTypes = getParameterTypes(objcFormalFnTy.getParams());
   bridgedFormalResultTy = objcFormalFnTy.getResult();
@@ -1618,16 +1606,40 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
   }
 
+  std::optional<ForeignErrorConvention> foreignError;
+  std::optional<ForeignAsyncConvention> foreignAsync;
+
+  // Find the foreign error and async conventions if we have one.
+  if (thunk.hasDecl()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(thunk.getDecl())) {
+      foreignError = func->getForeignErrorConvention();
+      foreignAsync = func->getForeignAsyncConvention();
+    }
+  }
+
   // If we are bridging a Swift method with Any return value(s), create a
   // stack allocation to hold the result(s), since Any is address-only.
   SmallVector<SILValue, 4> args;
+  SILFunctionConventions funcConv = F.getConventions();
+  bool needsBridging = true;
   if (substConv.hasIndirectSILResults()) {
     for (auto result : substConv.getResults()) {
       if (!substConv.isSILIndirect(result)) {
         continue;
       }
+
+      if (!foreignAsync && funcConv.hasIndirectSILResults()) {
+        auto resultTy =
+            funcConv.getSingleSILResultType(getTypeExpansionContext());
+        assert(substConv.getSingleSILResultType(getTypeExpansionContext()) ==
+               resultTy);
+        args.push_back(F.begin()->createFunctionArgument(resultTy));
+        needsBridging = false;
+        break;
+      }
+
       args.push_back(emitTemporaryAllocation(
-                loc, substConv.getSILType(result, getTypeExpansionContext())));
+          loc, substConv.getSILType(result, getTypeExpansionContext())));
     }
   }
 
@@ -1637,8 +1649,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   Scope argScope(Cleanups, CleanupLocation(loc));
 
   // Bridge the arguments.
-  std::optional<ForeignErrorConvention> foreignError;
-  std::optional<ForeignAsyncConvention> foreignAsync;
   SILValue foreignErrorSlot;
   SILValue foreignAsyncSlot;
   CanType nativeFormalResultType, bridgedFormalResultType;
@@ -1872,12 +1882,14 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (foreignAsync) {
       result = passResultToCompletionHandler(result);
     } else {
-      if (substConv.hasIndirectSILResults()) {
-        assert(substTy->getNumResults() == 1);
-        result = args[0];
+      if (needsBridging) {
+        if (substConv.hasIndirectSILResults()) {
+          assert(substTy->getNumResults() == 1);
+          result = args[0];
+        }
+        result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
+                                       bridgedFormalResultType, objcResultTy);
       }
-      result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
-                                     bridgedFormalResultType, objcResultTy);
     }
   } else {
     SILBasicBlock *contBB = createBasicBlock();
