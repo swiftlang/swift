@@ -735,7 +735,8 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
 /// error.
 ///
 /// \see TypeResolution::applyUnboundGenericArguments
-static Type applyGenericArguments(Type type, TypeResolution resolution,
+static Type applyGenericArguments(Type type,
+                                  const TypeResolution &resolution,
                                   SILTypeResolutionContext *silContext,
                                   DeclRefTypeRepr *repr) {
   auto options = resolution.getOptions();
@@ -1249,7 +1250,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 
 /// Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
-                            TypeResolution resolution,
+                            const TypeResolution &resolution,
                             SILTypeResolutionContext *silContext,
                             UnqualifiedIdentTypeRepr *repr) {
   // Resolve the type declaration to a specific type. How this occurs
@@ -1306,7 +1307,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
 ///
 /// \returns either the corrected type, if possible, or an error type to
 /// that correction failed.
-static Type diagnoseUnknownType(TypeResolution resolution,
+static Type diagnoseUnknownType(const TypeResolution &resolution,
                                 Type parentType,
                                 SourceRange parentRange,
                                 DeclRefTypeRepr *repr,
@@ -1570,7 +1571,7 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
   }
 }
 
-static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
+static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
                                            UnqualifiedIdentTypeRepr *repr,
                                            DeclContext *typeDC) {
   ASTContext &ctx = resolution.getASTContext();
@@ -1597,7 +1598,7 @@ static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
 /// \returns Either the resolved type or a null type, the latter of
 /// which indicates that some dependencies were unsatisfied.
 static Type
-resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
+resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
                                 SILTypeResolutionContext *silContext,
                                 UnqualifiedIdentTypeRepr *repr) {
   const auto options = resolution.getOptions();
@@ -1773,7 +1774,7 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
 /// lookup within the given parent type, returning the type it
 /// references.
 /// \param silContext Used to look up generic parameters in SIL mode.
-static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
+static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
                                           SILTypeResolutionContext *silContext,
                                           Type parentTy,
                                           QualifiedIdentTypeRepr *repr) {
