@@ -1269,12 +1269,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   signature.visitParameterList(
       [&](const LoweredFunctionSignature::IndirectResultValue &) {},
       [&](const LoweredFunctionSignature::DirectParameter &param) {
-        if (isConsumedParameter(param.getConvention()))
+        if (isConsumedParameterInCaller(param.getConvention()))
           emitParamCopyForConsume(param.getParamDecl());
         ++paramIndex;
       },
       [&](const LoweredFunctionSignature::IndirectParameter &param) {
-        if (isConsumedParameter(param.getConvention()))
+        if (isConsumedParameterInCaller(param.getConvention()))
           emitParamCopyForConsume(param.getParamDecl());
         ++paramIndex;
       },
@@ -1338,12 +1338,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         },
         [&](const LoweredFunctionSignature::DirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/false,
-                        isConsumedParameter(param.getConvention()),
+                        isConsumedParameterInCaller(param.getConvention()),
                         encodeTypeInfo(param, moduleContext, typeMapping));
         },
         [&](const LoweredFunctionSignature::IndirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/true,
-                        isConsumedParameter(param.getConvention()),
+                        isConsumedParameterInCaller(param.getConvention()),
                         /*directTypeEncoding=*/"");
         },
         [&](const LoweredFunctionSignature::GenericRequirementParameter
