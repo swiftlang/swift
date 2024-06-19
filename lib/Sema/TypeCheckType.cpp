@@ -3930,11 +3930,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (isolatedAttr && !isolatedAttr->isInvalid()) {
       switch (isolatedAttr->getIsolationKind()) {
       case IsolatedTypeAttr::IsolationKind::Dynamic:
-        if (!getASTContext().LangOpts.hasFeature(Feature::IsolatedAny)) {
-          diagnose(isolatedAttr->getAtLoc(), diag::isolated_any_experimental);
-          // Proceed as normal.
-        }
-
         if (representation != FunctionType::Representation::Swift) {
           assert(conventionAttr);
           diagnoseInvalid(repr, isolatedAttr->getAtLoc(),
