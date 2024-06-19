@@ -538,14 +538,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       //
       auto *func = fri->getReferencedFunction();
       auto funcType = func->getLoweredFunctionType();
-      auto selfParam = funcType->getSelfInstanceType(
-          fri->getModule(), func->getTypeExpansionContext());
-      if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
-        auto isolation = swift::getActorIsolation(nomDecl);
-        if (isolation.isGlobalActor()) {
-          return SILIsolationInfo::getGlobalActorIsolated(
-                     fri, isolation.getGlobalActor())
+      if (funcType->hasSelfParam()) {
+        auto selfParam = funcType->getSelfInstanceType(
+            fri->getModule(), func->getTypeExpansionContext());
+        if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
+          auto isolation = swift::getActorIsolation(nomDecl);
+          if (isolation.isGlobalActor()) {
+            return SILIsolationInfo::getGlobalActorIsolated(
+                fri, isolation.getGlobalActor())
               .withUnsafeNonIsolated(true);
+          }
         }
       }
     }
