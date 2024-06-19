@@ -1561,7 +1561,8 @@ namespace {
         });
       }
 
-      if (auto Body = D->getBody(/*canSynthesize=*/ParseIfNeeded)) {
+      auto canParse = ParseIfNeeded && !D->isBodySkipped();
+      if (auto Body = D->getBody(canParse)) {
         printRec(Body, &D->getASTContext());
       }
     }
