@@ -2159,7 +2159,7 @@ ERROR(init_accessor_is_not_on_property,none,
       ())
 
 ERROR(init_accessor_is_not_in_the_primary_declaration,none,
-      "init accessors could only be declared in the primary declaration",
+      "init accessors cannot be declared in an extension",
       ())
 
 ERROR(missing_storage_restrictions_attr_label,none,

@@ -699,7 +699,7 @@ extension Test2ForExtension {
   var extendedX: Int {
     @storageRestrictions(initializes: _x)
     init {
-    // expected-error@-1 {{init accessors could only be declared in the primary declaration}}
+      // expected-error@-1 {{init accessors cannot be declared in an extension}}
       self._x = newValue
     }
     get { _x }
