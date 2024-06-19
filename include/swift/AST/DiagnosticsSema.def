@@ -5670,8 +5670,6 @@ ERROR(isolated_parameter_combined_nonisolated,none,
 ERROR(isolated_parameter_isolated_attr_type,none,
       "function with 'isolated' parameter cannot also be '@isolated(%0)'",
       (StringRef))
-ERROR(isolated_any_experimental,none,
-      "attribute requires '-enable-experimental-feature IsolatedAny'", ())
 ERROR(isolated_attr_global_actor_type,none,
       "function type cannot have both a global actor and '@isolated(%0)'",
       (StringRef))
