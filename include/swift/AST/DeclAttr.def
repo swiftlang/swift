@@ -453,10 +453,10 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   DeclModifier | OnFunc | OnParam | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   130)
 CONTEXTUAL_SIMPLE_DECL_ATTR(consuming, Consuming,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | DeclModifier | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   140)
 CONTEXTUAL_SIMPLE_DECL_ATTR(borrowing, Borrowing,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | DeclModifier | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   141)
 DECL_ATTR(attached, MacroRole,
   OnMacro | AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
