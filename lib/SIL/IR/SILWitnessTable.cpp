@@ -169,15 +169,20 @@ void SILWitnessTable::convertToDefinition(
 
 SerializedKind_t SILWitnessTable::conformanceSerializedKind(
                                                             const RootProtocolConformance *conformance) {
+
+  auto optInPackage = conformance->getDeclContext()->getParentModule()->serializePackageEnabled();
+  auto accessLevelToCheck =
+  optInPackage ? AccessLevel::Package : AccessLevel::Public;
+
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-  if (normalConformance && normalConformance->isResilient())
+  if (normalConformance && normalConformance->isResilient() && !optInPackage)
     return IsNotSerialized;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
+  if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToCheck)
     return IsNotSerialized;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  if (nominal->getEffectiveAccess() >= AccessLevel::Public)
+  if (nominal->getEffectiveAccess() >= accessLevelToCheck)
     return IsSerialized;
 
   return IsNotSerialized;
