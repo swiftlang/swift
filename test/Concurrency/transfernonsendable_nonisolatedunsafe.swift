@@ -30,6 +30,8 @@ protocol ProvidesStaticValue {
 @MainActor func transferToMainIndirectConsuming<T>(_ t: consuming T) async {}
 @MainActor func transferToMainDirectConsuming(_ t: consuming NonSendableKlass) async {}
 
+func useInOut<T>(_ t: inout T) {}
+
 actor CustomActorInstance {}
 
 @globalActor
@@ -349,11 +351,26 @@ func testAccessStaticGlobals() async {
 nonisolated(unsafe) let globalNonIsolatedUnsafeLetObject = NonSendableKlass()
 nonisolated(unsafe) var globalNonIsolatedUnsafeVarObject = NonSendableKlass()
 
-func testAccessGlobals() async {
+func testPassGlobalToMainActorIsolatedFunction() async {
   await transferToMainDirect(globalNonIsolatedUnsafeLetObject)
   await transferToMainIndirect(globalNonIsolatedUnsafeLetObject)
   await transferToMainDirect(globalNonIsolatedUnsafeVarObject)
   await transferToMainIndirect(globalNonIsolatedUnsafeVarObject)
+}
+
+// We use this to force the modify in testPassGlobalToModify
+nonisolated(unsafe)
+var computedGlobalNonIsolatedUnsafeVarObject : NonSendableKlass {
+  _read {
+    yield globalNonIsolatedUnsafeVarObject
+  }
+  _modify {
+    yield &globalNonIsolatedUnsafeVarObject
+  }
+}
+
+func testPassGlobalToModify() async {
+  useInOut(&computedGlobalNonIsolatedUnsafeVarObject)
 }
 
 ///////////////////////
