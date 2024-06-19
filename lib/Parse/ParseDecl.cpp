@@ -5658,10 +5658,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
   HasPotentialRegexLiteral = false;
 
   unsigned OpenBraces = 1;
+  unsigned OpenPoundIf = 0;
 
   bool LastTokenWasFunc = false;
 
-  while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
+  while ((OpenBraces != 0 || OpenPoundIf != 0) && P.Tok.isNot(tok::eof)) {
     // Detect 'func' followed by an operator identifier.
     if (LastTokenWasFunc) {
       LastTokenWasFunc = false;
@@ -5690,6 +5691,24 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
     if (P.L->isPotentialUnskippableBareSlashRegexLiteral(P.Tok)) {
       HasPotentialRegexLiteral = true;
       return OpenBraces;
+    }
+
+    // Match opening `#if` with closing `#endif` to match what the parser does,
+    // `#if` + `#endif` are considered stronger delimiters than `{` + `}`.
+    if (P.consumeIf(tok::pound_if)) {
+      OpenPoundIf += 1;
+      continue;
+    }
+    if (OpenPoundIf != 0) {
+      // We're in a `#if`, check to see if we've reached the end.
+      if (P.consumeIf(tok::pound_endif)) {
+        OpenPoundIf -= 1;
+        continue;
+      }
+      // Consume the next token and continue iterating. We can swallow any
+      // amount of '{' and '}' while in the `#if`.
+      P.consumeToken();
+      continue;
     }
 
     if (P.consumeIf(tok::l_brace)) {
