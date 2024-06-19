@@ -1540,6 +1540,8 @@ uint16_t SILGenFunction::emitBasicProlog(
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getReducedType(genericSig);
+  if (errorType)
+    errorType = (*errorType)->getReducedType(genericSig);
 
   std::optional<AbstractionPattern> origClosureType;
   if (TypeContext) origClosureType = TypeContext->OrigType;

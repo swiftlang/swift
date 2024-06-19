@@ -179,7 +179,7 @@ ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
     if (pc.isNull())
       return nullptr;
     clang::FunctionProtoType::ExtParameterInfo extParamInfo;
-    if (p.isConsumed()) {
+    if (p.isConsumedInCallee()) {
       someParamIsConsumed = true;
       extParamInfo = extParamInfo.withIsConsumed(true);
     }

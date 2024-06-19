@@ -2678,6 +2678,8 @@ protected:
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs) {
+    assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
+        ->getInvocationGenericSignature());
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
@@ -8535,6 +8537,16 @@ class EndLifetimeInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
+/// Mark the end of the linear live range of a value without destroying it.
+class ExtendLifetimeInst
+    : public UnaryInstructionBase<SILInstructionKind::ExtendLifetimeInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  ExtendLifetimeInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
+};
+
 /// An unsafe conversion in between ownership kinds.
 ///
 /// This is used today in destructors where due to Objective-C legacy
@@ -9150,7 +9162,7 @@ class MoveOnlyWrapperToCopyableBoxInst
                                    ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(
             DebugLoc, operand,
-            operand->getType().removingMoveOnlyWrapperToBoxedType(
+            operand->getType().removingMoveOnlyWrapperFromBoxedType(
                 operand->getFunction()),
             forwardingOwnershipKind) {
     assert(

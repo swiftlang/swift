@@ -60,10 +60,6 @@ final public class FunctionArgument : Argument {
     return index < parentFunction.numIndirectResultArguments
   }
 
-  public var hasResultDependsOn : Bool {
-    return bridged.hasResultDependsOn()
-  }
-
   /// If the function's result depends on this argument, return the
   /// kind of dependence.
   public var resultDependence: LifetimeDependenceConvention? {

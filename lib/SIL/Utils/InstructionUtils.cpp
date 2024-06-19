@@ -561,6 +561,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::ExtendLifetimeInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::CondFailInst:
@@ -618,7 +619,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::IndexAddrInst:
     // TODO: hasArchetype() ?
-    if (!inst->getOperand(0)->getType().isLoadable(*inst->getFunction())) {
+    if (!inst->getOperand(0)->getType().isFixedABI(*inst->getFunction())) {
       impactType = inst->getOperand(0)->getType();
       return RuntimeEffect::MetaData;
     }

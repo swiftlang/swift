@@ -14,11 +14,11 @@ public struct SendableStruct: Sendable {
 //
 //   @escaping @callee_guaranteed (@guaranteed sending Swift.Result<test.SendableStruct, Swift.Error>) -> ()
 //
-// CHECK: !{{[0-9]+}} = !DICompositeType(tag: DW_TAG_structure_type, name: "$ss6ResultOy4test14SendableStructVs5Error_pGIeggT_D", flags: DIFlagFwdDecl, runtimeLang: DW_LANG_Swift)
+// CHECK: !{{[0-9]+}} = !DICompositeType(tag: DW_TAG_structure_type, name: "$ss6ResultOy4test14SendableStructVs5Error_pGIeggT_D",
 func testReconstructingEscapingClosureWithSendingParam() async throws -> SendableStruct {
   func callSendableFunction(_ x: @Sendable () -> ()) {}
 
-  func helper(_ completion: @escaping (Result<SendableStruct, Swift.Error>) -> Void) {
+  func helper(_ completion: @escaping (__shared sending Result<SendableStruct, Swift.Error>) -> Void) {
     fatalError()
   }
 

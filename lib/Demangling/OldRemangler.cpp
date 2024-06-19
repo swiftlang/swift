@@ -1116,6 +1116,11 @@ ManglingError Remangler::mangleMacroExpansionUniqueName(
   return mangleChildNodes(node, depth + 1);
 }
 
+ManglingError Remangler::mangleMacroExpansionLoc(
+    Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleAccessor(Node *storageNode,
                                         StringRef accessorCode,
                                         EntityContext &ctx, unsigned depth) {

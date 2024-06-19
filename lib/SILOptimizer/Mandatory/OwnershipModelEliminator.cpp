@@ -165,6 +165,10 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(eli);
     return true;
   }
+  bool visitExtendLifetimeInst(ExtendLifetimeInst *eli) {
+    eraseInstruction(eli);
+    return true;
+  }
   bool visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *uoci) {
     eraseInstructionAndRAUW(uoci, uoci->getOperand());

@@ -82,15 +82,15 @@ static VarDecl*
 // what already has a witness.
 static VarDecl *addImplicitDistributedActorIDProperty(
     ClassDecl *nominal) {
-  if (!nominal)
-    return nullptr;
-  if (!nominal->isDistributedActor())
+  if (!nominal || !nominal->isDistributedActor())
     return nullptr;
 
   auto &C = nominal->getASTContext();
 
   // ==== Synthesize and add 'id' property to the actor decl
   Type propertyType = getDistributedActorIDType(nominal);
+  if (!propertyType || propertyType->hasError())
+    return nullptr;
 
   auto *propDecl = new (C)
       VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
@@ -693,7 +693,8 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
 
-    paramDecl->setImplicit(true);
+    paramDecl->setImplicit();
+    paramDecl->setSending();
     paramDecl->setSpecifier(funcParam->getSpecifier());
     paramDecl->setInterfaceType(funcParam->getInterfaceType());
 

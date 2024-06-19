@@ -101,7 +101,6 @@ import Swift
 ///     var result: Work?
 ///
 ///     deinit {
-///         assert(work != nil)
 ///         // even though the task is still retained,
 ///         // once it completes it no longer causes a reference cycle with the actor
 ///
@@ -124,7 +123,7 @@ import Swift
 /// And using it like this:
 ///
 /// ```
-/// await Actor().start()
+/// await Worker().start()
 /// ```
 ///
 /// Note that the actor is only retained by the start() method's use of `self`,
@@ -135,7 +134,7 @@ import Swift
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
-/// ```
+/// ```other
 /// start task work
 /// completed task work
 /// deinit actor

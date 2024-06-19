@@ -1769,6 +1769,8 @@ bool ExtensionDecl::hasValidParent() const {
   return getDeclContext()->canBeParentOfExtension();
 }
 
+/// Does the extension's generic signature impose additional generic requirements
+/// not stated on the extended nominal type itself?
 bool ExtensionDecl::isConstrainedExtension() const {
   auto nominal = getExtendedNominal();
   if (!nominal)
@@ -1787,12 +1789,26 @@ bool ExtensionDecl::isConstrainedExtension() const {
   return !typeSig->isEqual(extSig);
 }
 
+/// Is the extension written as an unconstrained extension? This is not the same
+/// as isConstrainedExtension() in the case where the extended nominal type has
+/// inverse requirements, because an extension of such a type introduces default
+/// conformance requirements unless they're suppressed on the extension.
+///
+/// enum Optional<Wrapped> where Wrapped: ~Copyable {}
+///
+/// extension Optional {}
+///   --> isConstrainedExtension(): true
+///   --> isWrittenWithConstraints(): false
+///
+/// extension Optional where Wrapped: ~Copyable {}
+///   --> isConstrainedExtension(): false
+///   --> isWrittenWithConstraints(): true
 bool ExtensionDecl::isWrittenWithConstraints() const {
   auto nominal = getExtendedNominal();
   if (!nominal)
     return false;
 
-  // If there's no generic signature, then it's written without constraints.
+  // If there's no generic signature, then it's unconstrained.
   CanGenericSignature extSig = getGenericSignature().getCanonicalSignature();
   if (!extSig)
     return false;
@@ -1809,30 +1825,18 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   SmallVector<InverseRequirement, 2> typeInverseReqs;
   typeSig->getRequirementsWithInverses(typeReqs, typeInverseReqs);
 
-  // If the (non-inverse) requirements are different between the extension and
-  // the original type, it's written with constraints. Note that
-  // the extension can only add requirements, so we need only check the size
-  // (not the specific requirements).
-  if (extReqs.size() > typeReqs.size()) {
+  // If the non-inverse requirements are different between the extension and
+  // the original type, it's written with constraints.
+  if (extReqs != typeReqs)
     return true;
-  }
 
-  assert(extReqs.size() == typeReqs.size());
+  // If the extension has inverse requirements, then it's written with
+  // constraints.
+  if (!extInverseReqs.empty())
+    return true;
 
-  // If the type has no inverse requirements, there are no extra constraints
-  // to write.
-  if (typeInverseReqs.empty()) {
-    return false;
-  }
-
-  // If the extension has no inverse requirements, then there are no constraints
-  // that need to be written down.
-  if (extInverseReqs.empty()) {
-    return false;
-  }
-
-  // We have inverses that need to be written out.
-  return true;
+  // Otherwise, the extension is written as an unconstrained extension.
+  return false;
 }
 
 bool ExtensionDecl::isInSameDefiningModule() const {
@@ -2315,7 +2319,7 @@ bool VarDecl::isLayoutExposedToClients() const {
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
-  if (!nominalAccess.isPublicOrPackage()) return false;
+  if (!nominalAccess.isPublic()) return false;
 
   if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
       !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
@@ -3054,9 +3058,6 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
     return isResilient();
   case ResilienceExpansion::Maximal:
     if (M == getModuleContext())
-      return false;
-    // Access non-resiliently if package optimization is enabled
-    if (bypassResilienceInPackage(M))
       return false;
     return isResilient();
   }
@@ -4681,10 +4682,8 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
 
   if (scope.isPublic())
     return !otherScope.isPublic();
-  else if (scope.isPackage())
-    return !otherScope.isPublicOrPackage();
   else if (scope.isInternal())
-    return !otherScope.isPublicOrPackage() && !otherScope.isInternal();
+    return !otherScope.isPublic() && !otherScope.isInternal();
   else
     return false;
 }
@@ -8666,7 +8665,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      hasResultDependsOn(), isSending());
+      isSending());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

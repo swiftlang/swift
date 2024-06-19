@@ -286,7 +286,7 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst: {
     FullApplySite applySite(memInst);
-    return applySite.getCaptureConvention(*memOper).isOwnedConvention();
+    return applySite.getCaptureConvention(*memOper).isOwnedConventionInCaller();
   }
   case SILInstructionKind::BeginAccessInst:
     return cast<BeginAccessInst>(memInst)->getAccessKind() ==

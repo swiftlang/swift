@@ -2457,7 +2457,7 @@ Parser::parseDocumentationAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef finalMetadata = metadata.value_or("");
 
   return makeParserResult(
-    new (Context) DocumentationAttr(loc, range, finalMetadata,
+    new (Context) DocumentationAttr(atLoc, range, finalMetadata,
                                     visibility, false));
 }
 
@@ -2899,13 +2899,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
           DeclAttribute::isDeclModifier(DK));
     }
 
-    DiscardAttribute = true;
-  }
-
-  if (DK == DeclAttrKind::ResultDependsOnSelf &&
-      !Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnose(Loc, diag::requires_experimental_feature, AttrName, true,
-             getFeatureName(Feature::NonescapableTypes));
     DiscardAttribute = true;
   }
 
@@ -5130,10 +5123,16 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
             Identifier paramName;
             auto paramLoc =
                 consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
-            specifierList.push_back(
-                LifetimeDependenceSpecifier::
-                    getNamedLifetimeDependenceSpecifier(
-                        paramLoc, lifetimeDependenceKind, paramName));
+            if (paramName.is("immortal")) {
+              specifierList.push_back(
+                  LifetimeDependenceSpecifier::
+                      getImmortalLifetimeDependenceSpecifier(paramLoc));
+            } else {
+              specifierList.push_back(
+                  LifetimeDependenceSpecifier::
+                      getNamedLifetimeDependenceSpecifier(
+                          paramLoc, lifetimeDependenceKind, paramName));
+            }
             break;
           }
           case tok::integer_literal: {
@@ -5450,15 +5449,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("_const")) {
       Tok.setKind(tok::contextual_keyword);
       ConstLoc = P.consumeToken();
-      continue;
-    }
-
-    if (Tok.isContextualKeyword("_resultDependsOn")) {
-      if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, "resultDependsOn",
-                   false, getFeatureName(Feature::NonescapableTypes));
-      }
-      ResultDependsOnLoc = P.consumeToken();
       continue;
     }
 

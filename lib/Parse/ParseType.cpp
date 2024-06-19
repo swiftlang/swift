@@ -54,10 +54,6 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
   }
 
-  if (ResultDependsOnLoc.isValid()) {
-    ty = new (p.Context) ResultDependsOnTypeRepr(ty, ResultDependsOnLoc);
-  }
-
   if (TransferringLoc.isValid()) {
     ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
   }
@@ -1207,6 +1203,16 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     }
     Backtracking.reset();
 
+    // If we have a code completion token, treat this as a possible parameter
+    // type since the user may be writing this as a function type.
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletionCallbacks)
+        CodeCompletionCallbacks->completeTypePossibleFunctionParamBeginning();
+
+      consumeToken();
+      return makeParserCodeCompletionStatus();
+    }
+
     // Parse the type annotation.
     auto type = parseType(diag::expected_type);
     if (type.hasCodeCompletion())
@@ -1555,6 +1561,8 @@ bool Parser::canParseType() {
   } else if (Tok.isContextualKeyword("any")) {
     consumeToken();
   } else if (Tok.isContextualKeyword("each")) {
+    consumeToken();
+  } else if (Tok.isContextualKeyword("sending")) {
     consumeToken();
   }
 

@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILValue.h"
+#include <memory>
 #define DEBUG_TYPE "sil-verifier"
 
 #include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTSynthesis.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -36,6 +38,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -865,7 +868,15 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
-  std::unique_ptr<DeadEndBlocks> DEBlocks;
+  /// TODO: LifetimeCompletion: Remove.
+  std::shared_ptr<DeadEndBlocks> DEBlocks;
+
+  /// Blocks without function exiting paths.
+  ///
+  /// Used to verify extend_lifetime instructions.
+  ///
+  /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
+  std::shared_ptr<DeadEndBlocks> deadEndBlocks;
 
   LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
 
@@ -1061,6 +1072,16 @@ public:
     auto dc = F.getDeclContext();
     if (!dc) dc = F.getParentModule();
     return SynthesisContext(F.getASTContext(), dc);
+  }
+
+  DeadEndBlocks &getDeadEndBlocks() {
+    if (DEBlocks) {
+      deadEndBlocks = DEBlocks;
+    } else {
+      deadEndBlocks =
+          std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+    }
+    return *deadEndBlocks;
   }
 
   template <class S>
@@ -2174,8 +2195,9 @@ public:
           "applied argument types do not match suffix of function type's "
           "inputs");
       if (PAI->isOnStack()) {
-        require(!substConv.getSILArgumentConvention(argIdx).isOwnedConvention(),
-          "on-stack closures do not support owned arguments");
+        require(!substConv.getSILArgumentConvention(argIdx)
+                     .isOwnedConventionInCaller(),
+                "on-stack closures do not support owned arguments");
       }
     }
 
@@ -2363,8 +2385,8 @@ public:
     if (builtinKind == BuiltinValueKind::CreateAsyncTask) {
       requireType(BI->getType(), _object(_tuple(_nativeObject, _rawPointer)),
                   "result of createAsyncTask");
-      require(arguments.size() == 5,
-              "createAsyncTask expects five arguments");
+      require(arguments.size() == 6,
+              "createAsyncTask expects six arguments");
       requireType(arguments[0]->getType(), _object(_swiftInt),
                   "first argument of createAsyncTask");
       requireType(arguments[1]->getType(), _object(_optional(_executor)),
@@ -2373,7 +2395,18 @@ public:
                   "third argument of createAsyncTask");
       requireType(arguments[3]->getType(), _object(_optional(_executor)),
                   "fourth argument of createAsyncTask");
-      auto fnType = requireObjectType(SILFunctionType, arguments[4],
+      if (F.getASTContext().getProtocol(swift::KnownProtocolKind::TaskExecutor)) {
+        requireType(arguments[4]->getType(),
+                    _object(_optional(_existential(_taskExecutor))),
+                    "fifth argument of createAsyncTask");
+      } else {
+        // This is just a placeholder type for being able to pass 'nil' for it
+        // with SDKs which do not have the TaskExecutor type.
+        requireType(arguments[4]->getType(),
+                    _object(_optional(_executor)),
+                    "fifth argument of createAsyncTask");
+      }
+      auto fnType = requireObjectType(SILFunctionType, arguments[5],
                                       "result of createAsyncTask");
       auto expectedExtInfo =
         SILExtInfoBuilder().withAsync(true).withSendable(true).build();
@@ -2654,6 +2687,54 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "end_lifetime is only valid in functions with qualified "
             "ownership");
+  }
+
+  void checkExtendLifetimeInst(ExtendLifetimeInst *I) {
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial");
+    require(F.hasOwnership(),
+            "extend_lifetime is only valid in functions with qualified "
+            "ownership");
+    require(getDeadEndBlocks().isDeadEnd(I->getParent()),
+            "extend_lifetime in non-dead-end!?");
+    auto value = I->getOperand();
+    LinearLiveness linearLiveness(value,
+                                  LinearLiveness::DoNotIncludeExtensions);
+    linearLiveness.compute();
+    auto &liveness = linearLiveness.getLiveness();
+    require(!liveness.isWithinBoundary(I),
+            "extend_lifetime use within unextended linear liveness boundary!?");
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    BasicBlockSet boundaryEdgeTargets(value->getFunction());
+    for (auto *edge : boundary.boundaryEdges) {
+      boundaryEdgeTargets.insert(edge);
+    }
+    BasicBlockSet deadDefBlocks(value->getFunction());
+    for (auto *def : boundary.deadDefs) {
+      deadDefBlocks.insert(def->getParentBlock());
+    }
+    BasicBlockSet lastUserBlocks(value->getFunction());
+    for (auto *user : boundary.lastUsers) {
+      lastUserBlocks.insert(user->getParent());
+    }
+    BasicBlockWorklist worklist(value->getFunction());
+    worklist.push(I->getParent());
+    while (auto *block = worklist.pop()) {
+      if (boundaryEdgeTargets.contains(block)) {
+        // The backwards walk reached a boundary edge; this is the correct
+        // behavior being checked for.
+        continue;
+      }
+      require(!lastUserBlocks.contains(block),
+              "extend_lifetime after last user block");
+      require(liveness.getBlockLiveness(block) !=
+                  PrunedLiveBlocks::IsLive::LiveOut,
+              "extend_lifetime in a live-out block");
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predecessor);
+      }
+    }
   }
 
   void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
@@ -6480,9 +6561,11 @@ public:
             "Operand value should be an object");
     require(cvt->getOperand()->getType().isBoxedMoveOnlyWrappedType(cvt->getFunction()),
             "Operand should be move only wrapped");
-    require(cvt->getType() ==
-            cvt->getOperand()->getType().removingMoveOnlyWrapperToBoxedType(cvt->getFunction()),
-            "Result and operand must have the same type, today.");
+    require(
+        cvt->getType() ==
+            cvt->getOperand()->getType().removingMoveOnlyWrapperFromBoxedType(
+                cvt->getFunction()),
+        "Result and operand must have the same type, today.");
   }
 
   void checkCopyableToMoveOnlyWrapperValueInst(
@@ -7150,7 +7233,7 @@ public:
 
   void verify(bool isCompleteOSSA) {
     if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
-      DEBlocks = std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+      DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
   }

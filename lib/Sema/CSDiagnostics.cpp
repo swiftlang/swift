@@ -4231,7 +4231,7 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
 
     // Is one more available than the other?
     WORSE(->getAttrs().isUnavailable(ctx));
-    WORSE(->getAttrs().getDeprecated(ctx));
+    WORSE(->getAttrs().isDeprecated(ctx));
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?
     WORSE(->getName().getBaseName().userFacingName().size());
@@ -7916,6 +7916,24 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
         .highlight(argExpr->getSourceRange());
   }
   emitSuggestionNotes();
+  return true;
+}
+
+bool SendingOnFunctionParameterMismatchFail::diagnoseAsError() {
+  emitDiagnosticAt(getLoc(), diag::sending_function_wrong_sending,
+                   getFromType(), getToType())
+      .warnUntilSwiftVersion(6);
+  emitDiagnosticAt(getLoc(),
+                   diag::sending_function_param_with_sending_param_note);
+  return true;
+}
+
+bool SendingOnFunctionResultMismatchFailure::diagnoseAsError() {
+  emitDiagnosticAt(getLoc(), diag::sending_function_wrong_sending,
+                   getFromType(), getToType())
+      .warnUntilSwiftVersion(6);
+  emitDiagnosticAt(getLoc(),
+                   diag::sending_function_result_with_sending_param_note);
   return true;
 }
 

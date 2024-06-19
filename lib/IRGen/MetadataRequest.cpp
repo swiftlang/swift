@@ -1103,9 +1103,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
       assert(type->hasUnboundGenericType());
     }
 
-    if (type->isForeignReferenceType())
-      return MetadataAccessStrategy::PublicUniqueAccessor;
-
     if (requiresForeignTypeMetadata(nominal))
       return MetadataAccessStrategy::ForeignAccessor;
 

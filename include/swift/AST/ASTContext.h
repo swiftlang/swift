@@ -1109,7 +1109,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModuleImpl(ImportPath::Module ModulePath,
+  bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
                            bool updateFailingList,
                            llvm::VersionTuple &foundVersion) const;
@@ -1146,7 +1146,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(ImportPath::Module ModulePath,
+  bool canImportModule(ImportPath::Module ModulePath, SourceLoc loc,
                        llvm::VersionTuple version = llvm::VersionTuple(),
                        bool underlyingVersion = false);
 

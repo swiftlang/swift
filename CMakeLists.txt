@@ -712,6 +712,10 @@ option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
   FALSE)
 
+option(SWIFT_ENABLE_VOLATILE
+  "Enable build of the Swift Volatile module"
+  FALSE)
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -1359,6 +1363,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
   message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
+  message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")

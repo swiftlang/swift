@@ -2697,7 +2697,8 @@ enum class TaskOptionRecordKind : uint8_t {
   /// Information about the result type of the task, used in embedded Swift.
   ResultTypeInfo = 4,
   /// Set the initial task executor preference of the task.
-  InitialTaskExecutor = 5,
+  InitialTaskExecutorUnowned = 5,
+  InitialTaskExecutorOwned = 6,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

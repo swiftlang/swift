@@ -1284,7 +1284,7 @@ public:
     thrownValue = removeErasureToExistentialError(thrownValue);
 
     Type thrownType = thrownValue->getType();
-    if (!thrownType)
+    if (!thrownType || thrownType->hasError())
       return Classification::forInvalidCode();
 
     // FIXME: Add a potential effect reason for a throw site.

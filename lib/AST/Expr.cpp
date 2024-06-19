@@ -1935,7 +1935,12 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
         Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
 
-  assert(getRawDiscriminator() != InvalidDiscriminator);
+  if (getRawDiscriminator() == InvalidDiscriminator) {
+    llvm::errs() << "Closure does not have an assigned discriminator:\n";
+    dump(llvm::errs());
+    abort();
+  }
+
   return getRawDiscriminator();
 }
 

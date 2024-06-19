@@ -2580,7 +2580,7 @@ void Serializer::writeLifetimeDependenceInfo(
 
   auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
   LifetimeDependenceLayout::emitRecord(
-      Out, ScratchRecord, abbrCode,
+      Out, ScratchRecord, abbrCode, lifetimeDependenceInfo.isImmortal(),
       lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
       lifetimeDependenceInfo.hasScopeLifetimeParamIndices(), paramIndices);
 }
@@ -5584,8 +5584,7 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn(),
-          paramFlags.isSending());
+          paramFlags.isCompileTimeConst(), paramFlags.isSending());
     }
   }
 

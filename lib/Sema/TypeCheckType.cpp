@@ -2157,10 +2157,9 @@ namespace {
                                               TypeResolutionOptions options);
     NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
                                          TypeResolutionOptions options);
-    NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
-                                                  TypeResolutionOptions options);
-    NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
-                                                 TypeResolutionOptions options);
+    NeverNullType
+    resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
+                                    TypeResolutionOptions options);
     NeverNullType resolveLifetimeDependentReturnTypeRepr(
         LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
@@ -2769,10 +2768,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
-
-  case TypeReprKind::ResultDependsOn:
-    return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
-                                          options);
 
   case TypeReprKind::LifetimeDependentReturn:
     return resolveLifetimeDependentReturnTypeRepr(
@@ -3399,6 +3394,10 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
           diagnoseInvalid(repr, repr->getLoc(),
                           diag::escaping_optional_type_argument)
               .fixItRemove(attrRange);
+        } else if (options.is(TypeResolverContext::InoutFunctionInput)) {
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_inout_parameter)
+              .fixItRemove(attrRange);
         } else {
           diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
               .fixItRemove(attrRange);
@@ -3646,7 +3645,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
-    bool hasResultDependsOn = false;
     bool isSending = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
@@ -3670,10 +3668,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
-          nestedRepr = specifierRepr->getBase();
-          continue;
-        case TypeReprKind::ResultDependsOn:
-          hasResultDependsOn = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3778,8 +3772,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, hasResultDependsOn,
-        isSending);
+        isolated, noDerivative, compileTimeConst, isSending);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -3928,6 +3921,10 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         globalActorAttr->setInvalid();
       } else {
         isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
+
+        // This inference is currently gated because `@Sendable` impacts mangling.
+        if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability))
+          sendable = true;
       }
     }
 
@@ -4972,7 +4969,8 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  if (!options.is(TypeResolverContext::FunctionResult) &&
+  if (!options.is(TypeResolverContext::ClosureExpr) &&
+      !options.is(TypeResolverContext::FunctionResult) &&
       (!options.is(TypeResolverContext::FunctionInput) ||
        options.hasBase(TypeResolverContext::EnumElementDecl))) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
@@ -5046,31 +5044,6 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   }
 
   return ArraySliceType::get(baseTy);
-}
-
-NeverNullType
-TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
-                                             TypeResolutionOptions options) {
-  // _resultDependsOn is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
-
-    decltype(diag::attr_only_on_parameters) diagID;
-    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
-        options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagID = diag::attr_only_valid_on_func_or_init_params;
-    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
-      diagID = diag::attr_not_on_variadic_parameters;
-    } else {
-      diagID = diag::attr_only_on_parameters;
-    }
-
-    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
-    return ErrorType::get(getASTContext());
-  }
-  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
@@ -6068,7 +6041,6 @@ private:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
-    case TypeReprKind::ResultDependsOn:
     case TypeReprKind::LifetimeDependentReturn:
       return false;
     }

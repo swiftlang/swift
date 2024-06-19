@@ -1327,6 +1327,14 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
+  // If we are suppressing @implementation, also suppress @objc on extensions.
+  if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    if (ED->isObjCImplementation() &&
+            Options.excludeAttrKind(DeclAttrKind::ObjCImplementation)) {
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
+    }
+  }
+
   // We will handle ownership specifiers separately.
   if (isa<FuncDecl>(D)) {
     Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
@@ -2908,6 +2916,19 @@ void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
+/// If an extension adds a conformance for an invertible protocol, then we
+/// should not print inverses for its generic signature, because no conditional
+/// requirements are inferred by default for such an extension.
+static bool isExtensionAddingInvertibleConformance(const ExtensionDecl *ext) {
+  auto conformances = ext->getLocalConformances();
+  for (auto *conf : conformances) {
+    if (conf->getProtocol()->getInvertibleProtocolKind()) {
+      assert(conformances.size() == 1 && "expected solo conformance");
+      return true;
+    }
+  }
+  return false;
+}
 
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
@@ -3032,9 +3053,21 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       auto baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
+
+      auto genSigFlags = defaultGenericRequirementFlags()
+                       | IncludeOuterInverses;
+
+      // Disable printing inverses if the extension is adding a conformance
+      // for an invertible protocol itself, as we do not infer any requirements
+      // in such an extension. We need to print the whole signature:
+      //     extension S: Copyable where T: Copyable
+      if (isExtensionAddingInvertibleConformance(decl)) {
+        genSigFlags &= ~PrintInverseRequirements;
+        genSigFlags &= ~IncludeOuterInverses;
+      }
+
       printGenericSignature(genericSig,
-                            defaultGenericRequirementFlags()
-                              | IncludeOuterInverses,
+                            genSigFlags,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);
@@ -3783,9 +3816,6 @@ static void printParameterFlags(ASTPrinter &printer,
           options.SuppressOptionalIsolatedParams))
       printer.printKeyword("isolated", options, " ");
   }
-
-  if (flags.hasResultDependsOn())
-    printer.printKeyword("_resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
@@ -5720,8 +5750,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  std::optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
-      VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> flatArgs) {
     Printer << "<";
@@ -5795,56 +5823,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     return T->hasSimpleTypeRepr();
   }
 
-  /// Computes the map that is cached by `getVisibleClangModules()`.
-  /// Do not call directly.
-  llvm::DenseMap<const clang::Module *, ModuleDecl *>
-  computeVisibleClangModules() {
-    assert(Options.CurrentModule &&
-           "CurrentModule needs to be set to determine imported Clang modules");
-
-    llvm::DenseMap<const clang::Module *, ModuleDecl *> Result;
-
-    // For the current module, consider both private and public imports.
-    ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
-    Filter |= ModuleDecl::ImportFilterKind::Default;
-
-    // For private or package swiftinterfaces, also look through @_spiOnly imports.
-    if (!Options.printPublicInterface())
-      Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
-    // Consider package import for package interface
-    if (Options.printPackageInterface())
-      Filter |= ModuleDecl::ImportFilterKind::PackageOnly;
-
-    SmallVector<ImportedModule, 4> Imports;
-    Options.CurrentModule->getImportedModules(Imports, Filter);
-
-    SmallVector<ModuleDecl *, 4> ModulesToProcess;
-    for (const auto &Import : Imports) {
-      ModulesToProcess.push_back(Import.importedModule);
-    }
-
-    SmallPtrSet<ModuleDecl *, 4> Processed;
-    while (!ModulesToProcess.empty()) {
-      ModuleDecl *Mod = ModulesToProcess.back();
-      ModulesToProcess.pop_back();
-
-      if (!Processed.insert(Mod).second)
-        continue;
-
-      if (const clang::Module *ClangModule = Mod->findUnderlyingClangModule())
-        Result[ClangModule] = Mod;
-
-      // For transitive imports, consider only public imports.
-      Imports.clear();
-      Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Exported);
-      for (const auto &Import : Imports) {
-        ModulesToProcess.push_back(Import.importedModule);
-      }
-    }
-
-    return Result;
-  }
-
   /// Returns all Clang modules that are visible from `Options.CurrentModule`.
   /// This includes any modules that are imported transitively through public
   /// (`@_exported`) imports.
@@ -5853,10 +5831,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   /// corresponding Swift module.
   const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
   getVisibleClangModules() {
-    if (!VisibleClangModules) {
-      VisibleClangModules = computeVisibleClangModules();
-    }
-    return *VisibleClangModules;
+    return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
   template <typename T>

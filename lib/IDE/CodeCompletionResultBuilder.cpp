@@ -37,6 +37,11 @@ static bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   if (VD->hasClangNode() && !VD->getClangDecl())
     return false;
 
+  // Avoid generating USRs for decls in local contexts, we cannot guarantee
+  // any parent closures will be type-checked, which is needed for mangling.
+  if (VD->getDeclContext()->getLocalContext())
+    return false;
+
   return true;
 }
 
@@ -213,7 +218,7 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     CurrentModule = MD;
   }
 
-  if (D->getAttrs().getDeprecated(D->getASTContext()))
+  if (D->getAttrs().isDeprecated(D->getASTContext()))
     setContextFreeNotRecommended(ContextFreeNotRecommendedReason::Deprecated);
   else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
     setContextFreeNotRecommended(

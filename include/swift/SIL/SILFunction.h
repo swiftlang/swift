@@ -28,6 +28,8 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/SILUndef.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace swift {
 
@@ -337,12 +339,8 @@ private:
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
-  /// This is the set of undef values we've created, for uniquing purposes.
-  ///
-  /// We use a SmallDenseMap since in most functions, we will have only one type
-  /// of undef if we have any at all. In that case, by staying small we avoid
-  /// needing a heap allocation.
-  llvm::SmallDenseMap<SILType, SILUndef *, 1> undefValues;
+  /// The undefs of each type in the function.
+  llvm::SmallMapVector<SILType, SILUndef *, 1> undefValues;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -463,8 +461,6 @@ private:
   /// If true, the function returns a non-escapable value without any
   /// lifetime-dependence on an argument.
   unsigned HasUnsafeNonEscapableResult : 1;
-
-  unsigned HasResultDependsOnSelf : 1;
 
   /// True, if this function or a caller (transitively) has a performance
   /// constraint.
@@ -758,11 +754,6 @@ public:
     HasUnsafeNonEscapableResult = value;
   }
 
-  bool hasResultDependsOnSelf() const { return HasResultDependsOnSelf; }
-
-  void setHasResultDependsOnSelf(bool flag = true) {
-    HasResultDependsOnSelf = flag;
-  }
   /// Returns true if this is a reabstraction thunk of escaping function type
   /// whose single argument is a potentially non-escaping closure. i.e. the
   /// thunks' function argument may itself have @inout_aliasable parameters.
@@ -820,7 +811,7 @@ public:
   // callee.
   bool hasOwnedParameters() const {
     for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
-      if (ParamInfo.isConsumed())
+      if (ParamInfo.isConsumedInCallee())
         return true;
     }
     return false;
@@ -1642,6 +1633,10 @@ public:
   Lifetime getLifetime(VarDecl *decl, SILType ty) {
     return ty.getLifetime(*this).getLifetimeForAnnotatedValue(
         decl->getLifetimeAnnotation());
+  }
+
+  ArrayRef<std::pair<SILType, SILUndef *>> getUndefValues() {
+    return {undefValues.begin(), undefValues.end()};
   }
 
   /// verify - Run the SIL verifier to make sure that the SILFunction follows

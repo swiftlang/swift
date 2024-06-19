@@ -129,9 +129,7 @@ bool Parser::startsParameterName(bool isClosure) {
          !Tok.isContextualKeyword("transferring")) &&
         (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
          !Tok.isContextualKeyword("sending")) &&
-        !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
-        (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
-         !Tok.isContextualKeyword("_resultDependsOn")))
+        !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat))
       return true;
 
     // Parameter specifiers can be an argument label, but they're also
@@ -358,6 +356,22 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
     }
 
+    auto parseParamType = [&]() -> ParserResult<TypeRepr> {
+      // Currently none of the parameter type completions are relevant for
+      // enum cases, so don't include them. We'll complete for a regular type
+      // beginning instead.
+      if (Tok.is(tok::code_complete) &&
+          paramContext != ParameterContextKind::EnumElement) {
+        if (CodeCompletionCallbacks)
+          CodeCompletionCallbacks->completeTypePossibleFunctionParamBeginning();
+
+        auto CCLoc = consumeToken(tok::code_complete);
+        auto *ET = ErrorTypeRepr::create(Context, CCLoc);
+        return makeParserCodeCompletionResult<TypeRepr>(ET);
+      }
+      return parseType(diag::expected_parameter_type);
+    };
+
     if (startsParameterName(isClosure)) {
       // identifier-or-none for the first name
       param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
@@ -405,7 +419,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       // (':' type)?
       if (consumeIf(tok::colon)) {
 
-        auto type = parseType(diag::expected_parameter_type);
+        auto type = parseParamType();
         status |= type;
         param.Type = type.getPtrOrNull();
 
@@ -428,7 +442,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       if (isBareType && paramContext == ParameterContextKind::EnumElement) {
-        auto type = parseType(diag::expected_parameter_type);
+        auto type = parseParamType();
         status |= type;
         param.Type = type.getPtrOrNull();
         param.FirstName = Identifier();
@@ -443,7 +457,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // the user is about to type the parameter label and we shouldn't
         // suggest types.
         SourceLoc typeStartLoc = Tok.getLoc();
-        auto type = parseType(diag::expected_parameter_type);
+        auto type = parseParamType();
         status |= type;
         param.Type = type.getPtrOrNull();
 
@@ -613,12 +627,6 @@ mapParsedParameters(Parser &parser,
         param->setCompileTimeConst();
       }
 
-      if (paramInfo.ResultDependsOnLoc.isValid()) {
-        type = new (parser.Context)
-            ResultDependsOnTypeRepr(type, paramInfo.ResultDependsOnLoc);
-        param->setResultDependsOn();
-      }
-
       if (paramInfo.TransferringLoc.isValid()) {
         type = new (parser.Context)
             TransferringTypeRepr(type, paramInfo.TransferringLoc);
@@ -655,8 +663,6 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             else if (isa<CompileTimeConstTypeRepr>(STR))
               param->setCompileTimeConst(true);
-            else if (isa<ResultDependsOnTypeRepr>(STR))
-              param->setResultDependsOn(true);
             else if (isa<TransferringTypeRepr>(STR))
               param->setSending(true);
             else if (isa<SendingTypeRepr>(STR))
