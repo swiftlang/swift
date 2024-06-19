@@ -216,6 +216,8 @@ normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
 normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
+normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
 normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
