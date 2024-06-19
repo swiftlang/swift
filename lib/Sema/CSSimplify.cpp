@@ -6473,6 +6473,8 @@ bool ConstraintSystem::repairFailures(
     ConstraintFix *fix;
     if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>()) {
       fix = AllowFunctionTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    } else if (tupleLocator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      fix = AllowArgumentMismatch::create(*this, lhs, rhs, tupleLocator);
     } else {
       fix = AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
     }
