@@ -255,6 +255,8 @@ extension Task where Failure == Error {
     @_spi(MainActorUtilities)
     @MainActor
     @available(SwiftStdlib 5.9, *)
+    @available(*, deprecated, message: "Use Task.init with a main actor isolated closure instead")
+    @available(swift, obsoleted: 6.0, message: "Use Task.init with a main actor isolated closure instead")
     @discardableResult
     public static func startOnMainActor(
         priority: TaskPriority? = nil,
@@ -278,6 +280,8 @@ extension Task where Failure == Never {
     @_spi(MainActorUtilities)
     @MainActor
     @available(SwiftStdlib 5.9, *)
+    @available(*, deprecated, message: "Use Task.init with a main actor isolated closure instead")
+    @available(swift, obsoleted: 6.0, message: "Use Task.init with a main actor isolated closure instead")
     @discardableResult
     public static func startOnMainActor(
         priority: TaskPriority? = nil,
