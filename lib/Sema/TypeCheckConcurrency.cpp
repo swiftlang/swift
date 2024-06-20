@@ -3463,21 +3463,18 @@ namespace {
 
         argForIsolatedParam = arg;
         unsatisfiedIsolation = std::nullopt;
+
+        // Assume that a callee with an isolated parameter does not
+        // cross an isolation boundary. We'll set this again below if
+        // the given isolated argument doesn't match the isolation of the
+        // caller.
+        mayExitToNonisolated = false;
+
+        // If the argument is an isolated parameter from the enclosing context,
+        // or #isolation, then the call does not cross an isolation boundary.
         if (getIsolatedActor(arg) || isa<CurrentContextIsolationExpr>(arg))
           continue;
 
-        // An isolated parameter was provided with a non-isolated argument.
-        // FIXME: The modeling of unsatisfiedIsolation is not great here.
-        // We'd be better off using something more like closure isolation
-        // that can talk about specific parameters.
-        auto nominal = getType(arg)->getAnyNominal();
-        if (!nominal) {
-          // FIXME: This is wrong for distributed actors.
-          nominal = getType(arg)->getASTContext().getProtocol(
-              KnownProtocolKind::Actor);
-        }
-
-        mayExitToNonisolated = false;
         auto calleeIsolation = ActorIsolation::forActorInstanceParameter(
             const_cast<Expr *>(arg->findOriginalValue()), paramIdx);
 
