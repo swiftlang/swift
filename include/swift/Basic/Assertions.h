@@ -17,8 +17,6 @@
 #ifndef SWIFT_BASIC_ASSERTIONS_H
 #define SWIFT_BASIC_ASSERTIONS_H
 
-#include <stdint.h>
-
 // Only for use in this header
 #if __has_builtin(__builtin_expect)
 #define ASSERT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
@@ -46,7 +44,7 @@
 #define ASSERT(expr) \
   do { \
     if (ASSERT_UNLIKELY(!expr)) {			   \
-      ASSERT_failure(#expr, __FILE__, __LINE__, __func__); \
+      ASSERT_failure(#expr, __FILE_NAME__, __LINE__, __func__); \
     } \
   } while (0)
 
