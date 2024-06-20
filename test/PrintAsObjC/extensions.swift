@@ -76,6 +76,27 @@ extension A5 {
   var notObjC: NotObjC { return NotObjC() }
 }
 
+// Check that two otherwise tied extensions will print in alphabetical
+// order by first member with a differing Swift name.
+
+// CHECK-LABEL: @interface A6
+@objc class A6 {}
+
+extension A6 {
+  @objc(skippedBool:) func skipped(_: Bool) {}
+  @objc func def() {}
+}
+extension A6 {
+  @objc(skippedInt:) func skipped(_: Int) {}
+  @objc func abc() {}
+}
+// CHECK: @interface A6 (SWIFT_EXTENSION(extensions))
+// CHECK: - (void)skippedInt:
+// CHECK: - (void)abc
+// CHECK: @interface A6 (SWIFT_EXTENSION(extensions))
+// CHECK: - (void)skippedBool:
+// CHECK: - (void)def
+
 // CHECK-LABEL: @interface CustomName{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
