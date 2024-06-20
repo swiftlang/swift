@@ -88,7 +88,7 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
         _fatal_error(
-            "command terminated with a non-zero exit status " +
+            "command `{0}` terminated with a non-zero exit status ".format(command) +
             str(e.returncode) + ", aborting")
     except OSError as e:
         _fatal_error(
@@ -138,7 +138,7 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         if optional:
             return None
         _fatal_error(
-            "command terminated with a non-zero exit status " +
+            "command `{0}` terminated with a non-zero exit status ".format(command) +
             str(e.returncode) + ", aborting")
     except OSError as e:
         if optional:
