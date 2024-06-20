@@ -3020,9 +3020,24 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   Type getCaughtErrorTypeAt(SourceLoc loc) {
     auto dc = CurContext.getDeclContext();
     auto module = dc->getParentModule();
+
+    // Autoclosures can't be found via ASTScope lookup.
+    if (CurContext.isAutoClosure()) {
+      auto *closure = dyn_cast<AutoClosureExpr>(CurContext.getDeclContext());
+      if (auto type = closure->getEffectiveThrownType())
+        return *type;
+
+      // Otherwise, the closure does not throw.
+      return Ctx.getNeverType();
+    }
+
     if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
       if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
         return *caughtType;
+
+      // If a catch node returns null for its thrown error type, we're
+      // in a non-throwing context.
+      return Ctx.getNeverType();
     }
 
     // Fall back to the error existential.
