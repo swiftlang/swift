@@ -8497,8 +8497,11 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   }
 
   if (Init) {
-    if (!storage->getDeclContext()->getSelfNominalTypeDecl() ||
-        isa<SubscriptDecl>(storage)) {
+    auto *DC = storage->getDeclContext();
+    if (isa<ExtensionDecl>(DC)) {
+      P.diagnose(Init->getLoc(),
+                 diag::init_accessor_is_not_in_the_primary_declaration);
+    } else if (!DC->isTypeContext() || isa<SubscriptDecl>(storage)) {
       P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
     }
   }
