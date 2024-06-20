@@ -3631,6 +3631,14 @@ protected:
     singleValueInstructionFallback(kp);
   }
 
+  void visitMarkDependenceInst(MarkDependenceInst *mark) {
+    // This instruction is purely for semantic tracking in SIL.
+    // Simply forward the value and delete the instruction.
+    auto valAddr = assignment.getAddressForValue(mark->getValue());
+    assignment.mapValueToAddress(mark, valAddr);
+    assignment.markForDeletion(mark);
+  }
+
   void visitBeginApplyInst(BeginApplyInst *apply) {
     auto builder = assignment.getBuilder(++apply->getIterator());
     auto addr = assignment.createAllocStack(origValue->getType());
