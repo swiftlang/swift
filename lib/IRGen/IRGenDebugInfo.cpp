@@ -30,6 +30,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"

@@ -32,6 +32,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"

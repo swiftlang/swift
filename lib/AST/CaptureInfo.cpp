@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;

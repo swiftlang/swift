@@ -77,6 +77,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CodeGenABITypes.h"

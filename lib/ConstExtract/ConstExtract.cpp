@@ -20,6 +20,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/TypeID.h"
 #include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/Subsystems.h"

@@ -23,6 +23,7 @@
 #include "TypeDifference.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"

@@ -54,6 +54,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"

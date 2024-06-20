@@ -20,6 +20,7 @@
 #include "swift/LLVMPasses/Passes.h"
 #include "ARCEntryPointBuilder.h"
 #include "LLVMARCOpts.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"

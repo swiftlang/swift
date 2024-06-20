@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/RequirementSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"

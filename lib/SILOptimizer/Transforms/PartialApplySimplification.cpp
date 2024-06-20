@@ -33,6 +33,7 @@
 
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/Statistic.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"

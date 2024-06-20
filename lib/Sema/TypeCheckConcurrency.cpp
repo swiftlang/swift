@@ -29,6 +29,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;

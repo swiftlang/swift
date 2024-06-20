@@ -30,6 +30,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace irgen;

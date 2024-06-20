@@ -99,6 +99,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "PropertyMap.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
