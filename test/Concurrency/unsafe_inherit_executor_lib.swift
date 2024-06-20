@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -emit-sil -verify -o /dev/null -disable-availability-checking %s -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
 // RUN: %target-swift-frontend -emit-sil -verify -o /dev/null -disable-availability-checking %s -strict-concurrency=complete
 
 // REQUIRES: concurrency
