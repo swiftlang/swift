@@ -751,6 +751,103 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
   llvm_unreachable("Unknown combination of types for casting");
 }
 
+namespace {
+  class TypeDependentVisitor : public CanTypeVisitor<TypeDependentVisitor, bool> {
+  public:
+    // If the type isn't actually dependent, we're okay.
+    bool visit(CanType type) {
+      if (!type->hasArchetype() && !type->hasTypeParameter())
+        return false;
+      return CanTypeVisitor::visit(type);
+    }
+
+    bool visitStructType(CanStructType type) {
+      return visitStructDecl(type->getDecl());
+    }
+    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
+      return visitStructDecl(type->getDecl());
+    }
+    bool visitStructDecl(StructDecl *decl) {
+      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+      if (rawLayout) {
+        if (auto likeType = rawLayout->getResolvedScalarLikeType(decl)) {
+          return visit((*likeType)->getCanonicalType());
+        } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
+          return visit(likeArray->first->getCanonicalType());
+        }
+      }
+
+      for (auto field : decl->getStoredProperties()) {
+        if (visit(field->getInterfaceType()->getCanonicalType()))
+          return true;
+      }
+      return false;
+    }
+
+    bool visitEnumType(CanEnumType type) {
+      return visitEnumDecl(type->getDecl());
+    }
+    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      return visitEnumDecl(type->getDecl());
+    }
+    bool visitEnumDecl(EnumDecl *decl) {
+      if (decl->isIndirect())
+        return false;
+
+      for (auto elt : decl->getAllElements()) {
+        if (!elt->hasAssociatedValues() || elt->isIndirect())
+          continue;
+
+        if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
+          return true;
+      }
+      return false;
+    }
+
+    bool visitTupleType(CanTupleType type) {
+      for (auto eltTy : type.getElementTypes()) {
+        if (visit(eltTy->getCanonicalType()))
+          return true;
+      }
+      return false;
+    }
+
+    // A class reference does not depend on the layout of the class.
+    bool visitClassType(CanClassType type) {
+      return false;
+     }
+    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
+      return false;
+    }
+
+    // The same for non-strong references.
+    bool visitReferenceStorageType(CanReferenceStorageType type) {
+      return false;
+    }
+
+    // All function types have the same layout.
+    bool visitAnyFunctionType(CanAnyFunctionType type) {
+      return false;
+    }
+
+    // The safe default for types we didn't handle above.
+    bool visitType(CanType type) {
+      return true;
+    }
+  };
+} // end anonymous namespace
+
+bool swift::layoutIsTypeDependent(NominalTypeDecl *decl) {
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    return false;
+  } else if (auto *structDecl = dyn_cast<StructDecl>(decl)) {
+    return TypeDependentVisitor().visitStructDecl(structDecl);
+  } else {
+    auto *enumDecl = cast<EnumDecl>(decl);
+    return TypeDependentVisitor().visitEnumDecl(enumDecl);
+  }
+}
+
 ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *abi,
                                              unsigned index) {
   SILBasicBlock::iterator iter(abi);
