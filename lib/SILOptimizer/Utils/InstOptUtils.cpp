@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -735,6 +736,30 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
                                              /*WithoutActuallyEscaping=*/false),
               false};
     }
+  }
+  NominalTypeDecl *srcNominal = srcTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *destNominal = destTy.getNominalOrBoundGenericNominal();
+  if (srcNominal && srcNominal == destNominal &&
+      !layoutIsTypeDependent(srcNominal) &&
+      srcTy.isObject() && destTy.isObject()) {
+
+    // This can be a result from whole-module reasoning of protocol conformances.
+    // If a protocol only has a single conformance where the associated type (`ID`) is some
+    // concrete type (e.g. `Int`), then the devirtualizer knows that `p.get()`
+    // can only return an `Int`:
+    // ```
+    //   public struct X2<ID> {
+    //     let p: any P2<ID>
+    //     public func testit(i: ID, x: ID) -> S2<ID> {
+    //       return p.get(x: x)
+    //     }
+    //   }
+    // ```
+    // and after devirtualizing the `get` function, its result must be cast from `Int` to `ID`.
+    //
+    // The `layoutIsTypeDependent` utility is basically only used here to assert that this
+    // cast can only happen between layout compatible types.
+    return {builder->createUncheckedForwardingCast(loc, value, destTy), false};
   }
 
   llvm::errs() << "Source type: " << srcTy << "\n";
