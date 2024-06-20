@@ -8071,18 +8071,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
       }
 
-      if (swiftAttr->getAttribute() == "transferring") {
-        // Swallow this if the feature is not enabled.
-        if (!SwiftContext.LangOpts.hasFeature(
-                Feature::TransferringArgsAndResults))
-          continue;
-        auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
-        if (!funcDecl)
-          continue;
-        funcDecl->setSendingResult();
-        continue;
-      }
-
       if (swiftAttr->getAttribute() == "sending") {
         // Swallow this if the feature is not enabled.
         if (!SwiftContext.LangOpts.hasFeature(Feature::SendingArgsAndResults))

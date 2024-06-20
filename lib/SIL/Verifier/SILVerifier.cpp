@@ -6679,8 +6679,8 @@ public:
              FTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "only thick function types can have erased isolation");
 
-    // If our function hasTransferringResult, then /all/ results must be
-    // transferring.
+    // If our function hasSendingResult, then /all/ results must be
+    // sending.
     require(FTy->hasSendingResult() ==
                 (FTy->getResults().size() &&
                  llvm::all_of(FTy->getResults(),
@@ -6688,7 +6688,7 @@ public:
                                 return result.hasOption(
                                     SILResultInfo::IsSending);
                               })),
-            "transferring result means all results are transferring");
+            "sending result means all results are sending");
 
     require(1 >= std::count_if(FTy->getParameters().begin(), FTy->getParameters().end(),
                                [](const SILParameterInfo &parameterInfo) {
