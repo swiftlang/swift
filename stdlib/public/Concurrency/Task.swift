@@ -1357,7 +1357,7 @@ extension Task where Failure == Error {
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @usableFromInline
-internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: sending @escaping () async -> Void) {
+internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
   Task(operation: body)
 #else
