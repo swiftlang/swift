@@ -736,6 +736,16 @@ public:
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
+  /// Returns true if -experimental-package-cmo was passed, which
+  /// enables serialization of package, public, and inlinable decls in a
+  /// package. This requires -experimental-allow-non-resilient-access.
+  bool serializePackageEnabled() const {
+    return Bits.ModuleDecl.SerializePackageEnabled;
+  }
+  void setSerializePackageEnabled(bool flag = true) {
+    Bits.ModuleDecl.SerializePackageEnabled = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///
@@ -781,6 +791,15 @@ public:
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
+  /// True if this module is resilient AND also does _not_ allow
+  /// non-resilient access; the module can allow such access if
+  /// package optimization is enabled so its client modules within
+  /// the same package can have a direct access to decls in this
+  /// module even if it's built resiliently.
+  bool isStrictlyResilient() const {
+    return isResilient() && !allowNonResilientAccess();
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope

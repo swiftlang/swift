@@ -43,7 +43,7 @@ SILFunction *GenericCloner::createDeclaration(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
-      ReInfo.isSerialized(), IsNotDynamic, IsNotDistributed,
+      ReInfo.getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, Orig->getEntryCount(), Orig->isThunk(),
       Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());

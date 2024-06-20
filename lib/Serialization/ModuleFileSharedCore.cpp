@@ -200,6 +200,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::ALLOW_NON_RESILIENT_ACCESS:
       extendedInfo.setAllowNonResilientAccess(true);
       break;
+    case options_block::SERIALIZE_PACKAGE_ENABLED:
+      extendedInfo.setSerializePackageEnabled(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1448,6 +1451,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       Bits.HasCxxInteroperability = extInfo.hasCxxInteroperability();
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
+      Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();

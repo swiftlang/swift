@@ -529,6 +529,12 @@ struct BridgedFunction {
     IsSignatureOptimizedThunk
   };
 
+  enum class SerializedKind {
+    IsNotSerialized,
+    IsSerialized,
+    IsSerializedForPackage
+  };
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nonnull getFunction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
@@ -558,7 +564,10 @@ struct BridgedFunction {
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;
   BRIDGED_INLINE bool isSerialized() const;
-  BRIDGED_INLINE bool hasValidLinkageForFragileRef() const;
+  BRIDGED_INLINE bool isAnySerialized() const;
+  BRIDGED_INLINE SerializedKind getSerializedKind() const;
+  BRIDGED_INLINE bool canBeInlinedIntoCaller(SerializedKind) const;
+  BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;
   BRIDGED_INLINE bool needsStackProtection() const;

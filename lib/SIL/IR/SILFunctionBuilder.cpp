@@ -24,8 +24,9 @@
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
-    SILLocation loc, StringRef name, SILLinkage linkage, CanSILFunctionType type, IsBare_t isBareSILFunction,
-    IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+    SILLocation loc, StringRef name, SILLinkage linkage,
+    CanSILFunctionType type, IsBare_t isBareSILFunction,
+    IsTransparent_t isTransparent, SerializedKind_t serializedKind,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible, ProfileCounter entryCount,
     IsThunk_t isThunk, SubclassScope subclassScope) {
@@ -38,7 +39,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   }
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
-                                isBareSILFunction, isTransparent, isSerialized,
+                                isBareSILFunction, isTransparent, serializedKind,
                                 entryCount, isDynamic, isDistributed,
                                 isRuntimeAccessible, IsNotExactSelfClass,
                                 isThunk, subclassScope);
@@ -329,9 +330,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   IsTransparent_t IsTrans =
       constant.isTransparent() ? IsTransparent : IsNotTransparent;
 
-  IsSerialized_t IsSer = constant.isSerialized();
+  SerializedKind_t IsSer = constant.getSerializedKind();
   // Don't create a [serialized] function after serialization has happened.
-  if (IsSer == IsSerialized && mod.isSerialized())
+  if (IsSer != IsNotSerialized && mod.isSerialized())
     IsSer = IsNotSerialized;
 
   Inline_t inlineStrategy = InlineDefault;
@@ -408,11 +409,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
-    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
+    SerializedKind_t serializedKind, ProfileCounter entryCount, IsThunk_t isThunk,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
-                             isBareSILFunction, isTransparent, isSerialized,
+                             isBareSILFunction, isTransparent, serializedKind,
                              isDynamic, isDistributed, isRuntimeAccessible,
                              entryCount, isThunk, SubclassScope::NotApplicable);
 }
@@ -421,13 +422,13 @@ SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
     GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-    IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
+    SerializedKind_t serializedKind, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
     ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
-                             isBareSILFunction, isTrans, isSerialized,
+                             isBareSILFunction, isTrans, serializedKind,
                              entryCount, isDynamic, isDistributed,
                              isRuntimeAccessible, IsNotExactSelfClass, isThunk,
                              subclassScope, inlineStrategy, EK, InsertBefore,
