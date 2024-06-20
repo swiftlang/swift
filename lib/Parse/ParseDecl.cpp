@@ -9351,10 +9351,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     if (!Tok.is(tok::comma))
       break;
     CommaLoc = consumeToken(tok::comma);
-    if (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
-        (Tok.isAtStartOfLine() || Tok.is(tok::r_brace) || Tok.is(tok::semi))) {
-      break;
-    }
   }
 
   if (!(Flags & PD_AllowEnumElement)) {

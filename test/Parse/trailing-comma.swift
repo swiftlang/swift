@@ -41,17 +41,6 @@ struct S<T1, T2, T3,> where T1: P1, T2: P2, { }
 
 let _ = { [obj1, obj2,] in }
 
-// Enum Case List
-
-enum E1 {
-    case a, b, c,
-    func foo() { }
-}
-
-enum E2 { case a, b, c, }
-
-enum E3 { case a, b, c, ; func foo() { } }
-
 // Switch Case List
 
 switch number {
