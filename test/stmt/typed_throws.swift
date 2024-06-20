@@ -311,3 +311,29 @@ func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
     }
   }
 }
+
+func takesThrowingAutoclosure(_: @autoclosure () throws(MyError) -> Int) {}
+func takesNonThrowingAutoclosure(_: @autoclosure () throws(Never) -> Int) {}
+
+func getInt() throws -> Int { 0 }
+
+func throwingAutoclosures() {
+  takesThrowingAutoclosure(try getInt())
+  // expected-error@-1 {{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
+
+  takesNonThrowingAutoclosure(try getInt())
+  // expected-error@-1 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
+}
+
+func noThrow() throws(Never) {
+  throw MyError.epicFailed
+  // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+
+  try doSomething()
+  // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+
+  do throws(Never) {
+    throw MyError.epicFailed
+    // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+  } catch {}
+}
