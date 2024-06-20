@@ -4576,6 +4576,7 @@ int main(int argc, char *argv[]) {
     InitInvok.getSearchPathOptions().PluginSearchOpts.emplace_back(
         PluginSearchOption::PluginPath{path});
   }
+  InitInvok.setDefaultInProcessPluginServerPathIfNecessary();
 
   // Process the clang arguments last and allow them to override previously
   // set options.

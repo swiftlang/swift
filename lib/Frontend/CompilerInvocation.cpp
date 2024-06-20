@@ -186,6 +186,37 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
   }
 }
 
+void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
+  if (!SearchPathOpts.InProcessPluginServerPath.empty())
+    return;
+  if (FrontendOpts.MainExecutablePath.empty())
+    return;
+
+  // '/usr/bin/swift'
+  SmallString<64> serverLibPath{FrontendOpts.MainExecutablePath};
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'swift'
+
+#if defined(_WIN32)
+  // Windows: usr\bin\SwiftInProcPluginServer.dll
+  llvm::sys::path::append(serverLibPath, "SwiftInProcPluginServer.dll");
+
+#elif defined(__APPLE__)
+  // Darwin: usr/lib/swift/host/libSwiftInProcPluginServer.dylib
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'bin'
+  llvm::sys::path::append(serverLibPath, "lib", "swift", "host");
+  llvm::sys::path::append(serverLibPath, "libSwiftInProcPluginServer.dylib");
+
+#else
+  // Other: usr/lib/swift/host/libSwiftInProcPluginServer.so
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'bin'
+  llvm::sys::path::append(serverLibPath, "lib", "swift", "host");
+  llvm::sys::path::append(serverLibPath, "libSwiftInProcPluginServer.so");
+
+#endif
+
+  SearchPathOpts.InProcessPluginServerPath = serverLibPath.str();
+}
+
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       const FrontendOptions &FrontendOpts,
                                       const LangOptions &LangOpts) {
@@ -3504,6 +3535,7 @@ bool CompilerInvocation::parseArgs(
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
+  setDefaultInProcessPluginServerPathIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
