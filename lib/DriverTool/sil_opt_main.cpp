@@ -535,10 +535,6 @@ struct SILOptOptions {
       "Xcc",
       llvm::cl::desc("option to pass to clang"));
 
-  llvm::cl::opt<bool> DisableRegionBasedIsolationWithStrictConcurrency =
-      llvm::cl::opt<bool>(
-          "disable-region-based-isolation-with-strict-concurrency",
-          llvm::cl::init(false));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -706,8 +702,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   if (options.StrictConcurrencyLevel.hasArgStr()) {
     Invocation.getLangOptions().StrictConcurrencyLevel =
         options.StrictConcurrencyLevel;
-    if (options.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        !options.DisableRegionBasedIsolationWithStrictConcurrency) {
+    if (options.StrictConcurrencyLevel == StrictConcurrency::Complete) {
       Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
     }
   }
