@@ -12,6 +12,7 @@
 
 #include "swift/AST/PluginRegistry.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Program.h"

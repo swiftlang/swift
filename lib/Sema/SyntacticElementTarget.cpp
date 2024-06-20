@@ -17,6 +17,7 @@
 #include "swift/Sema/SyntacticElementTarget.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "TypeChecker.h"
 
 using namespace swift;

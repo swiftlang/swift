@@ -35,6 +35,7 @@
 
 #include "RewriteLoop.h"
 #include "RewriteSystem.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
 #include <utility>
 

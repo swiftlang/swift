@@ -14,6 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/raw_ostream.h"
 #include "RewriteContext.h"
 #include "Term.h"

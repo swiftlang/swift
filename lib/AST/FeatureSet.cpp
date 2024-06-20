@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "clang/AST/DeclObjC.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

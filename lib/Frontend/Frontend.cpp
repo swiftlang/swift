@@ -24,6 +24,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"

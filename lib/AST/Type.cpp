@@ -37,6 +37,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"

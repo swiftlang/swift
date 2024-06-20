@@ -18,6 +18,7 @@
 
 #define DEBUG_TYPE "sil-temp-rvalue-opt"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"

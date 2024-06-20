@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "raw-sil-inst-lowering"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
