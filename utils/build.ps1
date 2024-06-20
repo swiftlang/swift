@@ -1630,6 +1630,10 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
 }
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  if ($Test) {
+    # Disable tests until we can build the new recore'd swift-foundation tests
+    return
+  }
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
   $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
   $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
