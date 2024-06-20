@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "llvm/ADT/SmallString.h"

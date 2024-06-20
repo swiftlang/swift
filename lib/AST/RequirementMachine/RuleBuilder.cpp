@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/RequirementSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "RequirementMachine.h"

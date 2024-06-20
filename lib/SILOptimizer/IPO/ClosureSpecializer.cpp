@@ -57,6 +57,7 @@
 
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"

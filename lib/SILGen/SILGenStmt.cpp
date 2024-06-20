@@ -22,6 +22,7 @@
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"

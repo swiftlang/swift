@@ -14,6 +14,7 @@
 
 #include "SILCombiner.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"

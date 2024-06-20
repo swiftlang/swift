@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #include "llvm/ADT/bit.h"
 

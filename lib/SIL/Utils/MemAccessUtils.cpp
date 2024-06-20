@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"

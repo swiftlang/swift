@@ -14,6 +14,7 @@
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/ADT/STLExtras.h"
 

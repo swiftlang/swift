@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/Frontend.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"

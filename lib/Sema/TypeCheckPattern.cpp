@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"

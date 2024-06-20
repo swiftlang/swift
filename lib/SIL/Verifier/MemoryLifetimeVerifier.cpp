@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memory-lifetime-verifier"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/CalleeCache.h"

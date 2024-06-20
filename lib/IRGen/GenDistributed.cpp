@@ -40,6 +40,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/IR/DataLayout.h"

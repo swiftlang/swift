@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"

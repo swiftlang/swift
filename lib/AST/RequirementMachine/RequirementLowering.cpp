@@ -157,6 +157,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "Diagnostics.h"

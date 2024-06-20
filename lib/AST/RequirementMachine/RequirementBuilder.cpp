@@ -25,6 +25,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"

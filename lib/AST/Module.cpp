@@ -42,6 +42,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"

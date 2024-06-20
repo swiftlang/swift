@@ -1,5 +1,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>

@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementMachine.h"
 #include "RewriteSystem.h"
 

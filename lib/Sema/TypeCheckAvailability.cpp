@@ -31,6 +31,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"

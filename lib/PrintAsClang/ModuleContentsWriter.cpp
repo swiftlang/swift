@@ -28,6 +28,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Strings.h"
