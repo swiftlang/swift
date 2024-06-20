@@ -35,16 +35,7 @@ int CONDITIONAL_ASSERT_Global_enable_flag =
   0; // TODO: Default to `on` in debug builds
 #endif
 
-void ASSERT_failure(const char *expr, const char *file, int line, const char *func) {
-  // Only print the last component of `file`
-  const char *f = file;
-  for (const char *p = file; *p != '\0'; p++) {
-    if ((p[0] == '/' || p[0] == '\\')
-	&& p[1] != '/' && p[1] != '\\' && p[1] != '\0') {
-      f = p + 1;
-    }
-  }
-
+void ASSERT_failure(const char *expr, const char *filename, int line, const char *func) {
   if (AssertHelp) {
     ASSERT_help();
   } else {
@@ -56,9 +47,9 @@ void ASSERT_failure(const char *expr, const char *file, int line, const char *fu
   std::cerr
     << "Assertion failed: "
     << "(" << expr << "), "
-    << "function " << func << ", "
-    << "file " << f << ", "
-    << "line " << line << "."
+    << "function " << func << " at "
+    << filename << ":"
+    << line << "."
     << std::endl;
 
   if (AssertContinue) {
