@@ -279,7 +279,7 @@ extension Unicode._NFDNormalizer {
     // The buffer contains the decomposed segment *prior to*
     // any pending starter we might have.
 
-    return buffer.next() ?? pendingStarter._take()
+    return buffer.next() ?? pendingStarter.take()
   }
 
   @inline(__always)
@@ -287,7 +287,7 @@ extension Unicode._NFDNormalizer {
     _ nextFromSource: () -> Unicode.Scalar?
   ) -> ScalarAndNormData? {
 
-    if let pendingStarter = pendingStarter._take() {
+    if let pendingStarter = pendingStarter.take() {
       return pendingStarter
     } else if let nextScalar = nextFromSource() {
       return (nextScalar, Unicode._NormData(nextScalar))
