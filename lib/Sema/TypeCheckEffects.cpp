@@ -1251,6 +1251,7 @@ public:
     Classification classification;
     PotentialEffectReason reason = PotentialEffectReason::forPropertyAccess();
     ConcreteDeclRef declRef = E->getDeclRef();
+
     if (auto getter = getEffectfulGetOnlyAccessor(declRef)) {
       reason = getKindOfEffectfulProp(declRef);
       classification = Classification::forDeclRef(
@@ -2018,7 +2019,7 @@ private:
   /// Given the type of an argument, try to determine if it contains
   /// a throws/async function in a way that is permitted to cause a
   /// rethrows/reasync function to throw/async.
-  static Classification 
+  static Classification
   classifyArgumentByType(Type paramType, SubstitutionMap subs,
                          ConditionalEffectKind conditional,
                          PotentialEffectReason reason, EffectKind kind) {
@@ -2663,12 +2664,20 @@ public:
   }
 
   /// providing a \c kind helps tailor the emitted message.
-  void
-  diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
+  void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
                              std::optional<PotentialEffectReason> maybeReason,
                              bool forAwait = false) {
-    if (node.isImplicit())
+    if (node.isImplicit()) {
+      // The reason we return early on implicit nodes is that sometimes we
+      // inject implicit closures, e.g. in 'async let' and we'd end up
+      // "double reporting" some errors, with no great way to make sure the
+      // "more specific diagnostic" is emitted. So instead, we avoid emitting
+      // about implicit code.
+      //
+      // Some synthesized code, like macros, are NOT marked implicit, so we will
+      // report about errors in them properly.
       return;
+    }
 
     switch (getKind()) {
     case Kind::PotentiallyHandled: {
@@ -2691,6 +2700,7 @@ public:
       return;
     }
   }
+
 };
 
 /// A class to walk over a local context and validate the correctness
@@ -2723,13 +2733,13 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       /// Do we have a throw site using 'try' in this context?
       HasTryThrowSite = 0x10,
-      
+
       /// Are we in the context of an 'await'?
       IsAsyncCovered = 0x20,
-      
+
       /// Do we have any calls to 'async' functions in this context?
       HasAnyAsyncSite = 0x40,
-      
+
       /// Do we have any 'await's in this context?
       HasAnyAwait = 0x80,
 
@@ -3293,7 +3303,7 @@ private:
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
         return Action::Continue(E);
       }
-      
+
       PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
         if (isa<ThrowStmt>(S))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
@@ -3305,7 +3315,7 @@ private:
     for (auto &clause : ICD->getClauses()) {
       // Active clauses are handled by the normal AST walk.
       if (clause.isActive) continue;
-      
+
       for (auto elt : clause.Elements)
         elt.walk(ConservativeThrowChecker(*this));
     }

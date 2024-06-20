@@ -2290,11 +2290,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+
       /// Conditions like `if let self` or `guard let self`
       /// have an RHS 'self' decl that is implicit, but this is not
       /// the sort of "implicit self" decl that should trigger
       /// these diagnostics. Track these DREs in a list so we can
       /// avoid running diagnostics on them when we see them later.
+      // FIXME: avoid special casing?
       auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S);
       if (!conditionalStmt) {
         return Action::Continue(S);
