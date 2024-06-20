@@ -2091,7 +2091,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
 
   // TODO: Support constant static arrays on other platforms, too.
   // See also the comment in GlobalObjects.cpp.
-  if (!Triple.isOSDarwin())
+  if (!Triple.isOSDarwin() && !Context.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
   auto *clDecl = objectType.getClassOrBoundGenericClass();
