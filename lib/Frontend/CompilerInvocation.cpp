@@ -1101,16 +1101,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
     Opts.enableFeature(Feature::IsolatedDefaultValues);
     Opts.enableFeature(Feature::GlobalConcurrency);
-
-    // If asserts are enabled, allow for region based isolation to be disabled
-    // with a flag. This is intended only to be used with tests.
-    bool enableRegionIsolation = true;
-#ifndef NDEBUG
-    enableRegionIsolation =
-        !Args.hasArg(OPT_disable_strict_concurrency_region_based_isolation);
-#endif
-    if (enableRegionIsolation)
-      Opts.enableFeature(Feature::RegionBasedIsolation);
+    Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
   Opts.WarnImplicitOverrides =

@@ -571,11 +571,6 @@ struct SILOptOptions {
       "Xcc",
       llvm::cl::desc("option to pass to clang"));
 
-  llvm::cl::opt<bool> DisableRegionBasedIsolationWithStrictConcurrency =
-      llvm::cl::opt<bool>(
-          "disable-region-based-isolation-with-strict-concurrency",
-          llvm::cl::init(false));
-
   llvm::cl::opt<std::string> SwiftVersionString = llvm::cl::opt<std::string>(
       "swift-version",
       llvm::cl::desc(
@@ -789,8 +784,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // If we have strict concurrency set as a feature and were told to turn off
   // region based isolation... do so now.
-  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency) &&
-      !options.DisableRegionBasedIsolationWithStrictConcurrency) {
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
 
