@@ -25,6 +25,14 @@ public struct ConformsToProtoWithAssociatedType_MissingTypeRequirement: ProtoWit
   // expected-error@-1 {{type 'ConformsToProtoWithAssociatedType_MissingTypeRequirement' does not conform to protocol 'ProtoWithAssociatedType'}}
 }
 
+public protocol ProtoWithConstrainedAssociatedType {
+  associatedtype A: Proto
+}
+
+public struct ConformsToProtoWithConstrainedAssociatedType_MissingTypeRequirement: ProtoWithConstrainedAssociatedType {
+  // expected-error@-1 {{type 'ConformsToProtoWithConstrainedAssociatedType_MissingTypeRequirement' does not conform to protocol 'ProtoWithConstrainedAssociatedType'}}
+}
+
 public struct GenericStruct<T> {
   public var t: T
 }
