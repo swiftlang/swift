@@ -7,9 +7,6 @@
 // Emit SIL with targeted concurrency.
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
 
-// Emit SIL with strict concurrency but without region based isolation
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -verify-additional-prefix without-transferring- -disable-region-based-isolation-with-strict-concurrency
-
 // Emit SIL with strict concurrency + region based isolation + transferring
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
 

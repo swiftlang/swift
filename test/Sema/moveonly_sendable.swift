@@ -1,4 +1,3 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -disable-region-based-isolation-with-strict-concurrency -verify-additional-prefix complete-
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
 // REQUIRES: concurrency
