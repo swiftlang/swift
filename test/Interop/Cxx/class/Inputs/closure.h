@@ -20,7 +20,15 @@ struct ARCStrong {
 void cfuncARCStrong(void (*_Nonnull)(ARCStrong));
 #endif
 
+struct ARCWeak {
+#if __OBJC__
+  __weak _Nullable id m;
+#endif
+};
+
 void cfuncReturnNonTrivial(NonTrivial (^_Nonnull)()) noexcept;
 void cfuncReturnNonTrivial2(NonTrivial (*_Nonnull)()) noexcept;
+
+void (*_Nonnull getFnPtr2() noexcept)(ARCWeak) noexcept;
 
 #endif // __CLOSURE__
