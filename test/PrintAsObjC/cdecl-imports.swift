@@ -12,19 +12,19 @@ import Foundation
 // CHECK-NOT: @import Foundation;
 
 // CHECK: @class Bee;
-// CHECK-LABEL: Bee * _Nonnull fwd_declares_bee(void) SWIFT_WARN_UNUSED_RESULT;
+// CHECK-LABEL: Bee * _Nonnull fwd_declares_bee(void) SWIFT_WARN_UNUSED_RESULT SWIFT_NOEXCEPT;
 
 @_cdecl("fwd_declares_bee")
 public func fwdDeclaresBee() -> Bee { fatalError() }
 
 // CHECK: @class Hive;
-// CHECK-LABEL: void fwd_declares_hive(Hive * _Nonnull (* _Nonnull bzzz)(Bee * _Nonnull));
+// CHECK-LABEL: void fwd_declares_hive(Hive * _Nonnull (* _Nonnull bzzz)(Bee * _Nonnull)) SWIFT_NOEXCEPT;
 
 @_cdecl("fwd_declares_hive")
 public func fwdDeclaresHive(bzzz: @convention(c) (Bee) -> Hive) { fatalError() }
 
 // CHECK: @protocol NSWobbling;
-// CHECK-LABEL: void fwd_declares_wobble(id <NSWobbling> _Nonnull wobbler);
+// CHECK-LABEL: void fwd_declares_wobble(id <NSWobbling> _Nonnull wobbler) SWIFT_NOEXCEPT;
 
 @_cdecl("fwd_declares_wobble")
 public func fwdDeclaresWobble(wobbler: NSWobbling) { fatalError() }
