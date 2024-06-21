@@ -178,7 +178,7 @@ public struct DiscardingTaskGroup {
   #endif
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Void
+    operation: sending @escaping @isolated(any) () async -> Void
   ) {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
@@ -235,7 +235,7 @@ public struct DiscardingTaskGroup {
   #endif
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Void
+    operation: sending @escaping @isolated(any) () async -> Void
   ) -> Bool {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -287,7 +287,7 @@ public struct DiscardingTaskGroup {
   @_alwaysEmitIntoClient
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Void
+    operation: sending @escaping @isolated(any) () async -> Void
   ) {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
@@ -332,7 +332,7 @@ public struct DiscardingTaskGroup {
   @_allowFeatureSuppression(IsolatedAny)
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Void
+    operation: sending @escaping @isolated(any) () async -> Void
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -394,7 +394,7 @@ public struct DiscardingTaskGroup {
   #endif
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Void
+    operation: sending @escaping () async -> Void
   ) {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
@@ -442,7 +442,7 @@ public struct DiscardingTaskGroup {
   #endif
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Void
+    operation: sending @escaping () async -> Void
   ) -> Bool {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -485,7 +485,7 @@ public struct DiscardingTaskGroup {
 
   @_alwaysEmitIntoClient
   public mutating func addTask(
-    operation: __owned @Sendable @escaping () async -> Void
+    operation: sending @escaping () async -> Void
   ) {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
@@ -521,7 +521,7 @@ public struct DiscardingTaskGroup {
 #endif
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping () async -> Void
+    operation: sending @escaping () async -> Void
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -830,7 +830,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Void
+    operation: sending @escaping @isolated(any) () async throws -> Void
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
@@ -874,7 +874,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Void
+    operation: sending @escaping @isolated(any) () async throws -> Void
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
