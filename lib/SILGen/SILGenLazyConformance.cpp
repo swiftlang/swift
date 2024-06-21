@@ -33,6 +33,12 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // If the conformance is invalid, crash deterministically even in noassert
   // builds.
   if (conformanceRef.isInvalid()) {
+    // When lazy type checking is enabled, a conformance may only be diagnosed
+    // as invalid during SILGen. Ignore it instead of asserting.
+    auto &ctx = getASTContext();
+    if (ctx.TypeCheckerOpts.EnableLazyTypecheck && ctx.hadError())
+      return;
+
     llvm::report_fatal_error("Invalid conformance in type-checked AST");
   }
 
