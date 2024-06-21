@@ -1624,12 +1624,37 @@ bool ReferencedActor::isKnownToBeLocal() const {
   }
 }
 
-static AbstractFunctionDecl const *
-isActorInitOrDeInitContext(const DeclContext *dc) {
-  return swift::isActorInitOrDeInitContext(
-      dc, [](const AbstractClosureExpr *closure) {
-        return isSendableClosure(closure, /*forActorIsolation=*/false);
-      });
+const AbstractFunctionDecl *
+swift::isActorInitOrDeInitContext(const DeclContext *dc) {
+  while (true) {
+    // Non-Sendable closures are considered part of the enclosing context.
+    if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      if (isSendableClosure(closure, /*for actor isolation*/ false))
+        return nullptr;
+
+      dc = dc->getParent();
+      continue;
+    }
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+      // If this is an initializer or deinitializer of an actor, we're done.
+      if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
+          getSelfActorDecl(dc->getParent()))
+        return func;
+
+      // Non-Sendable local functions are considered part of the enclosing
+      // context.
+      if (func->getDeclContext()->isLocalContext()) {
+        if (func->isSendable())
+          return nullptr;
+
+        dc = dc->getParent();
+        continue;
+      }
+    }
+
+    return nullptr;
+  }
 }
 
 static bool isStoredProperty(ValueDecl const *member) {
@@ -6450,40 +6475,6 @@ bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
     [](const ClosureExpr *closure) {
       return closure->isIsolatedByPreconcurrency();
     });
-}
-
-AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
-    const DeclContext *dc,
-    llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable) {
-  while (true) {
-    // Non-Sendable closures are considered part of the enclosing context.
-    if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      if (isSendable(closure))
-        return nullptr;
-
-      dc = dc->getParent();
-      continue;
-    }
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-      // If this is an initializer or deinitializer of an actor, we're done.
-      if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
-          getSelfActorDecl(dc->getParent()))
-        return func;
-
-      // Non-Sendable local functions are considered part of the enclosing
-      // context.
-      if (func->getDeclContext()->isLocalContext()) {
-        if (func->isSendable())
-          return nullptr;
-
-        dc = dc->getParent();
-        continue;
-      }
-    }
-
-    return nullptr;
-  }
 }
 
 /// Find the directly-referenced parameter or capture of a parameter for
