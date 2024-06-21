@@ -325,7 +325,7 @@ public:
       }
     }
     Cached.File = getOrCreateFile(
-        SM.getDisplayNameForLoc(SL, !ForceGeneratedSourceToDisk), Source);
+        SM.getDisplayNameForLoc(SL, ForceGeneratedSourceToDisk), Source);
     std::tie(Cached.Line, Cached.Column) =
         SM.getPresumedLineAndColumnForLoc(SL);
     // When WinDbg finds two locations with the same line but different
