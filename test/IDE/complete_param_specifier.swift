@@ -2,9 +2,14 @@
 
 func foo(x: #^FUNC_PARAM?check=SPECIFIER^#) {
   let fn1 = { (x: #CLOSURE_PARAM?check=SPECIFIER#) in }
-  let fn2: (#^CLOSURE_PARAM_TY_COMPLETE?check=SPECIFIER^#) -> Void
-  let fn3: (#^CLOSURE_PARAM_TY_INCOMPLETE?check=SPECIFIER^#
+  let fn2 = { (x: consuming #CLOSURE_PARAM2?check=SPECIFIER#) in }
+  let fn3: (#^CLOSURE_PARAM_TY_COMPLETE?check=SPECIFIER^#) -> Void
+  let fn4: (borrowing #^CLOSURE_PARAM_TY_COMPLETE2?check=SPECIFIER^#) -> Void
+  let fn5: (#^CLOSURE_PARAM_TY_INCOMPLETE?check=SPECIFIER^#
+  let fn6: (inout #^CLOSURE_PARAM_TY_INCOMPLETE2?check=SPECIFIER^#
 }
+
+func bar(_ x: borrowing #^FUNC_PARAM_2?check=SPECIFIER^#) {}
 
 struct S {
   init(x: #^INIT_PARAM?check=SPECIFIER^#) {}
