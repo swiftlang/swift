@@ -3837,7 +3837,7 @@ struct ParameterListInfo {
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
   SmallBitVector variadicGenerics;
-  SmallBitVector isSending;
+  SmallBitVector isPassedToSending;
 
 public:
   ParameterListInfo() { }
@@ -3870,7 +3870,7 @@ public:
   bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Returns true if this is a sending parameter.
-  bool isSendingParameter(unsigned paramIdx) const;
+  bool isPassedToSendingParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
