@@ -370,12 +370,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     PreviousHadSemi = false;
     if (Tok.is(tok::pound_if) && !isStartOfSwiftDecl()) {
       auto IfConfigResult = parseIfConfig(
-        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-          parseBraceItems(Elements, Kind, IsActive
-                            ? BraceItemListKind::ActiveConditionalBlock
-                            : BraceItemListKind::InactiveConditionalBlock,
-                          IsFollowingGuard);
-        });
+          IfConfigContext::BraceItems,
+          [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
+            parseBraceItems(Elements, Kind,
+                            IsActive
+                                ? BraceItemListKind::ActiveConditionalBlock
+                                : BraceItemListKind::InactiveConditionalBlock,
+                            IsFollowingGuard);
+          });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
         consumeDecl(BeginParserPosition, IsTopLevel);
         return IfConfigResult;
@@ -2573,10 +2575,11 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
     } else if (Tok.is(tok::pound_if)) {
       // '#if' in 'case' position can enclose one or more 'case' or 'default'
       // clauses.
-      auto IfConfigResult = parseIfConfig(
-        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-          parseStmtCases(Elements, IsActive);
-        });
+      auto IfConfigResult =
+          parseIfConfig(IfConfigContext::SwitchStmt,
+                        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
+                          parseStmtCases(Elements, IsActive);
+                        });
       Status |= IfConfigResult;
       if (auto ICD = IfConfigResult.getPtrOrNull()) {
         cases.emplace_back(ICD);
