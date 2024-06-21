@@ -846,6 +846,21 @@ public:
       OpaqueValues.erase(expr->getInterpolationExpr());
     }
 
+    bool shouldVerify(PropertyWrapperValuePlaceholderExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      assert(expr->getOpaqueValuePlaceholder());
+      assert(!OpaqueValues.count(expr->getOpaqueValuePlaceholder()));
+      OpaqueValues[expr->getOpaqueValuePlaceholder()] = 0;
+      return true;
+    }
+
+    void cleanup(PropertyWrapperValuePlaceholderExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValuePlaceholder()));
+      OpaqueValues.erase(expr->getOpaqueValuePlaceholder());
+    }
+
     void pushLocalGenerics(GenericEnvironment *env) {
       assert(LocalGenerics.count(env)==0);
       LocalGenerics.insert(env);
@@ -2288,7 +2303,7 @@ public:
       }
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(MakeTemporarilyEscapableExpr *E) {
       PrettyStackTraceExpr debugStack(
         Ctx, "verifying MakeTemporarilyEscapableExpr", E);
