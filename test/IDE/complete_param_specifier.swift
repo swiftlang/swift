@@ -13,7 +13,7 @@ func bar(_ x: borrowing #^FUNC_PARAM_2?check=SPECIFIER^#) {}
 
 struct S {
   init(x: #^INIT_PARAM?check=SPECIFIER^#) {}
-  subscript(x: #SUBSCRIPT_PARAM?check=SPECIFIER#) {}
+  subscript(x: #SUBSCRIPT_PARAM?check=SPECIFIER#) -> #^SUBSCRIPT_RET?check=RESULT;check=RESULT_NOT^# {}
 }
 
 // Don't complete for enum cases.
@@ -22,18 +22,32 @@ enum E {
   case f(x: #^ENUM_CASE_LABELED_TY?check=SPECIFIER_NOT^#)
 }
 
-// Don't complete for a regular variable type.
-let x: #^VAR_TY?check=SPECIFIER_NOT^#
+// Don't complete the parameter specifiers for a variable type.
+//
+// Note that we will still complete 'sending' here, even though it isn't
+// currently supported for computed properties (it is supported for functions
+// and subscripts though).
+let x: #^VAR_TY?check=RESULT;check=RESULT_NOT^#
+var y: #^VAR_TY2?check=RESULT;check=RESULT_NOT^#
 
 // Or for a return type.
-func bar() -> #^RETURN_TY?check=SPECIFIER_NOT^# {}
+func bar() -> #^RESULT_TY?check=RESULT;check=RESULT_NOT^# {}
 
 // SPECIFIER-DAG: Keyword[inout]/None: inout; name=inout
 // SPECIFIER-DAG: Keyword/None: consuming; name=consuming
 // SPECIFIER-DAG: Keyword/None: borrowing; name=borrowing
 // SPECIFIER-DAG: Keyword/None: isolated; name=isolated
+// SPECIFIER-DAG: Keyword/None: sending; name=sending
 
 // SPECIFIER_NOT-NOT: Keyword[inout]/None: inout
 // SPECIFIER_NOT-NOT: Keyword/None: consuming
 // SPECIFIER_NOT-NOT: Keyword/None: borrowing
 // SPECIFIER_NOT-NOT: Keyword/None: isolated
+// SPECIFIER_NOT-NOT: Keyword/None: sending
+
+// RESULT_NOT-NOT: Keyword[inout]/None: inout
+// RESULT_NOT-NOT: Keyword/None: consuming
+// RESULT_NOT-NOT: Keyword/None: borrowing
+// RESULT_NOT-NOT: Keyword/None: isolated
+
+// RESULT-DAG: Keyword/None: sending
