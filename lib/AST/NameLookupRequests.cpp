@@ -512,7 +512,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "Finding custom (foreign reference) reference counting operation '"
       << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
                                                               : "release")
-      << "for '" << desc.decl->getNameStr() << "'.\n";
+      << "' for '" << desc.decl->getNameStr() << "'.\n";
 }
 
 SourceLoc
