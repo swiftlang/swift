@@ -7330,10 +7330,10 @@ std::optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
           TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
       }
     }
-    if (inherited.empty()) {
-      inherited.push_back(
-        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
-    }
+
+    inherited.push_back(
+      TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
+
     genericParamDecl->setInherited(Impl.SwiftContext.AllocateCopy(inherited));
 
     genericParams.push_back(genericParamDecl);
