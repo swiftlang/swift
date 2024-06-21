@@ -35,7 +35,7 @@ extension TaskGroup {
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
@@ -84,7 +84,7 @@ extension TaskGroup {
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
@@ -144,7 +144,7 @@ extension ThrowingTaskGroup {
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
@@ -189,7 +189,7 @@ extension ThrowingTaskGroup {
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) -> Bool {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
@@ -249,7 +249,7 @@ extension DiscardingTaskGroup {
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Void
+    operation: sending @escaping @isolated(any) () async -> Void
   ) {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
@@ -299,7 +299,7 @@ extension DiscardingTaskGroup {
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Void
+    operation: sending @escaping @isolated(any) () async -> Void
   ) -> Bool {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
@@ -359,7 +359,7 @@ extension ThrowingDiscardingTaskGroup {
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Void
+    operation: sending @escaping @isolated(any) () async throws -> Void
   ) {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
@@ -409,7 +409,7 @@ extension ThrowingDiscardingTaskGroup {
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Void
+    operation: sending @escaping @isolated(any) () async throws -> Void
   ) -> Bool {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)

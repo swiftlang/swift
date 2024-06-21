@@ -722,14 +722,14 @@ bool SILDeclRef::hasFuncDecl() const {
 }
 
 ClosureExpr *SILDeclRef::getClosureExpr() const {
-  return dyn_cast<ClosureExpr>(getAbstractClosureExpr());
+  return dyn_cast_or_null<ClosureExpr>(getAbstractClosureExpr());
 }
 AutoClosureExpr *SILDeclRef::getAutoClosureExpr() const {
-  return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
+  return dyn_cast_or_null<AutoClosureExpr>(getAbstractClosureExpr());
 }
 
 FuncDecl *SILDeclRef::getFuncDecl() const {
-  return dyn_cast<FuncDecl>(getDecl());
+  return dyn_cast_or_null<FuncDecl>(getDecl());
 }
 
 ModuleDecl *SILDeclRef::getModuleContext() const {
