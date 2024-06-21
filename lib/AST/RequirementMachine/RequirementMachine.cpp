@@ -510,7 +510,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
     dump(llvm::dbgs());
   }
 
-  assert(!Complete);
+  ASSERT(!Complete);
   Complete = true;
 
   return std::make_pair(CompletionResult::Success, 0);
