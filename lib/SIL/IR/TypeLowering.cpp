@@ -4004,6 +4004,16 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
+
+      // If we have a closure expr, see if we need to add Sendable to work
+      // issues with inheritActorContext and global actor isolation.
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (CE->inheritsActorContext() && CE->isBodyAsync() &&
+            CE->getActorIsolation().isActorIsolated() && !CE->isSendable()) {
+          auto newExtInfo = funcTy->getExtInfo().withSendable();
+          funcTy = funcTy.withExtInfo(newExtInfo);
+        }
+      }
     } else {
       funcTy = cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
     }

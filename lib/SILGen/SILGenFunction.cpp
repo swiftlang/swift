@@ -1038,10 +1038,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-    auto resultIsolation = (hasErasedIsolation
-                              ? SILFunctionTypeIsolation::Erased
-                              : SILFunctionTypeIsolation::Unknown);
-
+    auto resultIsolation =
+        (hasErasedIsolation ? SILFunctionTypeIsolation::Erased
+                            : SILFunctionTypeIsolation::Unknown);
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
                            calleeConvention, resultIsolation);
@@ -1056,6 +1055,26 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                   typeContext.OrigType,
                                   typeContext.FormalType,
               SILType::getPrimitiveObjectType(typeContext.ExpectedLoweredType));
+
+    auto resultType = cast<SILFunctionType>(result.getType().getASTType());
+
+    // Check if we performed Sendable/sending type compensation in
+    // emitTransformedValue for a closure. If we did, insert some fixup code to
+    // convert from an @Sendable to a not-@Sendable value.
+    //
+    // DISCUSSION: We cannot do this internally to emitTransformedValue since it
+    // does not have access to our SILDeclRef.
+    if (auto *e = constant.getClosureExpr()) {
+      auto actualType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+      if (e->inheritsActorContext() &&
+          e->getActorIsolation().isActorIsolated() && actualType->isAsync() &&
+          !actualType->isSendable() && resultType->isSendable()) {
+        auto extInfo = resultType->getExtInfo().withSendable(false);
+        resultType = resultType->getWithExtInfo(extInfo);
+        result = B.createConvertFunction(
+            loc, result, SILType::getPrimitiveObjectType(resultType));
+      }
+    }
   }
 
   return result;

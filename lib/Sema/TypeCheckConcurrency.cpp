@@ -702,6 +702,49 @@ static bool isSendableClosure(
   return false;
 }
 
+/// Returns true if this closure acts as an inference boundary in the AST. An
+/// inference boundary is an expression in the AST where we newly infer
+/// isolation different from our parent decl context.
+///
+/// Examples:
+///
+///   1. a @Sendable closure.
+///   2. a closure literal passed to a sending parameter.
+///
+/// NOTE: This does not mean that it has nonisolated isolation since for
+/// instance one could define an @MainActor closure in a nonisolated
+/// function. That @MainActor closure would act as an Isolation Inference
+/// Boundary.
+///
+/// \arg forActorIsolation we currently have two slightly varying semantics
+/// here. If this is set, then we assuming that we are being called recursively
+/// while walking up a decl context path to determine the actor isolation of a
+/// closure. In such a case, we do not want to be a boundary if we should
+/// inheritActorContext. In other contexts though, we want to determine if the
+/// closure is part of an init or deinit. In such a case, we are walking up the
+/// decl context chain and we want to stop if we see a sending parameter since
+/// in such a case, the sending closure parameter is known to not be part of the
+/// init or deinit.
+static bool
+isIsolationInferenceBoundaryClosure(const AbstractClosureExpr *closure,
+                                    bool forActorIsolation) {
+  if (auto *ce = dyn_cast<ClosureExpr>(closure)) {
+    if (!forActorIsolation) {
+      // For example, one would along this path see if for flow sensitive
+      // isolation the closure is part of an init or deinit.
+      if (ce->isPassedToSendingParameter())
+        return true;
+    } else {
+      // This is for actor isolation. If we have inheritActorContext though, we
+      // do not want to do anything since we are part of our parent's isolation.
+      if (!ce->inheritsActorContext() && ce->isPassedToSendingParameter())
+        return true;
+    }
+  }
+
+  return isSendableClosure(closure, forActorIsolation);
+}
+
 /// Add Fix-It text for the given nominal type to adopt Sendable.
 static void addSendableFixIt(
     const NominalTypeDecl *nominal, InFlightDiagnostic &diag, bool unchecked) {
@@ -1625,12 +1668,40 @@ bool ReferencedActor::isKnownToBeLocal() const {
   }
 }
 
-static AbstractFunctionDecl const *
-isActorInitOrDeInitContext(const DeclContext *dc) {
-  return swift::isActorInitOrDeInitContext(
-      dc, [](const AbstractClosureExpr *closure) {
-        return isSendableClosure(closure, /*forActorIsolation=*/false);
-      });
+const AbstractFunctionDecl *
+swift::isActorInitOrDeInitContext(const DeclContext *dc) {
+  while (true) {
+    // Stop looking if we hit an isolation inference boundary.
+    if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      if (isIsolationInferenceBoundaryClosure(closure,
+                                              false /*is for actor isolation*/))
+        return nullptr;
+
+      // Otherwise, look through our closure at the closure's parent decl
+      // context.
+      dc = dc->getParent();
+      continue;
+    }
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+      // If this is an initializer or deinitializer of an actor, we're done.
+      if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
+          getSelfActorDecl(dc->getParent()))
+        return func;
+
+      // Non-Sendable local functions are considered part of the enclosing
+      // context.
+      if (func->getDeclContext()->isLocalContext()) {
+        if (func->isSendable())
+          return nullptr;
+
+        dc = dc->getParent();
+        continue;
+      }
+    }
+
+    return nullptr;
+  }
 }
 
 static bool isStoredProperty(ValueDecl const *member) {
@@ -4177,9 +4248,14 @@ namespace {
               .withPreconcurrency(preconcurrency);
       }
 
-      // Sendable closures are nonisolated unless the closure has
-      // specifically opted into inheriting actor isolation.
-      if (isSendableClosure(closure, /*forActorIsolation=*/true))
+      // If we have a closure that acts as an isolation inference boundary, then
+      // we return that it is non-isolated.
+      //
+      // NOTE: Since we already checked for global actor isolated things, we
+      // know that all Sendable closures must be nonisolated. That is why it is
+      // safe to rely on this path to handle Sendable closures.
+      if (isIsolationInferenceBoundaryClosure(
+              closure, true /*is for closure isolation*/))
         return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
 
@@ -6472,40 +6548,6 @@ bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
     [](const ClosureExpr *closure) {
       return closure->isIsolatedByPreconcurrency();
     });
-}
-
-AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
-    const DeclContext *dc,
-    llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable) {
-  while (true) {
-    // Non-Sendable closures are considered part of the enclosing context.
-    if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      if (isSendable(closure))
-        return nullptr;
-
-      dc = dc->getParent();
-      continue;
-    }
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-      // If this is an initializer or deinitializer of an actor, we're done.
-      if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
-          getSelfActorDecl(dc->getParent()))
-        return func;
-
-      // Non-Sendable local functions are considered part of the enclosing
-      // context.
-      if (func->getDeclContext()->isLocalContext()) {
-        if (func->isSendable())
-          return nullptr;
-
-        dc = dc->getParent();
-        continue;
-      }
-    }
-
-    return nullptr;
-  }
 }
 
 /// Find the directly-referenced parameter or capture of a parameter for

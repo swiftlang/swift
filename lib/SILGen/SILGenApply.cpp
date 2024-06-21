@@ -57,6 +57,23 @@ using namespace Lowering;
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
 
+FunctionTypeInfo SILGenFunction::getClosureTypeInfo(AbstractClosureExpr *expr) {
+  auto fnType = cast<AnyFunctionType>(expr->getType()->getCanonicalType());
+
+  // If we have a closure expr that has inherits actor context, work around AST
+  // issues that causes us to be able to get non-Sendable actor isolated
+  // closures.
+  if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
+    if (ce->inheritsActorContext() && fnType->isAsync() &&
+        !fnType->isSendable() && expr->getActorIsolation().isActorIsolated()) {
+      auto newExtInfo = fnType->getExtInfo().withSendable();
+      fnType = fnType.withExtInfo(newExtInfo);
+    }
+  }
+
+  return getFunctionTypeInfo(fnType);
+}
+
 FunctionTypeInfo SILGenFunction::getFunctionTypeInfo(CanAnyFunctionType fnType) {
   return { AbstractionPattern(fnType), fnType,
            cast<SILFunctionType>(getLoweredRValueType(fnType)) };
@@ -1292,8 +1309,7 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    SGF.SGM.emitClosure(e, SGF.getFunctionTypeInfo(closureType));
+    SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e));
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
