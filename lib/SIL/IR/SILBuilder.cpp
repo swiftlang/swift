@@ -103,6 +103,10 @@ SILType SILBuilder::getPartialApplyResultType(
   for (auto yield : FTI->getYields()) {
     needsSubstFunctionType |= yield.getInterfaceType()->hasTypeParameter();
   }
+  if (FTI->hasErrorResult()) {
+    needsSubstFunctionType
+      |= FTI->getErrorResult().getInterfaceType()->hasTypeParameter();
+  }
 
   SubstitutionMap appliedSubs;
   if (needsSubstFunctionType) {
