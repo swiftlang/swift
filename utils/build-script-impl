@@ -2919,75 +2919,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 esac
                 ;;
-            foundation)
-                # FIXME: Foundation doesn't build from the script on OS X
-                if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
-                    continue
-                fi
-
-                if [[ "${SKIP_TEST_FOUNDATION}" ]]; then
-                    continue
-                fi
-
-                if [[ "${SKIP_BUILD_XCTEST}" ]]; then
-                    continue
-                fi
-
-                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
-                    ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
-                    ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                    LIBICU_BUILD_ARGS=(
-                        -DICU_ROOT:PATH=${ICU_ROOT}
-                        -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
-                        -DICU_DATA_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
-                        -DICU_DATA_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
-                        -DICU_DATA_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
-                        -DICU_DATA_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
-                        -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
-                        -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
-                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
-                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
-                        -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
-                        -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
-                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
-                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
-                    )
-                else
-                    LIBICU_BUILD_ARGS=()
-                fi
-
-                # NOTE(compnerd) the time has come to enable tests now
-                cmake_options=(
-                  ${cmake_options[@]}
-                  -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
-                  -DCMAKE_C_COMPILER:PATH=${CLANG_BIN}/clang
-                  -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
-                  -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
-                  -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
-
-                  ${LIBICU_BUILD_ARGS[@]}
-
-                  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
-                  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
-                  -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
-
-                  -DENABLE_TESTING:BOOL=YES
-                  -DXCTest_DIR=$(build_directory ${host} xctest)/cmake/modules
-
-                  -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
-                  -DFOUNDATION_PATH_TO_XCTEST_BUILD:PATH=$(build_directory ${host} xctest)
-                )
-
-                [[ -z "${DISTCC}" ]] || EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
-                export CTEST_OUTPUT_ON_FAILURE=1
-                with_pushd "$(build_directory ${host} foundation)" \
-                    call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${FOUNDATION_SOURCE_DIR}"
-
-                results_targets=( "test" )
-                executable_target=("TestFoundation")
-                ;;
-            foundation_static)
+            foundation|foundation_static)
               continue
             ;;
             libdispatch)
