@@ -1059,7 +1059,7 @@ void swift::conformToCxxFunctionIfNeeded(
 
   auto funcPointerType = clangCtx.getPointerType(clangCtx.getFunctionType(
       operatorCallDecl->getReturnType(), operatorCallParamTypes,
-      clang::FunctionProtoType::ExtProtoInfo()));
+      clang::FunctionProtoType::ExtProtoInfo())).withConst();
 
   // Create a fake variable with a function type that matches the type of
   // `operator()`.
