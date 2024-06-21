@@ -105,6 +105,15 @@ enum class IfConfigElementsRole {
   Skipped
 };
 
+/// Describes the context in which the '#if' is being parsed.
+enum class IfConfigContext {
+  BraceItems,
+  DeclItems,
+  SwitchStmt,
+  PostfixExpr,
+  DeclAttrs
+};
+
 /// The main class used for parsing a source file (.swift or .sil).
 ///
 /// Rather than instantiating a Parser yourself, use one of the parsing APIs
@@ -993,8 +1002,9 @@ public:
   /// them however they wish. The parsing function will be provided with the
   /// location of the clause token (`#if`, `#else`, etc.), the condition,
   /// whether this is the active clause, and the role of the elements.
-  template<typename Result>
+  template <typename Result>
   Result parseIfConfigRaw(
+      IfConfigContext ifConfigContext,
       llvm::function_ref<void(SourceLoc clauseLoc, Expr *condition,
                               bool isActive, IfConfigElementsRole role)>
           parseElements,
@@ -1003,7 +1013,8 @@ public:
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
   ParserResult<IfConfigDecl> parseIfConfig(
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
+      IfConfigContext ifConfigContext,
+      llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
 
   /// Parse an #if ... #endif containing only attributes.
   ParserStatus parseIfConfigDeclAttributes(
