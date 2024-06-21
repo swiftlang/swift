@@ -4586,13 +4586,15 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
 static std::optional<ActorIsolation>
 getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
   std::optional<ActorIsolation> foundIsolation;
-  for (auto inherited : protocol->getInheritedProtocols()) {
-    switch (auto protoIsolation = getActorIsolation(inherited)) {
+  bool conflict = false;
+
+  auto inferIsolation = [&](ValueDecl *decl) {
+    switch (auto protoIsolation = getActorIsolation(decl)) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
-      break;
+      return;
 
     case ActorIsolation::Erased:
       llvm_unreachable("protocol cannot have erased isolation");
@@ -4600,15 +4602,26 @@ getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
     case ActorIsolation::GlobalActor:
       if (!foundIsolation) {
         foundIsolation = protoIsolation;
-        continue;
+        return;
       }
 
       if (*foundIsolation != protoIsolation)
-        return std::nullopt;
+        conflict = true;
 
-      break;
+      return;
     }
+  };
+
+  for (auto inherited : protocol->getInheritedProtocols()) {
+    inferIsolation(inherited);
   }
+
+  if (auto *superclass = protocol->getSuperclassDecl()) {
+    inferIsolation(superclass);
+  }
+
+  if (conflict)
+    return std::nullopt;
 
   return foundIsolation;
 }
