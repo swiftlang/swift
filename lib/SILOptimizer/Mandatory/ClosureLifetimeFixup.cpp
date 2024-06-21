@@ -735,6 +735,7 @@ static SILValue tryRewriteToPartialApplyStack(
   unsigned appliedArgStartIdx =
         newPA->getOrigCalleeType()->getNumParameters() - newPA->getNumArguments();
 
+  MarkDependenceInst *markDepChain = nullptr;
   for (unsigned i : indices(newPA->getArgumentOperands())) {
     auto &arg = newPA->getArgumentOperands()[i];
     SILValue copy = arg.get();
@@ -782,6 +783,20 @@ static SILValue tryRewriteToPartialApplyStack(
         continue;
       }
       if (auto mark = dyn_cast<MarkDependenceInst>(use->getUser())) {
+        // When we insert mark_dependence for non-trivial address operands, we
+        // emit a chain that looks like:
+        //    %md = mark_dependence %pai on %0
+        //    %md2 = mark_dependence %md on %1
+        // to tie all of those operands together on the same partial_apply.
+        //
+        // FIXME: Should we not be chaining like this and just emit independent
+        // mark_dependence?
+        if (markDepChain && mark->getValue() == markDepChain) {
+          markDep = mark;
+          markDepChain = mark;
+          continue;
+        }
+
         // If we're marking dependence of the current partial_apply on this
         // stack slot, that's fine.
         if (mark->getValue() != newPA
@@ -793,6 +808,11 @@ static SILValue tryRewriteToPartialApplyStack(
           break;
         }
         markDep = mark;
+
+        if (!markDepChain) {
+          markDepChain = mark;
+        }
+
         continue;
       }
       
