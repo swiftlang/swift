@@ -1,18 +1,28 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -module-name MyModule
 
-struct Value {
-  static let defaultValue = Value(a: Nested(b: 1))
+struct Nested {
+  var b: Int
 
-  struct Nested {
-    var b: Int
-
-    @discardableResult
-    mutating func setToZero() -> Int {
-      let prev = b
-      b = 0
-      return prev
-    }
+  @discardableResult
+  mutating func setToZero() -> Int {
+    let prev = b
+    b = 0
+    return prev
   }
+}
+
+protocol ValueProto {
+  static var defaultValue: Self { get }
+
+  var a: Nested { get set }
+
+  subscript(_ i: Int) -> Nested { get set }
+
+  @discardableResult mutating func setToZero() -> Int
+}
+
+struct StructValue: ValueProto {
+  static var defaultValue: Self { .init(a: Nested(b: 1)) }
 
   var a: Nested
 
@@ -29,22 +39,22 @@ struct Value {
   }
 }
 
-struct BaseStruct {
-  var available: Value = .defaultValue
+struct BaseStruct<T: ValueProto> {
+  var available: T = .defaultValue
 
-  var unavailableGetter: Value {
+  var unavailableGetter: T {
     @available(*, unavailable)
     get { fatalError() } // expected-note 28 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set {}
   }
 
-  var unavailableSetter: Value {
+  var unavailableSetter: T {
     get { .defaultValue }
     @available(*, unavailable)
     set { fatalError() } // expected-note 21 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
-  var unavailableGetterAndSetter: Value {
+  var unavailableGetterAndSetter: T {
     @available(*, unavailable)
     get { fatalError() } // expected-note 28 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
@@ -56,10 +66,8 @@ func takesIntInOut(_ i: inout Int) -> Int {
   return 0
 }
 
-let someValue = Value.defaultValue
-
 func testRValueLoads() {
-  var x = BaseStruct() // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  var x = BaseStruct<StructValue>() // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
 
   _ = x.available
   _ = x.available.a
@@ -82,8 +90,8 @@ func testRValueLoads() {
   _ = x.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testLValueAssignments() {
-  var x = BaseStruct()
+func testLValueAssignments(_ someValue: StructValue) {
+  var x = BaseStruct<StructValue>()
 
   x.available = someValue
   x.available.a = someValue.a
@@ -108,7 +116,7 @@ func testLValueAssignments() {
 
 func testKeyPathLoads() {
   let a = [0]
-  var x = BaseStruct()
+  var x = BaseStruct<StructValue>()
 
   _ = x[keyPath: \.available]
   _ = x[keyPath: \.available.a]
@@ -139,9 +147,9 @@ func testKeyPathLoads() {
   _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testKeyPathAssignments() {
+func testKeyPathAssignments(_ someValue: StructValue) {
   var a = [0]
-  var x = BaseStruct()
+  var x = BaseStruct<StructValue>()
 
   x[keyPath: \.available] = someValue
   x[keyPath: \.available.a] = someValue.a
@@ -174,7 +182,7 @@ func testKeyPathAssignments() {
 }
 
 func testMutatingMember() {
-  var x = BaseStruct()
+  var x = BaseStruct<StructValue>()
   let a = [0]
 
   x.available.setToZero()
@@ -205,7 +213,7 @@ func testMutatingMember() {
 func testPassAsInOutParameter() {
   func takesInOut<T>(_ t: inout T) {}
 
-  var x = BaseStruct()
+  var x = BaseStruct<StructValue>()
 
   takesInOut(&x.available)
   takesInOut(&x.available.a)
@@ -228,7 +236,7 @@ func testPassAsInOutParameter() {
   takesInOut(&x.unavailableGetterAndSetter[0].b) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-var global = BaseStruct()
+var global = BaseStruct<StructValue>()
 
 struct TestPatternBindingInitExprs {
   var available = global.available
