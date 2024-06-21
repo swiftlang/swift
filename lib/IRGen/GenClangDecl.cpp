@@ -284,6 +284,12 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // class because they might be emitted in the vtable even if not used
     // directly from Swift.
     if (auto *record = dyn_cast<clang::CXXRecordDecl>(next->getDeclContext())) {
+      if (auto *destructor = record->getDestructor()) {
+        // Ensure virtual destructors have the body defined, even if they're
+        // not used directly, as they might be referenced by the emitted vtable.
+        if (destructor->isVirtual())
+          ensureImplicitCXXDestructorBodyIsDefined(destructor);
+      }
       for (auto *method : record->methods()) {
         if (method->isVirtual()) {
           callback(method);
@@ -332,4 +338,16 @@ void IRGenModule::finalizeClangCodeGen() {
 
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
+}
+
+void IRGenModule::ensureImplicitCXXDestructorBodyIsDefined(
+    clang::CXXDestructorDecl *destructor) {
+  if (!destructor->isUserProvided() &&
+      !destructor->doesThisDeclarationHaveABody()) {
+    assert(!destructor->isDeleted() &&
+           "Swift cannot handle a type with no known destructor.");
+    // Make sure we define the destructor so we have something to call.
+    auto &sema = Context.getClangModuleLoader()->getClangSema();
+    sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
+  }
 }
