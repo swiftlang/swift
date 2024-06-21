@@ -21,5 +21,6 @@ void cfuncARCStrong(void (*_Nonnull)(ARCStrong));
 #endif
 
 void cfuncReturnNonTrivial(NonTrivial (^_Nonnull)()) noexcept;
+void cfuncReturnNonTrivial2(NonTrivial (*_Nonnull)()) noexcept;
 
 #endif // __CLOSURE__
