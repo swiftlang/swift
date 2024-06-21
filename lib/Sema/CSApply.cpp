@@ -5965,23 +5965,24 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
                                         bool inheritActorContext,
-                                        bool isSendingParameter) {
+                                        bool isPassedToSendingParameter) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
-    closure->setSendingParameter(isSendingParameter);
+    closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(captureList->getClosureBody(),
                                 implicitSelfCapture, inheritActorContext,
-                                isSendingParameter);
+                                isPassedToSendingParameter);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
-                                inheritActorContext, isSendingParameter);
+                                inheritActorContext,
+                                isPassedToSendingParameter);
   }
 }
 
@@ -6209,10 +6210,12 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // implicit self capture or inheriting actor context.
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isSendingParameter = paramInfo.isSendingParameter(paramIdx);
+    bool isPassedToSendingParameter =
+        paramInfo.isPassedToSendingParameter(paramIdx);
 
     applyContextualClosureFlags(argExpr, isImplicitSelfCapture,
-                                inheritsActorContext, isSendingParameter);
+                                inheritsActorContext,
+                                isPassedToSendingParameter);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();

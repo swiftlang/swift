@@ -4188,7 +4188,7 @@ namespace {
       // the context.
       if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (!explicitClosure->inheritsActorContext() &&
-            explicitClosure->isSendingParameter())
+            explicitClosure->isPassedToSendingParameter())
           return ActorIsolation::forNonisolated(/*unsafe=*/false)
               .withPreconcurrency(preconcurrency);
       }

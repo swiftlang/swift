@@ -283,8 +283,8 @@ protected:
     /// \c \@preconcurrency declaration.
     IsolatedByPreconcurrency : 1,
 
-    /// True if this is a closure literal that is passed as a sending parameter.
-    IsSendingParameter : 1
+    /// True if this is a closure literal that is passed to a sending parameter.
+    IsPassedToSendingParameter : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -4142,7 +4142,7 @@ public:
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
     Bits.ClosureExpr.ImplicitSelfCapture = false;
     Bits.ClosureExpr.InheritActorContext = false;
-    Bits.ClosureExpr.IsSendingParameter = false;
+    Bits.ClosureExpr.IsPassedToSendingParameter = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4198,14 +4198,14 @@ public:
     Bits.ClosureExpr.IsolatedByPreconcurrency = value;
   }
 
-  /// Whether the closure is a closure literal that is passed as a sending
+  /// Whether the closure is a closure literal that is passed to a sending
   /// parameter.
-  bool isSendingParameter() const {
-    return Bits.ClosureExpr.IsSendingParameter;
+  bool isPassedToSendingParameter() const {
+    return Bits.ClosureExpr.IsPassedToSendingParameter;
   }
 
-  void setSendingParameter(bool value = true) {
-    Bits.ClosureExpr.IsSendingParameter = value;
+  void setIsPassedToSendingParameter(bool value = true) {
+    Bits.ClosureExpr.IsPassedToSendingParameter = value;
   }
 
   /// Determine whether this closure expression has an
