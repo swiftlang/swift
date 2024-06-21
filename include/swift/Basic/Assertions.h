@@ -43,7 +43,7 @@
 
 #define ASSERT(expr) \
   do { \
-    if (ASSERT_UNLIKELY(!expr)) {			   \
+    if (ASSERT_UNLIKELY(!(expr))) {			   \
       ASSERT_failure(#expr, __FILE_NAME__, __LINE__, __func__); \
     } \
   } while (0)
