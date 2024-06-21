@@ -269,7 +269,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -316,7 +316,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -362,7 +362,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_alwaysEmitIntoClient
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+    operation: sending @escaping () async -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -390,7 +390,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+    operation: sending @escaping () async -> ChildTaskResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -428,7 +428,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -440,7 +440,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_alwaysEmitIntoClient
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
@@ -469,7 +469,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+    operation: sending @escaping () async -> ChildTaskResult
   ) -> Bool {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -483,7 +483,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_alwaysEmitIntoClient
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -814,7 +814,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
@@ -856,7 +856,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -894,7 +894,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -908,7 +908,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func addTask(
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
@@ -928,7 +928,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) -> Bool {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -944,7 +944,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)

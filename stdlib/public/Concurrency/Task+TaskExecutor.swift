@@ -223,7 +223,7 @@ extension Task where Failure == Never {
   public init(
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
@@ -283,7 +283,7 @@ extension Task where Failure == Error {
   public init(
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
@@ -342,7 +342,7 @@ extension Task where Failure == Never {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
@@ -401,7 +401,7 @@ extension Task where Failure == Error {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
