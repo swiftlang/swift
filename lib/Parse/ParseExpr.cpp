@@ -1479,8 +1479,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       }
 
       llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
-      auto ICD =
-          parseIfConfig([&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
+      auto ICD = parseIfConfig(
+          IfConfigContext::PostfixExpr,
+          [&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
             // Although we know the '#if' body starts with period,
             // '#elseif'/'#else' bodies might start with invalid tokens.
             if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
@@ -1491,13 +1492,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
               if (exprHasBindOptional)
                 exprsWithBindOptional.insert(expr.get());
               elements.push_back(expr.get());
-            }
-
-            // Don't allow any character other than the postfix expression.
-            if (!Tok.isAny(tok::pound_elseif, tok::pound_else, tok::pound_endif,
-                           tok::eof)) {
-              diagnose(Tok, diag::expr_postfix_ifconfig_unexpectedtoken);
-              skipUntilConditionalBlockClose();
             }
           });
       if (ICD.isNull())
