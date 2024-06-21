@@ -372,6 +372,27 @@ ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
   param->setSpecifier(s.specifier);
   return param;
 }
+
+template <class S>
+struct SendingParamSynthesizer {
+  S sub;
+};
+
+template <class S>
+constexpr SendingParamSynthesizer<S> _sending(S sub) {
+  return {sub};
+}
+
+template <class S>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const SendingParamSynthesizer<S> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
+  if (SC.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults))
+    param->setSending();
+  return param;
+}
+
 template <class S>
 FunctionType::Param synthesizeParamType(SynthesisContext &SC,
                                         const SpecifiedParamSynthesizer<S> &s) {

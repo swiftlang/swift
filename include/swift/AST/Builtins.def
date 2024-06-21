@@ -975,7 +975,7 @@ BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBo
 ///               initialSerialExecutor: (Builtin.Executor)? = nil,
 ///               taskGroup: Builtin.RawPointer? = nil,
 ///               initialTaskExecutor: (Builtin.Executor)? = nil,
-///               operation: @escaping () async throws -> T)
+///               operation: sending @escaping () async throws -> T)
 ///  -> Builtin.NativeObject, Builtin.RawPointer)
 ///
 /// Create a new task.
@@ -985,7 +985,7 @@ BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
 ///                      initialSerialExecutor: (Builtin.Executor)? = nil,
 ///                      taskGroup: Builtin.RawPointer? = nil,
 ///                      initialTaskExecutor: (Builtin.Executor)? = nil,
-///                      operation: @escaping () async throws -> ())
+///                      operation: sending @escaping () async throws -> ())
 ///  -> (Builtin.NativeObject, Builtin.RawPointer)
 ///
 /// Create a new discarding task.
@@ -993,7 +993,7 @@ BUILTIN_SIL_OPERATION(CreateDiscardingTask, "createDiscardingTask", Special)
 
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
-///     @escaping () async throws -> T  // function
+///     sending @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Legacy spelling of:
@@ -1004,7 +1004,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 /// createAsyncTaskInGroup(): (
 ///     Int,                            // flags
 ///     Builtin.RawPointer,             // group
-///     @escaping () async throws -> T  // function
+///     sending @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Legacy spelling of:
@@ -1015,7 +1015,7 @@ BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroup,
 /// createAsyncDiscardingTaskInGroup(): (
 ///     Int,                               // flags
 ///     Builtin.RawPointer,                // group
-///     @escaping () async throws -> Void  // function
+///     sending @escaping () async throws -> Void  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Legacy spelling of:
@@ -1026,7 +1026,7 @@ BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroup,
 /// createAsyncTaskWithExecutor(): (
 ///     Int,                            // flags
 ///     Builtin.Executor,               // executor
-///     @escaping () async throws -> T  // function
+///     sending @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Legacy spelling of:
@@ -1038,7 +1038,7 @@ BUILTIN_SIL_OPERATION(CreateAsyncTaskWithExecutor,
 ///     Int,                            // flags
 ///     Builtin.RawPointer,             // group
 ///     Builtin.Executor,               // executor
-///     @escaping () async throws -> T  // function
+///     sending @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Legacy spelling of:
@@ -1050,7 +1050,7 @@ BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroupWithExecutor,
 ///     Int,                               // flags
 ///     Builtin.RawPointer,                // group
 ///     Builtin.Executor,                  // executor
-///     @escaping () async throws -> Void  // function
+///     sending @escaping () async throws -> Void  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Legacy spelling of:
