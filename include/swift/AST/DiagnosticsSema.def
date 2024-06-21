@@ -5302,14 +5302,22 @@ ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
+#define EFFECTS_CONTEXT_KIND \
+  "%select{<<ERROR>>|" \
+  "a default argument|" \
+  "a property wrapper initializer|" \
+  "a property initializer|" \
+  "a global variable initializer|" \
+  "a lazy variable initializer|" \
+  "an enum case raw value|" \
+  "a catch pattern|" \
+  "a catch guard expression|" \
+  "a defer body}" \
+
 ERROR(throwing_op_in_illegal_context,none,
-      "%1 can throw, but errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned, StringRef))
+      "%1 can throw, but errors cannot be thrown out of " EFFECTS_CONTEXT_KIND "0", (unsigned, StringRef))
 ERROR(throw_in_illegal_context,none,
-      "errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
+      "errors cannot be thrown out of " EFFECTS_CONTEXT_KIND "0", (unsigned))
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
@@ -5404,17 +5412,6 @@ ERROR(async_let_no_variables,none,
       "'async let' requires at least one named variable", ())
 NOTE(async_let_without_await,none,
       "reference to async let %0 is 'async'", (const ValueDecl *))
-
-#define EFFECTS_CONTEXT_KIND \
-  "%select{<<ERROR>>|" \
-  "a default argument|" \
-  "a property wrapper initializer|" \
-  "a property initializer|" \
-  "a global variable initializer|" \
-  "an enum case raw value|" \
-  "a catch pattern|" \
-  "a catch guard expression|" \
-  "a defer body}" \
 
 ERROR(async_call_in_illegal_context,none,
       "'async' call cannot occur in " EFFECTS_CONTEXT_KIND "0",
