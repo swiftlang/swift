@@ -1323,6 +1323,7 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+        CMAKE_Swift_FLAGS = @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
