@@ -5131,7 +5131,11 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // isolated to a global actor.
   auto checkGlobalIsolation = [var = dyn_cast<VarDecl>(value)](
                                   ActorIsolation isolation) {
-    if (var && var->getLoc() &&
+    // Diagnose only declarations in the same module.
+    //
+    // TODO: This should be factored out from ActorIsolationRequest into
+    // either ActorIsolationChecker or DeclChecker.
+    if (var && var->getLoc(/*SerializedOK*/false) &&
         var->getASTContext().LangOpts.hasFeature(Feature::GlobalConcurrency) &&
         !isolation.isGlobalActor() &&
         (isolation != ActorIsolation::NonisolatedUnsafe)) {
