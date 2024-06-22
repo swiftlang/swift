@@ -373,7 +373,7 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
     TopLevelScope = It->second;
   else {
     // Recursively create one inlined function + scope per layer of generated
-    // sources.  Chains of Macro expansions are representad as flat
+    // sources.  Chains of Macro expansions are represented as flat
     // function-level scopes.
     SILGenFunctionBuilder B(SGM);
     auto &ASTContext = SGM.M.getASTContext();
