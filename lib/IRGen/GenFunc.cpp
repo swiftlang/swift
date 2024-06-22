@@ -1167,8 +1167,19 @@ public:
     llvm::Value *errorResultPtr = origParams.claimNext();
     args.add(errorResultPtr);
     if (origConv.isTypedError()) {
-      auto *typedErrorResultPtr = origParams.claimNext();
-      args.add(typedErrorResultPtr);
+      auto errorType =
+        origConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+      auto silResultTy =
+        origConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto &errorTI = IGM.getTypeInfo(errorType);
+      auto &resultTI = IGM.getTypeInfo(silResultTy);
+      auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
+      auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
+
+      if (resultSchema.requiresIndirect() || errorSchema.shouldReturnTypedErrorIndirectly() || outConv.hasIndirectSILErrorResults()) {
+        auto *typedErrorResultPtr = origParams.claimNext();
+        args.add(typedErrorResultPtr);
+      }
     }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
