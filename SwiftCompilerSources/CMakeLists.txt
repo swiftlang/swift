@@ -141,6 +141,13 @@ function(add_swift_compiler_modules_library name)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
   set(sdk_option ${sdk_option} "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
 
+  # The STL in VS 17.10 requires Clang 17 or higher, but bootstrapping generally uses toolchains with older versions
+  # versions of Clang. Swift 6 toolchains are the first to include Clang 17, so if we are on Windows and using an
+  # earlier toolchain, we need to relax to relax this requirement with ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0)
+    list(APPEND swift_compile_options "-Xcc" "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
+  endif()
+
   set(all_obj_files)
   set(all_module_targets)
   get_property(modules GLOBAL PROPERTY "swift_compiler_modules")
