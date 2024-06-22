@@ -65,7 +65,7 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
     return false;
   }
 
-  assert(EndOffset == other.EndOffset && "Bad whiskering?");
+  ASSERT(EndOffset == other.EndOffset && "Bad whiskering?");
   return true;
 }
 

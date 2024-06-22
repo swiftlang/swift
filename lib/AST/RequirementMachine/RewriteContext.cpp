@@ -359,7 +359,7 @@ void RewriteContext::installRequirementMachine(
 void RewriteContext::getProtocolComponentRec(
     const ProtocolDecl *proto,
     SmallVectorImpl<const ProtocolDecl *> &stack) {
-  assert(Protos.count(proto) == 0);
+  ASSERT(Protos.count(proto) == 0);
 
   // Initialize the next component index and push the entry
   // on the stack
@@ -375,7 +375,7 @@ void RewriteContext::getProtocolComponentRec(
 
   // Look at each successor.
   auto found = Dependencies.find(proto);
-  assert(found != Dependencies.end());
+  ASSERT(found != Dependencies.end());
 
   for (auto *depProto : found->second) {
     auto found = Protos.find(depProto);
@@ -384,7 +384,7 @@ void RewriteContext::getProtocolComponentRec(
       getProtocolComponentRec(depProto, stack);
 
       auto &entry = Protos[proto];
-      assert(Protos.count(depProto) != 0);
+      ASSERT(Protos.count(depProto) != 0);
       entry.LowLink = std::min(entry.LowLink, Protos[depProto].LowLink);
     } else if (found->second.OnStack) {
       // Successor is on the stack and hence in the current SCC.
@@ -405,7 +405,7 @@ void RewriteContext::getProtocolComponentRec(
       depProto = stack.back();
       stack.pop_back();
 
-      assert(Protos.count(depProto) != 0);
+      ASSERT(Protos.count(depProto) != 0);
       Protos[depProto].OnStack = false;
       Protos[depProto].ComponentID = id;
 
@@ -472,19 +472,19 @@ RewriteContext::getProtocolComponentImpl(const ProtocolDecl *proto) {
 
     SmallVector<const ProtocolDecl *, 3> stack;
     getProtocolComponentRec(proto, stack);
-    assert(stack.empty());
+    ASSERT(stack.empty());
 
     found = Protos.find(proto);
-    assert(found != Protos.end());
+    ASSERT(found != Protos.end());
 
     ProtectProtocolComponentRec = false;
   }
 
-  assert(Components.count(found->second.ComponentID) != 0);
+  CONDITIONAL_ASSERT(Components.count(found->second.ComponentID) != 0);
   auto &component = Components[found->second.ComponentID];
 
-  assert(std::find(component.Protos.begin(), component.Protos.end(), proto)
-         != component.Protos.end() && "Protocol is in the wrong SCC");
+  CONDITIONAL_ASSERT(std::find(component.Protos.begin(), component.Protos.end(), proto)
+                     != component.Protos.end() && "Protocol is in the wrong SCC");
   return component;
 }
 
@@ -517,7 +517,7 @@ void RewriteContext::finishComputingRequirementSignatures(
     const ProtocolDecl *proto) {
   auto &component = getProtocolComponentImpl(proto);
 
-  assert(component.ComputingRequirementSignatures &&
+  ASSERT(component.ComputingRequirementSignatures &&
          "Didn't call startComputingRequirementSignatures()");
   component.ComputedRequirementSignatures = true;
 }
