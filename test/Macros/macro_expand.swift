@@ -24,6 +24,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
 // Debug info IR testing
+// RUN: %target-swift-frontend -swift-version 5 -dwarf-version=4 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR-DWARF4 %s
 // RUN: %target-swift-frontend -swift-version 5 -dwarf-version=5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
@@ -71,7 +72,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX69_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX70_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }
@@ -163,9 +164,10 @@ func testFileID(a: Int, b: Int) {
   // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
   print("Builtin result is \(#fileID)")
   print(
-    // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+3]], column: 5
+    // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+4]], column: 5
     // CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
     // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}// original-source-range: {{.*}}")
+    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: ""\))}}
     #addBlocker(
       #stringify(a - b)
       )
