@@ -41,12 +41,26 @@
 // that are more expensive than you think.  You can switch those to
 // `CONDITIONAL_ASSERT` or `DEBUG_ASSERT` as needed.
 
+// Visual Studio doesn't have __FILE_NAME__
+#ifdef __FILE_NAME__
+
 #define ASSERT(expr) \
   do { \
-    if (ASSERT_UNLIKELY(!expr)) {			   \
+    if (ASSERT_UNLIKELY(!(expr))) {			   \
       ASSERT_failure(#expr, __FILE_NAME__, __LINE__, __func__); \
     } \
   } while (0)
+
+#else
+
+#define ASSERT(expr) \
+  do { \
+    if (ASSERT_UNLIKELY(!(expr))) {			   \
+      ASSERT_failure(#expr, __FILE__, __LINE__, __func__); \
+    } \
+  } while (0)
+
+#endif
 
 // Function that reports the actual failure when it occurs.
 void ASSERT_failure(const char *expr, const char *file, int line, const char *func);

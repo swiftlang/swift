@@ -199,7 +199,7 @@ static void desugarSameTypeRequirement(
     }
 
     void popPosition(Position pos) {
-      assert(stack.back() == pos);
+      ASSERT(stack.back() == pos);
       stack.pop_back();
     }
 
@@ -879,7 +879,7 @@ void swift::rewriting::realizeInheritedRequirements(
 ArrayRef<StructuralRequirement>
 StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *proto) const {
-  assert(!proto->hasLazyRequirementSignature());
+  ASSERT(!proto->hasLazyRequirementSignature());
 
   SmallVector<StructuralRequirement, 2> result;
   SmallVector<RequirementError, 2> errors;
@@ -1035,7 +1035,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   if (proto->isObjC())
     return ArrayRef<Requirement>();
 
-  assert(!proto->hasLazyRequirementSignature());
+  ASSERT(!proto->hasLazyRequirementSignature());
 
   SmallVector<Requirement, 2> result;
   SmallVector<RequirementError, 2> errors;
@@ -1088,8 +1088,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
     auto firstType = getStructuralType(first);
     auto secondType = getStructuralType(second);
-    assert(!firstType->is<UnboundGenericType>());
-    assert(!secondType->is<UnboundGenericType>());
+    ASSERT(!firstType->is<UnboundGenericType>());
+    ASSERT(!secondType->is<UnboundGenericType>());
 
     desugarRequirement(Requirement(RequirementKind::SameType, firstType, secondType),
                        SourceLoc(), result, ignoredInverses, errors);
