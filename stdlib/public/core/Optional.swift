@@ -437,6 +437,7 @@ extension Optional: CustomDebugStringConvertible {
       #if !$Embedded
       debugPrint(value, terminator: "", to: &result)
       #else
+      _ = value
       "(cannot print value in embedded Swift)".write(to: &result)
       #endif
       result += ")"
