@@ -691,20 +691,21 @@ public:
         // Sort top level functions with the same C++ name by their location to
         // have stable sorting that depends on users source but not on the
         // compiler invocation.
+        // FIXME: This is pretty suspect; PrintAsClang sometimes operates on
+        //        serialized modules which don't have SourceLocs, so this sort
+        //        rule may be applied in some steps of a build but not others.
         if ((*rhs)->getLoc().isValid() && (*lhs)->getLoc().isValid()) {
-          std::string rhsLoc, lhsLoc;
-          auto getLocText = [](const AbstractFunctionDecl *afd) {
+          auto getLocText = [](const Decl *afd) {
             std::string res;
             llvm::raw_string_ostream os(res);
             afd->getLoc().print(os, afd->getASTContext().SourceMgr);
             return std::move(os.str());
           };
-          if (getLocText(cast<AbstractFunctionDecl>(*lhs)) <
-              getLocText(cast<AbstractFunctionDecl>(*rhs)))
-            return Descending;
-          return Ascending;
+
+          result = getLocText(*rhs).compare(getLocText(*lhs));
+          if (result != 0)
+            return result;
         }
-        return result;
       }
 
       // A function and a global variable can have the same name in C++,
@@ -716,11 +717,34 @@ public:
         return Ascending;
 
       // Prefer value decls to extensions.
-      assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));
       if (isa<ValueDecl>(*lhs) && !isa<ValueDecl>(*rhs))
         return Descending;
       if (!isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs))
         return Ascending;
+
+      // Last-ditch ValueDecl tiebreaker: Compare mangled names. This captures
+      // *tons* of context and detail missed by the previous checks, but the
+      // resulting sort makes little sense to humans.
+      // FIXME: It'd be nice to share the mangler or even memoize mangled names,
+      //        but we'd have to stop using `llvm::array_pod_sort()` so that we
+      //        could capture some outside state.
+      Mangle::ASTMangler mangler;
+      auto getMangledName = [&](const Decl *D) {
+        auto VD = dyn_cast<ValueDecl>(D);
+        if (!VD && isa<ExtensionDecl>(D))
+          VD = cast<ExtensionDecl>(D)->getExtendedNominal();
+        if (!VD)
+          return std::string();
+        return mangler.mangleAnyDecl(VD, /*prefix=*/true,
+                                     /*respectOriginallyDefinedIn=*/true);
+      };
+      result = getMangledName(*rhs).compare(getMangledName(*lhs));
+      if (result != 0)
+        return result;
+
+      // Mangled names ought to distinguish all value decls, leaving only
+      // extensions of the same nominal type beyond this point.
+      assert(isa<ExtensionDecl>(*lhs) && isa<ExtensionDecl>(*rhs));
 
       // Break ties in extensions by putting smaller extensions last (in reverse
       // order).
@@ -742,16 +766,48 @@ public:
 
       // If that fails, arbitrarily pick the extension whose protocols are
       // alphabetically first.
-      auto mismatch =
-        std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
-                      [] (const ProtocolDecl *nextLHSProto,
-                          const ProtocolDecl *nextRHSProto) {
-        return nextLHSProto->getName() != nextRHSProto->getName();
-      });
-      if (mismatch.first == lhsProtos.end())
-        return Equivalent;
-      StringRef lhsProtoName = (*mismatch.first)->getName().str();
-      return lhsProtoName.compare((*mismatch.second)->getName().str());
+      {
+        auto mismatch =
+          std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
+                        [] (const ProtocolDecl *nextLHSProto,
+                            const ProtocolDecl *nextRHSProto) {
+          return nextLHSProto->getName() != nextRHSProto->getName();
+        });
+        if (mismatch.first != lhsProtos.end()) {
+          StringRef lhsProtoName = (*mismatch.first)->getName().str();
+          return lhsProtoName.compare((*mismatch.second)->getName().str());
+        }
+      }
+
+      // Still nothing? Fine, we'll pick the one with the alphabetically first
+      // member instead.
+      {
+        auto mismatch =
+          std::mismatch(cast<ExtensionDecl>(*lhs)->getMembers().begin(),
+                        cast<ExtensionDecl>(*lhs)->getMembers().end(),
+                        cast<ExtensionDecl>(*rhs)->getMembers().begin(),
+                        [] (const Decl *nextLHSDecl, const Decl *nextRHSDecl) {
+          if (isa<ValueDecl>(nextLHSDecl) && isa<ValueDecl>(nextRHSDecl)) {
+            return cast<ValueDecl>(nextLHSDecl)->getName() !=
+                     cast<ValueDecl>(nextRHSDecl)->getName();
+          }
+          return isa<ValueDecl>(nextLHSDecl) != isa<ValueDecl>(nextRHSDecl);
+        });
+        if (mismatch.first != cast<ExtensionDecl>(*lhs)->getMembers().end()) {
+          auto *lhsMember = dyn_cast<ValueDecl>(*mismatch.first),
+               *rhsMember = dyn_cast<ValueDecl>(*mismatch.second);
+          if (!rhsMember && lhsMember)
+            return Descending;
+          if (lhsMember && !rhsMember)
+            return Ascending;
+          if (lhsMember && rhsMember)
+            return rhsMember->getName().compare(lhsMember->getName());
+        }
+      }
+
+      // Hopefully two extensions with identical conformances and member names
+      // will be interchangeable enough not to matter.
+      return Equivalent;
     });
 
     assert(declsToWrite.empty());
