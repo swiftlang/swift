@@ -184,7 +184,7 @@ std::optional<Identifier> Rule::isProtocolTypeAliasRule() const {
     }
   } else {
     // This is the case where the underlying type is concrete.
-    assert(LHS.size() == 3);
+    ASSERT(LHS.size() == 3);
 
     auto prop = isPropertyRule();
     if (!prop || prop->getKind() != Symbol::Kind::ConcreteType)
