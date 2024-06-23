@@ -576,10 +576,9 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
 }
 
 /// Determine whether to escape the given keyword in the given context.
-bool swift::escapeKeywordInContext(
-    StringRef keyword,
-    PrintNameContext context
-) {
+bool swift::escapeIdentifierInContext(Identifier name,
+                                      PrintNameContext context) {
+  StringRef keyword = name.str();
   bool isKeyword = llvm::StringSwitch<bool>(keyword)
 #define KEYWORD(KW) \
       .Case(#KW, true)
@@ -589,7 +588,7 @@ bool swift::escapeKeywordInContext(
   switch (context) {
   case PrintNameContext::Normal:
   case PrintNameContext::Attribute:
-    return isKeyword;
+    return isKeyword || name.mustAlwaysBeEscaped();
   case PrintNameContext::Keyword:
   case PrintNameContext::IntroducerKeyword:
     return false;
@@ -599,12 +598,12 @@ bool swift::escapeKeywordInContext(
     return isKeyword && keyword != "Self";
 
   case PrintNameContext::TypeMember:
-    return isKeyword || !canBeMemberName(keyword);
+    return isKeyword || !canBeMemberName(keyword) || name.mustAlwaysBeEscaped();
 
   case PrintNameContext::FunctionParameterExternal:
   case PrintNameContext::FunctionParameterLocal:
   case PrintNameContext::TupleElement:
-    return !canBeArgumentLabel(keyword);
+    return !canBeArgumentLabel(keyword) || name.mustAlwaysBeEscaped();
   }
 
   llvm_unreachable("Unhandled PrintNameContext in switch.");
@@ -619,12 +618,12 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
     return;
   }
 
-  bool shouldEscapeKeyword = escapeKeywordInContext(Name.str(), Context);
+  bool shouldEscapeIdentifier = escapeIdentifierInContext(Name, Context);
 
-  if (shouldEscapeKeyword)
+  if (shouldEscapeIdentifier)
     *this << "`";
   *this << Name.str();
-  if (shouldEscapeKeyword)
+  if (shouldEscapeIdentifier)
     *this << "`";
 
   printNamePost(Context);
