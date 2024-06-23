@@ -483,3 +483,9 @@ $s4mainAAyyycAA1CCFTTH ---> hop to main actor thunk of main.main(main.C) -> () -
 
 $s4main6VectorVy$1_SiG ---> main.Vector<2, Swift.Int>
 $s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
+
+_$s4test3fooyyF ---> test.foo() -> ()
+_$s4test0014foospace_ntJBbyyF ---> test.foo space() -> ()
+_$s4test0012_3times_bpJCayyF ---> test.3 times() -> ()
+_$s4test0011test_DkJtFbyyF ---> test.test +() -> ()
+_$s4test0016pathfoo_yuEHaaCiyyF ---> test

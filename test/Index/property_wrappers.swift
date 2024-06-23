@@ -66,6 +66,10 @@ public struct HasWrappers {
   public var z: Int
   // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
 
+  @Wrapper
+  public var `escaped identifier`: Int = globalInt
+  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | escaped identifier | [[escaped_identifier_USR:.*]] | Def,RelChild | rel: 1
+
   func backingUse() {
     _ = _y.wrappedValue + _z.wrappedValue + x + _x.wrappedValue + $y.item
     // CHECK: [[@LINE-1]]:10 | instance-property/Swift | y | [[y_USR]] | Ref,Read,RelCont | rel: 1
@@ -74,6 +78,10 @@ public struct HasWrappers {
     // CHECK: [[@LINE-4]]:45 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
     // CHECK: [[@LINE-5]]:50 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
     // CHECK: [[@LINE-6]]:68 | instance-property/Swift | y | [[y_USR]] | Ref,Read,RelCont | rel: 1
+    _ = `_escaped identifier`.wrappedValue + `$escaped identifier`.item
+    // CHECK: [[@LINE-1]]:11 | instance-property/Swift | escaped identifier | [[escaped_identifier_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-2]]:31 | instance-property/Swift | wrappedValue | [[wrappedValue_USR:.*]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-3]]:48 | instance-property/Swift | escaped identifier | [[escaped_identifier_USR]] | Ref,Read,RelCont | rel: 1
   }
 }
 
