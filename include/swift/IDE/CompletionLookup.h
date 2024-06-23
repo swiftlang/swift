@@ -340,6 +340,8 @@ public:
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
 
+  void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
+
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T,

@@ -581,6 +581,31 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
   return true;
 }
 
+static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
+  // An escaped identifier is terminated by a backtick, and the backslash is
+  // reserved for possible future escaping.
+  if (c == '`' || c == '\\')
+    return false;
+
+  // This is the set of code points satisfying the `White_Space` property,
+  // excluding the set satisfying the `Pattern_White_Space` property, and
+  // excluding any other ASCII non-printables and Unicode separators. In
+  // other words, the only whitespace code points allowed in a raw
+  // identifier are U+0020, and U+200E/200F (LTR/RTL marks).
+  if ((c >= 0x0009 && c <= 0x000D) ||
+      c == 0x0085 ||
+      c == 0x00A0 ||
+      c == 0x1680 ||
+      (c >= 0x2000 && c <= 0x200A) ||
+      (c >= 0x2028 && c <= 0x2029) ||
+      c == 0x202F ||
+      c == 0x205F ||
+      c == 0x3000)
+    return false;
+
+  return true;
+}
+
 static bool advanceIf(char const *&ptr, char const *end,
                       bool (*predicate)(uint32_t)) {
   char const *next = ptr;
@@ -605,6 +630,10 @@ static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
   return advanceIf(ptr, end, isValidIdentifierContinuationCodePoint);
 }
 
+static bool advanceIfValidEscapedIdentifier(char const *&ptr, char const *end) {
+  return advanceIf(ptr, end, isValidIdentifierEscapedCodePoint);
+}
+
 static bool advanceIfValidStartOfOperator(char const *&ptr,
                                           char const *end) {
   return advanceIf(ptr, end, Identifier::isOperatorStartCodePoint);
@@ -622,6 +651,18 @@ bool Lexer::isIdentifier(StringRef string) {
     return false;
   while (p < end && advanceIfValidContinuationOfIdentifier(p, end));
   return p == end;
+}
+
+bool Lexer::identifierMustAlwaysBeEscaped(StringRef str) {
+  bool mustEscape =
+      !isOperator(str) && !isIdentifier(str) &&
+      str.front() != '$'; // a property wrapper does not need to be escaped
+
+  // dollar sign must be escaped
+  if (str == "$") {
+    mustEscape = true;
+  }
+  return mustEscape;
 }
 
 /// Determines if the given string is a valid operator identifier,
@@ -2216,7 +2257,7 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 }
 
 /// lexEscapedIdentifier:
-///   identifier ::= '`' identifier '`'
+///   identifier ::= '`' escaped-identifier '`'
 ///
 /// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
@@ -2227,21 +2268,14 @@ void Lexer::lexEscapedIdentifier() {
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
   const char *IdentifierStart = CurPtr;
-  if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
-    // Keep continuing the identifier.
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+  while (advanceIfValidEscapedIdentifier(CurPtr, BufferEnd))
+    ;
 
-    // If we have the terminating "`", it's an escaped identifier.
-    if (*CurPtr == '`') {
-      ++CurPtr;
-      formEscapedIdentifierToken(Quote);
-      return;
-    }
-  }
-
-  // Special case; allow '`$`'.
-  if (Quote[1] == '$' && Quote[2] == '`') {
-    CurPtr = Quote + 3;
+  // If we have the terminating "`", it's an escaped identifier, unless it
+  // contained only operator characters.
+  if (*CurPtr == '`' &&
+      !isOperator(StringRef(IdentifierStart, CurPtr - IdentifierStart))) {
+    ++CurPtr;
     formEscapedIdentifierToken(Quote);
     return;
   }
