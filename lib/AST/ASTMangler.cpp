@@ -1152,7 +1152,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
            "synthesized type's original name must be a valid Swift identifier");
     appendIdentifier(synthesizedTypeAttr->originalTypeName);
   } else if (name.isOperator()) {
-    appendIdentifier(translateOperator(name.getIdentifier().str()));
+    appendIdentifier(translateOperator(name.getIdentifier().str()), /*allowRawIdentifiers=*/ false);
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
         appendOperator("op");
@@ -4782,7 +4782,7 @@ void ASTMangler::appendMacroExpansionContext(
     appendIdentifier(origDC->getParentModule()->getName().str());
 
     auto *SF = origDC->getParentSourceFile();
-    appendIdentifier(llvm::sys::path::filename(SF->getFilename()));
+    appendIdentifier(llvm::sys::path::filename(SF->getFilename()), /*allowRawIdentifiers=*/false);
 
     auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
     appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));

@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
@@ -5980,6 +5981,17 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
   entry = createStringConstant(data, willBeRelativelyAddressed,
                                sectionName, name);
   return entry.second;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfGlobalIdentifierString(StringRef data,
+                                             bool willBeRelativelyAddressed) {
+  if (Lexer::identifierMustAlwaysBeEscaped(data)) {
+    llvm::SmallString<256> name;
+    Mangle::Mangler::appendRawIdentifierForRuntime(data, name);
+    return getAddrOfGlobalString(name, willBeRelativelyAddressed);
+  }
+  return getAddrOfGlobalString(data, willBeRelativelyAddressed);
 }
 
 /// Get or create a global UTF-16 string constant.
