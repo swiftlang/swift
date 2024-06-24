@@ -1249,7 +1249,7 @@ public:
       if (next.isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
                      tok::identifier, tok::l_square, tok::kw_Any,
                      tok::kw_Self, tok::kw__, tok::kw_var,
-                     tok::kw_let))
+                     tok::kw_let, tok::code_complete))
         return true;
 
       if (next.is(tok::oper_prefix) && next.getText() == "~")
@@ -1618,6 +1618,11 @@ public:
 
   /// Whether we are at the start of a parameter name when parsing a parameter.
   bool startsParameterName(bool isClosure);
+
+  /// Attempts to perform code completion for the possible start of a function
+  /// parameter type, returning the source location of the consumed completion
+  /// token, or a null location if there is no completion token.
+  SourceLoc tryCompleteFunctionParamTypeBeginning();
 
   /// Parse a parameter-clause.
   ///
