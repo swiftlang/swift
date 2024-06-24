@@ -3,6 +3,8 @@
 // FIXME swift-ci linux tests do not support std::span
 // UNSUPPORTED: OS=linux-gnu
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 #if !BRIDGING_HEADER
 import StdSpan
