@@ -1283,9 +1283,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
   // Filter out explicit conformances to invertible protocols.
   for (auto req : getRequirements()) {
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->is<GenericTypeParamType>() &&
-        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+    if (req.isInvertibleProtocolRequirement()) {
       continue;
     }
 
