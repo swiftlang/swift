@@ -104,18 +104,45 @@ struct CFunctionSignatureTypePrinterModifierDelegate {
 
 class ClangTypeHandler {
 public:
-  ClangTypeHandler(const clang::Decl *typeDecl) : typeDecl(typeDecl) {}
+  ClangTypeHandler(const clang::Decl *typeDecl)
+      : typeDecl(dyn_cast<clang::TagDecl>(typeDecl)) {}
 
   bool isRepresentable() const {
-    // We can only return trivial types, or
-    // types that can be moved or copied.
-    if (auto *record = dyn_cast<clang::CXXRecordDecl>(typeDecl)) {
-      return record->isTrivial() || record->hasMoveConstructor() ||
-             record->hasCopyConstructorWithConstParam();
+    // We can only return tag types.
+    if (typeDecl) {
+      // We can return trivial types.
+      if (isTrivial(typeDecl))
+        return true;
+
+      // We can return nontrivial types iff they can be moved or copied.
+      if (auto *record = dyn_cast<clang::CXXRecordDecl>(typeDecl)) {
+        return record->hasMoveConstructor() ||
+               record->hasCopyConstructorWithConstParam();
+      }
     }
+
+    // Otherwise, we can't return this type.
     return false;
   }
 
+private:
+  /// Is the tag type trivial?
+  static bool isTrivial(const clang::TagDecl *typeDecl) {
+    if (!typeDecl)
+      return false;
+
+    if (auto *record = dyn_cast<clang::CXXRecordDecl>(typeDecl))
+      return record->isTrivial();
+
+    // FIXME: If we can get plain clang::RecordDecls here, we need to figure out
+    //        how nontrivial (i.e. ARC) fields work.
+    assert(!isa<clang::RecordDecl>(typeDecl));
+
+    // C-family enums are always trivial.
+    return isa<clang::EnumDecl>(typeDecl);
+  }
+
+public:
   void printTypeName(raw_ostream &os) const {
     ClangSyntaxPrinter(os).printClangTypeReference(typeDecl);
   }
@@ -135,7 +162,7 @@ public:
       llvm::raw_string_ostream typeNameOS(fullQualifiedType);
       printTypeName(typeNameOS);
       llvm::raw_string_ostream unqualTypeNameOS(typeName);
-      unqualTypeNameOS << cast<clang::NamedDecl>(typeDecl)->getName();
+      unqualTypeNameOS << typeDecl->getName();
     }
     printReturnScaffold(typeDecl, os, fullQualifiedType, typeName,
                         bodyOfReturn);
@@ -143,7 +170,7 @@ public:
 
 private:
   static void
-  printReturnScaffold(const clang::Decl *typeDecl, raw_ostream &os,
+  printReturnScaffold(const clang::TagDecl *typeDecl, raw_ostream &os,
                       StringRef fullQualifiedType, StringRef typeName,
                       llvm::function_ref<void(StringRef)> bodyOfReturn) {
     os << "alignas(alignof(" << fullQualifiedType << ")) char storage[sizeof("
@@ -152,7 +179,7 @@ private:
        << fullQualifiedType << " *>(storage);\n";
     bodyOfReturn("storage");
     os << ";\n";
-    if (typeDecl && cast<clang::CXXRecordDecl>(typeDecl)->isTrivial()) {
+    if (isTrivial(typeDecl)) {
       // Trivial object can be just copied and not destroyed.
       os << "return *storageObjectPtr;\n";
       return;
@@ -164,7 +191,7 @@ private:
     os << "return result;\n";
   }
 
-  const clang::Decl *typeDecl;
+  const clang::TagDecl *typeDecl;
 };
 
 // Prints types in the C function signature that corresponds to the
@@ -378,6 +405,7 @@ public:
       return ClangRepresentation::unsupported;
 
     if (decl->hasClangNode()) {
+      assert(genericArgs.empty() && "this path doesn't support generic args");
       ClangTypeHandler handler(decl->getClangDecl());
       if (!handler.isRepresentable())
         return ClangRepresentation::unsupported;
