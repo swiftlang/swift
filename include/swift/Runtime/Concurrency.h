@@ -558,7 +558,7 @@ swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 /// signals a bug in record handling by the concurrency library -- a record push
 /// must always be paired with a record pop.
 ///
-/// Runtime availability: Swift 9999.
+/// Runtime availability: Swift 6.0
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
@@ -866,6 +866,10 @@ swift_distributedActor_remote_initialize(const Metadata *actorType);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_enqueue_withTaskExecutor(
+    Job *job, DefaultActor *actor, TaskExecutorRef taskExecutor);
+
 /// Check if the actor is a distributed 'remote' actor instance.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_distributed_actor_is_remote(HeapObject *actor);
@@ -923,10 +927,10 @@ void swift_task_asyncMainDrainQueue [[noreturn]]();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run(Job *job, SerialExecutorRef executor);
 
-/// Establish that the current thread is running as the given
-/// executor, then run a job.
+/// DEPRECATED. Use swift_job_run_on_serial_and_task_executor(Job, SerialExecutorRef, TaskExecutorRef)
+/// instead, as it will correctly handle actor isolation of the executed task.
 ///
-/// Runtime availability: Swift 9999
+/// Runtime availability: Swift 6.0
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run_on_task_executor(Job *job,
                                     TaskExecutorRef executor);
@@ -934,7 +938,7 @@ void swift_job_run_on_task_executor(Job *job,
 /// Establish that the current thread is running as the given
 /// executor, then run a job.
 ///
-/// Runtime availability: Swift 9999
+/// Runtime availability: Swift 6.0
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run_on_serial_and_task_executor(Job *job,
                                     SerialExecutorRef serialExecutor,

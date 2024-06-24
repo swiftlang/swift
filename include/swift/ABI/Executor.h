@@ -124,6 +124,12 @@ public:
     return Identity;
   }
 
+  const char* getIdentityDebugName() const {
+    return isMainExecutor() ? " (MainActorExecutor)"
+           : isGeneric()    ? " (GenericExecutor)"
+                            : "";
+  }
+
   /// Is this the generic executor reference?
   bool isGeneric() const {
     return Identity == 0;
