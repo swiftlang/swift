@@ -3626,6 +3626,17 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
             return argumentTypeNames[i];
           return std::string("<unknown>");
         };
+        auto getArgumentNodeName = [](NodePointer node) {
+          if (node->getKind() == Node::Kind::Identifier) {
+            return std::string(node->getText());
+          }
+          if (node->getKind() == Node::Kind::LocalDeclName) {
+            auto text = node->getChild(1)->getText();
+            auto index = node->getChild(0)->getIndex() + 1;
+            return std::string(text) + " #" + std::to_string(index);
+          }
+          return std::string("<unknown>");
+        };
         // Multiple arguments case
         NodePointer argList = matchSequenceOfKinds(
             child, {
@@ -3644,11 +3655,8 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
             if (argumentType->getKind() == Node::Kind::TupleElement) {
               argumentType =
                   argumentType->getChild(0)->getChild(0)->getChild(1);
-              if (argumentType->getKind() == Node::Kind::Identifier) {
-                argumentTypeNames.push_back(
-                    std::string(argumentType->getText()));
-                continue;
-              }
+              argumentTypeNames.push_back(getArgumentNodeName(argumentType));
+              continue;
             }
             argumentTypeNames.push_back("<Unknown>");
           }
@@ -3663,7 +3671,7 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
                      });
           if (argList != nullptr) {
             argumentTypeNames.push_back(
-                std::string(argList->getChild(0)->getChild(1)->getText()));
+                getArgumentNodeName(argList->getChild(0)->getChild(1)));
           }
         }
         child = child->getChild(1);
