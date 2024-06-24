@@ -1203,15 +1203,10 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     }
     Backtracking.reset();
 
-    // If we have a code completion token, treat this as a possible parameter
-    // type since the user may be writing this as a function type.
-    if (Tok.is(tok::code_complete)) {
-      if (CodeCompletionCallbacks)
-        CodeCompletionCallbacks->completeTypePossibleFunctionParamBeginning();
-
-      consumeToken();
+    // Try complete the start of a parameter type since the user may be writing
+    // this as a function type.
+    if (tryCompleteFunctionParamTypeBeginning())
       return makeParserCodeCompletionStatus();
-    }
 
     // Parse the type annotation.
     auto type = parseType(diag::expected_type);

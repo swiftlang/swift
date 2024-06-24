@@ -154,6 +154,27 @@ bool Parser::startsParameterName(bool isClosure) {
   return isClosure;
 }
 
+SourceLoc Parser::tryCompleteFunctionParamTypeBeginning() {
+  if (!L->isCodeCompletion())
+    return SourceLoc();
+
+  // Skip over any starting parameter specifiers.
+  {
+    CancellableBacktrackingScope backtrack(*this);
+    ParsedTypeAttributeList attrs;
+    attrs.parse(*this);
+    if (!Tok.is(tok::code_complete))
+      return SourceLoc();
+
+    backtrack.cancelBacktrack();
+  }
+
+  if (CodeCompletionCallbacks)
+    CodeCompletionCallbacks->completeTypePossibleFunctionParamBeginning();
+
+  return consumeToken(tok::code_complete);
+}
+
 ParserStatus
 Parser::parseParameterClause(SourceLoc &leftParenLoc,
                              SmallVectorImpl<ParsedParameter> &params,
@@ -360,14 +381,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       // Currently none of the parameter type completions are relevant for
       // enum cases, so don't include them. We'll complete for a regular type
       // beginning instead.
-      if (Tok.is(tok::code_complete) &&
-          paramContext != ParameterContextKind::EnumElement) {
-        if (CodeCompletionCallbacks)
-          CodeCompletionCallbacks->completeTypePossibleFunctionParamBeginning();
-
-        auto CCLoc = consumeToken(tok::code_complete);
-        auto *ET = ErrorTypeRepr::create(Context, CCLoc);
-        return makeParserCodeCompletionResult<TypeRepr>(ET);
+      if (paramContext != ParameterContextKind::EnumElement) {
+        if (auto CCLoc = tryCompleteFunctionParamTypeBeginning()) {
+          auto *ET = ErrorTypeRepr::create(Context, CCLoc);
+          return makeParserCodeCompletionResult<TypeRepr>(ET);
+        }
       }
       return parseType(diag::expected_parameter_type);
     };

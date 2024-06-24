@@ -1073,10 +1073,14 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addKeyword(Sink, "consuming", CodeCompletionKeywordKind::None);
     addKeyword(Sink, "isolated", CodeCompletionKeywordKind::None);
     LLVM_FALLTHROUGH;
-  case CompletionKind::TypeBeginning:
-    addKeyword(Sink, "repeat", CodeCompletionKeywordKind::None);
-    LLVM_FALLTHROUGH;
   case CompletionKind::TypeDeclResultBeginning:
+    addKeyword(Sink, "sending", CodeCompletionKeywordKind::None);
+    LLVM_FALLTHROUGH;
+  case CompletionKind::TypeBeginning:
+    // Not technically allowed after '->', since you need to write in parens.
+    if (Kind != CompletionKind::TypeDeclResultBeginning)
+      addKeyword(Sink, "repeat", CodeCompletionKeywordKind::None);
+    LLVM_FALLTHROUGH;
   case CompletionKind::TypeSimpleOrComposition:
     addKeyword(Sink, "some", CodeCompletionKeywordKind::None);
     addKeyword(Sink, "any", CodeCompletionKeywordKind::None);
