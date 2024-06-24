@@ -206,6 +206,12 @@ bool Requirement::canBeSatisfied() const {
   llvm_unreachable("Bad requirement kind");
 }
 
+bool Requirement::isInvertibleProtocolRequirement() const {
+  return getKind() == RequirementKind::Conformance
+      && getFirstType()->is<GenericTypeParamType>()
+      && getProtocolDecl()->getInvertibleProtocolKind();
+}
+
 /// Determine the canonical ordering of requirements.
 static unsigned getRequirementKindOrder(RequirementKind kind) {
   switch (kind) {
