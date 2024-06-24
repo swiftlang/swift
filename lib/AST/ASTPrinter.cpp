@@ -2916,20 +2916,6 @@ void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
-/// If an extension adds a conformance for an invertible protocol, then we
-/// should not print inverses for its generic signature, because no conditional
-/// requirements are inferred by default for such an extension.
-static bool isExtensionAddingInvertibleConformance(const ExtensionDecl *ext) {
-  auto conformances = ext->getLocalConformances();
-  for (auto *conf : conformances) {
-    if (conf->getProtocol()->getInvertibleProtocolKind()) {
-      assert(conformances.size() == 1 && "expected solo conformance");
-      return true;
-    }
-  }
-  return false;
-}
-
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
   if (Options.PrintCompatibilityFeatureChecks &&
@@ -3061,7 +3047,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       // for an invertible protocol itself, as we do not infer any requirements
       // in such an extension. We need to print the whole signature:
       //     extension S: Copyable where T: Copyable
-      if (isExtensionAddingInvertibleConformance(decl)) {
+      if (decl->isAddingConformanceToInvertible()) {
         genSigFlags &= ~PrintInverseRequirements;
         genSigFlags &= ~IncludeOuterInverses;
       }
