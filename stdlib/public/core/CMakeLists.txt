@@ -413,7 +413,8 @@ add_swift_target_library(swiftCore
 # i.e. there is no .o or .a file produced (no binary code is actually produced)
 # and only users of a library are going to actually compile any needed code.
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  add_custom_target(embedded-stdlib ALL)
+  add_custom_target(embedded-stdlib)
+  add_dependencies(embedded-libraries embedded-stdlib)
 
   set(SWIFT_ENABLE_REFLECTION OFF)
   set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)

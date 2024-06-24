@@ -1,7 +1,8 @@
 
 # Embedded Swift Unicode library
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  add_custom_target(embedded-unicode ALL)
+  add_custom_target(embedded-unicode)
+  add_dependencies(embedded-libraries embedded-unicode)
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
