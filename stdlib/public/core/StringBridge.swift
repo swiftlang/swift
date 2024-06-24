@@ -696,7 +696,7 @@ extension String {
         _internalInvariant(!copy._guts.isSmall)
         return copy._bridgeToObjectiveCImpl()
     }
-    if _guts._object.isImmortal {
+    if _guts._object.isImmortal && !_guts._object.hasObjCBridgeableObject {
       // TODO: We'd rather emit a valid ObjC object statically than create a
       // shared string class instance.
       let gutsCountAndFlags = _guts._object._countAndFlags
@@ -735,6 +735,22 @@ internal func _SwiftCreateBridgedString_DoNotCall(
     fatalError("Unsupported encoding in shim")
   }
   return Unmanaged<AnyObject>.passRetained(str._bridgeToObjectiveCImpl())
+}
+
+extension String {
+  @_spi(Foundation)
+  public init<Encoding: Unicode.Encoding>(_immortalCocoaString: AnyObject, buffer: UnsafeBufferPointer<UInt8>, encoding: Encoding.Type) {
+    precondition(encoding == Unicode.ASCII.self || encoding == Unicode.UTF8.self)
+    let storage = __SharedStringStorage(
+      immortalCocoa: buffer.baseAddress!,
+      owner: _immortalCocoaString,
+      countAndFlags: _StringObject.CountAndFlags(
+        sharedCount: buffer.count,
+        isASCII: encoding == Unicode.ASCII.self
+      )
+    )
+    self._guts = _StringGuts(_StringObject(immortal: storage))
+  }
 }
 
 // At runtime, this class is derived from `__SwiftNativeNSStringBase`,
