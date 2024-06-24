@@ -3345,7 +3345,8 @@ public:
 
       ctx.Diags.diagnose(decl->getLoc(),
                          diag::inverse_on_class,
-                         getProtocolName(getKnownProtocolKind(ip)));
+                         getProtocolName(getKnownProtocolKind(ip)),
+                         decl->isAnyActor());
     }
   }
 
