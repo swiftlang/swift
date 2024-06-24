@@ -923,6 +923,12 @@ if (NOT BOOTSTRAPPING_MODE)
   message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
 endif()
 
+# As a temporary workaround, disable SwiftCompilerSources on
+# Windows/ARM64 because the compiler segfaults
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+  set(BOOTSTRAPPING_MODE "OFF")
+endif()
+
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
