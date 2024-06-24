@@ -171,16 +171,6 @@ void MoveOnlyChecker::completeObjectLifetimes(
         }
       }
     }
-    for (SILArgument *arg : block->getArguments()) {
-      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
-      if (!transitiveValues.isVisited(arg))
-        continue;
-      if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::Availability) ==
-          LifetimeCompletion::WasCompleted) {
-        madeChange = true;
-      }
-    }
   }
 }
 
