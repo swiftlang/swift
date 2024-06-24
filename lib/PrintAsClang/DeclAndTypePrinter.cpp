@@ -1437,6 +1437,7 @@ private:
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     printFunctionClangAttributes(FD, funcTy);
+    os << " SWIFT_NOEXCEPT";
     printAvailability(FD);
     os << ";\n";
   }
