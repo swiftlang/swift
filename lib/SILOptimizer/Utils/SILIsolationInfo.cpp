@@ -394,6 +394,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         // TODO: We really should be doing this based off of an Operand. Then
         // we would get the SILValue() for the first element. Today this can
         // only mess up isolation history.
+
         return SILIsolationInfo::getActorInstanceIsolated(
             SILValue(), isolatedOp->get(), nomDecl);
       }
@@ -1098,6 +1099,30 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
 
   // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
   return !type.isSendable(fn);
+}
+
+//===----------------------------------------------------------------------===//
+//                            MARK: ActorInstance
+//===----------------------------------------------------------------------===//
+
+SILValue ActorInstance::lookThroughInsts(SILValue value) {
+  if (!value)
+    return value;
+
+  while (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
+    if (isa<EndInitLetRefInst>(svi) || isa<CopyValueInst>(svi) ||
+        isa<MoveValueInst>(svi) || isa<ExplicitCopyValueInst>(svi) ||
+        isa<BeginBorrowInst>(svi) ||
+        isa<CopyableToMoveOnlyWrapperValueInst>(svi) ||
+        isa<MoveOnlyWrapperToCopyableValueInst>(svi)) {
+      value = lookThroughInsts(svi->getOperand(0));
+      continue;
+    }
+
+    break;
+  }
+
+  return value;
 }
 
 //===----------------------------------------------------------------------===//
