@@ -65,21 +65,21 @@ struct BaseStruct<T: ValueProto> {
 
   var unavailableGetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 46 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 62 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set {}
   }
 
   var unavailableSetter: T {
     get { .defaultValue }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 27 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 36 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 46 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 62 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 27 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 36 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 }
 
@@ -398,6 +398,89 @@ func testIgnoredApplyOfFuncWithInOutParam_Class() {
   takesInOut(&x.unavailableGetterAndSetter[0]) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   takesInOut(&x.unavailableGetterAndSetter[0].b) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
+
+func testDiscardedApplyOfFuncWithInOutParam_Struct() {
+  var x = BaseStruct<StructValue>()
+
+  _ = takesInOut(&x.available)
+  _ = takesInOut(&x.available).a
+  _ = takesInOut(&x.available.a)
+  _ = takesInOut(&x.available.a).b
+  _ = takesInOut(&x.available[0])
+  _ = takesInOut(&x.available[0]).b
+  _ = takesInOut(&x.available[0].b)
+  _ = takesInOut(&x.available[0].b).magnitude
+
+  _ = takesInOut(&x.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter).a // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter.a) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter.a).b // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0]) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0]).b // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0].b) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0].b).magnitude // expected-error {{getter for 'unavailableGetter' is unavailable}}
+
+  _ = takesInOut(&x.unavailableSetter) // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter).a // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter.a) // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter.a).b // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter[0]) // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter[0]).b // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter[0].b) // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableSetter[0].b).magnitude // expected-error {{setter for 'unavailableSetter' is unavailable}}
+
+  _ = takesInOut(&x.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter).a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter.a) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter.a).b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0]) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0]).b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0].b) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0].b).magnitude // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+}
+
+func testDiscardedApplyOfFuncWithInOutParam_Class() {
+  var x = BaseStruct<ClassValue>()
+
+  _ = takesInOut(&x.available)
+  _ = takesInOut(&x.available).a
+  _ = takesInOut(&x.available.a)
+  _ = takesInOut(&x.available.a).b
+  _ = takesInOut(&x.available[0])
+  _ = takesInOut(&x.available[0]).b
+  _ = takesInOut(&x.available[0].b)
+  _ = takesInOut(&x.available[0].b).magnitude
+
+  _ = takesInOut(&x.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter).a // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter.a) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter.a).b // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0]) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0]).b // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0].b) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetter[0].b).magnitude // expected-error {{getter for 'unavailableGetter' is unavailable}}
+
+  _ = takesInOut(&x.unavailableSetter) // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  // FIXME: missing diagnostic for setter
+  _ = takesInOut(&x.unavailableSetter).a
+  _ = takesInOut(&x.unavailableSetter.a)
+  _ = takesInOut(&x.unavailableSetter.a).b
+  _ = takesInOut(&x.unavailableSetter[0])
+  _ = takesInOut(&x.unavailableSetter[0]).b
+  _ = takesInOut(&x.unavailableSetter[0].b)
+  _ = takesInOut(&x.unavailableSetter[0].b).magnitude
+
+  _ = takesInOut(&x.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  // FIXME: missing diagnostic for setter
+  _ = takesInOut(&x.unavailableGetterAndSetter).a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter.a) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter.a).b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0]) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0]).b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0].b) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = takesInOut(&x.unavailableGetterAndSetter[0].b).magnitude // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+}
+
 
 var global = BaseStruct<StructValue>()
 
