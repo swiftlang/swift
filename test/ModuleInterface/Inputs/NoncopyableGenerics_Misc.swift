@@ -137,3 +137,8 @@ public struct Generic<T: Publik & ~Copyable> : (P & ~Copyable) {}
 public struct VeryNested: (P & (Q & ~Copyable & Publik) & (P & ~Copyable)) {}
 public struct Twice: P & ~Copyable, Q & ~Copyable {}
 public struct RegularTwice: ~Copyable, ~Copyable {}
+
+// coverage for rdar://130179698
+public struct Continuation<T: ~Copyable, E: Error> {
+  public func resume(returning value: consuming T) where E == Never {}
+}

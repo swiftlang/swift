@@ -215,6 +215,11 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public struct RegularTwice : ~Swift.Copyable, ~Swift.Copyable {
 // CHECK-MISC-NEXT: }
 
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct Continuation<T, E> where E : Swift.Error, T : ~Copyable {
+// CHECK-MISC-NOT:  ~
+// CHECK-MISC:      #endif
+
 // NOTE: below are extensions emitted at the end of NoncopyableGenerics_Misc.swift
 // CHECK-MISC: extension {{.*}}.VeryNested : {{.*}}.Publik {}
 
