@@ -319,6 +319,9 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     return ManagedValue::forLValue(value);
 
   case ParameterConvention::Indirect_In_Guaranteed:
+    if (!value->getType().isAddress())
+      return ManagedValue::forBorrowedObjectRValue(value);
+
     if (valueTL.isLoadable()) {
       return SGF.B.createLoadBorrow(
           loc, ManagedValue::forBorrowedAddressRValue(value));
