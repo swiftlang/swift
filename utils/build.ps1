@@ -152,6 +152,7 @@ if ($PinnedBuild -eq "") {
     "AMD64" {
       $PinnedBuild = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
       $PinnedSHA256 = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
+      $PinnedVersion = "5.10.1"
     }
     "ARM64" {
       # TODO(hjyamauchi) once we have an arm64 release, fill in PinnedBuild and PinnedSHA256.
@@ -739,6 +740,13 @@ function Get-PinnedToolchainRuntime() {
   return "$BinaryCache\toolchains\${PinnedToolchain}\PFiles64\Swift\runtime-development\usr\bin"
 }
 
+function Get-PinnedToolchainVersion() {
+  if (Test-Path variable:PinnedVersion) {
+    return $PinnedVersion
+  }
+  return "5.10.1"
+}
+
 function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
   if (-not $Hashtable.Contains($Key)) {
     $Hashtable.Add($Key, $Value)
@@ -1311,6 +1319,14 @@ function Build-Compilers() {
       }
     }
 
+    # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
+    # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
+    # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
+    $SwiftFlags = @();
+    if ([System.Version](Get-PinnedToolchainVersion) -lt [System.Version]"6.0") {
+      $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
+    }
+
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
       -Bin $CompilersBinaryCache `
@@ -1323,6 +1339,7 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+        CMAKE_Swift_FLAGS = $SwiftFlags;
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
