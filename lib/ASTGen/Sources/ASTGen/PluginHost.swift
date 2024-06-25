@@ -138,15 +138,15 @@ struct CompilerPlugin {
   }
 
   func sendMessageAndWaitWithoutLock(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
+    guard !Plugin_spawnIfNeeded(opaqueHandle) else {
+      throw PluginError.stalePlugin
+    }
     try sendMessage(message)
     return try waitForNextMessage()
   }
 
   func sendMessageAndWait(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
     try self.withLock {
-      guard !Plugin_spawnIfNeeded(opaqueHandle) else {
-        throw PluginError.stalePlugin
-      }
       return try sendMessageAndWaitWithoutLock(message);
     }
   }
