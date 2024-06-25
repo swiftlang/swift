@@ -1591,9 +1591,6 @@ SwiftPassInvocation::~SwiftPassInvocation() {}
 //===----------------------------------------------------------------------===//
 //                           SIL Bridging
 //===----------------------------------------------------------------------===//
-bool BridgedFunction::mayBindDynamicSelf() const {
-  return swift::mayBindDynamicSelf(getFunction());
-}
 
 bool BridgedFunction::isTrapNoReturn() const {
   return swift::isTrapNoReturnFunction(getFunction());
