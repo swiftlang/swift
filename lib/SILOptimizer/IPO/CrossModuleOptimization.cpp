@@ -98,6 +98,7 @@ private:
   bool canSerializeGlobal(SILGlobalVariable *global);
 
   bool canSerializeType(SILType type);
+  bool canSerializeDecl(NominalTypeDecl *decl);
 
   bool canUseFromInline(DeclContext *declCtxt);
 
@@ -426,6 +427,10 @@ bool CrossModuleOptimization::canSerializeFunction(
 
   // Check if any instruction prevents serializing the function.
   for (SILBasicBlock &block : *function) {
+    for (auto &arg : block.getArguments()) {
+      if (!canSerializeType(arg->getType()))
+        return false;
+    }
     for (SILInstruction &inst : block) {
       if (!canSerializeInstruction(&inst, canSerializeFlags, maxDepth)) {
         return false;
@@ -449,6 +454,22 @@ bool CrossModuleOptimization::canSerializeInstruction(
   for (Operand &op : inst->getAllOperands()) {
     if (!canSerializeType(op.get()->getType()))
       return false;
+  }
+
+  if (auto AI = ApplySite::isa(inst)) {
+    auto substs = AI.getSubstitutionMap();
+    for (Type replType : substs.getReplacementTypes()) {
+      auto ntd = replType->getCanonicalType()->getNominalOrBoundGenericNominal();
+      if (!ntd || !canSerializeDecl(ntd))
+        return false;
+    }
+    for (ProtocolConformanceRef pref : substs.getConformances()) {
+      if (pref.isConcrete()) {
+        ProtocolConformance *concrete = pref.getConcrete();
+        if (!canSerializeDecl(concrete->getProtocol()))
+          return false;
+      }
+    }
   }
 
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
@@ -563,6 +584,30 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
   return true;
 }
 
+bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
+  // In conservative mode we don't want to change the access level of types.
+  if (conservative && decl->getEffectiveAccess() < AccessLevel::Package) {
+    return false;
+  }
+
+  // Exclude types which are defined in an @_implementationOnly imported
+  // module. Such modules are not transitively available.
+  if (!canUseFromInline(decl)) {
+    return false;
+  }
+
+  if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    if (!canSerializeDecl(nominalCtx))
+      return false;
+  } else if (auto *extCtx = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+    if (auto *extendedNominal = extCtx->getExtendedNominal()) {
+      if (!canSerializeDecl(extendedNominal))
+        return false;
+    }
+  }
+  return true;
+}
+
 bool CrossModuleOptimization::canSerializeType(SILType type) {
   auto iter = typesChecked.find(type);
   if (iter != typesChecked.end())
@@ -572,20 +617,12 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
     [this](Type rawSubType) {
       CanType subType = rawSubType->getCanonicalType();
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
-
-        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Package) {
-          return true;
-        }
-
-        // Exclude types which are defined in an @_implementationOnly imported
-        // module. Such modules are not transitively available.
-        if (!canUseFromInline(subNT)) {
-          return true;
-        }
+        return !canSerializeDecl(subNT);
       }
       return false;
     });
   typesChecked[type] = success;
+
   return success;
 }
 
@@ -836,6 +873,8 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
 
   if (!isPackageOrPublic(decl->getFormalAccess()) &&
       !decl->isUsableFromInline()) {
+    assert(!isPackageCMOEnabled(M.getSwiftModule()));
+
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be
     // immutable at this point.
