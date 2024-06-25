@@ -3639,12 +3639,7 @@ private:
 
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    // If there is a LoadExpr in the stack, then this InOutExpr is not actually
-    // indicative of any mutation so the access context should just be Getter.
-    auto accessContext = getEnclosingLoadExpr() ? MemberAccessContext::Getter
-                                                : MemberAccessContext::InOut;
-
-    walkInContext(E, E->getSubExpr(), accessContext);
+    walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
@@ -3664,7 +3659,6 @@ private:
 
     return;
   }
-
 
   /// Walk the given expression in the member access context.
   void walkInContext(Expr *baseExpr, Expr *E,
@@ -3701,8 +3695,10 @@ private:
       break;
 
     case MemberAccessContext::Setter:
-      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC, std::nullopt);
+      if (!getEnclosingLoadExpr()) {
+        diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
+                                 ReferenceRange, ReferenceDC, std::nullopt);
+      }
       break;
 
     case MemberAccessContext::InOut:
@@ -3710,9 +3706,11 @@ private:
                                ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
 
-      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC,
-                               DeclAvailabilityFlag::ForInout);
+      if (!getEnclosingLoadExpr()) {
+        diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
+                                 ReferenceRange, ReferenceDC,
+                                 DeclAvailabilityFlag::ForInout);
+      }
       break;
     }
   }
