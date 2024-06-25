@@ -984,19 +984,17 @@ void DerivedConformance::tryDiagnoseFailedHashableDerivation(
 }
 
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
-  ASTContext &C = ConformanceDecl->getASTContext();
-
   // var hashValue: Int
-  if (requirement->getBaseName() == C.Id_hashValue) {
+  if (requirement->getBaseName() == Context.Id_hashValue) {
     // We always allow hashValue to be synthesized; invalid cases are diagnosed
     // during hash(into:) synthesis.
     return deriveHashable_hashValue(*this);
   }
 
   // Hashable.hash(into:)
-  if (requirement->getBaseName() == C.Id_hash) {
+  if (requirement->getBaseName() == Context.Id_hash) {
     // Start by resolving hashValue conformance.
-    auto hashValueReq = getHashValueRequirement(C);
+    auto hashValueReq = getHashValueRequirement(Context);
     auto conformance = getHashableConformance(ConformanceDecl);
     auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
@@ -1010,7 +1008,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       
       // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
       // has non-Hashable stored properties/associated values.
-      auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
+      auto hashableProto = Context.getProtocol(KnownProtocolKind::Hashable);
       if (!canDeriveConformance(getConformanceContext(), Nominal,
                                 hashableProto)) {
         ConformanceDecl->diagnose(diag::type_does_not_conform,
