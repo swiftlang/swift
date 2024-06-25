@@ -279,7 +279,7 @@ void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
 ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
-  // TypeChecker::deriveProtocolRequirement.
+  // deriveProtocolRequirement.
   ASTContext &ctx = nominal->getASTContext();
   const auto name = requirement->getName();
 
