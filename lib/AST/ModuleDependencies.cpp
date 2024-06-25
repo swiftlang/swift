@@ -537,11 +537,6 @@ swift::dependencies::registerCxxInteropLibraries(
                     })) {
     // Only link with CxxStdlib on platforms where the overlay is available.
     switch (Target.getOS()) {
-    case llvm::Triple::Linux:
-      if (!Target.isAndroid())
-        RegistrationCallback(LinkLibrary("swiftCxxStdlib",
-                                         LibraryKind::Library));
-      break;
     case llvm::Triple::Win32: {
       RegistrationCallback(
           LinkLibrary(hasStaticCxxStdlib ? "libswiftCxxStdlib" : "swiftCxxStdlib",
@@ -549,7 +544,7 @@ swift::dependencies::registerCxxInteropLibraries(
       break;
     }
     default:
-      if (Target.isOSDarwin())
+      if (Target.isOSDarwin() || Target.isOSLinux())
         RegistrationCallback(LinkLibrary("swiftCxxStdlib",
                                          LibraryKind::Library));
       break;

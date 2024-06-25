@@ -5992,6 +5992,11 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SubstitutionMap subs,
                                           ArrayRef<SILValue> args,
                                           SmallVectorImpl<SILValue> &yields) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
