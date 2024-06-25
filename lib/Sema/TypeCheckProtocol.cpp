@@ -4511,11 +4511,6 @@ deriveProtocolRequirement(const NormalProtocolConformance *Conformance,
   if (!derivableKind)
     return nullptr;
 
-  auto *DC = Conformance->getDeclContext();
-  const auto Decl = DC->getInnermostDeclarationDeclContext();
-  if (Decl->isInvalid())
-    return nullptr;
-
   DerivedConformance derived(Conformance, TypeDecl, protocol);
 
   switch (*derivableKind) {
