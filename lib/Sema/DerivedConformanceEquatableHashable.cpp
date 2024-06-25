@@ -953,20 +953,6 @@ getHashValueRequirement(ASTContext &C) {
   return nullptr;
 }
 
-static ProtocolConformance *
-getHashableConformance(const Decl *parentDecl) {
-  ASTContext &C = parentDecl->getASTContext();
-  const auto IDC = cast<IterableDeclContext>(parentDecl);
-  auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: IDC->getLocalConformances(
-           ConformanceLookupKind::NonStructural)) {
-    if (conformance->getProtocol() == hashableProto) {
-      return conformance;
-    }
-  }
-  return nullptr;
-}
-
 bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
   // FIXME: This is not actually correct. We cannot promise to always
   // provide a witness here in all cases. Unfortunately, figuring out
@@ -996,8 +982,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_hash) {
     // Start by resolving hashValue conformance.
     auto hashValueReq = getHashValueRequirement(Context);
-    auto conformance = getHashableConformance(ConformanceDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
+    auto hashValueDecl = Conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.
