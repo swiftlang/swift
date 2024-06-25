@@ -1257,23 +1257,29 @@ void UseState::initializeLiveness(
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
   }
+  
+  auto updateForLivenessAccess = [&](BeginAccessInst *beginAccess,
+                                     const SmallBitVector &livenessMask) {
+    for (auto *endAccess : beginAccess->getEndAccesses()) {
+      liveness.updateForUse(endAccess, livenessMask, false /*lifetime ending*/);
+    }
+  };
 
   for (auto livenessInstAndValue : nonconsumingUses) {
     if (auto *lbi = dyn_cast<LoadBorrowInst>(livenessInstAndValue.first)) {
       auto accessPathWithBase =
           AccessPathWithBase::computeInScope(lbi->getOperand());
       if (auto *beginAccess =
-              dyn_cast<BeginAccessInst>(accessPathWithBase.base)) {
-        for (auto *endAccess : beginAccess->getEndAccesses()) {
-          liveness.updateForUse(endAccess, livenessInstAndValue.second,
-                                false /*lifetime ending*/);
-        }
+              dyn_cast_or_null<BeginAccessInst>(accessPathWithBase.base)) {
+        updateForLivenessAccess(beginAccess, livenessInstAndValue.second);
       } else {
         for (auto *ebi : lbi->getEndBorrows()) {
           liveness.updateForUse(ebi, livenessInstAndValue.second,
                                 false /*lifetime ending*/);
         }
       }
+    } else if (auto *bai = dyn_cast<BeginAccessInst>(livenessInstAndValue.first)) {
+      updateForLivenessAccess(bai, livenessInstAndValue.second);
     } else {
       liveness.updateForUse(livenessInstAndValue.first,
                             livenessInstAndValue.second,
