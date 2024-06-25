@@ -47,6 +47,7 @@
 /cmake/**/*Windows*                       @compnerd
 
 # docs
+/docs/CrossCompilationModel.md            @MaxDesiatov
 /docs/Generics.rst                        @slavapestov
 /docs/Generics/                           @slavapestov
 /docs/HowToGuides/                        @AnthonyLatsis @LucianoPAlmeida @xedin
