@@ -3239,9 +3239,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
   if (func1->hasSendingResult() != func2->hasSendingResult() &&
       (!func1->hasSendingResult() || kind < ConstraintKind::Subtype)) {
-    auto *fix = AllowSendingMismatch::create(
-        *this, getConstraintLocator(locator), func1, func2,
-        AllowSendingMismatch::Kind::Result);
+    auto *fix = AllowSendingMismatch::create(*this, func1, func2,
+                                             getConstraintLocator(locator));
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
   }
@@ -3681,8 +3680,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (func1Param.getParameterFlags().isSending() &&
           !func2Param.getParameterFlags().isSending()) {
         auto *fix = AllowSendingMismatch::create(
-            *this, getConstraintLocator(argumentLocator), func1, func2,
-            AllowSendingMismatch::Kind::Parameter);
+            *this, func1, func2, getConstraintLocator(argumentLocator));
         if (recordFix(fix))
           return getTypeMatchFailure(argumentLocator);
       }
