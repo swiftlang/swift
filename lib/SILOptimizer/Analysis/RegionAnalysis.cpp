@@ -1590,6 +1590,10 @@ public:
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
+    // A helper we use to emit an unknown patten error if our merge is
+    // invalid. This ensures we guarantee that if we find an actor merge error,
+    // the compiler halts. Importantly this lets our users know 100% that if the
+    // compiler exits successfully, actor merge errors could not have happened.
     std::optional<SILDynamicMergedIsolationInfo> mergedInfo;
     if (resultIsolationInfoOverride) {
       mergedInfo = resultIsolationInfoOverride;
@@ -1600,12 +1604,26 @@ public:
     for (SILValue src : sourceValues) {
       if (auto value = tryToTrackValue(src)) {
         assignOperands.push_back(value->getRepresentative().getValue());
-        mergedInfo = mergedInfo->merge(value->getIsolationRegionInfo());
+        auto originalMergedInfo = mergedInfo;
+        (void)originalMergedInfo;
+        if (mergedInfo)
+          mergedInfo = mergedInfo->merge(value->getIsolationRegionInfo());
 
         // If we fail to merge, then we have an incompatibility in between some
         // of our arguments (consider isolated to different actors) or with the
         // isolationInfo we specified. Emit an unknown patten error.
         if (!mergedInfo) {
+          LLVM_DEBUG(
+              llvm::dbgs() << "Merge Failure!\n"
+                           << "Original Info: ";
+              if (originalMergedInfo)
+                  originalMergedInfo->printForDiagnostics(llvm::dbgs());
+              else llvm::dbgs() << "nil";
+              llvm::dbgs() << "\nValue: "
+                           << value->getRepresentative().getValue();
+              llvm::dbgs() << "Value Info: ";
+              value->getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
+              llvm::dbgs() << "\n");
           builder.addUnknownPatternError(src);
           continue;
         }
@@ -1614,7 +1632,7 @@ public:
 
     for (SILValue result : resultValues) {
       // If we had isolation info explicitly passed in... use our
-      // mergedInfo. Otherwise, we want to infer.
+      // resultIsolationInfoError. Otherwise, we want to infer.
       if (resultIsolationInfoOverride) {
         // We only get back result if it is non-Sendable.
         if (auto nonSendableValue =
@@ -1657,9 +1675,10 @@ public:
       // derived, introduce a fake element so we just propagate the actor
       // region.
       //
-      // NOTE: Here we check if we have mergedInfo rather than isolationInfo
-      // since we want to do this regardless of whether or not we passed in a
-      // specific isolation info unlike earlier when processing actual results.
+      // NOTE: Here we check if we have resultIsolationInfoOverride rather than
+      // isolationInfo since we want to do this regardless of whether or not we
+      // passed in a specific isolation info unlike earlier when processing
+      // actual results.
       if (assignOperands.size() && resultIsolationInfoOverride) {
         builder.addActorIntroducingInst(assignOperands.back(),
                                         resultIsolationInfoOverride);
