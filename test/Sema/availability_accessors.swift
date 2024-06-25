@@ -83,11 +83,11 @@ struct BaseStruct<T: ValueProto> {
   }
 }
 
-func takesIntInOut(_ i: inout Int) -> Int {
-  return 0
+@discardableResult func takesInOut<T>(_ t: inout T) -> T {
+  return t
 }
 
-func testRValueLoads_Struct() {
+func testDiscardedRValueLoads_Struct() {
   var x = BaseStruct<StructValue>() // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
 
   _ = x.available
@@ -111,7 +111,7 @@ func testRValueLoads_Struct() {
   _ = x.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testRValueLoads_Class() {
+func testDiscardedRValueLoads_Class() {
   var x = BaseStruct<ClassValue>() // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
 
   _ = x.available
@@ -184,7 +184,7 @@ func testLValueAssignments_Class(_ someValue: ClassValue) {
   x.unavailableGetterAndSetter[0].b = 1 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testKeyPathLoads_Struct() {
+func testDiscardedKeyPathLoads_Struct() {
   let a = [0]
   var x = BaseStruct<StructValue>()
 
@@ -192,32 +192,32 @@ func testKeyPathLoads_Struct() {
   _ = x[keyPath: \.available.a]
   _ = x[keyPath: \.available[0]]
   _ = x[keyPath: \.available[0].b]
-  _ = a[keyPath: \.[takesIntInOut(&x.available.a.b)]]
-  _ = a[keyPath: \.[takesIntInOut(&x.available[0].b)]]
+  _ = a[keyPath: \.[takesInOut(&x.available.a.b)]]
+  _ = a[keyPath: \.[takesInOut(&x.available[0].b)]]
 
   _ = x[keyPath: \.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetter.a] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetter[0]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetter[0].b] // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetter.a.b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetter[0].b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetter.a.b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetter[0].b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
   _ = x[keyPath: \.unavailableSetter]
   _ = x[keyPath: \.unavailableSetter.a]
   _ = x[keyPath: \.unavailableSetter[0]]
   _ = x[keyPath: \.unavailableSetter[0].b]
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableSetter.a.b)]] // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableSetter[0].b)]] // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableSetter.a.b)]] // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableSetter[0].b)]] // expected-error {{setter for 'unavailableSetter' is unavailable}}
 
   _ = x[keyPath: \.unavailableGetterAndSetter] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetterAndSetter.a] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetterAndSetter[0]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetterAndSetter[0].b] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter.a.b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter.a.b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testKeyPathLoads_Class() {
+func testDiscardedKeyPathLoads_Class() {
   let a = [0]
   var x = BaseStruct<ClassValue>() // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
 
@@ -225,29 +225,29 @@ func testKeyPathLoads_Class() {
   _ = x[keyPath: \.available.a]
   _ = x[keyPath: \.available[0]]
   _ = x[keyPath: \.available[0].b]
-  _ = a[keyPath: \.[takesIntInOut(&x.available.a.b)]]
-  _ = a[keyPath: \.[takesIntInOut(&x.available[0].b)]]
+  _ = a[keyPath: \.[takesInOut(&x.available.a.b)]]
+  _ = a[keyPath: \.[takesInOut(&x.available[0].b)]]
 
   _ = x[keyPath: \.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetter.a] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetter[0]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetter[0].b] // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetter.a.b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetter[0].b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetter.a.b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetter[0].b)]] // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
   _ = x[keyPath: \.unavailableSetter]
   _ = x[keyPath: \.unavailableSetter.a]
   _ = x[keyPath: \.unavailableSetter[0]]
   _ = x[keyPath: \.unavailableSetter[0].b]
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableSetter.a.b)]]
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableSetter[0].b)]]
+  _ = a[keyPath: \.[takesInOut(&x.unavailableSetter.a.b)]]
+  _ = a[keyPath: \.[takesInOut(&x.unavailableSetter[0].b)]]
 
   _ = x[keyPath: \.unavailableGetterAndSetter] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetterAndSetter.a] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetterAndSetter[0]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   _ = x[keyPath: \.unavailableGetterAndSetter[0].b] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter.a.b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  _ = a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter.a.b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
 func testKeyPathAssignments_Struct(_ someValue: StructValue) {
@@ -259,29 +259,29 @@ func testKeyPathAssignments_Struct(_ someValue: StructValue) {
   x[keyPath: \.available[0]] = someValue.a
   x[keyPath: \.available[0].b] = 1
   x[keyPath: \.available] = someValue
-  a[keyPath: \.[takesIntInOut(&x.available.a.b)]] = 0
-  a[keyPath: \.[takesIntInOut(&x.available[0].b)]] = 0
+  a[keyPath: \.[takesInOut(&x.available.a.b)]] = 0
+  a[keyPath: \.[takesInOut(&x.available[0].b)]] = 0
 
   x[keyPath: \.unavailableGetter] = someValue
   x[keyPath: \.unavailableGetter.a] = someValue.a // FIXME: missing diagnostic for getter
   x[keyPath: \.unavailableGetter[0]] = someValue.a // FIXME: missing diagnostic for getter
   x[keyPath: \.unavailableGetter[0].b] = 1 // FIXME: missing diagnostic for getter
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
   x[keyPath: \.unavailableSetter] = someValue // expected-error {{setter for 'unavailableSetter' is unavailable}}
   x[keyPath: \.unavailableSetter.a] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
   x[keyPath: \.unavailableSetter[0]] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
   x[keyPath: \.unavailableSetter[0].b] = 1 // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableSetter.a.b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableSetter[0].b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableSetter.a.b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableSetter[0].b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
 
   x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x[keyPath: \.unavailableGetterAndSetter[0].b] = 1 // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
 func testKeyPathAssignments_Class(_ someValue: ClassValue) {
@@ -293,15 +293,15 @@ func testKeyPathAssignments_Class(_ someValue: ClassValue) {
   x[keyPath: \.available[0]] = someValue.a
   x[keyPath: \.available[0].b] = 1
   x[keyPath: \.available] = someValue
-  a[keyPath: \.[takesIntInOut(&x.available.a.b)]] = 0
-  a[keyPath: \.[takesIntInOut(&x.available[0].b)]] = 0
+  a[keyPath: \.[takesInOut(&x.available.a.b)]] = 0
+  a[keyPath: \.[takesInOut(&x.available[0].b)]] = 0
 
   x[keyPath: \.unavailableGetter] = someValue
   x[keyPath: \.unavailableGetter.a] = someValue.a // FIXME: missing diagnostic for getter
   x[keyPath: \.unavailableGetter[0]] = someValue.a // FIXME: missing diagnostic for getter
   x[keyPath: \.unavailableGetter[0].b] = 1 // FIXME: missing diagnostic for getter
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
   x[keyPath: \.unavailableSetter] = someValue // expected-error {{setter for 'unavailableSetter' is unavailable}}
   // FIXME: spurious unavailable setter error
@@ -310,16 +310,16 @@ func testKeyPathAssignments_Class(_ someValue: ClassValue) {
   x[keyPath: \.unavailableSetter[0]] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
   // FIXME: spurious unavailable setter error
   x[keyPath: \.unavailableSetter[0].b] = 1 // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableSetter.a.b)]] = 0
-  a[keyPath: \.[takesIntInOut(&x.unavailableSetter[0].b)]] = 0
+  a[keyPath: \.[takesInOut(&x.unavailableSetter.a.b)]] = 0
+  a[keyPath: \.[takesInOut(&x.unavailableSetter[0].b)]] = 0
 
   x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   // FIXME: spurious unavailable setter error
   x[keyPath: \.unavailableGetterAndSetter[0].b] = 1 // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  a[keyPath: \.[takesIntInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
 func testMutatingStructMember() {
@@ -351,9 +351,7 @@ func testMutatingStructMember() {
   _ = a[x.unavailableGetterAndSetter[0].setToZero()] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testPassAsInOutParameter_Struct() {
-  func takesInOut<T>(_ t: inout T) {}
-
+func testIgnoredApplyOfFuncWithInOutParam_Struct() {
   var x = BaseStruct<StructValue>()
 
   takesInOut(&x.available)
@@ -377,9 +375,7 @@ func testPassAsInOutParameter_Struct() {
   takesInOut(&x.unavailableGetterAndSetter[0].b) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testPassAsInOutParameter_Class() {
-  func takesInOut<T>(_ t: inout T) {}
-
+func testIgnoredApplyOfFuncWithInOutParam_Class() {
   var x = BaseStruct<ClassValue>()
 
   takesInOut(&x.available)
