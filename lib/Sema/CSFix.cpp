@@ -1848,30 +1848,19 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
 
 bool AllowSendingMismatch::diagnose(const Solution &solution,
                                     bool asNote) const {
-  switch (kind) {
-  case Kind::Parameter: {
-    SendingOnFunctionParameterMismatchFail failure(
-        solution, getFromType(), getToType(), getLocator(), fixBehavior);
-    return failure.diagnose(asNote);
-  }
-  case Kind::Result: {
-    SendingOnFunctionResultMismatchFailure failure(
-        solution, getFromType(), getToType(), getLocator(), fixBehavior);
-    return failure.diagnose(asNote);
-  }
-  }
-  llvm_unreachable("Covered switch isn't covered?!");
+  SendingMismatchFailure failure(solution, getFromType(), getToType(),
+                                 getLocator(), fixBehavior);
+  return failure.diagnose(asNote);
 }
 
 AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
-                                                   ConstraintLocator *locator,
                                                    Type srcType, Type dstType,
-                                                   Kind kind) {
+                                                   ConstraintLocator *locator) {
   auto fixBehavior = cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
-      AllowSendingMismatch(cs, srcType, dstType, locator, kind, fixBehavior);
+      AllowSendingMismatch(cs, srcType, dstType, locator, fixBehavior);
 }
 
 bool SpecifyBaseTypeForContextualMember::diagnose(const Solution &solution,
