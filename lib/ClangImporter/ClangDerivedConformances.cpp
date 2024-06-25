@@ -395,6 +395,28 @@ bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
   return getIteratorCategoryDecl(clangDecl);
 }
 
+ValueDecl *
+swift::importer::getImportedMemberOperator(const DeclBaseName &name,
+                                           NominalTypeDecl *selfType,
+                                           std::optional<Type> parameterType) {
+  assert(name.isOperator());
+  // Handle ==, -, and += operators, that are required operators for C++
+  // iterator types to conform to the corresponding Cxx iterator protocols.
+  // These operators can be instantiated and synthesized by clang importer below,
+  // and thus require additional lookup logic when they're being deserialized.
+  if (name.getIdentifier() == selfType->getASTContext().Id_EqualsOperator) {
+    return getEqualEqualOperator(selfType);
+  }
+  if (name.getIdentifier() == selfType->getASTContext().getIdentifier("-")) {
+    return getMinusOperator(selfType);
+  }
+  if (name.getIdentifier() == selfType->getASTContext().getIdentifier("+=") &&
+      parameterType) {
+    return getPlusEqualOperator(selfType, *parameterType);
+  }
+  return nullptr;
+}
+
 void swift::conformToCxxIteratorIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl) {
