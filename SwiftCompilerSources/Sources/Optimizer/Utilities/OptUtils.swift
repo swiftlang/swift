@@ -540,6 +540,10 @@ extension Function {
     }
     return nil
   }
+
+  var mayBindDynamicSelf: Bool {
+    self.bridged.mayBindDynamicSelf()
+  }
 }
 
 extension FullApplySite {

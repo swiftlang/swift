@@ -1541,6 +1541,13 @@ void SwiftPassInvocation::endVerifyFunction() {
 SwiftPassInvocation::~SwiftPassInvocation() {}
 
 //===----------------------------------------------------------------------===//
+//                           SIL Bridging
+//===----------------------------------------------------------------------===//
+bool BridgedFunction::mayBindDynamicSelf() const {
+  return swift::mayBindDynamicSelf(getFunction());
+}
+
+//===----------------------------------------------------------------------===//
 //                           OptimizerBridging
 //===----------------------------------------------------------------------===//
 
