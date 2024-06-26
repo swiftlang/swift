@@ -1727,6 +1727,7 @@ retry:;
     } else {
       // We're trying to take the lock in an uncontended manner
       if (oldState.isRunning() || oldState.isScheduled()) {
+        SWIFT_TASK_DEBUG_LOG("Failed to jump to %p in fast path", this);
         return false;
       }
 
@@ -1851,9 +1852,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
       if (newState.isScheduled()) {
         // See ownership rule (6) in DefaultActorImpl
-        // FIXME: we have to respect task executor here as well
-        //        - how to get the right value to the unlock?
-        scheduleActorProcessJob(newState.getMaxPriority(), TaskExecutorRef::undefined());
+        scheduleActorProcessJob(newState.getMaxPriority(), TaskExecutorRef::undefined()); // TODO: handle task executor?
       } else {
         // See ownership rule (5) in DefaultActorImpl
         SWIFT_TASK_DEBUG_LOG("Actor %p is idle now", this);
@@ -2197,17 +2196,9 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 // SerialExecutor's protocol witness table.  We could inline this
 // with effort, though.
 extern "C" SWIFT_CC(swift)
-void _swift_task_enqueueOnExecutor(
-    Job *job, HeapObject *executor,
-    const Metadata *executorType,
-                                   const SerialExecutorWitnessTable *wtable);
-
-extern "C" SWIFT_CC(swift)
-void _swift_task_enqueueOnTaskExecutor(
-    Job *job, HeapObject *taskExecutor,
-    const Metadata *taskExecutorType,
-    const TaskExecutorWitnessTable *taskExecutorWtable);
-
+    void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
+                                       const Metadata *executorType,
+                                       const SerialExecutorWitnessTable *wtable);
 
 extern "C" SWIFT_CC(swift)
 void _swift_task_makeAnyTaskExecutor(
