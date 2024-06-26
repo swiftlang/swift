@@ -36,6 +36,8 @@ struct KlassPair {
 
 sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 
+protocol Error {}
+
 ///////////
 // Tests //
 ///////////
@@ -598,4 +600,16 @@ bb0(%x : @owned $Klass):
   dealloc_box %box : ${ var @moveOnly Klass }
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @existential_metatype : $@convention(thin) (@guaranteed any Error) -> @thick any Error.Type {
+// CHECK:         [[EM:%.*]] = existential_metatype $@thick any Error.Type, {{%.*}} : $any Error
+// CHECK:         return [[EM]] : $@thick any Error.Type
+// CHECK-LABEL: } // end sil function 'existential_metatype'
+sil [ossa] @existential_metatype : $@convention(thin) (@guaranteed any Error) -> @thick any Error.Type {
+bb0(%x : @guaranteed $any Error):
+  %y = copyable_to_moveonlywrapper [guaranteed] %x : $any Error
+  %em = existential_metatype $@thick any Error.Type, %y : $@moveOnly (any Error)
+  debug_value %em : $@thick any Error.Type, var, name "s", argno 1, expr op_deref
+  return %em : $@thick any Error.Type
 }
