@@ -600,7 +600,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -624,8 +624,11 @@ protected:
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
 
-    /// Whether we've computed the inherited protocols list yet.
+    /// Whether we've computed the InheritedProtocolsRequest.
     InheritedProtocolsValid : 1,
+
+    /// Whether we've computed the AllInheritedProtocolsRequest.
+    AllInheritedProtocolsValid : 1,
 
     /// Whether we have computed a requirement signature.
     HasRequirementSignature : 1,
@@ -5191,6 +5194,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames;
   ArrayRef<ProtocolDecl *> InheritedProtocols;
+  ArrayRef<ProtocolDecl *> AllInheritedProtocols;
   ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
   ArrayRef<ValueDecl *> ProtocolRequirements;
 
@@ -5267,6 +5271,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ExistentialConformsToSelfRequest;
   friend class HasSelfOrAssociatedTypeRequirementsRequest;
   friend class InheritedProtocolsRequest;
+  friend class AllInheritedProtocolsRequest;
   friend class PrimaryAssociatedTypesRequest;
   friend class ProtocolRequirementsRequest;
   
@@ -5404,6 +5409,13 @@ private:
   }
   void setInheritedProtocolsValid() {
     Bits.ProtocolDecl.InheritedProtocolsValid = true;
+  }
+
+  bool areAllInheritedProtocolsValid() const {
+    return Bits.ProtocolDecl.AllInheritedProtocolsValid;
+  }
+  void setAllInheritedProtocolsValid() {
+    Bits.ProtocolDecl.AllInheritedProtocolsValid = true;
   }
 
   bool areProtocolRequirementsValid() const {
