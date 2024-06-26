@@ -6622,13 +6622,14 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.RequiresClass = false;
   Bits.ProtocolDecl.ExistentialConformsToSelfValid = false;
   Bits.ProtocolDecl.ExistentialConformsToSelf = false;
-  Bits.ProtocolDecl.InheritedProtocolsValid = 0;
+  Bits.ProtocolDecl.InheritedProtocolsValid = false;
+  Bits.ProtocolDecl.AllInheritedProtocolsValid = false;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  Bits.ProtocolDecl.HasAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasRequirementSignature = 0;
-  Bits.ProtocolDecl.HasLazyRequirementSignature = 0;
+  Bits.ProtocolDecl.HasAssociatedTypes = false;
+  Bits.ProtocolDecl.HasLazyAssociatedTypes = false;
+  Bits.ProtocolDecl.HasRequirementSignature = false;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = false;
   Bits.ProtocolDecl.ProtocolRequirementsValid = false;
   setTrailingWhereClause(TrailingWhere);
 }
@@ -6662,6 +6663,11 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
+  // Avoid evaluator overhead because we call this from Symbol::compare()
+  // in the Requirement Machine.
+  if (Bits.ProtocolDecl.AllInheritedProtocolsValid)
+    return AllInheritedProtocols;
+
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            AllInheritedProtocolsRequest{mutThis},

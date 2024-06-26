@@ -113,9 +113,7 @@ bool Rule::isProtocolRefinementRule(RewriteContext &ctx) const {
     auto *proto = LHS[0].getProtocol();
     auto *otherProto = LHS[1].getProtocol();
 
-    auto inherited = ctx.getInheritedProtocols(proto);
-    return (std::find(inherited.begin(), inherited.end(), otherProto)
-            != inherited.end());
+    return proto->inheritsFrom(otherProto);
   }
 
   return false;
