@@ -643,8 +643,12 @@ extension Function {
     return nil
   }
 
+  /// True if this function has a dynamic-self metadata argument and any instruction is type dependent on it.
   var mayBindDynamicSelf: Bool {
-    self.bridged.mayBindDynamicSelf()
+    guard let dynamicSelf = self.dynamicSelfMetadata else {
+      return false
+    }
+    return dynamicSelf.uses.contains { $0.isTypeDependent }
   }
 }
 
