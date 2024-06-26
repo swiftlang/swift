@@ -783,34 +783,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
 
-    // The inherited entries influence the generic signature of the extension,
-    // because if it introduces conformance to invertible protocol IP, we do not
-    // we do not infer any requirements that the generic parameters to conform
+    // If the extension introduces conformance to invertible protocol IP, do not
+    // infer any conditional requirements that the generic parameters to conform
     // to invertible protocols. This forces people to write out the conditions.
-    const unsigned numEntries = ext->getInherited().size();
-    for (unsigned i = 0; i < numEntries; ++i) {
-      InheritedTypeRequest request{ext, i, TypeResolutionStage::Structural};
-      auto result = evaluateOrDefault(ctx.evaluator, request,
-                                      InheritedTypeResult::forDefault());
-      Type inheritedTy;
-      switch (result) {
-      case InheritedTypeResult::Inherited:
-        inheritedTy = result.getInheritedType();
-        break;
-      case InheritedTypeResult::Suppressed:
-      case InheritedTypeResult::Default:
-        continue;
-      }
-
-      if (inheritedTy) {
-        if (auto kp = inheritedTy->getKnownProtocol()) {
-          if (getInvertibleProtocolKind(*kp)) {
-            inferInvertibleReqs = false;
-            break;
-          }
-        }
-      }
-    }
+    inferInvertibleReqs = !ext->isAddingConformanceToInvertible();
 
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
