@@ -31,13 +31,13 @@
         "swift-tools-support-core": {
             "remote": { "id": "apple/swift-tools-support-core" } },
         "swiftpm": {
-            "remote": { "id": "apple/swift-package-manager" } },
+            "remote": { "id": "swiftlang/swift-package-manager" } },
         "swift-syntax": {
-            "remote": { "id": "apple/swift-syntax" } },
+            "remote": { "id": "swiftlang/swift-syntax" } },
         "swift-system": {
             "remote": { "id": "apple/swift-system" } },
         "swift-stress-tester": {
-            "remote": { "id": "apple/swift-stress-tester" } },
+            "remote": { "id": "swiftlang/swift-stress-tester" } },
         "swift-corelibs-xctest": {
             "remote": { "id": "apple/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
@@ -64,11 +64,11 @@
         "swift-cmark-gfm": {
              "remote": { "id": "apple/swift-cmark" } },
         "indexstore-db": {
-            "remote": { "id": "apple/indexstore-db" } },
+            "remote": { "id": "swiftlang/indexstore-db" } },
         "sourcekit-lsp": {
-            "remote": { "id": "apple/sourcekit-lsp" } },
+            "remote": { "id": "swiftlang/sourcekit-lsp" } },
         "swift-format": {
-            "remote": { "id": "apple/swift-format" } },
+            "remote": { "id": "swiftlang/swift-format" } },
         "swift-installer-scripts": {
             "remote": { "id": "swiftlang/swift-installer-scripts" } },
         "swift-docc": {
@@ -88,7 +88,7 @@
         "swift-experimental-string-processing": {
             "remote": { "id": "apple/swift-experimental-string-processing" } },
         "swift-sdk-generator": {
-            "remote": { "id": "apple/swift-sdk-generator" } },
+            "remote": { "id": "swiftlang/swift-sdk-generator" } },
         "swift-llvm-bindings": {
             "remote": { "id": "apple/swift-llvm-bindings" } },
         "llvm-project": {
