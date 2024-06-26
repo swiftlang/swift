@@ -3,7 +3,7 @@
     "https-clone-pattern": "https://github.com/%s.git",
     "repos" : {
         "swift": {
-            "remote": { "id": "apple/swift" } },
+            "remote": { "id": "swiftlang/swift" } },
         "cmark": {
             "remote": { "id": "apple/swift-cmark" } },
         "llbuild": {
@@ -49,7 +49,7 @@
         "swift-corelibs-libdispatch": {
             "remote": { "id": "apple/swift-corelibs-libdispatch" } },
         "swift-integration-tests": {
-            "remote": { "id": "apple/swift-integration-tests" } },
+            "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
@@ -70,7 +70,7 @@
         "swift-format": {
             "remote": { "id": "apple/swift-format" } },
         "swift-installer-scripts": {
-            "remote": { "id": "apple/swift-installer-scripts" } },
+            "remote": { "id": "swiftlang/swift-installer-scripts" } },
         "swift-docc": {
             "remote": { "id": "apple/swift-docc" } },
         "swift-lmdb": {
