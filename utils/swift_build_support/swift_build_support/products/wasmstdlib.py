@@ -90,6 +90,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_STDLIB_TRACING:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_ASLR:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_CONCURRENCY_TRACING:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL', 'FALSE')
