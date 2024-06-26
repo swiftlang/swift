@@ -146,14 +146,14 @@ llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>>
 SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
   llvm::TargetOptions TargetOpt;
   std::string CPU;
-  std::string Triple;
+  llvm::Triple Triple;
   std::vector<std::string> Features;
   const auto &Invocation = CI.getInvocation();
   const auto &IRGenOpts = Invocation.getIRGenOptions();
   auto &Ctx = CI.getASTContext();
   std::tie(TargetOpt, CPU, Features, Triple) =
       getIRTargetOptions(IRGenOpts, Ctx);
-  auto JTMB = llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
+  auto JTMB = llvm::orc::JITTargetMachineBuilder(Triple)
                   .setRelocationModel(llvm::Reloc::PIC_)
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))

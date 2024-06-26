@@ -118,7 +118,7 @@ static cl::opt<bool> AlignModuleToPageSize(
     cl::desc("Align the text section of all LLVM modules to the page size"));
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
-           std::string>
+           llvm::Triple>
 swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
@@ -164,8 +164,14 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
     break;
   }
 
+  // Infer the target by combining the arch from effective clang triple + vendor
+  // and platform from swift target.
+  auto Target = Ctx.LangOpts.Target;
+  Target.setArch(Clang->getTargetInfo().getTriple().getArch(),
+                 Clang->getTargetInfo().getTriple().getSubArch());
+
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
+  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, Target);
 }
 
 void setModuleFlags(IRGenModule &IGM) {
@@ -869,11 +875,10 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
   std::string CPU;
-  std::string EffectiveClangTriple;
+  llvm::Triple EffectiveTriple;
   std::vector<std::string> targetFeaturesArray;
-  std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveClangTriple)
-    = getIRTargetOptions(Opts, Ctx);
-  const llvm::Triple &EffectiveTriple = llvm::Triple(EffectiveClangTriple);
+  std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveTriple) =
+      getIRTargetOptions(Opts, Ctx);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;
