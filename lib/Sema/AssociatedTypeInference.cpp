@@ -2489,9 +2489,8 @@ AssociatedTypeInference::computeDefaultTypeWitness(
 }
 
 static std::pair<Type, TypeDecl *>
-deriveTypeWitness(DeclContext *DC,
-                  NominalTypeDecl *TypeDecl,
-                  AssociatedTypeDecl *AssocType) {
+deriveTypeWitness(const NormalProtocolConformance *Conformance,
+                  NominalTypeDecl *TypeDecl, AssociatedTypeDecl *AssocType) {
   auto *protocol = cast<ProtocolDecl>(AssocType->getDeclContext());
 
   auto knownKind = protocol->getKnownProtocolKind();
@@ -2499,10 +2498,7 @@ deriveTypeWitness(DeclContext *DC,
   if (!knownKind)
     return std::make_pair(nullptr, nullptr);
 
-  auto Decl = DC->getInnermostDeclarationDeclContext();
-
-  DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
-                             protocol);
+  DerivedConformance derived(Conformance, TypeDecl, protocol);
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
     return std::make_pair(derived.deriveRawRepresentable(AssocType), nullptr);
@@ -2536,7 +2532,7 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Try to derive the type witness.
-  auto result = deriveTypeWitness(dc, derivingTypeDecl, assocType);
+  auto result = deriveTypeWitness(conformance, derivingTypeDecl, assocType);
   if (!result.first)
     return std::make_pair(Type(), nullptr);
 
