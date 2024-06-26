@@ -18,15 +18,15 @@ let package = Package(
     .executableTarget(
       name: "swift-plugin-server",
       dependencies: [
-        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "SwiftLibraryPluginProvider", package: "swift-syntax"),
+        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
       ]
     ),
     .target(
       name: "SwiftInProcPluginServer",
       dependencies: [
-        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
-        .product(name: "SwiftLibraryPluginProvider", package: "swift-syntax"),
+        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
       ]
     ),
   ],
