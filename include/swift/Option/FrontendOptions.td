@@ -1257,6 +1257,12 @@ def enable_move_inout_stack_protector :
   Flag<["-"], "enable-move-inout-stack-protector">,
   HelpText<"Enable the stack protector by moving values to temporaries">;
 
+// This feature is enabled by default, the flag is a no-op.
+def enable_import_ptrauth_field_function_pointers :
+   Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
+   HelpText<"Enable import of custom ptrauth qualified field function pointers. "
+            "This is on by default.">;
+
 def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
