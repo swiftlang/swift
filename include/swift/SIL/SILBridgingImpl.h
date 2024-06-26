@@ -687,6 +687,10 @@ bool BridgedFunction::hasUnsafeNonEscapableResult() const {
   return getFunction()->hasUnsafeNonEscapableResult();
 }
 
+bool BridgedFunction::hasDynamicSelfMetadata() const {
+  return getFunction()->hasDynamicSelfMetadata();
+}
+
 BridgedFunction::EffectsKind BridgedFunction::getEffectAttribute() const {
   return (EffectsKind)getFunction()->getEffectsKind();
 }
