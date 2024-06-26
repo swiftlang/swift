@@ -112,7 +112,7 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
     // between getTypeForTerm() and isValidTypeParameter(), we need to add rules
     // for inherited protocols.
     if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
-      for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+      for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
         Requirement req(RequirementKind::Conformance,
                         proto->getSelfInterfaceType(),
                         inheritedProto->getDeclaredInterfaceType());
@@ -238,7 +238,7 @@ void RuleBuilder::addPermanentProtocolRules(const ProtocolDecl *proto) {
   for (auto *assocType : proto->getAssociatedTypeMembers())
     addAssociatedType(assocType, proto);
 
-  for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+  for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
     for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
   }
@@ -553,7 +553,7 @@ void RuleBuilder::collectPackShapeRules(ArrayRef<GenericTypeParamType *> generic
       addMemberShapeRule(proto, assocType);
     }
 
-    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+    for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
       for (auto *assocType : inheritedProto->getAssociatedTypeMembers()) {
         addMemberShapeRule(proto, assocType);
       }

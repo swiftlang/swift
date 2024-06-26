@@ -1072,7 +1072,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
   // Collect all typealiases from inherited protocols recursively.
   llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
-  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
+  for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
     for (auto req : inheritedProto->getMembers()) {
       if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
         if (!isSuitableType(typeReq))
