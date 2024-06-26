@@ -696,7 +696,7 @@ extension String {
         _internalInvariant(!copy._guts.isSmall)
         return copy._bridgeToObjectiveCImpl()
     }
-    if _guts._object.isImmortal && !_guts._object.hasObjCBridgeableObject {
+    if _guts._object.isImmortal {
       // TODO: We'd rather emit a valid ObjC object statically than create a
       // shared string class instance.
       let gutsCountAndFlags = _guts._object._countAndFlags
