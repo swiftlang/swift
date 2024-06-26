@@ -23,11 +23,12 @@
 
 // Class
 // CHECK: [[selector_data__cxx_destruct:@[^, ]+]] = private global [14 x i8] c".cxx_destruct\00", section "__TEXT,__objc_methname,cstring_literals", align 1
-// CHECK-LABEL: @_INSTANCE_METHODS_ImplClass = internal constant { i32, i32, [9 x { ptr, ptr, ptr }] } { i32 24, i32 9, [9 x { ptr, ptr, ptr }] [
+// CHECK-LABEL: @_INSTANCE_METHODS_ImplClass = internal constant { i32, i32, [10 x { ptr, ptr, ptr }] } { i32 24, i32 10, [10 x { ptr, ptr, ptr }] [
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(init)", ptr @".str.7.@16@0:8", ptr @"$sSo9ImplClassC19objc_implementationEABycfcTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(implProperty)", ptr @".str.7.i16@0:8", ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvgTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(setImplProperty:)", ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvsTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(mainMethod:)", ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE10mainMethodyys5Int32VFTo{{(\.ptrauth)?}}" }
+// CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(asyncMethodWithCompletionHandler:)", ptr @".str.16.v24@0:8@?<v@?>16", ptr @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaFTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(extensionMethod:)", ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE15extensionMethodyys5Int32VFTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(copyWithZone:)", ptr @".str.11.@24@0:8^v16", ptr @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tFTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(mutableCopyWithZone:)", ptr @".str.11.@24@0:8^v16", ptr @"$sSo9ImplClassC19objc_implementationE11mutableCopy4withypSg10ObjectiveC6NSZoneVSg_tFTo{{(\.ptrauth)?}}" }
@@ -61,6 +62,7 @@
   final var implProperty2: NSObject?
   
   @objc func mainMethod(_: Int32) { print(implProperty) }
+  @objc func asyncMethod() async {}
   @objc func extensionMethod(_: Int32) {}
 
   @objc(copyWithZone:)
@@ -130,7 +132,6 @@
 
 // Swift metadata
 // CHECK: @"$s19objc_implementationMXM" = linkonce_odr hidden constant <{ i32, i32, i32 }> <{ i32 0, i32 0, i32 trunc (i64 sub (i64 ptrtoint (ptr @.str.19.objc_implementation to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32 }>, ptr @"$s19objc_implementationMXM", i32 0, i32 2) to i64)) to i32) }>, section "__TEXT,__constg_swiftt", align 4
-// CHECK: @"symbolic So9ImplClassC" = linkonce_odr hidden constant <{ [13 x i8], i8 }> <{ [13 x i8] c"So9ImplClassC", i8 0 }>, section "__TEXT,__swift5_typeref, regular"{{.*}}, align 2
 // CHECK: @"$s19objc_implementation13SwiftSubclassCMn" = constant <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }> <{ i32 80, i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s19objc_implementationMXM" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }>, ptr @"$s19objc_implementation13SwiftSubclassCMn", i32 0, i32 1) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (ptr @.str.13.SwiftSubclass to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }>, ptr @"$s19objc_implementation13SwiftSubclassCMn", i32 0, i32 2) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s19objc_implementation13SwiftSubclassCMa" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }>, ptr @"$s19objc_implementation13SwiftSubclassCMn", i32 0, i32 3) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s19objc_implementation13SwiftSubclassCMF" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }>, ptr @"$s19objc_implementation13SwiftSubclassCMn", i32 0, i32 4) to i64)) to i32), i32 trunc (i64 sub (i64 ptrtoint (ptr @"symbolic So9ImplClassC" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }>, ptr @"$s19objc_implementation13SwiftSubclassCMn", i32 0, i32 5) to i64)) to i32), i32 3, i32 10, i32 0, i32 0, i32 10 }>, section "__TEXT,__constg_swiftt", align 4
 // CHECK: @"$s19objc_implementation13SwiftSubclassCMf" = internal global <{ ptr, ptr, ptr, i64, ptr, ptr, ptr, i64, i32, i32, i32, i16, i16, i32, i32, ptr, ptr }> <{ ptr null, ptr @"$s19objc_implementation13SwiftSubclassCfD", ptr @"$sBOWV", i64 ptrtoint (ptr @"OBJC_METACLASS_$__TtC19objc_implementation13SwiftSubclass" to i64), ptr @"OBJC_CLASS_$_ImplClass", ptr @_objc_empty_cache, ptr null, i64 add (i64 ptrtoint (ptr @_DATA__TtC19objc_implementation13SwiftSubclass to i64), i64 2), i32 0, i32 0, i32 24, i16 7, i16 0, i32 104, i32 24, ptr @"$s19objc_implementation13SwiftSubclassCMn", ptr null }>, section "__DATA,__objc_data, regular", align 8
 // CHECK: @"symbolic _____ 19objc_implementation13SwiftSubclassC" = linkonce_odr hidden constant <{ i8, i32, i8 }> <{ i8 1, i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s19objc_implementation13SwiftSubclassCMn" to i64), i64 ptrtoint (ptr getelementptr inbounds (<{ i8, i32, i8 }>, ptr @"symbolic _____ 19objc_implementation13SwiftSubclassC", i32 0, i32 1) to i64)) to i32), i8 0 }>, section "__TEXT,__swift5_typeref, regular"{{.*}}, align 2
@@ -236,6 +237,33 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 
 // ObjC calling convention -[ImplClass mainMethod:]
 // CHECK-LABEL: define internal void @"$sSo9ImplClassC19objc_implementationE10mainMethodyys5Int32VFTo"
+
+// Swift calling convention -[ImplClass asyncMethodWithCompletion:]
+// CHECK-LABEL: define hidden swifttailcc void @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaF"
+
+// ObjC calling convention -[ImplClass asyncMethodWithCompletion:]
+// CHECK-LABEL: define internal void @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaFTo"
+// CHECK: call swiftcc void @"$ss29_runTaskForBridgedAsyncMethodyyyyYaYbcnF"(ptr @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaFyyYacfU_To{{[^"]*}}"
+
+// ObjC calling convention -[ImplClass asyncMethodWithCompletion:] (start of helper closure)
+// CHECK-LABEL: define linkonce_odr hidden swifttailcc void @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaFyyYacfU_To"
+// CHECK: musttail call swifttailcc void @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaF"
+
+// ObjC calling convention -[ImplClass asyncMethodWithCompletion:] (end of helper closure)
+// CHECK-LABEL: define internal swifttailcc void @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaFyyYacfU_ToTQ0_"
+
+// Make sure this function incorporates a nil check
+// CHECK: [[IS_COMPLETION_NULL:%[0-9]+]] = icmp eq i64 {{%\.reload[0-9+]}}, 0
+// CHECK: br i1 [[IS_COMPLETION_NULL]], label %[[FINISH:[^,]+]], label %[[RUN_COMPLETION:[^,]+]]
+// CHECK: [[RUN_COMPLETION]]:
+
+// The actual call to the block
+// CHECK: call void {{%[0-9]+}}
+
+// Final control flow for the nil check
+// CHECK: br label %[[FINISH]]
+// CHECK: [[FINISH]]:
+// CHECK: ret void
 
 // Swift calling convention -[ImplClass extensionMethod:]
 // CHECK-LABEL: define hidden swiftcc void @"$sSo9ImplClassC19objc_implementationE15extensionMethodyys5Int32VF"
