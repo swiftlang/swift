@@ -161,7 +161,7 @@ public func withTaskExecutorPreference<T, Failure>(
 
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
-@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
 public func __abi__withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
