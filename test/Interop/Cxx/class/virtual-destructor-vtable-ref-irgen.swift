@@ -1,6 +1,7 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: %target-swiftxx-frontend -emit-ir -I %t/Inputs -validate-tbd-against-ir=none %t/test.swift | %FileCheck %s
+// RUN: %target-swiftxx-frontend -verify -emit-ir -I %t/Inputs -validate-tbd-against-ir=none %t/test.swift -Xcc -DDELETED -o /dev/null
 
 //--- Inputs/module.modulemap
 module VtableDestructorRef {
@@ -11,6 +12,27 @@ module VtableDestructorRef {
 
 
 namespace impl {
+
+#ifdef DELETED
+
+template<class T>
+class BaseClass
+{
+public:
+    ~BaseClass() = delete;
+};
+
+template<class Fp, class T>
+class Func: public BaseClass<T>
+{
+   Fp x;
+public:
+    inline explicit Func(Fp x);
+    Func(const Func &) = delete;
+    ~Func();
+};
+
+#else
 
 template<class T>
 class BaseClass
@@ -28,6 +50,7 @@ public:
     inline explicit Func(Fp x) : x(x) {}
 };
 
+#endif
 
 template <class _Fp> class ValueFunc;
 
@@ -103,4 +126,4 @@ public func test() {
 }
 
 // Make sure we reach the virtual destructor of 'Func'.
-// CHECK: define linkonce_odr {{.*}} @{{_ZN4impl4FuncIZNK8MyFutureIiE12OnCompletionEPFvPvES3_EUlRK12MyFutureBaseE_FvS8_EED2Ev|\?\?1\?\$BaseClass@\$\$A6AXAEBVMyFutureBase@@@Z@impl@@UEAA@XZ}}
+// CHECK: define linkonce_odr {{.*}} @{{_ZN4impl4FuncIZNK8MyFutureIiE12OnCompletionEPFvPvES3_EUlRK12MyFutureBaseE_FvS8_EED2Ev|"\?\?1\?\$BaseClass@\$\$A6AXAEBVMyFutureBase@@@Z@impl@@UEAA@XZ"}}

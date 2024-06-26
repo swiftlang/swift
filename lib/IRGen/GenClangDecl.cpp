@@ -287,7 +287,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       if (auto *destructor = record->getDestructor()) {
         // Ensure virtual destructors have the body defined, even if they're
         // not used directly, as they might be referenced by the emitted vtable.
-        if (destructor->isVirtual())
+        if (destructor->isVirtual() && !destructor->isDeleted())
           ensureImplicitCXXDestructorBodyIsDefined(destructor);
       }
       for (auto *method : record->methods()) {
@@ -342,12 +342,12 @@ void IRGenModule::finalizeClangCodeGen() {
 
 void IRGenModule::ensureImplicitCXXDestructorBodyIsDefined(
     clang::CXXDestructorDecl *destructor) {
-  if (!destructor->isUserProvided() &&
-      !destructor->doesThisDeclarationHaveABody()) {
-    assert(!destructor->isDeleted() &&
-           "Swift cannot handle a type with no known destructor.");
-    // Make sure we define the destructor so we have something to call.
-    auto &sema = Context.getClangModuleLoader()->getClangSema();
-    sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
-  }
+  if (destructor->isUserProvided() ||
+      destructor->doesThisDeclarationHaveABody())
+    return;
+  assert(!destructor->isDeleted() &&
+         "Swift cannot handle a type with no known destructor.");
+  // Make sure we define the destructor so we have something to call.
+  auto &sema = Context.getClangModuleLoader()->getClangSema();
+  sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
 }
