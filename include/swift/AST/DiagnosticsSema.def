@@ -7719,8 +7719,8 @@ ERROR(inverse_associatedtype_restriction, none,
       "cannot suppress '%0' requirement of an associated type",
       (StringRef))
 ERROR(inverse_on_class, none,
-      "classes cannot be '~%0'",
-      (StringRef))
+      "%select{classes|actors}1 cannot be '~%0'",
+      (StringRef, bool))
 ERROR(inverse_with_class_constraint, none,
       "composition involving %select{class requirement %2|'AnyObject'}0 "
       "cannot contain '~%1'",

@@ -974,7 +974,6 @@ public:
     SwapSelfAndDependentMemberType = 8,
     PrintInherited = 16,
     PrintInverseRequirements = 32,
-    IncludeOuterInverses = 64,
   };
 
   /// The default generic signature flags for printing requirements.
@@ -1004,7 +1003,8 @@ public:
   void
   printGenericSignature(GenericSignature genericSig,
                         unsigned flags,
-                        llvm::function_ref<bool(const Requirement &)> filter);
+                        llvm::function_ref<bool(const Requirement &)> filter,
+                        InverseFilter inverseFilter);
   void printSingleDepthOfGenericSignature(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements,
@@ -1693,9 +1693,13 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
 void PrintAST::printGenericSignature(GenericSignature genericSig,
                                      unsigned flags) {
+  ASSERT(!((flags & InnermostOnly) && (flags & PrintInverseRequirements))
+         && "InnermostOnly + PrintInverseRequirements is not handled");
+
   printGenericSignature(genericSig, flags,
                         // print everything
-                        [&](const Requirement &) { return true; });
+                        [&](const Requirement &) { return true; },
+                        AllInverses());
 }
 
 // Erase any requirements involving invertible protocols.
@@ -1710,33 +1714,41 @@ static void eraseInvertibleProtocolConformances(
     });
 }
 
+InversesAtDepth::InversesAtDepth(GenericContext *level) {
+  includedDepth = std::nullopt;
+  // Does this generic context have its own generic parameters?
+  if (auto *list = level->getGenericParams()) {
+    includedDepth = list->getParams().back()->getDepth(); // use this depth.
+  }
+}
+bool InversesAtDepth::operator()(const InverseRequirement &inverse) const {
+  if (includedDepth) {
+    auto d = inverse.subject->castTo<GenericTypeParamType>()->getDepth();
+    return d == includedDepth.value();
+  }
+  return false;
+}
+
 void PrintAST::printGenericSignature(
     GenericSignature genericSig,
     unsigned flags,
-    llvm::function_ref<bool(const Requirement &)> filter) {
+    llvm::function_ref<bool(const Requirement &)> filter,
+    InverseFilter inverseFilter) {
 
   SmallVector<Requirement, 2> requirements;
   SmallVector<InverseRequirement, 2> inverses;
 
   if (flags & PrintInverseRequirements) {
     genericSig->getRequirementsWithInverses(requirements, inverses);
+    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
+      return !inverseFilter(inverse);
+    });
   } else {
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
 
     if (Options.SuppressNoncopyableGenerics)
       eraseInvertibleProtocolConformances(requirements);
-  }
-
-  // Unless `IncludeOuterInverses` is enabled, limit inverses to the
-  // innermost generic parameters.
-  if (!(flags & IncludeOuterInverses) && !inverses.empty()) {
-    auto innerParams = genericSig.getInnermostGenericParams();
-    SmallPtrSet<TypeBase *, 4> innerParamSet(innerParams.begin(),
-                                             innerParams.end());
-    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
-      return !innerParamSet.contains(inverse.subject.getPointer());
-    });
   }
 
   if (flags & InnermostOnly) {
@@ -2772,8 +2784,9 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   // In many cases, inverses should not be printed for outer generic parameters.
   // Exceptions to that include extensions, as it's valid to write an inverse
   // on the generic parameters they get from the extended nominal.
-  if (isa<ExtensionDecl>(decl))
-    flags |= IncludeOuterInverses;
+  InverseFilter inverseFilter = AllInverses();
+  if (!isa<ExtensionDecl>(decl))
+    inverseFilter = InversesAtDepth(decl);
 
   Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
   printGenericSignature(genericSig,
@@ -2782,7 +2795,8 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
                           if (parentSig)
                             return !parentSig->isRequirementSatisfied(req);
                           return true;
-                        });
+                        },
+                        inverseFilter);
   Printer.printStructurePost(PrintStructureKind::DeclGenericParameterClause);
 }
 
@@ -2916,20 +2930,6 @@ void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
-/// If an extension adds a conformance for an invertible protocol, then we
-/// should not print inverses for its generic signature, because no conditional
-/// requirements are inferred by default for such an extension.
-static bool isExtensionAddingInvertibleConformance(const ExtensionDecl *ext) {
-  auto conformances = ext->getLocalConformances();
-  for (auto *conf : conformances) {
-    if (conf->getProtocol()->getInvertibleProtocolKind()) {
-      assert(conformances.size() == 1 && "expected solo conformance");
-      return true;
-    }
-  }
-  return false;
-}
-
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
   if (Options.PrintCompatibilityFeatureChecks &&
@@ -3054,24 +3054,22 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
 
-      auto genSigFlags = defaultGenericRequirementFlags()
-                       | IncludeOuterInverses;
+      auto genSigFlags = defaultGenericRequirementFlags();
 
       // Disable printing inverses if the extension is adding a conformance
       // for an invertible protocol itself, as we do not infer any requirements
       // in such an extension. We need to print the whole signature:
       //     extension S: Copyable where T: Copyable
-      if (isExtensionAddingInvertibleConformance(decl)) {
+      if (decl->isAddingConformanceToInvertible())
         genSigFlags &= ~PrintInverseRequirements;
-        genSigFlags &= ~IncludeOuterInverses;
-      }
 
       printGenericSignature(genericSig,
                             genSigFlags,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);
-      });
+      },
+      AllInverses());
     }
   }
   if (Options.TypeDefinitions) {

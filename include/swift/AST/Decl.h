@@ -1919,6 +1919,10 @@ public:
   /// \endcode
   bool isWrittenWithConstraints() const;
 
+  /// Does this extension add conformance to an invertible protocol for the
+  /// extended type?
+  bool isAddingConformanceToInvertible() const;
+
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
   Identifier getObjCCategoryName() const;
