@@ -1260,7 +1260,7 @@ def enable_move_inout_stack_protector :
 // This feature is enabled by default, the flag is a no-op.
 def enable_import_ptrauth_field_function_pointers :
    Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
-   HelpText<"Enable import of custom ptrauth qualified field function pointers."
+   HelpText<"Enable import of custom ptrauth qualified field function pointers. "
             "This is on by default.">;
 
 def disable_import_ptrauth_field_function_pointers :
