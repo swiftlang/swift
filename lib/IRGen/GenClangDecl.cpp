@@ -85,8 +85,19 @@ public:
   bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
     callback(CXXCD);
     for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
-      if (clang::FieldDecl *FD = CXXCI->getMember())
+      if (clang::FieldDecl *FD = CXXCI->getMember()) {
         callback(FD);
+        // A throwing constructor might throw after the field is initialized,
+        // emitting additional cleanup code that destroys the field. Make sure
+        // we record the destructor of the field in that case as it might need
+        // to be potentially emitted.
+        if (auto *recordType = FD->getType()->getAsCXXRecordDecl()) {
+          if (auto *destructor = recordType->getDestructor()) {
+            if (!destructor->isDeleted())
+              callback(destructor);
+          }
+        }
+      }
     }
     return true;
   }
