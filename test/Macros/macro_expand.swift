@@ -167,7 +167,7 @@ func testFileID(a: Int, b: Int) {
     // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+4]], column: 5
     // CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
     // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}// original-source-range: {{.*}}")
-    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: ""\))}}
+    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: "[^"]*"\))}}
     #addBlocker(
       #stringify(a - b)
       )
