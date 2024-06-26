@@ -137,10 +137,16 @@ toolchains::Darwin::addPluginArguments(const ArgList &Args,
   CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
       programPath, /*shared=*/true, pluginPath);
 
-  auto defaultPluginPath = pluginPath;
-  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
+  // In-process plugin server path.
+  auto inProcPluginServerPath = pluginPath;
+  llvm::sys::path::append(inProcPluginServerPath, "host",
+                          "libSwiftInProcPluginServer.dylib");
+  Arguments.push_back("-in-process-plugin-server-path");
+  Arguments.push_back(Args.MakeArgString(inProcPluginServerPath));
 
   // Default plugin path.
+  auto defaultPluginPath = pluginPath;
+  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
   Arguments.push_back("-plugin-path");
   Arguments.push_back(Args.MakeArgString(defaultPluginPath));
 
