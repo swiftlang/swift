@@ -37,13 +37,6 @@ int CONDITIONAL_ASSERT_Global_enable_flag =
 #endif
 
 void ASSERT_failure(const char *expr, const char *filename, int line, const char *func) {
-  if (AssertHelp) {
-    ASSERT_help();
-  } else {
-    llvm::errs() << "Assertion help:  -Xllvm -assert-help\n";
-  }
-
-
   // Format here matches that used by `assert` on macOS:
   llvm::errs()
     << "Assertion failed: "
@@ -51,6 +44,8 @@ void ASSERT_failure(const char *expr, const char *filename, int line, const char
     << "function " << func << " at "
     << filename << ":"
     << line << ".\n";
+
+  ASSERT_help();
 
   if (AssertContinue) {
     llvm::errs() << "Continuing after failed assertion (-Xllvm -assert-continue)\n";
@@ -66,6 +61,11 @@ void ASSERT_help() {
     return;
   }
   ASSERT_help_shown = 1;
+
+  if (!AssertHelp) {
+    llvm::errs() << "(to display assertion configuration options: -Xllvm -assert-help)\n";
+    return;
+  }
 
   llvm::errs() << "\n";
   llvm::errs() << "Control assertion behavior with one or more of the following options:\n\n";
