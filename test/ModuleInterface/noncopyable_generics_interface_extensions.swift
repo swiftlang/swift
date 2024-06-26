@@ -6,7 +6,7 @@
 
 // swift-interface-format-version: 1.0
 // swift-compiler-version: Apple Swift version 6.0 effective-5.10 (swiftlang-6.0.0.4.52 clang-1600.0.21.1.3)
-// swift-module-flags: -target arm64-apple-macosx15.0 -enable-objc-interop -enable-library-evolution -module-name bug
+// swift-module-flags: -enable-objc-interop -enable-library-evolution -module-name bug
 import Swift
 import _Concurrency
 import _StringProcessing
