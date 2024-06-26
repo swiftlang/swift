@@ -268,15 +268,10 @@ public:
           dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
           src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
           asImpl().Impl::getSize(IGF, T));
-      return;
-    }
-
-    // If the fields are not ABI-accessible, use the value witness table.
-    if (!AreFieldsABIAccessible) {
+    } else if (!AreFieldsABIAccessible) {
+      // If the fields are not ABI-accessible, use the value witness table.
       return emitInitializeWithTakeCall(IGF, T, dest, src);
-    }
-
-    if (auto rawLayout = T.getRawLayout()) {
+    } else if (auto rawLayout = T.getRawLayout()) {
       // Because we have a rawlayout attribute, we know this has to be a struct.
       auto structDecl = T.getStructOrBoundGenericStruct();
 
@@ -292,9 +287,7 @@ public:
                                           isOutlined);
         }
       }
-    }
-
-    if (isOutlined || T.hasParameterizedExistential()) {
+    } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
