@@ -23,6 +23,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Type.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
@@ -31,11 +32,13 @@ class ClangTypeConverter :
     public TypeVisitor<ClangTypeConverter, clang::QualType> {
 
   using super = TypeVisitor<ClangTypeConverter, clang::QualType>;
+  using TypeAndAllowBridging = llvm::PointerIntPair<Type, 1, bool>;
 
-  llvm::DenseMap<Type, clang::QualType> Cache;
+  llvm::DenseMap<TypeAndAllowBridging, clang::QualType> Cache;
   llvm::DenseMap<const clang::Decl *, swift::Decl *> ReversedExportMap;
 
   bool StdlibTypesAreCached = false;
+  bool AllowBridging = true;
 
   ASTContext &Context;
 
@@ -100,6 +103,7 @@ private:
   friend ASTContext; // HACK: expose `convert` method to ASTContext
 
   clang::QualType convert(Type type);
+  clang::QualType convert(Type type, bool allowBridging);
 
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);

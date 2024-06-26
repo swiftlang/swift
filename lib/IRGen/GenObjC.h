@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_GENOBJC_H
 
 #include "swift/SIL/SILDeclRef.h"
+#include "Field.h"
 
 namespace llvm {
   class Type;
@@ -173,7 +174,11 @@ namespace irgen {
   /// Get the type encoding for an ObjC property.
   void getObjCEncodingForPropertyType(IRGenModule &IGM, VarDecl *property,
                                       std::string &s);
-  
+
+  /// Get the type encoding for an ObjC ivar, represented by an IRGen Field.
+  void getObjCEncodingForIvarType(IRGenModule &IGM, Field field,
+                                  SILType baseType, std::string &s);
+
   /// Produces extended encoding of ObjC block signature.
   /// \returns the encoded type.
   llvm::Constant *getBlockTypeExtendedEncoding(IRGenModule &IGM,
