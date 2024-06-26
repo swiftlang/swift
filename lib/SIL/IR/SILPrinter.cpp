@@ -1738,6 +1738,9 @@ public:
   }
 
   void visitLoadBorrowInst(LoadBorrowInst *LBI) {
+    if (LBI->isUnchecked()) {
+      *this << "[unchecked] ";
+    }
     *this << getIDAndType(LBI->getOperand());
   }
 
