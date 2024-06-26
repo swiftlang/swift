@@ -10,6 +10,7 @@ add_swift_host_library(swiftFrontend STATIC
   CompileJobCacheResult.cpp
   CompilerInvocation.cpp
   DependencyVerifier.cpp
+  DiagnosticHelper.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
