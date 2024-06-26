@@ -3524,13 +3524,19 @@ private:
     return call;
   }
 
-  /// Walks up to the first enclosing LoadExpr and returns it.
+  /// Walks up from a potential member reference to the first LoadExpr that would
+  /// make the member reference an r-value instead of an l-value.
   const LoadExpr *getEnclosingLoadExpr() const {
     assert(!ExprStack.empty() && "must be called while visiting an expression");
     ArrayRef<const Expr *> stack = ExprStack;
     stack = stack.drop_back();
 
     for (auto expr : llvm::reverse(stack)) {
+      // Do not search past the first enclosing ApplyExpr. Any enclosing
+      // LoadExpr from this point only applies to the result of the call.
+      if (auto applyExpr = dyn_cast<ApplyExpr>(expr))
+        return nullptr;
+
       if (auto loadExpr = dyn_cast<LoadExpr>(expr))
         return loadExpr;
     }
@@ -3631,12 +3637,7 @@ private:
 
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    // If there is a LoadExpr in the stack, then this InOutExpr is not actually
-    // indicative of any mutation so the access context should just be Getter.
-    auto accessContext = getEnclosingLoadExpr() ? MemberAccessContext::Getter
-                                                : MemberAccessContext::InOut;
-
-    walkInContext(E, E->getSubExpr(), accessContext);
+    walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
@@ -3656,7 +3657,6 @@ private:
 
     return;
   }
-
 
   /// Walk the given expression in the member access context.
   void walkInContext(Expr *baseExpr, Expr *E,
@@ -3693,8 +3693,10 @@ private:
       break;
 
     case MemberAccessContext::Setter:
-      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC, std::nullopt);
+      if (!getEnclosingLoadExpr()) {
+        diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
+                                 ReferenceRange, ReferenceDC, std::nullopt);
+      }
       break;
 
     case MemberAccessContext::InOut:
@@ -3702,9 +3704,11 @@ private:
                                ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
 
-      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC,
-                               DeclAvailabilityFlag::ForInout);
+      if (!getEnclosingLoadExpr()) {
+        diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
+                                 ReferenceRange, ReferenceDC,
+                                 DeclAvailabilityFlag::ForInout);
+      }
       break;
     }
   }
