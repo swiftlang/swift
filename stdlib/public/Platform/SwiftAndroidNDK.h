@@ -143,6 +143,7 @@
 #include <sys/user.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 
 #include <android/api-level.h>
 #include <android/asset_manager_jni.h>
