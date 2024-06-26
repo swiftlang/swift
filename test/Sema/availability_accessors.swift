@@ -56,21 +56,21 @@ struct BaseStruct<T> {
 
   var unavailableGetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 65 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 67 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set {}
   }
 
   var unavailableSetter: T {
     get { fatalError() }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 39 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 38 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 65 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 67 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 39 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 38 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 }
 
@@ -187,7 +187,7 @@ func testLValueAssignments_Class(_ someValue: ClassValue) {
 
   x.unavailableGetter = someValue
   x.unavailableGetter.a = someValue.a // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  x.unavailableGetter[0] = someValue.a // FIXME: missing diagnostic for getter
+  x.unavailableGetter[0] = someValue.a // expected-error {{getter for 'unavailableGetter' is unavailable}}
   x.unavailableGetter[0].b = 1 // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
   x.unavailableSetter = someValue // expected-error {{setter for 'unavailableSetter' is unavailable}}
@@ -197,8 +197,7 @@ func testLValueAssignments_Class(_ someValue: ClassValue) {
 
   x.unavailableGetterAndSetter = someValue // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x.unavailableGetterAndSetter.a = someValue.a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
-  // FIXME: missing diagnostic for getter
-  x.unavailableGetterAndSetter[0] = someValue.a
+  x.unavailableGetterAndSetter[0] = someValue.a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   x.unavailableGetterAndSetter[0].b = 1 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
@@ -207,11 +206,9 @@ func testSubscripts(_ s: BaseStruct<StructValue>) {
 
   // Available subscript, available member, varying argument availability
   x.available[available: s.available] = ()
-  x.available[available: s.unavailableGetter] = () // FIXME: missing diagnostic for getter
-  // FIXME: spurious diagnostic for setter
-  x.available[available: s.unavailableSetter] = () // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  // FIXME: spurious diagnostic for setter
-  x.available[available: s.unavailableGetterAndSetter] = () // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x.available[available: s.unavailableGetter] = () // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  x.available[available: s.unavailableSetter] = ()
+  x.available[available: s.unavailableGetterAndSetter] = () // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 
   _ = x.available[available: s.available]
   _ = x.available[available: s.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
