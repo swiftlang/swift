@@ -572,6 +572,13 @@ gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
   NominalTypeConformanceCollector ConformanceCollector(Protocols,
                                                        ConformanceDecls);
   Module->walk(ConformanceCollector);
+  // Visit macro expanded extensions
+  for (auto *FU : Module->getFiles())
+    if (auto *synthesizedSF = FU->getSynthesizedFile())
+      for (auto D : synthesizedSF->getTopLevelDecls())
+        if (isa<ExtensionDecl>(D))
+          D->walk(ConformanceCollector);
+
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(CD->getASTContext().evaluator,
                                           ConstantValueInfoRequest{CD, Module},
