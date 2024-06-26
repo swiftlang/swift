@@ -2640,8 +2640,13 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-            "Found load borrow that is invalidated by a local write?!");
+    if (LBI->isUnchecked()) {
+      require(LBI->getModule().getStage() == SILStage::Raw,
+              "load_borrow can only be [unchecked] in raw SIL");
+    } else {
+      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
+              "Found load borrow that is invalidated by a local write?!");
+    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {

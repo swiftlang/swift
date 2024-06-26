@@ -205,6 +205,22 @@ void MoveOnlyChecker::checkAddresses() {
 
 namespace {
 
+static bool canonicalizeLoadBorrows(SILFunction *F) {
+  bool changed = false;
+  for (auto &block : *F) {
+    for (auto &inst : block) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(&inst)) {
+        if (lbi->isUnchecked()) {
+          changed = true;
+          lbi->setUnchecked(false);
+        }
+      }
+    }
+  }
+  
+  return changed;
+}
+
 class MoveOnlyCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
@@ -219,8 +235,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     // If an earlier pass told use to not emit diagnostics for this function,
     // clean up any copies, invalidate the analysis, and return early.
     if (fn->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
-      if (cleanupNonCopyableCopiesAfterEmittingDiagnostic(getFunction()))
+      bool didChange = canonicalizeLoadBorrows(fn);
+      didChange |= cleanupNonCopyableCopiesAfterEmittingDiagnostic(getFunction());
+      if (didChange) {
         invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      }
       return;
     }
 
@@ -242,6 +261,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
       emitCheckerMissedCopyOfNonCopyableTypeErrors(fn,
                                                    checker.diagnosticEmitter);
     }
+
+    // Remaining borrows
+    // should be correctly immutable. We can canonicalize any remaining
+    // `load_borrow [unchecked]` instructions.
+    checker.madeChange |= canonicalizeLoadBorrows(fn);
 
     checker.madeChange |=
         cleanupNonCopyableCopiesAfterEmittingDiagnostic(fn);

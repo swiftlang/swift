@@ -1232,6 +1232,11 @@ namespace {
         return base;
       }
       auto result = SGF.B.createLoadBorrow(loc, base.getValue());
+      // Mark the load_borrow as unchecked. We can't stop the source code from
+      // trying to mutate or consume the same lvalue during this borrow, so
+      // we don't want verifiers to trip before the move checker gets a chance
+      // to diagnose these situations.
+      result->setUnchecked(true);
       return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
          base.getValue(), result);
     }
