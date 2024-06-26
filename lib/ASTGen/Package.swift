@@ -57,7 +57,7 @@ let package = Package(
     .target(
       name: "swiftASTGen",
       dependencies: [
-        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftParser", package: "swift-syntax"),
