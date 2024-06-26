@@ -1168,8 +1168,7 @@ extension _StringObject {
   internal var hasObjCBridgeableObject: Bool {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
-      return !self.isImmortal ||
-      (self.hasSharedStorage && self.sharedStorage._owner != nil)
+      return !self.isImmortal
     }
   }
 
@@ -1181,7 +1180,7 @@ extension _StringObject {
     fatalError("unreachable in embedded Swift")
 #else
     _internalInvariant(hasObjCBridgeableObject)
-    if self.hasSharedStorage {
+    if self.hasSharedStorage && self.sharedStorage.immortal {
       return self.sharedStorage._owner!
     }
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
@@ -1263,12 +1262,12 @@ extension _StringObject {
 #if _pointerBitWidth(_64)
     self.init(
       object: castStorage,
-      discriminator: Nibbles.largeImmortal(),
+      discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
 #elseif _pointerBitWidth(_32)
     self.init(
       variant: .native(castStorage),
-      discriminator: Nibbles.largeImmortal(),
+      discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
 #else
 #error("Unknown platform")
