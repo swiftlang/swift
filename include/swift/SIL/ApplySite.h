@@ -741,6 +741,11 @@ public:
     return getArguments().slice(0, getNumIndirectSILResults());
   }
 
+  OperandValueArrayRef getIndirectSILErrorResults() const {
+    return getArguments().slice(getNumIndirectSILResults(),
+                                getNumIndirectSILErrorResults());
+  }
+
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectSILResults() +
                                 getNumIndirectSILErrorResults());
