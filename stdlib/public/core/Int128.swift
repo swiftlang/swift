@@ -10,16 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-// MARK: - Memory layout
+// MARK: Memory layout
 
-/// A 128-bit signed integer type.
+/// A 128-bit signed integer value type.
 @available(SwiftStdlib 6.0, *)
 @frozen
 public struct Int128: Sendable {
+#if _pointerBitWidth(_64) || arch(arm64_32)
   //  On 64-bit platforms (including arm64_32 and any similar targets with
   //  32b pointers but HW-backed 64b integers), the layout is simply that
   //  of `Builtin.Int128`.
-#if _pointerBitWidth(_64) || arch(arm64_32)
   public var _value: Builtin.Int128
 
   @available(SwiftStdlib 6.0, *)
@@ -45,9 +45,9 @@ public struct Int128: Sendable {
   @_transparent
   public init(_low: UInt64, _high: Int64) {
 #if _endian(little)
-    self = unsafeBitCast((_low, _high), to: Int128.self)
+    self = unsafeBitCast((_low, _high), to: Self.self)
 #else
-    self = unsafeBitCast((_high, _low), to: Int128.self)
+    self = unsafeBitCast((_high, _low), to: Self.self)
 #endif
   }
   
@@ -55,15 +55,13 @@ public struct Int128: Sendable {
   //  On 32-bit platforms, we don't want to use Builtin.Int128 for layout
   //  because it would be 16B aligned, which is excessive for such targets
   //  (and generally incompatible with C's `_BitInt(128)`). Instead we lay
-  //  out the type as two `UInt64` fields--note that we have to be careful
+  //  out the type as two `{U}Int64` fields--note that we have to be careful
   //  about endianness in this case.
 #if _endian(little)
   public var _low: UInt64
-
   public var _high: Int64
 #else
   public var _high: Int64
-
   public var _low: UInt64
 #endif
 
@@ -94,6 +92,16 @@ public struct Int128: Sendable {
   }
 #endif
 
+  /// Creates a new instance with the same memory representation as the given
+  /// value.
+  ///
+  /// This initializer does not perform any range or overflow checking. The
+  /// resulting instance may not have the same numeric value as
+  /// `bitPattern`---it is only guaranteed to use the same pattern of bits in
+  /// its binary representation.
+  ///
+  /// - Parameter bitPattern: A value to use as the source of the new instance's
+  ///   binary representation.
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public init(bitPattern: UInt128) {
@@ -102,7 +110,6 @@ public struct Int128: Sendable {
 }
 
 // MARK: - Constants
-
 @available(SwiftStdlib 6.0, *)
 extension Int128 {
   @available(SwiftStdlib 6.0, *)
@@ -125,7 +132,6 @@ extension Int128 {
 }
 
 // MARK: - Conversions from other integers
-
 @available(SwiftStdlib 6.0, *)
 extension Int128: ExpressibleByIntegerLiteral,
                   _ExpressibleByBuiltinIntegerLiteral {
