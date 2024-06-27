@@ -510,7 +510,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   case SILArgumentConvention::Indirect_Out:
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
-    llvm_unreachable("Illegal convention for non-address types");
+    ASSERT(false && "Illegal convention for non-address types");
   }
   llvm_unreachable("covered switch");
 }
