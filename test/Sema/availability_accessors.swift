@@ -11,17 +11,7 @@ struct Nested {
   }
 }
 
-protocol ValueProto {
-  static var defaultValue: Self { get }
-
-  var a: Nested { get set }
-
-  subscript(_ i: Int) -> Nested { get set }
-
-  @discardableResult mutating func setToZero() -> Int
-}
-
-struct StructValue: ValueProto {
+struct StructValue {
   static var defaultValue: Self { .init(a: Nested(b: 1)) }
 
   var a: Nested
@@ -39,9 +29,7 @@ struct StructValue: ValueProto {
   }
 }
 
-class ClassValue: ValueProto {
-  static var defaultValue: Self { .init(a: Nested(b: 1)) }
-
+class ClassValue {
   var a: Nested
 
   required init(a: Nested) {
@@ -60,26 +48,29 @@ class ClassValue: ValueProto {
   }
 }
 
-struct BaseStruct<T: ValueProto> {
-  var available: T = .defaultValue
+struct BaseStruct<T> {
+  var available: T {
+    get { fatalError() }
+    set { }
+  }
 
   var unavailableGetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 63 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 65 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set {}
   }
 
   var unavailableSetter: T {
-    get { .defaultValue }
+    get { fatalError() }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 38 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 39 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 63 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 65 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 38 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 39 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 }
 
@@ -212,28 +203,38 @@ func testLValueAssignments_Class(_ someValue: ClassValue) {
 }
 
 func testSubscripts(_ s: BaseStruct<StructValue>) {
-  var x = SubscriptHelper()
+  var x = BaseStruct<SubscriptHelper>()
 
-  x[available: s.available] = ()
-  x[available: s.unavailableGetter] = () // FIXME: missing diagnostic for getter
+  // Available subscript, available member, varying argument availability
+  x.available[available: s.available] = ()
+  x.available[available: s.unavailableGetter] = () // FIXME: missing diagnostic for getter
   // FIXME: spurious diagnostic for setter
-  x[available: s.unavailableSetter] = () // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x.available[available: s.unavailableSetter] = () // expected-error {{setter for 'unavailableSetter' is unavailable}}
   // FIXME: spurious diagnostic for setter
-  x[available: s.unavailableGetterAndSetter] = () // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x.available[available: s.unavailableGetterAndSetter] = () // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 
-  _ = x[available: s.available]
-  _ = x[available: s.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  _ = x[available: s.unavailableSetter]
-  _ = x[available: s.unavailableGetterAndSetter] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  _ = x.available[available: s.available]
+  _ = x.available[available: s.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = x.available[available: s.unavailableSetter]
+  _ = x.available[available: s.unavailableGetterAndSetter] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 
-  x[unavailableGetter: s.available] = ()
-  _ = x[unavailableGetter: s.available] // expected-error {{getter for 'subscript(unavailableGetter:)' is unavailable}}
+  // Varying subscript availability, available member, available argument
+  x.available[unavailableGetter: s.available] = ()
+  x.available[unavailableSetter: s.available] = () // expected-error {{setter for 'subscript(unavailableSetter:)' is unavailable}}
+  x.available[unavailableGetterAndSetter: s.available] = () // expected-error {{setter for 'subscript(unavailableGetterAndSetter:)' is unavailable}}
 
-  x[unavailableSetter: s.available] = () // expected-error {{setter for 'subscript(unavailableSetter:)' is unavailable}}
-  _ = x[unavailableSetter: s.available]
+  _ = x.available[unavailableGetter: s.available] // expected-error {{getter for 'subscript(unavailableGetter:)' is unavailable}}
+  _ = x.available[unavailableSetter: s.available]
+  _ = x.available[unavailableGetterAndSetter: s.available] // expected-error {{getter for 'subscript(unavailableGetterAndSetter:)' is unavailable}}
 
-  x[unavailableGetterAndSetter: s.available] = () // expected-error {{setter for 'subscript(unavailableGetterAndSetter:)' is unavailable}}
-  _ = x[unavailableGetterAndSetter: s.available] // expected-error {{getter for 'subscript(unavailableGetterAndSetter:)' is unavailable}}
+  // Available subscript, varying member availability, available argument
+  x.unavailableGetter[available: s.available] = () // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  x.unavailableSetter[available: s.available] = () // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x.unavailableGetterAndSetter[available: s.available] = () // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+
+  _ = x.unavailableGetter[available: s.available] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = x.unavailableSetter[available: s.available]
+  _ = x.unavailableGetterAndSetter[available: s.available] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
 func testDiscardedKeyPathLoads_Struct() {
