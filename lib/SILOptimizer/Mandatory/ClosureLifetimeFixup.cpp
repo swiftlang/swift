@@ -734,7 +734,7 @@ static SILValue tryRewriteToPartialApplyStack(
   SmallVector<SILInstruction *, 4> lifetimeEnds;
   collectStackClosureLifetimeEnds(lifetimeEnds, closureOp);
   
-  // For noncopyable address-only captures, see if we can eliminate the copy
+  // For address-only captures, see if we can eliminate the copy
   // that SILGen emitted to allow the original partial_apply to take ownership.
   // We do this here because otherwise the move checker will see the copy as an
   // attempt to consume the value, which we don't want.
@@ -760,14 +760,7 @@ static SILValue tryRewriteToPartialApplyStack(
       LLVM_DEBUG(llvm::dbgs() << "-- not an alloc_stack\n");
       continue;
     }
-    
-    // This would be a nice optimization to attempt for all types, but for now,
-    // limit the effect to move-only types.
-    if (!copy->getType().isMoveOnly()) {
-      LLVM_DEBUG(llvm::dbgs() << "-- not move-only\n");
-      continue;
-    }
-    
+
     // Is the capture a borrow?
 
     auto paramIndex = i + appliedArgStartIdx;
