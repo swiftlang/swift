@@ -1767,16 +1767,16 @@ ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
 ERROR(attr_objc_implementation_must_be_imported,none,
-      "'@_objcImplementation' cannot be used to extend %kind0 because it was "
+      "'@objc @implementation' cannot be used to extend %kind0 because it was "
       "defined by a Swift 'class' declaration, not an imported Objective-C "
       "'@interface' declaration",
       (ValueDecl *))
 ERROR(attr_objc_implementation_must_have_super,none,
-      "'@_objcImplementation' cannot be used to implement root %kind0; declare "
-      "its superclass in the header",
+      "'@objc @implementation' cannot be used to implement root %kind0; "
+      "declare its superclass in the header",
       (ValueDecl *))
 ERROR(objc_implementation_cannot_have_generics,none,
-      "'@_objcImplementation' cannot be used to implement %kind0",
+      "'@objc @implementation' cannot be used to implement %kind0",
       (ValueDecl *))
 ERROR(attr_objc_implementation_category_not_found,none,
       "could not find category %0 on Objective-C class %1; make sure your "
@@ -1794,7 +1794,7 @@ ERROR(attr_objc_implementation_no_category_for_func,none,
       "name from this attribute",
       (ValueDecl*))
 ERROR(attr_objc_implementation_no_conformance,none,
-      "'@_objcImplementation' extension cannot add conformance to %0; "
+      "'@objc @implementation' extension cannot add conformance to %0; "
       "add this conformance %select{with an ordinary extension|"
       "in the Objective-C header}1",
       (Type, bool))
@@ -1922,7 +1922,7 @@ NOTE(objc_implementation_requirement_here,none,
      (ValueDecl *))
 
 ERROR(objc_implementation_init_must_be_convenience, none,
-      "%kind0 is not valid in an '@_objcImplementation' extension because "
+      "%kind0 is not valid in an '@objc @implementation' extension because "
       "Objective-C subclasses must be able to override "
       "%select{designated|required}1 initializers",
       (const ValueDecl *, /*isRequired=*/bool))
@@ -1936,7 +1936,7 @@ NOTE(objc_implementation_init_turn_required_to_convenience, none,
 
 // Fallback diagnostic; super-general by nature.
 ERROR(objc_implementation_member_requires_vtable, none,
-      "%kind0 is not valid in an '@_objcImplementation' extension because it "
+      "%kind0 is not valid in an '@objc @implementation' extension because it "
       "is an overridable Swift-only %kindonly0",
       (const ValueDecl *))
 
