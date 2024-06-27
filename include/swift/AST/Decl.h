@@ -1912,6 +1912,10 @@ public:
   /// \endcode
   bool isWrittenWithConstraints() const;
 
+  /// Does this extension add conformance to an invertible protocol for the
+  /// extended type?
+  bool isAddingConformanceToInvertible() const;
+
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid or
   /// \c isObjCImplementation() is false.

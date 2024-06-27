@@ -785,33 +785,18 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
 
-    // The inherited entries influence the generic signature of the extension,
-    // because if it introduces conformance to invertible protocol IP, we do not
-    // we do not infer any requirements that the generic parameters to conform
+    // If the extension introduces conformance to invertible protocol IP, do not
+    // infer any conditional requirements that the generic parameters to conform
     // to invertible protocols. This forces people to write out the conditions.
-    const unsigned numEntries = ext->getInherited().size();
-    for (unsigned i = 0; i < numEntries; ++i) {
-      InheritedTypeRequest request{ext, i, TypeResolutionStage::Structural};
-      auto result = evaluateOrDefault(ctx.evaluator, request,
-                                      InheritedTypeResult::forDefault());
-      Type inheritedTy;
-      switch (result) {
-      case InheritedTypeResult::Inherited:
-        inheritedTy = result.getInheritedType();
-        break;
-      case InheritedTypeResult::Suppressed:
-      case InheritedTypeResult::Default:
-        continue;
-      }
+    inferInvertibleReqs = !ext->isAddingConformanceToInvertible();
 
-      if (inheritedTy) {
-        if (auto kp = inheritedTy->getKnownProtocol()) {
-          if (getInvertibleProtocolKind(*kp)) {
-            inferInvertibleReqs = false;
-            break;
-          }
-        }
-      }
+    // FIXME: to workaround a reverse condfail, always infer the requirements if
+    //  the extension is in a swiftinterface file. This is temporary and should
+    //  be removed soon. (rdar://130424971)
+    if (auto *sf = ext->getOutermostParentSourceFile()) {
+      if (sf->Kind == SourceFileKind::Interface
+          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension))
+        inferInvertibleReqs = true;
     }
 
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
