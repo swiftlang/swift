@@ -1887,7 +1887,7 @@ bool Parser::isStartOfConditionalStmtBody() {
       // print("body") }
       return false;
     }
-    if (Tok.is(tok::oper_binary_spaced)) {
+    if (Tok.is(tok::oper_binary_spaced) || Tok.is(tok::oper_binary_unspaced)) {
       // If current token is a binary operator this can't be the statement body
       // since an `if` expression can't be the left-hand side of an operator,
       // e.g. if true, { true }
