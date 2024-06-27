@@ -860,7 +860,7 @@ static SILValue tryRewriteToPartialApplyStack(
     LLVM_DEBUG(llvm::dbgs() << "++ found original:\n";
                orig->print(llvm::dbgs());
                llvm::dbgs() << "\n");
-               
+
     bool origIsUnmodifiedDuringClosureLifetime = true;
 
     class OrigUnmodifiedDuringClosureLifetimeWalker
@@ -868,12 +868,14 @@ static SILValue tryRewriteToPartialApplyStack(
               OrigUnmodifiedDuringClosureLifetimeWalker> {
       SSAPrunedLiveness &closureLiveness;
       bool &origIsUnmodifiedDuringClosureLifetime;
+
     public:
-      OrigUnmodifiedDuringClosureLifetimeWalker(SSAPrunedLiveness &closureLiveness,
-                                        bool &origIsUnmodifiedDuringClosureLifetime)
-        : closureLiveness(closureLiveness),
-          origIsUnmodifiedDuringClosureLifetime(origIsUnmodifiedDuringClosureLifetime)
-      {}
+      OrigUnmodifiedDuringClosureLifetimeWalker(
+          SSAPrunedLiveness &closureLiveness,
+          bool &origIsUnmodifiedDuringClosureLifetime)
+          : closureLiveness(closureLiveness),
+            origIsUnmodifiedDuringClosureLifetime(
+                origIsUnmodifiedDuringClosureLifetime) {}
 
       bool visitUse(Operand *origUse) {
         LLVM_DEBUG(llvm::dbgs() << "looking at use\n";
@@ -895,12 +897,12 @@ static SILValue tryRewriteToPartialApplyStack(
       }
     };
 
-    OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(closureLiveness,
-                                             origIsUnmodifiedDuringClosureLifetime);
+    OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(
+        closureLiveness, origIsUnmodifiedDuringClosureLifetime);
     auto walkResult = std::move(origUseWalker).walk(orig);
-    
-    if (walkResult == AddressUseKind::Unknown
-        || !origIsUnmodifiedDuringClosureLifetime) {
+
+    if (walkResult == AddressUseKind::Unknown ||
+        !origIsUnmodifiedDuringClosureLifetime) {
       continue;
     }
 
