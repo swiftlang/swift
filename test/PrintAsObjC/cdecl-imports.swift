@@ -12,7 +12,7 @@ import Foundation
 // CHECK-NOT: @import Foundation;
 
 // CHECK: @class Bee;
-// CHECK-LABEL: Bee * _Nonnull fwd_declares_bee(void) SWIFT_WARN_UNUSED_RESULT SWIFT_NOEXCEPT;
+// CHECK-LABEL: Bee * _Nonnull fwd_declares_bee(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
 @_cdecl("fwd_declares_bee")
 public func fwdDeclaresBee() -> Bee { fatalError() }
