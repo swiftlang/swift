@@ -528,7 +528,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (!storage.base)
       return;
     if (auto *arg = dyn_cast<SILFunctionArgument>(storage.base))
-      if (arg->getOwnershipKind() != OwnershipKind::Guaranteed)
+      if (!arg->getArgumentConvention().isGuaranteedConventionInCallee())
         return;
   }
 
