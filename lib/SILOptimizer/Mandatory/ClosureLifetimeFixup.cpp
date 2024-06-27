@@ -861,18 +861,18 @@ static SILValue tryRewriteToPartialApplyStack(
                orig->print(llvm::dbgs());
                llvm::dbgs() << "\n");
                
-    bool origIsUnusedDuringClosureLifetime = true;
+    bool origIsUnmodifiedDuringClosureLifetime = true;
 
-    class OrigUnusedDuringClosureLifetimeWalker
+    class OrigUnmodifiedDuringClosureLifetimeWalker
         : public TransitiveAddressWalker<
-              OrigUnusedDuringClosureLifetimeWalker> {
+              OrigUnmodifiedDuringClosureLifetimeWalker> {
       SSAPrunedLiveness &closureLiveness;
-      bool &origIsUnusedDuringClosureLifetime;
+      bool &origIsUnmodifiedDuringClosureLifetime;
     public:
-      OrigUnusedDuringClosureLifetimeWalker(SSAPrunedLiveness &closureLiveness,
-                                        bool &origIsUnusedDuringClosureLifetime)
+      OrigUnmodifiedDuringClosureLifetimeWalker(SSAPrunedLiveness &closureLiveness,
+                                        bool &origIsUnmodifiedDuringClosureLifetime)
         : closureLiveness(closureLiveness),
-          origIsUnusedDuringClosureLifetime(origIsUnusedDuringClosureLifetime)
+          origIsUnmodifiedDuringClosureLifetime(origIsUnmodifiedDuringClosureLifetime)
       {}
 
       bool visitUse(Operand *origUse) {
@@ -885,7 +885,7 @@ static SILValue tryRewriteToPartialApplyStack(
           return true;
         }
         if (closureLiveness.isWithinBoundary(origUse->getUser())) {
-          origIsUnusedDuringClosureLifetime = false;
+          origIsUnmodifiedDuringClosureLifetime = false;
           LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing use during closure lifetime\n";
                      origUse->getUser()->print(llvm::dbgs());
                      llvm::dbgs() << "\n");
@@ -895,12 +895,12 @@ static SILValue tryRewriteToPartialApplyStack(
       }
     };
 
-    OrigUnusedDuringClosureLifetimeWalker origUseWalker(closureLiveness,
-                                             origIsUnusedDuringClosureLifetime);
+    OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(closureLiveness,
+                                             origIsUnmodifiedDuringClosureLifetime);
     auto walkResult = std::move(origUseWalker).walk(orig);
     
     if (walkResult == AddressUseKind::Unknown
-        || !origIsUnusedDuringClosureLifetime) {
+        || !origIsUnmodifiedDuringClosureLifetime) {
       continue;
     }
 
