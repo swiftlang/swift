@@ -244,6 +244,7 @@ static llvm::Error resolveExplicitModuleInputs(
     return E;
 
   std::vector<std::string> commandLine = resolvingDepInfo.getCommandline();
+  auto dependencyInfoCopy = resolvingDepInfo;
   for (const auto &depModuleID : dependencies) {
     const auto &depInfo = cache.findKnownDependency(depModuleID);
     switch (depModuleID.Kind) {
@@ -255,6 +256,14 @@ static llvm::Error resolveExplicitModuleInputs(
                        : interfaceDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             path);
+      // Add the exported macro from interface into current module.
+      llvm::for_each(
+          interfaceDepDetails->textualModuleDetails.macroDependencies,
+          [&](const auto &entry) {
+            dependencyInfoCopy.addMacroDependency(entry.first(),
+                                                  entry.second.LibraryPath,
+                                                  entry.second.ExecutablePath);
+          });
     } break;
     case swift::ModuleDependencyKind::SwiftBinary: {
       auto binaryDepDetails = depInfo.getAsSwiftBinaryModule();
@@ -319,7 +328,6 @@ static llvm::Error resolveExplicitModuleInputs(
   }
 
   // Update the dependency in the cache with the modified command-line.
-  auto dependencyInfoCopy = resolvingDepInfo;
   if (resolvingDepInfo.isSwiftInterfaceModule() ||
       resolvingDepInfo.isClangModule()) {
     if (service.hasPathMapping())
@@ -345,6 +353,10 @@ static llvm::Error resolveExplicitModuleInputs(
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [&tracker](const std::string &file) { tracker->trackFile(file); });
+      llvm::for_each(sourceDep->textualModuleDetails.macroDependencies,
+                     [&tracker](const auto &entry) {
+                       tracker->trackFile(entry.second.LibraryPath);
+                     });
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return root.takeError();
