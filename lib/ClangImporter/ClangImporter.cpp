@@ -1150,6 +1150,10 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     if (ctx.CASOpts.EnableCaching)
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
 
+    // If clang target is ignored, using swift target.
+    if (ignoreClangTarget)
+      CI->getTargetOpts().Triple = ctx.LangOpts.Target.str();
+
     // Forward the index store path. That information is not passed to scanner
     // and it is cached invariant so we don't want to re-scan if that changed.
     CI->getFrontendOpts().IndexStorePath = ctx.ClangImporterOpts.IndexStorePath;
