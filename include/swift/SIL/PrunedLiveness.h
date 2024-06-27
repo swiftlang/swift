@@ -402,7 +402,7 @@ public:
     bool isEnding() const { return value == Value::Ending; }
 
     LifetimeEnding meet(LifetimeEnding const other) const {
-      return value < other.value ? *this : other;
+      return std::min(value, other.value);
     }
     void meetInPlace(LifetimeEnding const other) { *this = meet(other); }
   };
