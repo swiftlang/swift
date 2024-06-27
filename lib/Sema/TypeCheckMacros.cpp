@@ -239,7 +239,7 @@ static llvm::Expected<CompilerPlugin *>
 initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
                  Identifier moduleName) {
   // Lock the plugin while initializing.
-  // Note that'executablePlugn' can be shared between multiple ASTContext.
+  // Note that 'executablePlugin' can be shared between multiple ASTContext.
   plugin->lock();
   SWIFT_DEFER { plugin->unlock(); };
 
