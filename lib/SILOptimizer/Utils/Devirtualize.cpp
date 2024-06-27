@@ -799,6 +799,17 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
     ++indirectResultArgIter;
   }
 
+  if (SILType errorTy = substConv.getIndirectErrorResultType(applySite.getFunction()->getTypeExpansionContext())) {
+    auto errorArgs = applySite.getIndirectSILErrorResults();
+    ASSERT(errorArgs.size() == 1);
+    SILValue errorArg = errorArgs[0];
+    auto castRes = castValueToABICompatibleType(
+        &builder, pm, loc, errorArg, errorArg->getType(),
+        errorTy, {applySite.getInstruction()});
+    newArgs.push_back(castRes.first);
+    changedCFG |= castRes.second;
+  }
+
   auto paramArgIter = applySite.getArgumentsWithoutIndirectResults().begin();
   // Skip the last parameter, which is `self`. Add it below.
   for (auto param : substConv.getParameters()) {
