@@ -65,22 +65,49 @@ struct BaseStruct<T: ValueProto> {
 
   var unavailableGetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 62 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 63 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set {}
   }
 
   var unavailableSetter: T {
     get { .defaultValue }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 37 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 38 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 62 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 63 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 37 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 38 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
+}
+
+struct SubscriptHelper {
+  subscript<T>(available t: T) -> () {
+    get { }
+    set { }
+  }
+
+  subscript<T>(unavailableGetter t: T) -> () {
+    @available(*, unavailable)
+    get { } // expected-note {{getter for 'subscript(unavailableGetter:)' has been explicitly marked unavailable here}}
+    set { }
+  }
+
+  subscript<T>(unavailableSetter t: T) -> () {
+    get { }
+    @available(*, unavailable)
+    set { } // expected-note {{setter for 'subscript(unavailableSetter:)' has been explicitly marked unavailable here}}
+  }
+
+  subscript<T>(unavailableGetterAndSetter t: T) -> () {
+    @available(*, unavailable)
+    get { } // expected-note {{getter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
+    @available(*, unavailable)
+    set { } // expected-note {{setter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
+  }
+
 }
 
 @discardableResult func takesInOut<T>(_ t: inout T) -> T {
@@ -182,6 +209,31 @@ func testLValueAssignments_Class(_ someValue: ClassValue) {
   // FIXME: missing diagnostic for getter
   x.unavailableGetterAndSetter[0] = someValue.a
   x.unavailableGetterAndSetter[0].b = 1 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+}
+
+func testSubscripts(_ s: BaseStruct<StructValue>) {
+  var x = SubscriptHelper()
+
+  x[available: s.available] = ()
+  x[available: s.unavailableGetter] = () // FIXME: missing diagnostic for getter
+  // FIXME: spurious diagnostic for setter
+  x[available: s.unavailableSetter] = () // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  // FIXME: spurious diagnostic for setter
+  x[available: s.unavailableGetterAndSetter] = () // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+
+  _ = x[available: s.available]
+  _ = x[available: s.unavailableGetter] // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  _ = x[available: s.unavailableSetter]
+  _ = x[available: s.unavailableGetterAndSetter] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+
+  x[unavailableGetter: s.available] = ()
+  _ = x[unavailableGetter: s.available] // expected-error {{getter for 'subscript(unavailableGetter:)' is unavailable}}
+
+  x[unavailableSetter: s.available] = () // expected-error {{setter for 'subscript(unavailableSetter:)' is unavailable}}
+  _ = x[unavailableSetter: s.available]
+
+  x[unavailableGetterAndSetter: s.available] = () // expected-error {{setter for 'subscript(unavailableGetterAndSetter:)' is unavailable}}
+  _ = x[unavailableGetterAndSetter: s.available] // expected-error {{getter for 'subscript(unavailableGetterAndSetter:)' is unavailable}}
 }
 
 func testDiscardedKeyPathLoads_Struct() {
