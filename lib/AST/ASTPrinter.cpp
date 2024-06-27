@@ -1684,7 +1684,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
 void PrintAST::printGenericSignature(GenericSignature genericSig,
                                      unsigned flags) {
-  ASSERT(!((flags & InnermostOnly) && (flags & PrintInverseRequirements))
+  assert(!((flags & InnermostOnly) && (flags & PrintInverseRequirements))
          && "InnermostOnly + PrintInverseRequirements is not handled");
 
   printGenericSignature(genericSig, flags,
