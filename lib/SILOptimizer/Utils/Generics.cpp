@@ -771,6 +771,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       continue;
 
     switch (PI.getConvention()) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed: {
       Conversions.set(IdxToInsert);
