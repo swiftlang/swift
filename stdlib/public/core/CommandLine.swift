@@ -50,9 +50,9 @@ extension CommandLine {
     // Note: It's still entirely possible that someone may update argv after
     // this iteration and before we actually read argv, but we have no control
     // over synchronizing access to argc and argv.
-    var argc = 0
+    var argc: Int32 = 0
 
-    while let _ = _unsafeArgv[argc] {
+    while let _ = _unsafeArgv[Int(argc)] {
       argc += 1
     }
 
