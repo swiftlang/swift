@@ -23,10 +23,8 @@ actor MyActor {
     async let z = synchronous()
 
     var localText = text
-    // TODO: We should allow this since text is Sendable and localText is a
-    // separate box. localText should be disconnected.
+
     async let w = localText.removeLast() // expected-without-transferring-warning {{mutation of captured var 'localText' in concurrently-executing code}}
-    // expected-tns-warning @-1 {{task or actor isolated value cannot be sent}}
 
     _ = await x
     _ = await y

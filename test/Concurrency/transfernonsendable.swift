@@ -1794,3 +1794,18 @@ public func doNotCrashOrEmitUnhandledPatternErrors<T: Sendable>(
     throw CancellationError()
   }
 }
+
+/// The following makes sure that when we have a function like test2 with an
+/// assigned isolation that returns a Sendable value... we treat the value as
+/// actually Sendable. This occurs in this example via the result of the default
+/// parameter function for string.
+///
+/// We shouldn't emit any diagnostic here.
+actor FunctionWithSendableResultAndIsolationActor {
+    func foo() -> String {
+        return string()
+    }
+    func string(someCondition: Bool = false) -> String {
+        return ""
+    }
+}
