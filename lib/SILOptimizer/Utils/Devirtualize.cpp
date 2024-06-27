@@ -801,7 +801,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
 
   if (SILType errorTy = substConv.getIndirectErrorResultType(applySite.getFunction()->getTypeExpansionContext())) {
     auto errorArgs = applySite.getIndirectSILErrorResults();
-    assert(errorArgs.size() == 1);
+    ASSERT(errorArgs.size() == 1);
     SILValue errorArg = errorArgs[0];
     auto castRes = castValueToABICompatibleType(
         &builder, pm, loc, errorArg, errorArg->getType(),
