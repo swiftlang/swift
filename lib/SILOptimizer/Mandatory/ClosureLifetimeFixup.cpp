@@ -775,6 +775,7 @@ static SILValue tryRewriteToPartialApplyStack(
     CopyAddrInst *initialization = nullptr;
     MarkDependenceInst *markDep = nullptr;
     for (auto *use : stack->getUses()) {
+      auto *user = use->getUser();
       // Since we removed the `dealloc_stack`s from the capture arguments,
       // the only uses of this stack slot should be the initialization, the
       // partial application, and possibly a mark_dependence from the
@@ -840,7 +841,13 @@ static SILValue tryRewriteToPartialApplyStack(
         initialization = possibleInit;
         continue;
       }
+      if (isa<DebugValueInst>(user) || isa<DestroyAddrInst>(user) ||
+          isa<DeallocStackInst>(user)) {
+        continue;
+      }
       LLVM_DEBUG(llvm::dbgs() << "-- unrecognized use\n");
+      // Reset initialization on an unrecognized use
+      initialization = nullptr;
       break;
     }
     if (!initialization) {
