@@ -927,13 +927,12 @@ void swift_task_asyncMainDrainQueue [[noreturn]]();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run(Job *job, SerialExecutorRef executor);
 
-/// DEPRECATED. Use swift_job_run_on_serial_and_task_executor(Job, SerialExecutorRef, TaskExecutorRef)
-/// instead, as it will correctly handle actor isolation of the executed task.
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
 ///
 /// Runtime availability: Swift 6.0
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_job_run_on_task_executor(Job *job,
-                                    TaskExecutorRef executor);
+void swift_job_run_on_task_executor(Job *job, TaskExecutorRef executor);
 
 /// Establish that the current thread is running as the given
 /// executor, then run a job.

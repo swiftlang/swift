@@ -49,8 +49,7 @@ final class QueueTaskExecutor: TaskExecutor {
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
     queue.async {
-      job.runSynchronously(
-        on: self.asUnownedTaskExecutor())
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
 }
