@@ -566,6 +566,7 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         SILArgumentConvention convention,
                                         bool isTryApply) {
   switch (convention) {
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       killBits(state, op.get());
       break;
@@ -789,7 +790,9 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           requireBitsSet(bits, sbi->getDest(), &I);
           locations.clearBits(bits, sbi->getDest());
         } else if (auto *lbi = dyn_cast<LoadBorrowInst>(ebi->getOperand())) {
-          requireBitsSet(bits, lbi->getOperand(), &I);
+          if (!lbi->isUnchecked()) {
+            requireBitsSet(bits, lbi->getOperand(), &I);
+          }
         }
         break;
       }
@@ -891,6 +894,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
     requireNoStoreBorrowLocation(argumentOp.get(), applyInst);
   
   switch (argumentConvention) {
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       requireBitsSetForArgument(bits, &argumentOp);
       locations.clearBits(bits, argumentOp.get());

@@ -1158,6 +1158,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
       conv = ResultConvention::Indirect;
       break;
     case ParameterConvention::Pack_Guaranteed:

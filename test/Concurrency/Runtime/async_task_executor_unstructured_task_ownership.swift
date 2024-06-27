@@ -11,16 +11,28 @@ import Dispatch
 import StdlibUnittest
 import _Concurrency
 
+// For sleep
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Android)
+import Android
+#endif
+
 final class NaiveQueueExecutor: TaskExecutor {
   let queue: DispatchQueue
+  let sem: DispatchSemaphore
 
-  init(_ queue: DispatchQueue) {
+  init(_ sem: DispatchSemaphore, _ queue: DispatchQueue) {
     print("init \(Self.self)")
+    self.sem = sem
     self.queue = queue
   }
 
   deinit {
     print("deinit \(Self.self)")
+    sem.signal()
   }
 
   public func enqueue(_ _job: consuming ExecutorJob) {
@@ -39,7 +51,7 @@ final class NaiveQueueExecutor: TaskExecutor {
 }
 
 nonisolated func nonisolatedFunc(expectedQueue queue: DispatchQueue) async {
-//  dispatchPrecondition(condition: .onQueue(queue))
+  dispatchPrecondition(condition: .onQueue(queue))
   print("Invoked: \(#function)")
 }
 
@@ -47,7 +59,8 @@ nonisolated func nonisolatedFunc(expectedQueue queue: DispatchQueue) async {
 
   static func main() async {
     let queue = DispatchQueue(label: "example-queue")
-    var executor: NaiveQueueExecutor? = NaiveQueueExecutor(queue)
+    let deinitSem = DispatchSemaphore(value: 0)
+    var executor: NaiveQueueExecutor? = NaiveQueueExecutor(deinitSem, queue)
 
     // Task retains the executor, so it should never deinit before the task completes
     // CHECK: init NaiveQueueExecutor
@@ -74,6 +87,8 @@ nonisolated func nonisolatedFunc(expectedQueue queue: DispatchQueue) async {
     // regardless when the reference in main() was released.
     // CHECK: Task done
     // CHECK-NEXT: deinit NaiveQueueExecutor
+
+    deinitSem.wait()
 
     print("Done")
     // CHECK: Done

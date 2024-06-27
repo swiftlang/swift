@@ -461,6 +461,7 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   auto calleeConv = getCalleeFunction()->getConventions();
   SmallBitVector borrowedArgs(AppliedArgs.size());
   SmallBitVector copiedArgs(AppliedArgs.size());
+  SmallBitVector inCxxArgs(AppliedArgs.size());
   if (!Apply->getFunction()->hasOwnership()) {
 
     for (auto p : llvm::enumerate(AppliedArgs)) {
@@ -511,6 +512,9 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             }
           }
         }
+
+        if (paramInfo.getConvention() == ParameterConvention::Indirect_In_CXX)
+          inCxxArgs[idx] = true;
       }
     }
   }
@@ -566,6 +570,20 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
         returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+      }
+    }
+  }
+
+  if (inCxxArgs.any()) {
+    for (unsigned i : indices(AppliedArgs)) {
+      if (!inCxxArgs.test(i)) {
+        continue;
+      }
+
+      for (auto *insertPt : endBorrowInsertPts) {
+        SILBuilderWithScope returnBuilder(insertPt->getParent()->begin(),
+                                          getBuilder());
+        returnBuilder.emitDestroyOperation(Apply.getLoc(), entryArgs[i]);
       }
     }
   }

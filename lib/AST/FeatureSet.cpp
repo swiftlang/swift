@@ -772,6 +772,7 @@ static bool usesFeatureSensitive(Decl *decl) {
 
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
+UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
