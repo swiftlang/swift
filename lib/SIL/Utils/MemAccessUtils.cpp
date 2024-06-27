@@ -2195,6 +2195,7 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Pack_Out:
       return visitApplyOperand(use, visitor,

@@ -113,6 +113,7 @@ static  bool fixupReferenceCounts(
     bool hasOwnership = f->hasOwnership();
 
     switch (convention) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
       llvm_unreachable("Missing indirect copy");
 

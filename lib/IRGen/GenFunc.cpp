@@ -847,6 +847,7 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
   // address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_CXX:
     if (isNoEscape)
       return CanInOutType::get(type);
     else
@@ -1520,6 +1521,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     break;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Pack_Guaranteed:
@@ -1631,6 +1633,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     //   - we received as unowned and are passing as guaranteed
     auto argConvention = conventions[0];
     switch (argConvention) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
       if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
@@ -1725,6 +1728,7 @@ static llvm::Value *emitPartialApplicationForwarder(
       
       Explosion param;
       switch (fieldConvention) {
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In: {
 
         auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
@@ -2313,6 +2317,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       switch (argConventions[i]) {
       // Take indirect value arguments out of memory.
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In_Guaranteed: {
         if (outType->isNoEscape()) {
           cast<LoadableTypeInfo>(fieldLayout.getType())
