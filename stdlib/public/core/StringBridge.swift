@@ -625,7 +625,16 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     default:  (fastUTF8, isASCII) = (false, false)
     }
     let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-
+    if fastUTF8 {
+      let ptr = stableCocoaUTF8Pointer(immutableCopy)
+      if let ptr {
+        return String(
+          _immortalCocoaString: immutableCopy,
+          buffer: UnsafeBufferPointer(start: ptr, count: length),
+          encoding: Unicode.UTF8.self
+        )._guts
+      }
+    }
     return _StringGuts(
       cocoa: immutableCopy,
       providesFastUTF8: fastUTF8,
