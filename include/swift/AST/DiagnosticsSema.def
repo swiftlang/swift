@@ -6735,7 +6735,7 @@ ERROR(availability_isolated_any_only_version_newer, none,
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
-ERROR(availability_noncopyable_generics_only_version_newer, none,
+WARNING(availability_noncopyable_generics_only_version_newer, none,
       "runtime support for '~' suppressions on generic parameters is only available in "
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))

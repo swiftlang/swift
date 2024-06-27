@@ -3026,6 +3026,13 @@ static bool diagnoseIsolatedAnyAvailability(
 
 static bool diagnoseNoncopyableGenericsAvailability(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+  // Do not check availability in the stdlib.
+  // FIXME: would be better if we had an attribute on each decl that opt's out
+  //   of availability checking in the stdlib, because it's been audited or
+  //   automatically checked to ensure it doesn't use the metadata.
+//  if (ReferenceDC->getParentModule()->isStdlibModule())
+//    return false;
+
   return TypeChecker::checkAvailability(
       ReferenceRange,
       ReferenceDC->getASTContext().getNoncopyableGenericsAvailability(),
@@ -3044,6 +3051,7 @@ static bool inverseGenericsOldRuntimeCompatable(BoundGenericType *boundTy) {
       case InvertibleProtocolKind::Copyable:
         if (arg->isNoncopyable())
           return false;
+        break;
       case InvertibleProtocolKind::Escapable:
         if (!arg->isEscapable())
           return false;
@@ -3088,8 +3096,12 @@ static bool checkTypeMetadataAvailabilityInternal(CanType type,
       auto isolation = fnType->getIsolation();
       if (isolation.isErased())
         return diagnoseIsolatedAnyAvailability(refLoc, refDC);
-    } else if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(type)) {
-      if (requiresNoncopyableGenericsAvailabilityCheck(nominalTy))
+//    } else if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(type)) {
+//      if (requiresNoncopyableGenericsAvailabilityCheck(nominalTy))
+//        return diagnoseNoncopyableGenericsAvailability(refLoc, refDC);
+////        llvm_unreachable("did hit this case!");
+    } else if (auto archeType = dyn_cast<ArchetypeType>(type)) {
+      if (archeType->isNoncopyable())
         return diagnoseNoncopyableGenericsAvailability(refLoc, refDC);
     }
     return false;
