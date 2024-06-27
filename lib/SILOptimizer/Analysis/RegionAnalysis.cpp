@@ -3475,6 +3475,14 @@ RegionAnalysisValueMap::initializeTrackableValue(
 
   // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+
+  // Before we do anything, see if we have a Sendable value.
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {{iter.first->first, iter.first->second}, true};
+  }
+
+  // Otherwise, we have a non-Sendable type... so wire up the isolation.
   iter.first->getSecond().setIsolationRegionInfo(newInfo);
 
   return {{iter.first->first, iter.first->second}, true};

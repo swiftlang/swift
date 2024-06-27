@@ -3734,12 +3734,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::LoadBorrowInst: {
     SourceLoc AddrLoc;
+    
+    bool IsUnchecked = false;
+    StringRef AttrName;
+    SourceLoc AttrLoc;
+    if (parseSILOptional(AttrName, AttrLoc, *this)) {
+      if (AttrName == "unchecked") {
+        IsUnchecked = true;
+      } else {
+        P.diagnose(InstLoc.getSourceLoc(),
+                   diag::sil_invalid_attribute_for_instruction, AttrName,
+                   "load_borrow");
+        return true;
+      }
+    }
 
     if (parseTypedValueRef(Val, AddrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createLoadBorrow(InstLoc, Val);
+    auto LB = B.createLoadBorrow(InstLoc, Val);
+    LB->setUnchecked(IsUnchecked);
+    ResultVal = LB;
     break;
   }
 

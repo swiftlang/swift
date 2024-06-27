@@ -544,6 +544,7 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In_CXX:
       return true;
 
     case SILArgumentConvention::Direct_Unowned:
@@ -2640,8 +2641,13 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-            "Found load borrow that is invalidated by a local write?!");
+    if (LBI->isUnchecked()) {
+      require(LBI->getModule().getStage() == SILStage::Raw,
+              "load_borrow can only be [unchecked] in raw SIL");
+    } else {
+      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
+              "Found load borrow that is invalidated by a local write?!");
+    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -6479,6 +6485,7 @@ public:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
+                         case ParameterConvention::Indirect_In_CXX:
                          case ParameterConvention::Pack_Owned:
                          case ParameterConvention::Pack_Guaranteed:
                          case ParameterConvention::Pack_Inout:

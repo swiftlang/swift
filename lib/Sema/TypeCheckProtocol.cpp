@@ -4500,9 +4500,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   return ResolveWitnessResult::ExplicitFailed;
 }
 
-static ValueDecl *deriveProtocolRequirement(DeclContext *DC,
-                                            NominalTypeDecl *TypeDecl,
-                                            ValueDecl *Requirement) {
+static ValueDecl *
+deriveProtocolRequirement(const NormalProtocolConformance *Conformance,
+                          NominalTypeDecl *TypeDecl, ValueDecl *Requirement) {
   // Note: whenever you update this function, also update
   // DerivedConformance::getDerivableRequirement.
   const auto protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
@@ -4511,12 +4511,7 @@ static ValueDecl *deriveProtocolRequirement(DeclContext *DC,
   if (!derivableKind)
     return nullptr;
 
-  const auto Decl = DC->getInnermostDeclarationDeclContext();
-  if (Decl->isInvalid())
-    return nullptr;
-
-  DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
-                             protocol);
+  DerivedConformance derived(Conformance, TypeDecl, protocol);
 
   switch (*derivableKind) {
   case KnownDerivableProtocolKind::RawRepresentable:
@@ -4597,7 +4592,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   }
 
   // Attempt to derive the witness.
-  auto derived = deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
+  auto derived =
+      deriveProtocolRequirement(Conformance, derivingTypeDecl, requirement);
 
   if (!derived) {
     return ResolveWitnessResult::ExplicitFailed;

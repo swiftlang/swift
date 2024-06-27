@@ -329,6 +329,10 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
       return ManagedValue::forBorrowedAddressRValue(value);
     }
 
+  case ParameterConvention::Indirect_In_CXX:
+    // Don't emit a cleanup if the parameter is @in_cxx.
+    return ManagedValue::forOwnedRValue(value, CleanupHandle::invalid());
+
   case ParameterConvention::Indirect_In:
     if (valueTL.isLoadable()) {
       return SGF.emitLoad(loc, value, valueTL, SGFContext(), IsTake);
@@ -443,6 +447,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Pack_Guaranteed:
       case ParameterConvention::Pack_Owned:
       case ParameterConvention::Pack_Inout:
@@ -1312,7 +1317,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
                                            SILValue arg) {
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If address-only, make a +1 copy and operate on that.
-  if (lowering.isAddressOnly()) {
+  if (lowering.isAddressOnly() && SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
@@ -2190,6 +2195,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         case ParameterConvention::Indirect_InoutAliasable:
           param = ManagedValue::forLValue(paramValue);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In:
           param = emitManagedRValueWithCleanup(paramValue);
           break;

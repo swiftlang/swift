@@ -2161,6 +2161,7 @@ NodePointer Demangler::demangleImplParamConvention(Node::Kind ConvKind) {
     case 'l': attr = "@inout"; break;
     case 'b': attr = "@inout_aliasable"; break;
     case 'n': attr = "@in_guaranteed"; break;
+    case 'X': attr = "@in_cxx"; break;
     case 'x': attr = "@owned"; break;
     case 'g': attr = "@guaranteed"; break;
     case 'e': attr = "@deallocating"; break;

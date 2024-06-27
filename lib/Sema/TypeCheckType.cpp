@@ -4475,6 +4475,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     convention = ParameterConvention::KIND;                                    \
     return true;
         OWNERSHIP(InGuaranteed, Indirect_In_Guaranteed)
+        OWNERSHIP(InCXX, Indirect_In_CXX)
         OWNERSHIP(In, Indirect_In)
         OWNERSHIP(InConstant, Indirect_In)
         OWNERSHIP(Inout, Indirect_Inout)
