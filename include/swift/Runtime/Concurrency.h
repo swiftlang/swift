@@ -866,10 +866,6 @@ swift_distributedActor_remote_initialize(const Metadata *actorType);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_defaultActor_enqueue_withTaskExecutor(
-    Job *job, DefaultActor *actor, TaskExecutorRef taskExecutor);
-
 /// Check if the actor is a distributed 'remote' actor instance.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_distributed_actor_is_remote(HeapObject *actor);

@@ -239,6 +239,10 @@ public:
     return TaskExecutorRef(identity, wtable);
   }
 
+  /// If the job is an 'AsyncTask' return its task executor preference,
+  /// otherwise return 'undefined', meaning "no preference".
+  static TaskExecutorRef fromTaskExecutorPreference(Job *job);
+
   HeapObject *getIdentity() const {
     return Identity;
   }
