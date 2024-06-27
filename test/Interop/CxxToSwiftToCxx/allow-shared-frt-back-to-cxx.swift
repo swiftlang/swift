@@ -29,6 +29,6 @@ import CxxTest
 public func consumeSharedFRT(_ x: consuming SharedFRT) {}
 public func takeSharedFRT(_ x: SharedFRT) {}
 
-// CHECK: Unavailable in C++: Swift global function 'consumeSharedFRT(_:)'.
+// CHECK: SWIFT_EXTERN void $s8UseCxxTy16consumeSharedFRTyySo0eF0VnF(SharedFRT *_Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // consumeSharedFRT(_:)
 
-// CHECK: Unavailable in C++: Swift global function 'takeSharedFRT(_:)'.
+// CHECK: SWIFT_EXTERN void $s8UseCxxTy13takeSharedFRTyySo0eF0VF(SharedFRT *_Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeSharedFRT(_:)
