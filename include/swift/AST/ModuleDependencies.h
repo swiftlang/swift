@@ -90,6 +90,12 @@ enum class ModuleDependencyKind : int8_t {
   LastKind = SwiftPlaceholder + 1
 };
 
+/// This is used to idenfity a specific macro plugin dependency.
+struct MacroPluginDependency {
+  std::string LibraryPath;
+  std::string ExecutablePath;
+};
+
 /// This is used to identify a specific module.
 struct ModuleDependencyID {
   std::string ModuleName;
@@ -246,6 +252,9 @@ struct CommonSwiftTextualModuleDependencyDetails {
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
 
+  /// The macro dependencies.
+  llvm::StringMap<MacroPluginDependency> macroDependencies;
+
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
   std::vector<std::string> buildCommandLine;
@@ -311,6 +320,12 @@ public:
   void updateCommandLine(const std::vector<std::string> &newCommandLine) {
     textualModuleDetails.buildCommandLine = newCommandLine;
   }
+
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath) {
+    textualModuleDetails.macroDependencies.insert(
+        {macroModuleName, {libraryPath.str(), executablePath.str()}});
+  }
 };
 
 /// Describes the dependencies of a Swift module
@@ -360,6 +375,12 @@ public:
 
   void addTestableImport(ImportPath::Module module) {
     testableImports.insert(module.front().Item.str());
+  }
+
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath) {
+    textualModuleDetails.macroDependencies.insert(
+        {macroModuleName, {libraryPath.str(), executablePath.str()}});
   }
 };
 
@@ -758,6 +779,10 @@ public:
 
   /// For a Source dependency, register a `Testable` import
   void addTestableImport(ImportPath::Module module);
+
+  /// For a Source dependency, register a macro dependency.
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath);
 
   /// Whether or not a queried module name is a `@Testable` import dependency
   /// of this module. Can only return `true` for Swift source modules.
