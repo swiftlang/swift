@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// MARK: - Memory layout
+// MARK: Memory layout
 
-/// A 128-bit unsigned integer type.
+/// A 128-bit unsigned integer value type.
 @available(SwiftStdlib 6.0, *)
 @frozen
 public struct UInt128: Sendable {
@@ -59,13 +59,12 @@ public struct UInt128: Sendable {
   //  about endianness in this case.
 #if _endian(little)
   public var _low: UInt64
-
   public var _high: UInt64
 #else
   public var _high: UInt64
-
   public var _low: UInt64
 #endif
+
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public init(_low: UInt64, _high: UInt64) {
@@ -93,6 +92,16 @@ public struct UInt128: Sendable {
   }
 #endif
 
+  /// Creates a new instance with the same memory representation as the given
+  /// value.
+  ///
+  /// This initializer does not perform any range or overflow checking. The
+  /// resulting instance may not have the same numeric value as
+  /// `bitPattern`---it is only guaranteed to use the same pattern of bits in
+  /// its binary representation.
+  ///
+  /// - Parameter bitPattern: A value to use as the source of the new instance's
+  ///   binary representation.
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public init(bitPattern: Int128) {
@@ -541,4 +550,3 @@ extension UInt128: FixedWidthInteger, UnsignedInteger {
     return Self(_low: _high.byteSwapped, _high: _low.byteSwapped)
   }
 }
-
