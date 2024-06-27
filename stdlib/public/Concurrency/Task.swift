@@ -603,6 +603,19 @@ func taskCreateFlags(
 
 // ==== Task Creation ----------------------------------------------------------
 
+public struct DispatchGroup {}
+public enum DispatchQoS { case unspecified }
+public typealias DispatchWorkItemFlags = [Int]
+
+public struct FakeQueue {
+  public func async(
+    group: DispatchGroup? = nil,
+    qos: DispatchQoS = .unspecified,
+    flags: DispatchWorkItemFlags = [],
+    execute work: sending @escaping @convention(block) () -> Void)
+  { fatalError() }
+}
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

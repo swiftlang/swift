@@ -1274,12 +1274,20 @@ dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
 }
 #endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
 
+//extern "C" SWIFT_CC(swift)
+//    void _swift_task_enqueueOnSerialAndTaskExecutor(
+//        Job *job,
+//        /* serialExecutor: UnownedSerialExecutor */
+//        SerialExecutorRef unownedSerialExecutor,
+//        /* taskExecutor: TE where TE: TaskExecutor */
+//        HeapObject *taskExecutor,
+//        const Metadata *taskExecutorType,
+//        const TaskExecutorWitnessTable *taskExecutorWtable
+//    );
+
 extern "C" SWIFT_CC(swift)
-    void _swift_task_enqueueOnSerialAndTaskExecutor(
+    void _swift_task_enqueueOnTaskExecutor(
         Job *job,
-        /* serialExecutor: UnownedSerialExecutor */
-        SerialExecutorRef unownedSerialExecutor,
-        /* taskExecutor: TE where TE: TaskExecutor */
         HeapObject *taskExecutor,
         const Metadata *taskExecutorType,
         const TaskExecutorWitnessTable *taskExecutorWtable
@@ -1300,9 +1308,9 @@ void DefaultActorImpl::scheduleActorProcessJob(
     auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
     auto taskExecutorWtable = taskExecutor.getTaskExecutorWitnessTable();
 
-    return _swift_task_enqueueOnSerialAndTaskExecutor(
+    return _swift_task_enqueueOnTaskExecutor(
         job,
-        SerialExecutorRef::forDefaultActor(asAbstract(this)),
+//        SerialExecutorRef::forDefaultActor(asAbstract(this)),
         taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
 #endif
   }
@@ -2234,9 +2242,8 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
         auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
         auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
 
-        return _swift_task_enqueueOnSerialAndTaskExecutor(
+        return _swift_task_enqueueOnTaskExecutor(
             job,
-            serialExecutorRef,
             taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
       } // else, fall-through to the default global enqueue

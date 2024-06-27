@@ -47,10 +47,6 @@ final class QueueTaskExecutor: TaskExecutor {
   }
 
   public func enqueue(_ _job: consuming ExecutorJob) {
-    fatalError("Should not be used when enqueue(_:isolatedTo:) is present")
-  }
-
-  public func enqueue(_ _job: consuming ExecutorJob, isolatedTo unownedSerialExecutor: UnownedSerialExecutor) {
     let job = UnownedJob(_job)
     queue.async {
       job.runSynchronously(
@@ -155,8 +151,6 @@ actor CharlieTheCustomExecutorActor {
         let reply = await defaultActor.printBlockingSleepPrint(name: "Task()")
         print("= Task() got reply: \(reply)")
       }
-
-    sleep(1)
 
       let t2 = Task(executorPreference: taskExecutor) {
         let reply = await defaultActor.printBlockingSleepPrint(name: "Task(executorPreference:)")
