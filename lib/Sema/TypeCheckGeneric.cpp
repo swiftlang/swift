@@ -794,7 +794,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     //  the extension is in a swiftinterface file. This is temporary and should
     //  be removed soon. (rdar://130424971)
     if (auto *sf = ext->getOutermostParentSourceFile()) {
-      if (sf->Kind == SourceFileKind::Interface)
+      if (sf->Kind == SourceFileKind::Interface
+          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension))
         inferInvertibleReqs = true;
     }
 
