@@ -1081,12 +1081,13 @@ void writeProperties(llvm::json::OStream &JSON,
 void writeConformances(llvm::json::OStream &JSON,
                        const NominalTypeDecl &NomTypeDecl) {
   JSON.attributeArray("conformances", [&] {
-    for (auto *Protocol : NomTypeDecl.getAllProtocols()) {
+    for (auto *Conformance : NomTypeDecl.getAllConformances()) {
+      auto Proto = Conformance->getProtocol();
       // FIXME(noncopyable_generics): Should these be included?
-      if (Protocol->getInvertibleProtocolKind())
+      if (Proto->getInvertibleProtocolKind())
         continue;
 
-      JSON.value(toFullyQualifiedProtocolNameString(*Protocol));
+      JSON.value(toFullyQualifiedProtocolNameString(*Proto));
     }
   });
 }
