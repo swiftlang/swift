@@ -853,7 +853,7 @@ public:
     auto *callee = call->getCalledFunction();
     if (!callee)
       return false;
-    auto isTaskAlloc = callee->getName().equals("swift_task_alloc");
+    auto isTaskAlloc = callee->getName() == "swift_task_alloc";
     return isTaskAlloc;
   }
 
@@ -2966,31 +2966,31 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
   // Check for some special cases, which are currently all async:
   if (fn->isAsync()) {
     auto name = fn->getName();
-    if (name.equals("swift_task_future_wait"))
+    if (name == "swift_task_future_wait")
       return SpecialKind::TaskFutureWait;
-    if (name.equals("swift_task_future_wait_throwing"))
+    if (name == "swift_task_future_wait_throwing")
       return SpecialKind::TaskFutureWaitThrowing;
 
-    if (name.equals("swift_asyncLet_wait"))
+    if (name == "swift_asyncLet_wait")
       return SpecialKind::AsyncLetWait;
-    if (name.equals("swift_asyncLet_wait_throwing"))
+    if (name == "swift_asyncLet_wait_throwing")
       return SpecialKind::AsyncLetWaitThrowing;
 
-    if (name.equals("swift_asyncLet_get"))
+    if (name == "swift_asyncLet_get")
       return SpecialKind::AsyncLetGet;
-    if (name.equals("swift_asyncLet_get_throwing"))
+    if (name == "swift_asyncLet_get_throwing")
       return SpecialKind::AsyncLetGetThrowing;
 
-    if (name.equals("swift_asyncLet_finish"))
+    if (name == "swift_asyncLet_finish")
       return SpecialKind::AsyncLetFinish;
-    
-    if (name.equals("swift_taskGroup_wait_next_throwing"))
+
+    if (name == "swift_taskGroup_wait_next_throwing")
       return SpecialKind::TaskGroupWaitNext;
 
-    if (name.equals("swift_taskGroup_waitAll"))
+    if (name == "swift_taskGroup_waitAll")
       return SpecialKind::TaskGroupWaitAll;
 
-    if (name.equals("swift_distributed_execute_target"))
+    if (name == "swift_distributed_execute_target")
       return SpecialKind::DistributedExecuteTarget;
   }
 

@@ -1270,7 +1270,7 @@ private:
         getLocForContentStartOnSameLine(SM, StringLiteralRange.getEnd());
     bool HaveEndQuotes = CharSourceRange(SM, EndLineContentLoc,
                                          StringLiteralRange.getEnd())
-        .str().equals(StringRef("\"\"\""));
+        .str() == "\"\"\"";
 
     if (!HaveEndQuotes) {
       // Indent to the same indentation level as the first non-empty line

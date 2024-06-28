@@ -1627,7 +1627,7 @@ static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
     llvm::MDNode *Op = ModuleFlags->getOperand(I);
     llvm::MDString *ID = cast<llvm::MDString>(Op->getOperand(1));
 
-    if (ID->getString().equals(EntryName)) {
+    if (ID->getString() == EntryName) {
 
       // Create the new entry.
       llvm::Type *Int32Ty = llvm::Type::getInt32Ty(Ctx);

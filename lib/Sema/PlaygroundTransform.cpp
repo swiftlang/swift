@@ -662,7 +662,7 @@ public:
       return nullptr;
     }
 
-    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
+    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr() == "self") {
       // Don't log "self" in a constructor
       return nullptr;
     }

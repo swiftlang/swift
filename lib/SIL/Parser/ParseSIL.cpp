@@ -2609,13 +2609,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
-      if (attrName.equals("dynamic_lifetime")) {
+      if (attrName == "dynamic_lifetime") {
         hasDynamicLifetime = HasDynamicLifetime;
-      } else if (attrName.equals("reflection")) {
+      } else if (attrName == "reflection") {
         hasReflection = true;
-      } else if (attrName.equals("moveable_value_debuginfo")) {
+      } else if (attrName == "moveable_value_debuginfo") {
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
-      } else if (attrName.equals("pointer_escape")) {
+      } else if (attrName == "pointer_escape") {
         hasPointerEscape = HasPointerEscape;
       } else {
         P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
@@ -3552,7 +3552,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     
     auto Strict = MarkUnresolvedNonCopyableValueInst::IsNotStrict;
-    if (AttrName.equals("strict")) {
+    if (AttrName == "strict") {
       Strict = MarkUnresolvedNonCopyableValueInst::IsStrict;
       if (!parseSILOptional(AttrName, *this)) {
         auto diag = diag::sil_markmustcheck_requires_attribute;
@@ -4043,7 +4043,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
-        if (attrName.equals("not_guaranteed"))
+        if (attrName == "not_guaranteed")
           not_guaranteed = true;
         else
           return true;
@@ -4065,7 +4065,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (Opcode == SILInstructionKind::ConvertFunctionInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
-        if (attrName.equals("without_actually_escaping"))
+        if (attrName == "without_actually_escaping")
           without_actually_escaping = true;
         else
           return true;
@@ -4177,13 +4177,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (attr.empty())
         return true;
 
-      if (attr.equals("strict"))
+      if (attr == "strict")
         isStrict = true;
 
-      if (attr.equals("invariant"))
+      if (attr == "invariant")
         isInvariant = true;
 
-      if (attr.equals("align"))
+      if (attr == "align")
         alignment = llvm::Align(std::get<uint64_t>(*parsedValue));
     }
 
@@ -6664,37 +6664,37 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   std::optional<ApplyIsolationCrossing> isolationCrossing;
 
   while (parseSILOptional(AttrName, AttrLoc, AttrValue, AttrValueLoc, *this)) {
-    if (AttrName.equals("nothrow")) {
+    if (AttrName == "nothrow") {
       assert(!bool(AttrValue));
       ApplyOpts |= ApplyFlags::DoesNotThrow;
       continue;
     }
 
-    if (AttrName.equals("noasync")) {
+    if (AttrName == "noasync") {
       assert(!bool(AttrValue));
       ApplyOpts |= ApplyFlags::DoesNotAwait;
       continue;
     }
 
-    if (AttrName.equals("callee_guaranteed")) {
+    if (AttrName == "callee_guaranteed") {
       assert(!bool(AttrValue));
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
       continue;
     }
 
-    if (AttrName.equals("isolated_any")) {
+    if (AttrName == "isolated_any") {
       assert(!bool(AttrValue));
       PartialApplyIsolation = SILFunctionTypeIsolation::Erased;
       continue;
     }
 
-    if (AttrName.equals("on_stack")) {
+    if (AttrName == "on_stack") {
       assert(!bool(AttrValue));
       IsNoEscape = true;
       continue;
     }
 
-    if (AttrName.equals("callee_isolation")) {
+    if (AttrName == "callee_isolation") {
       auto applyIsolation =
           ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
@@ -6707,7 +6707,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
-    if (AttrName.equals("caller_isolation")) {
+    if (AttrName == "caller_isolation") {
       auto applyIsolation =
           ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
