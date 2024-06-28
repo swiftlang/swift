@@ -648,7 +648,7 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
   }
 
   // Don't outline in the outlined function.
-  if (ObjCMethod->getFunction()->getName().equals(getOutlinedFunctionName()))
+  if (ObjCMethod->getFunction()->getName() == getOutlinedFunctionName())
     return false;
 
   // switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt: bb8,
@@ -1232,7 +1232,7 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   // Don't outline inside the outlined function.
   auto OutlinedName = getOutlinedFunctionName();
   auto CurrentName = ObjCMethod->getFunction()->getName();
-  if (CurrentName.equals(OutlinedName))
+  if (CurrentName == OutlinedName)
     return false;
 
   // Don't outline if we created an outlined function without the bridged result

@@ -6595,7 +6595,7 @@ bool swift::isPotentiallyIsolatedActor(
   if (!var)
     return false;
 
-  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
+  if (var->getName().str() == "__secretlyKnownToBeLocal") {
     // FIXME(distributed): we did a dynamic check and know that this actor is
     //   local, but we can't express that to the type system; the real
     //   implementation will have to mark 'self' as "known to be local" after

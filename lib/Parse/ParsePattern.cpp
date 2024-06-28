@@ -1412,7 +1412,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     // binding, which isn't yet supported.
     if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
                           tok::l_square)
-        || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
+        || (peekToken().isAnyOperator() && peekToken().getText() == "<")) {
 
       // Diagnose the unsupported production.
       diagnose(Tok.getLoc(),

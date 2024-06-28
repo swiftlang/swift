@@ -1004,7 +1004,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
             .fixItInsert(FirstTypeLoc, keyword.str() + " ");
       }
 
-      const bool isAnyKeyword = keyword.equals("any");
+      const bool isAnyKeyword = keyword == "any";
 
       if (isAnyKeyword) {
         if (anyLoc.isInvalid()) {
@@ -1508,7 +1508,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
 }
 
 bool Parser::canParseAsGenericArgumentList() {
-  if (!Tok.isAnyOperator() || !Tok.getText().equals("<"))
+  if (!Tok.isAnyOperator() || Tok.getText() != "<")
     return false;
 
   BacktrackingScope backtrack(*this);
