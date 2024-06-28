@@ -3,7 +3,7 @@
 
 @_implementationOnly import objc_implementation_internal
 
-@_objcImplementation extension InternalObjCClass {
+@objc @implementation extension InternalObjCClass {
   @objc public func method(fromHeader1: CInt) {
     // OK
   }
