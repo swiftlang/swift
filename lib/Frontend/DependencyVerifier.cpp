@@ -192,7 +192,7 @@ struct Obligation {
       }
       static bool isEqual(const Obligation::Key &LHS,
                           const Obligation::Key &RHS) {
-        return LHS.Name.equals(RHS.Name) && LHS.Kind == RHS.Kind;
+        return LHS.Name == RHS.Name && LHS.Kind == RHS.Kind;
       }
     };
   };

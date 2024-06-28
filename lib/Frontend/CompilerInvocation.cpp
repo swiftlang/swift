@@ -2775,9 +2775,9 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   for (auto A : ReducedArgs) {
     StringRef Arg(A);
     // FIXME: this should distinguish between key and value.
-    if (!haveSDKPath && Arg.equals("-sdk"))
+    if (!haveSDKPath && Arg == "-sdk")
       haveSDKPath = true;
-    if (!haveResourceDir && Arg.equals("-resource-dir"))
+    if (!haveResourceDir && Arg == "-resource-dir")
       haveResourceDir = true;
   }
   if (!haveSDKPath) {
@@ -3182,19 +3182,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
-      if (version.equals("none")) {
+      if (version == "none") {
         runtimeCompatibilityVersion = std::nullopt;
-      } else if (version.equals("5.0")) {
+      } else if (version == "5.0") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
-      } else if (version.equals("5.1")) {
+      } else if (version == "5.1") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
-      } else if (version.equals("5.5")) {
+      } else if (version == "5.5") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
-      } else if (version.equals("5.6")) {
+      } else if (version == "5.6") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
-      } else if (version.equals("5.8")) {
+      } else if (version == "5.8") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-      } else if (version.equals("6.0")) {
+      } else if (version == "6.0") {
         runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,

@@ -808,18 +808,18 @@ descriptorFromStandardMangling(Demangle::NodePointer symbolicNode) {
   // Fast-path lookup for standard library type references with short manglings.
   if (symbolicNode->getNumChildren() >= 2
       && symbolicNode->getChild(0)->getKind() == Node::Kind::Module
-      && symbolicNode->getChild(0)->getText().equals("Swift")
+      && stringRefEqualsCString(symbolicNode->getChild(0)->getText(), "Swift")
       && symbolicNode->getChild(1)->getKind() == Node::Kind::Identifier) {
     auto name = symbolicNode->getChild(1)->getText();
 
-#define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
-    if (name.equals(#TYPENAME)) { \
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                                \
+    if (stringRefEqualsCString(name, #TYPENAME)) {                             \
       return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
     }
   // FIXME: When the _Concurrency library gets merged into the Standard Library,
   // we will be able to reference those symbols directly as well.
 #define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
-  if (concurrencyDescriptors && name.equals(#TYPENAME)) {                      \
+  if (concurrencyDescriptors && stringRefEqualsCString(name, #TYPENAME)) {     \
     return concurrencyDescriptors->TYPENAME;                                   \
   }
 #if !SWIFT_OBJC_INTEROP
@@ -1870,7 +1870,7 @@ public:
   TypeLookupErrorOr<BuiltType> createBuiltinType(StringRef builtinName,
                                                  StringRef mangledName) const {
 #define BUILTIN_TYPE(Symbol, _) \
-    if (mangledName.equals(#Symbol)) \
+    if (stringRefEqualsCString(mangledName, #Symbol)) \
       return BuiltType(&METADATA_SYM(Symbol).base);
 #if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)

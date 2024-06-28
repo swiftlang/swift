@@ -935,7 +935,7 @@ void Driver::buildInputs(const ToolChain &TC,
       file_types::ID Ty = file_types::TY_INVALID;
 
       // stdin must be handled specially.
-      if (Value.equals("-")) {
+      if (Value == "-") {
         // By default, treat stdin as Swift input.
         Ty = file_types::TY_Swift;
       } else {

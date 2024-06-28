@@ -323,8 +323,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
     OwningNominal = ThisNominal;
   } else if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
-      if (!ExtendedNominal->getModuleContext()->getNameStr()
-          .equals(M.getNameStr())) {
+      if (ExtendedNominal->getModuleContext()->getNameStr() != M.getNameStr()) {
         OwningNominal = ExtendedNominal;
       } else {
         return;

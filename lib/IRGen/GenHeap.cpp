@@ -1277,7 +1277,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
                                          llvm::GlobalValue::PrivateLinkage,
                                          "__swift_fixLifetime",
                                          &Module);
-  assert(fixLifetime->getName().equals("__swift_fixLifetime")
+  assert(fixLifetime->getName() == "__swift_fixLifetime"
          && "fixLifetime symbol name got mangled?!");
   // Don't inline the function, so it stays as a signal to the ARC passes.
   // The ARC passes will remove references to the function when they're
