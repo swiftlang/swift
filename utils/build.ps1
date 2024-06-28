@@ -1781,8 +1781,9 @@ function Install-Platform([Platform]$Platform, $Arch) {
   Copy-Directory "$($Arch.SDKInstallRoot)\usr\lib\swift\shims" $SDKInstallRoot\usr\lib\swift
   foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
     $ModuleDirectory = "$($Arch.SDKInstallRoot)\usr\lib\swift\$Module"
+    $DestinationDirectory = "$SDKInstallRoot\usr\include"
     if (Test-Path $ModuleDirectory) {
-      Copy-Directory $ModuleDirectory $SDKInstallRoot\usr\include
+      Copy-Directory $ModuleDirectory $DestinationDirectory
     }
   }
 
