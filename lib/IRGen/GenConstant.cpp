@@ -31,7 +31,6 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/Require.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
@@ -331,8 +330,8 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
 
         auto *result = llvm::ConstantFoldCastOperand(
             llvm::Instruction::ZExt, val, storageTy, IGM.DataLayout);
-        require(result != nullptr,
-                "couldn't constant fold initializer expression");
+        ASSERT(result != nullptr &&
+               "couldn't constant fold initializer expression");
         return result;
       }
       case BuiltinValueKind::StringObjectOr: {
