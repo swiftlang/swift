@@ -105,10 +105,6 @@ void *MainAddr);
 extern int swift_api_digester_main(ArrayRef<const char *> Args,
                                    const char *Argv0, void *MainAddr);
 
-/// Run 'swift-api-extract'
-extern int swift_api_extract_main(ArrayRef<const char *> Args,
-                                  const char *Argv0, void *MainAddr);
-
 /// Run 'swift-cache-tool'
 extern int swift_cache_tool_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
@@ -398,10 +394,6 @@ static int run_driver(StringRef ExecName,
       argv[0], (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::SymbolGraph:
       return swift_symbolgraph_extract_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0], (void *)(intptr_t)getExecutablePath);
-  case Driver::DriverKind::APIExtract:
-    return swift_api_extract_main(
-        TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0],
-        (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::APIDigester:
     return swift_api_digester_main(
         TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0],
