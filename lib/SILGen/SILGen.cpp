@@ -784,20 +784,6 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (D->isExposedToClients())
     return false;
 
-  if (isa<AbstractFunctionDecl>(D)) {
-    // If this function is nested within another function that is exposed to
-    // clients then it should be emitted.
-    auto dc = D->getDeclContext();
-    do {
-      if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
-        if (afd->isExposedToClients())
-          return false;
-    } while ((dc = dc->getParent()));
-
-    // We didn't find a parent function that is exposed.
-    return true;
-  }
-
   return true;
 }
 
