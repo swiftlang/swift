@@ -7,6 +7,9 @@
 
 // REQUIRES: executable_test
 
+// rdar://130527427
+// REQUIRES: rdar130527427
+
 import StdlibUnittest
 import StdFunction
 import CxxStdlib
