@@ -201,6 +201,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and resul
 LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matching")
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
+LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -377,9 +378,6 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
 // Whether lookup of members respects the enclosing file's imports.
 EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true)
-
-// Enable @implementation on extensions of ObjC classes.
-EXPERIMENTAL_FEATURE(ObjCImplementation, true)
 
 // Enable @implementation on extensions of ObjC classes with non-fixed layout
 // due to resilient stored properties. Requires OS support; this flag exists for
