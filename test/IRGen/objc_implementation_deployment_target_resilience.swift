@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-stable-abi-triple -I %S/Inputs/abi -F %clang-importer-sdk-path/frameworks %s -import-objc-header %S/Inputs/objc_implementation.h -emit-ir -o %t.ir -enable-library-evolution -enable-experimental-feature ObjCImplementationWithResilientStorage -target %target-future-triple
 // REQUIRES: objc_interop
 
-@_objcImplementation extension ImplClassWithResilientStoredProperty {
+@objc @implementation extension ImplClassWithResilientStoredProperty {
   @objc var beforeInt: Int32 = 0    // no-error
   final var a: Mirror?              // expected-error {{does not support stored properties whose size can change due to library evolution; store this value in an object or 'any' type}}
   final var b: AnyKeyPath?          // no-error
