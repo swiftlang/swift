@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
@@ -1668,6 +1669,16 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
       // Don't record adjacency between base and result types,
       // this is just an auxiliary constraint to enforce ordering.
+      break;
+    }
+
+    case ConstraintKind::OptionalObject: {
+      // Type variable that represents an object type of
+      // an un-inferred optional is adjacent to a type
+      // variable that presents such optional (`bindingTypeVar`
+      // in this case).
+      if (kind == AllowedBindingKind::Supertypes)
+        AdjacentVars.insert({bindingTypeVar, constraint});
       break;
     }
 

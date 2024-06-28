@@ -27,7 +27,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
-*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md) and is tracked by [#44054](https://github.com/apple/swift/issues/44054).*
+*This feature has been accepted in [SE-0157](https://github.com/apple/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md) and was released with Swift 4.1.*
 
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 

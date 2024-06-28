@@ -10,8 +10,8 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-warning@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'}}
   // FIXME: give better diagnostic expected-warning@-5 {{extension for main class interface should provide implementation for property 'propertyFromHeader7'}}
   // FIXME: give better diagnostic expected-warning@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'}}
-  // expected-warning@-7 {{'@_objcImplementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
-  // expected-warning@-8 {{'@_objcImplementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
+  // expected-warning@-7 {{'@objc @implementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
+  // expected-warning@-8 {{'@objc @implementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
   // expected-warning@-9 {{extension for main class interface should provide implementation for instance method 'extensionMethod(fromHeader2:)'}}
 
   func method(fromHeader1: CInt) {
@@ -204,12 +204,12 @@ protocol EmptySwiftProto {}
   }
 
   @nonobjc public init(notFromHeader4: CInt) {
-    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override designated initializers}}
+    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@objc @implementation' extension because Objective-C subclasses must be able to override designated initializers}}
     // expected-note@-2 {{add 'convenience' keyword to make this a convenience initializer}} {{12-12=convenience }}
   }
 
   @nonobjc public required init(notFromHeader5: CInt) {
-    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override required initializers}}
+    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@objc @implementation' extension because Objective-C subclasses must be able to override required initializers}}
     // expected-note@-2 {{replace 'required' keyword with 'convenience' to make this a convenience initializer}} {{19-27=convenience}}
   }
 
@@ -229,6 +229,11 @@ protocol EmptySwiftProto {}
   // rdar://122280735 - crash when the parameter of a block property needs @escaping
   let rdar122280735: (() -> ()) -> Void = { _ in }
   // expected-warning@-1 {{property 'rdar122280735' of type '(() -> ()) -> Void' does not match type '(@escaping () -> Void) -> Void' declared by the header}}
+
+  private func privateNonObjCMethod(_: EmptySwiftProto) {
+    // expected-warning@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+    // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
+  }
 }
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {
@@ -428,8 +433,8 @@ protocol EmptySwiftProto {}
   func nullableResult() -> Any { fatalError() } // expected-warning {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
   func nullableArgument(_: Any) {} // expected-warning {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
 
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-warning{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-warning {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
 }
 
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
@@ -472,17 +477,17 @@ protocol EmptySwiftProto {}
 // expected-note@-1 2 {{'SwiftClass' declared here}}
 
 @_objcImplementation extension SwiftClass {}
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-22=}}
+// expected-error@-1 {{'@objc @implementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-22=}}
 
 @_objcImplementation(WTF) extension SwiftClass {} // expected
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-27=}}
+// expected-error@-1 {{'@objc @implementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-27=}}
 
 @_objcImplementation extension ObjCImplRootClass {
-  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
+  // expected-error@-1 {{'@objc @implementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
 }
 
 @_objcImplementation extension ObjCImplGenericClass {
-  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
+  // expected-error@-1 {{'@objc @implementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
 }
 
 //

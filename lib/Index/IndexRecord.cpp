@@ -23,6 +23,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -285,11 +286,6 @@ StringRef StdlibGroupsIndexRecordingConsumer::findGroupForSymbol(const IndexSymb
 static bool writeRecord(SymbolTracker &record, std::string Filename,
                         std::string indexStorePath, DiagnosticEngine *diags,
                         std::string &outRecordFile) {
-  if (record.getOccurrences().empty()) {
-    outRecordFile = std::string();
-    return false;
-  }
-
   IndexRecordWriter recordWriter(indexStorePath);
   std::string error;
   auto result = recordWriter.beginRecord(
