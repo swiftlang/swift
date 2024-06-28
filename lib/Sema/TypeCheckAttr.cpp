@@ -1060,6 +1060,12 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
       D->getASTContext().LangOpts.PackageName.empty() &&
       File && File->Kind != SourceFileKind::Interface) {
     // `package` modifier used outside of a package.
+    // Error if a source file contains a package decl or `package import` but
+    // no package-name is passed.
+    // Note that if the file containing the package decl is a public (or private)
+    // interface file, the decl must be @usableFromInline (or "inlinable"),
+    // effectively getting "public" visibility; in such case, package-name is
+    // not needed, and typecheck on those decls are skipped.
     diagnose(attr->getLocation(), diag::access_control_requires_package_name,
              isa<ValueDecl>(D), D);
     return true;

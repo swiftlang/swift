@@ -720,6 +720,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+def disable_print_package_name_for_non_package_interface :
+  Flag<["-"], "disable-print-package-name-for-non-package-interface">,
+  Flags<[FrontendOption, NoDriverOption, ModuleInterfaceOption, HelpHidden]>,
+  HelpText<"Disable adding package name to public or private interface">;
+
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
