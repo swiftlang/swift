@@ -554,6 +554,18 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
   }
 }
 
+static bool lookThroughMarkDependenceChainForValue(MarkDependenceInst *mark,
+                                                   PartialApplyInst *pai) {
+  if (mark->getValue() == pai) {
+    return true;
+  }
+  auto *markChain = dyn_cast<MarkDependenceInst>(mark->getValue());
+  if (!markChain) {
+    return false;
+  }
+  return lookThroughMarkDependenceChainForValue(markChain, pai);
+}
+
 /// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
 /// apply/try_apply user to a partial_apply [stack] terminated with a
 /// dealloc_stack placed after the apply.
@@ -735,7 +747,6 @@ static SILValue tryRewriteToPartialApplyStack(
   unsigned appliedArgStartIdx =
         newPA->getOrigCalleeType()->getNumParameters() - newPA->getNumArguments();
 
-  MarkDependenceInst *markDepChain = nullptr;
   for (unsigned i : indices(newPA->getArgumentOperands())) {
     auto &arg = newPA->getArgumentOperands()[i];
     SILValue copy = arg.get();
@@ -775,6 +786,7 @@ static SILValue tryRewriteToPartialApplyStack(
     CopyAddrInst *initialization = nullptr;
     MarkDependenceInst *markDep = nullptr;
     for (auto *use : stack->getUses()) {
+      auto *user = use->getUser();
       // Since we removed the `dealloc_stack`s from the capture arguments,
       // the only uses of this stack slot should be the initialization, the
       // partial application, and possibly a mark_dependence from the
@@ -788,30 +800,18 @@ static SILValue tryRewriteToPartialApplyStack(
         //    %md = mark_dependence %pai on %0
         //    %md2 = mark_dependence %md on %1
         // to tie all of those operands together on the same partial_apply.
-        //
-        // FIXME: Should we not be chaining like this and just emit independent
-        // mark_dependence?
-        if (markDepChain && mark->getValue() == markDepChain) {
-          markDep = mark;
-          markDepChain = mark;
-          continue;
-        }
 
-        // If we're marking dependence of the current partial_apply on this
-        // stack slot, that's fine.
-        if (mark->getValue() != newPA
-            || mark->getBase() != stack) {
+        // Check if we're marking dependence on this stack slot for the current
+        // partial_apply or it's chain of mark_dependences.
+        if (!lookThroughMarkDependenceChainForValue(mark, newPA) ||
+            mark->getBase() != stack) {
           LLVM_DEBUG(llvm::dbgs() << "-- had unexpected mark_dependence use\n";
                      use->getUser()->print(llvm::dbgs());
                      llvm::dbgs() << "\n");
-          
+          initialization = nullptr;
           break;
         }
         markDep = mark;
-
-        if (!markDepChain) {
-          markDepChain = mark;
-        }
 
         continue;
       }
@@ -840,7 +840,13 @@ static SILValue tryRewriteToPartialApplyStack(
         initialization = possibleInit;
         continue;
       }
+      if (isa<DebugValueInst>(user) || isa<DestroyAddrInst>(user) ||
+          isa<DeallocStackInst>(user)) {
+        continue;
+      }
       LLVM_DEBUG(llvm::dbgs() << "-- unrecognized use\n");
+      // Reset initialization on an unrecognized use
+      initialization = nullptr;
       break;
     }
     if (!initialization) {
