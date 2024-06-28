@@ -21,6 +21,8 @@ struct M4: ~Copyable {
   let s4: M
 }
 
+class C {}
+
 sil @get_M4 : $@convention(thin) () -> @owned M4
 sil @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
 sil @see_addr : $@convention(thin) (@in_guaranteed M) -> ()
@@ -28,6 +30,7 @@ sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
 sil @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
 sil @get_out_2 : $@convention(thin) () -> (@out M, @out M)
 sil @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
+sil @getC : $@convention(thin) () -> (@owned C)
 
 /// Two non-contiguous fields (#M4.s2, #M4.s4) are borrowed by @see_addr_2.
 /// Two non-contiguous fields (#M4.s1, #M$.s3) are consumed by @end_2.
@@ -253,3 +256,40 @@ bb0(%0 : @guaranteed $M):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @rdar130427564 : {{.*}} {
+// Verify that no instructions were inserted after backedge2's terminator.  (In
+// fact, if they were, the test would crash.)
+// CHECK:       bb2([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow @guaranteed $C):
+// CHECK-NEXT:    [[B0F:%[^,]+]] = borrowed [[B0]] : $C from ([[C0]] : $C)
+// CHECK-NEXT:    end_borrow [[B0F]]
+// CHECK-NEXT:    destroy_value [[C0]]
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'rdar130427564'
+sil [ossa] @rdar130427564 : $@convention(thin) (@in_guaranteed M) -> () {
+entry(%ignore_me : $*M):
+  %ignore_me_2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %ignore_me : $*M
+  br fn
+fn:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b = begin_borrow %c : $C
+  br header(%c : $C, %b : $C)
+header(%c0 : @owned $C, %b0 : @reborrow @guaranteed $C):
+  %b0f = borrowed %b0 : $C from (%c0 : $C)
+  end_borrow %b0f : $C
+  destroy_value %c0 : $C
+  br body
+body:
+  br latch
+latch:
+  cond_br undef, backedge, ecit
+backedge:
+  %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b1 = begin_borrow %c1 : $C
+  br backedge2(%c1 : $C, %b1 : $C)
+backedge2(%c2 : @owned $C, %b2 : @reborrow @guaranteed $C):
+  %b2f = borrowed %b2 : $C from (%c2 : $C)
+  br header(%c2 : $C, %b2f : $C)
+ecit:
+  unreachable
+}
