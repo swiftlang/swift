@@ -11113,7 +11113,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
 
-      auto impact = 2;
+      auto impact = 4;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
@@ -13390,7 +13390,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Let's make this fix as high impact so if there is a function or member
     // overload with e.g. argument-to-parameter type mismatches it would take
     // a higher priority.
-    return recordFix(fix, /*impact=*/10) ? SolutionKind::Error
+    return recordFix(fix, /*impact=*/3) ? SolutionKind::Error
                                          : SolutionKind::Solved;
   }
 
