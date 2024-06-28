@@ -1440,8 +1440,8 @@ private:
     assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
-    printFunctionClangAttributes(FD, funcTy);
     os << " SWIFT_NOEXCEPT";
+    printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << ";\n";
   }
