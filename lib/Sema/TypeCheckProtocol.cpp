@@ -5828,7 +5828,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
 static bool isNSCoding(ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
   return protocol->getModuleContext()->getName() == ctx.Id_Foundation &&
-    protocol->getName().str().equals("NSCoding");
+    protocol->getName().str() == "NSCoding";
 }
 
 /// Whether the given class has an explicit '@objc' name.

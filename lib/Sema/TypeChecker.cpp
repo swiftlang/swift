@@ -596,11 +596,11 @@ DeclTypeCheckingSemantics
 TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
   // Check for a @_semantics attribute.
   if (auto semantics = decl->getAttrs().getAttribute<SemanticsAttr>()) {
-    if (semantics->Value.equals("typechecker.type(of:)"))
+    if (semantics->Value == "typechecker.type(of:)")
       return DeclTypeCheckingSemantics::TypeOf;
-    if (semantics->Value.equals("typechecker.withoutActuallyEscaping(_:do:)"))
+    if (semantics->Value == "typechecker.withoutActuallyEscaping(_:do:)")
       return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
-    if (semantics->Value.equals("typechecker._openExistential(_:do:)"))
+    if (semantics->Value == "typechecker._openExistential(_:do:)")
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
