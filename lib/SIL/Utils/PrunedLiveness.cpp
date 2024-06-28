@@ -193,6 +193,43 @@ static FunctionTest
 //                              PrunedLiveRange
 //===----------------------------------------------------------------------===//
 
+static PrunedLiveness::LifetimeEnding
+branchMeet(PrunedLiveness::LifetimeEnding const lhs,
+           PrunedLiveness::LifetimeEnding const rhs) {
+  enum BranchLifetimeEnding {
+    Ending,
+    NonEnding,
+    NonUse,
+  };
+  auto toBranch =
+      [](PrunedLiveness::LifetimeEnding const ending) -> BranchLifetimeEnding {
+    switch (ending) {
+    case PrunedLiveness::LifetimeEnding::Value::NonEnding:
+      return NonEnding;
+    case PrunedLiveness::LifetimeEnding::Value::Ending:
+      return Ending;
+    case PrunedLiveness::LifetimeEnding::Value::NonUse:
+      return NonUse;
+    }
+  };
+  auto toRegular =
+      [](BranchLifetimeEnding const ending) -> PrunedLiveness::LifetimeEnding {
+    switch (ending) {
+    case NonEnding:
+      return PrunedLiveness::LifetimeEnding::Value::NonEnding;
+    case Ending:
+      return PrunedLiveness::LifetimeEnding::Value::Ending;
+    case NonUse:
+      return PrunedLiveness::LifetimeEnding::Value::NonUse;
+    }
+  };
+  return toRegular(std::min(toBranch(lhs), toBranch(rhs)));
+}
+static void branchMeetInPlace(PrunedLiveness::LifetimeEnding &that,
+                              PrunedLiveness::LifetimeEnding const other) {
+  that = branchMeet(that, other);
+}
+
 template <typename LivenessWithDefs>
 void PrunedLiveRange<LivenessWithDefs>::updateForUse(
     SILInstruction *user,
@@ -211,8 +248,13 @@ void PrunedLiveRange<LivenessWithDefs>::updateForUse(
   // This call is not considered the end of %val's lifetime. The @owned
   // argument must be copied.
   auto iterAndSuccess = users.insert({user, lifetimeEnding});
-  if (!iterAndSuccess.second)
-    iterAndSuccess.first->second.meetInPlace(lifetimeEnding);
+  if (!iterAndSuccess.second) {
+    if (isa<BranchInst>(user)) {
+      branchMeetInPlace(iterAndSuccess.first->second, lifetimeEnding);
+    } else {
+      iterAndSuccess.first->second.meetInPlace(lifetimeEnding);
+    }
+  }
 }
 template <typename LivenessWithDefs>
 void PrunedLiveRange<LivenessWithDefs>::updateForUse(SILInstruction *user,
