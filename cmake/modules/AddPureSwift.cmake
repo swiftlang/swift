@@ -291,6 +291,12 @@ function(add_pure_swift_host_library name)
 
   _set_pure_swift_profile_flags(${name})
 
+  # Enable build IDs
+  if(SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_USE_BUILD_ID)
+    target_link_options(${name} PRIVATE
+      "SHELL:-Xlinker --build-id=sha1")
+  endif()
+
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
@@ -390,6 +396,12 @@ function(add_pure_swift_host_tool name)
     target_link_options(${name} PRIVATE
       "-use-ld=${LLVM_USE_LINKER}"
     )
+  endif()
+
+  # Enable build IDs
+  if(SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_USE_BUILD_ID)
+    target_link_options(${name} PRIVATE
+      "SHELL:-Xlinker --build-id=sha1")
   endif()
 
   # Workaround to touch the library and its objects so that we don't
