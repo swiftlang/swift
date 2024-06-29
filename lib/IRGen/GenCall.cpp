@@ -2848,7 +2848,8 @@ public:
             errorExplosion.add(elt);
           }
         } else {
-          errorExplosion.add(convertIfNecessary(combined.combinedTy, values[0]));
+          errorExplosion.add(convertIfNecessary(
+              combined.combinedTy, values[combined.errorValueMapping[0]]));
         }
 
         typedErrorExplosion =
