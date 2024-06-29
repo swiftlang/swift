@@ -398,7 +398,7 @@ extension SynthesizedConformances.NotSendable: Sendable {}
 enum SynthesizedConformances {
   struct NotSendable: Equatable {}
 
-  // expected-warning@+2 2{{main actor-isolated property 'x' can not be referenced from a non-isolated context}}
+  // expected-warning@+2 2{{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
   // expected-note@+1 2{{in static method '==' for derived conformance to 'Equatable'}}
   @MainActor struct Isolated: Equatable {
     let x: NotSendable // expected-note 2{{property declared here}}

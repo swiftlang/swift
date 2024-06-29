@@ -63,7 +63,7 @@ distributed actor Philosopher {
 
 func test_outside(system: FakeActorSystem) async throws {
   _ = try await Philosopher(system: system).dist()
-  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can not be accessed from a non-isolated context}}
+  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can not be accessed from a nonisolated context}}
 
   _ = Philosopher(system: system).id
   _ = Philosopher(system: system).actorSystem

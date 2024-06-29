@@ -5472,16 +5472,16 @@ ERROR(actor_isolated_non_self_reference,none,
         "%4 %kind0 can not be "
         "%select{referenced|mutated|used 'inout'}1 "
         "%select{from outside the actor|on a different actor instance|"
-        "on a non-isolated actor instance|"
+        "on a nonisolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %3|"
-        "from the main actor|from a non-isolated context|"
-        "from a non-isolated autoclosure}2",
+        "from the main actor|from a nonisolated context|"
+        "from a nonisolated autoclosure}2",
         (const ValueDecl *, unsigned, unsigned, Type,
          ActorIsolation))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
-      "non-isolated context",
+      "nonisolated context",
       (const ValueDecl *))
 ERROR(conflicting_stored_property_isolation,none,
       "%select{default|memberwise}0 initializer for %1 cannot be both %2 and %3",
@@ -5622,7 +5622,7 @@ ERROR(shared_mutable_state_access,none,
       "reference to %kind0 is not concurrency-safe because it involves shared "
       "mutable state", (const ValueDecl *))
 ERROR(shared_mutable_state_decl,none,
-      "%kind0 is not concurrency-safe because it is non-isolated global shared "
+      "%kind0 is not concurrency-safe because it is nonisolated global shared "
       "mutable state", (const ValueDecl *))
 ERROR(shared_immutable_state_decl,none,
       "%kind1 is not concurrency-safe because non-'Sendable' type %0 may have "
@@ -5682,7 +5682,7 @@ NOTE(in_derived_witness, none,
      (DescriptiveDeclKind, DeclName, Type))
 ERROR(non_sendable_param_type,none,
       "non-sendable type %0 %select{passed in call to %3 %kind2|"
-      "exiting %3 context in call to non-isolated %kind2|"
+      "exiting %3 context in call to nonisolated %kind2|"
       "passed in implicitly asynchronous call to %3 %kind2|"
       "in parameter of the protocol requirement satisfied by %3 %kind2|"
       "in parameter of superclass method overridden by %3 %kind2|"
@@ -5694,7 +5694,7 @@ ERROR(non_sendable_call_argument,none,
       (Type, bool, ActorIsolation))
 ERROR(non_sendable_result_type,none,
       "non-sendable type %0 returned by %select{call to %3 %kind2|"
-      "call from %4 context to non-isolated %kind2|"
+      "call from %4 context to nonisolated %kind2|"
       "implicitly asynchronous call to %3 %kind2|"
       "%3 %kind2 satisfying protocol requirement|"
       "%3 overriding %kind2|"
@@ -5707,7 +5707,7 @@ ERROR(non_sendable_call_result_type,none,
 ERROR(non_sendable_property_type,none,
       "non-sendable type %0 in %select{"
       "%select{asynchronous access to %4 %kind1|"
-      "asynchronous access from %4 context to non-isolated %kind1|"
+      "asynchronous access from %4 context to nonisolated %kind1|"
       "implicitly asynchronous access to %4 %kind1|"
       "conformance of %4 %kind1 to protocol requirement|"
       "%4 overriding %kind1|"
@@ -5810,7 +5810,7 @@ ERROR(nonisolated_wrapped_property,none,
       ())
 
 ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
+        "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
         (Type, DescriptiveDeclKind, DeclName))
 
 ERROR(actor_instance_property_wrapper,none,
