@@ -4460,6 +4460,11 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
                       eltTy->getPrimitiveSizeInBits()) {
                 assert(nativeTy->getPrimitiveSizeInBits() >
                        eltTy->getPrimitiveSizeInBits());
+
+                if (eltTy->isPointerTy()) {
+                  return elt = Builder.CreatePtrToInt(elt, nativeTy);
+                }
+
                 return Builder.CreateZExt(elt, nativeTy);
               }
               return elt;
