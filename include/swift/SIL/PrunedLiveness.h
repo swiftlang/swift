@@ -399,7 +399,7 @@ public:
         : value(lifetimeEnding ? Value::Ending : Value::NonEnding) {}
     operator Value() const { return value; }
     LifetimeEnding meet(LifetimeEnding const other) const {
-      return value < other.value ? *this : other;
+      return std::min(value, other.value);
     }
     void meetInPlace(LifetimeEnding const other) { *this = meet(other); }
     bool isEnding() const { return value == Value::Ending; }
