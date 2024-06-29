@@ -19,12 +19,12 @@
 // CHECK-PRIVATE-NOT: -package-name foopkg
 // CHECK-PRIVATE-NOT: -package-name barpkg
 // CHECK-PACKAGE-NOT: -package-name foopkg
-// CHECK-PACKAGE: -package-name barpkg
 
-// CHECK-PUBLIC: -module-name Bar
-// CHECK-PRIVATE: -module-name Bar
-// CHECK-PACKAGE: -module-name Bar
+// CHECK-PUBLIC:  -enable-library-evolution -swift-version 6 -disable-print-package-name-for-non-package-interface -module-name Bar
+// CHECK-PRIVATE:  -enable-library-evolution -swift-version 6 -disable-print-package-name-for-non-package-interface -module-name Bar
+// CHECK-PACKAGE:  -enable-library-evolution -swift-version 6 -disable-print-package-name-for-non-package-interface -module-name Bar -package-name barpkg
 
+/// Verify building modules from non-package interfaces succeeds without the package-name flag.
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Bar.swiftinterface -o %t/Bar.swiftmodule -module-name Bar
 // RUN: rm -rf %t/Bar.swiftmodule
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Bar.private.swiftinterface -o %t/Bar.swiftmodule -module-name Bar
@@ -48,9 +48,9 @@
 // RUN: %FileCheck %s < %t/Bar.private.swiftinterface
 // RUN: %FileCheck %s < %t/Bar.package.swiftinterface
 
-// CHECK: -package-name barpkg
-// CHECK: -module-name Bar
+// CHECK: -enable-library-evolution -package-name barpkg -swift-version 6 -module-name Bar
 
+/// Building modules from non-package interfaces with package-name (default mode) should succeed.
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Bar.swiftinterface -o %t/Bar.swiftmodule -module-name Bar
 // RUN: rm -rf %t/Bar.swiftmodule
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Bar.private.swiftinterface -o %t/Bar.swiftmodule -module-name Bar
