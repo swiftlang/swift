@@ -59,35 +59,8 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
-
-  // Check if printing package-name is disabled for
-  // non-package interfaces (by default, it's printed
-  // in all interfaces).
-  std::string flagsStr = Opts.Flags;
-  if (Opts.DisablePackageNameForNonPackageInterface &&
-      !Opts.printPackageInterface()) {
-    size_t pkgIdx = 0;
-    size_t end = flagsStr.size();
-    auto pkgFlag = StringRef("-package-name ");
-    size_t pkgLen = pkgFlag.size();
-
-    // Find the package-name flag and its value and
-    // drop them. There can be multiple package-name
-    // flags passed, so drop them all.
-    while (pkgIdx < end) {
-      // First, find "-package-name "
-      pkgIdx = flagsStr.find(pkgFlag, 0);
-      if (pkgIdx == std::string::npos)
-        break;
-      // If found, find the next flag's starting pos.
-      auto next = flagsStr.find_first_of("-", pkgIdx + pkgLen + 1);
-      // Remove the substr in-place.
-      flagsStr.erase(pkgIdx, next - pkgIdx);
-    }
-  }
-
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << flagsStr;
+      << Opts.Flags;
 
   // Adding package-name can be disabled in non-package
   // swiftinterfaces; add only to package.swiftinterface
