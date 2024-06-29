@@ -2643,6 +2643,8 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
     anyChanged = false;
     anyUnsubstituted = false;
 
+  LLVM_DEBUG(llvm::dbgs() << "Simplifying type witnesses -- iteration " << iterations << "\n");
+
     if (++iterations > 100) {
       llvm::errs() << "Too many iterations in simplifyCurrentTypeWitnesses()\n";
 
@@ -2677,6 +2679,10 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
       auto typeWitness = known->first;
       if (!typeWitness->hasTypeParameter())
         continue;
+
+      LLVM_DEBUG(llvm::dbgs() << "Attempting to simplify witness for "
+                              << assocType->getName()
+                              << ": " << typeWitness << "\n";);
 
       auto simplified = typeWitness.transformRec(
         [&](TypeBase *type) -> std::optional<Type> {
@@ -2806,10 +2812,16 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
         return nullptr;
       }
 
-      Type type = self->typeWitnesses.begin(assocType)->first;
+      auto found = self->typeWitnesses.begin(assocType);
+      if (found == self->typeWitnesses.end()) {
+        // Invalid code.
+        return ErrorType::get(thisProto->getASTContext()).getPointer();
+      }
+
+      Type type = found->first;
       if (type->hasTypeParameter()) {
         // Not fully substituted yet.
-        return ErrorType::get(type->getASTContext()).getPointer();
+        return ErrorType::get(thisProto->getASTContext()).getPointer();
       }
 
       return type->mapTypeOutOfContext().getPointer();
