@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/DependencyScan/DependencyScanJSON.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/StringUtils.h"

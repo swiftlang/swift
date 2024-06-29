@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "mandatory-inlining"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -112,6 +113,7 @@ static  bool fixupReferenceCounts(
     bool hasOwnership = f->hasOwnership();
 
     switch (convention) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
       llvm_unreachable("Missing indirect copy");
 

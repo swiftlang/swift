@@ -19,6 +19,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -326,9 +327,10 @@ ModuleDependencyScanner::getModuleDependencies(ModuleDependencyID moduleID,
   }
 
   // Resolve cross-import overlays.
-  discoverCrossImportOverlayDependencies(
-      moduleID.ModuleName, allModules.getArrayRef().slice(1), cache,
-      [&](ModuleDependencyID id) { allModules.insert(id); });
+  if (ScanCompilerInvocation.getLangOptions().EnableCrossImportOverlays)
+    discoverCrossImportOverlayDependencies(
+        moduleID.ModuleName, allModules.getArrayRef().slice(1), cache,
+        [&](ModuleDependencyID id) { allModules.insert(id); });
 
   return allModules.takeVector();
 }

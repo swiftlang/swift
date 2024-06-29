@@ -830,6 +830,9 @@ ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))
 
+WARNING(can_import_invalid_swiftmodule,none,
+        "canImport() evaluated to false due to invalid swiftmodule: %0", (StringRef))
+
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
@@ -1764,16 +1767,16 @@ ERROR(attr_objc_implementation_must_be_unconditional,none,
       "only unconditional extensions can implement an Objective-C '@interface'",
       ())
 ERROR(attr_objc_implementation_must_be_imported,none,
-      "'@_objcImplementation' cannot be used to extend %kind0 because it was "
+      "'@objc @implementation' cannot be used to extend %kind0 because it was "
       "defined by a Swift 'class' declaration, not an imported Objective-C "
       "'@interface' declaration",
       (ValueDecl *))
 ERROR(attr_objc_implementation_must_have_super,none,
-      "'@_objcImplementation' cannot be used to implement root %kind0; declare "
-      "its superclass in the header",
+      "'@objc @implementation' cannot be used to implement root %kind0; "
+      "declare its superclass in the header",
       (ValueDecl *))
 ERROR(objc_implementation_cannot_have_generics,none,
-      "'@_objcImplementation' cannot be used to implement %kind0",
+      "'@objc @implementation' cannot be used to implement %kind0",
       (ValueDecl *))
 ERROR(attr_objc_implementation_category_not_found,none,
       "could not find category %0 on Objective-C class %1; make sure your "
@@ -1791,7 +1794,7 @@ ERROR(attr_objc_implementation_no_category_for_func,none,
       "name from this attribute",
       (ValueDecl*))
 ERROR(attr_objc_implementation_no_conformance,none,
-      "'@_objcImplementation' extension cannot add conformance to %0; "
+      "'@objc @implementation' extension cannot add conformance to %0; "
       "add this conformance %select{with an ordinary extension|"
       "in the Objective-C header}1",
       (Type, bool))
@@ -1919,7 +1922,7 @@ NOTE(objc_implementation_requirement_here,none,
      (ValueDecl *))
 
 ERROR(objc_implementation_init_must_be_convenience, none,
-      "%kind0 is not valid in an '@_objcImplementation' extension because "
+      "%kind0 is not valid in an '@objc @implementation' extension because "
       "Objective-C subclasses must be able to override "
       "%select{designated|required}1 initializers",
       (const ValueDecl *, /*isRequired=*/bool))
@@ -1933,7 +1936,7 @@ NOTE(objc_implementation_init_turn_required_to_convenience, none,
 
 // Fallback diagnostic; super-general by nature.
 ERROR(objc_implementation_member_requires_vtable, none,
-      "%kind0 is not valid in an '@_objcImplementation' extension because it "
+      "%kind0 is not valid in an '@objc @implementation' extension because it "
       "is an overridable Swift-only %kindonly0",
       (const ValueDecl *))
 
@@ -3648,7 +3651,8 @@ ERROR(decl_from_hidden_module,none,
       "cannot use %kind0 %select{here|as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}1; "
+      "in an extension with conditional conformances|"
+      "in a public or '@usableFromInline' conformance}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
       "it is SPI|"
@@ -3662,7 +3666,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}3 "
+      "in an extension with conditional conformance|"
+      "in a public or '@usableFromInline' conformance}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
@@ -3675,7 +3680,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances}2; "
+      "in an extension with conditional conformances|"
+      "<<ERROR>>}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
@@ -5296,14 +5302,22 @@ ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
+#define EFFECTS_CONTEXT_KIND \
+  "%select{<<ERROR>>|" \
+  "a default argument|" \
+  "a property wrapper initializer|" \
+  "a property initializer|" \
+  "a global variable initializer|" \
+  "a lazy variable initializer|" \
+  "an enum case raw value|" \
+  "a catch pattern|" \
+  "a catch guard expression|" \
+  "a defer body}" \
+
 ERROR(throwing_op_in_illegal_context,none,
-      "%1 can throw, but errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned, StringRef))
+      "%1 can throw, but errors cannot be thrown out of " EFFECTS_CONTEXT_KIND "0", (unsigned, StringRef))
 ERROR(throw_in_illegal_context,none,
-      "errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
+      "errors cannot be thrown out of " EFFECTS_CONTEXT_KIND "0", (unsigned))
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
@@ -5398,17 +5412,6 @@ ERROR(async_let_no_variables,none,
       "'async let' requires at least one named variable", ())
 NOTE(async_let_without_await,none,
       "reference to async let %0 is 'async'", (const ValueDecl *))
-
-#define EFFECTS_CONTEXT_KIND \
-  "%select{<<ERROR>>|" \
-  "a default argument|" \
-  "a property wrapper initializer|" \
-  "a property initializer|" \
-  "a global variable initializer|" \
-  "an enum case raw value|" \
-  "a catch pattern|" \
-  "a catch guard expression|" \
-  "a defer body}" \
 
 ERROR(async_call_in_illegal_context,none,
       "'async' call cannot occur in " EFFECTS_CONTEXT_KIND "0",
@@ -5664,8 +5667,6 @@ ERROR(isolated_parameter_combined_nonisolated,none,
 ERROR(isolated_parameter_isolated_attr_type,none,
       "function with 'isolated' parameter cannot also be '@isolated(%0)'",
       (StringRef))
-ERROR(isolated_any_experimental,none,
-      "attribute requires '-enable-experimental-feature IsolatedAny'", ())
 ERROR(isolated_attr_global_actor_type,none,
       "function type cannot have both a global actor and '@isolated(%0)'",
       (StringRef))
@@ -7718,8 +7719,8 @@ ERROR(inverse_associatedtype_restriction, none,
       "cannot suppress '%0' requirement of an associated type",
       (StringRef))
 ERROR(inverse_on_class, none,
-      "classes cannot be '~%0'",
-      (StringRef))
+      "%select{classes|actors}1 cannot be '~%0'",
+      (StringRef, bool))
 ERROR(inverse_with_class_constraint, none,
       "composition involving %select{class requirement %2|'AnyObject'}0 "
       "cannot contain '~%1'",
@@ -7728,8 +7729,8 @@ ERROR(inverse_conflicts_explicit_composition, none,
       "composition cannot contain '~%0' when another member requires '%0'",
       (StringRef))
 ERROR(inverse_extension, none,
-      "cannot suppress %0 in extension",
-      (Type))
+      "cannot suppress '%0' in extension",
+      (StringRef))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))
@@ -7799,6 +7800,9 @@ ERROR(suppress_nonsuppressable_protocol,none,
       "conformance to %0 cannot be suppressed", (const ProtocolDecl *))
 WARNING(suppress_already_suppressed_protocol,none,
       "already suppressed conformance to %0", (const ProtocolDecl *))
+ERROR(extension_conforms_to_invertible_and_others, none,
+      "conformance to '%0' must be declared in a separate extension",
+      (StringRef))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -7991,6 +7995,19 @@ ERROR(sending_only_on_parameters_and_results, none,
       "'sending' may only be used on parameters and results", ())
 ERROR(sending_cannot_be_applied_to_tuple_elt, none,
       "'sending' cannot be applied to tuple elements", ())
+ERROR(sending_function_wrong_sending,none,
+      "converting a value of type %0 to type %1 risks causing data races",
+      (Type, Type))
+NOTE(sending_function_param_with_sending_param_note, none,
+     "converting a function typed value with a sending parameter to one "
+     "without risks allowing actor-isolated values to escape their isolation "
+     "domain as an argument to an invocation of value",
+     ())
+NOTE(sending_function_result_with_sending_param_note, none,
+     "converting a function typed value without a sending result as one with "
+     "risks allowing actor-isolated values to escape their "
+     "isolation domain through a result of an invocation of value",
+     ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

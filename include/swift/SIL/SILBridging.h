@@ -136,6 +136,7 @@ enum class BridgedArgumentConvention {
   Indirect_In_Guaranteed,
   Indirect_Inout,
   Indirect_InoutAliasable,
+  Indirect_In_CXX,
   Indirect_Out,
   Direct_Owned,
   Direct_Unowned,
@@ -153,6 +154,7 @@ inline swift::ParameterConvention getParameterConvention(BridgedArgumentConventi
     case BridgedArgumentConvention::Indirect_In_Guaranteed:  return swift::ParameterConvention::Indirect_In_Guaranteed;
     case BridgedArgumentConvention::Indirect_Inout:          return swift::ParameterConvention::Indirect_Inout;
     case BridgedArgumentConvention::Indirect_InoutAliasable: return swift::ParameterConvention::Indirect_InoutAliasable;
+    case BridgedArgumentConvention::Indirect_In_CXX:         return swift::ParameterConvention::Indirect_In_CXX;
     case BridgedArgumentConvention::Indirect_Out:            break;
     case BridgedArgumentConvention::Direct_Owned:            return swift::ParameterConvention::Direct_Owned;
     case BridgedArgumentConvention::Direct_Unowned:          return swift::ParameterConvention::Direct_Unowned;
@@ -171,6 +173,7 @@ inline BridgedArgumentConvention getArgumentConvention(swift::ParameterConventio
     case swift::ParameterConvention::Indirect_In_Guaranteed:   return BridgedArgumentConvention::Indirect_In_Guaranteed;
     case swift::ParameterConvention::Indirect_Inout:           return BridgedArgumentConvention::Indirect_Inout;
     case swift::ParameterConvention::Indirect_InoutAliasable:  return BridgedArgumentConvention::Indirect_InoutAliasable;
+    case swift::ParameterConvention::Indirect_In_CXX:          return BridgedArgumentConvention::Indirect_In_CXX;
     case swift::ParameterConvention::Direct_Owned:             return BridgedArgumentConvention::Direct_Owned;
     case swift::ParameterConvention::Direct_Unowned:           return BridgedArgumentConvention::Direct_Unowned;
     case swift::ParameterConvention::Direct_Guaranteed:        return BridgedArgumentConvention::Direct_Guaranteed;
@@ -622,7 +625,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isGeneric() const;
   BRIDGED_INLINE bool hasSemanticsAttr(BridgedStringRef attrName) const;
   BRIDGED_INLINE bool hasUnsafeNonEscapableResult() const;
-  bool mayBindDynamicSelf() const;
+  BRIDGED_INLINE bool hasDynamicSelfMetadata() const;
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;

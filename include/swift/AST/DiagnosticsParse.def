@@ -51,6 +51,8 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
+ERROR(ifconfig_unexpectedtoken,none,
+      "unexpected tokens in '#if' body", ())
 ERROR(unexpected_if_following_else_compilation_directive,none,
       "unexpected 'if' keyword following '#else' conditional compilation "
       "directive; did you mean '#elseif'?",
@@ -2156,6 +2158,10 @@ ERROR(sil_markuncheckedreferencebinding_invalid_attribute,none,
 
 ERROR(init_accessor_is_not_on_property,none,
       "init accessors could only be associated with properties",
+      ())
+
+ERROR(init_accessor_is_not_in_the_primary_declaration,none,
+      "init accessors cannot be declared in an extension",
       ())
 
 ERROR(missing_storage_restrictions_attr_label,none,

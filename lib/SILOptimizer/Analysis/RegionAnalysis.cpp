@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/Basic/SmallBitVector.h"
@@ -1584,10 +1585,15 @@ public:
   void
   translateSILMultiAssign(const TargetRange &resultValues,
                           const SourceRange &sourceValues,
-                          SILIsolationInfo resultIsolationInfoOverride = {}) {
+                          SILIsolationInfo resultIsolationInfoOverride = {},
+                          bool requireSrcValues = true) {
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
+    // A helper we use to emit an unknown patten error if our merge is
+    // invalid. This ensures we guarantee that if we find an actor merge error,
+    // the compiler halts. Importantly this lets our users know 100% that if the
+    // compiler exits successfully, actor merge errors could not have happened.
     std::optional<SILDynamicMergedIsolationInfo> mergedInfo;
     if (resultIsolationInfoOverride) {
       mergedInfo = resultIsolationInfoOverride;
@@ -1598,12 +1604,26 @@ public:
     for (SILValue src : sourceValues) {
       if (auto value = tryToTrackValue(src)) {
         assignOperands.push_back(value->getRepresentative().getValue());
-        mergedInfo = mergedInfo->merge(value->getIsolationRegionInfo());
+        auto originalMergedInfo = mergedInfo;
+        (void)originalMergedInfo;
+        if (mergedInfo)
+          mergedInfo = mergedInfo->merge(value->getIsolationRegionInfo());
 
         // If we fail to merge, then we have an incompatibility in between some
         // of our arguments (consider isolated to different actors) or with the
         // isolationInfo we specified. Emit an unknown patten error.
         if (!mergedInfo) {
+          LLVM_DEBUG(
+              llvm::dbgs() << "Merge Failure!\n"
+                           << "Original Info: ";
+              if (originalMergedInfo)
+                  originalMergedInfo->printForDiagnostics(llvm::dbgs());
+              else llvm::dbgs() << "nil";
+              llvm::dbgs() << "\nValue: "
+                           << value->getRepresentative().getValue();
+              llvm::dbgs() << "Value Info: ";
+              value->getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
+              llvm::dbgs() << "\n");
           builder.addUnknownPatternError(src);
           continue;
         }
@@ -1612,7 +1632,7 @@ public:
 
     for (SILValue result : resultValues) {
       // If we had isolation info explicitly passed in... use our
-      // mergedInfo. Otherwise, we want to infer.
+      // resultIsolationInfoError. Otherwise, we want to infer.
       if (resultIsolationInfoOverride) {
         // We only get back result if it is non-Sendable.
         if (auto nonSendableValue =
@@ -1631,9 +1651,17 @@ public:
       }
     }
 
-    // Require all srcs.
-    for (auto src : assignOperands)
-      builder.addRequire(src);
+    // Require all srcs if we are supposed to. (By default we do).
+    //
+    // DISCUSSION: The reason that this may be useful is for special
+    // instructions like store_borrow. On the one hand, we want store_borrow to
+    // act like a store in the sense that we want to combine the regions of its
+    // src and dest... but at the same time, we do not want to treat the store
+    // itself as a use of its parent value. We want that to be any subsequent
+    // uses of the store_borrow.
+    if (requireSrcValues)
+      for (auto src : assignOperands)
+        builder.addRequire(src);
 
     // Merge all srcs.
     for (unsigned i = 1; i < assignOperands.size(); i++) {
@@ -1647,9 +1675,10 @@ public:
       // derived, introduce a fake element so we just propagate the actor
       // region.
       //
-      // NOTE: Here we check if we have mergedInfo rather than isolationInfo
-      // since we want to do this regardless of whether or not we passed in a
-      // specific isolation info unlike earlier when processing actual results.
+      // NOTE: Here we check if we have resultIsolationInfoOverride rather than
+      // isolationInfo since we want to do this regardless of whether or not we
+      // passed in a specific isolation info unlike earlier when processing
+      // actual results.
       if (assignOperands.size() && resultIsolationInfoOverride) {
         builder.addActorIntroducingInst(assignOperands.back(),
                                         resultIsolationInfoOverride);
@@ -1849,10 +1878,22 @@ public:
     translateSILMultiAssign(applyResults, pai->getOperandValues());
   }
 
+  void translateCreateAsyncTask(BuiltinInst *bi) {
+    if (auto value = tryToTrackValue(bi->getOperand(1))) {
+      builder.addRequire(value->getRepresentative().getValue());
+      builder.addTransfer(value->getRepresentative().getValue(),
+                          &bi->getAllOperands()[1]);
+    }
+  }
+
   void translateSILBuiltin(BuiltinInst *bi) {
     if (auto kind = bi->getBuiltinKind()) {
       if (kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
         return translateAsyncLetStart(bi);
+      }
+
+      if (kind == BuiltinValueKind::CreateAsyncTask) {
+        return translateCreateAsyncTask(bi);
       }
     }
 
@@ -2082,12 +2123,17 @@ public:
   }
 
   template <typename Collection>
-  void translateSILMerge(SILValue dest, Collection collection) {
+  void translateSILMerge(SILValue dest, Collection collection,
+                         bool requireOperands = true) {
     auto trackableDest = tryToTrackValue(dest);
     if (!trackableDest)
       return;
     for (SILValue elt : collection) {
       if (auto trackableSrc = tryToTrackValue(elt)) {
+        if (requireOperands) {
+          builder.addRequire(trackableSrc->getRepresentative().getValue());
+          builder.addRequire(trackableDest->getRepresentative().getValue());
+        }
         builder.addMerge(trackableDest->getRepresentative().getValue(),
                          trackableSrc->getRepresentative().getValue());
       }
@@ -2095,8 +2141,10 @@ public:
   }
 
   template <>
-  void translateSILMerge<SILValue>(SILValue dest, SILValue src) {
-    return translateSILMerge(dest, TinyPtrVector<SILValue>(src));
+  void translateSILMerge<SILValue>(SILValue dest, SILValue src,
+                                   bool requireOperands) {
+    return translateSILMerge(dest, TinyPtrVector<SILValue>(src),
+                             requireOperands);
   }
 
   void translateSILAssignmentToTransferringParameter(TrackableValue destRoot,
@@ -2572,7 +2620,6 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 CONSTANT_TRANSLATION(StoreInst, Store)
-CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
@@ -2803,6 +2850,44 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitStoreBorrowInst(StoreBorrowInst *sbi) {
+  // A store_borrow is an interesting instruction since we are essentially
+  // temporarily binding an object value to an address... so really any uses of
+  // the address, we want to consider to be uses of the parent object. So we
+  // basically put source/dest into the same region, but do not consider the
+  // store_borrow itself to be a require use. This prevents the store_borrow
+  // from causing incorrect diagnostics.
+  SILValue destValue = sbi->getDest();
+  SILValue srcValue = sbi->getSrc();
+
+  auto nonSendableDest = tryToTrackValue(destValue);
+  if (!nonSendableDest)
+    return TranslationSemantics::Ignored;
+
+  // In the following situations, we can perform an assign:
+  //
+  // 1. A store to unaliased storage.
+  // 2. A store that is to an entire value.
+  //
+  // DISCUSSION: If we have case 2, we need to merge the regions since we
+  // are not overwriting the entire region of the value. This does mean that
+  // we artificially include the previous region that was stored
+  // specifically in this projection... but that is better than
+  // miscompiling. For memory like this, we probably need to track it on a
+  // per field basis to allow for us to assign.
+  if (nonSendableDest.value().isNoAlias() &&
+      !isProjectedFromAggregate(destValue)) {
+    translateSILMultiAssign(sbi->getResults(), sbi->getOperandValues(),
+                            SILIsolationInfo(), false /*require src*/);
+  } else {
+    // Stores to possibly aliased storage must be treated as merges.
+    translateSILMerge(destValue, srcValue, false /*require src*/);
+  }
+
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
@@ -3390,6 +3475,14 @@ RegionAnalysisValueMap::initializeTrackableValue(
 
   // If we did not insert, just return the already stored value.
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+
+  // Before we do anything, see if we have a Sendable value.
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {{iter.first->first, iter.first->second}, true};
+  }
+
+  // Otherwise, we have a non-Sendable type... so wire up the isolation.
   iter.first->getSecond().setIsolationRegionInfo(newInfo);
 
   return {{iter.first->first, iter.first->second}, true};

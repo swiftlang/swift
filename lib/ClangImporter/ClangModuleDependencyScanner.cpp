@@ -18,6 +18,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Basic/Assertions.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendOptions.h"

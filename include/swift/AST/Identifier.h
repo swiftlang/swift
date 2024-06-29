@@ -96,7 +96,7 @@ public:
   bool nonempty() const { return !empty(); }
 
   LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
-    return str().equals(string);
+    return str() == string;
   }
   
   /// isOperator - Return true if this identifier is an operator, false if it is

@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/AST/DeclObjC.h"
@@ -867,6 +868,10 @@ bool swift::isRepresentableInObjC(
         completionHandlerParams, TupleType::getEmpty(ctx),
         ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
           .build());
+
+    // @objcImpl member implementations need to allow a nil completion handler.
+    if (AFD->isObjCMemberImplementation())
+      completionHandlerType = OptionalType::get(completionHandlerType);
 
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType->getCanonicalType(), completionHandlerParamIndex,

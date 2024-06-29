@@ -22,6 +22,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -707,10 +708,15 @@ namespace {
 
     template <class G>
     void addParameter(const G &generator,
-                      ParamSpecifier ownership = ParamSpecifier::Default) {
+                      ParamSpecifier ownership = ParamSpecifier::Default,
+                      bool isSending = false) {
       Type gTyIface = generator.build(*this);
       auto flags = ParameterTypeFlags().withOwnershipSpecifier(ownership);
-      InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
+      auto p = AnyFunctionType::Param(gTyIface, Identifier(), flags);
+      if (isSending) {
+        p = p.withFlags(p.getParameterFlags().withSending(true));
+      }
+      InterfaceParams.push_back(p);
     }
 
     template <class G>
@@ -1526,31 +1532,53 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
+  auto taskExecutorIsAvailable =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(
-        _label("flags", _swiftInt),
-        _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
-        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("operation", _function(_async(_throws(_sendable(_thick))),
-                                      _typeparam(0), _parameters()))),
+          _label("flags", _swiftInt),
+          _label("initialSerialExecutor",
+                 _defaulted(_optional(_executor), _nil)),
+          _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+          _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+          _label("initialTaskExecutorConsuming",
+                 _defaulted(_consuming(_optional(_bincompatType(
+                                /*if*/ taskExecutorIsAvailable,
+                                _existential(_taskExecutor),
+                                /*else*/ _executor))),
+                            _nil)),
+          _label("operation",
+                 _sending(_function(_async(_throws(_thick)), _typeparam(0),
+                                    _parameters())))),
       _tuple(_nativeObject, _rawPointer));
 }
 
 static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+  auto taskExecutorIsAvailable =
+      ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
+
   return getBuiltinFunction(
       ctx, id, _thin,
       _parameters(
-        _label("flags", _swiftInt),
-        _label("initialSerialExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
-        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-        _label("operation", _function(_async(_throws(_sendable(_thick))),
-                                      _void, _parameters()))),
+          _label("flags", _swiftInt),
+          _label("initialSerialExecutor",
+                 _defaulted(_optional(_executor), _nil)),
+          _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+          _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+          _label("initialTaskExecutorConsuming",
+                 _defaulted(_consuming(_optional(_bincompatType(
+                                /*if*/ taskExecutorIsAvailable,
+                                _existential(_taskExecutor),
+                                /*else*/ _executor))),
+                            _nil)),
+          _label("operation", _sending(_function(_async(_throws(_thick)), _void,
+                                                 _parameters())))),
       _tuple(_nativeObject, _rawPointer));
 }
 
+// Legacy entry point, prefer `createAsyncTask`
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
                                      bool inGroup, bool withTaskExecutor,
                                      bool isDiscarding) {
@@ -1560,19 +1588,29 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
   if (inGroup) {
     builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
   }
+
   if (withTaskExecutor) {
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows()
-                                    .withSendable(true).build();
+
+  bool areSendingArgsEnabled =
+      ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
+
+  auto extInfo = ASTExtInfoBuilder()
+                     .withAsync()
+                     .withThrows()
+                     .withSendable(!areSendingArgsEnabled)
+                     .build();
   Type operationResultType;
   if (isDiscarding) {
     operationResultType = TupleType::getEmpty(ctx); // ()
   } else {
     operationResultType = makeGenericParam().build(builder); // <T>
   }
-  builder.addParameter(makeConcrete(
-      FunctionType::get({}, operationResultType, extInfo))); // operation
+  builder.addParameter(
+      makeConcrete(FunctionType::get({}, operationResultType, extInfo)),
+      ParamSpecifier::Default,
+      areSendingArgsEnabled /*isSending*/); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
@@ -2990,7 +3028,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
-      
+
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
       

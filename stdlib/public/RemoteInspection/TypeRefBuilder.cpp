@@ -142,7 +142,7 @@ bool TypeRefBuilder::ReflectionTypeDescriptorFinder::reflectionNameMatches(
   auto normalized = normalizeReflectionName(reflectionName);
   if (!normalized)
     return false;
-  return searchName.equals(*normalized);
+  return searchName == *normalized;
 }
 
 const TypeRef *
@@ -340,7 +340,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldTypeInfo(
   auto ModuleName = FindOutermostModuleName(Node);
   // If we couldn't find a module name or the type is imported (__C module) we
   // don't any useful information on which image to look for the type.
-  if (ModuleName && !ModuleName->equals("__C")) {
+  if (ModuleName && ModuleName != "__C") {
     for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
       // If the external cache already has the contents of this reflection info,
       // and the previous lookup in the cache failed, then the field descriptor

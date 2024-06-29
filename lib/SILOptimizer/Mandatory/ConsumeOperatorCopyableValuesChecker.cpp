@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-consume-operator-copyable-values-checker"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"

@@ -16,6 +16,7 @@
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
@@ -185,6 +186,37 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
       }
     }
   }
+}
+
+void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
+  if (!SearchPathOpts.InProcessPluginServerPath.empty())
+    return;
+  if (FrontendOpts.MainExecutablePath.empty())
+    return;
+
+  // '/usr/bin/swift'
+  SmallString<64> serverLibPath{FrontendOpts.MainExecutablePath};
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'swift'
+
+#if defined(_WIN32)
+  // Windows: usr\bin\SwiftInProcPluginServer.dll
+  llvm::sys::path::append(serverLibPath, "SwiftInProcPluginServer.dll");
+
+#elif defined(__APPLE__)
+  // Darwin: usr/lib/swift/host/libSwiftInProcPluginServer.dylib
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'bin'
+  llvm::sys::path::append(serverLibPath, "lib", "swift", "host");
+  llvm::sys::path::append(serverLibPath, "libSwiftInProcPluginServer.dylib");
+
+#else
+  // Other: usr/lib/swift/host/libSwiftInProcPluginServer.so
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'bin'
+  llvm::sys::path::append(serverLibPath, "lib", "swift", "host");
+  llvm::sys::path::append(serverLibPath, "libSwiftInProcPluginServer.so");
+
+#endif
+
+  SearchPathOpts.InProcessPluginServerPath = serverLibPath.str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -1101,16 +1133,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
     Opts.enableFeature(Feature::IsolatedDefaultValues);
     Opts.enableFeature(Feature::GlobalConcurrency);
-
-    // If asserts are enabled, allow for region based isolation to be disabled
-    // with a flag. This is intended only to be used with tests.
-    bool enableRegionIsolation = true;
-#ifndef NDEBUG
-    enableRegionIsolation =
-        !Args.hasArg(OPT_disable_strict_concurrency_region_based_isolation);
-#endif
-    if (enableRegionIsolation)
-      Opts.enableFeature(Feature::RegionBasedIsolation);
+    Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
   Opts.WarnImplicitOverrides =
@@ -1983,6 +2006,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   }
   Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
+  if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
+    Opts.InProcessPluginServerPath = A->getValue();
+
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'
   // are grouped, and plugins are searched by the order of these options.
@@ -2773,9 +2799,9 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   for (auto A : ReducedArgs) {
     StringRef Arg(A);
     // FIXME: this should distinguish between key and value.
-    if (!haveSDKPath && Arg.equals("-sdk"))
+    if (!haveSDKPath && Arg == "-sdk")
       haveSDKPath = true;
-    if (!haveResourceDir && Arg.equals("-resource-dir"))
+    if (!haveResourceDir && Arg == "-resource-dir")
       haveResourceDir = true;
   }
   if (!haveSDKPath) {
@@ -3180,19 +3206,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
-      if (version.equals("none")) {
+      if (version == "none") {
         runtimeCompatibilityVersion = std::nullopt;
-      } else if (version.equals("5.0")) {
+      } else if (version == "5.0") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
-      } else if (version.equals("5.1")) {
+      } else if (version == "5.1") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
-      } else if (version.equals("5.5")) {
+      } else if (version == "5.5") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
-      } else if (version.equals("5.6")) {
+      } else if (version == "5.6") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
-      } else if (version.equals("5.8")) {
+      } else if (version == "5.8") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-      } else if (version.equals("6.0")) {
+      } else if (version == "6.0") {
         runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -3553,6 +3579,7 @@ bool CompilerInvocation::parseArgs(
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
+  setDefaultInProcessPluginServerPathIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);

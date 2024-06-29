@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -2456,7 +2457,7 @@ Parser::parseDocumentationAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef finalMetadata = metadata.value_or("");
 
   return makeParserResult(
-    new (Context) DocumentationAttr(loc, range, finalMetadata,
+    new (Context) DocumentationAttr(atLoc, range, finalMetadata,
                                     visibility, false));
 }
 
@@ -5376,7 +5377,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
         // or witness something static.
         if (isStartOfSwiftDecl() || (isa<ClassDecl>(CurDeclContext) &&
                                      (Tok.is(tok::code_complete) ||
-                                      Tok.getRawText().equals("override")))) {
+                                      Tok.getRawText() == "override"))) {
           /* We're OK */
         } else {
           // This 'class' is a real ClassDecl introducer.
@@ -5535,13 +5536,13 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (Tok.is(tok::kw_inout)) {
         Specifier = ParamDecl::Specifier::InOut;
       } else if (Tok.is(tok::identifier)) {
-        if (Tok.getRawText().equals("__shared")) {
+        if (Tok.getRawText() == "__shared") {
           Specifier = ParamDecl::Specifier::LegacyShared;
-        } else if (Tok.getRawText().equals("__owned")) {
+        } else if (Tok.getRawText() == "__owned") {
           Specifier = ParamDecl::Specifier::LegacyOwned;
-        } else if (Tok.getRawText().equals("borrowing")) {
+        } else if (Tok.getRawText() == "borrowing") {
           Specifier = ParamDecl::Specifier::Borrowing;
-        } else if (Tok.getRawText().equals("consuming")) {
+        } else if (Tok.getRawText() == "consuming") {
           Specifier = ParamDecl::Specifier::Consuming;
         }
       }
@@ -5658,10 +5659,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
   HasPotentialRegexLiteral = false;
 
   unsigned OpenBraces = 1;
+  unsigned OpenPoundIf = 0;
 
   bool LastTokenWasFunc = false;
 
-  while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
+  while ((OpenBraces != 0 || OpenPoundIf != 0) && P.Tok.isNot(tok::eof)) {
     // Detect 'func' followed by an operator identifier.
     if (LastTokenWasFunc) {
       LastTokenWasFunc = false;
@@ -5690,6 +5692,24 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
     if (P.L->isPotentialUnskippableBareSlashRegexLiteral(P.Tok)) {
       HasPotentialRegexLiteral = true;
       return OpenBraces;
+    }
+
+    // Match opening `#if` with closing `#endif` to match what the parser does,
+    // `#if` + `#endif` are considered stronger delimiters than `{` + `}`.
+    if (P.consumeIf(tok::pound_if)) {
+      OpenPoundIf += 1;
+      continue;
+    }
+    if (OpenPoundIf != 0) {
+      // We're in a `#if`, check to see if we've reached the end.
+      if (P.consumeIf(tok::pound_endif)) {
+        OpenPoundIf -= 1;
+        continue;
+      }
+      // Consume the next token and continue iterating. We can swallow any
+      // amount of '{' and '}' while in the `#if`.
+      P.consumeToken();
+      continue;
     }
 
     if (P.consumeIf(tok::l_brace)) {
@@ -5839,7 +5859,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // The protocol keyword needs more checking to reject "protocol<Int>".
   if (Tok.is(tok::kw_protocol)) {
     const Token &Tok2 = peekToken();
-    return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
+    return !Tok2.isAnyOperator() || Tok2.getText() != "<";
   }
 
   // The 'try' case is only for simple local recovery, so we only bother to
@@ -6191,23 +6211,16 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
 
   if (Tok.is(tok::pound_if) && !ifConfigContainsOnlyAttributes()) {
     auto IfConfigResult = parseIfConfig(
-      [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
-        ParserStatus Status;
-        bool PreviousHadSemi = true;
-        while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
-                         tok::eof)) {
-          if (Tok.is(tok::r_brace)) {
-            diagnose(Tok.getLoc(),
-                      diag::unexpected_rbrace_in_conditional_compilation_block);
-            // If we see '}', following declarations don't look like belong to
-            // the current decl context; skip them.
-            skipUntilConditionalBlockClose();
-            break;
+        IfConfigContext::DeclItems,
+        [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
+          ParserStatus Status;
+          bool PreviousHadSemi = true;
+          while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
+                           tok::r_brace, tok::eof)) {
+            Status |= parseDeclItem(PreviousHadSemi,
+                                    [&](Decl *D) { Decls.emplace_back(D); });
           }
-          Status |= parseDeclItem(PreviousHadSemi,
-                                  [&](Decl *D) { Decls.emplace_back(D); });
-        }
-      });
+        });
     if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
       consumeDecl(BeginParserPosition, CurDeclContext->isModuleScopeContext());
       return makeParserError();
@@ -8497,8 +8510,11 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   }
 
   if (Init) {
-    if (!storage->getDeclContext()->getSelfNominalTypeDecl() ||
-        isa<SubscriptDecl>(storage)) {
+    auto *DC = storage->getDeclContext();
+    if (isa<ExtensionDecl>(DC)) {
+      P.diagnose(Init->getLoc(),
+                 diag::init_accessor_is_not_in_the_primary_declaration);
+    } else if (!DC->isTypeContext() || isa<SubscriptDecl>(storage)) {
       P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
     }
   }
@@ -10123,7 +10139,7 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
     if (Tk.is(tok::identifier)) {
-      if (Tk.getText().equals("$") ||
+      if (Tk.getText() == "$" ||
           !DeclAttribute::getAttrKindFromString(Tk.getText())) {
         diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
         return true;

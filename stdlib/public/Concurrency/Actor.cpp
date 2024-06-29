@@ -2076,12 +2076,10 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
     asImpl(executor.getDefaultActor())->unlock(true);
 }
 
-// TODO (rokhinip): Workaround rdar://88700717. To be removed with
-// rdar://88711954
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
-                                  SerialExecutorRef newExecutor) SWIFT_OPTNONE {
+                                  SerialExecutorRef newExecutor) {
   auto task = swift_task_getCurrent();
   assert(task && "no current task!");
 
@@ -2170,6 +2168,8 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
                        executor.getIdentity());
 
   assert(job && "no job provided");
+  job->SchedulerPrivate[0] = NULL;
+  job->SchedulerPrivate[1] = NULL;
 
   _swift_tsan_release(job);
 

@@ -42,6 +42,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/PrimitiveParsing.h"
@@ -973,7 +974,6 @@ public:
     SwapSelfAndDependentMemberType = 8,
     PrintInherited = 16,
     PrintInverseRequirements = 32,
-    IncludeOuterInverses = 64,
   };
 
   /// The default generic signature flags for printing requirements.
@@ -1003,7 +1003,8 @@ public:
   void
   printGenericSignature(GenericSignature genericSig,
                         unsigned flags,
-                        llvm::function_ref<bool(const Requirement &)> filter);
+                        llvm::function_ref<bool(const Requirement &)> filter,
+                        InverseFilter inverseFilter);
   void printSingleDepthOfGenericSignature(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements,
@@ -1692,9 +1693,13 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
 void PrintAST::printGenericSignature(GenericSignature genericSig,
                                      unsigned flags) {
+  ASSERT(!((flags & InnermostOnly) && (flags & PrintInverseRequirements))
+         && "InnermostOnly + PrintInverseRequirements is not handled");
+
   printGenericSignature(genericSig, flags,
                         // print everything
-                        [&](const Requirement &) { return true; });
+                        [&](const Requirement &) { return true; },
+                        AllInverses());
 }
 
 // Erase any requirements involving invertible protocols.
@@ -1709,33 +1714,41 @@ static void eraseInvertibleProtocolConformances(
     });
 }
 
+InversesAtDepth::InversesAtDepth(GenericContext *level) {
+  includedDepth = std::nullopt;
+  // Does this generic context have its own generic parameters?
+  if (auto *list = level->getGenericParams()) {
+    includedDepth = list->getParams().back()->getDepth(); // use this depth.
+  }
+}
+bool InversesAtDepth::operator()(const InverseRequirement &inverse) const {
+  if (includedDepth) {
+    auto d = inverse.subject->castTo<GenericTypeParamType>()->getDepth();
+    return d == includedDepth.value();
+  }
+  return false;
+}
+
 void PrintAST::printGenericSignature(
     GenericSignature genericSig,
     unsigned flags,
-    llvm::function_ref<bool(const Requirement &)> filter) {
+    llvm::function_ref<bool(const Requirement &)> filter,
+    InverseFilter inverseFilter) {
 
   SmallVector<Requirement, 2> requirements;
   SmallVector<InverseRequirement, 2> inverses;
 
   if (flags & PrintInverseRequirements) {
     genericSig->getRequirementsWithInverses(requirements, inverses);
+    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
+      return !inverseFilter(inverse);
+    });
   } else {
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
 
     if (Options.SuppressNoncopyableGenerics)
       eraseInvertibleProtocolConformances(requirements);
-  }
-
-  // Unless `IncludeOuterInverses` is enabled, limit inverses to the
-  // innermost generic parameters.
-  if (!(flags & IncludeOuterInverses) && !inverses.empty()) {
-    auto innerParams = genericSig.getInnermostGenericParams();
-    SmallPtrSet<TypeBase *, 4> innerParamSet(innerParams.begin(),
-                                             innerParams.end());
-    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
-      return !innerParamSet.contains(inverse.subject.getPointer());
-    });
   }
 
   if (flags & InnermostOnly) {
@@ -2771,8 +2784,9 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   // In many cases, inverses should not be printed for outer generic parameters.
   // Exceptions to that include extensions, as it's valid to write an inverse
   // on the generic parameters they get from the extended nominal.
-  if (isa<ExtensionDecl>(decl))
-    flags |= IncludeOuterInverses;
+  InverseFilter inverseFilter = AllInverses();
+  if (!isa<ExtensionDecl>(decl))
+    inverseFilter = InversesAtDepth(decl);
 
   Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
   printGenericSignature(genericSig,
@@ -2781,7 +2795,8 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
                           if (parentSig)
                             return !parentSig->isRequirementSatisfied(req);
                           return true;
-                        });
+                        },
+                        inverseFilter);
   Printer.printStructurePost(PrintStructureKind::DeclGenericParameterClause);
 }
 
@@ -2915,7 +2930,6 @@ void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
-
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
   if (Options.PrintCompatibilityFeatureChecks &&
@@ -3039,13 +3053,23 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       auto baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
+
+      auto genSigFlags = defaultGenericRequirementFlags();
+
+      // Disable printing inverses if the extension is adding a conformance
+      // for an invertible protocol itself, as we do not infer any requirements
+      // in such an extension. We need to print the whole signature:
+      //     extension S: Copyable where T: Copyable
+      if (decl->isAddingConformanceToInvertible())
+        genSigFlags &= ~PrintInverseRequirements;
+
       printGenericSignature(genericSig,
-                            defaultGenericRequirementFlags()
-                              | IncludeOuterInverses,
+                            genSigFlags,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);
-      });
+      },
+      AllInverses());
     }
   }
   if (Options.TypeDefinitions) {
@@ -5724,8 +5748,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  std::optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
-      VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> flatArgs) {
     Printer << "<";
@@ -5799,56 +5821,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     return T->hasSimpleTypeRepr();
   }
 
-  /// Computes the map that is cached by `getVisibleClangModules()`.
-  /// Do not call directly.
-  llvm::DenseMap<const clang::Module *, ModuleDecl *>
-  computeVisibleClangModules() {
-    assert(Options.CurrentModule &&
-           "CurrentModule needs to be set to determine imported Clang modules");
-
-    llvm::DenseMap<const clang::Module *, ModuleDecl *> Result;
-
-    // For the current module, consider both private and public imports.
-    ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
-    Filter |= ModuleDecl::ImportFilterKind::Default;
-
-    // For private or package swiftinterfaces, also look through @_spiOnly imports.
-    if (!Options.printPublicInterface())
-      Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
-    // Consider package import for package interface
-    if (Options.printPackageInterface())
-      Filter |= ModuleDecl::ImportFilterKind::PackageOnly;
-
-    SmallVector<ImportedModule, 4> Imports;
-    Options.CurrentModule->getImportedModules(Imports, Filter);
-
-    SmallVector<ModuleDecl *, 4> ModulesToProcess;
-    for (const auto &Import : Imports) {
-      ModulesToProcess.push_back(Import.importedModule);
-    }
-
-    SmallPtrSet<ModuleDecl *, 4> Processed;
-    while (!ModulesToProcess.empty()) {
-      ModuleDecl *Mod = ModulesToProcess.back();
-      ModulesToProcess.pop_back();
-
-      if (!Processed.insert(Mod).second)
-        continue;
-
-      if (const clang::Module *ClangModule = Mod->findUnderlyingClangModule())
-        Result[ClangModule] = Mod;
-
-      // For transitive imports, consider only public imports.
-      Imports.clear();
-      Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Exported);
-      for (const auto &Import : Imports) {
-        ModulesToProcess.push_back(Import.importedModule);
-      }
-    }
-
-    return Result;
-  }
-
   /// Returns all Clang modules that are visible from `Options.CurrentModule`.
   /// This includes any modules that are imported transitively through public
   /// (`@_exported`) imports.
@@ -5857,10 +5829,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   /// corresponding Swift module.
   const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
   getVisibleClangModules() {
-    if (!VisibleClangModules) {
-      VisibleClangModules = computeVisibleClangModules();
-    }
-    return *VisibleClangModules;
+    return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
   template <typename T>
@@ -6788,6 +6757,7 @@ public:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("callee convention cannot be indirect");
     case ParameterConvention::Pack_Guaranteed:
@@ -7557,6 +7527,7 @@ StringRef swift::getStringForParameterConvention(ParameterConvention conv) {
   case ParameterConvention::Indirect_In_Guaranteed:  return "@in_guaranteed ";
   case ParameterConvention::Indirect_Inout: return "@inout ";
   case ParameterConvention::Indirect_InoutAliasable: return "@inout_aliasable ";
+  case ParameterConvention::Indirect_In_CXX: return "@in_cxx ";
   case ParameterConvention::Direct_Owned: return "@owned ";
   case ParameterConvention::Direct_Unowned: return "";
   case ParameterConvention::Direct_Guaranteed: return "@guaranteed ";

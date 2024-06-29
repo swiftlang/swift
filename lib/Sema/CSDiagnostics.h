@@ -2292,6 +2292,19 @@ private:
   void emitSuggestionNotes() const;
 };
 
+class SendingMismatchFailure final : public ContextualFailure {
+public:
+  SendingMismatchFailure(const Solution &solution, Type srcType, Type dstType,
+                         ConstraintLocator *locator, FixBehavior fixBehavior)
+      : ContextualFailure(solution, srcType, dstType, locator, fixBehavior) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  bool diagnoseArgFailure();
+  bool diagnoseResultFailure();
+};
+
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
 public:
   AssignmentTypeMismatchFailure(const Solution &solution,

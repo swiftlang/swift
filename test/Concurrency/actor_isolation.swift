@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
 
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -1305,11 +1304,11 @@ actor Counter {
 class C2 { }
 
 @SomeGlobalActor
-class C3: C2 { // expected-note {{class 'C3' does not conform to the 'Sendable' protocol}}
+class C3: C2 {
   func requireSendableSelf() {
+    // self is Sendable here.
     Task.detached {
       _ = self
-      // expected-warning@-1 {{capture of 'self' with non-sendable type 'C3' in a `@Sendable` closure; this is an error in the Swift 6 language mode}}
     }
   }
 }
@@ -1538,8 +1537,10 @@ extension MyActor {
         _ = self
         _ = sc
 
+        // A test that validates that we treat this as a true send was added
+        // into transfernonsendable.swift.
         Task {
-          _ = sc // expected-warning{{capture of 'sc' with non-sendable type 'SomeClass' in a `@Sendable` closure}}
+          _ = sc
         }
       }
     }

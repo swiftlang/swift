@@ -24,7 +24,14 @@
 #include <math.h>
 #include <setjmp.h>
 #include <signal.h>
+#ifdef __cplusplus
+// The Android r26 NDK contains an old libc++ modulemap that requires C++23
+// for 'stdatomic', which can't be imported unless we're using C++23. Thus,
+// import stdatomic from the NDK directly, bypassing the stdatomic from the libc++.
+#pragma clang module import _stdatomic
+#else
 #include <stdatomic.h>
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -136,6 +143,7 @@
 #include <sys/user.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 
 #include <android/api-level.h>
 #include <android/asset_manager_jni.h>

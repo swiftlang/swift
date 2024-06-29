@@ -19,6 +19,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
@@ -1003,7 +1004,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
             .fixItInsert(FirstTypeLoc, keyword.str() + " ");
       }
 
-      const bool isAnyKeyword = keyword.equals("any");
+      const bool isAnyKeyword = keyword == "any";
 
       if (isAnyKeyword) {
         if (anyLoc.isInvalid()) {
@@ -1201,6 +1202,11 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
       ObsoletedInOutLoc = SourceLoc();
     }
     Backtracking.reset();
+
+    // Try complete the start of a parameter type since the user may be writing
+    // this as a function type.
+    if (tryCompleteFunctionParamTypeBeginning())
+      return makeParserCodeCompletionStatus();
 
     // Parse the type annotation.
     auto type = parseType(diag::expected_type);
@@ -1502,7 +1508,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
 }
 
 bool Parser::canParseAsGenericArgumentList() {
-  if (!Tok.isAnyOperator() || !Tok.getText().equals("<"))
+  if (!Tok.isAnyOperator() || Tok.getText() != "<")
     return false;
 
   BacktrackingScope backtrack(*this);
@@ -1550,6 +1556,8 @@ bool Parser::canParseType() {
   } else if (Tok.isContextualKeyword("any")) {
     consumeToken();
   } else if (Tok.isContextualKeyword("each")) {
+    consumeToken();
+  } else if (Tok.isContextualKeyword("sending")) {
     consumeToken();
   }
 

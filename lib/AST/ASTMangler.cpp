@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1137,6 +1138,7 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Indirect_Inout: return 'l';
     case ParameterConvention::Indirect_InoutAliasable: return 'b';
     case ParameterConvention::Indirect_In_Guaranteed: return 'n';
+    case ParameterConvention::Indirect_In_CXX: return 'X';
     case ParameterConvention::Direct_Owned: return 'x';
     case ParameterConvention::Direct_Unowned: return 'y';
     case ParameterConvention::Direct_Guaranteed: return 'g';
@@ -3766,8 +3768,9 @@ void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
 
   auto type = closure->getType();
 
-  // FIXME: CodeCompletionResultBuilder calls printValueDeclUSR() but the
-  // closure hasn't been type checked yet.
+  // FIXME: We can end up with a null type here in the presence of invalid
+  // code; the type-checker currently isn't strict about producing typed
+  // expression nodes when it fails. Once we enforce that, we can remove this.
   if (!type)
     type = ErrorType::get(closure->getASTContext());
 
@@ -4441,10 +4444,21 @@ void ASTMangler::appendMacroExpansionContext(
   ASTContext &ctx = origDC->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
 
+  auto appendMacroExpansionLoc = [&]() {
+    appendIdentifier(origDC->getParentModule()->getName().str());
+
+    auto *SF = origDC->getParentSourceFile();
+    appendIdentifier(llvm::sys::path::filename(SF->getFilename()));
+
+    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
+    appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));
+  };
+
   auto bufferID = sourceMgr.findBufferContainingLoc(loc);
   auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
-  if (!generatedSourceInfo)
-    return appendContext(origDC, nullBase, StringRef());
+  if (!generatedSourceInfo) {
+    return appendMacroExpansionLoc();
+  }
 
   SourceLoc outerExpansionLoc;
   DeclContext *outerExpansionDC;
@@ -4463,7 +4477,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
-    return appendContext(origDC, nullBase, StringRef());
+    return appendMacroExpansionLoc();
   }
   
   switch (generatedSourceInfo->kind) {
@@ -4520,7 +4534,7 @@ void ASTMangler::appendMacroExpansionContext(
   // If we hit the point where the structure is represented as a DeclContext,
   // we're done.
   if (origDC->isChildContextOf(outerExpansionDC))
-    return appendContext(origDC, nullBase, StringRef());
+    return appendMacroExpansionLoc();
 
   // Append our own context and discriminator.
   appendMacroExpansionContext(outerExpansionLoc, origDC);

@@ -21,6 +21,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -770,6 +771,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       continue;
 
     switch (PI.getConvention()) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed: {
       Conversions.set(IdxToInsert);
@@ -983,7 +985,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // owned/guaranteed (except it's a trivial type).
     auto C = ParameterConvention::Direct_Unowned;
     if (!isTrivial) {
-      if (PI.isGuaranteed()) {
+      if (PI.isGuaranteedInCallee()) {
         C = ParameterConvention::Direct_Guaranteed;
       } else {
         C = ParameterConvention::Direct_Owned;
@@ -2265,7 +2267,7 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
       argConv = substConv.getSILArgumentConvention(ArgIdx);
     }
     SILValue Val;
-    if (!argConv.isGuaranteedConvention()) {
+    if (!argConv.isGuaranteedConventionInCaller()) {
       Val = Builder.emitLoadValueOperation(Loc, InputValue,
                                            LoadOwnershipQualifier::Take);
     } else {
@@ -2748,7 +2750,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
                                Builder.getTypeExpansionContext()));
       assert(ParamTy.isAddress());
       SILFunctionArgument *NewArg = addFunctionArgument(Thunk, ParamTy, specArg);
-      if (!NewArg->getArgumentConvention().isGuaranteedConvention()) {
+      if (!NewArg->getArgumentConvention().isGuaranteedConventionInCallee()) {
         SILValue argVal = Builder.emitLoadValueOperation(
             Loc, NewArg, LoadOwnershipQualifier::Take);
         Arguments.push_back(argVal);

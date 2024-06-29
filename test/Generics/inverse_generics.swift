@@ -2,11 +2,26 @@
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -enable-experimental-feature SuppressedAssociatedTypes
 
+// expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
+struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
+  var t: T // expected-error {{stored property 't' of 'Copyable'-conforming generic struct 'AttemptImplicitConditionalConformance' has non-Copyable type 'T'}}
+}
+extension AttemptImplicitConditionalConformance: Copyable {}
+// expected-error@-1 {{generic struct 'AttemptImplicitConditionalConformance' required to be 'Copyable' but is marked with '~Copyable'}}
 
+enum Hello<T: ~Escapable & ~Copyable>: ~Escapable & ~Copyable {}
+extension Hello: Escapable {} // expected-error {{generic enum 'Hello' required to be 'Escapable' but is marked with '~Escapable'}}
+extension Hello: Copyable {} // expected-error {{generic enum 'Hello' required to be 'Copyable' but is marked with '~Copyable'}}
+
+enum HelloExplicitlyFixed<T: ~Escapable & ~Copyable>: Escapable, Copyable {}
+
+struct NoInverseBecauseNoDefault<T: ~Copyable & ~Escapable>: ~Copyable {}
+extension NoInverseBecauseNoDefault: Copyable where T: Copyable, T: ~Escapable {}
+// expected-error@-1 {{cannot suppress '~Escapable' on generic parameter 'T' defined in outer scope}}
 
 // Check support for explicit conditional conformance
 public struct ExplicitCond<T: ~Copyable>: ~Copyable {}
-extension ExplicitCond: Copyable {}
+extension ExplicitCond: Copyable where T: Copyable {}
 // expected-note@-1 {{requirement from conditional conformance}}
 // expected-note@-2 {{requirement from conditional conformance of 'ExplicitCondAlias<NC>' (aka 'ExplicitCond<NC>') to 'Copyable'}}
 
@@ -80,7 +95,7 @@ struct ConditionalContainment<T: ~Copyable>: ~Copyable {
   var y: NC // expected-error {{stored property 'y' of 'Copyable'-conforming generic struct 'ConditionalContainment' has non-Copyable type 'NC'}}
 }
 
-extension ConditionalContainment: Copyable {}
+extension ConditionalContainment: Copyable where T: Copyable {}
 
 func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
 
@@ -126,7 +141,7 @@ enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   deinit {} // expected-error {{deinitializer cannot be declared in generic enum 'Maybe' that conforms to 'Copyable'}}
 }
 
-extension Maybe: Copyable {}
+extension Maybe: Copyable where Wrapped: Copyable {}
 
 // expected-note@+4{{requirement specified as 'NC' : 'Copyable'}}
 // expected-note@+3{{requirement from conditional conformance of 'Maybe<NC>' to 'Copyable'}}
@@ -173,11 +188,11 @@ class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Co
 
 
 struct Extendo: ~Copyable {}
-extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 // expected-error@-1 {{struct 'Extendo' required to be 'Copyable' but is marked with '~Copyable'}}
 
 enum EnumExtendo {}
-extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 
 extension NeedsCopyable where Self: ~Copyable {}
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -265,7 +280,7 @@ enum MaybeEscapes<T: ~Escapable>: ~Escapable { // expected-note {{generic enum '
   case none
 }
 
-extension MaybeEscapes: Escapable {}
+extension MaybeEscapes: Escapable where T: Escapable {}
 
 struct Escapes { // expected-note {{consider adding '~Escapable' to struct 'Escapes'}}
   let t: MaybeEscapes<NonescapingType> // expected-error {{stored property 't' of 'Escapable'-conforming struct 'Escapes' has non-Escapable type 'MaybeEscapes<NonescapingType>'}}

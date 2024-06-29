@@ -13,8 +13,8 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-error@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'}}
   // FIXME: give better diagnostic expected-error@-5 {{extension for main class interface should provide implementation for property 'propertyFromHeader7'}}
   // FIXME: give better diagnostic expected-error@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'}}
-  // expected-error@-7 {{'@_objcImplementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
-  // expected-error@-8 {{'@_objcImplementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
+  // expected-error@-7 {{'@objc @implementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
+  // expected-error@-8 {{'@objc @implementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
   // expected-error@-9 {{extension for main class interface should provide implementation for instance method 'extensionMethod(fromHeader2:)'}}
 
   func method(fromHeader1: CInt) {
@@ -207,12 +207,12 @@ protocol EmptySwiftProto {}
   }
 
   @nonobjc public init(notFromHeader4: CInt) {
-    // expected-error@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override designated initializers}}
+    // expected-error@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@objc @implementation' extension because Objective-C subclasses must be able to override designated initializers}}
     // expected-note@-2 {{add 'convenience' keyword to make this a convenience initializer}} {{12-12=convenience }}
   }
 
   @nonobjc public required init(notFromHeader5: CInt) {
-    // expected-error@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override required initializers}}
+    // expected-error@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@objc @implementation' extension because Objective-C subclasses must be able to override required initializers}}
     // expected-note@-2 {{replace 'required' keyword with 'convenience' to make this a convenience initializer}} {{19-27=convenience}}
   }
 
@@ -478,17 +478,17 @@ protocol EmptySwiftProto {}
 // expected-note@-1 2 {{'SwiftClass' declared here}}
 
 @objc @implementation extension SwiftClass {}
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{7-23=}}
+// expected-error@-1 {{'@objc @implementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{7-23=}}
 
 @objc(WTF) @implementation extension SwiftClass {} // expected
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{12-28=}}
+// expected-error@-1 {{'@objc @implementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{12-28=}}
 
 @objc @implementation extension ObjCImplRootClass {
-  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
+  // expected-error@-1 {{'@objc @implementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
 }
 
 @objc @implementation extension ObjCImplGenericClass {
-  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
+  // expected-error@-1 {{'@objc @implementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
 }
 
 @implementation extension ObjCBadClass {

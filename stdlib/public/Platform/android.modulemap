@@ -282,6 +282,10 @@ module posix_filesystem [system] {
     header "sys/uio.h"
     export *
   }
+  explicit module sys_xattr {
+    header "sys/xattr.h"
+    export *
+  }
 }
 
 module dl [system] {

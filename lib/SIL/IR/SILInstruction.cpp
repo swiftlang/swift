@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
@@ -537,7 +538,7 @@ namespace {
     bool visitStringLiteralInst(const StringLiteralInst *RHS) {
       auto LHS_ = cast<StringLiteralInst>(LHS);
       return LHS_->getEncoding() == RHS->getEncoding()
-        && LHS_->getValue().equals(RHS->getValue());
+        && LHS_->getValue() == RHS->getValue();
     }
 
     bool visitStructInst(const StructInst *RHS) {

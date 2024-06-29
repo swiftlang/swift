@@ -37,6 +37,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
@@ -7915,6 +7916,28 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
         .highlight(argExpr->getSourceRange());
   }
   emitSuggestionNotes();
+  return true;
+}
+
+bool SendingMismatchFailure::diagnoseAsError() {
+  if (getLocator()->getLastElementAs<LocatorPathElt::FunctionArgument>())
+    return diagnoseArgFailure();
+  return diagnoseResultFailure();
+}
+
+bool SendingMismatchFailure::diagnoseArgFailure() {
+  emitDiagnostic(diag::sending_function_wrong_sending, getFromType(),
+                 getToType())
+      .warnUntilSwiftVersion(6);
+  emitDiagnostic(diag::sending_function_param_with_sending_param_note);
+  return true;
+}
+
+bool SendingMismatchFailure::diagnoseResultFailure() {
+  emitDiagnostic(diag::sending_function_wrong_sending, getFromType(),
+                 getToType())
+      .warnUntilSwiftVersion(6);
+  emitDiagnostic(diag::sending_function_result_with_sending_param_note);
   return true;
 }
 

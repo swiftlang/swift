@@ -14,6 +14,7 @@
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFileCoreTableInfo.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"

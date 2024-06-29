@@ -13,6 +13,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Frontend/Frontend.h"
@@ -1269,7 +1270,7 @@ private:
         getLocForContentStartOnSameLine(SM, StringLiteralRange.getEnd());
     bool HaveEndQuotes = CharSourceRange(SM, EndLineContentLoc,
                                          StringLiteralRange.getEnd())
-        .str().equals(StringRef("\"\"\""));
+        .str() == "\"\"\"";
 
     if (!HaveEndQuotes) {
       // Indent to the same indentation level as the first non-empty line
