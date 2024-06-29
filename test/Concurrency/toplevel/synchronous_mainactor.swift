@@ -6,7 +6,7 @@ var a = 10 // expected-note{{var declared here}}
 var b = 15 // expected-error{{top-level code variables cannot have a global actor}}
 
 func unsafeAccess() { // expected-note{{add '@MainActor' to make global function 'unsafeAccess()' part of global actor 'MainActor'}}
-    print(a) // expected-error@:11{{main actor-isolated var 'a' can not be referenced from a non-isolated context}}
+    print(a) // expected-error@:11{{main actor-isolated var 'a' can not be referenced from a nonisolated context}}
 }
 
 func unsafeAsyncAccess() async {
