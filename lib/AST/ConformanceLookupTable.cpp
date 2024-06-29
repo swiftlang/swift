@@ -26,6 +26,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;

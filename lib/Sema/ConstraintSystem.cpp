@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"

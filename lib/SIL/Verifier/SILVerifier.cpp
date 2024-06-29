@@ -26,6 +26,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/AddressWalker.h"
@@ -543,6 +544,7 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In_CXX:
       return true;
 
     case SILArgumentConvention::Direct_Unowned:
@@ -2194,8 +2196,9 @@ public:
           "applied argument types do not match suffix of function type's "
           "inputs");
       if (PAI->isOnStack()) {
-        require(!substConv.getSILArgumentConvention(argIdx).isOwnedConvention(),
-          "on-stack closures do not support owned arguments");
+        require(!substConv.getSILArgumentConvention(argIdx)
+                     .isOwnedConventionInCaller(),
+                "on-stack closures do not support owned arguments");
       }
     }
 
@@ -2406,8 +2409,12 @@ public:
       }
       auto fnType = requireObjectType(SILFunctionType, arguments[5],
                                       "result of createAsyncTask");
-      auto expectedExtInfo =
-        SILExtInfoBuilder().withAsync(true).withSendable(true).build();
+      bool haveSending =
+          F.getASTContext().LangOpts.hasFeature(Feature::SendingArgsAndResults);
+      auto expectedExtInfo = SILExtInfoBuilder()
+                                 .withAsync(true)
+                                 .withSendable(!haveSending)
+                                 .build();
       require(fnType->getExtInfo().isEqualTo(expectedExtInfo, /*clang types*/true),
               "function argument to createAsyncTask has incorrect ext info");
       // FIXME: it'd be better if we took a consuming closure here
@@ -2634,8 +2641,13 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-            "Found load borrow that is invalidated by a local write?!");
+    if (LBI->isUnchecked()) {
+      require(LBI->getModule().getStage() == SILStage::Raw,
+              "load_borrow can only be [unchecked] in raw SIL");
+    } else {
+      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
+              "Found load borrow that is invalidated by a local write?!");
+    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -6473,6 +6485,7 @@ public:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
+                         case ParameterConvention::Indirect_In_CXX:
                          case ParameterConvention::Pack_Owned:
                          case ParameterConvention::Pack_Guaranteed:
                          case ParameterConvention::Pack_Inout:

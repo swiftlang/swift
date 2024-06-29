@@ -14,6 +14,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Overload.h"
@@ -392,6 +393,28 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 
 bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
   return getIteratorCategoryDecl(clangDecl);
+}
+
+ValueDecl *
+swift::importer::getImportedMemberOperator(const DeclBaseName &name,
+                                           NominalTypeDecl *selfType,
+                                           std::optional<Type> parameterType) {
+  assert(name.isOperator());
+  // Handle ==, -, and += operators, that are required operators for C++
+  // iterator types to conform to the corresponding Cxx iterator protocols.
+  // These operators can be instantiated and synthesized by clang importer below,
+  // and thus require additional lookup logic when they're being deserialized.
+  if (name.getIdentifier() == selfType->getASTContext().Id_EqualsOperator) {
+    return getEqualEqualOperator(selfType);
+  }
+  if (name.getIdentifier() == selfType->getASTContext().getIdentifier("-")) {
+    return getMinusOperator(selfType);
+  }
+  if (name.getIdentifier() == selfType->getASTContext().getIdentifier("+=") &&
+      parameterType) {
+    return getPlusEqualOperator(selfType, *parameterType);
+  }
+  return nullptr;
 }
 
 void swift::conformToCxxIteratorIfNeeded(
@@ -1058,7 +1081,7 @@ void swift::conformToCxxFunctionIfNeeded(
 
   auto funcPointerType = clangCtx.getPointerType(clangCtx.getFunctionType(
       operatorCallDecl->getReturnType(), operatorCallParamTypes,
-      clang::FunctionProtoType::ExtProtoInfo()));
+      clang::FunctionProtoType::ExtProtoInfo())).withConst();
 
   // Create a fake variable with a function type that matches the type of
   // `operator()`.

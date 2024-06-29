@@ -28,6 +28,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
@@ -1561,7 +1562,8 @@ namespace {
         });
       }
 
-      if (auto Body = D->getBody(/*canSynthesize=*/ParseIfNeeded)) {
+      auto canParse = ParseIfNeeded && !D->isBodySkipped();
+      if (auto Body = D->getBody(canParse)) {
         printRec(Body, &D->getASTContext());
       }
     }

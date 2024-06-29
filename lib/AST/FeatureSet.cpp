@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "clang/AST/DeclObjC.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -771,6 +772,7 @@ static bool usesFeatureSensitive(Decl *decl) {
 
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
+UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 
 // ----------------------------------------------------------------------------

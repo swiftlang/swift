@@ -24,6 +24,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
@@ -3109,6 +3110,13 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
 static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                                              SILLocation loc,
                                              UnexpectedEnumCaseInfo ueci) {
+  if (ueci.subjectTy->isNoncopyable()) {
+    // TODO: The DiagnoseUnexpectedEnumCase intrinsic currently requires a
+    // Copyable parameter. For noncopyable enums it should be impossible to
+    // reach an unexpected case statically, so just emit a trap for now.
+    SGF.B.createUnconditionalFail(loc, "unexpected enum case");
+    return;
+  }
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase();
   if (!diagnoseFailure) {

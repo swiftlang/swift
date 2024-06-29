@@ -49,6 +49,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
@@ -1889,6 +1890,30 @@ Type ExtensionDecl::getExtendedType() const {
           Type()))
     return type;
   return ErrorType::get(ctx);
+}
+
+bool ExtensionDecl::isAddingConformanceToInvertible() const {
+  const unsigned numEntries = getInherited().size();
+  for (unsigned i = 0; i < numEntries; ++i) {
+    InheritedTypeRequest request{this, i, TypeResolutionStage::Structural};
+    auto result = evaluateOrDefault(getASTContext().evaluator, request,
+                                    InheritedTypeResult::forDefault());
+    Type inheritedTy;
+    switch (result) {
+    case InheritedTypeResult::Inherited:
+      inheritedTy = result.getInheritedType();
+      break;
+    case InheritedTypeResult::Suppressed:
+    case InheritedTypeResult::Default:
+      continue;
+    }
+
+    if (inheritedTy)
+      if (auto kp = inheritedTy->getKnownProtocol())
+        if (getInvertibleProtocolKind(*kp))
+          return true;
+  }
+  return false;
 }
 
 bool Decl::isObjCImplementation() const {
@@ -4681,6 +4706,8 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
 
   if (scope.isPublic())
     return !otherScope.isPublic();
+  else if (scope.isPackage())
+    return !otherScope.isPublicOrPackage();
   else if (scope.isInternal())
     return !otherScope.isPublic() && !otherScope.isInternal();
   else
@@ -6619,13 +6646,14 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.RequiresClass = false;
   Bits.ProtocolDecl.ExistentialConformsToSelfValid = false;
   Bits.ProtocolDecl.ExistentialConformsToSelf = false;
-  Bits.ProtocolDecl.InheritedProtocolsValid = 0;
+  Bits.ProtocolDecl.InheritedProtocolsValid = false;
+  Bits.ProtocolDecl.AllInheritedProtocolsValid = false;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  Bits.ProtocolDecl.HasAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasRequirementSignature = 0;
-  Bits.ProtocolDecl.HasLazyRequirementSignature = 0;
+  Bits.ProtocolDecl.HasAssociatedTypes = false;
+  Bits.ProtocolDecl.HasLazyAssociatedTypes = false;
+  Bits.ProtocolDecl.HasRequirementSignature = false;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = false;
   Bits.ProtocolDecl.ProtocolRequirementsValid = false;
   setTrailingWhereClause(TrailingWhere);
 }
@@ -6659,6 +6687,11 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
+  // Avoid evaluator overhead because we call this from Symbol::compare()
+  // in the Requirement Machine.
+  if (Bits.ProtocolDecl.AllInheritedProtocolsValid)
+    return AllInheritedProtocols;
+
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            AllInheritedProtocolsRequest{mutThis},

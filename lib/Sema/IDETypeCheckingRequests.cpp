@@ -13,6 +13,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Sema/ConstraintSystem.h"

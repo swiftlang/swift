@@ -14,6 +14,7 @@
 
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -984,6 +985,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         llvm_unreachable("address value passed to indirect parameter");
 
       // If this is an in-parameter, it is like a load.
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);

@@ -14,6 +14,7 @@
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/Utils.h"

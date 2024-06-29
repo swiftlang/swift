@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 
 namespace swift {
@@ -353,7 +354,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromTypeRepr(
     auto kind = specifier.getParsedLifetimeDependenceKind();
 
     if (kind == ParsedLifetimeDependenceKind::Scope &&
-        (!isGuaranteedParameter(paramConvention) &&
+        (!isGuaranteedParameterInCallee(paramConvention) &&
          !isMutatingParameter(paramConvention))) {
       diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "_scope",
                      getStringForParameterConvention(paramConvention));

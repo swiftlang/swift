@@ -19,6 +19,7 @@
 #include "DemanglerAssert.h"
 #include "RemanglerBase.h"
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -2106,6 +2107,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@inout", 'l')
                 .Case("@inout_aliasable", 'b')
                 .Case("@in_guaranteed", 'n')
+                .Case("@in_cxx", 'X')
                 .Case("@in_constant", 'c')
                 .Case("@owned", 'x')
                 .Case("@guaranteed", 'g')

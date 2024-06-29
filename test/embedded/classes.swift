@@ -43,6 +43,16 @@ func testCasting(_ title: StaticString, _ c: MyClass) {
   }
 }
 
+public class DynamicSelfClass {
+  public static let ds = DynamicSelfClass()
+  public static let i: Int = 42
+  var x: Int
+
+  public init() {
+    self.x = Self.i
+  }
+}
+
 @main
 struct Main {
   static var o: (MyClass?, MyClass?, MyClass?) = (nil, nil, nil)
@@ -95,5 +105,8 @@ struct Main {
     testCasting("subsub: ", MySubSubClass())
     // CHECK: other: -
     testCasting("other: ", OtherSubClass())
+
+    // CHECK: 42
+    print(DynamicSelfClass.ds.x)
   }
 }

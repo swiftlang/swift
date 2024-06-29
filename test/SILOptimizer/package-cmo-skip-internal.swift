@@ -25,7 +25,7 @@ let x = useInternal(Base())
 
 /// Since Base is not serialized, accessing its field should go 
 /// through `class_method`.
-// CHECK-MAIN: class_method %13 : $Base, #Base.baseVarPkg!getter : (Base) -> () -> Int, $@convention(method) (@guaranteed Base) -> Int
+// CHECK-MAIN: class_method {{.*}} : $Base, #Base.baseVarPkg!getter : (Base) -> () -> Int, $@convention(method) (@guaranteed Base) -> Int
 let y = usePkg(Base())
 
 /// Since PubKlass is serialized, can access its field directly.

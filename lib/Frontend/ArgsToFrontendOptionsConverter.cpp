@@ -16,6 +16,7 @@
 #include "ArgsToFrontendOutputsConverter.h"
 #include "clang/Driver/Driver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"

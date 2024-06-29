@@ -25,6 +25,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -169,15 +170,20 @@ void SILWitnessTable::convertToDefinition(
 
 SerializedKind_t SILWitnessTable::conformanceSerializedKind(
                                                             const RootProtocolConformance *conformance) {
+
+  auto optInPackage = conformance->getDeclContext()->getParentModule()->serializePackageEnabled();
+  auto accessLevelToCheck =
+  optInPackage ? AccessLevel::Package : AccessLevel::Public;
+
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-  if (normalConformance && normalConformance->isResilient())
+  if (normalConformance && normalConformance->isResilient() && !optInPackage)
     return IsNotSerialized;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
+  if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToCheck)
     return IsNotSerialized;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  if (nominal->getEffectiveAccess() >= AccessLevel::Public)
+  if (nominal->getEffectiveAccess() >= accessLevelToCheck)
     return IsSerialized;
 
   return IsNotSerialized;

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
@@ -481,6 +482,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
                                                 bool hasScopeInCaller) {
 
   switch (argConv) {
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Direct_Owned:
   case SILArgumentConvention::Pack_Owned:
@@ -509,7 +511,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   case SILArgumentConvention::Indirect_Out:
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
-    llvm_unreachable("Illegal convention for non-address types");
+    ASSERT(false && "Illegal convention for non-address types");
   }
   llvm_unreachable("covered switch");
 }

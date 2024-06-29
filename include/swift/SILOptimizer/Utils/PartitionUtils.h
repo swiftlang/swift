@@ -1154,6 +1154,28 @@ public:
   }
 
 private:
+  bool isConvertFunctionFromSendableType(SILValue equivalenceClassRep) const {
+    SILValue valueToTest = equivalenceClassRep;
+    while (true) {
+      if (auto *i = dyn_cast<ThinToThickFunctionInst>(valueToTest)) {
+        valueToTest = i->getOperand();
+        continue;
+      }
+      if (auto *i = dyn_cast<ConvertEscapeToNoEscapeInst>(valueToTest)) {
+        valueToTest = i->getOperand();
+        continue;
+      }
+      break;
+    }
+
+    auto *cvi = dyn_cast<ConvertFunctionInst>(valueToTest);
+    if (!cvi)
+      return false;
+
+    return cvi->getOperand()->getType().isSendable(
+        equivalenceClassRep->getFunction());
+  }
+
   // Private helper that squelches the error if our transfer instruction and our
   // use have the same isolation.
   void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
@@ -1166,12 +1188,13 @@ private:
           return;
       }
 
-      // If we have a temporary that is initialized with an unsafe nonisolated
-      // value... squelch the error like if we were that value.
-      //
-      // TODO: This goes away with opaque values.
       if (SILValue equivalenceClassRep =
               getRepresentative(transferringOp->get())) {
+
+        // If we have a temporary that is initialized with an unsafe nonisolated
+        // value... squelch the error like if we were that value.
+        //
+        // TODO: This goes away with opaque values.
         if (auto *asi = dyn_cast<AllocStackInst>(equivalenceClassRep)) {
           if (SILValue value = getInitOfTemporaryAllocStack(asi)) {
             if (auto elt = getElement(value)) {
@@ -1182,6 +1205,11 @@ private:
             }
           }
         }
+
+        // See if we have a convert function from a `@Sendable` type. In this
+        // case, we want to squelch the error.
+        if (isConvertFunctionFromSendableType(equivalenceClassRep))
+          return;
       }
 
       // If our instruction does not have any isolation info associated with it,
@@ -1206,12 +1234,12 @@ private:
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) const {
     if (shouldTryToSquelchErrors()) {
-      // If we have a temporary that is initialized with an unsafe nonisolated
-      // value... squelch the error like if we were that value.
-      //
-      // TODO: This goes away with opaque values.
       if (SILValue equivalenceClassRep =
               getRepresentative(op.getSourceOp()->get())) {
+        // If we have a temporary that is initialized with an unsafe nonisolated
+        // value... squelch the error like if we were that value.
+        //
+        // TODO: This goes away with opaque values.
         if (auto *asi = dyn_cast<AllocStackInst>(equivalenceClassRep)) {
           if (SILValue value = getInitOfTemporaryAllocStack(asi)) {
             if (auto elt = getElement(value)) {
@@ -1222,6 +1250,11 @@ private:
             }
           }
         }
+
+        // See if we have a convert function from a `@Sendable` type. In this
+        // case, we want to squelch the error.
+        if (isConvertFunctionFromSendableType(equivalenceClassRep))
+          return;
       }
     }
 

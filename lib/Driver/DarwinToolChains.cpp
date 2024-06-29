@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -136,10 +137,16 @@ toolchains::Darwin::addPluginArguments(const ArgList &Args,
   CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
       programPath, /*shared=*/true, pluginPath);
 
-  auto defaultPluginPath = pluginPath;
-  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
+  // In-process plugin server path.
+  auto inProcPluginServerPath = pluginPath;
+  llvm::sys::path::append(inProcPluginServerPath, "host",
+                          "libSwiftInProcPluginServer.dylib");
+  Arguments.push_back("-in-process-plugin-server-path");
+  Arguments.push_back(Args.MakeArgString(inProcPluginServerPath));
 
   // Default plugin path.
+  auto defaultPluginPath = pluginPath;
+  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
   Arguments.push_back("-plugin-path");
   Arguments.push_back(Args.MakeArgString(defaultPluginPath));
 
@@ -378,19 +385,19 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
     auto value = context.Args.getLastArgValue(
                                     options::OPT_runtime_compatibility_version);
-    if (value.equals("5.0")) {
+    if (value == "5.0") {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
-    } else if (value.equals("5.1")) {
+    } else if (value == "5.1") {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
-    } else if (value.equals("5.5")) {
+    } else if (value == "5.5") {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
-    } else if (value.equals("5.6")) {
+    } else if (value == "5.6") {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
-    } else if (value.equals("5.8")) {
+    } else if (value == "5.8") {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-    } else if (value.equals("6.0")) {
+    } else if (value == "6.0") {
       runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
-    } else if (value.equals("none")) {
+    } else if (value == "none") {
       runtimeCompatibilityVersion = std::nullopt;
     } else {
       // TODO: diagnose unknown runtime compatibility version?

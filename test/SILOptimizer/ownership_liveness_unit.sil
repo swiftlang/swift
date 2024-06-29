@@ -606,7 +606,7 @@ bb1(%reborrow : @guaranteed $C):
 // CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT: bb0: LiveWithin
-// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: lifetime-ending user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
 // CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
 // CHECK-NEXT: Complete liveness
 // CHECK-NEXT: Unenclosed phis {

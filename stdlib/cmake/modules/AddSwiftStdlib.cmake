@@ -599,6 +599,11 @@ function(_add_target_variant_link_flags)
     endif()
   endif()
 
+  # Enable build-ids on non-Windows non-Darwin platforms
+  if(SWIFT_SDK_${LFLAGS_SDK}_USE_BUILD_ID)
+    list(APPEND result "-Wl,--build-id=sha1")
+  endif()
+
   # Enable dead stripping. Portions of this logic were copied from llvm's
   # `add_link_opts` function (which, perhaps, should have been used here in the
   # first place, but at this point it's hard to say whether that's feasible).

@@ -227,7 +227,7 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
-  virtual bool canImportModule(ImportPath::Module named,
+  virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
                                bool isTestableImport = false) override;
 
@@ -684,6 +684,13 @@ bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
 llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
+
+/// Lookup and return the synthesized conformance operator like '==' '-' or '+='
+/// for the given type.
+ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
+                                     NominalTypeDecl *selfType,
+                                     std::optional<Type> parameterType);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {

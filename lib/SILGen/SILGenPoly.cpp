@@ -93,6 +93,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "TupleGenerators.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
@@ -2010,7 +2011,7 @@ private:
     auto convention = innerSlot.getConvention();
     assert(!isPackParameter(convention));
     assert(innerSlot.shouldProduceAddress(SGF) == innerValue.getType().isAddress());
-    if (innerValue.hasCleanup() && !isConsumedParameter(convention)) {
+    if (innerValue.hasCleanup() && !isConsumedParameterInCaller(convention)) {
       return innerValue.borrow(SGF, Loc);
     }
     return innerValue;
@@ -2047,7 +2048,7 @@ private:
 
     // Easy case: we want to pass exactly this value.
     if (outer.getType() == innerParam.getType()) {
-      if (isConsumedParameter(innerParam.getConvention()) &&
+      if (isConsumedParameterInCaller(innerParam.getConvention()) &&
           !outer.isPlusOne(SGF)) {
         outer = outer.copyUnmanaged(SGF, Loc);
       }
@@ -2066,6 +2067,7 @@ private:
       return processIntoGuaranteed(innerOrigType, innerSubstType,
                                    outerOrigType, outerSubstType,
                                    outer, innerTy);
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In: {
       if (SGF.silConv.useLoweredAddresses()) {
         return processIndirect(innerOrigType, innerSubstType,
@@ -2260,6 +2262,7 @@ private:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("not a pack convention");
@@ -2699,6 +2702,7 @@ ManagedValue TranslateArguments::expandPackInnerParam(
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -2792,12 +2796,12 @@ static void forwardFunctionArguments(SILGenFunction &SGF,
     arg = applyTrivialConversions(SGF, loc, arg,
                                   SILType::getPrimitiveObjectType(argSubstTy));
 
-    if (argTy.isConsumed()) {
+    if (argTy.isConsumedInCaller()) {
       forwardedArgs.push_back(arg.ensurePlusOne(SGF, loc).forward(SGF));
       continue;
     }
 
-    if (isGuaranteedParameter(argTy.getConvention())) {
+    if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       forwardedArgs.push_back(
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
       continue;
@@ -2845,6 +2849,7 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
   case ParameterConvention::Pack_Inout:
     return ManagedValue::forLValue(value);
   case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(value);
@@ -3932,7 +3937,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
     // Note that we need to force *trivial* packs/tuples to be copied, in
     // case the inner context wants to mutate the memory, even though we might
     // have ownership of that memory (e.g. if it's a consuming parameter).
-    needsInnerTemporary = (isConsumedParameter(innerConvention) &&
+    needsInnerTemporary = (isConsumedParameterInCaller(innerConvention) &&
                            !outerTupleOrPackMV.isPlusOne(SGF));
   }
 
@@ -3960,7 +3965,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
   // This doesn't apply if we're translating into a tuple because we
   // always need to copy/move into the tuple.
   if (!innerIsTuple && !needsInnerTemporary &&
-      !isConsumedParameter(innerConvention)) {
+      !isConsumedParameterInCaller(innerConvention)) {
     outerTupleOrPackMV =
       ManagedValue::forBorrowedAddressRValue(outerTupleOrPackMV.getValue());
   }
@@ -3970,7 +3975,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
   SILValue outerTupleOrPackAddr = outerTupleOrPackMV.forward(SGF);
 
   bool innerIsOwned = (innerIsTuple || needsInnerTemporary ||
-                       isConsumedParameter(innerConvention));
+                       isConsumedParameterInCaller(innerConvention));
 
   // Perform a pack loop to translate the components and set the element
   // addresses for this pack expansion in the inner pack (if it's a pack).
@@ -4085,7 +4090,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
     // We only associate this cleanup with what we return from this function
     // if we're generating an owned value; otherwise we just leave it active
     // so that we destroy the values later.
-    if (isConsumedParameter(innerConvention)) {
+    if (isConsumedParameterInCaller(innerConvention)) {
       return ManagedValue::forOwnedAddressRValue(innerTupleOrPackAddr,
                                                  innerExpansionCleanup);
     }
@@ -6529,6 +6534,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
     SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
     fn = SGF.emitManagedRValueWithCleanup(
         SGF.B.createThinToThickFunction(Loc, fn.forward(SGF), resTy));
+
   } else if (newFnType != expectedFnType) {
     // Escaping to noescape conversion.
     SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);

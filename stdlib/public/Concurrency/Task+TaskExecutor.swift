@@ -161,7 +161,7 @@ public func withTaskExecutorPreference<T, Failure>(
 
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
-@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
 public func __abi__withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
@@ -223,7 +223,7 @@ extension Task where Failure == Never {
   public init(
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
@@ -283,7 +283,7 @@ extension Task where Failure == Error {
   public init(
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
@@ -342,7 +342,7 @@ extension Task where Failure == Never {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
@@ -401,7 +401,7 @@ extension Task where Failure == Error {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)

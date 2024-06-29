@@ -137,6 +137,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -2125,7 +2126,7 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     // An indirect argument is guaranteed if it's @in_guaranteed.
     auto *arg = base.getArgument();
     return MoveConstraint::forGuaranteed(
-        arg->getArgumentConvention().isGuaranteedConvention());
+        arg->getArgumentConvention().isGuaranteedConventionInCaller());
   }
   case AccessRepresentation::Kind::Yield: {
     auto baseAddr = base.getBaseAddress();
@@ -2133,7 +2134,7 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
         cast<MultipleValueInstructionResult>(baseAddr)->getParent());
     auto index = *bai->getIndexOfResult(baseAddr);
     auto info = bai->getSubstCalleeConv().getYieldInfoForOperandIndex(index);
-    return MoveConstraint::forGuaranteed(!info.isConsumed());
+    return MoveConstraint::forGuaranteed(!info.isConsumedInCaller());
   }
   case AccessRepresentation::Kind::Nested: {
     auto *bai = cast<BeginAccessInst>(base.getBaseAddress());

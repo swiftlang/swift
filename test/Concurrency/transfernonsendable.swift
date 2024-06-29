@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // This run validates that for specific test cases around closures, we properly
@@ -1745,4 +1744,68 @@ func testIndirectParameterSameIsolationNoError() async {
   let x = NonSendableKlass()
   await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+}
+
+extension MyActor {
+  func testNonSendableCaptures(sc: NonSendableKlass) {
+    Task {
+      _ = self
+      _ = sc
+
+      Task { [sc,self] in
+        _ = self
+        _ = sc
+
+        Task { // expected-tns-warning {{value of non-Sendable type '@isolated(any) @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' accessed after being transferred}}
+          _ = sc
+        }
+
+        Task { // expected-tns-note {{access can happen concurrently}}
+          _ = sc
+        }
+      }
+    }
+  }
+}
+
+public struct TimeoutError: Error, CustomStringConvertible {
+  public var description: String { "Timed out" }
+}
+
+// We used to not merge the isolation below correctly causing us to emit a crash
+// due to undefined behavior. Make sure we do not crash or emit an unhandled
+// pattern error.
+public func doNotCrashOrEmitUnhandledPatternErrors<T: Sendable>(
+  _ duration: Duration,
+  _ body: @escaping @Sendable () async throws -> T
+) async throws -> T {
+  try await withThrowingTaskGroup(of: T.self) { taskGroup in
+    taskGroup.addTask {
+      try await Task.sleep(for: duration)
+      throw TimeoutError()
+    }
+    taskGroup.addTask {
+      return try await body()
+    }
+    for try await value in taskGroup {
+      taskGroup.cancelAll()
+      return value
+    }
+    throw CancellationError()
+  }
+}
+
+/// The following makes sure that when we have a function like test2 with an
+/// assigned isolation that returns a Sendable value... we treat the value as
+/// actually Sendable. This occurs in this example via the result of the default
+/// parameter function for string.
+///
+/// We shouldn't emit any diagnostic here.
+actor FunctionWithSendableResultAndIsolationActor {
+    func foo() -> String {
+        return string()
+    }
+    func string(someCondition: Bool = false) -> String {
+        return ""
+    }
 }

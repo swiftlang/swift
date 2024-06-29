@@ -77,6 +77,7 @@ namespace clang {
   class ASTContext;
   template <class> class CanQual;
   class CodeGenerator;
+  class CXXDestructorDecl;
   class Decl;
   class GlobalDecl;
   class Type;
@@ -1615,6 +1616,9 @@ public:
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
+
+  void
+  ensureImplicitCXXDestructorBodyIsDefined(clang::CXXDestructorDecl *cxxDtor);
 
   llvm::ConstantInt *getInt32(uint32_t value);
   llvm::ConstantInt *getSize(Size size);

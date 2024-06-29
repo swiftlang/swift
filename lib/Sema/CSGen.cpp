@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -2588,6 +2589,10 @@ namespace {
         return FunctionTypeIsolation::forNonIsolated();
       }();
       extInfo = extInfo.withIsolation(isolation);
+      if (isolation.isGlobalActor() &&
+          CS.getASTContext().LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+        extInfo = extInfo.withSendable();
+      }
 
       auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
       return CS.replaceInferableTypesWithTypeVars(
@@ -4112,7 +4117,7 @@ namespace {
         return false;
 
       auto member = UDE->getName().getBaseName().userFacingName();
-      return member.equals("trigger_fallback_diagnostic");
+      return member == "trigger_fallback_diagnostic";
     }
 
     enum class TypeOperation { None,

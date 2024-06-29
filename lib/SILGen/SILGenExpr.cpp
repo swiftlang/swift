@@ -41,6 +41,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
@@ -520,7 +521,6 @@ namespace {
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     ManagedValue tryEmitConvertedClosure(AbstractClosureExpr *e,
-                                         CanAnyFunctionType closureType,
                                          const Conversion &conv);
     ManagedValue emitClosureReference(AbstractClosureExpr *e,
                                       const FunctionTypeInfo &contextInfo);
@@ -1808,9 +1808,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
     (void) emitAnyClosureExpr(SGF, semanticExpr,
                               [&](AbstractClosureExpr *closure) {
       // Emit the closure body.
-      auto closureType =
-        cast<AnyFunctionType>(closure->getType()->getCanonicalType());
-      SGF.SGM.emitClosure(closure, SGF.getFunctionTypeInfo(closureType));
+      SGF.SGM.emitClosure(closure, SGF.getClosureTypeInfo(closure));
 
       loc = closure;
       return ManagedValue();
@@ -2959,10 +2957,10 @@ static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
 
 /// Try to emit the given closure under the given conversion.
 /// Returns an invalid ManagedValue if this fails.
-ManagedValue
-RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
-                                       CanAnyFunctionType closureType,
-                                       const Conversion &conv) {
+ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
+                                                    const Conversion &conv) {
+  auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+
   // Bail out if we don't have specialized type information from context.
   auto info = tryGetSpecializedClosureTypeFromContext(closureType, conv);
   if (!info) return ManagedValue();
@@ -3011,13 +3009,11 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   if (auto *placeholder = wrappedValueAutoclosurePlaceholder(e))
     return visitPropertyWrapperValuePlaceholderExpr(placeholder, C);
 
-  auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-
   // If we're emitting into a converting context, try to combine the
   // conversion into the emission of the closure function.
   if (auto *convertingInit = C.getAsConversion()) {
-    ManagedValue closure = tryEmitConvertedClosure(e, closureType,
-                                              convertingInit->getConversion());
+    ManagedValue closure =
+        tryEmitConvertedClosure(e, convertingInit->getConversion());
     if (closure.isValid()) {
       convertingInit->initWithConvertedValue(SGF, e, closure);
       convertingInit->finishInitialization(SGF);
@@ -3026,9 +3022,10 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   }
 
   // Otherwise, emit the expression using the simple type of the expression.
-  auto info = SGF.getFunctionTypeInfo(closureType);
+  auto info = SGF.getClosureTypeInfo(e);
   auto closure = emitClosureReference(e, info);
-  return RValue(SGF, e, closureType, closure);
+
+  return RValue(SGF, e, e->getType()->getCanonicalType(), closure);
 }
 
 ManagedValue

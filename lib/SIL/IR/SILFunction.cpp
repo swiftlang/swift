@@ -32,6 +32,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "clang/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"

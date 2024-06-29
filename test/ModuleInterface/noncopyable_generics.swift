@@ -1,8 +1,12 @@
 // RUN: %empty-directory(%t)
 
+// Due to SE427NoInferenceOnExtension not being in production
+// REQUIRES: asserts
+
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:     -o %t/NoncopyableGenerics_Misc.swiftmodule \
 // RUN:     -emit-module-interface-path %t/NoncopyableGenerics_Misc.swiftinterface \
 // RUN:     %S/Inputs/NoncopyableGenerics_Misc.swift
@@ -10,6 +14,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
 // RUN:     %S/../Inputs/Swiftskell.swift
@@ -24,16 +29,19 @@
 // RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:    %t/NoncopyableGenerics_Misc.swiftinterface -o %t/NoncopyableGenerics_Misc.swiftmodule
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:    %t/Swiftskell.swiftinterface -o %t/Swiftskell.swiftmodule
 
 // RUN: %target-swift-frontend -emit-silgen -I %t %s \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:    -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:    -o %t/final.silgen
 
 // RUN: %FileCheck %s --check-prefix=CHECK-SILGEN < %t/final.silgen
@@ -214,6 +222,11 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: }
 // CHECK-MISC-NEXT: public struct RegularTwice : ~Swift.Copyable, ~Swift.Copyable {
 // CHECK-MISC-NEXT: }
+
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct Continuation<T, E> where E : Swift.Error, T : ~Copyable {
+// CHECK-MISC-NOT:  ~
+// CHECK-MISC:      #endif
 
 // NOTE: below are extensions emitted at the end of NoncopyableGenerics_Misc.swift
 // CHECK-MISC: extension {{.*}}.VeryNested : {{.*}}.Publik {}

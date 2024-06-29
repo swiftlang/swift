@@ -170,11 +170,7 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  // https://github.com/apple/swift/issues/50141
-  // This should be 'cannot_call_non_function_value'.
-  if s.count() == 0 {} 
-  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
-  // expected-error@-2 {{missing argument for parameter 'where' in call}}
+  if s.count() == 0 {} // expected-error {{cannot call value of non-function type 'Int'}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -1537,9 +1533,7 @@ func issue63746() {
 }
 
 func rdar86611718(list: [Int]) {
-  String(list.count())
-  // expected-error@-1 {{missing argument for parameter 'where' in call}}
-  // expected-error@-2 {{generic parameter 'E' could not be inferred}}
+  String(list.count()) // expected-error {{cannot call value of non-function type 'Int'}}
 }
 
 // rdar://108977234 - failed to produce diagnostic when argument to AnyHashable parameter doesn't conform to Hashable protocol
@@ -1558,17 +1552,28 @@ func testNilCoalescingOperatorRemoveFix() {
   let _ = "" /* This is a comment */ ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{13-43=}}
 
   let _ = "" // This is a comment
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1560:13-1561:10=}}
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1554:13-1555:10=}}
 
   let _ = "" // This is a comment
     /*
      * The blank line below is part of the test case, do not delete it
      */
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1563:13-1567:10=}}
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1557:13-1561:10=}}
 
-  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1570:9=}}
+  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1564:9=}}
       "").isEmpty {}
 
   if ("" // This is a comment
-      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1572:9-1573:12=}}
+      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1566:9-1567:12=}}
+}
+
+// https://github.com/apple/swift/issues/74617
+struct Foo_74617 {
+  public var bar: Float { 123 }
+  public static func + (lhs: Self, rhs: Self) -> Self { Self() }
+}
+func testAddMemberVsRemoveCall() {
+  let a = Foo_74617()
+  let b = Foo_74617()
+  let c = (a + b).bar() // expected-error {{cannot call value of non-function type 'Float'}} {{22-24=}}
 }

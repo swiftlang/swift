@@ -4591,13 +4591,28 @@ public:
 /// instruction in its use-def list.
 class LoadBorrowInst :
     public UnaryInstructionBase<SILInstructionKind::LoadBorrowInst,
-                                SingleValueInstruction> {
+                                SingleValueInstruction>
+{
   friend class SILBuilder;
+
+  bool Unchecked = false;
 
 public:
   LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+
+  // True if the invariants on `load_borrow` have not been checked and
+  // should not be strictly enforced.
+  //
+  // This can only occur during raw SIL before move-only checking occurs.
+  // Developers can write incorrect code using noncopyable types that
+  // consumes or mutates a memory location while that location is borrowed,
+  // but the move-only checker must diagnose those problems before canonical
+  // SIL is formed.
+  bool isUnchecked() const { return Unchecked; }
+  
+  void setUnchecked(bool value) { Unchecked = value; }
 
   using EndBorrowRange =
       decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());

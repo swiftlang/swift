@@ -71,7 +71,7 @@ public:
 
     inline bool operator==(const FilenameAndLocation &rhs) const {
       return line == rhs.line && column == rhs.column &&
-             filename.equals(rhs.filename);
+             filename == rhs.filename;
     }
 
     void dump() const;

@@ -19,6 +19,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -1601,6 +1602,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *I = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(&SI)) {
       Attr = I->getForwardingOwnershipKind() == OwnershipKind::Owned ? true
                                                                      : false;
+    } else if (auto *LB = dyn_cast<LoadBorrowInst>(&SI)) {
+      Attr = LB->isUnchecked();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

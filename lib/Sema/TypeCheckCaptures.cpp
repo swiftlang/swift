@@ -28,6 +28,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
