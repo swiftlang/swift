@@ -581,17 +581,7 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
   return true;
 }
 
-static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
-  // An escaped identifier is terminated by a backtick, and the backslash is
-  // reserved for possible future escaping.
-  if (c == '`' || c == '\\')
-    return false;
-
-  // This is the set of code points satisfying the `White_Space` property,
-  // excluding the set satisfying the `Pattern_White_Space` property, and
-  // excluding any other ASCII non-printables and Unicode separators. In
-  // other words, the only whitespace code points allowed in a raw
-  // identifier are U+0020, and U+200E/200F (LTR/RTL marks).
+static bool isForbiddenRawIdentifierWhitespace(uint32_t c) {
   if ((c >= 0x0009 && c <= 0x000D) ||
       c == 0x0085 ||
       c == 0x00A0 ||
@@ -601,6 +591,30 @@ static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
       c == 0x202F ||
       c == 0x205F ||
       c == 0x3000)
+    return true;
+
+  return false;
+}
+
+static bool isPermittedRawIdentifierWhitespace(uint32_t c) {
+  return c == 0x0020 || c == 0x200E || c == 0x200F;
+}
+
+static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
+  // An escaped identifier is terminated by a backtick, and the backslash is
+  // reserved for possible future escaping.
+  if (c == '`' || c == '\\')
+    return false;
+
+  if ((c >= 0x0000 && c <= 0x001F) || c == 0x007F)
+    return false;
+
+  // This is the set of code points satisfying the `White_Space` property,
+  // excluding the set satisfying the `Pattern_White_Space` property, and
+  // excluding any other ASCII non-printables and Unicode separators. In
+  // other words, the only whitespace code points allowed in a raw
+  // identifier are U+0020, and U+200E/200F (LTR/RTL marks).
+  if (isForbiddenRawIdentifierWhitespace(c))
     return false;
 
   return true;
@@ -644,6 +658,17 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
   return advanceIf(ptr, end, Identifier::isOperatorContinuationCodePoint);
 }
 
+/// Returns true if the given string is entirely whitespace (considering only
+/// those whitespace code points permitted in raw identifiers).
+static bool isEntirelyWhitespace(StringRef string) {
+  if (string.empty()) return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIf(p, end, isPermittedRawIdentifierWhitespace))
+    return false;
+  while (p < end && advanceIf(p, end, isPermittedRawIdentifierWhitespace));
+  return p == end;
+}
+
 bool Lexer::isIdentifier(StringRef string) {
   if (string.empty()) return false;
   char const *p = string.data(), *end = string.end();
@@ -663,6 +688,19 @@ bool Lexer::identifierMustAlwaysBeEscaped(StringRef str) {
     mustEscape = true;
   }
   return mustEscape;
+}
+
+bool Lexer::isValidAsEscapedIdentifier(StringRef string) {
+  if (string.empty())
+    return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidEscapedIdentifier(p, end))
+    return false;
+  while (p < end && advanceIfValidEscapedIdentifier(p, end))
+    ;
+  if (p != end)
+    return false;
+  return !isEntirelyWhitespace(string);
 }
 
 /// Determines if the given string is a valid operator identifier,
@@ -2271,10 +2309,10 @@ void Lexer::lexEscapedIdentifier() {
   while (advanceIfValidEscapedIdentifier(CurPtr, BufferEnd))
     ;
 
-  // If we have the terminating "`", it's an escaped identifier, unless it
-  // contained only operator characters.
-  if (*CurPtr == '`' &&
-      !isOperator(StringRef(IdentifierStart, CurPtr - IdentifierStart))) {
+  // If we have the terminating "`", it's an escaped/raw identifier, unless it
+  // contained only operator characters or was entirely whitespace.
+  StringRef IdStr(IdentifierStart, CurPtr - IdentifierStart);
+  if (*CurPtr == '`' && !isOperator(IdStr) && !isEntirelyWhitespace(IdStr)) {
     ++CurPtr;
     formEscapedIdentifierToken(Quote);
     return;
