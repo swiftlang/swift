@@ -5,18 +5,7 @@
 // RUN: split-file %s %t
 
 //#-- Prepare the Wasm macro plugin.
-// RUN: %swiftc_driver_plain \
-// RUN:   -swift-version 5 -static-stdlib -parse-as-library \
-// RUN:   -o %t/Plugin.wasm \
-// RUN:   -module-name MacroDefinition \
-// RUN:   %t/MacroDefinition.swift \
-// RUN:   %S/Inputs/wasm_plugin.swift \
-// RUN:   -g -target wasm32-unknown-wasi \
-// RUN:   -sdk %wasm-sdk-root/WASI.sdk \
-// RUN:   -resource-dir %wasm-sdk-root/swift.xctoolchain/usr/lib/swift_static \
-// RUN:   -Xcc --sysroot -Xcc %wasm-sdk-root/WASI.sdk \
-// RUN:   -Xcc -resource-dir -Xcc %wasm-sdk-root/swift.xctoolchain/usr/lib/swift_static/clang \
-// RUN:   -Xclang-linker -resource-dir -Xclang-linker %wasm-sdk-root/swift.xctoolchain/usr/lib/swift_static/clang
+// RUN: %swift-build-wasm-c-plugin %t/MacroDefinition.c -o %t/Plugin.wasm
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck \
@@ -43,14 +32,33 @@ func foo() {
   let _: Int = #constInt
 }
 
-//--- MacroDefinition.swift
-let mockPlugin = #"""
-[
-  {
-    "expect": {"expandFreestandingMacro": {
-               "macro": {"moduleName": "MacroDefinition", "typeName": "ConstMacro"},
-               "syntax": {"kind": "expression", "source": "#constInt"}}},
-    "response": {"expandMacroResult": {"expandedSource": "1", "diagnostics": []}}
-  }
-]
-"""#
+//--- MacroDefinition.c
+#include "Inputs/wasi_shim.h"
+
+_Noreturn static void swift_abort(const char *message) {
+  swift_puts(2, message);
+  wasi_proc_exit(1);
+}
+
+static void write_json(const char *json) {
+  wasi_size_t len = swift_strlen(json);
+  uint64_t len64 = (uint64_t)len;
+  swift_write(1, &len64, sizeof(len64));
+  swift_write(1, json, len);
+}
+
+int was_start_called = 0;
+int pump_calls = 0;
+
+__attribute__((export_name("_start")))
+void _start(void) {
+  if (was_start_called) swift_abort("_start called twice!");
+  was_start_called = 1;
+}
+
+__attribute__((export_name("swift_wasm_macro_v1_pump")))
+void pump(void) {
+  if (!was_start_called) swift_abort("_start not called!");
+  if (pump_calls++ != 0) swift_abort("expected pump to be called once");
+  write_json("{\"expandMacroResult\": {\"expandedSource\": \"1\", \"diagnostics\": []}}");
+}
