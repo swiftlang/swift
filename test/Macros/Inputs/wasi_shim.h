@@ -1,3 +1,6 @@
+// definitions from
+// https://github.com/WebAssembly/wasi-libc/blob/320bbbcced68ce8e564b0dc4c8f80a5a5ad21a9c/libc-bottom-half/headers/public/wasi/api.h
+
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
@@ -13,8 +16,6 @@ typedef struct wasi_ciovec_t {
   const uint8_t *buf;
   wasi_size_t buf_len;
 } wasi_ciovec_t;
-
-#define WASI_SIGNAL_ABRT (6)
 
 wasi_errno_t wasi_fd_write(
   wasi_fd_t fd,
@@ -34,13 +35,6 @@ _Noreturn void wasi_proc_exit(
   __import_name__("proc_exit")
 ));
 
-wasi_errno_t wasi_proc_raise(
-  wasi_signal_t sig
-) __attribute__((
-  __import_module__("wasi_snapshot_preview1"),
-  __import_name__("proc_raise")
-));
-
 // libc shims
 
 static inline wasi_size_t swift_strlen(const char *buf) {
@@ -55,6 +49,7 @@ static inline wasi_errno_t swift_write(int fd, const void *buf, wasi_size_t len)
   return wasi_fd_write(fd, &vec, 1, &nwritten);
 }
 
-static inline wasi_errno_t swift_puts(int fd, const char *buf) {
-  return swift_write(fd, buf, swift_strlen(buf));
+_Noreturn static inline void swift_abort(const char *message) {
+  swift_write(2, message, swift_strlen(message));
+  wasi_proc_exit(1);
 }
