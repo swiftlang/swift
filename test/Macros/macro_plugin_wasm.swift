@@ -35,11 +35,6 @@ func foo() {
 //--- MacroDefinition.c
 #include "Inputs/wasi_shim.h"
 
-_Noreturn static void swift_abort(const char *message) {
-  swift_puts(2, message);
-  wasi_proc_exit(1);
-}
-
 static void write_json(const char *json) {
   wasi_size_t len = swift_strlen(json);
   uint64_t len64 = (uint64_t)len;
