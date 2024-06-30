@@ -161,8 +161,8 @@ func test_outside(
 
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
-  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a non-isolated context}}
-  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can not be accessed from a non-isolated context}}
+  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a nonisolated context}}
+  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can not be accessed from a nonisolated context}}
 
   // ==== special properties (nonisolated, implicitly replicated)
   // the distributed actor's special fields may always be referred to
