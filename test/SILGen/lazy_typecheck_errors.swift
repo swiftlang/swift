@@ -61,3 +61,8 @@ public class DerivedFromNonExistent: NonExistent {
 
   public func method() {}
 }
+
+@inlinable public func hasErrorInBody() {
+  nonExistent()
+  // expected-error@-1 {{cannot find 'nonExistent' in scope}}
+}
