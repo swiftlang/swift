@@ -126,10 +126,7 @@ private struct DiagnoseDependence {
   }
 
   func reportUnknown(operand: Operand) {
-#if !os(Windows)
-    // TODO: https://github.com/apple/swift/issues/73252
-    standardError.write("Unknown use: \(operand)\n\(function)")
-#endif
+    log("Unknown use: \(operand)\n\(function)")
     reportEscaping(operand: operand)
   }
 
