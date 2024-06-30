@@ -231,7 +231,7 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 // FIXME: rdar://115752211 (deal with existing Swift modules that lack Copyable requirements)
 // the stdlib right now is not yet being compiled with NoncopyableGenerics
 func checkStdlibTypes(_ mo: borrowing MO) {
-  _ = "\(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
+  _ = "\(mo)" // expected-error {{cannot convert value of type 'MO' to expected argument type 'any Any.Type'}}
   let _: String = String(describing: mo) // expected-error {{no exact matches in call to initializer}}
 
   let _: [MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
@@ -241,12 +241,12 @@ func checkStdlibTypes(_ mo: borrowing MO) {
   let _: [String: MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       ["hello" : MO()]  // expected-error{{type '(String, MO)' containing noncopyable element is not supported}}
 
-  _ = [MO()] // expected-error {{generic struct 'Array' requires that 'MO' conform to 'Copyable'}}
+  _ = [MO()] // expected-error {{type of expression is ambiguous without a type annotation}}
 
   let _: Array<MO> = .init() // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   _ = [MO]() // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
-  let _: String = "hello \(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
+  let _: String = "hello \(mo)" // expected-error {{cannot convert value of type 'MO' to expected argument type 'any Any.Type'}}
 }
 
 func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHashable) {

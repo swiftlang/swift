@@ -20,6 +20,7 @@ if (true ꝸꝸꝸ false) {} // expected-note {{identifier 'ꝸꝸꝸ' contains 
 // expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{binary operator '==' cannot be applied to operands of type '(Int, Int)' and 'Int'}}
 if (5 ‒ 5) == 0 {} // expected-note {{unicode character '‒' (Figure Dash) looks similar to '-' (Hyphen Minus); did you mean to use '-' (Hyphen Minus)?}} {{7-10=-}}
+// expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (Int, Int)}}
 
 // GREEK QUESTION MARK (which looks like a semicolon) 
 print("A"); print("B")

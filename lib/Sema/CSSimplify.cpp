@@ -2726,7 +2726,7 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
                                ConstraintLocatorBuilder locator) {
   assert(requirementType);
 
-  unsigned impact = 1;
+  unsigned impact = 2;
   auto anchor = locator.getAnchor();
   if (!anchor)
     return impact;

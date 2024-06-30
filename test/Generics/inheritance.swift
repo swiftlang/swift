@@ -12,7 +12,7 @@ class Other { }
 
 func acceptA(_ a: A) { }
 
-func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) { // expected-note {{where 'T' = 'Other'}}
+func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) {
   var obj = obji, a = ai, b = bi
   // Method access
   obj.foo()
@@ -39,7 +39,7 @@ func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) { // expected-note {{where 'T' = 'Ot
 func call_f0(_ a: A, b: B, other: Other) {
   f0(a, a, b)
   f0(b, a, b)
-  f0(other, a, b) // expected-error{{global function 'f0' requires that 'Other' inherit from 'A'}}
+  f0(other, a, b) // expected-error{{type of expression is ambiguous without a type annotation}}
 }
 
 class X<T> {

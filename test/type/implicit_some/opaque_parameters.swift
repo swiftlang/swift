@@ -86,5 +86,8 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error {{conflicting arguments to generic parameter 'Collection<T>' ('Set<Int>' vs. 'Set<String>')}}
+  // expected-error@-1 {{conflicting arguments to generic parameter 'Element' ('String' vs. 'Int')}}
+  // expected-error@-2 {{conflicting arguments to generic parameter 'Collection<T>' ('[Int]' vs. '[String]')}}
+  // expected-error@-3 {{conflicting arguments to generic parameter 'T' ('Int' vs. 'String')}}
 }

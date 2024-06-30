@@ -2,8 +2,8 @@
 
 // rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
 func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {
-  AnySequence(arr.map { $0 })
-  // expected-error@-1 {{initializer 'init(_:)' requires the types '(question: String, answer: Int)' and '(q: String, a: Int)' be equivalent}}
+  AnySequence(arr.map { $0 }) // expected-note {{arguments to generic parameter 'Element' ('(q: String, a: Int)' and '(question: String, answer: Int)') are expected to be equal}}
+  // expected-error@-1 {{cannot convert value of type '[(q: String, a: Int)]' to expected argument type '[(question: String, answer: Int)]'}}
 }
 
 // Another case for rdar://85263844
@@ -28,6 +28,6 @@ extension S4 where T == (outer: Int, y: Int) {
 }
 
 public func rdar85263844_2(_ x: [Int]) -> S4<(outer: Int, y: Int)> {
-  // FIXME: Bad error message.
-  S4(x.map { (inner: $0, y: $0) }) // expected-error {{type of expression is ambiguous without a type annotation}}
+  S4(x.map { (inner: $0, y: $0) }) // expected-error {{cannot convert value of type '[(inner: Int, y: Int)]' to expected argument type '[(outer: Int, y: Int)]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('(inner: Int, y: Int)' and '(outer: Int, y: Int)') are expected to be equal}}
 }

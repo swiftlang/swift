@@ -24,13 +24,13 @@ class SomeMethods {
 
 // Test self-conformance
 
-func takesObjCClass<T : ObjCClass>(_: T) {} // expected-note {{where 'T' = 'any ObjCProtocol'}}
+func takesObjCClass<T : ObjCClass>(_: T) {}
 func takesObjCProtocol<T : ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCClass'}}
 func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'any ObjCProtocol'}} expected-note {{where 'T' = 'ObjCClass'}}
 
 func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProtocol) {
   takesObjCClass(c)
-  takesObjCClass(p) // expected-error {{global function 'takesObjCClass' requires that 'any ObjCProtocol' inherit from 'ObjCClass'}}
+  takesObjCClass(p) // expected-error {{type of expression is ambiguous without a type annotation}}
   takesObjCClass(cp)
 
   takesObjCProtocol(c) // expected-error {{global function 'takesObjCProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}

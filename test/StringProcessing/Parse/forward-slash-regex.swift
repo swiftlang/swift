@@ -130,7 +130,7 @@ _ = /x/.../y/
 // expected-error@-2 {{'/' is not a postfix unary operator}}
 
 _ = /x/...
-// expected-error@-1 {{unary operator '...' cannot be applied to an operand of type 'Regex<Substring>'}}
+// expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'UnboundedRange_'}}
 
 do {
   _ = /x /...
@@ -191,10 +191,10 @@ do {
   _ = [/abc /: /abc /]
   // expected-error@-1:14 {{expected expression after operator}}
 }
-_ = [/abc/:/abc/] // expected-error {{generic struct 'Dictionary' requires that 'Regex<Substring>' conform to 'Hashable'}}
-_ = [/abc/ : /abc/] // expected-error {{generic struct 'Dictionary' requires that 'Regex<Substring>' conform to 'Hashable'}}
-_ = [/abc/:/abc/] // expected-error {{generic struct 'Dictionary' requires that 'Regex<Substring>' conform to 'Hashable'}}
-_ = [/abc/: /abc/] // expected-error {{generic struct 'Dictionary' requires that 'Regex<Substring>' conform to 'Hashable'}}
+_ = [/abc/:/abc/] // expected-error {{type of expression is ambiguous without a type annotation}}
+_ = [/abc/ : /abc/] // expected-error {{type of expression is ambiguous without a type annotation}}
+_ = [/abc/:/abc/] // expected-error {{type of expression is ambiguous without a type annotation}}
+_ = [/abc/: /abc/] // expected-error {{type of expression is ambiguous without a type annotation}}
 _ = (/abc/, /abc/)
 _ = ((/abc/))
 

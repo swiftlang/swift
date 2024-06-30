@@ -618,7 +618,6 @@ extension UnfulfillableGenericRequirements {
   func method2() where A: Sequence, A.Element == Self {}
   func method3<U>(_: U) -> U {}
   func method4<U>(_: U) where U : Class<Self.A> {}
-  // expected-note@-1 3 {{where 'U' = 'Bool'}}
   func method5<U>(_: U) where U: Sequence, Self == U.Element {}
   // expected-note@-1 {{where 'U' = 'Bool'}}
 
@@ -639,8 +638,7 @@ do {
   // expected-error@-2 {{instance method 'method2()' requires that 'Self.A' conform to 'Sequence'}}
   _ = exist.method3(false) // ok
   exist.method4(false)
-  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
-  // expected-error@-2 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-error@-1 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
   exist.method5(false)
   // expected-error@-1 {{instance method 'method5' requires that 'Bool' conform to 'Sequence'}}
   // expected-error@-2 {{member 'method5' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
@@ -670,10 +668,9 @@ do {
   let exist2: any UnfulfillableGenericRequirementsDerived2
 
   exist1.method4(false)
-  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>}}
+  // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
   exist2.method4(false)
   // expected-error@-1 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived2'; consider using a generic constraint instead}}
-  // expected-error@-2 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
 }
 protocol UnfulfillableGenericRequirementsDerived3: UnfulfillableGenericRequirements where A: Sequence, A.Element: Sequence {}
 do {

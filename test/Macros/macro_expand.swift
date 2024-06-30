@@ -536,7 +536,7 @@ struct HasEqualsSelf3 {
 struct HasEqualsSelf4 {
 }
 
-protocol SelfEqualsBoolProto { // expected-note 4{{where 'Self' =}}
+protocol SelfEqualsBoolProto {
   static func ==(lhs: Self, rhs: Bool) -> Bool
 }
 
@@ -563,10 +563,10 @@ func testHasEqualsSelf(
 ) {
 #if TEST_DIAGNOSTICS
   // Global operator lookup doesn't find member operators introduced by macros.
-  _ = (x == true) // expected-error{{referencing operator function '=='}}
-  _ = (y == true) // expected-error{{referencing operator function '=='}}
-  _ = (z == true) // expected-error{{referencing operator function '=='}}
-  _ = (w == true) // expected-error{{referencing operator function '=='}}
+  _ = (x == true) // expected-error{{cannot convert value of type 'HasEqualsSelf' to expected argument type 'Bool'}}
+  _ = (y == true) // expected-error{{cannot convert value of type 'HasEqualsSelf2' to expected argument type 'Bool'}}
+  _ = (z == true) // expected-error{{cannot convert value of type 'HasEqualsSelf3' to expected argument type 'Bool'}}
+  _ = (w == true) // expected-error{{cannot convert value of type 'HasEqualsSelf4' to expected argument type 'Bool'}}
 #endif
 
   // These should be found through the protocol.

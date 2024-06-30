@@ -1148,7 +1148,7 @@ func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   // Notes, attached to declarations, explain that there is a difference between Array.init(_:) and
   // RangeReplaceableCollection.init(_:) which are both applicable in this case.
-  let array = [Int](sequence)
+  let array = [Int](sequence) // expected-note {{candidate expects value of type 'AnyObject' for parameter #1 (got 'AnySequence<[Int]>')}}
   // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
@@ -1555,19 +1555,19 @@ func testNilCoalescingOperatorRemoveFix() {
   let _ = "" /* This is a comment */ ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{13-43=}}
 
   let _ = "" // This is a comment
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1554:13-1555:10=}}
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:13-+0:10=}}
 
   let _ = "" // This is a comment
-    /*
-     * The blank line below is part of the test case, do not delete it
-     */
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1557:13-1561:10=}}
+  /*
+   * The blank line below is part of the test case, do not delete it
+   */
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-4:13-+0:10=}}
 
-  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1564:9=}}
+  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-+1:9=}}
       "").isEmpty {}
 
   if ("" // This is a comment
-      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1566:9-1567:12=}}
+      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
 // https://github.com/apple/swift/issues/74617
