@@ -1293,3 +1293,197 @@ bb3:
   %t = tuple ()
   return %t : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_storeborrow_trivial_none_to_lexical_storeborrow_only : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_storeborrow_trivial_none_to_lexical_storeborrow_only'
+sil [ossa] @test_storeborrow_trivial_none_to_lexical_storeborrow_only : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %sbi = store_borrow %none to  %1 : $*FakeOptional<Klass>
+  end_borrow %sbi : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_storeborrow_trivial_none_to_lexical_optional1'
+sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %sbi = store_borrow %none to  %1 : $*FakeOptional<Klass>
+  %ld = load [copy] %sbi : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  end_borrow %sbi : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_storeborrow_trivial_none_to_lexical_optional2'
+sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %sbi = store_borrow %none to  %1 : $*FakeOptional<Klass>
+  %ld = load [copy] %sbi : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  br bb1
+
+bb1:
+  end_borrow %sbi : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_storeonly : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_storeonly'
+sil [ossa] @test_store_trivial_none_to_lexical_storeonly : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [trivial] %1 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional1'
+sil [ossa] @test_store_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [trivial] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional2'
+sil [ossa] @test_store_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [trivial] %1 : $*FakeOptional<Klass>
+  br bb1
+
+bb1:
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional3 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional3'
+sil [ossa] @test_store_trivial_none_to_lexical_optional3 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional4 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional4'
+sil [ossa] @test_store_trivial_none_to_lexical_optional4 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none1 to [init] %1 : $*FakeOptional<Klass>
+  %none2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none2 to [assign] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional5 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional5'
+sil [ossa] @test_store_trivial_none_to_lexical_optional5 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  store %none to [assign] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional6 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional6'
+sil [ossa] @test_store_trivial_none_to_lexical_optional6 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  destroy_addr %1 : $*FakeOptional<Klass>
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional7 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional7'
+sil [ossa] @test_store_trivial_none_to_lexical_optional7 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb1
+bb1:
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  destroy_addr %1 : $*FakeOptional<Klass>
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @test_store_trivial_none_to_lexical_optional8 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb1
+bb1:
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}

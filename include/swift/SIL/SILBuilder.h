@@ -1707,9 +1707,11 @@ public:
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {
-    return createEnum(Loc, Operand, Element, Ty,
-                      Operand ? Operand->getOwnershipKind()
-                              : ValueOwnershipKind(OwnershipKind::None));
+    return createEnum(
+        Loc, Operand, Element, Ty,
+        Operand ? getSILValueOwnership({Operand}, Ty)
+                : (Ty.isMoveOnly() ? ValueOwnershipKind(OwnershipKind::Owned)
+                                   : ValueOwnershipKind(OwnershipKind::None)));
   }
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
