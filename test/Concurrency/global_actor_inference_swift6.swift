@@ -73,7 +73,7 @@ public struct WrapperOnMainActor<Wrapped> {
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -86,8 +86,8 @@ struct HasMainActorWrappedProp {
   var computedProp: Int { 0 }
 
   nonisolated func testErrors() {
-    _ = thing // expected-error {{main actor-isolated property 'thing' can not be referenced from a non-isolated context}}
-    _ = _thing.wrappedValue // expected-error {{main actor-isolated property 'wrappedValue' can not be referenced from a non-isolated context}}
+    _ = thing // expected-error {{main actor-isolated property 'thing' can not be referenced from a nonisolated context}}
+    _ = _thing.wrappedValue // expected-error {{main actor-isolated property 'wrappedValue' can not be referenced from a nonisolated context}}
 
     _ = _thing
     _ = _thing.accessCount
@@ -104,10 +104,10 @@ struct HasWrapperOnActor {
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
-    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a nonisolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a nonisolated context}}
     _ = _synced
-    _ = _synced.wrappedValue // expected-error{{main actor-isolated property 'wrappedValue' can not be referenced from a non-isolated context}}
+    _ = _synced.wrappedValue // expected-error{{main actor-isolated property 'wrappedValue' can not be referenced from a nonisolated context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -128,7 +128,7 @@ struct Carbon {
   @IntWrapper var atomicWeight: Int // expected-note {{property declared here}}
 
   nonisolated func getWeight() -> Int {
-    return atomicWeight // expected-error {{main actor-isolated property 'atomicWeight' can not be referenced from a non-isolated context}}
+    return atomicWeight // expected-error {{main actor-isolated property 'atomicWeight' can not be referenced from a nonisolated context}}
   }
 }
 

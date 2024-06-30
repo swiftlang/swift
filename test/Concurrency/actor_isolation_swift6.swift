@@ -92,6 +92,6 @@ class MainActorIsolated {
 }
 
 nonisolated func accessAcrossActors() {
-  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a nonisolated context}}
   let _ = MainActorIsolated.shared
 }
