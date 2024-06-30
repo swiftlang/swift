@@ -2293,6 +2293,14 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   return action(info);
 }
 
+static void addModuleAliasesFromExplicitSwiftModuleMap(
+    ASTContext &Ctx, llvm::StringMap<std::string> ModuleAliases) {
+  for (auto &entry : ModuleAliases) {
+    Ctx.addModuleAlias(/*moduleAlias=*/entry.getKey(),
+                       /*realModule=*/entry.getValue());
+  }
+}
+
 struct ExplicitSwiftModuleLoader::Implementation {
   ASTContext &Ctx;
   llvm::BumpPtrAllocator Allocator;
@@ -2302,6 +2310,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
   void parseSwiftExplicitModuleMap(StringRef fileName) {
     ExplicitModuleMapParser parser(Allocator);
     llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
+    llvm::StringMap<std::string> ModuleAliases;
     // Load the input file.
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
         llvm::MemoryBuffer::getFile(fileName);
@@ -2313,7 +2322,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
 
     auto hasError = parser.parseSwiftExplicitModuleMap(
         (*fileBufOrErr)->getMemBufferRef(), ExplicitModuleMap,
-        ExplicitClangModuleMap);
+        ExplicitClangModuleMap, ModuleAliases);
 
     if (hasError)
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
@@ -2340,6 +2349,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
                 .str());
       }
     }
+    addModuleAliasesFromExplicitSwiftModuleMap(Ctx, ModuleAliases);
   }
 
   void addCommandLineExplicitInputs(
@@ -2572,6 +2582,7 @@ struct ExplicitCASModuleLoader::Implementation {
   void parseSwiftExplicitModuleMap(StringRef ID) {
     ExplicitModuleMapParser parser(Allocator);
     llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
+    llvm::StringMap<std::string> ModuleAliases;
     auto buf = loadBuffer(ID);
     if (!buf) {
       Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
@@ -2587,7 +2598,8 @@ struct ExplicitCASModuleLoader::Implementation {
         llvm::MemoryBuffer::getFile(ID);
 
     auto hasError = parser.parseSwiftExplicitModuleMap(
-        (*buf)->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap);
+        (*buf)->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap,
+        ModuleAliases);
 
     if (hasError)
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
@@ -2626,6 +2638,7 @@ struct ExplicitCASModuleLoader::Implementation {
         extraClangArgs.push_back(*cachePath);
       }
     }
+    addModuleAliasesFromExplicitSwiftModuleMap(Ctx, ModuleAliases);
   }
 
   void addCommandLineExplicitInputs(
