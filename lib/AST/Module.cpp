@@ -1535,31 +1535,36 @@ void ModuleDecl::ImportCollector::collect(
 }
 
 static void
-collectExportedImports(const ModuleDecl *module,
+collectExportedImports(const ModuleDecl *topLevelModule,
                        ModuleDecl::ImportCollector &importCollector) {
-  for (const FileUnit *file : module->getFiles()) {
-    if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
-      if (source->hasImports()) {
-        for (const auto &import : source->getImports()) {
-          if (import.options.contains(ImportFlags::Exported) &&
-              import.docVisibility.value_or(AccessLevel::Public) >=
-                  importCollector.minimumDocVisibility) {
-            importCollector.collect(import.module);
-            collectExportedImports(import.module.importedModule,
-                                   importCollector);
+  SmallVector<const ModuleDecl *> stack;
+  stack.push_back(topLevelModule);
+  while (!stack.empty()) {
+    const ModuleDecl *module = stack.pop_back_val();
+
+    for (const FileUnit *file : module->getFiles()) {
+      if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
+        if (source->hasImports()) {
+          for (const auto &import : source->getImports()) {
+            if (import.options.contains(ImportFlags::Exported) &&
+                import.docVisibility.value_or(AccessLevel::Public) >=
+                importCollector.minimumDocVisibility) {
+              importCollector.collect(import.module);
+              stack.push_back(import.module.importedModule);
+            }
           }
         }
-      }
-    } else {
-      SmallVector<ImportedModule, 8> exportedImports;
-      file->getImportedModules(exportedImports,
-                               ModuleDecl::ImportFilterKind::Exported);
-      for (const auto &im : exportedImports) {
-        // Skip collecting the underlying clang module as we already have the relevant import.
-        if (module->isClangOverlayOf(im.importedModule))
-          continue;
-        importCollector.collect(im);
-        collectExportedImports(im.importedModule, importCollector);
+      } else {
+        SmallVector<ImportedModule, 8> exportedImports;
+        file->getImportedModules(exportedImports,
+                                 ModuleDecl::ImportFilterKind::Exported);
+        for (const auto &im : exportedImports) {
+          // Skip collecting the underlying clang module as we already have the relevant import.
+          if (module->isClangOverlayOf(im.importedModule))
+            continue;
+          importCollector.collect(im);
+          stack.push_back(im.importedModule);
+        }
       }
     }
   }
