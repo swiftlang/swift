@@ -864,8 +864,8 @@ static SILValue tryRewriteToPartialApplyStack(
     bool origIsUnusedDuringClosureLifetime = true;
 
     class OrigUnusedDuringClosureLifetimeWalker
-        : public TransitiveAddressWalker<
-              OrigUnusedDuringClosureLifetimeWalker> {
+        : public TransitiveAddressWalker<OrigUnusedDuringClosureLifetimeWalker,
+                                         DoNotWalkIntoPartialApply> {
       SSAPrunedLiveness &closureLiveness;
       bool &origIsUnusedDuringClosureLifetime;
     public:

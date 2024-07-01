@@ -32,6 +32,7 @@
 namespace swift {
 
 class FullApplySite;
+struct PrunedLivenessBoundary;
 
 //===----------------------------------------------------------------------===//
 //                                 ApplySite
@@ -562,6 +563,9 @@ public:
   /// insertAfterApplication.
   void insertAfterInvocation(function_ref<void(SILBuilder &)> func) const;
 
+  void
+  visitFinalApplications(function_ref<void(SILInstruction *)> visitor) const;
+
   /// Pass a builder with insertion points that are guaranteed to be immediately
   /// after this apply site has been applied.
   ///
@@ -574,6 +578,10 @@ public:
   /// abort_apply rather than an insertion point right after the
   /// begin_apply. For such functionality, please invoke insertAfterInvocation.
   void insertAfterApplication(function_ref<void(SILBuilder &)> func) const;
+
+  void computeApplicationBoundary(
+      PrunedLivenessBoundary &boundary,
+      SmallVectorImpl<SILBasicBlock *> &discoveredBlocks) const;
 
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.

@@ -2706,11 +2706,10 @@ sil [ossa] @test_partial_apply_3_loadable_heap : $() -> () {
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[STORAGE_LIFETIME:%[^,]+]] = store_borrow [[LIFETIME]] to [[STACK]]
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW]]([[STORAGE_LIFETIME]])
-// FIXME: These end_borrows must be _after_ the apply of the closure!
+// CHECK:         apply [[CLOSURE]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK:         end_borrow [[STORAGE_LIFETIME]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         dealloc_stack [[STACK]]
-// CHECK:         apply [[CLOSURE]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK:         destroy_value [[CLOSURE]] : $@noescape @callee_guaranteed () -> ()
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'test_partial_apply_4_loadable_stack'

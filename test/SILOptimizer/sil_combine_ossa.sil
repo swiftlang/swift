@@ -5434,3 +5434,21 @@ bb1(%10 : @owned $Optional<@callee_guaranteed () -> ()>, %11 : @guaranteed $Opti
   %12 = tuple ()
   return %12 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_sink_mark_dependence_beyond_base_lifetime : {{.*}} {
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'dont_sink_mark_dependence_beyond_base_lifetime'
+sil [ossa] @dont_sink_mark_dependence_beyond_base_lifetime : $@convention(thin) (@guaranteed C, @owned C) -> () {
+bb0(%c1 : @guaranteed $C, %c2 : @owned $C):
+  %stack = alloc_stack $C
+  %addr = store_borrow %c1 to %stack : $*C
+  %c2d = mark_dependence [nonescaping] %c2 : $C on %addr : $*C
+  br exit
+exit:
+  end_borrow %addr : $*C
+  destroy_value %c2d : $C
+  dealloc_stack %stack : $*C
+  %retval = tuple ()
+  return %retval : $()
+}

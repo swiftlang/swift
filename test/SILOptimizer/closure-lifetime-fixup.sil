@@ -383,3 +383,27 @@ bb2(%19 : @owned $any Error):
   dealloc_stack %5 : $*Int
   throw %19 : $any Error
 }
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+// The dealloc_stack must be after the apply.
+// CHECK-LABEL: sil [ossa] @dealloc_after_apply : {{.*}} {
+// CHECK:         partial_apply
+// CHECK:         apply
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'dealloc_after_apply'
+sil [ossa] @dealloc_after_apply : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%1 : $*Int):
+  %5 = alloc_stack $Int
+  copy_addr %1 to [init] %5 : $*Int
+  %7 = partial_apply [callee_guaranteed] undef(%5) : $@convention(thin) (@in_guaranteed Int) -> ()
+  %8 = convert_escape_to_noescape [not_guaranteed] %7 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %22 = apply undef(%8) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %8 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %7 : $@callee_guaranteed () -> ()
+  dealloc_stack %5 : $*Int
+  %retval = tuple ()
+  return %retval : $()
+}
