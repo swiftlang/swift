@@ -129,37 +129,6 @@ std::string toolchains::Darwin::sanitizerRuntimeLibName(StringRef Sanitizer,
       .str();
 }
 
-void
-toolchains::Darwin::addPluginArguments(const ArgList &Args,
-                                       ArgStringList &Arguments) const {
-  SmallString<64> pluginPath;
-  auto programPath = getDriver().getSwiftProgramPath();
-  CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
-      programPath, /*shared=*/true, pluginPath);
-
-  // In-process plugin server path.
-  auto inProcPluginServerPath = pluginPath;
-  llvm::sys::path::append(inProcPluginServerPath, "host",
-                          "libSwiftInProcPluginServer.dylib");
-  Arguments.push_back("-in-process-plugin-server-path");
-  Arguments.push_back(Args.MakeArgString(inProcPluginServerPath));
-
-  // Default plugin path.
-  auto defaultPluginPath = pluginPath;
-  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(defaultPluginPath));
-
-  // Local plugin path.
-  llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
-  llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
-  llvm::sys::path::append(pluginPath, "local", "lib");
-  llvm::sys::path::append(pluginPath, "swift");
-  llvm::sys::path::append(pluginPath, "host", "plugins");
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(pluginPath));
-}
-
 static void addLinkRuntimeLibRPath(const ArgList &Args,
                                    ArgStringList &Arguments,
                                    StringRef DarwinLibName,
