@@ -5381,6 +5381,11 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
+enum PoisonRefs_t : bool {
+  DontPoisonRefs = false,
+  PoisonRefs = true,
+};
+
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
@@ -8805,7 +8810,8 @@ class DestroyValueInst
   friend class SILBuilder;
   USE_SHARED_UINT8;
 
-  DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand, bool poisonRefs)
+  DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                   PoisonRefs_t poisonRefs)
       : UnaryInstructionBase(DebugLoc, operand) {
     setPoisonRefs(poisonRefs);
   }
@@ -8824,12 +8830,14 @@ public:
   /// transformations keep the poison operation associated with the destroy
   /// point. After OSSA, these are lowered to 'debug_values [poison]'
   /// instructions, after which the Onone pipeline should avoid code motion.
-  bool poisonRefs() const { return sharedUInt8().DestroyValueInst.poisonRefs; }
+  PoisonRefs_t poisonRefs() const {
+    return PoisonRefs_t(sharedUInt8().DestroyValueInst.poisonRefs);
+  }
 
-  void setPoisonRefs(bool poisonRefs = true) {
+  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
     sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
   }
-  
+
   /// If the value being destroyed is a stack allocation of a nonescaping
   /// closure, then return the PartialApplyInst that allocated the closure.
   PartialApplyInst *getNonescapingClosureAllocation() const;

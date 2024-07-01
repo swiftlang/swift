@@ -1442,8 +1442,9 @@ public:
                       ExplicitCopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
-  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
-                                       bool poisonRefs = false) {
+  DestroyValueInst *
+  createDestroyValue(SILLocation Loc, SILValue operand,
+                     PoisonRefs_t poisonRefs = DontPoisonRefs) {
     assert(getFunction().hasOwnership());
     assert(isLoadableOrOpaque(operand->getType()));
     assert(!operand->getType().isTrivial(getFunction()) &&

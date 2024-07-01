@@ -3356,7 +3356,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILOptional(poisonRefs, *this, "poison")
         || parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDestroyValue(InstLoc, Val, poisonRefs);
+    ResultVal = B.createDestroyValue(InstLoc, Val, PoisonRefs_t(poisonRefs));
     break;
   }
   case SILInstructionKind::BeginCOWMutationInst: {

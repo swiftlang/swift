@@ -2322,13 +2322,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::DestroyValueInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    unsigned poisonRefs = Attr;
+    PoisonRefs_t poisonRefs = PoisonRefs_t(Attr & 0x1);
     ResultInst = Builder.createDestroyValue(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
-        poisonRefs != 0);
+        poisonRefs);
     break;
   }
 
