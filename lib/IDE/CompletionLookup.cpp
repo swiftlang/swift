@@ -1765,6 +1765,15 @@ void CompletionLookup::addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
   builder.setAssociatedDecl(PGD);
 }
 
+void CompletionLookup::addBuiltinMemberRef(StringRef Name,
+                                           Type TypeAnnotation) {
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
+  addLeadingDot(Builder);
+  Builder.addBaseName(Name);
+  addTypeAnnotation(Builder, TypeAnnotation);
+}
+
 void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo,
@@ -2277,23 +2286,32 @@ bool CompletionLookup::tryTupleExprCompletions(Type ExprType) {
 
   unsigned Index = 0;
   for (auto TupleElt : TT->getElements()) {
-    CodeCompletionResultBuilder Builder = makeResultBuilder(
-        CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
-    addLeadingDot(Builder);
+    auto Ty = TupleElt.getType();
     if (TupleElt.hasName()) {
-      Builder.addBaseName(TupleElt.getName().str());
+      addBuiltinMemberRef(TupleElt.getName().str(), Ty);
     } else {
       llvm::SmallString<4> IndexStr;
       {
         llvm::raw_svector_ostream OS(IndexStr);
         OS << Index;
       }
-      Builder.addBaseName(IndexStr.str());
+      addBuiltinMemberRef(IndexStr, Ty);
     }
-    addTypeAnnotation(Builder, TupleElt.getType());
     ++Index;
   }
   return true;
+}
+
+void CompletionLookup::tryFunctionIsolationCompletion(Type ExprType) {
+  auto *FT = ExprType->getAs<FunctionType>();
+  if (!FT || !FT->getIsolation().isErased())
+    return;
+
+  // The type of `.isolation` is `(any Actor)?`
+  auto *actorProto = Ctx.getProtocol(KnownProtocolKind::Actor);
+  auto memberTy = OptionalType::get(actorProto->getDeclaredExistentialType());
+
+  addBuiltinMemberRef(Ctx.Id_isolation.str(), memberTy);
 }
 
 bool CompletionLookup::tryFunctionCallCompletions(
@@ -2373,6 +2391,9 @@ bool CompletionLookup::tryUnwrappedCompletions(Type ExprType, bool isIUO) {
     }
     if (NumBytesToEraseForOptionalUnwrap <=
         CodeCompletionResult::MaxNumBytesToErase) {
+      // Add '.isolation' to @isolated(any) functions.
+      tryFunctionIsolationCompletion(Unwrapped);
+
       if (!tryTupleExprCompletions(Unwrapped)) {
         lookupVisibleMemberDecls(*this, Unwrapped, DotLoc,
                                  CurrDeclContext,
@@ -2448,6 +2469,10 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
     ExprType = OptionalType::get(ExprType);
 
   // Handle special cases
+
+  // Add '.isolation' to @isolated(any) functions.
+  tryFunctionIsolationCompletion(ExprType);
+
   bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
   if (tryFunctionCallCompletions(ExprType, IsDeclUnapplied ? VD : nullptr))
     return;
