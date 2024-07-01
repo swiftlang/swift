@@ -700,7 +700,7 @@ repositories.
 
     cross_repos_pr = {}
     if github_comment:
-        regex_pr = r'(?:apple/|swiftlang/)([-a-zA-Z0-9_]+/pull/\d+|[-a-zA-Z0-9_]+#\d+)'
+        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+|apple/[-a-zA-Z0-9_]+#\d+|swiftlang/[-a-zA-Z0-9_]+/pull/\d+|swiftlang/[-a-zA-Z0-9_]+#\d+)'
         repos_with_pr = re.findall(regex_pr, github_comment)
         print("Found related pull requests:", str(repos_with_pr))
         repos_with_pr = [pr.replace('/pull/', '#') for pr in repos_with_pr]
