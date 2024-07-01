@@ -44,24 +44,6 @@ std::string toolchains::Windows::sanitizerRuntimeLibName(StringRef Sanitizer,
       .str();
 }
 
-void
-toolchains::Windows::addPluginArguments(const ArgList &Args,
-                                        ArgStringList &Arguments) const {
-  SmallString<261> LibraryPath = StringRef(getDriver().getSwiftProgramPath());
-  llvm::sys::path::remove_filename(LibraryPath); // Remove `swift`
-
-  // In-process plugin server path.
-  SmallString<261> InProcPluginServerPath = LibraryPath;
-  llvm::sys::path::append(InProcPluginServerPath,
-                          "SwiftInProcPluginServer.dll");
-  Arguments.push_back("-in-process-plugin-server-path");
-  Arguments.push_back(Args.MakeArgString(InProcPluginServerPath));
-
-  // Default plugin path.
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(LibraryPath));
-}
-
 ToolChain::InvocationInfo
 toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                                          const JobContext &context) const {
