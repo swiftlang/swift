@@ -10,9 +10,9 @@ var a = 10 // expected-note 2 {{var declared here}}
 
 // expected-note@+1 3{{add '@MainActor' to make global function 'nonIsolatedSync()' part of global actor 'MainActor'}}
 func nonIsolatedSync() {
-    print(a) // expected-error {{main actor-isolated var 'a' can not be referenced from a non-isolated context}}
-    a = a + 10 // expected-error{{main actor-isolated var 'a' can not be referenced from a non-isolated context}}
-  // expected-error@-1{{main actor-isolated var 'a' can not be mutated from a non-isolated context}}
+    print(a) // expected-error {{main actor-isolated var 'a' can not be referenced from a nonisolated context}}
+    a = a + 10 // expected-error{{main actor-isolated var 'a' can not be referenced from a nonisolated context}}
+  // expected-error@-1{{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
 }
 
 @MainActor
@@ -23,7 +23,7 @@ func isolatedSync() {
 
 func nonIsolatedAsync() async {
   await print(a)
-  a = a + 10 // expected-error{{main actor-isolated var 'a' can not be mutated from a non-isolated context}}
+  a = a + 10 // expected-error{{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
   // expected-note@-1{{property access is 'async'}}
   // expected-error@-2{{expression is 'async' but is not marked with 'await'}}
 }

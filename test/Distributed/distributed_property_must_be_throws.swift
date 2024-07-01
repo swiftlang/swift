@@ -29,7 +29,7 @@ func test(da: MyDistributedActor) async throws {
 }
 
 func testSyncFunc(da: MyDistributedActor) throws {
-  _ = da.accessMe // expected-error{{actor-isolated distributed property 'accessMe' can not be referenced from a non-isolated context}}
+  _ = da.accessMe // expected-error{{actor-isolated distributed property 'accessMe' can not be referenced from a nonisolated context}}
   // expected-error@-1{{property access can throw but is not marked with 'try'}}
   // expected-note@-2{{did you mean to use 'try'?}}
   // expected-note@-3{{did you mean to handle error as optional value?}}
