@@ -2301,6 +2301,18 @@ bool CompletionLookup::tryTupleExprCompletions(Type ExprType) {
   return true;
 }
 
+void CompletionLookup::tryFunctionIsolationCompletion(Type ExprType) {
+  auto *FT = ExprType->getAs<FunctionType>();
+  if (!FT || !FT->getIsolation().isErased())
+    return;
+
+  // The type of `.isolation` is `(any Actor)?`
+  auto *actorProto = Ctx.getProtocol(KnownProtocolKind::Actor);
+  auto memberTy = OptionalType::get(actorProto->getDeclaredExistentialType());
+
+  addBuiltinMemberRef(Ctx.Id_isolation.str(), memberTy);
+}
+
 bool CompletionLookup::tryFunctionCallCompletions(
     Type ExprType, const ValueDecl *VD,
     std::optional<SemanticContextKind> SemanticContext) {
@@ -2378,6 +2390,9 @@ bool CompletionLookup::tryUnwrappedCompletions(Type ExprType, bool isIUO) {
     }
     if (NumBytesToEraseForOptionalUnwrap <=
         CodeCompletionResult::MaxNumBytesToErase) {
+      // Add '.isolation' to @isolated(any) functions.
+      tryFunctionIsolationCompletion(Unwrapped);
+
       if (!tryTupleExprCompletions(Unwrapped)) {
         lookupVisibleMemberDecls(*this, Unwrapped, DotLoc,
                                  CurrDeclContext,
@@ -2453,6 +2468,10 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
     ExprType = OptionalType::get(ExprType);
 
   // Handle special cases
+
+  // Add '.isolation' to @isolated(any) functions.
+  tryFunctionIsolationCompletion(ExprType);
+
   bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
   if (tryFunctionCallCompletions(ExprType, IsDeclUnapplied ? VD : nullptr))
     return;
