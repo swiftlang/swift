@@ -1764,6 +1764,15 @@ void CompletionLookup::addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
   builder.setAssociatedDecl(PGD);
 }
 
+void CompletionLookup::addBuiltinMemberRef(StringRef Name,
+                                           Type TypeAnnotation) {
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
+  addLeadingDot(Builder);
+  Builder.addBaseName(Name);
+  addTypeAnnotation(Builder, TypeAnnotation);
+}
+
 void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo,
@@ -2276,20 +2285,17 @@ bool CompletionLookup::tryTupleExprCompletions(Type ExprType) {
 
   unsigned Index = 0;
   for (auto TupleElt : TT->getElements()) {
-    CodeCompletionResultBuilder Builder = makeResultBuilder(
-        CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
-    addLeadingDot(Builder);
+    auto Ty = TupleElt.getType();
     if (TupleElt.hasName()) {
-      Builder.addBaseName(TupleElt.getName().str());
+      addBuiltinMemberRef(TupleElt.getName().str(), Ty);
     } else {
       llvm::SmallString<4> IndexStr;
       {
         llvm::raw_svector_ostream OS(IndexStr);
         OS << Index;
       }
-      Builder.addBaseName(IndexStr.str());
+      addBuiltinMemberRef(IndexStr, Ty);
     }
-    addTypeAnnotation(Builder, TupleElt.getType());
     ++Index;
   }
   return true;
