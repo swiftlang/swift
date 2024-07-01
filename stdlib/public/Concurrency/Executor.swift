@@ -242,7 +242,6 @@ public protocol TaskExecutor: Executor {
   // avoid drilling down to the base conformance just for the basic
   // work-scheduling operation.
   @_nonoverride
-  @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   func enqueue(_ job: consuming Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -520,6 +519,7 @@ where E: SerialExecutor {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
+/// Used by Swift Concurrency runtime to call into a task executor's `enqueue`.
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
