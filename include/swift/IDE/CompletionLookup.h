@@ -441,6 +441,10 @@ public:
 
   void addPrecedenceGroupRef(PrecedenceGroupDecl *PGD);
 
+  /// Add a builtin member reference pattern. This is used for members that
+  /// do not have associated decls, e.g tuple access and '.isolation'.
+  void addBuiltinMemberRef(StringRef Name, Type TypeAnnotation);
+
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
@@ -505,6 +509,9 @@ public:
                          DynamicLookupInfo dynamicLookupInfo);
 
   bool tryTupleExprCompletions(Type ExprType);
+
+  /// Try add the completion for '.isolation' for @isolated(any) function types.
+  void tryFunctionIsolationCompletion(Type ExprType);
 
   bool tryFunctionCallCompletions(
       Type ExprType, const ValueDecl *VD,
