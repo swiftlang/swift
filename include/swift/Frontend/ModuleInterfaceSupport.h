@@ -47,6 +47,11 @@ struct ModuleInterfaceOptions {
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string Flags;
 
+  /// Keep track of flags to be printed in package.swiftinterface only.
+  /// If -disable-print-package-name-for-non-package-interface is passed,
+  /// package-name flag should only be printed in package.swiftinterface.
+  std::string FlagsForPackageOnly;
+
   /// Flags that should be emitted to the .swiftinterface file but are OK to be
   /// ignored by the earlier version of the compiler.
   std::string IgnorableFlags;
@@ -61,6 +66,10 @@ struct ModuleInterfaceOptions {
 
   /// Print imports that are missing from the source and used in API.
   bool PrintMissingImports = true;
+
+  /// If true, package-name flag is not printed in either public or private
+  /// interface file.
+  bool DisablePackageNameForNonPackageInterface = false;
 
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;

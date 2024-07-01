@@ -459,6 +459,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
+  Opts.DisablePackageNameForNonPackageInterface |= Args.hasArg(OPT_disable_print_package_name_for_non_package_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
@@ -484,6 +485,13 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   return true;
 }
 
+static bool ShouldIncludeArgInPackageInterfaceOnly(const Arg *A,
+                                                   ArgList &Args) {
+  return A->getOption().matches(options::OPT_package_name) &&
+         Args.hasArg(
+             options::OPT_disable_print_package_name_for_non_package_interface);
+}
+
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
@@ -492,8 +500,10 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
   ArgStringList RenderedArgs;
+  ArgStringList RenderedArgsForPackageOnly;
   ArgStringList RenderedArgsIgnorable;
   ArgStringList RenderedArgsIgnorablePrivate;
+
   for (auto A : Args) {
     if (!ShouldIncludeModuleInterfaceArg(A))
       continue;
@@ -503,7 +513,10 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     } else if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
       A->render(Args, RenderedArgsIgnorable);
     } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
-      A->render(Args, RenderedArgs);
+      if (ShouldIncludeArgInPackageInterfaceOnly(A, Args))
+        A->render(Args, RenderedArgsForPackageOnly);
+      else
+        A->render(Args, RenderedArgs);
     }
   }
   {
@@ -511,6 +524,13 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     interleave(RenderedArgs,
                [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
                [&] { OS << " "; });
+  }
+  {
+    llvm::raw_string_ostream OS(Opts.FlagsForPackageOnly);
+    interleave(
+        RenderedArgsForPackageOnly,
+        [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+        [&] { OS << " "; });
   }
   {
     llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
