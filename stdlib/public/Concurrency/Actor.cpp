@@ -387,6 +387,20 @@ static void checkIsCurrentExecutorMode(void *context) {
                                         : Swift6_UseCheckIsolated_AllowCrash;
 }
 
+// Implemented in Swift to avoid some annoying hard-coding about
+// TaskExecutor's protocol witness table.  We could inline this
+// with effort, though.
+extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnTaskExecutor(
+    Job *job, HeapObject *executor, const Metadata *selfType,
+    const TaskExecutorWitnessTable *wtable);
+
+// Implemented in Swift to avoid some annoying hard-coding about
+// SerialExecutor's protocol witness table.  We could inline this
+// with effort, though.
+extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
+    Job *job, HeapObject *executor, const Metadata *executorType,
+    const SerialExecutorWitnessTable *wtable);
+
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
   auto current = ExecutorTrackingInfo::current();
@@ -1282,10 +1296,6 @@ dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
   return (dispatch_lock_t *) (((char *) actorStatus) + ActiveActorStatus::drainLockOffset());
 }
 #endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
-
-extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnTaskExecutor(
-    Job *job, HeapObject *executor, const Metadata *selfType,
-    const TaskExecutorWitnessTable *wtable);
 
 void DefaultActorImpl::scheduleActorProcessJob(
     JobPriority priority, TaskExecutorRef taskExecutor) {
@@ -2196,14 +2206,6 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 /*****************************************************************************/
 /************************* GENERIC ACTOR INTERFACES **************************/
 /*****************************************************************************/
-
-// Implemented in Swift to avoid some annoying hard-coding about
-// SerialExecutor's protocol witness table.  We could inline this
-// with effort, though.
-extern "C" SWIFT_CC(swift)
-void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
-                                   const Metadata *executorType,
-                                   const SerialExecutorWitnessTable *wtable);
 
 extern "C" SWIFT_CC(swift) void _swift_task_makeAnyTaskExecutor(
     HeapObject *executor, const Metadata *selfType,
