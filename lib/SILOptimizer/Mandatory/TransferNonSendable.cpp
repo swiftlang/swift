@@ -664,6 +664,11 @@ public:
   }
 
   void emitUnknownPatternError() {
+    if (AbortOnUnknownPatternMatchError) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
     diagnoseError(transferOp->getUser(),
                   diag::regionbasedisolation_unknown_pattern)
         .limitBehaviorIf(getBehaviorLimit());
@@ -1058,6 +1063,11 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // tells the user to file a bug. This importantly ensures that we can
     // guarantee that we always find the require if we successfully compile.
     if (!didEmitRequireNote) {
+      if (AbortOnUnknownPatternMatchError) {
+        llvm::report_fatal_error(
+            "RegionIsolation: Aborting on unknown pattern match error");
+      }
+
       diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
       continue;
     }
@@ -1116,6 +1126,11 @@ public:
   }
 
   void emitUnknownPatternError() {
+    if (AbortOnUnknownPatternMatchError) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
     diagnoseError(getOperand()->getUser(),
                   diag::regionbasedisolation_unknown_pattern)
         .limitBehaviorIf(getBehaviorLimit());
@@ -1601,6 +1616,11 @@ struct DiagnosticEvaluator final
   }
 
   void handleUnknownCodePattern(const PartitionOp &op) const {
+    if (AbortOnUnknownPatternMatchError) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
     diagnoseError(op.getSourceInst(),
                   diag::regionbasedisolation_unknown_pattern);
   }
