@@ -510,6 +510,9 @@ public:
 
   bool tryTupleExprCompletions(Type ExprType);
 
+  /// Try add the completion for '.isolation' for @isolated(any) function types.
+  void tryFunctionIsolationCompletion(Type ExprType);
+
   bool tryFunctionCallCompletions(
       Type ExprType, const ValueDecl *VD,
       std::optional<SemanticContextKind> SemanticContext = std::nullopt);
