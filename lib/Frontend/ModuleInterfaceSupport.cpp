@@ -63,6 +63,13 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.Flags;
 
+  // Adding package-name can be disabled in non-package
+  // swiftinterfaces; add only to package.swiftinterface
+  // in such case.
+  if (Opts.printPackageInterface() &&
+      !Opts.FlagsForPackageOnly.empty())
+    out << " " << Opts.FlagsForPackageOnly;
+
   // Insert additional -module-alias flags
   if (Opts.AliasModuleNames) {
     StringRef moduleName = M->getNameStr();

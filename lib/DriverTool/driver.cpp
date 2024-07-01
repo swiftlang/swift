@@ -50,6 +50,7 @@
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
 
+#include <csignal>
 #include <memory>
 #include <stdlib.h>
 
@@ -460,6 +461,11 @@ int swift::mainEntry(int argc_, const char **argv_) {
   llvm::transform(utf8Args, std::back_inserter(utf8CStrs),
                   std::mem_fn(&std::string::c_str));
   argv_ = utf8CStrs.data();
+#else
+  // Set SIGINT to the default handler, ensuring we exit. This needs to be set
+  // before PROGRAM_START/INITIALIZE_LLVM since LLVM will set its own signal
+  // handler that does some cleanup before delegating to the original handler.
+  std::signal(SIGINT, SIG_DFL);
 #endif
   // Expand any response files in the command line argument vector - arguments
   // may be passed through response files in the event of command line length
