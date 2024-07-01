@@ -165,6 +165,12 @@ func testImplementationOnly() {
   // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
 }
 
+@inline(never)
+func testPrivateVar() {
+  // CHECK-OUTPUT: {{[0-9]+}}
+  print(getRandom())
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -175,4 +181,5 @@ testKeypath()
 testMisc()
 testGlobal()
 testImplementationOnly()
+testPrivateVar()
 
