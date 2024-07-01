@@ -24,12 +24,15 @@
 // CHECK-NOT: init
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
+// CHECK:   func instancePassThroughByRef(_ ref: IntPair) -> IntPair
+// CHECK:   class func staticPassThroughByRef(_ ref: IntPair) -> IntPair
 // CHECK:   class func create() -> IntPair
 // CHECK:   var a: Int32
 // CHECK:   var b: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: IntPair)
 // CHECK-NOT: func passThroughByValue(_ x: IntPair) -> IntPair
+// CHECK: func passThroughByRef(_ x: IntPair) -> IntPair
 
 // CHECK: class RefHoldingPair {
 // CHECK-NOT: init
@@ -66,6 +69,13 @@
 // CHECK:   mutating func testMutable() -> Int32
 // CHECK:   static func create() -> UnsafeMutablePointer<ValueHoldingPair>
 // CHECK:   var otherValue: Int32
+// CHECK: }
+
+// CHECK: struct ValueHoldingPairRef {
+// CHECK-NOT: pair
+// CHECK:   init()
+// CHECK:   func sub(_ other: IntPair) -> Int32
+// CHECK:   func max(_ other: IntPair) -> IntPair
 // CHECK: }
 
 // CHECK: class BigType {
