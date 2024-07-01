@@ -123,6 +123,22 @@ static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
 }
 
 static clang::TypeDecl *
+lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
+                          StringRef name) {
+  clang::IdentifierInfo *nestedDeclName =
+      &clangDecl->getASTContext().Idents.get(name);
+  auto nestedDecls = clangDecl->lookup(nestedDeclName);
+  // If this is a templated typedef, Clang might have instantiated several
+  // equivalent typedef decls. If they aren't equivalent, Clang has already
+  // complained about this. Let's assume that they are equivalent. (see
+  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
+  if (nestedDecls.empty())
+    return nullptr;
+  auto nestedDecl = nestedDecls.front();
+  return dyn_cast_or_null<clang::TypeDecl>(nestedDecl);
+}
+
+static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   clang::IdentifierInfo *iteratorCategoryDeclName =
       &clangDecl->getASTContext().Idents.get("iterator_category");
@@ -1128,4 +1144,94 @@ void swift::conformToCxxFunctionIfNeeded(
   decl->addMember(importedConstructor);
 
   // TODO: actually conform to some form of CxxFunction protocol
+
+}
+
+void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
+                                     NominalTypeDecl *decl,
+                                     const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxSpan", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+  clang::ASTContext &clangCtx = impl.getClangASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
+
+  // Only auto-conform types from the C++ standard library. Custom user types
+  // might have a similar interface but different semantics.
+  if (!isStdDecl(clangDecl, {"span"}))
+    return;
+
+  auto elementType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("element_type"));
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+
+  if (!elementType || !sizeType)
+    return;
+
+  auto constPointerTypeDecl =
+      lookupNestedClangTypeDecl(clangDecl, "const_pointer");
+  auto countTypeDecl = lookupNestedClangTypeDecl(clangDecl, "size_type");
+
+  if (!constPointerTypeDecl || !countTypeDecl)
+    return;
+
+  // create fake variable for constPointer (constructor arg 1)
+  auto constPointerType = clangCtx.getTypeDeclType(constPointerTypeDecl);
+  auto fakeConstPointerVarDecl = clang::VarDecl::Create(
+      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
+      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
+      constPointerType, clangCtx.getTrivialTypeSourceInfo(constPointerType),
+      clang::StorageClass::SC_None);
+
+  auto fakeConstPointer = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, fakeConstPointerVarDecl, false, constPointerType,
+      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
+
+  // create fake variable for count (constructor arg 2)
+  auto countType = clangCtx.getTypeDeclType(countTypeDecl);
+  auto fakeCountVarDecl = clang::VarDecl::Create(
+      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
+      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
+      countType, clangCtx.getTrivialTypeSourceInfo(countType),
+      clang::StorageClass::SC_None);
+
+  auto fakeCount = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, fakeCountVarDecl, false, countType,
+      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
+
+  // Use clangSema.BuildCxxTypeConstructExpr to create a CXXTypeConstructExpr,
+  // passing constPointer and count
+  SmallVector<clang::Expr *, 2> constructExprArgs = {fakeConstPointer,
+                                                     fakeCount};
+
+  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
+      clang::QualType(clangDecl->getTypeForDecl(), 0));
+
+  // Instantiate the templated constructor that would accept this fake variable.
+  auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
+      clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
+      clangDecl->getLocation(), /*ListInitialization*/ false);
+  if (!constructExprResult.isUsable())
+    return;
+
+  auto constructExpr =
+      dyn_cast_or_null<clang::CXXConstructExpr>(constructExprResult.get());
+  if (!constructExpr)
+    return;
+
+  auto constructorDecl = constructExpr->getConstructor();
+  auto importedConstructor =
+      impl.importDecl(constructorDecl, impl.CurrentVersion);
+  if (!importedConstructor)
+    return;
+  decl->addMember(importedConstructor);
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               elementType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
 }
