@@ -76,6 +76,12 @@ void conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
 void conformToCxxFunctionIfNeeded(ClangImporter::Implementation &impl,
                                   NominalTypeDecl *decl,
                                   const clang::CXXRecordDecl *clangDecl);
+                                  
+/// If the decl is an instantiation of C++ `std::span`, synthesize a
+/// conformance to CxxSpan, which is defined in the Cxx module.
+void conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
+                                NominalTypeDecl *decl,
+                                const clang::CXXRecordDecl *clangDecl);
 
 } // namespace swift
 
