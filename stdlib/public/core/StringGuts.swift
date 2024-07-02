@@ -63,6 +63,18 @@ extension _StringGuts {
   internal init(_ storage: __SharedStringStorage) {
     self.init(_StringObject(storage))
   }
+  
+#if !$Embedded
+internal init(
+  constantCocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
+) {
+  self.init(_StringObject(
+    constantCocoa: cocoa,
+    providesFastUTF8: providesFastUTF8,
+    isASCII: isASCII,
+    length: length))
+}
+#endif
 
   #if !$Embedded
   internal init(

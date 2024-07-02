@@ -436,6 +436,10 @@ extension _StringObject.Nibbles {
   internal static func largeCocoa(providesFastUTF8: Bool) -> UInt64 {
     return providesFastUTF8 ? 0x4000_0000_0000_0000 : 0x5000_0000_0000_0000
   }
+  
+  internal static func largeFastImmortalCocoa() -> UInt64 {
+    0xC000_0000_0000_0000
+  }
 }
 
 extension _StringObject {
@@ -547,6 +551,15 @@ extension _StringObject {
     return (discriminatedObjectRawBits & 0x0040_0000_0000_0000) != 0
 #else
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
+#endif
+  }
+  
+  @inline(__always)
+  internal var largeFastIsConstantCocoa: Bool {
+#if os(Android) && arch(arm64)
+    false
+#else
+    (discriminatedObjectRawBits & 0xC000_0000_0000_0000) == 0xC000_0000_0000_0000
 #endif
   }
 
@@ -952,9 +965,12 @@ extension _StringObject {
   internal func getSharedUTF8Start() -> UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
-    if largeIsCocoa {
-      return withCocoaObject {
-        stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+    return withCocoaObject {
+      if largeFastIsConstantCocoa {
+        return _getNSCFConstantStringContentsPointer($0)
+      }
+      if largeIsCocoa {
+          stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
       }
     }
 #endif
@@ -1075,7 +1091,9 @@ extension _StringObject {
 #if $Embedded
     fatalError("unreachable in embedded Swift")
 #elseif _pointerBitWidth(_64)
-    _internalInvariant(largeIsCocoa && !isImmortal)
+    _internalInvariant(
+      (largeIsCocoa && !isImmortal) || largeFastIsConstantCocoa
+    )
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged._withUnsafeGuaranteedRef { body($0) }
 #elseif _pointerBitWidth(_32)
@@ -1276,6 +1294,30 @@ extension _StringObject {
   ) {
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
+#if $Embedded
+    fatalError("unreachable in embedded Swift")
+#elseif _pointerBitWidth(_64)
+    self.init(
+      object: cocoa, discriminator: discriminator, countAndFlags: countAndFlags)
+    _internalInvariant(self.largeAddressBits == Builtin.reinterpretCast(cocoa))
+    _internalInvariant(self.providesFastUTF8 == providesFastUTF8)
+    _internalInvariant(self.largeCount == length)
+#elseif _pointerBitWidth(_32)
+    self.init(
+      variant: .bridged(cocoa),
+      discriminator: discriminator,
+      countAndFlags: countAndFlags)
+#else
+#error("Unknown platform")
+#endif
+  }
+  
+  @_unavailableInEmbedded
+  internal init(
+    constantCocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
+  ) {
+    let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
+    let discriminator = Nibbles.largeFastImmortalCocoa
 #if $Embedded
     fatalError("unreachable in embedded Swift")
 #elseif _pointerBitWidth(_64)
