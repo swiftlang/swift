@@ -60,15 +60,12 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
-  out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << Opts.Flags;
+  out << "// " SWIFT_MODULE_FLAGS_KEY ": " << Opts.PublicFlags.Flags;
 
-  // Adding package-name can be disabled in non-package
-  // swiftinterfaces; add only to package.swiftinterface
-  // in such case.
-  if (Opts.printPackageInterface() &&
-      !Opts.FlagsForPackageOnly.empty())
-    out << " " << Opts.FlagsForPackageOnly;
+  // Append flags that are for the package interface only (e.g. -package-name
+  // when -disable-print-package-name-for-non-package-interface is specified).
+  if (Opts.printPackageInterface() && !Opts.PackageFlags.Flags.empty())
+    out << " " << Opts.PackageFlags.Flags;
 
   // Insert additional -module-alias flags
   if (Opts.AliasModuleNames) {
@@ -104,10 +101,14 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   }
   out << "\n";
 
-  if (!Opts.IgnorableFlags.empty()) {
+  if (!Opts.PublicFlags.IgnorableFlags.empty()) {
     out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
-        << Opts.IgnorableFlags << "\n";
+        << Opts.PublicFlags.IgnorableFlags << "\n";
   }
+
+  // Append ignorable flags that are for the package interface only.
+  if (Opts.printPackageInterface() && !Opts.PackageFlags.IgnorableFlags.empty())
+    out << " " << Opts.PackageFlags.IgnorableFlags;
 }
 
 std::string
