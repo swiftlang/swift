@@ -397,12 +397,14 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
-      bool isFramework, bool isStatic, StringRef moduleCacheKey)
+      StringRef definingModuleInterface, bool isFramework, bool isStatic,
+      StringRef moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), headerImport(headerImport),
+        definingModuleInterfacePath(definingModuleInterface),
         isFramework(isFramework), isStatic(isStatic) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -421,6 +423,10 @@ public:
   /// The path of the .h dependency of this module.
   const std::string headerImport;
 
+  /// The path of the defining .swiftinterface that this
+  /// binary .swiftmodule was built from, if one exists.
+  const std::string definingModuleInterfacePath;
+
   /// Source files on which the header inputs depend.
   std::vector<std::string> headerSourceFiles;
 
@@ -432,6 +438,15 @@ public:
 
   /// A flag that indicates this dependency is associated with a static archive
   const bool isStatic;
+
+  /// Return the path to the defining .swiftinterface of this module
+  /// of one was determined. Otherwise, return the .swiftmodule path
+  /// itself.
+  std::string getDefiningModulePath() const {
+    if (definingModuleInterfacePath.empty())
+      return compiledModulePath;
+    return definingModuleInterfacePath;
+  }
 
   static bool classof(const ModuleDependencyInfoStorageBase *base) {
     return base->dependencyKind == ModuleDependencyKind::SwiftBinary;
@@ -588,12 +603,13 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
-      bool isFramework, bool isStatic, StringRef moduleCacheKey) {
+      StringRef definingModuleInterface, bool isFramework,
+      bool isStatic, StringRef moduleCacheKey) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
             compiledModulePath, moduleDocPath, sourceInfoPath, moduleImports,
-            optionalModuleImports, linkLibraries, headerImport, isFramework,
-            isStatic, moduleCacheKey));
+            optionalModuleImports, linkLibraries, headerImport,
+            definingModuleInterface,isFramework, isStatic, moduleCacheKey));
   }
 
   /// Describe the main Swift module.
