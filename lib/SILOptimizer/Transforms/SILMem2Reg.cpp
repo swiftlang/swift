@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #define DEBUG_TYPE "sil-mem2reg"
 
 #include "swift/AST/DiagnosticsSIL.h"
@@ -858,6 +859,9 @@ class StackAllocationPromoter {
   /// Dominator info.
   DominanceInfo *domInfo;
 
+  /// The function's dead-end blocks.
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
+
   /// Map from dominator tree node to tree level.
   DomTreeLevelMap &domTreeLevels;
 
@@ -921,10 +925,12 @@ public:
   /// C'tor.
   StackAllocationPromoter(
       AllocStackInst *inputASI, DominanceInfo *inputDomInfo,
+      DeadEndBlocksAnalysis *inputDeadEndBlocksAnalysis,
       DomTreeLevelMap &inputDomTreeLevels, SILBuilderContext &inputCtx,
       InstructionDeleter &deleter,
       SmallVectorImpl<SILInstruction *> &instructionsToDelete)
       : asi(inputASI), dsi(nullptr), domInfo(inputDomInfo),
+        deadEndBlocksAnalysis(inputDeadEndBlocksAnalysis),
         domTreeLevels(inputDomTreeLevels), ctx(inputCtx), deleter(deleter),
         instructionsToDelete(instructionsToDelete) {
     // Scan the users in search of a deallocation instruction.
@@ -1812,7 +1818,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   deleter.forceDeleteWithUsers(asi);
 
   // Now, complete lifetimes!
-  OSSALifetimeCompletion completion(function, domInfo);
+  OSSALifetimeCompletion completion(function, domInfo,
+                                    *deadEndBlocksAnalysis->get(function));
 
   // We may have incomplete lifetimes for enum locations on trivial paths.
   // After promoting them, complete lifetime here.
@@ -1844,6 +1851,8 @@ class MemoryToRegisters {
 
   /// Dominators.
   DominanceInfo *domInfo;
+
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
 
   NonLocalAccessBlockAnalysis *accessBlockAnalysis;
 
@@ -1910,9 +1919,11 @@ class MemoryToRegisters {
 public:
   /// C'tor
   MemoryToRegisters(SILFunction &inputFunc, DominanceInfo *inputDomInfo,
+                    DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
                     NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                     BasicCalleeAnalysis *calleeAnalysis)
       : f(inputFunc), domInfo(inputDomInfo),
+        deadEndBlocksAnalysis(deadEndBlocksAnalysis),
         accessBlockAnalysis(accessBlockAnalysis),
         calleeAnalysis(calleeAnalysis), ctx(inputFunc.getModule()) {}
 
@@ -2208,8 +2219,8 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
   // Promote this allocation, lazily computing dom tree levels for this function
   // if we have not done so yet.
   auto &domTreeLevels = getDomTreeLevels();
-  StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx, deleter,
-                          instructionsToDelete)
+  StackAllocationPromoter(alloc, domInfo, deadEndBlocksAnalysis, domTreeLevels,
+                          ctx, deleter, instructionsToDelete)
       .run(livePhiBlocks);
 
   return true;
@@ -2271,12 +2282,13 @@ class SILMem2Reg : public SILFunctionTransform {
                << "** Mem2Reg on function: " << f->getName() << " **\n");
 
     auto *da = getAnalysis<DominanceAnalysis>();
+    auto *deb = getAnalysis<DeadEndBlocksAnalysis>();
     auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
 
-    bool madeChange =
-        MemoryToRegisters(*f, da->get(f), accessBlockAnalysis, calleeAnalysis)
-            .run();
+    bool madeChange = MemoryToRegisters(*f, da->get(f), deb,
+                                        accessBlockAnalysis, calleeAnalysis)
+                          .run();
     if (madeChange)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
