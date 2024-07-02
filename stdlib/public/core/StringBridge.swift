@@ -661,7 +661,7 @@ extension String {
         _precondition(encoding == Unicode.UTF16.self)
         // Only need the very last bit of _bridgeCocoaString here,
         // since we know the fast paths don't apply
-        self._guts = StringGuts(
+        self._guts = _StringGuts(
           cocoa: _immortalCocoaString,
           providesFastUTF8: false,
           isASCII: false,
