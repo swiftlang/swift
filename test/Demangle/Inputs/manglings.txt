@@ -488,4 +488,5 @@ _$s4test3fooyyF ---> test.foo() -> ()
 _$s4test0014foospace_ntJBbyyF ---> test.foo space() -> ()
 _$s4test0012_3times_bpJCayyF ---> test.3 times() -> ()
 _$s4test0011test_DkJtFbyyF ---> test.test +() -> ()
-_$s4test0016pathfoo_yuEHaaCiyyF ---> test
+_$s4test0016pathfoo_yuEHaaCiyyF ---> test.path://foo() -> ()
+_$s4test10FontWeightV004_100_yyF ---> test.FontWeight.100() -> ()
