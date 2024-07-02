@@ -1249,44 +1249,9 @@ public:
     return isLifetimeDependenceToken();
   }
 
-  struct ParsedTypeAttributeList {
-    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
-    SourceLoc SpecifierLoc;
-    SourceLoc IsolatedLoc;
-    SourceLoc ConstLoc;
-    SourceLoc ResultDependsOnLoc;
-    SourceLoc SendingLoc;
-    SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
-
-    /// Main entry point for parsing.
-    ///
-    /// Inline we just have the fast path of failing to match. We call slowParse
-    /// that contains the outline of more complex implementation. This is HOT
-    /// code!
-    ParserStatus parse(Parser &P) {
-      auto &Tok = P.Tok;
-      if (Tok.is(tok::at_sign) || P.isParameterSpecifier())
-        return slowParse(P);
-      return makeParserSuccess();
-    }
-
-    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
-
-  private:
-    /// An out of line implementation of the more complicated cases. This
-    /// ensures on the inlined fast path we handle the case of not matching.
-    ParserStatus slowParse(Parser &P);
-  };
-
   bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
-
-  ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
-                                  SourceLoc AtEndLoc,
-                                  PatternBindingInitializer *&initContext,
-                                  bool justChecking = false);
 
   ParserStatus parseLifetimeDependenceSpecifiers(
       SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
@@ -1481,6 +1446,41 @@ public:
 
   /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
   ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
+
+  struct ParsedTypeAttributeList {
+    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
+    SourceLoc SpecifierLoc;
+    SourceLoc IsolatedLoc;
+    SourceLoc ConstLoc;
+    SourceLoc ResultDependsOnLoc;
+    SourceLoc SendingLoc;
+    SmallVector<TypeOrCustomAttr> Attributes;
+    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
+
+    /// Main entry point for parsing.
+    ///
+    /// Inline we just have the fast path of failing to match. We call slowParse
+    /// that contains the outline of more complex implementation. This is HOT
+    /// code!
+    ParserStatus parse(Parser &P) {
+      auto &Tok = P.Tok;
+      if (Tok.is(tok::at_sign) || P.isParameterSpecifier())
+        return slowParse(P);
+      return makeParserSuccess();
+    }
+
+    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
+
+  private:
+    /// An out of line implementation of the more complicated cases. This
+    /// ensures on the inlined fast path we handle the case of not matching.
+    ParserStatus slowParse(Parser &P);
+  };
+
+  ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
+                                  SourceLoc AtEndLoc,
+                                  PatternBindingInitializer *&initContext,
+                                  bool justChecking = false);
 
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
