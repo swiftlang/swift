@@ -2662,16 +2662,15 @@ public:
           return;
         }
 
-        auto diagMsg = isProtocolContext ? diag::attr_static_exclusive_no_setters
-                                      : diag::attr_static_exclusive_only_let_only;
+        auto diagMsg = isProtocolContext
+                           ? diag::attr_static_exclusive_no_setters
+                           : diag::attr_static_exclusive_only_let_only;
 
         Ctx.Diags.diagnoseWithNotes(
-          VD->diagnose(diagMsg,
-                       VD->getInterfaceType()),
-          [&]() {
-            SD->diagnose(diag::attr_static_exclusive_only_type_nonmutating,
-                       SD->getDeclaredInterfaceType());
-          });
+            VD->diagnose(diagMsg, VD->getInterfaceType()), [&]() {
+              SD->diagnose(diag::attr_static_exclusive_only_type_nonmutating,
+                           SD->getDeclaredInterfaceType());
+            });
       }
     }
   }
