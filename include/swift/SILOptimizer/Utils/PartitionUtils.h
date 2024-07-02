@@ -410,6 +410,15 @@ enum class PartitionOpKind : uint8_t {
   ///
   /// This is used if we need to reject the program and do not want to assert.
   UnknownPatternError,
+
+  /// Require that a 'inout sending' parameter's region is not transferred and
+  /// disconnected at a specific function exiting term inst.
+  ///
+  /// This ensures that if users transfer away an inout sending parameter, the
+  /// parameter is reinitialized with a disconnected value.
+  ///
+  /// Takes one parameter, the inout parameter that we need to check.
+  RequireInOutSendingAtFunctionExit,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
@@ -492,6 +501,12 @@ public:
   static PartitionOp UnknownPatternError(Element elt,
                                          SILInstruction *sourceInst) {
     return PartitionOp(PartitionOpKind::UnknownPatternError, elt, sourceInst);
+  }
+
+  static PartitionOp
+  RequireInOutSendingAtFunctionExit(Element elt, SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::RequireInOutSendingAtFunctionExit, elt,
+                       sourceInst);
   }
 
   bool operator==(const PartitionOp &other) const {
@@ -925,6 +940,21 @@ public:
                                                    isolationRegionInfo);
   }
 
+  /// Call our CRTP subclass.
+  void handleInOutSendingNotInitializedAtExitError(
+      const PartitionOp &op, Element elt, Operand *transferringOp) const {
+    return asImpl().handleInOutSendingNotInitializedAtExitError(op, elt,
+                                                                transferringOp);
+  }
+
+  /// Call our CRTP subclass.
+  void handleInOutSendingNotDisconnectedAtExitError(
+      const PartitionOp &op, Element elt,
+      SILDynamicMergedIsolationInfo isolation) const {
+    return asImpl().handleInOutSendingNotDisconnectedAtExitError(op, elt,
+                                                                 isolation);
+  }
+
   /// Call isActorDerived on our CRTP subclass.
   bool isActorDerived(Element elt) const {
     return asImpl().isActorDerived(elt);
@@ -959,8 +989,10 @@ public:
   }
 
   /// Overload of \p getIsolationRegionInfo without an Operand.
-  SILIsolationInfo getIsolationRegionInfo(Region region) const {
-    return getIsolationRegionInfo(region, nullptr).first;
+  SILDynamicMergedIsolationInfo getIsolationRegionInfo(Region region) const {
+    if (auto opt = getIsolationRegionInfo(region, nullptr))
+      return opt->first;
+    return SILDynamicMergedIsolationInfo();
   }
 
   bool isTaskIsolatedDerived(Element elt) const {
@@ -1128,6 +1160,41 @@ public:
         }
       }
       return;
+    case PartitionOpKind::RequireInOutSendingAtFunctionExit: {
+      assert(op.getOpArgs().size() == 1 &&
+             "Require PartitionOp should be passed 1 argument");
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
+             "Require PartitionOp's argument should already be tracked");
+
+      // First check if the region of our 'inout sending' element has been
+      // transferred. In that case, we emit a special use after free error.
+      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
+        for (auto transferredOperand : transferredOperandSet->data()) {
+          handleInOutSendingNotInitializedAtExitError(op, op.getOpArgs()[0],
+                                                      transferredOperand);
+        }
+        return;
+      }
+
+      // If we were not transferred, check if our region is actor isolated. If
+      // so, error since we need a disconnected value in the inout parameter.
+      Region inoutSendingRegion = p.getRegion(op.getOpArgs()[0]);
+      auto dynamicRegionIsolation = getIsolationRegionInfo(inoutSendingRegion);
+
+      // If we failed to merge emit an unknown pattern error so we fail.
+      if (!dynamicRegionIsolation) {
+        handleUnknownCodePattern(op);
+        return;
+      }
+
+      // Otherwise, emit the error if the dynamic region isolation is not
+      // disconnected.
+      if (!dynamicRegionIsolation.isDisconnected()) {
+        handleInOutSendingNotDisconnectedAtExitError(op, op.getOpArgs()[0],
+                                                     dynamicRegionIsolation);
+      }
+      return;
+    }
     case PartitionOpKind::UnknownPatternError:
       // Begin tracking the specified element in case we have a later use.
       p.trackNewElement(op.getOpArgs()[0]);
@@ -1314,6 +1381,16 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback
   /// to our user so that we can emit that error as we process.
   void handleUnknownCodePattern(const PartitionOp &op) const {}
+
+  /// Called if we find an 'inout sending' parameter that is not live at exit.
+  void handleInOutSendingNotInitializedAtExitError(
+      const PartitionOp &op, Element elt, Operand *transferringOp) const {}
+
+  /// Called if we find an 'inout sending' parameter that is live at excit but
+  /// is actor isolated instead of disconnected.
+  void handleInOutSendingNotDisconnectedAtExitError(
+      const PartitionOp &op, Element elt,
+      SILDynamicMergedIsolationInfo actorIsolation) const {}
 
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
