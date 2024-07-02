@@ -21,8 +21,8 @@ package protocol PackageOtherLibraryProtocol {}
 
 //--- Client.swift
 
-package import Library
-package import OtherLibrary
+public import Library
+public import OtherLibrary
 
 // These are all fine because all 3 of these modules are in the same package.
 
