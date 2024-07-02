@@ -23,13 +23,13 @@
         "swift-asn1": {
             "remote": { "id": "apple/swift-asn1" } },
         "swift-driver": {
-            "remote": { "id": "apple/swift-driver" } },
+            "remote": { "id": "swiftlang/swift-driver" } },
         "swift-log": {
             "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
             "remote": { "id": "apple/swift-numerics" } },        
         "swift-tools-support-core": {
-            "remote": { "id": "apple/swift-tools-support-core" } },
+            "remote": { "id": "swiftlang/swift-tools-support-core" } },
         "swiftpm": {
             "remote": { "id": "swiftlang/swift-package-manager" } },
         "swift-syntax": {
