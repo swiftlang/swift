@@ -11,6 +11,7 @@ struct B: ~Copyable { // expected-note {{'B' is a non-mutable type}}
                       // expected-note@-4 {{'B' is a non-mutable type}}
                       // expected-note@-5 {{'B' is a non-mutable type}}
                       // expected-note@-6 {{'B' is a non-mutable type}}
+                      // expected-note@-7 {{'B' is a non-mutable type}}
   mutating func change() { // expected-error {{type 'B' cannot have mutating function 'change()'}}
     print("123")
   }
@@ -91,4 +92,10 @@ extension W: U {
 
 struct X: ~Copyable, U {
   let v: B // OK
+}
+
+extension U {
+  var y: B { // expected-error {{variable of type 'B' must be declared with a 'let'}}
+    B()
+  }
 }

@@ -2652,7 +2652,7 @@ public:
     // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
     if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>()) {
-        auto isProtocolContext = DC->getSelfProtocolDecl() != nullptr;
+        auto isProtocolContext = isa<ProtocolDecl>(DC);
 
         if (isProtocolContext && !VD->supportsMutation()) {
           return;
