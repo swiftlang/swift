@@ -57,18 +57,20 @@ StringBridgeTests.test("Tagged NSString") {
 }
 
 StringBridgeTests.test("Constant NSString New SPI") {
-  //21 characters long so avoids _SmallString
-  let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
-  let regularBridged = constantString as String
-  let count = regularBridged.count
-  let bridged = String(
-    _immortalCocoaString: constantString,
-    count: count,
-    encoding: Unicode.ASCII.self
-  )
-  let reverseBridged = bridged as NSString
-  expectEqual(constantString, reverseBridged)
-  expectEqual(bridged, regularBridged)
+  if #available(6.1) {
+    //21 characters long so avoids _SmallString
+    let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
+    let regularBridged = constantString as String
+    let count = regularBridged.count
+    let bridged = String(
+      _immortalCocoaString: constantString,
+      count: count,
+      encoding: Unicode.ASCII.self
+    )
+    let reverseBridged = bridged as NSString
+    expectEqual(constantString, reverseBridged)
+    expectEqual(bridged, regularBridged)
+  }
 }
 
 StringBridgeTests.test("Bridging") {
