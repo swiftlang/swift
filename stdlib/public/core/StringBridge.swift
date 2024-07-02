@@ -390,7 +390,10 @@ private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer
 internal func _getNSCFConstantStringContentsPointer(
   _ cocoa: AnyObject
 ) -> UnsafePointer<UInt8> {
-  return _unsafeReferenceCast(cocoa, to: _swift_shims_builtin_CFString.self).str
+  return unsafeBitCast(
+    cocoa,
+    to: UnsafePointer<_swift_shims_builtin_CFString>.self
+  ).pointee.str
 }
 
 @_effects(readonly) // @opaque

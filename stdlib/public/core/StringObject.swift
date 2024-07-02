@@ -559,7 +559,7 @@ extension _StringObject {
 #if os(Android) && arch(arm64)
     false
 #else
-    (discriminatedObjectRawBits & 0xC000_0000_0000_0000) == 0xC000_0000_0000_0000
+    (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == 0xC000_0000_0000_0000
 #endif
   }
 
@@ -1188,7 +1188,7 @@ extension _StringObject {
   internal var hasObjCBridgeableObject: Bool {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
-      return !self.isImmortal
+      return !self.isImmortal || self.largeFastIsConstantCocoa
     }
   }
 
@@ -1404,7 +1404,7 @@ extension _StringObject {
           _internalInvariant(nativeStorage.count == self.count)
         }
       }
-      if largeIsCocoa {
+      if largeFastIsConstantCocoa || largeIsCocoa {
         _internalInvariant(hasObjCBridgeableObject)
         _internalInvariant(!isSmall)
         _internalInvariant(!_countAndFlags.isNativelyStored)
