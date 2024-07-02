@@ -5,7 +5,7 @@
         "swift": {
             "remote": { "id": "swiftlang/swift" } },
         "cmark": {
-            "remote": { "id": "apple/swift-cmark" } },
+            "remote": { "id": "swiftlang/swift-cmark" } },
         "llbuild": {
             "remote": { "id": "apple/swift-llbuild" } },
         "swift-argument-parser": {
@@ -62,7 +62,7 @@
             "platforms": [ "Linux" ]
         },
         "swift-cmark-gfm": {
-             "remote": { "id": "apple/swift-cmark" } },
+             "remote": { "id": "swiftlang/swift-cmark" } },
         "indexstore-db": {
             "remote": { "id": "swiftlang/indexstore-db" } },
         "sourcekit-lsp": {
