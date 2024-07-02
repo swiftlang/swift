@@ -812,8 +812,7 @@ static SILValue tryRewriteToPartialApplyStack(
         if (!lookThroughMarkDependenceChainForValue(mark, newPA) ||
             mark->getBase() != stack) {
           LLVM_DEBUG(llvm::dbgs() << "-- had unexpected mark_dependence use\n";
-                     use->getUser()->print(llvm::dbgs());
-                     llvm::dbgs() << "\n");
+                     use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
           initialization = nullptr;
           break;
         }
@@ -821,24 +820,25 @@ static SILValue tryRewriteToPartialApplyStack(
 
         continue;
       }
-      
+
       // If we saw more than just the initialization, this isn't a pattern we
       // recognize.
       if (initialization) {
-        LLVM_DEBUG(llvm::dbgs() << "-- had non-initialization, non-partial-apply use\n";
-                   use->getUser()->print(llvm::dbgs());
-                   llvm::dbgs() << "\n");
-                   
+        LLVM_DEBUG(llvm::dbgs()
+                       << "-- had non-initialization, non-partial-apply use\n";
+                   use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
+
         initialization = nullptr;
         break;
       }
       if (auto possibleInit = dyn_cast<CopyAddrInst>(use->getUser())) {
         // Should copy the source and initialize the destination.
-        if (possibleInit->isTakeOfSrc()
-            || !possibleInit->isInitializationOfDest()) {
-          LLVM_DEBUG(llvm::dbgs() << "-- had non-initialization, non-partial-apply use\n";
-                     use->getUser()->print(llvm::dbgs());
-                     llvm::dbgs() << "\n");
+        if (possibleInit->isTakeOfSrc() ||
+            !possibleInit->isInitializationOfDest()) {
+          LLVM_DEBUG(
+              llvm::dbgs()
+                  << "-- had non-initialization, non-partial-apply use\n";
+              use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
 
           break;
         }
@@ -887,14 +887,15 @@ static SILValue tryRewriteToPartialApplyStack(
         LLVM_DEBUG(llvm::dbgs() << "looking at use\n";
                    origUse->getUser()->printInContext(llvm::dbgs());
                    llvm::dbgs() << "\n");
-        
+
         // If the user doesn't write to memory, then it's harmless.
         if (!origUse->getUser()->mayWriteToMemory()) {
           return true;
         }
         if (closureLiveness.isWithinBoundary(origUse->getUser())) {
           origIsUnmodifiedDuringClosureLifetime = false;
-          LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing use during closure lifetime\n";
+          LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing "
+                                     "use during closure lifetime\n";
                      origUse->getUser()->print(llvm::dbgs());
                      llvm::dbgs() << "\n");
           return false;
