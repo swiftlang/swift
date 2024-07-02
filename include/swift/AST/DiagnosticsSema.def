@@ -1996,7 +1996,7 @@ ERROR(attr_static_exclusive_only_let_only_param,none,
 ERROR(attr_static_exclusive_only_mutating,none,
       "type %0 cannot have mutating function %1", (Type, ValueDecl *))
 ERROR(attr_static_exclusive_no_setters,none,
-      "varaible of type %0 must not have a setter", (Type))
+      "variable of type %0 must not have a setter", (Type))
 
 // @extractConstantsFromMembers
 ERROR(attr_extractConstantsFromMembers_experimental,none,
