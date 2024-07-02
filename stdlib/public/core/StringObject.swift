@@ -970,7 +970,7 @@ extension _StringObject {
         return _getNSCFConstantStringContentsPointer($0)
       }
       if largeIsCocoa {
-          stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+        return stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
       }
     }
 #endif
@@ -1314,10 +1314,13 @@ extension _StringObject {
   
   @_unavailableInEmbedded
   internal init(
-    constantCocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
+    constantCocoa cocoa: AnyObject,
+    providesFastUTF8: Bool,
+    isASCII: Bool,
+    length: Int
   ) {
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
-    let discriminator = Nibbles.largeFastImmortalCocoa
+    let discriminator = Nibbles.largeFastImmortalCocoa()
 #if $Embedded
     fatalError("unreachable in embedded Swift")
 #elseif _pointerBitWidth(_64)

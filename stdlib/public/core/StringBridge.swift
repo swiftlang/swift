@@ -387,15 +387,10 @@ private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer
 }
 
 @usableFromInline @_effects(readonly)
-private func _getNSCFConstantStringContentsPointer() -> UnsafePointer<UInt8> {
-  return unsafeReferenceCast(self, to: _swift_shims_builtin_CFString.self).str
-}
-
-@usableFromInline @_effects(readonly)
-private func _getNSCFConstantStringCount() -> Int {
-  return Int(truncatingIfNeeded:
-    unsafeReferenceCast(self, to: _swift_shims_builtin_CFString.self).length
-  )
+internal func _getNSCFConstantStringContentsPointer(
+  _ cocoa: AnyObject
+) -> UnsafePointer<UInt8> {
+  return _unsafeReferenceCast(cocoa, to: _swift_shims_builtin_CFString.self).str
 }
 
 @_effects(readonly) // @opaque
@@ -650,15 +645,15 @@ extension String {
   @_spi(Foundation)
   public init<Encoding: Unicode.Encoding>(
     _immortalCocoaString: AnyObject,
-    buffer: UnsafeBufferPointer<UInt8>,
+    count: Int,
     encoding: Encoding.Type) {
       //TODO: validate isa pointer, and use constant string isa pointer elsewhere
       if encoding == Unicode.ASCII.self || encoding == Unicode.UTF8.self {
-        return _StringGuts(
-          constantCocoa: _constantCocoaString,
-          providesFastUTF8: fastUTF8,
+        self._guts = _StringGuts(
+          constantCocoa: _immortalCocoaString,
+          providesFastUTF8: true,
           isASCII: encoding == Unicode.ASCII.self,
-          length: buffer.count)
+          length: count)
       } else {
         self._guts = _bridgeCocoaString(_immortalCocoaString)
       }

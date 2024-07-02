@@ -66,7 +66,10 @@ extension _StringGuts {
   
 #if !$Embedded
 internal init(
-  constantCocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
+  constantCocoa cocoa: AnyObject,
+  providesFastUTF8: Bool,
+  isASCII: Bool,
+  length: Int
 ) {
   self.init(_StringObject(
     constantCocoa: cocoa,
