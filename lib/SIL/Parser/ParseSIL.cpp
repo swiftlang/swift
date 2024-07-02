@@ -4971,12 +4971,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createDeallocPartialRef(InstLoc, Instance, Metatype);
     break;
   }
-    case SILInstructionKind::DeallocBoxInst:
-      if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
-        return true;
+  case SILInstructionKind::DeallocBoxInst: {
+    bool isDeadEnd = false;
+    if (parseSILOptional(isDeadEnd, *this, "dead_end") ||
+        parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
 
-      ResultVal = B.createDeallocBox(InstLoc, Val);
-      break;
+    ResultVal = B.createDeallocBox(InstLoc, Val, IsDeadEnd_t(isDeadEnd));
+    break;
+  }
     case SILInstructionKind::ValueMetatypeInst:
     case SILInstructionKind::ExistentialMetatypeInst: {
       SILType Ty;

@@ -42,6 +42,29 @@ bb0(%0 : $*Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_dealloc_box : {{.*}} {
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         dealloc_box [dead_end]
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_box
+// CHECK-LABEL: } // end sil function 'test_dealloc_box'
+sil [ossa] @test_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var C }
+  cond_br undef, exit, die
+
+exit:
+  dealloc_box %b : ${ var C }
+  %retval = tuple()
+  return %retval : $()
+
+die:
+  dealloc_box [dead_end] %b : ${ var C }
+  unreachable
+}
+
 // We don't serialize debug_value today... but we should.
 //
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {

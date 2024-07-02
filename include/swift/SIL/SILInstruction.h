@@ -9463,8 +9463,19 @@ class DeallocBoxInst
 {
   friend SILBuilder;
 
-  DeallocBoxInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  USE_SHARED_UINT8;
+
+public:
+  IsDeadEnd_t isDeadEnd() const {
+    return IsDeadEnd_t(sharedUInt8().DeallocBoxInst.deadEnd);
+  }
+
+private:
+  DeallocBoxInst(SILDebugLocation DebugLoc, SILValue operand,
+                 IsDeadEnd_t isDeadEnd)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    sharedUInt8().DeallocBoxInst.deadEnd = isDeadEnd;
+  }
 };
 
 /// Deallocate memory allocated for a boxed existential container created by

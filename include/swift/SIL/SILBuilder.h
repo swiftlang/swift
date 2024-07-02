@@ -2387,10 +2387,10 @@ public:
     return insert(new (getModule()) DeallocPartialRefInst(
         getSILDebugLocation(Loc), operand, metatype));
   }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc,
-                                   SILValue operand) {
-    return insert(new (getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), operand));
+  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILValue operand,
+                                   IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
+    return insert(new (getModule()) DeallocBoxInst(getSILDebugLocation(Loc),
+                                                   operand, isDeadEnd));
   }
   DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation Loc,
                                                          CanType concreteType,

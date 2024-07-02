@@ -4179,7 +4179,7 @@ dealloc_box
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_box' sil-operand
+  sil-instruction ::= 'dealloc_box' '[dead_end]'? sil-operand
 
   dealloc_box %0 : $@box T
 
@@ -4191,6 +4191,9 @@ undefined behavior results.
 This does not destroy the boxed value. The contents of the
 value must have been fully uninitialized or destroyed before
 ``dealloc_box`` is applied.
+
+The optional ``dead_end`` attribute specifies that this instruction was created
+during lifetime completion and is eligible for deletion during OSSA lowering.
 
 project_box
 ```````````

@@ -3809,6 +3809,10 @@ public:
     require(boxTy, "operand must be a @box type");
     require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
+    if (DI->isDeadEnd()) {
+      require(getDeadEndBlocks().isDeadEnd(DI->getParentBlock()),
+              "a dead_end dealloc_box must be in a dead-end block");
+    }
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {

@@ -1455,14 +1455,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
     ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
 #undef ONETYPE_ONEOPERAND_INST
-  case SILInstructionKind::DeallocBoxInst:
+  case SILInstructionKind::DeallocBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
+    IsDeadEnd_t isDeadEnd = IsDeadEnd_t(Attr & 0x1);
     ResultInst = Builder.createDeallocBox(
-        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
-                           getSILType(MF->getType(TyID2),
-                                      (SILValueCategory)TyCategory2, Fn)));
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        isDeadEnd);
     break;
+  }
   case SILInstructionKind::OpenExistentialAddrInst:
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");

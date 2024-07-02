@@ -31,3 +31,16 @@ entry(%c : @owned $C):
   %retval = tuple()
   return %retval : $()
 }
+
+// CHECK-LABEL: Begin Error in function dealloc_box_dead_end
+// CHECK:       SIL verification failed: a dead_end dealloc_box must be in a dead-end block
+// CHECK:       Verifying instruction:
+// CHECK:            [[BOX:%[^,]+]] = alloc_box
+// CHECK:       ->   dealloc_box [dead_end] [[BOX]]
+// CHECK-LABEL: End Error in function dealloc_box_dead_end
+sil [ossa] @dealloc_box_dead_end : $@convention(thin) () -> () {
+  %b = alloc_box ${ var C }
+  dealloc_box [dead_end] %b : ${ var C }
+  %retval = tuple()
+  return %retval : $()
+}

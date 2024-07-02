@@ -1036,9 +1036,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::DeallocBoxInst: {
     auto DBI = cast<DeallocBoxInst>(&SI);
-    writeOneTypeOneOperandLayout(DBI->getKind(), 0,
-                                 DBI->getOperand()->getType(),
-                                 DBI->getOperand());
+    unsigned Attr = unsigned(DBI->isDeadEnd());
+    writeOneTypeOneOperandLayout(
+        DBI->getKind(), Attr, DBI->getOperand()->getType(), DBI->getOperand());
     break;
   }
   case SILInstructionKind::DeallocExistentialBoxInst: {

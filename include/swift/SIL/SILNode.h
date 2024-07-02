@@ -248,6 +248,9 @@ protected:
                  fromVarDecl : 1,
                  fixed : 1);
 
+    SHARED_FIELD(DeallocBoxInst, uint8_t
+                 deadEnd : 1);
+
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
       isInitializationOfDest : 1);
