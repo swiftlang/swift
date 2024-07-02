@@ -147,8 +147,8 @@ class UnreachableLifetimeCompletion {
 
 public:
   UnreachableLifetimeCompletion(SILFunction *function, DominanceInfo *domInfo)
-    : function(function), unreachableBlocks(function),
-      unreachableInsts(function), incompleteValues(function) {}
+      : function(function), domInfo(domInfo), unreachableBlocks(function),
+        unreachableInsts(function), incompleteValues(function) {}
 
   /// Record information about this unreachable instruction and return true if
   /// ends any simple OSSA lifetimes.
