@@ -3109,17 +3109,6 @@ void TypeAttrSet::diagnoseUnclaimed(CustomAttr *attr,
   diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
 }
 
-static bool isSILAttribute(TypeAttrKind attrKind) {
-  switch (attrKind) {
-#define SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
-#include "swift/AST/TypeAttr.def"
-    return true;
-
-  default:
-    return false;
-  }
-}
-
 static bool isFunctionAttribute(TypeAttrKind attrKind) {
   static const TypeAttrKind FunctionAttrs[] = {
       TypeAttrKind::Convention,
@@ -3151,7 +3140,7 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
 
   // Use a special diagnostic for SIL attributes.
   if (!(options & TypeResolutionFlags::SILType) &&
-      isSILAttribute(attr->getKind())) {
+      TypeAttribute::isSilOnly(attr->getKind())) {
     diagnose(attr->getStartLoc(), diag::unknown_attribute, attr->getAttrName());
     return;
   }
