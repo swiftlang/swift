@@ -348,9 +348,9 @@ void RequireLiveness::process(Collection requireInstList) {
 
   // Then put all of our requires into our allRequires set.
   BasicBlockWorklist initializingWorklist(transferInst->getFunction());
-  for (auto *require : requireInstList) {
-    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << *require);
-    allRequires.insert(require);
+  for (auto require : requireInstList) {
+    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << **require);
+    allRequires.insert(*require);
     initializingWorklist.pushIfNotVisited(require->getParent());
   }
 
@@ -455,9 +455,38 @@ struct TransferredNonTransferrableInfo {
         isolationRegionInfo(isolationRegionInfo) {}
 };
 
+/// Wrapper around a SILInstruction that internally specifies whether we are
+/// dealing with an inout reinitialization needed or if it is just a normal
+/// use after transfer.
+class RequireInst {
+  enum Kind {
+    UseAfterTransfer,
+    InOutReinitializationNeeded,
+  };
+
+  llvm::PointerIntPair<SILInstruction *, 1> instAndKind;
+
+  RequireInst(SILInstruction *inst, Kind kind) : instAndKind(inst, kind) {}
+
+public:
+  static RequireInst forUseAfterTransfer(SILInstruction *inst) {
+    return {inst, Kind::UseAfterTransfer};
+  }
+
+  static RequireInst forInOutReinitializationNeeded(SILInstruction *inst) {
+    return {inst, Kind::InOutReinitializationNeeded};
+  }
+
+  SILInstruction *getInst() const { return instAndKind.getPointer(); }
+  Kind getKind() const { return Kind(instAndKind.getInt()); }
+
+  SILInstruction *operator*() const { return getInst(); }
+  SILInstruction *operator->() const { return getInst(); }
+};
+
 class TransferNonSendableImpl {
   RegionAnalysisFunctionInfo *regionInfo;
-  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+  SmallFrozenMultiMap<Operand *, RequireInst, 8>
       transferOpToRequireInstMultiMap;
   SmallVector<TransferredNonTransferrableInfo, 8>
       transferredNonTransferrableInfoList;
@@ -485,12 +514,12 @@ namespace {
 
 class UseAfterTransferDiagnosticEmitter {
   Operand *transferOp;
-  SmallVectorImpl<SILInstruction *> &requireInsts;
+  SmallVectorImpl<RequireInst> &requireInsts;
   bool emittedErrorDiagnostic = false;
 
 public:
-  UseAfterTransferDiagnosticEmitter(
-      Operand *transferOp, SmallVectorImpl<SILInstruction *> &requireInsts)
+  UseAfterTransferDiagnosticEmitter(Operand *transferOp,
+                                    SmallVectorImpl<RequireInst> &requireInsts)
       : transferOp(transferOp), requireInsts(requireInsts) {}
 
   ~UseAfterTransferDiagnosticEmitter() {
@@ -734,8 +763,8 @@ private:
   void emitRequireInstDiagnostics() {
     // Now actually emit the require notes.
     while (!requireInsts.empty()) {
-      auto *require = requireInsts.pop_back_val();
-      diagnoseNote(require, diag::regionbasedisolation_maybe_race)
+      auto require = requireInsts.pop_back_val();
+      diagnoseNote(*require, diag::regionbasedisolation_maybe_race)
           .highlight(require->getLoc().getSourceRange());
     }
   }
@@ -753,7 +782,7 @@ class UseAfterTransferDiagnosticInferrer {
 
 public:
   UseAfterTransferDiagnosticInferrer(
-      Operand *transferOp, SmallVectorImpl<SILInstruction *> &requireInsts,
+      Operand *transferOp, SmallVectorImpl<RequireInst> &requireInsts,
       RegionAnalysisValueMap &valueMap,
       TransferringOperandToStateMap &transferringOpToStateMap)
       : transferOp(transferOp), diagnosticEmitter(transferOp, requireInsts),
@@ -1074,17 +1103,17 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     ++blockLivenessInfoGeneration;
     liveness.process(requireInsts);
 
-    SmallVector<SILInstruction *, 8> requireInstsForError;
-    for (auto *require : requireInsts) {
+    SmallVector<RequireInst, 8> requireInstsForError;
+    for (auto require : requireInsts) {
       // We can have multiple of the same require insts if we had a require
       // and an assign from the same instruction. Our liveness checking
       // above doesn't care about that, but we still need to make sure we do
       // not emit twice.
-      if (!requireInstsUnique.insert(require))
+      if (!requireInstsUnique.insert(*require))
         continue;
 
       // If this was not a last require, do not emit an error.
-      if (!liveness.finalRequires.contains(require))
+      if (!liveness.finalRequires.contains(*require))
         continue;
 
       requireInstsForError.push_back(require);
@@ -1532,7 +1561,7 @@ namespace {
 struct DiagnosticEvaluator final
     : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
   RegionAnalysisFunctionInfo *info;
-  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+  SmallFrozenMultiMap<Operand *, RequireInst, 8>
       &transferOpToRequireInstMultiMap;
 
   /// First value is the operand that was transferred... second value is the
@@ -1542,7 +1571,7 @@ struct DiagnosticEvaluator final
 
   DiagnosticEvaluator(Partition &workingPartition,
                       RegionAnalysisFunctionInfo *info,
-                      SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+                      SmallFrozenMultiMap<Operand *, RequireInst, 8>
                           &transferOpToRequireInstMultiMap,
                       SmallVectorImpl<TransferredNonTransferrableInfo>
                           &transferredNonTransferrable,
@@ -1581,8 +1610,9 @@ struct DiagnosticEvaluator final
                << "        ID:  %%" << transferredVal << "\n"
                << "        Rep: " << *rep << "        Transferring Op Num: "
                << transferringOp->getOperandNumber() << '\n');
-    transferOpToRequireInstMultiMap.insert(transferringOp,
-                                           partitionOp.getSourceInst());
+    transferOpToRequireInstMultiMap.insert(
+        transferringOp,
+        RequireInst::forUseAfterTransfer(partitionOp.getSourceInst()));
   }
 
   void handleTransferNonTransferrable(
