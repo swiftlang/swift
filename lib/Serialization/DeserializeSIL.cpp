@@ -3651,11 +3651,23 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
     return nullptr;
   }
 
+  VarDecl *globalDecl = nullptr;
+  if (dID) {
+    llvm::Expected<Decl *> d = MF->getDeclChecked(dID);
+    if (d) {
+      globalDecl = cast<VarDecl>(d.get());
+    } else {
+      // This can happen with cross-module-optimizations, if the linkage of a
+      // private global variable is changed to public.
+      consumeError(d.takeError());
+    }
+  }
+
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
       SILMod, linkage.value(), SerializedKind_t(serializedKind),
       Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
-      std::nullopt, dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
+      std::nullopt, globalDecl);
   v->setLet(IsLet);
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);
