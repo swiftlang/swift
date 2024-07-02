@@ -6040,6 +6040,8 @@ bool swift::checkSendableConformance(
     }
   }
 
+  if (conformance->getSourceKind() == ConformanceEntryKind::Implied)
+    conformanceDC = nominal;
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
