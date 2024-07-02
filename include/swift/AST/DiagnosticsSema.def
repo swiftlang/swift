@@ -7133,8 +7133,8 @@ ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
 ERROR(property_wrapper_effectful,none,
-    "property wrappers cannot be applied to properties that are 'async' or 'throws'",
-    ())
+      "'wrappedValue' property cannot currently define an 'async' or 'throws' %0",
+    (DescriptiveDeclKind))
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
