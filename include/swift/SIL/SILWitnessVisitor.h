@@ -210,6 +210,10 @@ private:
     if (!thunk)
       return;
 
+    auto DC = AFD->getDeclContext();
+    if (isa<ProtocolDecl>(DC))
+      return;
+
     SILDeclRef declRef(thunk, kind);
     asDerived().addMethod(declRef.asDistributed());
   }
