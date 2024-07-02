@@ -3113,7 +3113,6 @@ static bool isSILAttribute(TypeAttrKind attrKind) {
   switch (attrKind) {
 #define SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
 #include "swift/AST/TypeAttr.def"
-  case TypeAttrKind::NoEscape: // noescape is only used in SIL now
     return true;
 
   default:
