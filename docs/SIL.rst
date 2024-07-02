@@ -6664,7 +6664,7 @@ destroy_value
 
 ::
 
-  sil-instruction ::= 'destroy_value' '[poison]'? sil-operand
+  sil-instruction ::= 'destroy_value' '[dead_end]'? '[poison]'? sil-operand
 
   destroy_value %0 : $A
 
@@ -6681,6 +6681,9 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+The optional ``dead_end`` attribute specifies that this instruction was created
+during lifetime completion and is eligible for deletion during OSSA lowering.
 
 autorelease_value
 `````````````````

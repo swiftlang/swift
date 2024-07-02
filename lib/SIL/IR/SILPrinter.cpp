@@ -2231,6 +2231,8 @@ public:
   void visitDestroyValueInst(DestroyValueInst *I) {
     if (I->poisonRefs())
       *this << "[poison] ";
+    if (I->isDeadEnd())
+      *this << "[dead_end] ";
     *this << getIDAndType(I->getOperand());
   }
 

@@ -1442,16 +1442,16 @@ public:
                       ExplicitCopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
-  DestroyValueInst *
-  createDestroyValue(SILLocation Loc, SILValue operand,
-                     PoisonRefs_t poisonRefs = DontPoisonRefs) {
+  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
+                                       PoisonRefs_t poisonRefs = DontPoisonRefs,
+                                       IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
     assert(getFunction().hasOwnership());
     assert(isLoadableOrOpaque(operand->getType()));
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
-    return insert(new (getModule()) DestroyValueInst(getSILDebugLocation(Loc),
-                                                     operand, poisonRefs));
+    return insert(new (getModule()) DestroyValueInst(
+        getSILDebugLocation(Loc), operand, poisonRefs, isDeadEnd));
   }
 
   MoveValueInst *createMoveValue(

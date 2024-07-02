@@ -2208,10 +2208,10 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
                   RefCountingInst::Atomicity::Atomic));
   }
 
-  recordClonedInstruction(
-      Inst, getBuilder().createDestroyValue(getOpLocation(Inst->getLoc()),
-                                            getOpValue(Inst->getOperand()),
-                                            Inst->poisonRefs()));
+  recordClonedInstruction(Inst, getBuilder().createDestroyValue(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getOperand()),
+                                    Inst->poisonRefs(), Inst->isDeadEnd()));
 }
 
 template <typename ImplClass>

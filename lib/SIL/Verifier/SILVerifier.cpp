@@ -3405,6 +3405,10 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
+    if (I->isDeadEnd()) {
+      require(getDeadEndBlocks().isDeadEnd(I->getParentBlock()),
+              "a dead_end destroy_value must be in a dead-end block");
+    }
   }
 
   void checkReleaseValueInst(ReleaseValueInst *I) {

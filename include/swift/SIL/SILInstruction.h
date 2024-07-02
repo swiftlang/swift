@@ -8806,6 +8806,11 @@ class UnownedCopyValueInst
   };
 #include "swift/AST/ReferenceStorage.def"
 
+enum IsDeadEnd_t : bool {
+  IsntDeadEnd = false,
+  IsDeadEnd = true,
+};
+
 class DestroyValueInst
     : public UnaryInstructionBase<SILInstructionKind::DestroyValueInst,
                                   NonValueInstruction> {
@@ -8813,9 +8818,10 @@ class DestroyValueInst
   USE_SHARED_UINT8;
 
   DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                   PoisonRefs_t poisonRefs)
+                   PoisonRefs_t poisonRefs, IsDeadEnd_t isDeadEnd)
       : UnaryInstructionBase(DebugLoc, operand) {
-    setPoisonRefs(poisonRefs);
+    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
+    sharedUInt8().DestroyValueInst.deadEnd = isDeadEnd;
   }
 
 public:
@@ -8843,6 +8849,10 @@ public:
   /// If the value being destroyed is a stack allocation of a nonescaping
   /// closure, then return the PartialApplyInst that allocated the closure.
   PartialApplyInst *getNonescapingClosureAllocation() const;
+
+  IsDeadEnd_t isDeadEnd() const {
+    return IsDeadEnd_t(sharedUInt8().DestroyValueInst.deadEnd);
+  }
 };
 
 class MoveValueInst
