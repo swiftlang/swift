@@ -141,6 +141,15 @@ struct OwnershipModelEliminatorVisitor
 
   void splitDestroy(DestroyValueInst *destroy);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
+  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
+    if (!dbi->isDeadEnd())
+      return false;
+
+    // dead_end instructions are required for complete OSSA lifetimes but should
+    // not exist post-OSSA.
+    eraseInstruction(dbi);
+    return true;
+  }
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitMoveValueInst(MoveValueInst *mvi) {
     eraseInstructionAndRAUW(mvi, mvi->getOperand());
@@ -571,6 +580,13 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
 
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
     DestroyValueInst *dvi) {
+  if (dvi->isDeadEnd()) {
+    // dead_end instructions are required for complete OSSA lifetimes but should
+    // not exist post-OSSA.
+    eraseInstruction(dvi);
+    return true;
+  }
+
   // Nonescaping closures are represented ultimately as trivial pointers to
   // their context, but we use ownership to do borrow checking of their captures
   // in OSSA. Now that we're eliminating ownership, fold away destroys.
