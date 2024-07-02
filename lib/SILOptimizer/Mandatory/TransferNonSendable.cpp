@@ -677,7 +677,7 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (AbortOnUnknownPatternMatchError) {
+    if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
@@ -1094,7 +1094,7 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // tells the user to file a bug. This importantly ensures that we can
     // guarantee that we always find the require if we successfully compile.
     if (!didEmitRequireNote) {
-      if (AbortOnUnknownPatternMatchError) {
+      if (shouldAbortOnUnknownPatternMatchError()) {
         llvm::report_fatal_error(
             "RegionIsolation: Aborting on unknown pattern match error");
       }
@@ -1157,7 +1157,7 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (AbortOnUnknownPatternMatchError) {
+    if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
@@ -1647,7 +1647,7 @@ struct DiagnosticEvaluator final
   }
 
   void handleUnknownCodePattern(const PartitionOp &op) const {
-    if (AbortOnUnknownPatternMatchError) {
+    if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
