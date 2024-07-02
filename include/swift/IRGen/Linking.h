@@ -1448,7 +1448,17 @@ public:
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
-    return reinterpret_cast<ValueDecl*>(Pointer);
+    auto decl = reinterpret_cast<ValueDecl*>(Pointer);
+
+    // FIXME: determine if this matters after all or not
+    // if it is a distributed thunk, find the thunk decl and mangled based on it
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (afd->isDistributed()) {
+        decl = afd->getDistributedThunk();
+      }
+    }
+
+    return decl;
   }
   
   const ExtensionDecl *getExtension() const {
@@ -1608,6 +1618,7 @@ public:
   bool isTypeMetadataAccessFunction() const {
     return getKind() == Kind::TypeMetadataAccessFunction;
   }
+  bool isDistributedThunk() const;
   bool isDispatchThunk() const {
     return getKind() == Kind::DispatchThunk ||
            getKind() == Kind::DispatchThunkInitializer ||
