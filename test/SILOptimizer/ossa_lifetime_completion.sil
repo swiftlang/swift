@@ -32,13 +32,13 @@ typealias AnyObject = Builtin.AnyObject
 
 protocol P : AnyObject {}
 
-// CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
+// CHECK-LABEL: begin running test 1 of 1 on eagerConsumeOwnedArg: ossa_lifetime_completion with: @argument
 // CHECK-LABEL: OSSA lifetime completion on liveness boundary: %0 = argument of bb0 : $C
-// CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: sil [ossa] @eagerConsumeOwnedArg : $@convention(thin) (@owned C) -> () {
 // CHECK: bb0(%0 : @_eagerMove @owned $C):
 // CHECK-NEXT:   destroy_value %0 : $C
-// CHECK-LABEL: end running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
-sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: end running test 1 of 1 on eagerConsumeOwnedArg: ossa_lifetime_completion with: @argument
+sil [ossa] @eagerConsumeOwnedArg : $@convention(thin) (@owned C) -> () {
 entry(%0 : @_eagerMove @owned $C):
   specify_test "ossa_lifetime_completion @argument liveness"
   br exit
