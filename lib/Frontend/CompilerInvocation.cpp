@@ -499,18 +499,16 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                                     ArgList &Args, DiagnosticEngine &Diags) {
   if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
+  
   ArgStringList RenderedArgs;
   ArgStringList RenderedArgsForPackageOnly;
   ArgStringList RenderedArgsIgnorable;
-  ArgStringList RenderedArgsIgnorablePrivate;
 
   for (auto A : Args) {
     if (!ShouldIncludeModuleInterfaceArg(A))
       continue;
 
-    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorablePrivate)) {
-      A->render(Args, RenderedArgsIgnorablePrivate);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
+    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
       A->render(Args, RenderedArgsIgnorable);
     } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
       if (ShouldIncludeArgInPackageInterfaceOnly(A, Args))
@@ -531,12 +529,6 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
         RenderedArgsForPackageOnly,
         [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
         [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
-    interleave(RenderedArgsIgnorablePrivate,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
   }
   {
     llvm::raw_string_ostream OS(Opts.IgnorableFlags);
