@@ -965,12 +965,14 @@ extension _StringObject {
   internal func getSharedUTF8Start() -> UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
-    return withCocoaObject {
-      if largeFastIsConstantCocoa {
-        return _getNSCFConstantStringContentsPointer($0)
+    if largeFastIsConstantCocoa {
+      return withCocoaObject {
+        _getNSCFConstantStringContentsPointer($0)
       }
-      if largeIsCocoa {
-        return stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+    }
+    if largeIsCocoa {
+      return withCocoaObject {
+        stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
       }
     }
 #endif
