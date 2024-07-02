@@ -2216,13 +2216,15 @@ extern "C" SWIFT_CC(swift) void _swift_task_makeAnyTaskExecutor(
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef) {
 #ifndef NDEBUG
-  auto _taskExecutorRef = TaskExecutorRef::undefined();
-  if (auto task = dyn_cast<AsyncTask>(job)) {
-    _taskExecutorRef = task->getPreferredTaskExecutor();
+  {
+    auto _taskExecutorRef = TaskExecutorRef::undefined();
+    if (auto task = dyn_cast<AsyncTask>(job)) {
+      _taskExecutorRef = task->getPreferredTaskExecutor();
+    }
+    SWIFT_TASK_DEBUG_LOG(
+        "enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
+        serialExecutorRef.getIdentity(), _taskExecutorRef.getIdentity());
   }
-  SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
-                       serialExecutorRef.getIdentity(),
-                       _taskExecutorRef.getIdentity());
 #endif
 
   assert(job && "no job provided");
