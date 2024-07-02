@@ -1072,7 +1072,7 @@ public:
 
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
-      bool poisonRefs = false,
+      PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false);
   DebugValueInst *createDebugValueAddr(

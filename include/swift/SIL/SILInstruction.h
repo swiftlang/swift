@@ -5402,11 +5402,11 @@ class DebugValueInst final
   USE_SHARED_UINT8;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, bool poisonRefs,
+                 SILDebugVariable Var, PoisonRefs_t poisonRefs,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                bool poisonRefs,
+                                PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
   static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
@@ -5516,9 +5516,11 @@ public:
   /// OSSA lowering. It should not be necessary to model the poison operation as
   /// a side effect, which would violate the rule that debug_values cannot
   /// affect optimization.
-  bool poisonRefs() const { return sharedUInt8().DebugValueInst.poisonRefs; }
+  PoisonRefs_t poisonRefs() const {
+    return PoisonRefs_t(sharedUInt8().DebugValueInst.poisonRefs);
+  }
 
-  void setPoisonRefs(bool poisonRefs = true) {
+  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
     sharedUInt8().DebugValueInst.poisonRefs = poisonRefs;
   }
 

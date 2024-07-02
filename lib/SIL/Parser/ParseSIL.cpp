@@ -3391,7 +3391,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::DebugValueInst: {
-    bool poisonRefs = false;
+    PoisonRefs_t poisonRefs = DontPoisonRefs;
     bool hasTrace = false;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
@@ -3402,7 +3402,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc attributeLoc;
     while (parseSILOptional(attributeName, attributeLoc, *this)) {
       if (attributeName == "poison")
-        poisonRefs = true;
+        poisonRefs = PoisonRefs;
       else if (attributeName == "trace")
         hasTrace = true;
       else if (attributeName == "moveable_value_debuginfo")

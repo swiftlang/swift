@@ -512,7 +512,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
             builder.createDebugValue(
                 dbgVarInst->getLoc(), SILUndef::get(mvi->getOperand()),
-                *varInfo, false /*poison*/, UsesMoveableValueDebugInfo);
+                *varInfo, DontPoisonRefs, UsesMoveableValueDebugInfo);
           }
           validMoves.push_back(mvi);
         }

@@ -455,8 +455,8 @@ static void injectDebugPoison(DestroyValueInst *destroy) {
     // This debug location is obviously inconsistent with surrounding code, but
     // IRGen is responsible for fixing this.
     builder.setCurrentDebugScope(scope);
-    auto *newDebugVal = builder.createDebugValue(loc, destroyedValue, *varInfo,
-                                                 /*poisonRefs*/ true);
+    auto *newDebugVal =
+        builder.createDebugValue(loc, destroyedValue, *varInfo, PoisonRefs);
     assert(*(newDebugVal->getVarInfo()) == *varInfo && "lost in translation");
     (void)newDebugVal;
   }

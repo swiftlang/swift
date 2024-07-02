@@ -436,8 +436,8 @@ SILType AllocBoxInst::getAddressType() const {
 
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    bool poisonRefs, UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
-    bool trace)
+    PoisonRefs_t poisonRefs,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -454,7 +454,8 @@ DebugValueInst::DebugValueInst(
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var, bool poisonRefs,
+                                       SILDebugVariable Var,
+                                       PoisonRefs_t poisonRefs,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -478,8 +479,8 @@ DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
   if (!isa<AllocStackInst>(Operand))
     Var.DIExpr.prependElements(
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
-  return DebugValueInst::create(DebugLoc, Operand, M, Var,
-                                /*poisonRefs=*/false, wasMoved, trace);
+  return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
+                                wasMoved, trace);
 }
 
 bool DebugValueInst::exprStartsWithDeref() const {
