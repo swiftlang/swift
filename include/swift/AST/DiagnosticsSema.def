@@ -6737,6 +6737,16 @@ ERROR(availability_isolated_any_only_version_newer, none,
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
+ERROR(availability_copyable_generics_casting_only_version_newer, none,
+      "runtime support for casting types with noncopyable generic arguments "
+      "is only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
+ERROR(availability_escapable_generics_casting_only_version_newer, none,
+      "runtime support for casting types with nonescapable generic arguments "
+      "is only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
 ERROR(availability_typed_throws_only_version_newer, none,
       "runtime support for typed throws function types is only available in "
       "%0 %1 or newer",
