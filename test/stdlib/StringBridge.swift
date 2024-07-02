@@ -57,27 +57,19 @@ StringBridgeTests.test("Tagged NSString") {
 }
 
 StringBridgeTests.test("Constant NSString New SPI") {
-   //21 characters long so avoids _SmallString
-   let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
-   let regularBridged = constantString as String
-   let buffer = constantString.utf8String!.withMemoryRebound(
-     to: UInt8.self,
-     capacity: regularBridged.utf8.count
-   ) { typedPtr in
-     UnsafeBufferPointer(
-       start: typedPtr,
-       count: regularBridged.utf8.count
-     )
-   }
-   let bridged = String(
-     _immortalCocoaString: constantString,
-     buffer: buffer,
-     encoding: Unicode.ASCII.self
-   )
-   let reverseBridged = bridged as NSString
-   expectEqual(constantString, reverseBridged)
-   expectEqual(bridged, regularBridged)
- }
+  //21 characters long so avoids _SmallString
+  let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
+  let regularBridged = constantString as String
+  let count = regularBridged.count
+  let bridged = String(
+    _immortalCocoaString: constantString,
+    count: count,
+    encoding: Unicode.ASCII.self
+  )
+  let reverseBridged = bridged as NSString
+  expectEqual(constantString, reverseBridged)
+  expectEqual(bridged, regularBridged)
+}
 
 StringBridgeTests.test("Bridging") {
   // Test bridging retains small string form
