@@ -227,7 +227,23 @@ operator()(CanType dependentType, Type conformingReplacementType,
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
   }
-  return Subs.lookupConformance(dependentType, conformedProtocol);
+
+  auto result = Subs.lookupConformance(dependentType, conformedProtocol);
+  if (!result.isInvalid())
+    return result;
+
+  // Otherwise, the original type might be fixed to a concrete type in
+  // the substitution map's input generic signature.
+  if (auto genericSig = Subs.getGenericSignature()) {
+    if (genericSig->isValidTypeParameter(dependentType) &&
+        genericSig->isConcreteType(dependentType)) {
+      return conformedProtocol->getModuleContext()->lookupConformance(
+          conformingReplacementType, conformedProtocol,
+          /*allowMissing=*/true);
+    }
+  }
+
+  return ProtocolConformanceRef::forInvalid();
 }
 
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
