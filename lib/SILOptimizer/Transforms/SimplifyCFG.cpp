@@ -232,6 +232,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                    (*ThreadedSuccessorBlock->args_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+        Cloner.registerBlockWithNewPhiArg(ThreadedSuccessorBlock);
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
         auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);
