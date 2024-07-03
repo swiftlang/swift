@@ -608,7 +608,6 @@ extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     priority: TaskPriority? = nil,
@@ -665,7 +664,6 @@ extension Task where Failure == Never {
   ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public init(
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
@@ -704,7 +702,6 @@ extension Task where Failure == Error {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     priority: TaskPriority? = nil,
@@ -761,7 +758,6 @@ extension Task where Failure == Error {
   ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public init(
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
@@ -802,7 +798,6 @@ extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
     priority: TaskPriority? = nil,
@@ -856,7 +851,6 @@ extension Task where Failure == Never {
   /// - Returns: A reference to the task.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public static func detached(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> Success
@@ -895,7 +889,6 @@ extension Task where Failure == Error {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
     priority: TaskPriority? = nil,
@@ -951,7 +944,6 @@ extension Task where Failure == Error {
   /// - Returns: A reference to the task.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public static func detached(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Success
