@@ -238,7 +238,6 @@ extension DiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -257,9 +256,6 @@ extension DiscardingTaskGroup {
                            operation: operation)
     #else
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
     #endif
   }
 
@@ -288,7 +284,6 @@ extension DiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -315,9 +310,6 @@ extension DiscardingTaskGroup {
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
@@ -348,7 +340,6 @@ extension ThrowingDiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -367,9 +358,6 @@ extension ThrowingDiscardingTaskGroup {
                            operation: operation)
     #else
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
     #endif
   }
 
@@ -398,7 +386,6 @@ extension ThrowingDiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -425,9 +412,6 @@ extension ThrowingDiscardingTaskGroup {
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
