@@ -20,20 +20,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
@@ -50,20 +42,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
