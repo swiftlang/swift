@@ -57,7 +57,7 @@ StringBridgeTests.test("Tagged NSString") {
 }
 
 StringBridgeTests.test("Constant NSString New SPI") {
-  if #available(6.1) {
+  if #available(SwiftStdlib 6.1, *) {
     //21 characters long so avoids _SmallString
     let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
     let regularBridged = constantString as String
@@ -69,6 +69,10 @@ StringBridgeTests.test("Constant NSString New SPI") {
     )
     let reverseBridged = bridged as NSString
     expectEqual(constantString, reverseBridged)
+    expectEqual(
+      ObjectIdentifier(constantString),
+      ObjectIdentifier(reverseBridged)
+    )
     expectEqual(bridged, regularBridged)
   }
 }

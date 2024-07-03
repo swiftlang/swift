@@ -650,7 +650,8 @@ extension String {
   public init<Encoding: Unicode.Encoding>(
     _immortalCocoaString: AnyObject,
     count: Int,
-    encoding: Encoding.Type) {
+    encoding: Encoding.Type
+  ) {
       if encoding == Unicode.ASCII.self || encoding == Unicode.UTF8.self {
         self._guts = _StringGuts(
           constantCocoa: _immortalCocoaString,
