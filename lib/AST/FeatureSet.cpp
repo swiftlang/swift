@@ -124,7 +124,6 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
   return usesFeatureRethrowsProtocol(decl, checked);
 }
 
-UNINTERESTING_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinUnprotectedStackAlloc)

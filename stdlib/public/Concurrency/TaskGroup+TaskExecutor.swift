@@ -40,7 +40,6 @@ extension TaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -59,9 +58,6 @@ extension TaskGroup {
                            operation: operation)
     #else
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
     #endif
   }
 
@@ -89,7 +85,6 @@ extension TaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -116,9 +111,6 @@ extension TaskGroup {
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
@@ -149,7 +141,6 @@ extension ThrowingTaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -168,9 +159,6 @@ extension ThrowingTaskGroup {
                            operation: operation)
     #else
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
     #endif
   }
 
@@ -194,7 +182,6 @@ extension ThrowingTaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -221,9 +208,6 @@ extension ThrowingTaskGroup {
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
