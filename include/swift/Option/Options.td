@@ -56,12 +56,6 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
-// The option should be written into a .private.swiftinterface or
-// .package.swiftinterface module interface file, and read/parsed from
-// there when reconstituting a .swiftmodule from it.
-// The option can be safely ignored by the older compiler.
-def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
-
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
