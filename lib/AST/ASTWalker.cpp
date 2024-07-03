@@ -2336,10 +2336,6 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitTransferringTypeRepr(TransferringTypeRepr *T) {
-  return doIt(T->getBase());
-}
-
 bool Traversal::visitSendingTypeRepr(SendingTypeRepr *T) {
   return doIt(T->getBase());
 }

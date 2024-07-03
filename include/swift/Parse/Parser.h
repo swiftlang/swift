@@ -1203,9 +1203,6 @@ public:
     if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
         Tok.isContextualKeyword("_resultDependsOn"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
-        Tok.isContextualKeyword("transferring"))
-      return true;
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
@@ -1258,7 +1255,6 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc ResultDependsOnLoc;
-    SourceLoc TransferringLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
@@ -1573,9 +1569,6 @@ public:
 
     /// The location of the '_resultDependsOn' keyword, if present.
     SourceLoc ResultDependsOnLoc;
-
-    /// The location of the 'transferring' keyword if present.
-    SourceLoc TransferringLoc;
 
     /// The location of the 'sending' keyword if present.
     SourceLoc SendingLoc;

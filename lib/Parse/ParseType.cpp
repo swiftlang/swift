@@ -57,10 +57,6 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) ResultDependsOnTypeRepr(ty, ResultDependsOnLoc);
   }
 
-  if (TransferringLoc.isValid()) {
-    ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
-  }
-
   if (SendingLoc.isValid()) {
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
