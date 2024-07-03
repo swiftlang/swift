@@ -198,7 +198,7 @@ func testConstantArgumentWithConstEval(constParam: Int) {
   constantArgumentFunction(constantEval(constParam, true))
 }
 
-// Test parital-apply of constantArgumentFunction.
+// Test partial-apply of constantArgumentFunction.
 @_semantics("oslog.requires_constant_arguments")
 func constArg2(_ x: Int) -> Int { x }
 

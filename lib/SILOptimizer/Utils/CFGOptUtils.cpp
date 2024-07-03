@@ -295,7 +295,7 @@ SILBasicBlock *swift::splitBasicBlockAndBranch(SILBuilder &builder,
     auto origBBDTNode = domInfo->getNode(origBB);
     if (origBBDTNode) {
       // Change the immediate dominators of the children of the block we
-      // splitted to the splitted block.
+      // split to the split block.
       SmallVector<DominanceInfoNode *, 16> Adoptees(origBBDTNode->begin(),
                                                     origBBDTNode->end());
 

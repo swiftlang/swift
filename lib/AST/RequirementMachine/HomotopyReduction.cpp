@@ -91,7 +91,7 @@ using namespace rewriting;
 ///
 ///    [P:X].[P2:Y].[Q] => [P:X].[P2:Y]
 ///
-/// Furthermore, if [P:X].[P2:Y] simplies to some other term, such as [P:Z],
+/// Furthermore, if [P:X].[P2:Y] simplifies to some other term, such as [P:Z],
 /// there will be yet another rule added by completion:
 ///
 ///    [P:Z].[Q] => [P:Z]

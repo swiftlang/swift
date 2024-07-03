@@ -1,5 +1,5 @@
 @_exported import FooSwiftModule
 
-public func overlayedFoo() {}
+public func overlaidFoo() {}
 public func onlyInFooOverlay() {}
 

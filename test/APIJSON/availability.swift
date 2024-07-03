@@ -18,7 +18,7 @@ public func callUnavailable() {}
 public func availableOnlyOnActiveOS() {}
 
 @available(tvOS, unavailable)
-public func unavailableOnSeperateOS() {}
+public func unavailableOnSeparateOS() {}
 
 extension A {
     @available(macOS 12, *)
@@ -114,7 +114,7 @@ extension A {
 // CHECK-NEXT:             "introduced": "10.10"
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
-// CHECK-NEXT:             "name": "_$s8MyModule23unavailableOnSeperateOSyyF",
+// CHECK-NEXT:             "name": "_$s8MyModule23unavailableOnSeparateOSyyF",
 // CHECK-NEXT:             "access": "public",
 // CHECK-NEXT:             "file": "SOURCE_DIR/test/APIJSON/availability.swift",
 // CHECK-NEXT:             "linkage": "exported"

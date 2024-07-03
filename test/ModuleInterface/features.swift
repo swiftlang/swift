@@ -19,7 +19,7 @@
 // the uses of those features are guarded by appropriate #if's that allow older
 // compilers to skip over the uses of newer features.
 
-// Some feature gaurds are retired when the first compiler that supports the
+// Some feature guards are retired when the first compiler that supports the
 // feature is old enough. The --implicit-check-not arguments to FileCheck above
 // verify that those guards no longer pollute the emitted interface.
 

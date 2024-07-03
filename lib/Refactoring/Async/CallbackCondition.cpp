@@ -120,7 +120,7 @@ void CallbackCondition::initFromEnumPattern(const Decl *D,
     if (!eedTy || !eedTy->isResult())
       return;
     if (EED->getNameStr() == StringRef("failure")) {
-      Type = ConditionType::FAILURE_PATTEN;
+      Type = ConditionType::FAILURE_PATTERN;
     } else {
       Type = ConditionType::SUCCESS_PATTERN;
     }

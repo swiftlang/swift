@@ -136,7 +136,7 @@ namespace swift {
       ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
       Expr *&parsedExpr, ConcreteDeclRef &referencedDecl);
 
-  /// Type check a function body element which is at \p TagetLoc.
+  /// Type check a function body element which is at \p TargetLoc.
   bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
                              SourceLoc TargetLoc);
 

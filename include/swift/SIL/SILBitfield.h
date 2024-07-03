@@ -158,7 +158,7 @@ public:
 ///       BitfieldRef<Container> container;
 ///
 ///       void performWithContainer(SILFunction *function) {
-///          BitfieldRef<Container>::StackState state(container, functon);
+///          BitfieldRef<Container>::StackState state(container, function);
 ///
 ///          assert(container->isValid());
 ///       }

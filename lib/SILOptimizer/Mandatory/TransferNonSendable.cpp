@@ -358,7 +358,7 @@ void RequireLiveness::process(Collection requireInstList) {
   // the transferInst...
   processDefBlock();
 
-  // If we found /any/ requries after the transferInst, we can bail early since
+  // If we found /any/ requires after the transferInst, we can bail early since
   // that is guaranteed to dominate all further requires.
   if (!finalRequires.empty()) {
     LLVM_DEBUG(
@@ -1412,7 +1412,7 @@ public:
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
   /// further diagnostics, since we may not have any diagnostics or be in an
-  /// inconcistent state.
+  /// inconsistent state.
   bool run();
 
 private:

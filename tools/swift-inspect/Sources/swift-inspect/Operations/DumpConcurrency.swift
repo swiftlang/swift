@@ -313,19 +313,19 @@ fileprivate class ConcurrencyDumper {
     let taskToThread: [swift_addr_t: UInt64] =
         Dictionary(threadCurrentTasks.map{ ($1, $0) }, uniquingKeysWith: { $1 })
 
-    var lastChilds: [Bool] = []
+    var lastChildren: [Bool] = []
 
     let hierarchy = taskHierarchy()
     for (i, (level, lastChild, task)) in hierarchy.enumerated() {
-      lastChilds.removeSubrange(level...)
-      lastChilds.append(lastChild)
+      lastChildren.removeSubrange(level...)
+      lastChildren.append(lastChild)
 
       let prevEntry = i > 0 ? hierarchy[i - 1] : nil
 
       let levelDidIncrease = level > (prevEntry?.level ?? -1)
 
       var prefix = ""
-      for lastChild in lastChilds {
+      for lastChild in lastChildren {
         prefix += lastChild ? "     " : "   | "
       }
       prefix += "   "

@@ -44,7 +44,7 @@ class PotentialMacroExpansions {
     return Storage.getPointer();
   }
 
-  /// Get or create a nam
+  /// Get or create a name
   NameSet &getOrCreateIntroducedNames() {
     if (auto nameSet = Storage.getPointer())
       return *nameSet;
@@ -121,7 +121,7 @@ public:
   /// Determine whether one should expand any macros in this context because
   /// they could introduce a declaration with the given name.
   bool shouldExpandForName(DeclName name) const {
-    // If any macro produces arbitraty names, we need to expand it.
+    // If any macro produces arbitrary names, we need to expand it.
     if (introducesArbitraryNames())
       return true;
 

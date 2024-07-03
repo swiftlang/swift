@@ -698,7 +698,7 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
         break;
       }
 
-      // Look through certian kinds of single-value instructions.
+      // Look through certain kinds of single-value instructions.
       case SILInstructionKind::CopyValueInst:
         // TODO: If we had some actual escape analysis information, we could
         // avoid marking a trivial copy as a nonisolated use, since it doesn't

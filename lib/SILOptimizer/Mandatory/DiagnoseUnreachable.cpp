@@ -935,7 +935,7 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   // Since at least one case was removed, we need to add a default case that
   // traps if there isn't already an existing default case. The resulting SIL
   // will have a structure that matches what SILGen would have produced for a
-  // switch statment that was written in source with unavailable cases
+  // switch statement that was written in source with unavailable cases
   // unhandled.
   SILBasicBlock *DefaultBB = SWI.getDefaultBBOrNull().getPtrOrNull();
   bool DidCreateDefault = false;

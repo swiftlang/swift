@@ -60,7 +60,7 @@ class DiagnoseLifetimeIssues {
     IsStoredWeakly
   };
 
-  /// To avoid quadratic complexity in the rare corener case of very deep
+  /// To avoid quadratic complexity in the rare corner case of very deep
   /// callgraphs, with pass down references.
   static constexpr int maxCallDepth = 8;
 

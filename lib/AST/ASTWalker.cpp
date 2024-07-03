@@ -1736,7 +1736,7 @@ public:
 } // end anonymous namespace
 
 bool Traversal::doItInSourceOrderRecursive(QualifiedIdentTypeRepr *T) {
-  // Qualified types are modeled resursively such that each previous
+  // Qualified types are modeled recursively such that each previous
   // dot-separated component is a child of the next one. To walk a member type
   // representation according to
   // `QualifiedIdentTypeReprWalkingScheme::SourceOrderRecursive`:

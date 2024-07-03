@@ -87,7 +87,7 @@ struct ScopedAddressValue {
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   // Helpers to allow a ScopedAddressValue to easily be used as a SILValue
-  // programatically.
+  // programmatically.
   SILValue operator->() { return value; }
   SILValue operator->() const { return value; }
   SILValue operator*() { return value; }

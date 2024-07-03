@@ -650,7 +650,7 @@ func testImplicitMemberInArrayLiteral() {
 struct Wrap<T> {
   func method<U>(_ fn: (T) -> U) -> Wrap<U> {}
 }
-func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
+func testGenericMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
   value.method(#^ARCHETYPE_GENERIC_1^#)
 // ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(fn): (Wrapped) -> U##(Wrapped) -> U#}[')'][#Wrap<U>#];
 }
@@ -780,7 +780,7 @@ func testAfterVariadic() {
   }
 }
 
-func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSiganture() {
+func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSignature() {
   func sort(callback: (_ left: Int, _ right: Int) -> Bool) {}
   sort(#^CLOSURE_PARAM_WITH_INTERNAL_NAME^#)
 // CLOSURE_PARAM_WITH_INTERNAL_NAME: Begin completions, 1 item
@@ -1072,16 +1072,16 @@ func testArgsAfterCompletion() {
   // INVALID_MISSINGCONFORMANCE-DAG: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
   // INVALID_MISSINGCONFORMANCE-DAG: Pattern/Local/Flair[ArgLabels]: {#y: String#}[#String#]; name=y:
 
-  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA?check=INVALID_MISSINGCONFORMANCE^# z: MisingConformance(), zz: MissingConformance())
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA?check=INVALID_MISSINGCONFORMANCE^# z: MissingConformance(), zz: MissingConformance())
   overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_INDIRECT?check=INVALID_MISSINGCONFORMANCE^#, z: [MissingConformance()], zz: [MissingConformance()])
-  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT?check=INVALID_MISSINGCONFORMANCE_CONSTAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")])
-  SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA_SUB?check=INVALID_MISSINGCONFORMANCE^# z: MisingConformance(), zz: MissingConformance()]
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT?check=INVALID_MISSINGCONFORMANCE_CONSTRAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")])
+  SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_NOCOMMA_SUB?check=INVALID_MISSINGCONFORMANCE^# z: MissingConformance(), zz: MissingConformance()]
   SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_INDIRECT_SUB?check=INVALID_MISSINGCONFORMANCE^#, z: [MissingConformance()], zz: [MissingConformance()]]
-  SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT_SUB?check=INVALID_MISSINGCONFORMANCE_CONSTAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")]]
+  SubOverloadedGeneric()[x: 1, #^INVALID_MISSINGCONFORMANCE_CONSTRAINT_SUB?check=INVALID_MISSINGCONFORMANCE_CONSTRAINT^#, z: [CondConfType("foo")], zz: [CondConfType("bar")]]
 
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT: Begin completions, 2 items
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#y: String#}[#String#]; name=y:
-  // INVALID_MISSINGCONFORMANCE_CONSTAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT: Begin completions, 2 items
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#y: String#}[#String#]; name=y:
+  // INVALID_MISSINGCONFORMANCE_CONSTRAINT-DAG: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p:
 }
 
 func testFuncTyVars(param: (Int, String, Double) -> ()) {

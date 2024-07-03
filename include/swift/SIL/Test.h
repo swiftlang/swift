@@ -254,7 +254,7 @@ private:
 private:
   /// Functions for getting tools that are visible in the SIL library.
   ///
-  /// The implementation is provided in the SILOptimizer libary where analyses
+  /// The implementation is provided in the SILOptimizer library where analyses
   /// are visible: TestRunner::FunctionTestDependenciesImpl.
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;

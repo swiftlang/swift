@@ -93,10 +93,10 @@ struct UnavailableType {
   var storedClosure: Int = { .random() ? 0 : 1 }()
 
   @Wrapper
-  var wrappered = .random() ? 0 : 1
+  var wrapped = .random() ? 0 : 1
 
   @Wrapper(wrappedValue: .random() ? 0 : 1)
-  var alsoWrappered: Int
+  var alsoWrapped: Int
 }
 
 @available(*, unavailable)

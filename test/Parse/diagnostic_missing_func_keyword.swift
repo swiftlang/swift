@@ -3,7 +3,7 @@
 // https://github.com/apple/swift/issues/52877
 
 protocol Brew { // expected-note {{in declaration of 'Brew'}}
-  tripel() -> Int // expected-error {{expected 'func' keyword in instance method declaration}} {{3-3=func }}
+  triple() -> Int // expected-error {{expected 'func' keyword in instance method declaration}} {{3-3=func }}
 
   quadrupel: Int { get } // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 

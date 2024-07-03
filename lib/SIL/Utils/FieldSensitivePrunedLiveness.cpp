@@ -1128,7 +1128,7 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
     FieldSensitivePrunedLivenessBoundary &boundary) const {
   assert(asImpl().isInitialized());
 
-  PRUNED_LIVENESS_LOG(llvm::dbgs() << "Liveness Boundary Compuation!\n");
+  PRUNED_LIVENESS_LOG(llvm::dbgs() << "Liveness Boundary Computation!\n");
 
   using IsLive = FieldSensitivePrunedLiveBlocks::IsLive;
   SmallVector<IsLive, 8> isLiveTmp;

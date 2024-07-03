@@ -679,7 +679,7 @@ static bool isForSingleValueStmtConjunction(ASTNode anchor,
     }
   }
 
-  // Other than the trailing SyntaticElement, we must be at the anchor.
+  // Other than the trailing SyntacticElement, we must be at the anchor.
   return path.empty();
 }
 
@@ -700,7 +700,7 @@ bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
       continue;
     }
 
-    // Ignore a SyntaticElement path element for a case statement of a switch,
+    // Ignore a SyntacticElement path element for a case statement of a switch,
     // or the catch of a do-catch, or the brace of a do-statement.
     if (auto elt = path.back().getAs<LocatorPathElt::SyntacticElement>()) {
       if (elt->getElement().isStmt(StmtKind::Case)) {

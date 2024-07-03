@@ -1184,7 +1184,7 @@ struct PartitionOpBuilder {
         lookupValueID(fst), lookupValueID(snd), currentInst));
   }
 
-  /// Mark \p value artifically as being part of an actor isolated region by
+  /// Mark \p value artificially as being part of an actor isolated region by
   /// introducing a new fake actor introducing representative and merging them.
   void addActorIntroducingInst(SILValue value,
                                SILIsolationInfo actorIsolation) {
@@ -1288,7 +1288,7 @@ enum class TranslationSemantics {
   ///    their behavior depending on some state on the instruction itself.
   Special,
 
-  /// An instruction that is a full apply site. Can cause transfering or
+  /// An instruction that is a full apply site. Can cause transferring or
   /// untransferring of regions.
   Apply,
 
@@ -1606,7 +1606,7 @@ public:
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
-    // A helper we use to emit an unknown patten error if our merge is
+    // A helper we use to emit an unknown pattern error if our merge is
     // invalid. This ensures we guarantee that if we find an actor merge error,
     // the compiler halts. Importantly this lets our users know 100% that if the
     // compiler exits successfully, actor merge errors could not have happened.
@@ -1627,7 +1627,7 @@ public:
 
         // If we fail to merge, then we have an incompatibility in between some
         // of our arguments (consider isolated to different actors) or with the
-        // isolationInfo we specified. Emit an unknown patten error.
+        // isolationInfo we specified. Emit an unknown pattern error.
         if (!mergedInfo) {
           LLVM_DEBUG(
               llvm::dbgs() << "Merge Failure!\n"
@@ -1653,7 +1653,7 @@ public:
         // We only get back result if it is non-Sendable.
         if (auto nonSendableValue =
                 initializeTrackedValue(result, resultIsolationInfoOverride)) {
-          // If we did not insert, emit an unknown patten error.
+          // If we did not insert, emit an unknown pattern error.
           if (!nonSendableValue->second) {
             builder.addUnknownPatternError(result);
           }
@@ -2646,7 +2646,7 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 //
 
 // These are treated as stores - meaning that they could write values into
-// memory. The beahvior of this depends on whether the tgt addr is aliased,
+// memory. The behavior of this depends on whether the tgt addr is aliased,
 // but conservative behavior is to treat these as merges of the regions of
 // the src value and tgt addr
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
@@ -3274,7 +3274,7 @@ bool BlockPartitionState::recomputeExitFromEntry(
                         transferringOpToStateMap);
   for (const auto &partitionOp : blockPartitionOps) {
     // By calling apply without providing any error handling callbacks, errors
-    // will be surpressed.  will be suppressed
+    // will be suppressed.  will be suppressed
     eval.apply(partitionOp);
   }
   LLVM_DEBUG(llvm::dbgs() << "    Working Partition: ";

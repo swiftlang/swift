@@ -6,7 +6,7 @@
 // Dependency graph:
 //
 // * CoreFilesystem - Swift module with generated ObjC header
-// * FilesystemKit - ObjC module without overlay, has #import <CoreFileystem-Generated.h>
+// * FilesystemKit - ObjC module without overlay, has #import <CoreFilesystem-Generated.h>
 // * TestFilesystem - Swift module, has import CoreFilesystem or FilesystemKit.
 //
 // * CoreDaemon - ObjC module with overlay, the overlay has import DaemonKit

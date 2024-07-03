@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-c-header-in-clang(%t/functions.h)
 
-// CHECK: SWIFT_EXTERN float $s9Functions16passThrougCFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK: SWIFT_EXTERN float $s9Functions16passThroughCFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN bool $s9Functions15passThroughBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN bool $s9Functions16passThroughCBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN char $s9Functions16passThroughCCharys4Int8VADF(char x) SWIFT_NOEXCEPT SWIFT_CALL;
@@ -63,7 +63,7 @@ public func passThroughCUnsignedShort(_ x: CUnsignedShort) -> CUnsignedShort { r
 public func passThroughCUnsignedInt(_ x: CUnsignedInt) -> CUnsignedInt { return x }
 public func passThroughCUnsignedLongLong(_ x: CUnsignedLongLong) -> CUnsignedLongLong { return x }
 
-public func passThrougCFloat(_ x: CFloat) -> CFloat { return x }
+public func passThroughCFloat(_ x: CFloat) -> CFloat { return x }
 public func passThroughCDouble(_ x: CDouble) -> CDouble { return x }
 
 public func passThroughInt8(_ x: Int8) -> Int8 { return x }

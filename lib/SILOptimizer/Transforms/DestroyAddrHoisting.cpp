@@ -750,7 +750,7 @@ bool HoistDestroys::checkFoldingBarrier(
     // We found a relevant instruction that is operating on a projection out
     // of the root storage which would be folded if folding were possible.
     // Find its nontrivial product leaves and remove them from the set of
-    // leaves of the root storage which we're wating to see.
+    // leaves of the root storage which we're waiting to see.
     bool alreadySawLeaf = false;
     bool alreadySawTrivialSubleaf = false;
     auto succeeded = visitProductLeafAccessPathNodes(

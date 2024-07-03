@@ -2606,7 +2606,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::WillThrow:
       return;
 
-    // Buitins that affect memory but can't be formal accesses.
+    // Builtins that affect memory but can't be formal accesses.
     case BuiltinValueKind::AssumeTrue:
     case BuiltinValueKind::UnexpectedError:
     case BuiltinValueKind::ErrorInMain:

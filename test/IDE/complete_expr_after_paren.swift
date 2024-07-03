@@ -34,7 +34,7 @@ class MyClass: Base, MyProtocol {
   override func method(method4: Int) {}
 }
 
-func testConstructer() {
+func testConstructor() {
   MyClass(#^INITIALIZER^#)
 // INITIALIZER: Begin completions, 4 items
 // INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init1: Int#}[')'][#MyClass#];

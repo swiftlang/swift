@@ -14,7 +14,7 @@
 ///
 /// Cleanup SIL to make it suitable for IRGen.
 ///
-/// We perform the following canonicalizations:
+/// We perform the following canonicalization:
 ///
 /// 1. We remove calls to Builtin.poundAssert() and Builtin.staticReport(),
 ///    which are not needed post SIL.

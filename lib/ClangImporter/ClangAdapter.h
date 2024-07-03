@@ -129,7 +129,7 @@ clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
 bool isNSString(const clang::Type *);
 bool isNSString(clang::QualType);
 
-/// Wehther the passed type is `NSNotificationName` typealias
+/// Whether the passed type is `NSNotificationName` typealias
 bool isNSNotificationName(clang::QualType);
 
 /// Whether the given declaration was exported from Swift.

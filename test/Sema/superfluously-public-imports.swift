@@ -271,7 +271,7 @@ module ClangSubmodule {
 module ClangSubmoduleUnused {
     header "ClangSubmoduleUnused.h"
 
-    module ClangSubmoduleUnsuedSubmodule {
+    module ClangSubmoduleUnusedSubmodule {
       header "ClangSubmoduleUnusedSubmodule.h"
     }
 }
@@ -302,7 +302,7 @@ struct ClangTopModuleType {};
 public import ClangSimple
 public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
 public import ClangSubmodule.ClangSubmoduleSubmodule
-public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
+public import ClangSubmoduleUnused.ClangSubmoduleUnusedSubmodule // expected-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
 
 // Only the top-level module is used, but we can't detect whether the submodule was used or not.
 public import ClangTopModule.ClangTopModuleSubmodule

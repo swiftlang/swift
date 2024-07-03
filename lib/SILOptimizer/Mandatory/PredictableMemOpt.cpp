@@ -578,7 +578,7 @@ bool AvailableValueAggregator::canTake(SILType loadTy,
     });
   }
 
-  // Otherwise, fail. The value is not fully available at its leafs. We can not
+  // Otherwise, fail. The value is not fully available at its leaves. We can not
   // perform a take.
   return false;
 }
@@ -1379,7 +1379,7 @@ public:
 
   /// Try to compute available values for "TheMemory" at the instruction \p
   /// StartingFrom. We only compute the values for set bits in \p
-  /// RequiredElts. We return the vailable values in \p Result. If any available
+  /// RequiredElts. We return the available values in \p Result. If any available
   /// values were found, return true. Otherwise, return false.
   bool computeAvailableValues(SILInstruction *StartingFrom,
                               unsigned FirstEltOffset,

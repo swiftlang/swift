@@ -1185,7 +1185,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       diagnose(varLoc, diag::let_pattern_in_immutable_context);
 
     // In our recursive parse, remember that we're in a let/var/inout
-    // pattern. We default to var if we don't have an immediate pattern bidning
+    // pattern. We default to var if we don't have an immediate pattern binding
     // state.
     llvm::SaveAndRestore<decltype(InBindingPattern)> T(
         InBindingPattern, newBindingState.getPatternBindingStateForIntroducer(

@@ -62,9 +62,9 @@ bool RefactoringActionConvertToSwitchStmt::isApplicable(
     }
   };
 
-  class SwitchConvertable {
+  class SwitchConvertible {
   public:
-    SwitchConvertable(const ResolvedRangeInfo &Info) : Info(Info) {}
+    SwitchConvertible(const ResolvedRangeInfo &Info) : Info(Info) {}
 
     bool isApplicable() {
       if (Info.Kind != RangeKind::SingleStatement)
@@ -114,7 +114,7 @@ bool RefactoringActionConvertToSwitchStmt::isApplicable(
       return checker.allCheckPassed();
     }
   };
-  return SwitchConvertable(Info).isApplicable();
+  return SwitchConvertible(Info).isApplicable();
 }
 
 bool RefactoringActionConvertToSwitchStmt::performChange() {

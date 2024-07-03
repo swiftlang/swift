@@ -18,7 +18,7 @@ struct ImplicitInit2 : ~Escapable, ~Copyable {
   let mbv: BufferView
 }
 
-struct ImplicitInit3 : ~Escapable, ~Copyable { // expected-error{{cannot infer lifetime dependence on implicit initializer, multiple parameters qualifiy as a candidate}}
+struct ImplicitInit3 : ~Escapable, ~Copyable { // expected-error{{cannot infer lifetime dependence on implicit initializer, multiple parameters qualify as a candidate}}
   let mbv1: BufferView
   let mbv2: BufferView
 }

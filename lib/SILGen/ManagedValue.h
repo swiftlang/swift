@@ -288,7 +288,7 @@ public:
   /// this value to a call that consumes the argument.
   bool isPlusOne(SILGenFunction &SGF) const;
 
-  /// Returns true if this managed value can be forwarded without necessarilly
+  /// Returns true if this managed value can be forwarded without necessarily
   /// destroying the original.
   ///
   /// This is true if either isPlusOne is true or the value is trivial. Unlike

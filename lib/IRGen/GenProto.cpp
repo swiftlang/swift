@@ -1677,7 +1677,7 @@ public:
 
   /// A resilient witness table consists of a list of descriptor/witness pairs,
   /// and a runtime function builds the actual witness table in memory, placing
-  /// entries in the correct oder and filling in default implementations as
+  /// entries in the correct order and filling in default implementations as
   /// needed.
   class ResilientWitnessTableBuilder : public WitnessTableBuilderBase {
   public:
@@ -2558,7 +2558,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 #ifndef NDEBUG
                         wt->dump();
 #endif
-                        llvm::report_fatal_error("use of relative protcol witness tables not supported");
+                        llvm::report_fatal_error("use of relative protocol witness tables not supported");
                       }});
   }
   if (!isResilient) {

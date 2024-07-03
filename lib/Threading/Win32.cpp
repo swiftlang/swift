@@ -72,7 +72,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
     WakeByAddressAll(&predicate);
 #else
     // On Windows 7 and earlier, we use a global lock and condition variable;
-    // this will wake *all* waiters on *all* onces, which might result in a
+    // this will wake *all* waiters on *all* once, which might result in a
     // thundering herd problem, but it's the best we can do.
     AcquireSRWLockExclusive(&onceMutex);
     WakeAllConditionVariable(&onceCond);

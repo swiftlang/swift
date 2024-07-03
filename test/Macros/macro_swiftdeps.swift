@@ -103,7 +103,7 @@
 // WITHOUT_PLUGIN-NOT:  AssertPlugin
 // WITHOUT_PLUGIN-NOT:  mock-plugin
 
-// TRACE_WITH_PLGUIN: "swiftmacros":[
+// TRACE_WITH_PLUGIN: "swiftmacros":[
 // TRACE_WITH_PLUGIN-DAG: {"name":"AssertPlugin","path":"{{.*}}AssertPlugin.{{(dylib|so|dll)}}"}
 // TRACE_WITH_PLUGIN-DAG: {"name":"StringifyPlugin","path":"{{.*}}StringifyPlugin.{{(dylib|so|dll)}}"}
 // TRACE_WITH_PLUGIN-DAG: {"name":"TestPlugin","path":"{{.*}}mock-plugin"}

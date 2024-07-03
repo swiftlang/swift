@@ -225,7 +225,7 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
         // results since we are deleting one of our stashed values.
         auto iter = find(originalIncomingValues, cvi);
         if (iter != originalIncomingValues.end()) {
-          // We use an auxillary array here so we can continue to bisect on
+          // We use an auxiliary array here so we can continue to bisect on
           // original incoming values. Once we are done processing here, we will
           // not need that property anymore.
           unsigned updateOffset =

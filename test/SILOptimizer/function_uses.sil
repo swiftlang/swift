@@ -27,7 +27,7 @@ sil @public_func : $@convention(thin) () -> ()
 // CHECK-NEXT:    %1 = dynamic_function_ref @internal_func
 // CHECK-NEXT:  ]
 // CHECK-NEXT:  End function internal_func
-sil hidden [dynamically_replacable] @internal_func : $@convention(thin) () -> () {
+sil hidden [dynamically_replaceable] @internal_func : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @public_func : $@convention(thin) () -> ()
   %1 = function_ref @public_func : $@convention(thin) () -> ()

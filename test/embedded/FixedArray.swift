@@ -28,7 +28,7 @@ func testDestroyOfElements() {
   a.append(CheckLifetime(29))
   a.append(CheckLifetime(30))
 
-  // The `*` is a prefix operator and serves as syntatic sugar for FixedArray.view.
+  // The `*` is a prefix operator and serves as syntactic sugar for FixedArray.view.
   printit(*a)
 }
 
@@ -58,7 +58,7 @@ struct S {
   static var a = FixedArray<Int>(capacity: 10)
 
   // Elements are initialized in the data section.
-  // The `^` is a prefix operator and serves as syntatic sugar to create a FixedArray literal.
+  // The `^` is a prefix operator and serves as syntactic sugar to create a FixedArray literal.
   static let b = ^[1, 2, 3]
 
   static let c: FixedArray<Int64?> = ^[10, 20, 30]

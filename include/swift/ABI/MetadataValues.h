@@ -2135,7 +2135,7 @@ enum class GenericRequirementKind : uint8_t {
   /// A requirement stating which invertible protocol checks are
   /// inverted.
   ///
-  /// This is more of an "anti-requirement", specifing which checks don't need
+  /// This is more of an "anti-requirement", specifying which checks don't need
   /// to happen for a given type.
   InvertedProtocols = 5,
   /// A layout requirement.

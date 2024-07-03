@@ -402,7 +402,7 @@ broadenSingleElementStores(StoreInst *storeInst,
 
     // If the struct is a move-only type, even though the single element in
     // the struct is trivial, the struct would be non-trivial. In this case, we
-    // need a much more compelx analysis to determine the store ownership
+    // need a much more complex analysis to determine the store ownership
     // qualifier. Such an analysis is not suitable in the canonicalize pass. So,
     // bail out.
     if (baseAddrType.isMoveOnly()) {

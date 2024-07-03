@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_functon_builder %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_function_builder %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 @resultBuilder
@@ -11,7 +11,7 @@ struct Summer {
   }
 }
 
-// CHECK-LABEL: sil_coverage_map {{.*}} "$s24coverage_functon_builder5test0SiyF"
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s24coverage_function_builder5test0SiyF"
 @Summer
 func test0() -> Int {
   // CHECK: [[@LINE-1]]:21 -> [[@LINE+3]]:2 : 0
@@ -19,7 +19,7 @@ func test0() -> Int {
   12
 }
 
-// CHECK-LABEL: sil_coverage_map {{.*}} "$s24coverage_functon_builder5test1SiyF"
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s24coverage_function_builder5test1SiyF"
 @Summer
 func test1() -> Int {
   // CHECK: [[@LINE-1]]:21 -> [[@LINE+7]]:2 : 0

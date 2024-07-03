@@ -1,13 +1,13 @@
 // RUN: %batch-code-completion
 
 protocol MyProtocol {
-  associatedtype Mistery
+  associatedtype Mystery
 }
 struct MyStruct {}
 enum MyEnum {}
 class MyClass {}
 struct ConcreteMyProtocol : MyProtocol {
-  typealias Mistery = MyStruct
+  typealias Mystery = MyStruct
 }
 
 // MARK: 'some' keyword.
@@ -19,7 +19,7 @@ struct ConcreteMyProtocol : MyProtocol {
 // BEGINNING_WITH_SOME-DAG: Decl[Protocol]/CurrModule:          MyProtocol[#MyProtocol#]; name=MyProtocol
 // BEGINNING_WITH_SOME-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 
-func gloabalFunc() -> #^GLOBAL_FUNC?check=BEGINNING_WITH_SOME^#
+func globalFunc() -> #^GLOBAL_FUNC?check=BEGINNING_WITH_SOME^#
 var globalVar: #^GLOBAL_VAR?check=BEGINNING_WITH_SOME^#
 
 protocol SomeProto {
@@ -129,7 +129,7 @@ class HasTypealias : HasAssocWithConformanceConstraint {
 // OVERRIDE_HasTypealias-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> ConcreteMyProtocol {|};
 }
 
-// MARK: Postfix expession for opaque result types.
+// MARK: Postfix expression for opaque result types.
 
 protocol TestProtocol {
   associatedtype Assoc1

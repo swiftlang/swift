@@ -54,7 +54,7 @@ actor MyGlobalActor {
 
 @globalActor
 actor MyGenericGlobalActor<T> {
-  static let shared = MyGenricGlobalActor<T>()
+  static let shared = MyGenericGlobalActor<T>()
 }
 
 @available(#^AVAILABILITY1^#)

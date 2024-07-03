@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -typecheck %t/print-string.swift -typecheck -module-name Stringer -enable-experimental-cxx-interop -emit-clang-header-path %t/Stringer.h
 
-// Ensure: we don't hit any spurios warnings instantiating
+// Ensure: we don't hit any spurious warnings instantiating
 // C++ standard library templates because of the generated header.
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fsyntax-only -c %t/test-stdlib.cpp -I %t -Wall -Werror -Werror=ignored-attributes -Wno-error=unused-command-line-argument

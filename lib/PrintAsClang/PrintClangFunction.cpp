@@ -1397,7 +1397,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << ')';
   };
 
-  // Values types are returned either direcly in their C representation, or
+  // Values types are returned either directly in their C representation, or
   // indirectly by a pointer.
   if (!isKnownCxxType(resultTy, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {

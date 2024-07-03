@@ -1,4 +1,4 @@
-//===--- ExprContextAnalysis.h - Expession context analysis ---------------===//
+//===--- ExprContextAnalysis.h - Expression context analysis ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

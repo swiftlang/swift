@@ -1244,7 +1244,7 @@ bool LinkEntity::isText() const {
     return false;
   // The following cases do not currently generate linkable symbols
   // through TBDGen. The full enumeration is captured to ensure
-  // that as more LinkEntity kind's are created their segement assignment
+  // that as more LinkEntity kind's are created their segment assignment
   // will be known.
   case Kind::ObjCMetadataUpdateFunction:
   case Kind::NominalTypeDescriptorRecord:

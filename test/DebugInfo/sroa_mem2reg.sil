@@ -32,7 +32,7 @@ bb0(%0 : $Int64, %1 : $Int64):
   debug_value %0 : $Int64, let, name "in_x", argno 1, loc "sroa.swift":7:10, scope 2
   debug_value %1 : $Int64, let, name "in_y", argno 2, loc "sroa.swift":7:21, scope 2
   %4 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":8:9, scope 2
-  // Make sure SROA propagate the debug info to the splitted alloc_stack instructions
+  // Make sure SROA propagate the debug info to the split alloc_stack instructions
   // CHECK-SROA: alloc_stack $Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
   // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x

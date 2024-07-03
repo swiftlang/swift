@@ -62,7 +62,7 @@ struct RenameLoc {
 
   /// How the identifier is being used (call, reference, definition, unknown).
   ///
-  /// Used to decide whether a given occurance should be renamed and/or if its
+  /// Used to decide whether a given occurrence should be renamed and/or if its
   /// argument labels should be renamed.
   RenameLocUsage Usage;
 

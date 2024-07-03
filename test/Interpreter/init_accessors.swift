@@ -140,7 +140,7 @@ struct TestNoInitAndInit {
 
   var pointX: Int {
     @storageRestrictions(accesses: x)
-    init(initalValue) {
+    init(initialValue) {
     }
 
     get { x }
@@ -559,7 +559,7 @@ func test_effects_are_still_supported() {
 }
 
 test_effects_are_still_supported()
-// CHEKC: effects-support-test: Test(_a: 42, b: 0)
+// CHECK: effects-support-test: Test(_a: 42, b: 0)
 
 func test_memberwise_without_stored_properties() {
   struct Test {
@@ -819,9 +819,9 @@ do {
   print(TestDefaultInitializable())
   print(TestDefaultInitializable(a: 42))
 
-  struct TestMixedDefaultInitalizable : CustomStringConvertible {
+  struct TestMixedDefaultInitializable : CustomStringConvertible {
     var description: String {
-      "TestMixedDefaultInitalizable(a: \(a), b: \(b))"
+      "TestMixedDefaultInitializable(a: \(a), b: \(b))"
     }
 
     var a: Int? {
@@ -838,15 +838,15 @@ do {
     }
   }
 
-  print(TestMixedDefaultInitalizable())
-  print(TestMixedDefaultInitalizable(b: "Hello"))
-  print(TestMixedDefaultInitalizable(a: 42))
+  print(TestMixedDefaultInitializable())
+  print(TestMixedDefaultInitializable(b: "Hello"))
+  print(TestMixedDefaultInitializable(a: 42))
 }
 // CHECK: TestDefaultInitializable(a: nil)
 // CHECK-NEXT: TestDefaultInitializable(a: Optional(42))
-// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
-// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional("Hello"))
-// CHECK-NEXT: TestMixedDefaultInitalizable(a: nil, b: Optional(""))
+// CHECK-NEXT: TestMixedDefaultInitializable(a: nil, b: Optional(""))
+// CHECK-NEXT: TestMixedDefaultInitializable(a: nil, b: Optional("Hello"))
+// CHECK-NEXT: TestMixedDefaultInitializable(a: nil, b: Optional(""))
 
 do {
   struct TestNonMutatingSetDefault {

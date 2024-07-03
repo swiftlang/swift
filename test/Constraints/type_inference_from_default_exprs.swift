@@ -11,10 +11,10 @@ enum ETest<T> {
 }
 
 func testInferFromOtherPos1<T>(_: T = 42, _: [T]) {}
-// expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
+// expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferable from parameters #0, #1}}
 
 func testInferFromOtherPos2<T>(_: T = 42, _: T = 0.0) {}
-// expected-error@-1 2 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
+// expected-error@-1 2 {{cannot use default expression for inference of 'T' because it is inferable from parameters #0, #1}}
 
 protocol P {
   associatedtype X

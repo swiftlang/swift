@@ -96,7 +96,7 @@ STATISTIC(NumPropagatedClosuresNotEliminated,
 llvm::cl::opt<bool> EliminateDeadClosures(
     "closure-specialize-eliminate-dead-closures", llvm::cl::init(true),
     llvm::cl::desc("Do not eliminate dead closures after closure "
-                   "specialization. This is meant ot be used when testing."));
+                   "specialization. This is meant to be used when testing."));
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -1147,7 +1147,7 @@ static void markReabstractionPartialApplyAsUsed(
     return markReabstractionPartialApplyAsUsed(FirstClosure, MD->getValue(),
                                                UsedReabstractionClosure);
   }
-  llvm_unreachable("Unexpect instruction");
+  llvm_unreachable("Unexpected instruction");
 }
 
 /// Returns true if the \p closureArgIdx argument of \p callee is called in

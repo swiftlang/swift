@@ -412,7 +412,7 @@ namespace swift {
   /// after forming the ASTContext.
   void registerClangImporterRequestFunctions(Evaluator &evaluator);
 
-  /// Register constant value extraction request functons with the evaluator.
+  /// Register constant value extraction request functions with the evaluator.
   void registerConstExtractRequestFunctions(Evaluator &evaluator);
 
   /// Register SILOptimizer passes necessary for IRGen.

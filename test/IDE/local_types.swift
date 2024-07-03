@@ -121,18 +121,18 @@ public var singlePattern: Int {
 
 // Cannot be public, because inlinable default arguments cannot contain local types
 func singleDefaultArgument(i: Int = {
-  //CHECK-DAG: 10LocalTypes21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_V
+  //CHECK-DAG: 10LocalTypes21singleDefaultArgument1itSi_tFfA_SiycfU_06SingledE6StructL_V
   struct SingleDefaultArgumentStruct {
     let sdasi: Int
   }
-  // CHECK-DAG: 10LocalTypes21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE5ClassL_C
+  // CHECK-DAG: 10LocalTypes21singleDefaultArgument1itSi_tFfA_SiycfU_06SingledE5ClassL_C
   class SingleDefaultArgumentClass {
     let sdacs: String
     init(s: String) {
       self.sdacs = s
     }
   }
-  // CHECK-DAG: 10LocalTypes21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE4EnumL_O
+  // CHECK-DAG: 10LocalTypes21singleDefaultArgument1itSi_tFfA_SiycfU_06SingledE4EnumL_O
   enum SingleDefaultArgumentEnum {
     case SDAEI(Int)
   }

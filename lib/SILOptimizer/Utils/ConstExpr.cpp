@@ -1145,7 +1145,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
       return getUnknown(evaluator, apply, UnknownReason::InvalidOperandValue);
     }
 
-    // Replace all precent symbol (%) in the string with double percents (%%)
+    // Replace all percent symbol (%) in the string with double percents (%%)
     StringRef stringVal = stringArgument.getStringValue();
     SmallString<4> percentEscapedString;
     for (auto charElem : stringVal) {

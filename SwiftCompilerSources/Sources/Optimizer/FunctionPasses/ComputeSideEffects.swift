@@ -145,7 +145,7 @@ private struct CollectedEffects {
       // In addition to the effects of the apply, also consider the
       // effects of the capture, which reads the captured value in
       // order to move it into the context. This only applies to
-      // addressible values, because capturing does not dereference
+      // addressable values, because capturing does not dereference
       // any class objects.
       //
       // Ignore captures for on-stack partial applies. They only
@@ -332,7 +332,7 @@ private struct CollectedEffects {
   /// Adds effects to a specific value.
   ///
   /// If the value comes from an argument (or multiple arguments), then the effects are added
-  /// to the corrseponding `argumentEffects`. Otherwise they are added to the `global` effects.
+  /// to the corresponding `argumentEffects`. Otherwise they are added to the `global` effects.
   private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value) {
     addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
   }

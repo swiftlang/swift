@@ -1988,14 +1988,14 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModuleArgument,
                                                   DiagnosticEngine &Diags,
                                                   std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs) {
-  std::size_t foundDelimeterPos = swiftModuleArgument.find_first_of("=");
-  if (foundDelimeterPos == std::string::npos) {
+  std::size_t foundDelimiterPos = swiftModuleArgument.find_first_of("=");
+  if (foundDelimiterPos == std::string::npos) {
     Diags.diagnose(SourceLoc(), diag::error_swift_module_file_requires_delimeter,
                    swiftModuleArgument);
     return true;
   }
-  std::string moduleName = swiftModuleArgument.substr(0, foundDelimeterPos),
-              modulePath = swiftModuleArgument.substr(foundDelimeterPos+1);
+  std::string moduleName = swiftModuleArgument.substr(0, foundDelimiterPos),
+              modulePath = swiftModuleArgument.substr(foundDelimiterPos+1);
   if (!Lexer::isIdentifier(moduleName)) {
     Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleName, false);
     return true;
@@ -2596,9 +2596,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   if (Args.hasArg(OPT_CrossModuleOptimization)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
-  } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
+  } else if (Args.hasArg(OPT_EnableDefaultCMO)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Default;  
-  } else if (Args.hasArg(OPT_EnbaleCMOEverything)) {
+  } else if (Args.hasArg(OPT_EnableCMOEverything)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
 

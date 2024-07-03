@@ -140,7 +140,7 @@ if #available(OSX 10.12, iOS 10.0, *) {
   TestNonEquatableEquals(F(i: 1), F(i: 1))
   TestSwiftValueNSObjectNotEquals(H(i:1) as AnyObject, E(i:1) as AnyObject)
 
-  // Equatable but not Hashable: alway have the same Obj-C hashValue
+  // Equatable but not Hashable: always have the same Obj-C hashValue
   TestEquatableHash(E(i: 1))
   TestEquatableHash(E1(i: 17))
 

@@ -383,7 +383,7 @@ func throwsError() throws {
 }
 
 // FIXME: If we ever support this, we need to fix the premature inference of '[Any]'/'[AnyHashable: Any]'.
-// The issue is that we're attempting to bind defaults to type variables before solving the conjuction.
+// The issue is that we're attempting to bind defaults to type variables before solving the conjunction.
 let g = [if .random() { "a" } else { "b" }]
 // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 // expected-error@-2 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
@@ -850,7 +850,7 @@ func testPoundIfBranch4() -> Int {
 }
 
 func testPoundIfBranch5() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Not allowed (matches the behavior of implicit expression returns)
   if .random() {
     #if false
     0
@@ -862,7 +862,7 @@ func testPoundIfBranch5() -> Int {
 }
 
 func testPoundIfBranch6() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Not allowed (matches the behavior of implicit expression returns)
   let x = if .random() {
     #if false
     0

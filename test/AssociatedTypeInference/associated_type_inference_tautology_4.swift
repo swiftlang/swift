@@ -9,7 +9,7 @@ protocol P2 {
 }
 
 struct S2<A>: P2 {
-  // These are not candiate witnesses for the requirement.
+  // These are not candidate witnesses for the requirement.
   func f(_: Float, _: Array<A>) {}
   func f(_: String, _: Array<A>) {}
 

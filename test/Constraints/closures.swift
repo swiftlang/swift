@@ -34,7 +34,7 @@ _ = f0(X2(), {$0.g()})
 
 func inoutToSharedConversions() {
   func fooOW<T, U>(_ f : (__owned T) -> U) {}
-  fooOW({ (x : Int) in return Int(5) }) // defaut-to-'__owned' allowed
+  fooOW({ (x : Int) in return Int(5) }) // default-to-'__owned' allowed
   fooOW({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
   fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
   fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__owned Int) -> Int'}}

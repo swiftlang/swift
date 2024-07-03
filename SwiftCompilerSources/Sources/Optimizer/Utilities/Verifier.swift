@@ -13,7 +13,7 @@
 import SIL
 import OptimizerBridging
 
-private protocol VerifyableInstruction : Instruction {
+private protocol VerifiableInstruction : Instruction {
   func verify(_ context: FunctionPassContext)
 }
 
@@ -33,8 +33,8 @@ extension Function {
 
         inst.checkForwardingConformance()
 
-        if let verifyableInst = inst as? VerifyableInstruction {
-          verifyableInst.verify(context)
+        if let verifiableInst = inst as? VerifiableInstruction {
+          verifiableInst.verify(context)
         }
       }
     }
@@ -51,7 +51,7 @@ private extension Instruction {
   }
 }
 
-extension BorrowedFromInst : VerifyableInstruction {
+extension BorrowedFromInst : VerifiableInstruction {
   func verify(_ context: FunctionPassContext) {
     var computedEVs = Stack<Value>(context)
     defer { computedEVs.deinitialize() }

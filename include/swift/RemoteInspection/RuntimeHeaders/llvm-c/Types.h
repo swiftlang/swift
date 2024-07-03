@@ -127,7 +127,7 @@ typedef struct LLVMOpaqueModuleProvider *LLVMModuleProviderRef;
 typedef struct LLVMOpaquePassManager *LLVMPassManagerRef;
 
 /**
- * Used to get the users and usees of a Value.
+ * Used to get the users and uses of a Value.
  *
  * @see llvm::Use */
 typedef struct LLVMOpaqueUse *LLVMUseRef;

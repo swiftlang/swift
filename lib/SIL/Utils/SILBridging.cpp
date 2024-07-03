@@ -13,7 +13,7 @@
 #include "swift/SIL/SILBridging.h"
 
 #ifdef PURE_BRIDGING_MODE
-// In PURE_BRIDGING_MODE, briding functions are not inlined and therefore inluded in the cpp file.
+// In PURE_BRIDGING_MODE, briding functions are not inlined and therefore included in the cpp file.
 #include "swift/SIL/SILBridgingImpl.h"
 #endif
 

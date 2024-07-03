@@ -446,7 +446,7 @@ func test_memberwise_ordering() {
 
     var pair: (Int, Int) {
       @storageRestrictions(accesses: _a, _b)
-      init(initalValue) {
+      init(initialValue) {
       }
 
       get { (_a, _b) }
@@ -464,7 +464,7 @@ func test_memberwise_ordering() {
 
     var c: Int {
       @storageRestrictions(initializes: _c, accesses: _a, _b)
-      init(initalValue) {
+      init(initialValue) {
       }
 
       get { _c }
@@ -494,7 +494,7 @@ func test_default_arguments_are_analyzed() {
 
     var otherPair = (0, 1) {
       // expected-error@-1 {{computed property must have an explicit type}}
-      init(initalValue) {}
+      init(initialValue) {}
 
       get { 42 }
       // expected-error@-1 {{cannot convert return expression of type 'Int' to return type '(Int, Int)'}}

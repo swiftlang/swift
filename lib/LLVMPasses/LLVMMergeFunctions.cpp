@@ -505,7 +505,7 @@ private:
     return ConstantInt::get(Type::getInt32Ty(module->getContext()), ptrAuthKey);
   }
 
-  /// Returns the value of function \p FuncIdx, and signes it if required.
+  /// Returns the value of function \p FuncIdx, and signs it if required.
   Constant *getSignedValue(const ParamInfo &PI, unsigned FuncIdx) {
     Constant *value = PI.Values[FuncIdx];
     if (!PI.needsPointerSigning)

@@ -10,16 +10,16 @@ struct FooStruct {
 func testInsideFunctionCall_1(_ x: inout FooStruct) {
   x.instanceFunc(#^BEFORE_COMMA^#,
 // BEFORE_COMMA-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
-// BOFORE_COMMA-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
+// BEFORE_COMMA-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
 func testInsideFunctionCall_2(_ x: inout FooStruct) {
   x.instanceFunc(#^BEFORE_PLACEHOLDER^#<#placeholder#>
 // BEFORE_PLACEHOLDER-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
-// BOFORE_PLACEHOLDER-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
+// BEFORE_PLACEHOLDER-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
 func testConstructor() {
   FooStruct(#^CONSTRUCTOR^#,
-// CONSTURCTOR: Begin completions, 3 items
+// CONSTRUCTOR: Begin completions, 3 items
 // CONSTRUCTOR-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#FooStruct#];
 // CONSTRUCTOR-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#FooStruct#];
 // CONSTRUCTOR-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}, {#b: Float#}[')'][#FooStruct#];

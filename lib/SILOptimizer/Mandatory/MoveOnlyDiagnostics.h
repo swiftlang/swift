@@ -48,7 +48,7 @@ class DiagnosticEmitter {
 
   /// A count of the total diagnostics emitted so that callers of routines that
   /// take a diagnostic emitter can know if the emitter emitted additional
-  /// diagnosics while running a callee.
+  /// diagnostics while running a callee.
   unsigned diagnosticCount = 0;
 
   bool emittedCheckerDoesntUnderstandDiagnostic = false;

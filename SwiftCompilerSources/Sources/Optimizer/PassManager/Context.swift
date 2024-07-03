@@ -184,7 +184,7 @@ extension MutatingContext {
   }
 
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
-    // This is only a best-effort attempt to notity the new cloned instructions as changed.
+    // This is only a best-effort attempt to notify the new cloned instructions as changed.
     // TODO: get a list of cloned instructions from the `inlineFunction`
     let instAfterInling: Instruction?
     switch apply {

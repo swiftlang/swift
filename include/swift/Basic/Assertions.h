@@ -129,11 +129,11 @@ extern int CONDITIONAL_ASSERT_Global_enable_flag;
 // You should mostly avoid this except for occasional experiments in your
 // local tree.  It can be useful in two situations:
 //
-// * Assertions that are known to mis-fire.
+// * Assertions that are known to misfire.
 //   Such assertions should not be `ASSERT` (since that will cause unnecessary
 //   broken compiles) and `CONDITIONAL_ASSERT` gets enabled a lot by people who
 //   are not compiler experts.  So `DEBUG_ASSERT` is appropriate there until the
-//   check can be fixed so it doesn't mis-fire.
+//   check can be fixed so it doesn't misfire.
 //
 // * Inner loops that can run billions of times.
 //   For these, even the cost of testing whether `CONDITIONAL_ASSERT` is enabled

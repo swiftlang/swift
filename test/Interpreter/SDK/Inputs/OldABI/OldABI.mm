@@ -11,7 +11,7 @@
 
 // Implementation of ObjC classes
 // with bits set to mimic the pre-stable Swift ABI
-// and additional memory protection to detect mis-use
+// and additional memory protection to detect misuse
 
 #if __has_include(<objc/objc-internal.h>)
 #include <objc/objc-internal.h>

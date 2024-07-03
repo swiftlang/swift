@@ -65,7 +65,7 @@ Size ClassLayout::getInstanceStart() const {
       // of the constant ivar offset for the empty field from 0 to 16. However
       // the field offset for empty fields is assume to be zero and the runtime
       // does not compute a different value for the empty field and so the field
-      // offset for the empty field stays 0. The runtime then trys to reconcile
+      // offset for the empty field stays 0. The runtime then tries to reconcile
       // the field offset and the ivar offset trying to write to the ivar
       // offset. However, the ivar offset is marked as constant and so we
       // crashed.

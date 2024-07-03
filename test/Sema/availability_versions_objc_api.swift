@@ -40,7 +40,7 @@ func functionWithObjCParam(o: NSAvailableOn10_51) { // expected-error {{'NSAvail
     // expected-note@-1 {{add @available attribute to enclosing global function}}
 }
 
-class ClassExtendingUnvailableClass : NSAvailableOn10_51 { // expected-error {{'NSAvailableOn10_51' is only available in macOS 10.51 or newer}}
+class ClassExtendingUnavailableClass : NSAvailableOn10_51 { // expected-error {{'NSAvailableOn10_51' is only available in macOS 10.51 or newer}}
     // expected-note@-1 {{add @available attribute to enclosing class}}
 }
 

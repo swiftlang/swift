@@ -136,7 +136,7 @@ public:
 
 private:
   // The data flow state for each block. It is only valid between the time at
-  // least one predecesor block has been finished and before its own block
+  // least one predecessor block has been finished and before its own block
   // has been finished.
   //
   // The isBottom flag allows the analysis to avoid quadratic behavior where

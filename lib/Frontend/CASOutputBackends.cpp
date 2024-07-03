@@ -216,7 +216,7 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
              [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });
 
   std::optional<ObjectRef> Result;
-  // Use a clang compatible result CAS object schema when emiting PCM.
+  // Use a clang compatible result CAS object schema when emitting PCM.
   if (Action == FrontendOptions::ActionType::EmitPCM) {
     clang::cas::CompileJobCacheResult::Builder Builder;
 

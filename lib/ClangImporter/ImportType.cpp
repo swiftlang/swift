@@ -2228,7 +2228,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // any nullability specifiers from their return type, and preserves it on the
   // declared return type. Thus, in C mode the imported return type of such
   // functions is always optional. However, in C++ interop mode, the return type
-  // of builtin functions can preseve the nullability specifiers on their return
+  // of builtin functions can preserve the nullability specifiers on their return
   // type, and thus the imported return type of such functions can be
   // non-optional, if the type is annotated with
   // `_Nonnull`. The difference between these two modes can break cross-module

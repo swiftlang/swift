@@ -39,7 +39,7 @@ void findAndDeleteTraceValues(SILFunction *function,
   }
 }
 
-bool isDeleteableTestInstruction(SILInstruction const *instruction) {
+bool isDeletableTestInstruction(SILInstruction const *instruction) {
   if (auto *dvi = dyn_cast<DebugValueInst>(instruction))
     return dvi->hasTrace();
   if (isa<SpecifyTestInst>(instruction))
@@ -50,11 +50,11 @@ bool isDeleteableTestInstruction(SILInstruction const *instruction) {
 SILInstruction *findAnchorInstructionAfter(SpecifyTestInst *tsi) {
   for (auto *instruction = tsi->getNextInstruction(); instruction;
        instruction = instruction->getNextInstruction()) {
-    if (!isDeleteableTestInstruction(instruction))
+    if (!isDeletableTestInstruction(instruction))
       return instruction;
   }
   // This can't happen because a SpecifyTestInst isn't a terminator itself
-  // nor are any deleteable instructions.
+  // nor are any deletable instructions.
   llvm_unreachable("found no anchor after SpecifyTestInst!?");
 }
 

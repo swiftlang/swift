@@ -1315,7 +1315,7 @@ inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
 
-/// If the import that would make the given declaration visibile is absent,
+/// If the import that would make the given declaration visible is absent,
 /// emit a diagnostic and a fix-it suggesting adding the missing import.
 bool diagnoseMissingImportForMember(const ValueDecl *decl,
                                     const DeclContext *dc, SourceLoc loc);

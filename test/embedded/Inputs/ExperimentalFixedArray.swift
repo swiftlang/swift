@@ -93,7 +93,7 @@ public struct FixedArray<T> : ~Copyable {
   }
 }
 
-// Syntatic sugar for creating a FixedArray literal
+// Syntactic sugar for creating a FixedArray literal
 prefix operator ^
 
 @_transparent
@@ -102,7 +102,7 @@ public prefix func ^<T>(_ literal: FixedArray<T>._Literal) -> FixedArray<T> {
   return FixedArray<T>(elements: literal.array)
 }
 
-// Syntatic sugar for getting a BufferView to a FixedArray
+// Syntactic sugar for getting a BufferView to a FixedArray
 prefix operator *
 
 @_transparent

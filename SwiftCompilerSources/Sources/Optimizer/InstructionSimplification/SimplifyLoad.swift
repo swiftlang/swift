@@ -20,7 +20,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     if optimizeLoadFromStringLiteral(context) {
       return
     }
-    if optmizeLoadFromEmptyCollection(context) {
+    if optimizeLoadFromEmptyCollection(context) {
       return
     }
     if replaceLoadOfGlobalLet(context) {
@@ -85,7 +85,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
 
   /// Loading `count` or `capacity` from the empty `Array`, `Set` or `Dictionary` singleton
   /// is replaced by a 0 literal.
-  private func optmizeLoadFromEmptyCollection(_ context: SimplifyContext) -> Bool {
+  private func optimizeLoadFromEmptyCollection(_ context: SimplifyContext) -> Bool {
     if self.isZeroLoadFromEmptyCollection() {
       let builder = Builder(before: self, context)
       let zeroLiteral = builder.createIntegerLiteral(0, type: type)

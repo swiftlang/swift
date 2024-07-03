@@ -1614,7 +1614,7 @@ llvm::cl::list<std::string>
                      llvm::cl::desc("Simplify instruction of specified kind(s)"));
 
 #ifdef PURE_BRIDGING_MODE
-// In PURE_BRIDGING_MODE, briding functions are not inlined and therefore inluded in the cpp file.
+// In PURE_BRIDGING_MODE, briding functions are not inlined and therefore included in the cpp file.
 #include "swift/SILOptimizer/OptimizerBridgingImpl.h"
 #endif
 

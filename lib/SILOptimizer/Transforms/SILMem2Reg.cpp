@@ -462,7 +462,7 @@ static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
   // transformed into a sequence of destructure instructions, followed by a
   // sequence of structure instructions where all the original values are
   // kept in place but the taken value is "knocked out" and replaced with
-  // undef.  The running value would then be set to the newly structed
+  // undef.  The running value would then be set to the newly structured
   // "knockout" value.
   //
   // Alternatively, a new copy of the running value could be created and a new

@@ -82,7 +82,7 @@ public:
       if (auto type = CS.getTypeIfAvailable(decl)) {
         auto &ctx = CS.getASTContext();
         // If this is not one of the closure parameters which
-        // is inferrable from the body, let's replace type
+        // is inferable from the body, let's replace type
         // variables with errors to avoid bringing external
         // information to the element component.
         if (type->hasTypeVariable() &&
@@ -233,7 +233,7 @@ private:
     // we can bring in scope unrelated type variables passed
     // into the closure (via parameter/result) from contextual type.
     // For example `Typealias<$T, $U>.Context` which desugars into
-    // `_Context<$U>` would bring in `$T` that could be inferrable
+    // `_Context<$U>` would bring in `$T` that could be inferable
     // only after the body of the closure is solved.
     type = type->getCanonicalType();
 
@@ -1041,7 +1041,7 @@ private:
     SmallVector<ElementInfo, 4> elements;
 
     // First, let's record a body of `do` statement. Note we need to add a
-    // SyntaticElement locator path element here to avoid treating the inner
+    // SyntacticElement locator path element here to avoid treating the inner
     // brace conjunction as being isolated if 'doLoc' is for an isolated
     // conjunction (as is the case with 'do' expressions).
     auto *doBodyLoc = cs.getConstraintLocator(
@@ -1205,7 +1205,7 @@ private:
             !element.isStmt(StmtKind::Guard) &&
             !element.isStmt(StmtKind::Return) &&
             !element.isStmt(StmtKind::Then)) {
-          // Statements can't influence the expresion that contains the code
+          // Statements can't influence the expression that contains the code
           // completion token.
           // Guard statements might define variables that are used in the code
           // completion expression. Don't skip them.
@@ -1219,7 +1219,7 @@ private:
           continue;
         }
         if (element.isExpr(ExprKind::Error)) {
-          // ErrorExpr can't influcence the expresssion that contains the code
+          // ErrorExpr can't influcence the expression that contains the code
           // completion token. Since they are causing type checking to abort
           // early, just skip them.
           continue;
@@ -1750,7 +1750,7 @@ private:
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
       SyntacticElementTarget target(patternBinding);
 
-      // If this is a placeholder varaible with an initializer, let's set
+      // If this is a placeholder variable with an initializer, let's set
       // the inferred type, and ask `typeCheckDecl` to type-check initializer.
       if (isPlaceholderVar(patternBinding) && patternBinding->getInit(0)) {
         auto *pattern = patternBinding->getPattern(0);

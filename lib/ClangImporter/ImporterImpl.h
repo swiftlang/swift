@@ -1456,7 +1456,7 @@ public:
 
   /// Import a parameter type
   ///
-  /// \param param The underlaying parameter declaraction.
+  /// \param param The underlying parameter declaraction.
   /// \param optionalityOfParam The kind of optionality for the parameter
   ///        being imported.
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be import as Int

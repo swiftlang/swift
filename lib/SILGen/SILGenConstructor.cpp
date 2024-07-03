@@ -411,7 +411,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       if (initializedViaAccessor.count(field))
         continue;
 
-      // Handle situations where this stored propery is initialized
+      // Handle situations where this stored property is initialized
       // via a call to an init accessor on some other property.
       if (auto *initAccessor = field->getAccessor(AccessorKind::Init)) {
         if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {

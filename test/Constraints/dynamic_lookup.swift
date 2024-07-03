@@ -478,7 +478,7 @@ class AmbiguityA : NSObject {
 }
 
 
-class AmbuguityB : NSObject {
+class AmbiguityB : NSObject {
   @objc class var testProp: B { get { B() } }
 }
 

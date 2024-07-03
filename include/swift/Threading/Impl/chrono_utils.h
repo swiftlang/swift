@@ -12,7 +12,7 @@
 //
 // Specifically, we want ceil() for these types, but that's only available in
 // C++17, and we need to build with C++14, so... include a version of the
-// necesary code here.
+// necessary code here.
 //
 //===----------------------------------------------------------------------===//
 

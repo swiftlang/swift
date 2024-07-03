@@ -578,7 +578,7 @@ void swift::ide::printModuleInterface(
         for (auto redecl : namespaceDecl->redecls()) {
           if (redecl->decls_empty())
             continue;
-          // Namespace redecls may exist across mutliple modules. We want to
+          // Namespace redecls may exist across multiple modules. We want to
           // add the decl "D" to every module that has a redecl. But we only
           // want to add "D" once to prevent duplicate printing.
           clang::SourceLocation loc = redecl->getLocation();

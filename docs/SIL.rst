@@ -1181,7 +1181,7 @@ information when inlined.
 The function is a compiler generated thunk.
 ::
 
-  sil-function-attribute ::= '[dynamically_replacable]'
+  sil-function-attribute ::= '[dynamically_replaceable]'
 
 The function can be replaced at runtime with a different implementation.
 Optimizations must not assume anything about such a function, even if the SIL
@@ -3747,7 +3747,7 @@ of ``scalar_pack_index``, ``pack_pack_index``, or ``dynamic_pack_index``),
 and it must index into a pack type with the same shape as the indexed
 pack type.
 
-Third, additional restrictions must be satisifed depending on which
+Third, additional restrictions must be satisfied depending on which
 pack indexing instruction the pack index is:
 
 - For ``scalar_pack_index``, the projected element type must be the
@@ -5778,8 +5778,8 @@ dynamic_function_ref
   // $@convention(thin) T -> U must be a thin function type
   // %1 has type $T -> U
 
-Creates a reference to a `dynamically_replacable` SIL function. A
-`dynamically_replacable` SIL function can be replaced at runtime.
+Creates a reference to a `dynamically_replaceable` SIL function. A
+`dynamically_replaceable` SIL function can be replaced at runtime.
 
 For the following Swift code::
 
@@ -5791,7 +5791,7 @@ For the following Swift code::
 
 We will generate::
 
-  sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+  sil [dynamically_replaceable] @test_dynamically_replaceable : $@convention(thin) () -> () {
   bb0:
     %0 = tuple ()
     return %0 : $()

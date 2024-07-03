@@ -82,7 +82,7 @@ public:
 /// individual element of the substituted tuple type.  This makes
 /// this generator more appropriate for use cases where the elements
 /// must all be visited, such as when iterating the elements of two
-/// tuples in paralle.
+/// tuples in parallel.
 ///
 /// In order to properly handle pack expansions within tuples,
 /// especially any empty pack expansions in the original tuple type,

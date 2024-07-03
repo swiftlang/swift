@@ -2503,7 +2503,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 
         // Reset the node found in a parent context if it's not part of this
         // brace statement.
-        // We must not reset FoundNode if it's inside thei BraceStmt's source
+        // We must not reset FoundNode if it's inside their BraceStmt's source
         // range because the found node could be inside a capture list, which is
         // syntactically part of the brace stmt's range but won't be walked as
         // a child of the brace stmt.
@@ -2690,7 +2690,7 @@ static void addImplicitReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
   if (body->empty())
     return;
 
-  // Must have a single active element (which is guarenteed to be the last
+  // Must have a single active element (which is guaranteed to be the last
   // element), or we must be allowing implicit last expression results.
   auto &ctx = dc->getASTContext();
   if (!body->getSingleActiveElement() &&

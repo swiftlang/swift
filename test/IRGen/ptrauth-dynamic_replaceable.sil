@@ -45,7 +45,7 @@
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
-sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+sil [dynamically_replaceable] @test_dynamically_replaceable : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -87,7 +87,7 @@ bb0:
 }
 
 
-sil [dynamically_replacable] @external_test_dynamically_replaceable : $@convention(thin) () -> ()
+sil [dynamically_replaceable] @external_test_dynamically_replaceable : $@convention(thin) () -> ()
 
 sil [dynamic_replacement_for "external_test_dynamically_replaceable"] @test_replacement_for_external : $@convention(thin) () -> () {
 bb0:

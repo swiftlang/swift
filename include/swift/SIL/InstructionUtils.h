@@ -218,7 +218,7 @@ SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 /// a tree of tuples.
 ///
 /// If visitor returns false, we stop processing early. We return true if we
-/// visited all of the tuple elements without the visitor returing false.
+/// visited all of the tuple elements without the visitor returning false.
 bool visitExplodedTupleType(SILType type,
                             llvm::function_ref<bool(SILType)> callback);
 
@@ -226,7 +226,7 @@ bool visitExplodedTupleType(SILType type,
 /// a tree of tuples.
 ///
 /// If visitor returns false, we stop processing early. We return true if we
-/// visited all of the tuple elements without the visitor returing false.
+/// visited all of the tuple elements without the visitor returning false.
 bool visitExplodedTupleValue(SILValue value,
                              llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
 

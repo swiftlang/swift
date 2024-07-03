@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractLiterals.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
 // RUN: cat %t/ExtractLiterals.swiftconstvalues 2>&1 | %FileCheck %s
 
-struct CoercableThing : ExpressibleByStringLiteral {
+struct CoercibleThing : ExpressibleByStringLiteral {
     let thing: String
     public init(unicodeScalarLiteral value: String) {
         self.init(stringLiteral: value)
@@ -17,8 +17,8 @@ struct CoercableThing : ExpressibleByStringLiteral {
 
 protocol MyProto {}
 public struct TestStruct : MyProto {
-    let foo: CoercableThing = "foo"
-    let bar: CoercableThing = CoercableThing("bar")
+    let foo: CoercibleThing = "foo"
+    let bar: CoercibleThing = CoercibleThing("bar")
 }
 
 // CHECK:             "label": "foo",

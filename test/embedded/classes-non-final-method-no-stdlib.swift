@@ -3,6 +3,6 @@
 // REQUIRES: swift_in_compiler
 
 public class MyClass {
-  func foo<T>(t: T) { } // expected-error {{classes cannot have non-final generic fuctions in embedded Swift}}
+  func foo<T>(t: T) { } // expected-error {{classes cannot have non-final generic functions in embedded Swift}}
   func bar() { }
 }

@@ -445,7 +445,7 @@ struct X15d : P15d { }
 // FIXME: Better diagnostic here?
 struct X15g : P15g { } // expected-error{{type 'X15g' does not conform to protocol 'P15g'}}
 
-// Associated type defaults in overidden associated types that require
+// Associated type defaults in overridden associated types that require
 // substitution.
 struct X16<T> { }
 

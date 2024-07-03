@@ -105,8 +105,8 @@ enum TriValue {
   case true_
   case top
 }
-// CHECK-DAG: !DIGlobalVariable(name: "unknown",{{.*}} type: ![[TRIVAL:[0-9]+]]
-// CHECK-DAG: ![[TRIVAL]] = !DICompositeType({{.*}}name: "TriValue",
+// CHECK-DAG: !DIGlobalVariable(name: "unknown",{{.*}} type: ![[TRIVIAL:[0-9]+]]
+// CHECK-DAG: ![[TRIVIAL]] = !DICompositeType({{.*}}name: "TriValue",
 var unknown = TriValue.top
 func myprint(_ value: TriValue) {
      switch value {

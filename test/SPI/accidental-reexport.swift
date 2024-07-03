@@ -4,13 +4,13 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module %t/Overlayed.swift -I %t -o %t
+// RUN: %target-swift-frontend -emit-module %t/Overlaid.swift -I %t -o %t
 // RUN: %target-swift-frontend -typecheck -verify %t/Client.swift -I %t
 // RUN: %target-swift-frontend -typecheck -verify %t/LowerClient.swift -I %t
 
 //--- module.modulemap
-module Overlayed {
-    header "Overlayed.h"
+module Overlaid {
+    header "Overlaid.h"
 }
 
 module Middle {
@@ -23,9 +23,9 @@ module LowerMiddle {
     export *
 }
 
-//--- Overlayed.h
-//--- Overlayed.swift
-@_exported import Overlayed
+//--- Overlaid.h
+//--- Overlaid.swift
+@_exported import Overlaid
 
 public func funcPublic() {}
 
@@ -33,7 +33,7 @@ public func funcPublic() {}
 public func funcSPI() {}
 
 //--- Middle.h
-#include <Overlayed.h>
+#include <Overlaid.h>
 
 //--- LowerMiddle.h
 #include <Middle.h>

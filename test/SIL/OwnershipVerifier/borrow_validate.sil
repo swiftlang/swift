@@ -239,8 +239,8 @@ bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
   return %ret : $()
 }
 
-// CHECK-NOT: Function: 'borrow_lifetime_discrepency'
-sil [ossa] @borrow_lifetime_discrepency : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+// CHECK-NOT: Function: 'borrow_lifetime_discrepancy'
+sil [ossa] @borrow_lifetime_discrepancy : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   %copy0 = copy_value %0 : $WrapperStruct
   cond_br undef, bb1, bb2
@@ -263,8 +263,8 @@ bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $Wrapper
   return %ret : $()
 }
 
-// CHECK-NOT: Function: 'borrow_lifetime_discrepency_2'
-sil [ossa] @borrow_lifetime_discrepency_2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+// CHECK-NOT: Function: 'borrow_lifetime_discrepancy_2'
+sil [ossa] @borrow_lifetime_discrepancy_2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   cond_br undef, bb1, bb2
 
@@ -288,15 +288,15 @@ bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $Wrapper
   return %ret : $()
 }
 
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrow_lifetime_discrepency_incorrect_1'
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrow_lifetime_discrepancy_incorrect_1'
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value: %13 = argument of bb3 : $WrapperStruct            // user: %15
 // CHECK: Consuming User:   destroy_value %13 : $WrapperStruct              // id: %15
 // CHECK: Non Consuming User:   end_borrow %12 : $WrapperStruct                 // id: %16
 // CHECK: Block: bb3
-// CHECK-LABEL: Error#: 0. End Error in Function: 'borrow_lifetime_discrepency_incorrect_1'
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrow_lifetime_discrepancy_incorrect_1'
 // CHECK-NOT: Error#: 1.
-sil [ossa] @borrow_lifetime_discrepency_incorrect_1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+sil [ossa] @borrow_lifetime_discrepancy_incorrect_1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   cond_br undef, bb1, bb2
 
@@ -320,15 +320,15 @@ bb3(%newborrowi : @guaranteed $WrapperStruct, %newborrowo : @guaranteed $Wrapper
   return %ret : $()
 }
 
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrow_lifetime_discrepency_incorrect_2'
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrow_lifetime_discrepancy_incorrect_2'
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value: %12 = argument of bb3 : $WrapperStruct            // user: %14
 // CHECK: Consuming User:   end_borrow %12 : $WrapperStruct                 // id: %14
 // CHECK: Non Consuming User:   end_borrow %11 : $WrapperStruct                 // id: %15
 // CHECK: Block: bb3
-// CHECK-LABEL: Error#: 0. End Error in Function: 'borrow_lifetime_discrepency_incorrect_2'
+// CHECK-LABEL: Error#: 0. End Error in Function: 'borrow_lifetime_discrepancy_incorrect_2'
 // CHECK-NOT: Error#: 1.
-sil [ossa] @borrow_lifetime_discrepency_incorrect_2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
+sil [ossa] @borrow_lifetime_discrepancy_incorrect_2 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   cond_br undef, bb1, bb2
 

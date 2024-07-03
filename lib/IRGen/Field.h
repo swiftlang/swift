@@ -89,7 +89,7 @@ public:
   /// Return the interface type of this concrete field.
   Type getInterfaceType(IRGenModule &IGM) const;
 
-  /// Return the nam eof this concrete field.
+  /// Return the name eof this concrete field.
   llvm::StringRef getName() const;
 
   bool operator==(Field other) const { return declOrKind == other.declOrKind; }

@@ -3525,7 +3525,7 @@ public:
 class ExtractFunctionIsolationExpr : public Expr {
   /// The function value expression from which to extract the
   /// isolation. The type of `fnExpr` must be an ``@isolated(any)`
-  /// funciton.
+  /// function.
   Expr *fnExpr;
 
   /// The source location of `.isolation`

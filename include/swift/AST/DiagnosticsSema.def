@@ -4338,7 +4338,7 @@ ERROR(diff_params_clause_param_not_differentiable,none,
       "can only differentiate with respect to parameters that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
-// completionHanderAsync attribute
+// completionHandlerAsync attribute
 WARNING(warn_use_async_alternative,none,
         "consider using asynchronous alternative function",())
 
@@ -7497,12 +7497,12 @@ ERROR(wrap_invalid_attr_added_by_access_note, none,
 
 ERROR(cannot_default_generic_parameter_inferrable_from_another_parameter, none,
       "cannot use default expression for inference of %0 because it "
-      "is inferrable from parameters %1",
+      "is inferable from parameters %1",
       (Type, StringRef))
 
 ERROR(cannot_default_generic_parameter_inferrable_through_same_type, none,
       "cannot use default expression for inference of %0 because it "
-      "is inferrable through same-type requirement: '%1'",
+      "is inferable through same-type requirement: '%1'",
       (Type, StringRef))
 
 ERROR(cannot_default_generic_parameter_invalid_requirement, none,
@@ -7802,7 +7802,7 @@ ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
       (const ValueDecl *))
 ERROR(suppress_inferrable_protocol_extension,none,
-      "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))
+      "conformance to inferable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))
 ERROR(suppress_nonsuppressable_protocol,none,
       "conformance to %0 cannot be suppressed", (const ProtocolDecl *))
 WARNING(suppress_already_suppressed_protocol,none,
@@ -7968,7 +7968,7 @@ ERROR(lifetime_dependence_only_on_function_method_init_result, none,
 ERROR(lifetime_dependence_invalid_return_type, none,
       "lifetime dependence can only be specified on ~Escapable results", ())
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
-      "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
+      "cannot infer lifetime dependence %0, multiple parameters qualify as a candidate", (StringRef))
  ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
        "cannot infer lifetime dependence%0, no parameters found that are either "
        "~Escapable or Escapable with a borrowing ownership", (StringRef))

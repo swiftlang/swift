@@ -337,12 +337,12 @@ void AsyncConverter::convertPattern(const Pattern *P) {
   addRange(LastAddedLoc, P->getEndLoc(), /*ToEndOfToken*/ true);
 }
 
-void AsyncConverter::wrapScopeInContinationIfNecessary(ASTNode Node) {
+void AsyncConverter::wrapScopeInContinuationIfNecessary(ASTNode Node) {
   if (NestedExprCount != 0) {
     // We can't start a continuation in the middle of an expression
     return;
   }
-  if (Scopes.back().isWrappedInContination()) {
+  if (Scopes.back().isWrappedInContinuation()) {
     // We are already in a continuation. No need to add another one.
     return;
   }
@@ -393,7 +393,7 @@ bool AsyncConverter::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (isa<PatternBindingDecl>(D)) {
     // We can't hoist a closure inside a PatternBindingDecl. If it contains
     // a call to the completion handler, wrap it in a continuation.
-    wrapScopeInContinationIfNecessary(D);
+    wrapScopeInContinuationIfNecessary(D);
     NestedExprCount++;
     return true;
   }
@@ -465,7 +465,7 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
                          [&]() { OS << newNameFor(D, true); });
     }
   } else if (CallExpr *CE = TopHandler.getAsHandlerCall(E)) {
-    if (Scopes.back().isWrappedInContination()) {
+    if (Scopes.back().isWrappedInContinuation()) {
       return addCustom(E->getSourceRange(),
                        [&]() { convertHandlerToContinuationResume(CE); });
     } else if (NestedExprCount == 0) {
@@ -478,7 +478,7 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
     //    middle of an expression)
     //  - the current scope is wrapped in a continuation (we can't have await
     //    calls in the continuation block)
-    if (NestedExprCount == 0 && !Scopes.back().isWrappedInContination()) {
+    if (NestedExprCount == 0 && !Scopes.back().isWrappedInContinuation()) {
       // If the refactoring is on the call itself, do not require the callee
       // to have the @available attribute or a completion-like name.
       auto HandlerDesc = AsyncHandlerParamDesc::find(
@@ -502,7 +502,7 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
 
   // We didn't do any special conversion for this expression. If needed, wrap
   // it in a continuation.
-  wrapScopeInContinationIfNecessary(E);
+  wrapScopeInContinuationIfNecessary(E);
 
   NestedExprCount++;
   return true;
@@ -574,10 +574,10 @@ bool AsyncConverter::walkToStmtPre(Stmt *S) {
 bool AsyncConverter::walkToStmtPost(Stmt *S) {
   if (startsNewScope(S)) {
     bool ClosedScopeWasWrappedInContinuation =
-        Scopes.back().isWrappedInContination();
+        Scopes.back().isWrappedInContinuation();
     Scopes.pop_back();
     if (ClosedScopeWasWrappedInContinuation &&
-        !Scopes.back().isWrappedInContination()) {
+        !Scopes.back().isWrappedInContinuation()) {
       // The nested scope was wrapped in a continuation but the current one
       // isn't anymore. Add the '}' that corresponds to the call to
       // withChecked(Throwing)Continuation.
@@ -942,7 +942,7 @@ void AsyncConverter::convertHandlerToContinuationResume(const CallExpr *CE) {
 
 void AsyncConverter::convertHandlerToContinuationResumeImpl(
     const CallExpr *CE, HandlerResult Result) {
-  assert(Scopes.back().isWrappedInContination());
+  assert(Scopes.back().isWrappedInContinuation());
 
   std::vector<Argument> Args;
   StringRef ResumeArgumentLabel;
@@ -987,7 +987,7 @@ void AsyncConverter::convertHandlerToContinuationResumeImpl(
       }
     }
     if (Args.size() == 1) {
-      // We only have a single result. 'result' seems a resonable name.
+      // We only have a single result. 'result' seems a reasonable name.
       return createUniqueName("result");
     } else {
       // We are returning a tuple. Name the result elements 'result' +

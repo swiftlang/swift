@@ -372,7 +372,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   // mmap to workaround issues on NFS when the swiftmodule file loaded changes
   // on disk while it's in use.
   //
-  // In practice, a swiftmodule file can chane when a client uses a
+  // In practice, a swiftmodule file can change when a client uses a
   // swiftmodule file from a framework while the framework is recompiled and
   // installed over existing files. Or when many processes rebuild the same
   // module interface.

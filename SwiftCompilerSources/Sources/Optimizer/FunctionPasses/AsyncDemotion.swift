@@ -590,7 +590,7 @@ private func analyzeForDemotion(_ function: Function) -> Node? {
   // because it may be a caller of a function that can be demoted.
 
   var executors = Set<Executor>()
-  var knownAsyncApplys: [ApplySite] = []
+  var knownAsyncApplies: [ApplySite] = []
   var hops: [Instruction] = []
   var unknownAsyncOp: Instruction? = nil
 
@@ -614,7 +614,7 @@ private func analyzeForDemotion(_ function: Function) -> Node? {
       if apply.referencedFunction == nil {
         unknownAsyncOp.setIfUnset(inst)
       } else {
-        knownAsyncApplys.append(apply)
+        knownAsyncApplies.append(apply)
         stats.tick(.asyncKnownCallsCount)
       }
 
@@ -630,7 +630,7 @@ private func analyzeForDemotion(_ function: Function) -> Node? {
 
   let data: AnalysisResult.Data =
     (function: function,
-     knownAsyncCalls: knownAsyncApplys,
+     knownAsyncCalls: knownAsyncApplies,
      executors: executors,
      hops: hops)
 

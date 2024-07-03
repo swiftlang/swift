@@ -46,7 +46,7 @@
 #define LAST_DECL_ATTR(CLASS)
 #endif
 
-// Declaration Attributes and Modifers
+// Declaration Attributes and Modifiers
 DECL_ATTR(_silgen_name, SILGenName,
   OnAbstractFunction | OnVar | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   0)

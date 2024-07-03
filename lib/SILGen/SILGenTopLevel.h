@@ -41,7 +41,7 @@ private:
   /// The `SILGenFunction` where toplevel code is emitted
   SILGenFunction &SGF;
 
-  /// Walks type declarations to scan for instances where unitialized global
+  /// Walks type declarations to scan for instances where uninitialized global
   /// variables are captured by function declarations and emits
   /// `mark_function_escape` SIL instructions for these escape points as needed
   class TypeVisitor : public TypeMemberVisitor<TypeVisitor> {

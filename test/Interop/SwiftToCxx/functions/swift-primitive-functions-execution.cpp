@@ -35,7 +35,7 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE(passThroughCUnsignedInt, 0xFFFFFFFF);
   VERIFY_PASSTHROUGH_VALUE(passThroughCUnsignedLongLong, 0xFFFFFFFF);
 
-  VERIFY_PASSTHROUGH_VALUE(passThrougCFloat, 1.0f);
+  VERIFY_PASSTHROUGH_VALUE(passThroughCFloat, 1.0f);
   VERIFY_PASSTHROUGH_VALUE(passThroughCDouble, 42.125f);
 
   VERIFY_PASSTHROUGH_VALUE(passThroughInt8, -1);

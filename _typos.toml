@@ -1,0 +1,263 @@
+[files]
+extend-exclude = [
+    "CHANGELOG.md",
+    "benchmark/single-source/CountAlgo.swift",
+    "benchmark/single-source/FindStringNaive.swift",
+    "benchmark/single-source/SortStrings.swift",
+    "docs/ABI/Mangling.rst",
+    "docs/Generics/chapters/monoids.tex",
+    "docs/Generics/chapters/substitution-maps.tex",
+    "docs/SIL.rst",
+    "include/swift/AST/Builtins.def",
+    "include/swift/Basic/PrefixMap.h",
+    "include/swift/RemoteInspection/RuntimeHeaders/*",
+    "include/swift/SIL/OptimizationRemark.h",
+    "lib/AST/AccessRequests.cpp",
+    "lib/IRGen/GenKeyPath.cpp",
+    "lib/SILOptimizer/Utils/SILIsolationInfo.cpp",
+    "stdlib/private/StdlibUnicodeUnittest/UnicodeScalarProperties.swift",
+    "stdlib/public/Backtracing/SymbolicatedBacktrace.swift",
+    "stdlib/public/Backtracing/modules/ImageFormats/Elf/elf.h",
+    "stdlib/public/Windows/WinSDK.swift",
+    "stdlib/public/core/CString.swift",
+    "stdlib/public/core/String.swift",
+    "stdlib/public/runtime/SwiftDtoa.cpp",
+    "test/AutoDiff/compiler_crashers_fixed/tf1160-derivative-usable-from-inline-mismatch.swift",
+    "test/Backtracing/CrashAsync.swift",
+    "test/Casting/fast_class_casts.swift",
+    "test/Concurrency/default_actor_definit.swift",
+    "test/Concurrency/flow_isolation.swift",
+    "test/Constraints/closures.swift",
+    "test/DebugInfo/*",
+    "test/Demangle/*",
+    "test/Distributed/*",
+    "test/Generics/deduction.swift",
+    "test/IRGen/*",
+    "test/Index/kinds.swift",
+    "test/Inputs/*",
+    "test/Interop/Cxx/foreign-reference/reference-counted-irgen.swift",
+    "test/Interop/Cxx/foreign-reference/reference-counted-objc-property.swift",
+    "test/Interop/SwiftToC/functions/swift-function-argument-keyword-in-c.swift",
+    "test/Interop/SwiftToCxx/cross-module-refs/imported-struct-refs-in-cxx.swift",
+    "test/Interop/SwiftToCxx/functions/swift-function-argument-keyword-in-cxx.swift",
+    "test/Interop/SwiftToCxx/functions/swift-functions.swift",
+    "test/Interop/SwiftToCxx/generics/generic-function-in-cxx.swift",
+    "test/Interop/SwiftToCxx/structs/small-structs-pass-return-direct-in-cxx.swift",
+    "test/Interpreter/SDK/objc_nsstring_bridge.swift",
+    "test/Interpreter/multi_payload_extra_inhabitant.swift",
+    "test/Macros/macro_expand_closure.swift",
+    "test/Migrator/Inputs/string-representable.json",
+    "test/Migrator/rename-func-decl.swift",
+    "test/Migrator/rename-func-decl.swift.expected",
+    "test/PrintAsObjC/circularity.swift",
+    "test/SIL/Parser/generic_signature_with_depth.swift",
+    "test/SIL/Serialization/deserialize_generic.sil",
+    "test/SIL/Serialization/deserialize_generic_marker.sil",
+    "test/SIL/implicit_lifetime_dependence.swift",
+    "test/SILGen/*",
+    "lib/SILOptimizer/Utils/OnonePrespecializations.def",
+    "test/SourceKit/*",
+    "test/SILOptimizer/*",
+    "test/Sema/typo_correction_limit.swift",
+    "test/Serialization/Inputs/def_basic.sil",
+    "test/Serialization/enum-mutual-circularity.swift",
+    "test/abi/*",
+    "test/attr/attr_dynamic_member_lookup.swift",
+    "test/embedded/*",
+    "test/expr/cast/array_coerce.swift",
+    "utils/gen-unicode-data/Data/*",
+    "validation-test/IDE/crashers_2_fixed",
+    "validation-test/compiler_crashers_2_fixed",
+    "validation-test/compiler_crashers_fixed",
+    "validation-test/stdlib/ArrayTrapsObjC.swift",
+    "validation-test/stdlib/StringNormalization.swift",
+    "test/stdlib/Inputs/NormalizationTest.txt",
+    "test/stdlib/Inputs/NormalizationTest15.txt",
+    "test/stdlib/runtime_autorelease_optimization.txt",
+    "test/stdlib/StringCreate.swift",
+    "unittests/SwiftDemangle/DemangleTest.cpp",
+    "utils/api_checker/FrameworkABIBaseline/Swift/ABI/macos.json",
+    "utils/api_checker/FrameworkABIBaseline/Swift/API/macos.json",
+    "utils/UnicodeData/confusables.txt",
+    "utils/UnicodeData/GraphemeBreakProperty.txt",
+    "utils/WindowsSDKVFSOverlay.yaml.in",
+    "validation-test/IDE/issues_fixed/rdar120798355.swift",
+    "validation-test/stdlib/Dictionary.swift",
+    "validation-test/stdlib/Unicode.swift.gyb",
+    "validation-test/Reflection/reflect_nested_generic.swift",
+]
+
+[default]
+check-filename = false
+
+[default.extend-identifiers]
+000000000002afe0 = "000000000002afe0"
+ALS = "ALS"
+ALS_BOOTSTRAPPING = "ALS_BOOTSTRAPPING"
+ALS_DEPENDS = "ALS_DEPENDS"
+ALS_SWIFT_EXEC = "ALS_SWIFT_EXEC"
+ASO = "ASO"
+ASYNC_CLOS = "ASYNC_CLOS"
+AllVisibles = "AllVisibles"
+ArrayClas = "ArrayClas"
+BA = "BA"
+BUILTIN_MISC_OPERATIONs = "BUILTIN_MISC_OPERATIONs"
+ClangModuleWithOverlayedDep = "ClangModuleWithOverlayedDep"
+Clas = "Clas"
+DAA = "DAA"
+DW_AT_endianity = "DW_AT_endianity"
+DW_TAG_formal_parmeter = "DW_TAG_formal_parmeter"
+EIS = "EIS"
+EIT = "EIT"
+EM_COREA_2ND = "EM_COREA_2ND"
+Elf32_Rela = "Elf32_Rela"
+Elf64_Rela = "Elf64_Rela"
+EmitGenericRODatas = "EmitGenericRODatas"
+EnableCMOEverything = "EnableCMOEverything"
+EnableDefaultCMO = "EnableDefaultCMO"
+ExtensionImportVisiblity = "ExtensionImportVisiblity"
+FCMP_OLT = "FCMP_OLT"
+FLE = "FLE"
+FO = "FO"
+ForwardScan2nd = "ForwardScan2nd"
+GenericRODatas = "GenericRODatas"
+HSI = "HSI"
+HTE = "HTE"
+IITDescriptor = "IITDescriptor"
+IMAGE_DLL_CHARACTERISTICS_NO_SEH = "IMAGE_DLL_CHARACTERISTICS_NO_SEH"
+IsSer = "IsSer"
+KindNd = "KindNd"
+MutipleTopLevelWriters = "MutipleTopLevelWriters"
+ND = "ND"
+Nd = "Nd"
+Nd1 = "Nd1"
+Nd2 = "Nd2"
+NdKind = "NdKind"
+OME = "OME"
+OT = "OT"
+ParmVarDecl = "ParmVarDecl"
+OVERLAYED_H = "OVERLAYED_H"
+O_WRONLY = "O_WRONLY"
+OverridenDeclsOwner = "OverridenDeclsOwner"
+PN = "PN"
+Parm = "Parm"
+Parms = "Parms"
+ParmsResult = "ParmsResult"
+PlatformConditon = "PlatformConditon"
+Pn = "Pn"
+RUNTIME_VERSIONs = "RUNTIME_VERSIONs"
+SEH = "SEH"
+SER = "SER"
+SHT_RELA = "SHT_RELA"
+SILSer = "SILSer"
+selt = "selt"
+selt2 = "selt2"
+ACN = "ACN"
+SWIFT_RUNTIME_MUTEX_PHTREAD_BACKDEPLOY56_H = "SWIFT_RUNTIME_MUTEX_PHTREAD_BACKDEPLOY56_H"
+SafeSEH = "SafeSEH"
+Ser = "Ser"
+SitlF = "SitlF"
+Siz = "Siz"
+SouceFile = "SouceFile"
+SpecNd = "SpecNd"
+Strat = "Strat"
+Sur = "Sur"
+TBE = "TBE"
+TRE = "TRE"
+TextNd = "TextNd"
+TrimedComment = "TrimedComment"
+TweedleDum = "TweedleDum"
+USED_IN_CPP_SOURC = "USED_IN_CPP_SOURC"
+UncompressibleProperty = "UncompressibleProperty"
+VABIy = "VABIy"
+YOUT = "YOUT"
+_O_WRONLY = "_O_WRONLY"
+alledge_iterator = "alledge_iterator"
+autoClos = "autoClos"
+ba = "ba"
+baResult1 = "baResult1"
+baResult2 = "baResult2"
+bitap = "bitap"
+cannot_default_generic_parameter_inferrable_from_another_parameter = "cannot_default_generic_parameter_inferrable_from_another_parameter"
+cannot_default_generic_parameter_inferrable_through_same_type = "cannot_default_generic_parameter_inferrable_through_same_type"
+clos = "clos"
+complexy = "complexy"
+daa = "daa"
+derivedBA = "derivedBA"
+desig_init_added = "desig_init_added"
+diagnoseRepresenationError = "diagnoseRepresenationError"
+doas = "doas"
+error_swift_module_file_requires_delimeter = "error_swift_module_file_requires_delimeter"
+explosion_size_oveflow = "explosion_size_oveflow"
+fcmp_olt = "fcmp_olt"
+fcmp_olt_ = "fcmp_olt_"
+fcmp_olt_FPIEEE = "fcmp_olt_FPIEEE"
+fnd_get_demangled_name = "fnd_get_demangled_name"
+preject = "preject"
+fo = "fo"
+foor = "foor"
+fpt = "fpt"
+generic_ro_datas = "generic_ro_datas"
+getCalleeWithoutImplmentation = "getCalleeWithoutImplmentation"
+gir = "gir"
+hasMangledNam = "hasMangledNam"
+hightlightLength = "hightlightLength"
+hsi = "hsi"
+inout = "inout"
+inout_aliasable = "inout_aliasable"
+inouts = "inouts"
+isConvertableToGuaranteed = "isConvertableToGuaranteed"
+isRela = "isRela"
+isSourceLocInOrignalBuffer = "isSourceLocInOrignalBuffer"
+ist = "ist"
+kindNd = "kindNd"
+mone = "mone"
+multline = "multline"
+nd = "nd"
+netinet_in_systm = "netinet_in_systm"
+numer = "numer"
+ois = "ois"
+ome = "ome"
+overridenFiles = "overridenFiles"
+overridenVFS = "overridenVFS"
+parm = "parm"
+partially_applyable_to_class = "partially_applyable_to_class"
+partially_applyable_to_two_classes = "partially_applyable_to_two_classes"
+peform = "peform"
+pn = "pn"
+primaryNd = "primaryNd"
+readed = "readed"
+s43_bridgeNonVerbatimFromObjectiveCConditionalySbyXl_xmxSgztlF = "s43_bridgeNonVerbatimFromObjectiveCConditionalySbyXl_xmxSgztlF"
+selfs = "selfs"
+ser = "ser"
+suppress_inferrable_protocol_extension = "suppress_inferrable_protocol_extension"
+thr = "thr"
+ue = "ue"
+usees = "usees"
+warn_ignore_option_overriden_by = "warn_ignore_option_overriden_by"
+yout = "yout"
+TemplateTypeParmType = "TemplateTypeParmType"
+ist64 = "ist64"
+
+[default.extend-words]
+ASO = "ASO"
+BUILTIN_MISC_OPERATIONs = "BUILTIN_MISC_OPERATIONs"
+Bitap = "Bitap"
+Frostig = "Frostig"
+Inout = "Inout"
+Inouts = "Inouts"
+KindNd = "KindNd"
+OME = "OME"
+RELA = "RELA"
+SEH = "SEH"
+SER = "SER"
+Sur = "Sur"
+WOH = "WOH"
+canonicalizations = "canonicalizations"
+dereferencable = "dereferencable"
+generic_ro_datas = "generic_ro_datas"
+hsi = "hsi"
+referencable = "referencable"
+rela = "rela"
+unparseable = "unparseable"
+BA = "BA"

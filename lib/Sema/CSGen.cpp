@@ -2551,7 +2551,7 @@ namespace {
         }
 
         // Because we are only pulling out the result type from the contextual
-        // type, we avoid prematurely converting any inferrable types by setting
+        // type, we avoid prematurely converting any inferable types by setting
         // forConstraint=false. Later on in inferClosureType we call
         // replaceInferableTypesWithTypeVars before returning to ensure we don't
         // introduce any placeholders into the constraint system.

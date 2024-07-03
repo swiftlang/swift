@@ -17,7 +17,7 @@ void takeASubscript(subscript *param);
 subscript* returnASubscript();
 
 // There is a Swift protocol, @objc protocol ShadowedProtocol, but
-// since here we are refering to a class and not a protocol, this
+// since here we are referring to a class and not a protocol, this
 // shouldn't be an issue.
 ShadowedProtocol* returnANativeObjCClassShadowedProtocol();
 

@@ -66,7 +66,7 @@ inline void deleteAllDebugUses(SILInstruction *inst) {
 /// This iterator filters out any debug (or non-debug) instructions from a range
 /// of uses, provided by the underlying ValueBaseUseIterator.
 /// If \p nonDebugInsts is true, then the iterator provides a view to all non-
-/// debug instructions. Otherwise it provides a view ot all debug-instructions.
+/// debug instructions. Otherwise it provides a view to all debug-instructions.
 template <bool nonDebugInsts> class DebugUseIterator {
 public:
   using iterator_category = std::forward_iterator_tag;
@@ -252,7 +252,7 @@ bool hasNonTrivialNonDebugTransitiveUsers(
 /// information about a VarDecl. This allows one to write high level code over
 /// the set of such instructions with greater correctness by using exhaustive
 /// switches, methods, and keeping it light weight by using *, -> operators to
-/// access functionality from the underlying instruction when eneded.
+/// access functionality from the underlying instruction when ended.
 class VarDeclCarryingInst {
 public:
   enum class Kind : uint8_t {

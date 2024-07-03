@@ -16,6 +16,6 @@
 
 // The dependency of `Foo` on `A` will not be visible if the scanner simply scans the textual interface
 // of `Foo`. So we verify that for a `@testable` import, the scanner also opens up the adjacent binary module and
-// attemtps to resolve optional dependencies contained within.
+// attempts to resolve optional dependencies contained within.
 //
 // CHECK: "swift": "A"

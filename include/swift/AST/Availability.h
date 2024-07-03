@@ -384,21 +384,21 @@ public:
 
   /// For the attribute's introduction version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
+  /// Returns `true` if a remap occurred.
   static bool updateIntroducedPlatformForFallback(
       const AvailableAttr *attr, const ASTContext &Ctx,
       llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
 
   /// For the attribute's deprecation version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
+  /// Returns `true` if a remap occurred.
   static bool updateDeprecatedPlatformForFallback(
       const AvailableAttr *attr, const ASTContext &Ctx,
       llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
 
   /// For the attribute's obsoletion version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
+  /// Returns `true` if a remap occurred.
   static bool updateObsoletedPlatformForFallback(
       const AvailableAttr *attr, const ASTContext &Ctx,
       llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
@@ -409,7 +409,7 @@ public:
 
   /// For the attribute's before version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
-  /// Returns `true` if a remap occured.
+  /// Returns `true` if a remap occurred.
   static bool updateBeforePlatformForFallback(const BackDeployedAttr *attr,
                                               const ASTContext &Ctx,
                                               llvm::StringRef &Platform,

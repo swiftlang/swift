@@ -368,7 +368,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   } else {
     os << "() noexcept {}\n";
   }
-  // Print out '_make' function which returns an unitialized instance for
+  // Print out '_make' function which returns an uninitialized instance for
   // passing to Swift.
   os << "  static ";
   printer.printInlineForThunk();
@@ -622,7 +622,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
 
   if (typeDecl->hasClangNode()) {
-    /// Print a reference to the type metadata fucntion for a C++ type.
+    /// Print a reference to the type metadata function for a C++ type.
     ClangSyntaxPrinter(os).printNamespace(
         cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
           ClangSyntaxPrinter(os).printCTypeMetadataTypeFunction(

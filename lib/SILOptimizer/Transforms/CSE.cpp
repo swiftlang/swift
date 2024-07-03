@@ -94,7 +94,7 @@ SILValue tryLookThroughOwnershipInsts(const Operand *op) {
   // OSSA RAUW does not lifetime extend base value for an escaped value.
   // Don't look through ownership instructions for such values.
 
-  // Theoritically, it should be possible to look through ownership instructions
+  // Theoretically, it should be possible to look through ownership instructions
   // for a bitwise escape, barring any dependent instructions like
   // mark_dependence. Not doing it here to be conservative.
   if (opOwnership == OperandOwnership::PointerEscape ||

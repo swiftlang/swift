@@ -50,8 +50,8 @@ int main() {
   // passThroughCUnsignedLongLong
   VERIFY_PASSTHROUGH_VALUE($s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF, 0xFFFFFFFF);
 
-  // passThrougCFloat
-  VERIFY_PASSTHROUGH_VALUE($s9Functions16passThrougCFloatyS2fF, 1.0f);
+  // passThroughCFloat
+  VERIFY_PASSTHROUGH_VALUE($s9Functions16passThroughCFloatyS2fF, 1.0f);
   // passThroughCDouble
   VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCDoubleyS2dF, 42.125f);
 

@@ -1,13 +1,13 @@
 
-#ifndef OVERLAYED_H
-#define OVERLAYED_H
+#ifndef OVERLAID_H
+#define OVERLAID_H
 
-struct __attribute__((swift_name("Overlayed"))) OVOverlayed {
+struct __attribute__((swift_name("Overlaid"))) OVOverlaid {
   double x, y, z;
 };
 
-double OVOverlayedInOriginalFunc(struct OVOverlayed s) __attribute__((swift_name("Overlayed.inOriginalFunc(self:)")));
+double OVOverlaidInOriginalFunc(struct OVOverlaid s) __attribute__((swift_name("Overlaid.inOriginalFunc(self:)")));
 
-struct OVOverlayed createOverlayed();
+struct OVOverlaid createOverlaid();
 
 #endif

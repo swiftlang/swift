@@ -161,7 +161,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
 void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // The arguments of the final apply instruction.
   SmallVector<SILValue, 8> argList;
-  // First, add the arguments of ther original ApplyInst args.
+  // First, add the arguments of their original ApplyInst args.
   for (auto Op : paiAI.getArguments())
     argList.push_back(Op);
 

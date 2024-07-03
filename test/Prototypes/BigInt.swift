@@ -459,7 +459,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       return
     }
 
-    // Comare `lhs` and `rhs` so we can use `_unsignedSubtract` to subtract
+    // Compare `lhs` and `rhs` so we can use `_unsignedSubtract` to subtract
     // the smaller magnitude from the larger magnitude.
     switch lhs._compareMagnitude(to: rhs) {
     case .equal:
@@ -1032,7 +1032,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     case lessThan, equal, greaterThan
   }
 
-  /// Returns whether this instance is less than, greather than, or equal to
+  /// Returns whether this instance is less than, greater than, or equal to
   /// the given value.
   func _compare(to rhs: _BigInt) -> _ComparisonResult {
     // Negative values are less than positive values
@@ -1050,7 +1050,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
   }
 
-  /// Returns whether the magnitude of this instance is less than, greather
+  /// Returns whether the magnitude of this instance is less than, greater
   /// than, or equal to the magnitude of the given value.
   func _compareMagnitude(to rhs: _BigInt) -> _ComparisonResult {
     guard _data.count == rhs._data.count else {

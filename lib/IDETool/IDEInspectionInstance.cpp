@@ -272,7 +272,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   switch (newInfo.Kind) {
   case IDEInspectionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
-    // See if the inteface of the function and types visible from a function
+    // See if the interface of the function and types visible from a function
     // body has changed since the last completion. If they haven't changed,
     // completion can reuse the existing AST of the source file.
     // \c getInterfaceHash() is not enough because it doesn't take the interface
@@ -300,7 +300,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     if (!DC || !isa<AbstractFunctionDecl>(DC))
       return false;
 
-    // OK, we can perform fast completion for this. Update the orignal delayed
+    // OK, we can perform fast completion for this. Update the original delayed
     // decl state.
 
     // Fast completion keeps the buffer in memory for multiple completions.

@@ -1742,7 +1742,7 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
 ///
 /// Return true \p visitOperand was called at least once.
 ///
-/// \p visitOperand should always recheck for Guaranteed owernship if it
+/// \p visitOperand should always recheck for Guaranteed ownership if it
 /// matters, in case a cast forwards a trivial type to a nontrivial type.
 ///
 /// This intentionally does not handle phis, which require recursive traversal

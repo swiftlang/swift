@@ -1480,7 +1480,7 @@ void Implementation::cleanup() {
   while (!interface.createdPhiArguments.empty()) {
     auto *arg = interface.createdPhiArguments.pop_back_val();
 
-    // If we have a trivial argument, we do not ened to add any compensating
+    // If we have a trivial argument, we do not need to add any compensating
     // destroys.
     if (arg->getType().isTrivial(*fn))
       continue;
@@ -1655,7 +1655,7 @@ bool BorrowToDestructureTransform::transform() {
   impl.blockToAvailableValues.emplace(impl.liveness);
   impl.rewriteUses();
 
-  // Now that we have done our rewritting, we need to do a few cleanups starting
+  // Now that we have done our rewriting, we need to do a few cleanups starting
   // by inserting compensating destroys for all of our inserted
   // phis/destructures/initial value copy.
   impl.cleanup();

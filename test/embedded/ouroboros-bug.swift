@@ -1,5 +1,5 @@
 // Regression test for a "Ouroboros Bug": The ARC optimizer doesn't like the
-// presense of a direct call to swift_retain and swift_release in any Swift
+// presence of a direct call to swift_retain and swift_release in any Swift
 // code, but in the embedded Swift's runtime that's somewhat reasonable thing
 // to do (but is to be avoided because of this).
 

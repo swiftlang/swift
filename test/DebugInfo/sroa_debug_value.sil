@@ -28,7 +28,7 @@ sil hidden @foo : $@convention(thin) (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
   %4 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":8:9, scope 2
   debug_value %4 : $*MyStruct, let, name "my_copy", expr op_deref, loc "sroa.swift":7:10, scope 2
-  // Make sure SROA propagate the debug info to the splitted alloc_stack/debug_value instructions
+  // Make sure SROA propagate the debug info to the split alloc_stack/debug_value instructions
   // CHECK-SROA: %[[ALLOC_X:[0-9]+]] = alloc_stack $Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
   // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x

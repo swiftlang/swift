@@ -73,7 +73,7 @@ func passS_Suppressed(_ s: S_Suppressed) { take(s) } // expected-error{{global f
                                                      // expected-note@-46{{where 'T' = 'S_Suppressed'}}
 
 struct S_Suppressed_Extension {}
-extension S_Suppressed_Extension : ~BitwiseCopyable {} // expected-error{{conformance to inferrable protocol 'BitwiseCopyable' cannot be suppressed in an extension}}
+extension S_Suppressed_Extension : ~BitwiseCopyable {} // expected-error{{conformance to inferable protocol 'BitwiseCopyable' cannot be suppressed in an extension}}
 
 struct S_Explicit_Suppressed : BitwiseCopyable, ~BitwiseCopyable {} // expected-error{{cannot both conform to and suppress conformance to 'BitwiseCopyable'}}
 

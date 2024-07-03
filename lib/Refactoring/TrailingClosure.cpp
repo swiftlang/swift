@@ -19,7 +19,7 @@ using namespace swift::refactoring;
 static CallExpr *findTrailingClosureTarget(SourceManager &SM,
                                            ResolvedCursorInfoPtr CursorInfo) {
   if (CursorInfo->getKind() == CursorInfoKind::StmtStart)
-    // StmtStart postion can't be a part of CallExpr.
+    // StmtStart position can't be a part of CallExpr.
     return nullptr;
 
   // Find inner most CallExpr
