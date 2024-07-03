@@ -1159,11 +1159,11 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // merging. These bits should not propagate through merging and should instead
   // always be associated with non-merged infos.
   if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
-    return other.withUnsafeNonIsolated(false);
+    return SILDynamicMergedIsolationInfo(other.withUnsafeNonIsolated(false));
   }
 
   // Otherwise, just return other.
-  return other;
+  return SILDynamicMergedIsolationInfo(other);
 }
 
 //===----------------------------------------------------------------------===//
