@@ -60,6 +60,12 @@ else()
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
+# Do not remove until IsolatedAny is on by default in all supported compilers.
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+  "-enable-experimental-feature"
+  "IsolatedAny"
+)
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
