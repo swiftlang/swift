@@ -2417,7 +2417,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-    if (Context.LangOpts.StrictConcurrencyLevel != StrictConcurrency::Complete)
+    // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+    // a Sendable conformance.
+    if (!Context.LangOpts.isSwiftVersionAtLeast(6))
       allowImpliedConditionalConformance = true;
   } else if (Proto->isMarkerProtocol()) {
     allowImpliedConditionalConformance = true;
