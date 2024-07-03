@@ -1907,6 +1907,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ClangImporterDirectCC1Scan = true;
   }
 
+  Opts.BridgingHeaderChaining |=
+      Args.hasArg(OPT_experimental_chained_bridging_header_requirement);
+
   // If in direct clang cc1 module build mode, return early.
   if (Opts.DirectClangCC1ModuleBuild)
     return false;

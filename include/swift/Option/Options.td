@@ -1923,6 +1923,11 @@ def experimental_clang_importer_direct_cc1_scan:
   Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
   HelpText<"Enables swift driver to construct swift-frontend invocations using -direct-clang-cc1-module-build">;
 
+def experimental_chained_bridging_header_requirement:
+  Flag<["-"], "experimental-chained-bridging-header-requirement">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Requires bridging headers from imported binary module to be chained by user">;
+
 def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
