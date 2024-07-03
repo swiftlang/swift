@@ -875,15 +875,38 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 }
 
 void SILIsolationInfo::print(llvm::raw_ostream &os) const {
+  auto printOptions = [&] {
+    auto opts = getOptions();
+    if (!opts)
+      return;
+
+    os << ": ";
+
+    std::array<std::pair<Flag, StringLiteral>, 2> data = {
+        std::make_pair(Flag::UnsafeNonIsolated,
+                       StringLiteral("nonisolated(unsafe)")),
+        std::make_pair(Flag::UnappliedIsolatedAnyParameter,
+                       StringLiteral("unapplied_isolated_parameter")),
+    };
+
+    llvm::interleave(
+        data, os,
+        [&](const std::pair<Flag, StringLiteral> &value) {
+          opts -= value.first;
+          os << value.second;
+        },
+        ", ");
+
+    assert(!opts && "Unhandled flag?!");
+  };
+
   switch (Kind(*this)) {
   case Unknown:
     os << "unknown";
     return;
   case Disconnected:
     os << "disconnected";
-    if (unsafeNonIsolated) {
-      os << ": nonisolated(unsafe)";
-    }
+    printOptions();
     return;
   case Actor:
     if (ActorInstance instance = getActorInstance()) {
@@ -892,9 +915,7 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
         SILValue value = instance.getValue();
         if (auto name = VariableNameInferrer::inferName(value)) {
           os << "'" << *name << "'-isolated";
-          if (unsafeNonIsolated) {
-            os << ": nonisolated(unsafe)";
-          }
+          printOptions();
           os << "\n";
           os << "instance: " << *value;
 
@@ -904,9 +925,7 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
       }
       case ActorInstance::Kind::ActorAccessorInit:
         os << "'self'-isolated";
-        if (unsafeNonIsolated) {
-          os << ": nonisolated(unsafe)";
-        }
+        printOptions();
         os << '\n';
         os << "instance: actor accessor init\n";
         return;
@@ -916,23 +935,17 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
     if (getActorIsolation().getKind() == ActorIsolation::ActorInstance) {
       if (auto *vd = getActorIsolation().getActorInstance()) {
         os << "'" << vd->getBaseIdentifier() << "'-isolated";
-        if (unsafeNonIsolated) {
-          os << ": nonisolated(unsafe)";
-        }
+        printOptions();
         return;
       }
     }
 
     getActorIsolation().printForDiagnostics(os);
-    if (unsafeNonIsolated) {
-      os << ": nonisolated(unsafe)";
-    }
+    printOptions();
     return;
   case Task:
     os << "task-isolated";
-    if (unsafeNonIsolated) {
-      os << ": nonisolated(unsafe)";
-    }
+    printOptions();
     os << '\n';
     os << "instance: " << *getIsolatedValue();
     return;
@@ -959,8 +972,13 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     ActorInstance actor1 = getActorInstance();
     ActorInstance actor2 = other.getActorInstance();
 
-    // If either are non-null, and the actor instance doesn't match, return
-    // false.
+    // If either have an actor instance, and the actor instance doesn't match,
+    // return false.
+    //
+    // This ensures that cases like comparing two global actor isolated things
+    // do not hit this path.
+    //
+    // It also catches cases where we have a missing actor instance.
     if ((actor1 || actor2) && actor1 != actor2)
       return false;
 
@@ -1054,7 +1072,7 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
     return;
   case Disconnected:
     os << "disconnected";
-    if (unsafeNonIsolated) {
+    if (getOptions().contains(Flag::UnsafeNonIsolated)) {
       os << ": nonisolated(unsafe)";
     }
     return;
@@ -1143,14 +1161,31 @@ std::optional<SILDynamicMergedIsolationInfo>
 SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // If we are greater than the other kind, then we are further along the
   // lattice. We ignore the change.
-  if (unsigned(other.getKind()) < unsigned(innerInfo.getKind()))
+  if (unsigned(innerInfo.getKind() > unsigned(other.getKind())))
     return {*this};
 
-  // If we are both actor isolated and our isolations are not
-  // compatible... return None.
-  if (other.isActorIsolated() && innerInfo.isActorIsolated() &&
-      !innerInfo.hasSameIsolation(other))
+  // If we are both actor isolated...
+  if (innerInfo.isActorIsolated() && other.isActorIsolated()) {
+    // If both innerInfo and other have the same isolation, we are obviously
+    // done. Just return innerInfo since we could return either.
+    if (innerInfo.hasSameIsolation(other))
+      return {innerInfo};
+
+    // Ok, there is some difference in between innerInfo and other. Lets see if
+    // they are both actor instance isolated and if either are unapplied
+    // isolated any parameter. In such a case, take the one that is further
+    // along.
+    if (innerInfo.getActorIsolation().isActorInstanceIsolated() &&
+        other.getActorIsolation().isActorInstanceIsolated()) {
+      if (innerInfo.isUnappliedIsolatedAnyParameter())
+        return other;
+      if (other.isUnappliedIsolatedAnyParameter())
+        return innerInfo;
+    }
+
+    // Otherwise, they do not match... so return None to signal merge failure.
     return {};
+  }
 
   // If we are both disconnected and other has the unsafeNonIsolated bit set,
   // drop that bit and return that.
@@ -1159,11 +1194,11 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // merging. These bits should not propagate through merging and should instead
   // always be associated with non-merged infos.
   if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
-    return SILDynamicMergedIsolationInfo(other.withUnsafeNonIsolated(false));
+    return {other.withUnsafeNonIsolated(false)};
   }
 
   // Otherwise, just return other.
-  return SILDynamicMergedIsolationInfo(other);
+  return {other};
 }
 
 //===----------------------------------------------------------------------===//
