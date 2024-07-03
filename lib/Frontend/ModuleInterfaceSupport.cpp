@@ -62,9 +62,12 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": " << Opts.PublicFlags.Flags;
 
-  // Append flags that are for the package interface only (e.g. -package-name
-  // when -disable-print-package-name-for-non-package-interface is specified).
-  if (Opts.printPackageInterface() && !Opts.PackageFlags.Flags.empty())
+  if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Private &&
+      !Opts.PrivateFlags.Flags.empty())
+    out << " " << Opts.PrivateFlags.Flags;
+
+  if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Package &&
+      !Opts.PackageFlags.Flags.empty())
     out << " " << Opts.PackageFlags.Flags;
 
   // Insert additional -module-alias flags
@@ -101,14 +104,29 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   }
   out << "\n";
 
-  if (!Opts.PublicFlags.IgnorableFlags.empty()) {
-    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
-        << Opts.PublicFlags.IgnorableFlags << "\n";
-  }
+  // Add swift-module-flags-ignorable: if non-empty.
+  {
+    llvm::SmallVector<StringRef, 4> ignorableFlags;
 
-  // Append ignorable flags that are for the package interface only.
-  if (Opts.printPackageInterface() && !Opts.PackageFlags.IgnorableFlags.empty())
-    out << " " << Opts.PackageFlags.IgnorableFlags;
+    if (!Opts.PublicFlags.IgnorableFlags.empty())
+      ignorableFlags.push_back(Opts.PublicFlags.IgnorableFlags);
+
+    if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Private &&
+        !Opts.PrivateFlags.IgnorableFlags.empty())
+      ignorableFlags.push_back(Opts.PrivateFlags.IgnorableFlags);
+
+    if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Package &&
+        !Opts.PackageFlags.IgnorableFlags.empty())
+      ignorableFlags.push_back(Opts.PackageFlags.IgnorableFlags);
+
+    if (!ignorableFlags.empty()) {
+      out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
+      llvm::interleave(
+          ignorableFlags, [&out](StringRef str) { out << str; },
+          [&out] { out << " "; });
+      out << "\n";
+    }
+  }
 }
 
 std::string
