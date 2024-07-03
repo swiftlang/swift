@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits.h
 // RUN: %FileCheck %s < %t/inits.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -swift-version 5 -emit-clang-header-path %t/inits2.h
 // RUN: %FileCheck %s < %t/inits2.h
