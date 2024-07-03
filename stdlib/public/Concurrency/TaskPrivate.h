@@ -17,7 +17,6 @@
 #ifndef SWIFT_CONCURRENCY_TASKPRIVATE_H
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
-#include "Error.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -33,7 +32,6 @@
 #include <atomic>
 #include <new>
 
-#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
 
 namespace swift {

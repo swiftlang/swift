@@ -23,6 +23,8 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include "swift/Runtime/Debug.h"
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
 #include <dispatch/dispatch.h>
@@ -138,7 +140,7 @@ extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   size_t numericPriority = static_cast<size_t>(priority);
   if (numericPriority >= globalQueueCacheCount)
-    swift_Concurrency_fatalError(0, "invalid job priority %#zx", numericPriority);
+    swift::fatalError(0, "invalid job priority %#zx", numericPriority);
 
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
   std::memory_order loadOrder = std::memory_order_acquire;
@@ -446,5 +448,5 @@ static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
 
   // otherwise, we have no way to check, so report an error
   // TODO: can we swift_getTypeName(swift_getObjectType(executor.getIdentity()), false).data safely in the message here?
-  swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
+  swift::fatalError(0, "Incorrect actor executor assumption");
 }
