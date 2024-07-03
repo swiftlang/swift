@@ -105,6 +105,20 @@ public struct StringifyAndTryMacro: ExpressionMacro {
   }
 }
 
+public struct TryCallThrowingFuncMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return """
+      try await {
+        print("let's throw")
+        return try await throwingFunc()
+      }()
+      """
+  }
+}
+
 struct SimpleDiagnosticMessage: DiagnosticMessage {
   let message: String
   let diagnosticID: MessageID
