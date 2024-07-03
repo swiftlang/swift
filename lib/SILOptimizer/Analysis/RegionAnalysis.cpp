@@ -1206,7 +1206,7 @@ struct PartitionOpBuilder {
   }
 
   void addUnknownPatternError(SILValue value) {
-    if (AbortOnUnknownPatternMatchError) {
+    if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }

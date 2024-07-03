@@ -2415,8 +2415,16 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
+  bool allowImpliedConditionalConformance = false;
+  if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    if (Context.LangOpts.StrictConcurrencyLevel != StrictConcurrency::Complete)
+      allowImpliedConditionalConformance = true;
+  } else if (Proto->isMarkerProtocol()) {
+    allowImpliedConditionalConformance = true;
+  }
+
   if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
-      !Proto->isMarkerProtocol()) {
+      !allowImpliedConditionalConformance) {
     // We've got something like:
     //
     //   protocol Foo : Proto {}

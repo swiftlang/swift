@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize
+// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
 // REQUIRES: PTRSIZE=64
@@ -85,9 +85,21 @@ public enum ForwardEnum<T> {
 // OPT:   [[T_PARAM:%.*]] = getelementptr inbounds i8, ptr %"A<T>", i64 16
 // OPT:   [[T:%.*]] = load ptr, ptr [[T_PARAM]]
 // OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8, ptr [[T]], {{(i64|i32)}} -8
-// OPT:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
+
+// OPT-noptrauth:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
+
+// OPT-ptrauth: [[ADDR_INT:%.*]] = ptrtoint ptr [[VWT_ADDR]] to i64
+// OPT-ptrauth: [[DISCRIMINANT:%.*]] = tail call i64 @llvm.ptrauth.blend(i64 [[ADDR_INT]], i64 11839)
+// OPT-ptrauth: [[SIGNED_VWT:%.*]] = ptrtoint ptr %T.valueWitnesses
+// OPT-ptrauth: [[VWT_INT:%.*]] = tail call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT]], i32 2, i64 [[DISCRIMINANT]])
+// OPT-ptrauth: [[VWT:%.*]] = inttoptr i64 [[VWT_INT]] to ptr
+
 // OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds i8, ptr [[VWT]], {{(i64|i32)}} 8
 // OPT:   [[DESTROY:%.*]] = load ptr, ptr [[DESTROY_VW]]
+
+// OPT-ptrauth: [[DESTROY_ADDR:%.*]] = ptrtoint ptr [[DESTROY_VW]] to i64
+// OPT-ptrauth: [[DISCRIMINANT:%.*]] = tail call i64 @llvm.ptrauth.blend(i64 [[DESTROY_ADDR]], i64 1272)
+
 // OPT:   tail call void [[DESTROY]](ptr noalias %object, ptr [[T]])
 // OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds i8, ptr [[VWT]], {{(i64|i32)}} 64
 // OPT:   [[SIZE_T:%.*]] = load {{(i64|i32)}}, ptr [[SIZE_VW]]
