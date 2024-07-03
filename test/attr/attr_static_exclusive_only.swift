@@ -75,7 +75,7 @@ var r0 = Q<Int>() // expected-error {{variable of type 'Q<Int>' must be declared
 protocol S {
   var t0: B { get } // OK
 
-  var t1: B { get set } // expected-error {{varaible of type 'B' must not have a setter}}
+  var t1: B { get set } // expected-error {{variable of type 'B' must not have a setter}}
 }
 
 protocol U: ~Copyable {
