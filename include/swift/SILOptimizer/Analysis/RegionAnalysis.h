@@ -34,6 +34,14 @@ namespace regionanalysisimpl {
 extern bool AbortOnUnknownPatternMatchError;
 #endif
 
+static inline bool shouldAbortOnUnknownPatternMatchError() {
+#ifndef NDEBUG
+  return AbortOnUnknownPatternMatchError;
+#else
+  return false;
+#endif
+}
+
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
 using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
