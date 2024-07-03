@@ -236,12 +236,16 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
 
     self._task = task
+#else
+    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+#endif
   }
 }
 
@@ -292,12 +296,16 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
 
     self._task = task
+#else
+    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+#endif
   }
 }
 
@@ -346,6 +354,7 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       // initialTaskExecutor: executorBuiltin, deprecated
@@ -353,6 +362,9 @@ extension Task where Failure == Never {
       operation: operation)
 
     return Task(task)
+#else
+    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+#endif
   }
 }
 
@@ -401,12 +413,16 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
 
     return Task(task)
+#else
+    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+#endif
   }
 }
 
