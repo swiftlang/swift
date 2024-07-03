@@ -308,10 +308,12 @@ func testStringifyWithThrows() throws {
   _ = #stringifyAndTry(maybeThrowing())
 }
 
+@available(SwiftStdlib 5.1, *)
 func throwingFunc() async throws -> Int { 5 }
 
 @freestanding(expression) macro callThrowingFunc<T>(_ body: () -> T) -> T = #externalMacro(module: "MacroDefinition", type: "TryCallThrowingFuncMacro")
 
+@available(SwiftStdlib 5.1, *)
 func testThrowingCall() async throws -> Int {
   #callThrowingFunc {
     [1, 2, 3, 4, 5].map { $0 + 1 }.first!
