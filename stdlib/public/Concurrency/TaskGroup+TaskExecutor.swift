@@ -40,7 +40,6 @@ extension TaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -48,7 +47,6 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -57,12 +55,6 @@ extension TaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 
   /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
@@ -89,7 +81,6 @@ extension TaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -103,7 +94,6 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -112,13 +102,7 @@ extension TaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
@@ -149,7 +133,6 @@ extension ThrowingTaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -157,7 +140,6 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -166,12 +148,6 @@ extension ThrowingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 
   /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
@@ -194,7 +170,6 @@ extension ThrowingTaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -208,7 +183,6 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -217,13 +191,7 @@ extension ThrowingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
@@ -254,7 +222,6 @@ extension DiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -262,7 +229,6 @@ extension DiscardingTaskGroup {
       isDiscardingTask: true)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -271,12 +237,6 @@ extension DiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 
   /// Adds a child task to the group and set it up with the passed in task executor preference,
@@ -304,7 +264,6 @@ extension DiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -318,7 +277,6 @@ extension DiscardingTaskGroup {
     )
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -327,13 +285,7 @@ extension DiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
@@ -364,7 +316,6 @@ extension ThrowingDiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTask(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -372,7 +323,6 @@ extension ThrowingDiscardingTaskGroup {
       isDiscardingTask: true)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -381,12 +331,6 @@ extension ThrowingDiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 
   /// Adds a child task to the group and set it up with the passed in task executor preference,
@@ -414,7 +358,6 @@ extension ThrowingDiscardingTaskGroup {
     guard let taskExecutor else {
       return self.addTaskUnlessCancelled(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -428,7 +371,6 @@ extension ThrowingDiscardingTaskGroup {
     )
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -437,13 +379,7 @@ extension ThrowingDiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
