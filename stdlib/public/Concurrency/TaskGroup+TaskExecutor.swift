@@ -46,7 +46,6 @@ extension TaskGroup {
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false)
 
-    // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -57,7 +56,14 @@ extension TaskGroup {
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
   }
 
@@ -107,10 +113,18 @@ extension TaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    return true
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
+
+    return true
   }
 }
 
@@ -158,7 +172,14 @@ extension ThrowingTaskGroup {
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
   }
 
@@ -204,10 +225,18 @@ extension ThrowingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    return true
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
+
+    return true
   }
 }
 
@@ -255,7 +284,14 @@ extension DiscardingTaskGroup {
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
   }
 
@@ -306,10 +342,18 @@ extension DiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    return true
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
+
+    return true
   }
 }
 
@@ -357,7 +401,14 @@ extension ThrowingDiscardingTaskGroup {
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+
+    _ = Builtin.createTask(flags: flags,
+                           initialSerialExecutor: builtinSerialExecutor,
+                           taskGroup: _group,
+                           initialTaskExecutor: executorBuiltin,
+                           operation: operation)
 #endif
   }
 
@@ -408,10 +459,18 @@ extension ThrowingDiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    return true
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+  let executorBuiltin: Builtin.Executor =
+    taskExecutor.asUnownedTaskExecutor().executor
+
+  _ = Builtin.createTask(flags: flags,
+                         initialSerialExecutor: builtinSerialExecutor,
+                         taskGroup: _group,
+                         initialTaskExecutor: executorBuiltin,
+                         operation: operation)
 #endif
+
+    return true
   }
 }
 

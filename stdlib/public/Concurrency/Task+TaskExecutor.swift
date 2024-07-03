@@ -241,11 +241,13 @@ extension Task where Failure == Never {
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
-    self._task = task
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
 #endif
+    self._task = task
   }
 }
 
@@ -301,11 +303,13 @@ extension Task where Failure == Error {
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
-    self._task = task
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
 #endif
+    self._task = task
   }
 }
 
@@ -357,14 +361,15 @@ extension Task where Failure == Never {
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
-      // initialTaskExecutor: executorBuiltin, deprecated
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
-    return Task(task)
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
 #endif
+    return Task(task)
   }
 }
 
@@ -418,11 +423,13 @@ extension Task where Failure == Error {
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
-    return Task(task)
 #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskOwnedTaskExecutor")
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
 #endif
+    return Task(task)
   }
 }
 
