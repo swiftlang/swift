@@ -47,7 +47,6 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -56,9 +55,6 @@ extension TaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
   }
 
   /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
@@ -98,7 +94,6 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -107,9 +102,6 @@ extension TaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
   }
 }
@@ -148,7 +140,6 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -157,9 +148,6 @@ extension ThrowingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
   }
 
   /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
@@ -195,7 +183,6 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -204,9 +191,6 @@ extension ThrowingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
   }
 }
@@ -245,7 +229,6 @@ extension DiscardingTaskGroup {
       isDiscardingTask: true)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -254,9 +237,6 @@ extension DiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
   }
 
   /// Adds a child task to the group and set it up with the passed in task executor preference,
@@ -297,7 +277,6 @@ extension DiscardingTaskGroup {
     )
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -306,9 +285,6 @@ extension DiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
   }
 }
@@ -347,7 +323,6 @@ extension ThrowingDiscardingTaskGroup {
       isDiscardingTask: true)
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -356,9 +331,6 @@ extension ThrowingDiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
   }
 
   /// Adds a child task to the group and set it up with the passed in task executor preference,
@@ -399,7 +371,6 @@ extension ThrowingDiscardingTaskGroup {
     )
 
     // Create the task in this group with an executor preference.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -408,9 +379,6 @@ extension ThrowingDiscardingTaskGroup {
                            taskGroup: _group,
                            initialTaskExecutorConsuming: taskExecutor,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    #endif
     return true
   }
 }

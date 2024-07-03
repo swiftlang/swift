@@ -348,16 +348,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -400,16 +396,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
 #else
@@ -510,16 +502,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       isDiscardingTask: false)
 
     // Create the task in this group.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#endif
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -560,16 +548,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       isDiscardingTask: false)
 
     // Create the task in this group.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#endif
 
     return true
 #else
@@ -885,16 +869,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -933,16 +913,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       isDiscardingTask: false)
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
 #else

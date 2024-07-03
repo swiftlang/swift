@@ -679,7 +679,6 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -687,9 +686,6 @@ extension Task where Failure == Never {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     self._task = task
 #else
@@ -775,7 +771,6 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task future.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -783,9 +778,6 @@ extension Task where Failure == Error {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     self._task = task
 #else
@@ -870,7 +862,6 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task future.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -878,9 +869,6 @@ extension Task where Failure == Never {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     return Task(task)
 #else
@@ -965,7 +953,6 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task future.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -973,9 +960,6 @@ extension Task where Failure == Error {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     return Task(task)
 #else

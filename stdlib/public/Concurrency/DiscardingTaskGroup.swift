@@ -223,7 +223,6 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -231,9 +230,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -275,7 +271,6 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -283,9 +278,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-#else
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-#endif
 
     return true
   }
@@ -302,7 +294,6 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -310,9 +301,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -344,7 +332,6 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -352,9 +339,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
 #else
@@ -809,7 +793,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -817,9 +800,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #endif
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -849,7 +829,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -857,9 +836,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #else
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
 #else

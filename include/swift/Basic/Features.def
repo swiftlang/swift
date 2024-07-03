@@ -187,7 +187,7 @@ CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Op
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
-LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
 SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeImplements, 0, "@_implements on associated types")
 LANGUAGE_FEATURE(BuiltinAddressOfRawLayout, 0, "Builtin.addressOfRawLayout")
 LANGUAGE_FEATURE(MoveOnlyPartialConsumption, 429, "Partial consumption of noncopyable values")
