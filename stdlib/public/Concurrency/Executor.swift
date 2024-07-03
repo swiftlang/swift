@@ -319,7 +319,6 @@ extension SerialExecutor {
 @available(SwiftStdlib 5.1, *)
 @frozen
 public struct UnownedSerialExecutor: Sendable {
-  #if compiler(>=5.5) && $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor
 
@@ -329,22 +328,15 @@ public struct UnownedSerialExecutor: Sendable {
   public var _executor: Builtin.Executor {
     self.executor
   }
-  #endif
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    #if compiler(>=5.5) && $BuiltinExecutor
     self.executor = executor
-    #endif
   }
 
   @inlinable
   public init<E: SerialExecutor>(ordinary executor: __shared E) {
-    #if compiler(>=5.5) && $BuiltinBuildExecutor
     self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   /// Opts the executor into complex "same exclusive execution context" equality checks.
@@ -360,11 +352,7 @@ public struct UnownedSerialExecutor: Sendable {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   public init<E: SerialExecutor>(complexEquality executor: __shared E) {
-    #if compiler(>=5.9) && $BuiltinBuildComplexEqualityExecutor
     self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @_spi(ConcurrencyExecutors)
@@ -380,7 +368,6 @@ public struct UnownedSerialExecutor: Sendable {
 @available(SwiftStdlib 6.0, *)
 @frozen
 public struct UnownedTaskExecutor: Sendable {
-  #if $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor
 
@@ -390,22 +377,15 @@ public struct UnownedTaskExecutor: Sendable {
   public var _executor: Builtin.Executor {
     self.executor
   }
-  #endif
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    #if $BuiltinExecutor
     self.executor = executor
-    #endif
   }
 
   @inlinable
   public init<E: TaskExecutor>(ordinary executor: __shared E) {
-    #if $BuiltinBuildTaskExecutorRef
     self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 }
 

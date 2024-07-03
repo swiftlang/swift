@@ -75,7 +75,6 @@ public func withDiscardingTaskGroup<GroupResult>(
   isolation: isolated (any Actor)? = #isolation,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
     discardResults: true
   )
@@ -89,9 +88,6 @@ public func withDiscardingTaskGroup<GroupResult>(
   try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -102,7 +98,6 @@ internal func __abi_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
     discardResults: true
   )
@@ -116,9 +111,6 @@ internal func __abi_withDiscardingTaskGroup<GroupResult>(
   try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 /// A discarding group that contains dynamically created child tasks.
@@ -223,7 +215,6 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -231,20 +222,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #elseif $BuiltinCreateAsyncDiscardingTaskInGroup
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -286,7 +263,6 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -294,20 +270,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-#elseif $BuiltinCreateAsyncDiscardingTaskInGroup
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-#else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#endif
 
     return true
   }
@@ -324,7 +286,6 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -332,20 +293,6 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #elseif $BuiltinCreateAsyncDiscardingTaskInGroup
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -362,7 +309,6 @@ public struct DiscardingTaskGroup {
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping @isolated(any) () async -> Void
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -377,7 +323,6 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -385,25 +330,8 @@ public struct DiscardingTaskGroup {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #elseif $BuiltinCreateAsyncDiscardingTaskInGroup
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 // The Embedded clones of the task-creation routines.
@@ -439,20 +367,7 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateAsyncDiscardingTaskInGroup
     _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -493,20 +408,7 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-#if $BuiltinCreateAsyncDiscardingTaskInGroup
     _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-#else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#endif
 
     return true
   }
@@ -522,20 +424,7 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateAsyncDiscardingTaskInGroup
     _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -551,7 +440,6 @@ public struct DiscardingTaskGroup {
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping () async -> Void
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -566,25 +454,9 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateAsyncDiscardingTaskInGroup
     _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 #endif // $Embedded
@@ -744,7 +616,6 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
     isolation: isolated (any Actor)? = #isolation,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
       discardResults: true
   )
@@ -767,9 +638,6 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
   try await group.awaitAllRemainingTasks(bodyError: nil)
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -780,7 +648,6 @@ internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
       discardResults: true
   )
@@ -803,9 +670,6 @@ internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
   try await group.awaitAllRemainingTasks(bodyError: nil)
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 
@@ -897,7 +761,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Void
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -905,7 +768,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -913,23 +775,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #elseif $BuiltinCreateAsyncDiscardingTaskInGroup
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -941,7 +786,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Void
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -956,7 +800,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -964,25 +807,8 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
                                      initialSerialExecutor: builtinSerialExecutor,
                                      taskGroup: _group,
                                      operation: operation)
-    #elseif $BuiltinCreateAsyncDiscardingTaskInGroup
-    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
-    #else
-    // This builtin happens to work, but the signature of the operation is
-    // incorrect, as the discarding group uses Void, and therefore has less
-    // generic parameters than the operation expected to be passed to
-    // createAsyncTaskInGroup. While this happened to work on some platforms,
-    // on others this causes issues, e.g. on wasm;
-    //
-    // Keep this branch for compatibility with old compilers, but use the
-    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
-    // enough compiler is used).
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   /// A Boolean value that indicates whether the group has any remaining tasks.

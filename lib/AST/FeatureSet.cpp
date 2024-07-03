@@ -124,14 +124,8 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
   return usesFeatureRethrowsProtocol(decl, checked);
 }
 
-UNINTERESTING_FEATURE(BuiltinBuildTaskExecutorRef)
-UNINTERESTING_FEATURE(BuiltinBuildComplexEqualityExecutor)
-UNINTERESTING_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor)
-UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup)
-UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinUnprotectedStackAlloc)
 UNINTERESTING_FEATURE(BuiltinAllocVector)
-UNINTERESTING_FEATURE(BuiltinCreateTask)
 
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
