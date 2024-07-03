@@ -259,7 +259,10 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
     });
     plugin->addOnReconnect(callback);
 
-    plugin->setCleanup([plugin] { swift_ASTGen_deinitializePlugin(plugin); });
+    plugin->setCleanup([plugin, callback] {
+      swift_ASTGen_deinitializePlugin(plugin);
+      delete callback;
+    });
 #endif
   }
 
