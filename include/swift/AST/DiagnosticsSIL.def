@@ -943,6 +943,9 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 
 NOTE(regionbasedisolation_maybe_race, none,
      "access can happen concurrently", ())
+NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
+     "'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value",
+     ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
@@ -972,6 +975,9 @@ ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
      "value is %0 since it is in the same region as %1",
      (StringRef, DeclBaseName))
+NOTE(regionbasedisolation_isolated_since_in_same_region_string, none,
+     "%0 is %1since it is in the same region as %2",
+     (Identifier, StringRef, Identifier))
 
 //===---
 // New Transfer Non Sendable Diagnostics
@@ -980,6 +986,13 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
       "sending %0 risks causing data races",
       (Identifier))
+
+ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
+      "'inout sending' parameter %0 cannot be %1at end of function",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
+      "%1%0 risks causing races in between %1uses and caller uses since caller assumes value is not actor isolated",
+      (Identifier, StringRef))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
