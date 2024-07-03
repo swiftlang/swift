@@ -142,6 +142,9 @@ public:
     /// If set, this means that this actor isolation is from an isolated
     /// parameter and should be allowed to merge into a self parameter.
     UnappliedIsolatedAnyParameter = 0x2,
+
+    /// The maximum number of bits used by a Flag.
+    MaxNumBits = 2,
   };
 
   using Options = OptionSet<Flag>;
@@ -426,6 +429,9 @@ public:
   bool isEqual(const SILIsolationInfo &other) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const;
+
+private:
+  void printOptions(llvm::raw_ostream &os) const;
 };
 
 /// A SILIsolationInfo that has gone through merging and represents the dynamic
