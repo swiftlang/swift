@@ -475,6 +475,10 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 /// Checks if an arg is generally allowed to be included
 /// in a module interface
 static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
+  if (!A->getOption().hasFlag(options::ModuleInterfaceOption) &&
+      !A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable))
+    return false;
+
   if (!A->getOption().matches(options::OPT_enable_experimental_feature))
     return true;
 
@@ -485,11 +489,14 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   return true;
 }
 
-static bool ShouldIncludeArgInPackageInterfaceOnly(const Arg *A,
-                                                   ArgList &Args) {
+static bool IsPackageInterfaceFlag(const Arg *A, ArgList &Args) {
   return A->getOption().matches(options::OPT_package_name) &&
          Args.hasArg(
              options::OPT_disable_print_package_name_for_non_package_interface);
+}
+
+static bool IsPrivateInterfaceFlag(const Arg *A, ArgList &Args) {
+  return A->getOption().matches(options::OPT_project_name);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -499,51 +506,52 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                                     ArgList &Args, DiagnosticEngine &Diags) {
   if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
-  ArgStringList RenderedArgs;
-  ArgStringList RenderedArgsForPackageOnly;
-  ArgStringList RenderedArgsIgnorable;
-  ArgStringList RenderedArgsIgnorablePrivate;
+
+  struct RenderedInterfaceArgs {
+    ArgStringList Standard = {};
+    ArgStringList Ignorable = {};
+  };
+
+  RenderedInterfaceArgs PublicArgs{};
+  RenderedInterfaceArgs PrivateArgs{};
+  RenderedInterfaceArgs PackageArgs{};
+
+  auto interfaceArgListForArg = [&](Arg *A) -> ArgStringList & {
+    bool ignorable =
+        A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable);
+    if (IsPackageInterfaceFlag(A, Args))
+      return ignorable ? PackageArgs.Ignorable : PackageArgs.Standard;
+
+    if (IsPrivateInterfaceFlag(A, Args))
+      return ignorable ? PrivateArgs.Ignorable : PrivateArgs.Standard;
+
+    return ignorable ? PublicArgs.Ignorable : PublicArgs.Standard;
+  };
 
   for (auto A : Args) {
     if (!ShouldIncludeModuleInterfaceArg(A))
       continue;
 
-    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorablePrivate)) {
-      A->render(Args, RenderedArgsIgnorablePrivate);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
-      A->render(Args, RenderedArgsIgnorable);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
-      if (ShouldIncludeArgInPackageInterfaceOnly(A, Args))
-        A->render(Args, RenderedArgsForPackageOnly);
-      else
-        A->render(Args, RenderedArgs);
-    }
+    ArgStringList &ArgList = interfaceArgListForArg(A);
+    A->render(Args, ArgList);
   }
-  {
-    llvm::raw_string_ostream OS(Opts.Flags);
-    interleave(RenderedArgs,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.FlagsForPackageOnly);
-    interleave(
-        RenderedArgsForPackageOnly,
-        [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-        [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
-    interleave(RenderedArgsIgnorablePrivate,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorableFlags);
-    interleave(RenderedArgsIgnorable,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
+
+  auto updateInterfaceOpts = [](ModuleInterfaceOptions::InterfaceFlags &Flags,
+                                RenderedInterfaceArgs &RenderedArgs) {
+    auto printFlags = [](std::string &str, ArgStringList argList) {
+      llvm::raw_string_ostream OS(str);
+      interleave(
+          argList,
+          [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+          [&] { OS << " "; });
+    };
+    printFlags(Flags.Flags, RenderedArgs.Standard);
+    printFlags(Flags.IgnorableFlags, RenderedArgs.Ignorable);
+  };
+
+  updateInterfaceOpts(Opts.PublicFlags, PublicArgs);
+  updateInterfaceOpts(Opts.PrivateFlags, PrivateArgs);
+  updateInterfaceOpts(Opts.PackageFlags, PackageArgs);
 }
 
 enum class CxxCompatMode {

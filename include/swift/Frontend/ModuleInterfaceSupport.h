@@ -21,7 +21,6 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
-#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY "swift-module-flags-ignorable-private"
 
 namespace swift {
 
@@ -42,23 +41,26 @@ struct ModuleInterfaceOptions {
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
-  /// Copy of all the command-line flags passed at .swiftinterface
-  /// generation time, re-applied to CompilerInvocation when reading
-  /// back .swiftinterface and reconstructing .swiftmodule.
-  std::string Flags;
+  struct InterfaceFlags {
+    /// Copy of all the command-line flags passed at .swiftinterface
+    /// generation time, re-applied to CompilerInvocation when reading
+    /// back .swiftinterface and reconstructing .swiftmodule.
+    std::string Flags = "";
 
-  /// Keep track of flags to be printed in package.swiftinterface only.
-  /// If -disable-print-package-name-for-non-package-interface is passed,
-  /// package-name flag should only be printed in package.swiftinterface.
-  std::string FlagsForPackageOnly;
+    /// Flags that should be emitted to the .swiftinterface file but are OK to
+    /// be ignored by the earlier version of the compiler.
+    std::string IgnorableFlags = "";
+  };
 
-  /// Flags that should be emitted to the .swiftinterface file but are OK to be
-  /// ignored by the earlier version of the compiler.
-  std::string IgnorableFlags;
+  /// Flags which appear in all .swiftinterface files.
+  InterfaceFlags PublicFlags = {};
 
-  /// Ignorable flags that should only be printed in .private.swiftinterface file;
-  /// e.g. -package-name PACKAGE_ID
-  std::string IgnorablePrivateFlags;
+  /// Flags which appear in both the private and package .swiftinterface files,
+  /// but not the public interface.
+  InterfaceFlags PrivateFlags = {};
+
+  /// Flags which appear only in the .package.swiftinterface.
+  InterfaceFlags PackageFlags = {};
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.
