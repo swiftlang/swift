@@ -449,11 +449,14 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   return true;
 }
 
-static bool ShouldIncludeArgInPackageInterfaceOnly(const Arg *A,
-                                                   ArgList &Args) {
+static bool IsPackageInterfaceFlag(const Arg *A, ArgList &Args) {
   return A->getOption().matches(options::OPT_package_name) &&
          Args.hasArg(
              options::OPT_disable_print_package_name_for_non_package_interface);
+}
+
+static bool IsPrivateInterfaceFlag(const Arg *A, ArgList &Args) {
+  return A->getOption().matches(options::OPT_project_name);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -470,13 +473,17 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   };
 
   RenderedInterfaceArgs PublicArgs{};
+  RenderedInterfaceArgs PrivateArgs{};
   RenderedInterfaceArgs PackageArgs{};
 
   auto interfaceArgListForArg = [&](Arg *A) -> ArgStringList & {
     bool ignorable =
         A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable);
-    if (ShouldIncludeArgInPackageInterfaceOnly(A, Args))
+    if (IsPackageInterfaceFlag(A, Args))
       return ignorable ? PackageArgs.Ignorable : PackageArgs.Standard;
+
+    if (IsPrivateInterfaceFlag(A, Args))
+      return ignorable ? PrivateArgs.Ignorable : PrivateArgs.Standard;
 
     return ignorable ? PublicArgs.Ignorable : PublicArgs.Standard;
   };
@@ -503,6 +510,7 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   };
 
   updateInterfaceOpts(Opts.PublicFlags, PublicArgs);
+  updateInterfaceOpts(Opts.PrivateFlags, PrivateArgs);
   updateInterfaceOpts(Opts.PackageFlags, PackageArgs);
 }
 

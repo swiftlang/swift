@@ -55,6 +55,10 @@ struct ModuleInterfaceOptions {
   /// Flags which appear in all .swiftinterface files.
   InterfaceFlags PublicFlags = {};
 
+  /// Flags which appear in both the private and package .swiftinterface files,
+  /// but not the public interface.
+  InterfaceFlags PrivateFlags = {};
+
   /// Flags which appear only in the .package.swiftinterface.
   InterfaceFlags PackageFlags = {};
 
