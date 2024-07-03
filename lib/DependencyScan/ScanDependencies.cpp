@@ -65,6 +65,7 @@
 #include <algorithm>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <algorithm>
 
