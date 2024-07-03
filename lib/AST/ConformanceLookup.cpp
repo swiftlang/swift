@@ -718,6 +718,12 @@ LookupConformanceInModuleRequest::evaluate(
       // specialized type.
       auto *normalConf = cast<NormalProtocolConformance>(conformance);
       auto *conformanceDC = normalConf->getDeclContext();
+
+      if (normalConf->getSourceKind() == ConformanceEntryKind::Implied &&
+          normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        conformanceDC = conformanceDC->getSelfNominalTypeDecl();
+      }
+
       auto subMap = type->getContextSubstitutionMap(mod, conformanceDC);
       return ProtocolConformanceRef(
           ctx.getSpecializedConformance(type, normalConf, subMap));
