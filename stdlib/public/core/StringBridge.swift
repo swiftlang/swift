@@ -652,22 +652,22 @@ extension String {
     count: Int,
     encoding: Encoding.Type
   ) {
-      if encoding == Unicode.ASCII.self || encoding == Unicode.UTF8.self {
-        self._guts = _StringGuts(
-          constantCocoa: _immortalCocoaString,
-          providesFastUTF8: true,
-          isASCII: encoding == Unicode.ASCII.self,
-          length: count)
-      } else {
-        _precondition(encoding == Unicode.UTF16.self)
-        // Only need the very last bit of _bridgeCocoaString here,
-        // since we know the fast paths don't apply
-        self._guts = _StringGuts(
-          cocoa: _immortalCocoaString,
-          providesFastUTF8: false,
-          isASCII: false,
-          length: count)
-      }
+    if encoding == Unicode.ASCII.self || encoding == Unicode.UTF8.self {
+      self._guts = _StringGuts(
+        constantCocoa: _immortalCocoaString,
+        providesFastUTF8: true,
+        isASCII: encoding == Unicode.ASCII.self,
+        length: count)
+    } else {
+      _precondition(encoding == Unicode.UTF16.self)
+      // Only need the very last bit of _bridgeCocoaString here,
+      // since we know the fast paths don't apply
+      self._guts = _StringGuts(
+        cocoa: _immortalCocoaString,
+        providesFastUTF8: false,
+        isASCII: false,
+        length: count)
+    }
   }
   
   @_spi(Foundation)
