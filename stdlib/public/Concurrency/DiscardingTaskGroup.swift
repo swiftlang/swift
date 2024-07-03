@@ -75,7 +75,6 @@ public func withDiscardingTaskGroup<GroupResult>(
   isolation: isolated (any Actor)? = #isolation,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
     discardResults: true
   )
@@ -89,9 +88,6 @@ public func withDiscardingTaskGroup<GroupResult>(
   try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -102,7 +98,6 @@ internal func __abi_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
     discardResults: true
   )
@@ -116,9 +111,6 @@ internal func __abi_withDiscardingTaskGroup<GroupResult>(
   try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 /// A discarding group that contains dynamically created child tasks.
@@ -632,7 +624,6 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
     isolation: isolated (any Actor)? = #isolation,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
       discardResults: true
   )
@@ -655,9 +646,6 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
   try await group.awaitAllRemainingTasks(bodyError: nil)
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -668,7 +656,6 @@ internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinCreateTaskGroupWithFlags
   let flags = taskGroupCreateFlags(
       discardResults: true
   )
@@ -691,9 +678,6 @@ internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
   try await group.awaitAllRemainingTasks(bodyError: nil)
 
   return result
-  #else
-  fatalError("Swift compiler is incompatible with this SDK version")
-  #endif
 }
 
 
