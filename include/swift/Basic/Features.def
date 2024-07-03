@@ -148,7 +148,7 @@ BASELINE_LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribu
 BASELINE_LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute")
 BASELINE_LANGUAGE_FEATURE(BuiltinBuildTaskExecutorRef, 0, "TaskExecutor-building builtins")
 BASELINE_LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins")
-LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins")
+BASELINE_LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins")
 BASELINE_LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags")
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in task group builtin with extra flags")
