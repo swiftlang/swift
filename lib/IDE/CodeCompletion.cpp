@@ -1843,6 +1843,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       if (*AttTargetDK != DeclKind::Param) {
         ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
       }
+      if (AbstractFunctionDecl::isKind(*AttTargetDK))
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::FunctionMacro;
     } else {
       // If we don't know on which decl kind we are completing, suggest all
       // attribute kinds.
@@ -1852,6 +1854,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::FunctionMacro;
     }
 
     Lookup.setExpectedTypes(/*Types=*/{}, /*isImpliedResult=*/false,
