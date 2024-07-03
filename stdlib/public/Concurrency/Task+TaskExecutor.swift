@@ -236,11 +236,17 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     self._task = task
   }
 }
@@ -292,11 +298,17 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     self._task = task
   }
 }
@@ -346,12 +358,17 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
-      // initialTaskExecutor: executorBuiltin, deprecated
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     return Task(task)
   }
 }
@@ -401,11 +418,17 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     return Task(task)
   }
 }
