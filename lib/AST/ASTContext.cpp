@@ -2714,6 +2714,9 @@ ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       NormalProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
+  CONDITIONAL_ASSERT(substitutions.getGenericSignature().getCanonicalSignature()
+                     == generic->getGenericSignature().getCanonicalSignature());
+
   // If the specialization is a no-op, use the root conformance instead.
   if (collapseSpecializedConformance(type, generic, substitutions)) {
     ++NumCollapsedSpecializedProtocolConformances;
