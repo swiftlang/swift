@@ -56,12 +56,6 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
-// The option should be written into a .private.swiftinterface or
-// .package.swiftinterface module interface file, and read/parsed from
-// there when reconstituting a .swiftmodule from it.
-// The option can be safely ignored by the older compiler.
-def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
-
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -716,6 +710,11 @@ def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
 def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
+
+def disable_print_package_name_for_non_package_interface :
+  Flag<["-"], "disable-print-package-name-for-non-package-interface">,
+  Flags<[FrontendOption, NoDriverOption, ModuleInterfaceOption, HelpHidden]>,
+  HelpText<"Disable adding package name to public or private interface">;
 
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,

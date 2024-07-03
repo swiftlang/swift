@@ -42,9 +42,8 @@ namespace options {
     SwiftAPIDigesterOption = (1 << 17),
     NewDriverOnlyOption = (1 << 18),
     ModuleInterfaceOptionIgnorable = (1 << 19),
-    ModuleInterfaceOptionIgnorablePrivate = (1 << 20),
-    ArgumentIsFileList = (1 << 21),
-    CacheInvariant = (1 << 22),
+    ArgumentIsFileList = (1 << 20),
+    CacheInvariant = (1 << 21),
   };
 
   enum ID {
