@@ -39,7 +39,8 @@ var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration
 /// implementations.
 @usableFromInline
-internal let _fastEnumerationStorageMutationsPtr =
+internal nonisolated(unsafe)
+let _fastEnumerationStorageMutationsPtr =
   UnsafeMutablePointer<CUnsignedLong>(Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
 #endif
 

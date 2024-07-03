@@ -35,7 +35,7 @@ internal class _TLSAtomicInt {
   }
 }
 
-internal let _destroyTLSCounter = _TLSAtomicInt()
+internal nonisolated(unsafe) let _destroyTLSCounter = _TLSAtomicInt()
 
 public // @testable
 func _loadDestroyTLSCounter() -> Int {
