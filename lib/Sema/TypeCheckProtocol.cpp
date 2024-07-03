@@ -2414,8 +2414,18 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
+  bool allowImpliedConditionalConformance = false;
+  if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+    // a Sendable conformance.
+    if (!Context.LangOpts.isSwiftVersionAtLeast(6))
+      allowImpliedConditionalConformance = true;
+  } else if (Proto->isMarkerProtocol()) {
+    allowImpliedConditionalConformance = true;
+  }
+
   if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
-      !Proto->isMarkerProtocol()) {
+      !allowImpliedConditionalConformance) {
     // We've got something like:
     //
     //   protocol Foo : Proto {}

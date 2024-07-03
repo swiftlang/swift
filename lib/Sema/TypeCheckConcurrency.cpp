@@ -6040,6 +6040,12 @@ bool swift::checkSendableConformance(
     }
   }
 
+  // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+  // a Sendable conformance. The implied conformance is unconditional, so check
+  // the storage for sendability as if the conformance was declared on the nominal,
+  // and not some (possibly constrained) extension.
+  if (conformance->getSourceKind() == ConformanceEntryKind::Implied)
+    conformanceDC = nominal;
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 

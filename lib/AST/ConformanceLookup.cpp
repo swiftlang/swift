@@ -717,6 +717,16 @@ LookupConformanceInModuleRequest::evaluate(
       // specialized type.
       auto *normalConf = cast<NormalProtocolConformance>(conformance);
       auto *conformanceDC = normalConf->getDeclContext();
+
+      // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+      // a Sendable conformance. The implied conformance is unconditional so it uses
+      // the generic signature of the nominal type and not the generic signature of
+      // the extension that declared the (implying) conditional conformance.
+      if (normalConf->getSourceKind() == ConformanceEntryKind::Implied &&
+          normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        conformanceDC = conformanceDC->getSelfNominalTypeDecl();
+      }
+
       auto subMap = type->getContextSubstitutionMap(mod, conformanceDC);
       return ProtocolConformanceRef(
           ctx.getSpecializedConformance(type, normalConf, subMap));
