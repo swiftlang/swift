@@ -161,10 +161,19 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   ASTContext &ctx = Ty->getASTContext();
   llvm::SaveAndRestore<bool> savedConcurrencyStandardSubstitutions(
       AllowConcurrencyStandardSubstitutions);
+  llvm::SaveAndRestore<bool> savedIsolatedAny(AllowIsolatedAny);
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           ctx.LangOpts.Target)) {
     if (*runtimeCompatVersion < llvm::VersionTuple(5, 5))
       AllowConcurrencyStandardSubstitutions = false;
+
+    // Suppress @isolated(any) if we're mangling for pre-6.0 runtimes.
+    // This is unprincipled but, because of the restrictions in e.g.
+    // mangledNameIsUnknownToDeployTarget, should only happen when
+    // mangling for certain reflective uses where we have to hope that
+    // the exact type identity is generally unimportant.
+    if (*runtimeCompatVersion < llvm::VersionTuple(6, 0))
+      AllowIsolatedAny = false;
   }
 
   llvm::SaveAndRestore<bool> savedAllowStandardSubstitutions(
