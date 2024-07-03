@@ -545,25 +545,29 @@ private:
             std::tie(objectType, optKind) = getObjectTypeAndOptionality(
                 paramType->getNominalOrBoundGenericNominal(), paramType);
             auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+            assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-            if (auto knownCxxType =
-                    owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                        objectTypeDecl)) {
+            if (objectTypeDecl &&
+                owningPrinter.typeMapping.getKnownCxxTypeInfo(objectTypeDecl)) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
               outOfLineOS << "    "
                              "memcpy(&result, payloadFromDestruction, "
                              "sizeof(result));\n";
               outOfLineOS << "    return result;\n  ";
             } else {
+              bool isOptional = false;
+              if (!objectTypeDecl) {
+                objectTypeDecl = paramType->getNominalOrBoundGenericNominal();
+                isOptional = true;
+              }
               outOfLineOS << "    return swift::";
               outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
               outOfLineOS << "::implClassFor<";
-              outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                  objectTypeDecl->getModuleContext(),
+              outOfLineSyntaxPrinter.printNominalTypeReference(
+                  objectTypeDecl,
                   elementDecl->getParentEnum()->getModuleContext());
-              outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
               outOfLineOS << ">::type";
-              if (isa<ClassDecl>(objectTypeDecl)) {
+              if (!isOptional && isa<ClassDecl>(objectTypeDecl)) {
                 outOfLineOS << "::makeRetained(*reinterpret_cast<void "
                                "**>(payloadFromDestruction));\n  ";
               } else {
@@ -572,10 +576,9 @@ private:
                 outOfLineOS << "      swift::"
                             << cxx_synthesis::getCxxImplNamespaceName();
                 outOfLineOS << "::implClassFor<";
-                outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                    objectTypeDecl->getModuleContext(),
+                outOfLineSyntaxPrinter.printNominalTypeReference(
+                    objectTypeDecl,
                     elementDecl->getParentEnum()->getModuleContext());
-                outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
                 outOfLineOS << ">::type";
                 outOfLineOS << "::initializeWithTake(result, "
                                "payloadFromDestruction);\n";
@@ -709,14 +712,15 @@ private:
                           ED, paramType);
                   auto objectTypeDecl =
                       objectType->getNominalOrBoundGenericNominal();
-                  assert(objectTypeDecl != nullptr);
+                  assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-                  if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                  if (objectTypeDecl &&
+                      owningPrinter.typeMapping.getKnownCxxTypeInfo(
                           objectTypeDecl)) {
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
-                  } else if (isa<ClassDecl>(objectTypeDecl)) {
+                  } else if (isa_and_nonnull<ClassDecl>(objectTypeDecl)) {
                     outOfLineOS
                         << "    auto op = swift::"
                         << cxx_synthesis::getCxxImplNamespaceName()
@@ -727,46 +731,31 @@ private:
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
                     outOfLineOS << "    alignas(";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineSyntaxPrinter.printNominalTypeReference(
+                        objectTypeDecl, ED->getModuleContext());
                     outOfLineOS << ") unsigned char buffer[sizeof(";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineSyntaxPrinter.printNominalTypeReference(
+                        objectTypeDecl, ED->getModuleContext());
                     outOfLineOS << ")];\n";
                     outOfLineOS << "    auto *valCopy = new(buffer) ";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineSyntaxPrinter.printNominalTypeReference(
+                        objectTypeDecl, ED->getModuleContext());
                     outOfLineOS << "(val);\n";
                     outOfLineOS << "    ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineSyntaxPrinter.printNominalTypeReference(
+                        objectTypeDecl, ED->getModuleContext());
                     outOfLineOS << ">::type::initializeWithTake(result._"
                                    "getOpaquePointer(), ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineSyntaxPrinter.printNominalTypeReference(
+                        objectTypeDecl, ED->getModuleContext());
                     outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                     outOfLineOS << ");\n";
                   }
@@ -2914,9 +2903,6 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
       if (auto *params = elementDecl->getParameterList()) {
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
-          // TODO: properly support exporting these optionals. rdar://131112273 
-          if (paramType->isOptional() && paramType->getOptionalObjectType()->isTypeParameter())
-            return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
                   printer, enumDecl->getModuleContext(), paramType)
