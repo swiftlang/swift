@@ -1615,7 +1615,7 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (AbortOnUnknownPatternMatchError) {
+    if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
