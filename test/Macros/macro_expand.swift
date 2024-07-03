@@ -308,6 +308,16 @@ func testStringifyWithThrows() throws {
   _ = #stringifyAndTry(maybeThrowing())
 }
 
+func throwingFunc() async throws -> Int { 5 }
+
+@freestanding(expression) macro callThrowingFunc<T>(_ body: () -> T) -> T = #externalMacro(module: "MacroDefinition", type: "TryCallThrowingFuncMacro")
+
+func testThrowingCall() async throws -> Int {
+  #callThrowingFunc {
+    [1, 2, 3, 4, 5].map { $0 + 1 }.first!
+  }
+}
+
 func testStringifyWithLocalType() throws {
   _ =  #stringify({
     struct QuailError: Error {}
