@@ -331,7 +331,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -354,9 +353,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -374,7 +370,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -404,9 +399,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
                            operation: operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 #elseif $Embedded
@@ -416,7 +408,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     priority: TaskPriority? = nil,
     operation: sending @escaping () async -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -434,9 +425,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   @_alwaysEmitIntoClient
@@ -444,7 +432,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     priority: TaskPriority? = nil,
     operation: sending @escaping () async -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -469,9 +456,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 #else // if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -494,7 +478,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   public mutating func addTask(
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -508,9 +491,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   @available(SwiftStdlib 5.7, *)
@@ -533,7 +513,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -556,9 +535,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
                            operation: operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 
@@ -860,7 +836,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -875,9 +850,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -898,7 +870,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -921,9 +892,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
                            operation: operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   @available(SwiftStdlib 5.7, *)
@@ -946,7 +914,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   public mutating func addTask(
     operation: sending @escaping () async throws -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -955,9 +922,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   @available(SwiftStdlib 5.7, *)
@@ -982,7 +946,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping () async throws -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -1000,9 +963,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 

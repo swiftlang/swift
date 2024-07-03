@@ -623,7 +623,6 @@ extension Task where Failure == Never {
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async -> Success
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -635,9 +634,6 @@ extension Task where Failure == Never {
     let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given nonthrowing operation asynchronously
@@ -670,7 +666,6 @@ extension Task where Failure == Never {
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -688,9 +683,6 @@ extension Task where Failure == Never {
                                        operation: operation)
 
     self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -715,7 +707,6 @@ extension Task where Failure == Error {
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async throws -> Success
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the task flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -727,9 +718,6 @@ extension Task where Failure == Error {
     let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given throwing operation asynchronously
@@ -762,7 +750,6 @@ extension Task where Failure == Error {
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the task flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -780,9 +767,6 @@ extension Task where Failure == Error {
                                        operation: operation)
 
     self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -809,7 +793,6 @@ extension Task where Failure == Never {
     priority: TaskPriority? = nil,
     operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -821,9 +804,6 @@ extension Task where Failure == Never {
     let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given nonthrowing operation asynchronously
@@ -853,7 +833,6 @@ extension Task where Failure == Never {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -871,9 +850,6 @@ extension Task where Failure == Never {
                                        operation: operation)
 
     return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -898,7 +874,6 @@ extension Task where Failure == Error {
     priority: TaskPriority? = nil,
     operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -910,9 +885,6 @@ extension Task where Failure == Error {
     let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given throwing operation asynchronously
@@ -944,7 +916,6 @@ extension Task where Failure == Error {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -962,9 +933,6 @@ extension Task where Failure == Error {
                                        operation: operation)
 
     return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
