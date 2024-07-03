@@ -36,7 +36,7 @@ public:
 /// An abstract base class for consumers of context info results.
 class TypeContextInfoConsumer {
 public:
-  virtual ~TypeContextInfoConsumer() {}
+  virtual ~TypeContextInfoConsumer() noexcept {}
   virtual void handleResults(ArrayRef<TypeContextInfoItem>) = 0;
 };
 
