@@ -27,6 +27,11 @@ struct FakeBool {
 
 class Klass {}
 
+struct F {
+    let a: Int?
+    let e: String
+}
+
 sil @external_f : $@convention(thin) () -> ()
 // func testThread3(a : Int32) -> Int32 {
 //   (enum b, val) = (a ? (_true, 16) : (_false, 17))
@@ -886,3 +891,44 @@ bb10:
   return %21 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @jump_thread_new_phi_arg
+// CHECK:         switch_enum %0 : $Optional<F>
+// CHECK:         switch_enum {{%[0-9]+}} : $Optional<Int>
+// CHECK-NOT:     switch_enum
+// CHECK:       } // end sil function 'jump_thread_new_phi_arg'
+sil [ossa] @jump_thread_new_phi_arg : $@convention(thin) (@guaranteed Optional<F>) -> Optional<Int> {
+bb0(%0 : @guaranteed $Optional<F>):
+  switch_enum %0 : $Optional<F>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = enum $Optional<Int>, #Optional.none!enumelt
+  br bb3(%4 : $Optional<Int>)
+
+
+bb2(%6 : @guaranteed $F):
+  %7 = struct_extract %6 : $F, #F.a
+  br bb3(%7 : $Optional<Int>)
+
+
+bb3(%9 : $Optional<Int>):
+  switch_enum %9 : $Optional<Int>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%11 : $Int):
+  br bb8(%9 : $Optional<Int>)
+
+bb5:
+  switch_enum %0 : $Optional<F>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb7
+
+
+bb6(%14 : @guaranteed $F):
+  %15 = struct_extract %14 : $F, #F.a
+  br bb8(%15 : $Optional<Int>)
+
+bb7:
+  %17 = enum $Optional<Int>, #Optional.none!enumelt
+  br bb8(%17 : $Optional<Int>)
+
+
+bb8(%19 : $Optional<Int>):
+  return %19 : $Optional<Int>
+}
