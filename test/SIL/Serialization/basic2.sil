@@ -6,6 +6,9 @@
 
 import Builtin
 
+class C {}
+sil @getC : $@convention(thin) () -> (@owned C)
+
 // CHECK-LABEL: sil [ossa] @test_allocbox_moveable_value_debuginfo_flag : $@convention(thin) () -> () {
 // CHECK: alloc_box [moveable_value_debuginfo] ${ var Builtin.NativeObject }
 // CHECK: } // end sil function 'test_allocbox_moveable_value_debuginfo_flag'
@@ -39,6 +42,29 @@ bb0(%0 : $*Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_dealloc_box : {{.*}} {
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         dealloc_box [dead_end]
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_box
+// CHECK-LABEL: } // end sil function 'test_dealloc_box'
+sil [ossa] @test_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var C }
+  cond_br undef, exit, die
+
+exit:
+  dealloc_box %b : ${ var C }
+  %retval = tuple()
+  return %retval : $()
+
+die:
+  dealloc_box [dead_end] %b : ${ var C }
+  unreachable
+}
+
 // We don't serialize debug_value today... but we should.
 //
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
@@ -57,6 +83,60 @@ bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destroy_value : {{.*}} {
+// CHECK:         cond_br undef, [[GOOD:bb[0-9]+]], [[BAD:bb[0-9]+]]
+// CHECK:       [[BAD]]:
+// CHECK:         cond_br undef, [[BLEFT:bb[0-9]+]], [[BRIGHT:bb[0-9]+]]
+// CHECK:       [[BRIGHT]]:
+// CHECK:         %3 = apply %0()
+// CHECK:         destroy_value [poison] [dead_end] %3
+// CHECK:         unreachable
+// CHECK:       [[BLEFT]]:
+// CHECK:         %6 = apply %0()
+// CHECK:         destroy_value [dead_end] %6
+// CHECK:         unreachable
+// CHECK:       [[GOOD]]:
+// CHECK:         cond_br undef, [[GLEFT:bb[0-9]+]], [[GRIGHT:bb[0-9]+]]
+// CHECK:       [[GRIGHT]]:
+// CHECK:         %10 = apply %0()
+// CHECK:         destroy_value [poison] %10
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[GLEFT]]:
+// CHECK:         %13 = apply %0()
+// CHECK:         destroy_value %13
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'test_destroy_value'
+sil [ossa] @test_destroy_value : $@convention(thin) () -> () {
+entry:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  cond_br undef, good, bad
+
+good:
+  cond_br undef, gleft, gright
+gleft:
+  %k1 = apply %getC() : $@convention(thin) () -> (@owned C)
+  destroy_value %k1 : $C
+  br exit
+gright:
+  %k2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  destroy_value [poison] %k2 : $C
+  br exit
+exit:
+  %retval = tuple()
+  return %retval : $()
+bad:
+  cond_br undef, bleft, bright
+bleft:
+  %k3 = apply %getC() : $@convention(thin) () -> (@owned C)
+  destroy_value [dead_end] %k3 : $C
+  unreachable
+bright:
+  %k4 = apply %getC() : $@convention(thin) () -> (@owned C)
+  destroy_value [poison] [dead_end] %k4 : $C
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @test_explicit_copy_addr : $@convention(thin) (@owned Builtin.NativeObject) -> () {

@@ -323,7 +323,7 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   SILBuilderWithScope debugInfoBuilder(insertPt);
   debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
   debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand(), *varInfo,
-                                    false, UsesMoveableValueDebugInfo);
+                                    DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 static void convertMemoryReinitToInitForm(SILInstruction *memInst,
@@ -4030,7 +4030,8 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
   PostOrderFunctionInfo *postOrder = poa->get(fn);
-  OSSALifetimeCompletion completion(fn, domTree);
+  OSSALifetimeCompletion completion(fn, domTree,
+                                    *deadEndBlocksAnalysis->get(fn));
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
