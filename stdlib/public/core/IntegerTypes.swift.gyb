@@ -889,87 +889,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   }
     return comments[operator]
 
-# documentation for overflow-calculating arithmetic methods, indexed
-# by the related operator:
-#     +   addingReportingOverflow(_:)
-#     -   subtractingReportingOverflow(_:)
-#     *   multipliedReportingOverflow(by:)
-#     /   dividedReportingOverflow(by:)
-#     %   remainderReportingOverflow(dividingBy:)
-def overflowOperationComment(operator):
-    comments = {
-        '+': """\
-  /// Returns the sum of this value and the given value, along with a Boolean
-  /// value indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: A tuple containing the result of the addition along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   sum. If the `overflow` component is `true`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated sum of this value
-  ///   and `rhs`.
-""",
-        '-': """\
-  /// Returns the difference obtained by subtracting the given value from this
-  /// value, along with a Boolean value indicating whether overflow occurred in
-  /// the operation.
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: A tuple containing the result of the subtraction along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   difference. If the `overflow` component is `true`, an overflow occurred
-  ///   and the `partialValue` component contains the truncated result of `rhs`
-  ///   subtracted from this value.
-""",
-        '*': """\
-  /// Returns the product of this value and the given value, along with a
-  /// Boolean value indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: A tuple containing the result of the multiplication along with
-  ///   a Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   product. If the `overflow` component is `true`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated product of this
-  ///   value and `rhs`.
-""",
-        '/': """\
-  /// Returns the quotient obtained by dividing this value by the given value,
-  /// along with a Boolean value indicating whether overflow occurred in the
-  /// operation.
-  ///
-  /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: A tuple containing the result of the division along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   quotient. If the `overflow` component is `true`, an overflow occurred
-  ///   and the `partialValue` component contains either the truncated quotient
-  ///   or, if the quotient is undefined, the dividend.
-""",
-        '%': """\
-  /// Returns the remainder after dividing this value by the given value, along
-  /// with a Boolean value indicating whether overflow occurred during division.
-  ///
-  /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.remainderReportingOverflow(dividingBy: 0)` is
-  /// `(x, true)`.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: A tuple containing the result of the operation along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   remainder. If the `overflow` component is `true`, an overflow occurred
-  ///   during division and the `partialValue` component contains either the
-  ///   entire remainder or, if the remainder is undefined, the dividend.
-""",
-    }
-    return comments[operator]
-
 }%
 
 //===----------------------------------------------------------------------===//
@@ -1183,7 +1102,6 @@ ${assignmentOperatorComment(x.operator, True)}
 
 %       for x in chain(*binaryArithmetic.values()):
 
-${overflowOperationComment(x.operator)}
   @_transparent
   public func ${x.name}ReportingOverflow(
     ${x.firstArg} other: ${Self}
