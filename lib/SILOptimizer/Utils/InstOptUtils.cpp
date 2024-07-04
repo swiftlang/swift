@@ -1008,7 +1008,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
     return;
   }
 
-  if (operand->getType().hasReferenceSemantics()) {
+  if (operand->getType().isReferenceCounted(builder.getModule())) {
     auto u = builder.emitStrongRelease(loc, operand);
     if (u.isNull())
       return;
