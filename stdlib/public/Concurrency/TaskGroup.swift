@@ -326,7 +326,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
@@ -373,7 +372,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
@@ -485,7 +483,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 #else // if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
@@ -498,7 +495,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Parameters:
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
@@ -541,7 +537,6 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
@@ -871,7 +866,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
@@ -913,7 +907,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
