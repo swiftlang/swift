@@ -83,6 +83,14 @@ protected:
   /// a critical role.
   bool AllowIsolatedAny = true;
 
+  /// If enabled, typed throws can be encoded in the mangled name.
+  /// Suppressing type attributes this way is generally questionable ---
+  /// for example, it does not interact properly with substitutions ---
+  /// and should only be done in situations where it is just going to be
+  /// interpreted as a type and the exact string value does not play
+  /// a critical role.
+  bool AllowTypedThrows = true;
+
   /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
   /// as if they're part of their original module. Disabled for debug mangling,
   /// because lldb wants to find declarations in the modules they're currently
