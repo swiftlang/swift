@@ -514,12 +514,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!headerImport)
         llvm::report_fatal_error("Bad binary direct dependencies: no header import");
 
-      // TODO: LinkLibraries
+      // TODO: LinkLibraries, DefiningModulePath
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
            *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
            currentModuleImports, currentOptionalModuleImports, {},
-           *headerImport, isFramework, isStatic, *moduleCacheKey);
+           *headerImport, "", isFramework, isStatic, *moduleCacheKey);
 
       auto headerModuleDependencies = getStringArray(headerModuleDependenciesArrayID);
       if (!headerModuleDependencies)
