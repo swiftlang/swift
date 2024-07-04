@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public struct StructSeveralI64 {
     var x1, x2, x3, x4, x5: Int64

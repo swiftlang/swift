@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend %t/clean.swift -typecheck -module-name Decls -clang-header-expose-decls=all-public -disable-availability-checking -emit-clang-header-path %t/decls.h
 // RUN: %FileCheck %s < %t/decls.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/decls.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/decls.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public protocol Proto { init() }
 
