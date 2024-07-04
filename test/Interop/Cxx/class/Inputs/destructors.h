@@ -28,4 +28,16 @@ struct HasNonTrivialImplicitDestructor {
   HasUserProvidedDestructor member;
 };
 
+template <typename T>
+struct TemplatedHasVirtualDestructor {
+  T value;
+  virtual ~TemplatedHasVirtualDestructor() {}
+};
+
+template <typename T>
+struct DerivedTemplatedHasVirtualDestructor : TemplatedHasVirtualDestructor<T> {
+};
+
+using DerivedTemplatedHasVirtualDestructorChar = DerivedTemplatedHasVirtualDestructor<char>;
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_DESTRUCTORS_H
