@@ -503,8 +503,9 @@ void CopyPropagation::run() {
     bool firstRun = true;
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
-    // - CanonicalizeOSSALifetime
+    // - CanonicalizeOSSALifetime(borrowee)
     // - LexicalDestroyFolding
+    // - CanonicalizeOSSALifetime(folded)
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
@@ -529,8 +530,7 @@ void CopyPropagation::run() {
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
-      auto hoisted =
-          hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
+      auto hoisted = canonicalizer.canonicalizeValueLifetime(folded);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
       eliminateRedundantMove(folded, deleter, defWorklist);
@@ -542,7 +542,7 @@ void CopyPropagation::run() {
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
-      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter, calleeAnalysis);
+      canonicalizer.canonicalizeValueLifetime(argument);
     }
   }
   deleter.cleanupDeadInstructions();
