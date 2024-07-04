@@ -1809,3 +1809,22 @@ actor FunctionWithSendableResultAndIsolationActor {
         return ""
     }
 }
+
+struct SendableAddressOnly<T : Sendable> : Sendable {
+  let x: T
+}
+
+class SendableAddressOnlyHolder<T : Sendable> {
+  init() {}
+  func getSendableAddressOnly() async -> SendableAddressOnly<T>? { nil }
+}
+
+// Make sure that we accept this code.
+@MainActor
+func miscClosureSendableAddressOnlyClosureTest<T : Sendable>(foo: SendableAddressOnlyHolder<T>) async -> SendableAddressOnly<T>? {
+  // Pattern that the region based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode
+  return await { () -> SendableAddressOnly<T>? in
+    return await foo.getSendableAddressOnly() // expected-warning {{sending 'foo' risks causing data races}}
+    // expected-note @-1 {{sending main actor-isolated 'foo' to nonisolated instance method 'getSendableAddressOnly()' risks causing data races between nonisolated and main actor-isolated uses}}
+  }()
+}
