@@ -1803,6 +1803,57 @@ public:
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
   }
 
+  /// Handle `enum` instruction.
+  ///   Original: y = enum $Enum, #Enum.some!enumelt, x
+  ///    Adjoint: adj[x] += adj[y]
+  void visitEnumInst(EnumInst *ei) {
+    SILBasicBlock *bb = ei->getParent();
+    SILLocation loc = ei->getLoc();
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+
+    // Only `Optional`-typed operands are supported for now. Diagnose all other
+    // enum operand types.
+    if (ei->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Unsupported enum type in PullbackCloner: " << *ei);
+      getContext().emitNondifferentiabilityError(
+          ei, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+
+    auto adjOpt = getAdjointValue(bb, ei);
+    auto adjStruct = materializeAdjointDirect(adjOpt, loc);
+    StructDecl *adjStructDecl =
+        adjStruct->getType().getStructOrBoundGenericStruct();
+
+    VarDecl *adjOptVar = nullptr;
+    if (adjStructDecl) {
+      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
+      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
+    }
+
+    EnumDecl *adjOptDecl =
+        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
+                  : nullptr;
+
+    // Optional<T>.TangentVector should be a struct with a single
+    // Optional<T.TangentVector> property. This is an implementation detail of
+    // OptionalDifferentiation.swift
+    // TODO: Maybe it would be better to have getters / setters here that we
+    // can call and hide this implementation detail?
+    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
+      llvm_unreachable("Unexpected type of Optional.TangentVector");
+
+    auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
+
+    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
+    auto *adjData = builder.createUncheckedEnumData(loc, adjVal, someElemDecl);
+
+    addAdjointValue(bb, ei->getOperand(), makeConcreteAdjointValue(adjData), loc);
+  }
+
   /// Handle a sequence of `init_enum_data_addr` and `inject_enum_addr`
   /// instructions.
   ///
