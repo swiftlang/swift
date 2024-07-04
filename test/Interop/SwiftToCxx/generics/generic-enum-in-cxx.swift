@@ -89,6 +89,11 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
     }
 }
 
+@frozen public enum GenericCustomType<T> {
+    case success(T?)
+    case failure
+}
+
 // CHECK: namespace Generics SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Generics") {
 
 // CHECK: template<class T_0_0>
