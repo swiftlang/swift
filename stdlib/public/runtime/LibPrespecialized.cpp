@@ -408,8 +408,8 @@ getMetadataFromPointerKeyedMap(const LibPrespecializedState &state,
 #else
   LOG("Looking up description %p but dyld hash table call not available.",
       description);
-  return nullptr;
 #endif
+  return nullptr;
 }
 
 // When we have a pointer-keyed map from a debug library, it's not built as a
