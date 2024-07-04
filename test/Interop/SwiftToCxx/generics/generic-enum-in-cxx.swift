@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // FIXME: remove the need for -Wno-reserved-identifier
 
@@ -88,6 +88,8 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
         break
     }
 }
+
+// CHECK: namespace Generics SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Generics") {
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts

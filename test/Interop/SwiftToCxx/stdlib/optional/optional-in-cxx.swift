@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/useopt.h
+// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -emit-clang-header-path %t/useopt.h
+
+// RUN: %check-interop-cxx-header-in-clang(%t/useopt.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %FileCheck %s < %t/useopt.h
 
-@_expose(Cxx)
 public struct SmallStruct {
     let x: Int16
 }
 
-@_expose(Cxx)
 public class Klass {
     let x: Int16
 
@@ -18,37 +18,30 @@ public class Klass {
     }
 }
 
-@_expose(Cxx)
 public func createCIntOpt(_ val: CInt) -> Optional<CInt> {
     return val
 }
 
-@_expose(Cxx)
 public func takeCIntOpt(_ val: Optional<CInt>) {
     print(String(describing: val))
 }
 
-@_expose(Cxx)
 public func createSmallStructOpt(_ val: Int16) -> SmallStruct? {
     return SmallStruct(x: val)
 }
 
-@_expose(Cxx)
 public func takeSmallStructOpt(_ val: Optional<SmallStruct>) {
     print(String(describing: val))
 }
 
-@_expose(Cxx)
 public func createKlassOpt(_ val: Int16) -> Klass? {
     return Klass(val)
 }
 
-@_expose(Cxx)
 public func takeKlassOpt(_ val: Klass?) {
     print(String(describing: val))
 }
 
-@_expose(Cxx)
 public func resetOpt<T>(_ val: inout Optional<T>) {
     val = .none
 }
