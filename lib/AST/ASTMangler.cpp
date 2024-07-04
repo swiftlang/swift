@@ -3062,7 +3062,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   if (fn->isSendable())
     appendOperator("Yb");
   if (auto thrownError = fn->getEffectiveThrownErrorType()) {
-    if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())){
+    if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())
+        || !AllowTypedThrows) {
       appendOperator("K");
     } else {
       appendType(*thrownError, sig);

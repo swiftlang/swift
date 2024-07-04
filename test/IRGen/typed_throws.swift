@@ -13,11 +13,14 @@ public enum MyBigError: Error {
 }
 
 // CHECK-MANGLE: @"$s12typed_throws1XVAA1PAAWP" = hidden global [2 x ptr] [ptr @"$s12typed_throws1XVAA1PAAMc", ptr getelementptr inbounds (i8, ptr @"symbolic ySi_____YKc 12typed_throws10MyBigErrorO", {{i32|i64}} 1)]
+@available(SwiftStdlib 6.0, *)
 struct X: P {
   typealias A = (Int) throws(MyBigError) -> Void
 }
 
 func requiresP<T: P>(_: T.Type) { }
+
+@available(SwiftStdlib 6.0, *)
 func createsP() {
   requiresP(X.self)
 }
@@ -27,6 +30,7 @@ func createsP() {
 
 
 // CHECK-LABEL: define {{.*}}hidden swiftcc ptr @"$s12typed_throws13buildMetatypeypXpyF"()
+@available(SwiftStdlib 6.0, *)
 func buildMetatype() -> Any.Type {
   typealias Fn = (Int) throws(MyBigError) -> Void
 
