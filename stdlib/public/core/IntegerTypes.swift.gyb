@@ -237,7 +237,7 @@ def operatorComment(operator, fixedWidth):
         '>>': '',
         '<<': '',
   }
-    return comments[operator]
+    return comments[operator].rstrip()
 
 # documentation for assignment operators: +=, -=, <<=, etc
 def assignmentOperatorComment(operator, fixedWidth):
@@ -392,7 +392,7 @@ def assignmentOperatorComment(operator, fixedWidth):
         '>>': '',
         '<<': '',
   }
-    return comments[operator]
+    return comments[operator].rstrip()
 
 }%
 
