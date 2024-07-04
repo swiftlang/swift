@@ -2208,10 +2208,10 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
                   RefCountingInst::Atomicity::Atomic));
   }
 
-  recordClonedInstruction(
-      Inst, getBuilder().createDestroyValue(getOpLocation(Inst->getLoc()),
-                                            getOpValue(Inst->getOperand()),
-                                            Inst->poisonRefs()));
+  recordClonedInstruction(Inst, getBuilder().createDestroyValue(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getOperand()),
+                                    Inst->poisonRefs(), Inst->isDeadEnd()));
 }
 
 template <typename ImplClass>
@@ -3175,7 +3175,8 @@ SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createDeallocBox(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand())));
+                                          getOpValue(Inst->getOperand()),
+                                          Inst->isDeadEnd()));
 }
 
 template<typename ImplClass>

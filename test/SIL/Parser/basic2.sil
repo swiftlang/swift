@@ -8,6 +8,8 @@ class Klass {}
   var rhs: Klass
 }
 
+sil @getKlass : $@convention(thin) () -> (@owned Klass)
+
 // CHECK-LABEL: sil [ossa] @test_copy_release_value
 // CHECK: bb0([[T0:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Builtin.NativeObject
@@ -346,4 +348,59 @@ entry(%k : @owned $Klass):
 bb1:
   extend_lifetime %k : $Klass
   br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @test_destroy_value : {{.*}} {
+// CHECK:         destroy_value
+// CHECK:         destroy_value [poison]
+// CHECK:         destroy_value [dead_end]
+// CHECK:         destroy_value [poison] [dead_end]
+// CHECK-LABEL: } // end sil function 'test_destroy_value'
+sil [ossa] @test_destroy_value : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  cond_br undef, good, bad
+
+good:
+  cond_br undef, gleft, gright
+gleft:
+  %k1 = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  destroy_value %k1 : $Klass
+  br exit
+gright:
+  %k2 = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  destroy_value [poison] %k2 : $Klass
+  br exit
+exit:
+  %retval = tuple()
+  return %retval : $()
+bad:
+  cond_br undef, bleft, bright
+bleft:
+  %k3 = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  destroy_value [dead_end] %k3 : $Klass
+  unreachable
+bright:
+  %k4 = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  destroy_value [poison] [dead_end] %k4 : $Klass
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_dealloc_box : {{.*}} {
+// CHECK:         dealloc_box
+// CHECK:         dealloc_box [dead_end]
+// CHECK-LABEL: } // end sil function 'test_dealloc_box'
+sil [ossa] @test_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var Klass }
+  cond_br undef, exit, die
+
+exit:
+  dealloc_box %b : ${ var Klass }
+  %retval = tuple()
+  return %retval : $()
+
+die:
+  dealloc_box [dead_end] %b : ${ var Klass }
+  unreachable
 }

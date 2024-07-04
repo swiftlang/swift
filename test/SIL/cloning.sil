@@ -226,3 +226,66 @@ entry(%o : @owned $Builtin.NativeObject):
   %retval = apply %callee(%o) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   return %retval : $()
 }
+
+sil [ossa] [always_inline] @callee_destroy_value : $@convention(thin) (@owned X) -> () {
+entry(%x : @owned $X):
+  cond_br undef, good, bad
+good:
+  cond_br undef, gleft, gright
+gleft:
+  destroy_value %x : $X
+  br exit
+gright:
+  destroy_value [poison] %x : $X
+  br exit
+exit:
+  %retval = tuple()
+  return %retval : $()
+bad:
+  cond_br undef, bleft, bright
+bleft:
+  destroy_value [dead_end] %x : $X
+  unreachable
+bright:
+  destroy_value [poison] [dead_end] %x : $X
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @caller_destroy_value : {{.*}} {
+// CHECK:         destroy_value
+// CHECK:         destroy_value [poison]
+// CHECK:         destroy_value [dead_end]
+// CHECK:         destroy_value [poison] [dead_end]
+// CHECK-LABEL: } // end sil function 'caller_destroy_value'
+sil [ossa] @caller_destroy_value : $@convention(thin) (@owned X) -> () {
+entry(%x : @owned $X):
+  %callee = function_ref @callee_destroy_value : $@convention(thin) (@owned X) -> ()
+  %res = apply %callee(%x) : $@convention(thin) (@owned X) -> ()
+  return %res : $()
+}
+
+sil [ossa] [always_inline] @callee_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var X }
+  cond_br undef, exit, die
+
+exit:
+  dealloc_box %b : ${ var X }
+  %retval = tuple()
+  return %retval : $()
+
+die:
+  dealloc_box [dead_end] %b : ${ var X }
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @caller_dealloc_box : {{.*}} {
+// CHECK:         dealloc_box
+// CHECK:         dealloc_box [dead_end]
+// CHECK-LABEL: } // end sil function 'caller_dealloc_box'
+sil [ossa] @caller_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %callee = function_ref @callee_dealloc_box : $@convention(thin) () -> ()
+  %res = apply %callee() : $@convention(thin) () -> ()
+  return %res : $()
+}
