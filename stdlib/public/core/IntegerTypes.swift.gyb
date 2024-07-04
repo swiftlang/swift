@@ -1068,7 +1068,6 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 % end # end of concrete FixedWidthInteger section
 
 extension Int {
-  // FIXME(ABI): using Int as the return type is wrong.
   /// Returns the distance from this value to the given value, expressed as a
   /// stride.
   ///
@@ -1082,7 +1081,6 @@ extension Int {
     return other - self
   }
 
-  // FIXME(ABI): using Int as the parameter type is wrong.
   /// Returns a value that is offset the specified distance from this value.
   ///
   /// Use the `advanced(by:)` method in generic code to offset a value by a
