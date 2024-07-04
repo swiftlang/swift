@@ -3405,6 +3405,10 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
+    if (I->isDeadEnd()) {
+      require(getDeadEndBlocks().isDeadEnd(I->getParentBlock()),
+              "a dead_end destroy_value must be in a dead-end block");
+    }
   }
 
   void checkReleaseValueInst(ReleaseValueInst *I) {
@@ -3805,6 +3809,10 @@ public:
     require(boxTy, "operand must be a @box type");
     require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
+    if (DI->isDeadEnd()) {
+      require(getDeadEndBlocks().isDeadEnd(DI->getParentBlock()),
+              "a dead_end dealloc_box must be in a dead-end block");
+    }
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
