@@ -347,6 +347,8 @@ enum class TypeMatchFlags {
   AllowCompatibleOpaqueTypeArchetypes = 1 << 5,
   /// Ignore the @Sendable attributes on functions when matching types.
   IgnoreFunctionSendability = 1 << 6,
+  /// Ignore `any Sendable` and compositions with Sendable protocol.
+  IgnoreSendability = 1 << 7,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
