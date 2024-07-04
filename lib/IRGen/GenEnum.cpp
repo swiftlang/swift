@@ -1688,11 +1688,22 @@ namespace {
       auto payload = EnumPayload::load(IGF, projectPayload(IGF, addr),
                                        PayloadSchema);
       if (ExtraTagBitCount > 0) {
-        extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
         if (maskExtraTagBits) {
-          auto maskBits = llvm::NextPowerOf2(NumExtraTagValues) - 1;
+          auto projectedBits = projectExtraTagBits(IGF, addr);
+          // LLVM assumes that loads of fractional byte sizes have been stored
+          // with the same type, so all unused bits would be 0. Since we are
+          // re-using spare bits for tag storage, that assumption is wrong here.
+          // In CVW we have to mask the extra bits, which requires us to make
+          // this cast here, otherwise LLVM would optimize away the bit mask.
+          if (projectedBits.getElementType()->getIntegerBitWidth() < 8) {
+            projectedBits = IGF.Builder.CreateElementBitCast(addr, IGM.Int8Ty);
+          }
+          extraTag = IGF.Builder.CreateLoad(projectedBits);
+          auto maskBits = llvm::PowerOf2Ceil(NumExtraTagValues) - 1;
           auto mask = llvm::ConstantInt::get(extraTag->getType(), maskBits);
           extraTag = IGF.Builder.CreateAnd(extraTag, mask);
+        } else {
+          extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
         }
       }
       return {std::move(payload), extraTag};
