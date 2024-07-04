@@ -2910,6 +2910,9 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
       if (auto *params = elementDecl->getParameterList()) {
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
+          // TODO: properly support exporting these optionals.  
+          if (paramType->isOptional() && paramType->getOptionalObjectType()->isTypeParameter())
+            return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
                   printer, enumDecl->getModuleContext(), paramType)
