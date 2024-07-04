@@ -511,11 +511,16 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
                                           LibraryKind::Framework));
   }
 
+  // Attempt to resolve the module's defining .swiftinterface path
+  std::string definingModulePath =
+       loadedModuleFile->resolveModuleDefiningFilePath(Ctx.SearchPathOpts.getSDKPath());
+
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
       modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
-      optionalModuleImports, linkLibraries, importedHeader, isFramework,
-      loadedModuleFile->isStaticLibrary(), /*module-cache-key*/ "");
+      optionalModuleImports, linkLibraries, importedHeader,
+      definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
+      /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }
