@@ -4,7 +4,7 @@
 
 import CxxStdlib
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 @_cdecl("cdeclFunction") public func cdeclFunction(_ x: CInt) {}
 

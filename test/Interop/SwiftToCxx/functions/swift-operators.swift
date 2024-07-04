@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Operators -clang-header-expose-decls=all-public -emit-clang-header-path %t/operators.h
 // RUN: %FileCheck %s < %t/operators.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/operators.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/operators.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // CHECK-LABEL: namespace Operators SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Operators") {
 
