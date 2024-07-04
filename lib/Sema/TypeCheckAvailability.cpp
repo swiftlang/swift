@@ -3031,6 +3031,15 @@ static bool diagnoseIsolatedAnyAvailability(
       ReferenceDC);
 }
 
+static bool diagnoseTypedThrowsAvailability(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+  return TypeChecker::checkAvailability(
+      ReferenceRange,
+      ReferenceDC->getASTContext().getTypedThrowsAvailability(),
+      diag::availability_typed_throws_only_version_newer,
+      ReferenceDC);
+}
+
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
                                                   SourceRange refLoc,
                                                   const DeclContext *refDC) {
@@ -3041,6 +3050,8 @@ static bool checkTypeMetadataAvailabilityInternal(CanType type,
       auto isolation = fnType->getIsolation();
       if (isolation.isErased())
         return diagnoseIsolatedAnyAvailability(refLoc, refDC);
+      if (fnType.getThrownError())
+        return diagnoseTypedThrowsAvailability(refLoc, refDC);
     }
     return false;
   });
