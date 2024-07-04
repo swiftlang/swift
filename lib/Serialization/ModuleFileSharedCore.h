@@ -623,6 +623,10 @@ public:
     return Bits.IsStaticLibrary;
   }
 
+  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
+  /// resolve it to be absolute to the specified SDK.
+  std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
+
   /// Returns \c true if this module file contains a section with incremental
   /// information.
   bool hasIncrementalInfo() const { return HasIncrementalInfo; }
