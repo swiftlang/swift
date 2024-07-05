@@ -767,7 +767,6 @@ addDistributedActorCodableConformance(
   assert(proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
          proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
   auto &C = actor->getASTContext();
-  auto module = actor->getParentModule();
 
   // === Only Distributed actors can gain this implicit conformance
   if (!actor->isDistributedActor()) {
@@ -776,7 +775,7 @@ addDistributedActorCodableConformance(
 
   // === Does the actor explicitly conform to the protocol already?
   auto explicitConformance =
-      module->lookupConformance(actor->getInterfaceType(), proto);
+      ModuleDecl::lookupConformance(actor->getInterfaceType(), proto);
   if (!explicitConformance.isInvalid()) {
     // ok, it was conformed explicitly -- let's not synthesize;
     return nullptr;
@@ -1071,12 +1070,10 @@ NormalProtocolConformance *
 GetDistributedActorAsActorConformanceRequest::evaluate(
     Evaluator &evaluator, ProtocolDecl *distributedActorProto) const {
   auto &ctx = distributedActorProto->getASTContext();
-  auto swiftModule = ctx.getStdlibModule();
-
   auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
 
   auto ext = findDistributedActorAsActorExtension(
-      distributedActorProto, swiftModule);
+      distributedActorProto);
   if (!ext)
     return nullptr;
 

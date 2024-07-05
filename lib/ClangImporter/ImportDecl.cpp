@@ -8069,10 +8069,10 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);
         if (!nominal)
           continue;
-        auto *module = nominal->getModuleContext();
+
         // Don't synthesize a conformance if one already exists.
         auto ty = nominal->getDeclaredInterfaceType();
-        if (module->lookupConformance(ty, protocol))
+        if (ModuleDecl::lookupConformance(ty, protocol))
           continue;
         auto conformance = SwiftContext.getNormalConformance(
             ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),

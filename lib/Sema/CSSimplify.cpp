@@ -8604,8 +8604,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
-        type, protocol, DC->getParentModule(),
-        /*allowMissing=*/true);
+        type, protocol, /*allowMissing=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -10282,7 +10281,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     if (shouldCheckSendabilityOfBase()) {
       auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = DC->getParentModule()->lookupConformance(
+      auto baseConformance = ModuleDecl::lookupConformance(
           instanceTy, sendableProtocol);
 
       if (llvm::any_of(

@@ -499,15 +499,14 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 /// \endcode
 static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
                                                     Expr *E,
-                                                    Type ResultType,
-                                                    ModuleDecl *module) {
+                                                    Type ResultType) {
   auto *NTD = ResultType->getAnyNominal();
   if (!NTD)
     return;
   auto optionSetType = dyn_cast_or_null<ProtocolDecl>(Ctx.getOptionSetDecl());
   if (!optionSetType)
     return;
-  if (!module->lookupConformance(ResultType, optionSetType))
+  if (!ModuleDecl::lookupConformance(ResultType, optionSetType))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
@@ -1089,7 +1088,7 @@ public:
       RS->setResult(resultTarget->getAsExpr());
     } else {
       tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
-                                              ResultTy, DC->getParentModule());
+                                              ResultTy);
     }
     return RS;
   }

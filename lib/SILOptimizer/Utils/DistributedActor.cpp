@@ -51,7 +51,7 @@ void emitDistributedActorSystemWitnessCall(
   if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
     systemConfRef = ProtocolConformanceRef(DAS);
   } else {
-    systemConfRef = module->lookupConformance(systemASTType, DAS);
+    systemConfRef = ModuleDecl::lookupConformance(systemASTType, DAS);
   }
 
   assert(!systemConfRef.isInvalid() &&
@@ -81,7 +81,7 @@ void emitDistributedActorSystemWitnessCall(
       assert(actorProto);
 
       ProtocolConformanceRef conformance;
-      auto distributedActorConfRef = module->lookupConformance(
+      auto distributedActorConfRef = ModuleDecl::lookupConformance(
           actorType.getASTType(), actorProto);
       assert(!distributedActorConfRef.isInvalid() &&
              "Missing conformance to `DistributedActor`");

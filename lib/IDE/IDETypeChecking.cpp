@@ -66,7 +66,7 @@ void swift::getTopLevelDeclsForDisplay(
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void)M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void)ModuleDecl::lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 

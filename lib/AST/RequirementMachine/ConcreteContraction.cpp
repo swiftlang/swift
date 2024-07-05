@@ -396,7 +396,6 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
         firstType, Position::ConformanceRequirement);
 
     auto *proto = req.getProtocolDecl();
-    auto *module = proto->getParentModule();
 
     // For conformance to 'Sendable', allow synthesis of a missing conformance
     // if the generic parameter is concrete, that is, if we're looking at a
@@ -412,8 +411,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
       allowMissing = true;
 
     if (!substFirstType->isTypeParameter()) {
-      auto conformance = module->lookupConformance(substFirstType, proto,
-                                                   allowMissing);
+      auto conformance = ModuleDecl::lookupConformance(substFirstType, proto,
+                                                       allowMissing);
 
       if (!allowMissing &&
           proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
@@ -624,8 +623,7 @@ bool ConcreteContraction::performConcreteContraction(
     auto superclassTy = *found->second.begin();
 
     for (auto *proto : pair.second) {
-      auto *module = proto->getParentModule();
-      if (module->lookupConformance(superclassTy, proto)) {
+      if (ModuleDecl::lookupConformance(superclassTy, proto)) {
         auto genericSig = proto->getGenericSignature();
         // FIXME: If we end up here while building the requirement
         // signature of `proto`, we will hit a request cycle.

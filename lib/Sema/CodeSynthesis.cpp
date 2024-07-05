@@ -1383,7 +1383,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = target->getParentModule()->lookupConformance(
+    auto ref = ModuleDecl::lookupConformance(
         targetType, protocol);
     if (ref.isInvalid()) {
       return false;

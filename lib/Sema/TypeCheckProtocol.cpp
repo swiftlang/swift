@@ -2467,7 +2467,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
-      DC->getParentModule()->lookupConformance(T, InheritedProto);
+      ModuleDecl::lookupConformance(T, InheritedProto);
     if (InheritedConformance.isInvalid() ||
         !InheritedConformance.isConcrete()) {
       diagnoseConformanceFailure(T, InheritedProto, DC, ComplainLoc);
@@ -4182,7 +4182,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
         auto conformance =
-            DC->getParentModule()->lookupConformance(Adoptee, derivableProto);
+            ModuleDecl::lookupConformance(Adoptee, derivableProto);
         if (conformance.isConcrete()) {
           (void) conformance.getConcrete()->getWitnessDecl(derivable);
         }
@@ -5244,7 +5244,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
-      TypeChecker::containsProtocol(T, Proto, DC->getParentModule())) {
+      TypeChecker::containsProtocol(T, Proto)) {
 
     if (!T->isObjCExistentialType()) {
       Type constraintType = T;
@@ -5378,7 +5378,7 @@ void swift::diagnoseConformanceFailure(Type T,
 }
 
 ProtocolConformanceRef
-TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
+TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
                               bool allowMissing) {
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
@@ -5390,7 +5390,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
       constraint = existential->getConstraintType();
     if (constraint->isEqual(Proto->getDeclaredInterfaceType()) &&
         Proto->requiresSelfConformanceWitnessTable()) {
-      auto &ctx = M->getASTContext();
+      auto &ctx = T->getASTContext();
       return ProtocolConformanceRef(ctx.getSelfConformance(Proto));
     }
 
@@ -5403,8 +5403,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
-      auto result = M->lookupConformance(superclass, Proto,
-                                         /*allowMissing=*/false);
+      auto result = ModuleDecl::lookupConformance(superclass, Proto,
+                                                  /*allowMissing=*/false);
       if (result) {
         return result;
       }
@@ -5427,7 +5427,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   }
 
   // For non-existential types, this is equivalent to checking conformance.
-  return M->lookupConformance(T, Proto, allowMissing);
+  return ModuleDecl::lookupConformance(T, Proto, allowMissing);
 }
 
 bool TypeChecker::conformsToKnownProtocol(

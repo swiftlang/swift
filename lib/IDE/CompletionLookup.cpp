@@ -749,8 +749,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
     if (auto NTD = BaseTy->getAnyNominal()) {
-      auto *Module = NTD->getParentModule();
-      auto Conformance = Module->lookupConformance(BaseTy, ATD->getProtocol());
+      auto Conformance = ModuleDecl::lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
             const_cast<AssociatedTypeDecl *>(ATD));
@@ -2603,7 +2602,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
     // Check for conformance to the literal protocol.
     if (T->getAnyNominal()) {
-      if (CurrModule->lookupConformance(T, PD)) {
+      if (ModuleDecl::lookupConformance(T, PD)) {
         literalType = T;
         break;
       }

@@ -1531,7 +1531,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
 
   auto type = decl->getDeclaredInterfaceType();
   auto builtinProtocol = getProtocol(builtinProtocolKind);
-  auto builtinConformance = getStdlibModule()->lookupConformance(
+  auto builtinConformance = ModuleDecl::lookupConformance(
       type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
     assert(false && "Missing required conformance");
@@ -5671,7 +5671,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (nominal != dc->getASTContext().getOptionalDecl()) {
       if (auto objcBridgeable
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-        auto conformance = dc->getParentModule()->lookupConformance(
+        auto conformance = ModuleDecl::lookupConformance(
             nominal->getDeclaredInterfaceType(), objcBridgeable);
         if (conformance) {
           result =
@@ -5823,7 +5823,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (!proto)
       return ProtocolConformanceRef::forInvalid();
 
-    return dc->getParentModule()->lookupConformance(type, proto);
+    return ModuleDecl::lookupConformance(type, proto);
   };
 
   // Do we conform to _ObjectiveCBridgeable?

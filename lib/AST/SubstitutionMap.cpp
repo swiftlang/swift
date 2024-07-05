@@ -400,7 +400,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (proto->getInvertibleProtocolKind()) {
     auto substType = type.subst(*this);
     if (!substType->isTypeParameter())
-      return proto->getModuleContext()->lookupConformance(substType, proto);
+      return ModuleDecl::lookupConformance(substType, proto);
     return ProtocolConformanceRef(proto);
   }
 
@@ -434,8 +434,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
-        auto *M = proto->getParentModule();
-        return M->lookupConformance(substType, proto);
+        return ModuleDecl::lookupConformance(substType, proto);
       }
 
       return ProtocolConformanceRef(proto);
@@ -645,7 +644,7 @@ LookUpConformanceInOverrideSubs::operator()(CanType type,
   if (substType->isTypeParameter())
     return ProtocolConformanceRef(proto);
 
-  return proto->getParentModule()->lookupConformance(substType, proto);
+  return ModuleDecl::lookupConformance(substType, proto);
 }
 
 SubstitutionMap
@@ -743,7 +742,7 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (substType->isTypeParameter())
         return ProtocolConformanceRef(proto);
 
-      return proto->getParentModule()->lookupConformance(substType, proto);
+      return ModuleDecl::lookupConformance(substType, proto);
     });
 }
 

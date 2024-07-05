@@ -240,10 +240,9 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   // Create call expression applying a member `move(by:)` method to a
   // parameter member: `self.<member>.move(by: offset.<member>)`.
   auto createMemberMethodCallExpr = [&](VarDecl *member) -> Expr * {
-    auto *module = nominal->getModuleContext();
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = module->lookupConformance(memberType, diffProto);
+    auto confRef = ModuleDecl::lookupConformance(memberType, diffProto);
     assert(confRef && "Member does not conform to `Differentiable`");
 
     // Get member type's requirement witness: `<Member>.move(by:)`.

@@ -84,7 +84,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  return (bool)SGM.SwiftModule->lookupConformance(type, errorProtocol);
+  return (bool)ModuleDecl::lookupConformance(type, errorProtocol);
 }
 
 /// Bridge the given Swift value to its corresponding Objective-C

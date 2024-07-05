@@ -42,10 +42,8 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
   if (!superclass)
     return false;
 
-  return !superclass
-              ->getModuleContext()
-              ->lookupConformance(target->getSuperclass(),
-                                  target->getASTContext().getProtocol(kpk))
+  return !ModuleDecl::lookupConformance(target->getSuperclass(),
+                                        target->getASTContext().getProtocol(kpk))
               .isInvalid();
 }
 
@@ -271,7 +269,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!derived.getParentModule()->lookupConformance(codingKeysType, codingKeyProto)) {
+  if (!ModuleDecl::lookupConformance(codingKeysType, codingKeyProto)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -1407,7 +1405,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             });
         auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
         bool conformsToEncodable =
-            conformanceDC->getParentModule()->lookupConformance(
+            ModuleDecl::lookupConformance(
                 targetDecl->getDeclaredInterfaceType(), encodableProto) != nullptr;
 
         // Strategy to use for CodingKeys enum diagnostic part - this is to

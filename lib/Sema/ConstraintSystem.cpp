@@ -7772,8 +7772,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
     return cachedConformance->second;
 
   auto conformance =
-      DC->getParentModule()->lookupConformance(type, protocol,
-                                               /*allowMissing=*/true);
+      ModuleDecl::lookupConformance(type, protocol, /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
 }

@@ -667,7 +667,7 @@ ManagedValue Transform::transform(ManagedValue v,
   if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
-    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+    auto conformance = ModuleDecl::lookupConformance(
         inputSubstType, protocol);
     auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
     auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,

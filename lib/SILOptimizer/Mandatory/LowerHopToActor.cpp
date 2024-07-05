@@ -249,7 +249,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
       actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
     }
 
-    auto actorConf = module->lookupConformance(actorType, actorProtocol);
+    auto actorConf = ModuleDecl::lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
            "hop_to_executor with actor that doesn't conform to Actor or DistributedActor");
 

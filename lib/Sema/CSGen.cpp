@@ -2175,15 +2175,13 @@ namespace {
         if (!contextualType)
           return false;
 
-        auto *M = CS.DC->getParentModule();
-
         auto type = contextualType->lookThroughAllOptionalTypes();
 
-        if (M->lookupConformance(type, arrayProto))
+        if (ModuleDecl::lookupConformance(type, arrayProto))
           return false;
 
         if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-          if (M->lookupConformance(type, proto))
+          if (ModuleDecl::lookupConformance(type, proto))
             return true;
 
         return false;

@@ -122,7 +122,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
 
     // FIXME: Retrieve the conformance from the solution itself.
     auto conformance =
-        getConstraintSystem().DC->getParentModule()->lookupConformance(
+        ModuleDecl::lookupConformance(
             replacement, protoType, /*allowMissing=*/true);
 
     if (conformance.isInvalid()) {

@@ -1422,7 +1422,7 @@ getFunctionTypeFlags(CanFunctionType type) {
       auto proto =
         type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
       if (proto &&
-          proto->getParentModule()->lookupConformance(type, proto).isInvalid())
+          ModuleDecl::lookupConformance(type, proto).isInvalid())
         InvertedProtocols.insert(invertibleKind);
       break;
     }

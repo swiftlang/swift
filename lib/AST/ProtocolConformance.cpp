@@ -1282,8 +1282,7 @@ findSynthesizedConformance(
   if (!cvProto)
     return nullptr;
 
-  auto module = dc->getParentModule();
-  auto conformance = module->lookupConformance(
+  auto conformance = ModuleDecl::lookupConformance(
       nominal->getDeclaredInterfaceType(), cvProto);
   if (!conformance || !conformance.isConcrete())
     return nullptr;

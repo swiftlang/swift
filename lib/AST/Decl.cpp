@@ -5128,7 +5128,7 @@ NominalTypeDecl::canConformTo(InvertibleProtocolKind ip) const {
   Type selfTy = getDeclaredInterfaceType();
   assert(selfTy);
 
-  auto conformance = getModuleContext()->lookupConformance(selfTy, proto,
+  auto conformance = ModuleDecl::lookupConformance(selfTy, proto,
       /*allowMissing=*/false);
 
   if (conformance.isInvalid())

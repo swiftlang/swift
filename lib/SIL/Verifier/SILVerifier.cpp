@@ -6283,8 +6283,7 @@ public:
                                    Type conformingType,
                                    ProtocolDecl *protocol) -> ProtocolConformanceRef {
         // FIXME: This violates the spirit of this verifier check.
-        return protocol->getParentModule()
-            ->lookupConformance(conformingType, protocol);
+        return ModuleDecl::lookupConformance(conformingType, protocol);
       };
 
       // If the pack components and expected element types are SIL types,

@@ -190,11 +190,9 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
       return CheckTypeWitnessResult::forSuperclass(superclass);
   }
 
-  auto *module = dc->getParentModule();
-
   // Check protocol conformances. We don't check conditional requirements here.
   for (const auto reqProto : sig->getRequiredProtocols(depTy)) {
-    if (module->lookupConformance(
+    if (ModuleDecl::lookupConformance(
             type, reqProto,
             /*allowMissing=*/reqProto->isSpecificProtocol(
                 KnownProtocolKind::Sendable))
@@ -363,9 +361,9 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 
     // Find the conformance for this overridden protocol.
     auto overriddenConformance =
-      dc->getParentModule()->lookupConformance(dc->getSelfInterfaceType(),
-                                               overridden->getProtocol(),
-                                               /*allowMissing=*/true);
+      ModuleDecl::lookupConformance(dc->getSelfInterfaceType(),
+                                    overridden->getProtocol(),
+                                    /*allowMissing=*/true);
     if (overriddenConformance.isInvalid() ||
         !overriddenConformance.isConcrete())
       continue;
@@ -4471,8 +4469,6 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
                                        NormalProtocolConformance *conformance,
                                        CanType origTy, ProtocolDecl *reqProto,
                                        unsigned index) const {
-  auto *module = conformance->getDeclContext()->getParentModule();
-
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
       conformance->getProtocol(),
       conformance->getType(),
@@ -4498,7 +4494,7 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
   if (substTy->hasTypeParameter())
     substTy = conformance->getDeclContext()->mapTypeIntoContext(substTy);
 
-  return module->lookupConformance(substTy, reqProto, /*allowMissing=*/true)
+  return ModuleDecl::lookupConformance(substTy, reqProto, /*allowMissing=*/true)
       .mapConformanceOutOfContext();
 }
 

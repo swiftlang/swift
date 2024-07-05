@@ -1831,7 +1831,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
   unsigned typeContextDepth = 0;
   SubstitutionMap subMap;
-  ModuleDecl *M = nullptr;
+
   if (CurrentType && Current) {
     if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
@@ -1851,7 +1851,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         return type;
       },
       [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return M->lookupConformance(substType, proto);
+        return ModuleDecl::lookupConformance(substType, proto);
       });
   };
 

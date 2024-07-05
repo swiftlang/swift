@@ -804,7 +804,6 @@ Expr *addImplicitLoadExpr(
 /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        ModuleDecl *M,
                                         bool allowMissing=false);
 
 /// Check whether the type conforms to a given known protocol.
