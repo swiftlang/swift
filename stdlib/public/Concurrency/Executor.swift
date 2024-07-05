@@ -451,6 +451,43 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
 
+/// SPI which allows to warn but not crash about executing on unexpected executor or dispatch queue.
+@_unavailableInEmbedded
+@_spi(ConcurrencyDiagnostics)
+@available(SwiftStdlib 6.0, *)
+public func _checkOnExpectedExecutor(
+  expected actor: any Actor,
+  message: @autoclosure () -> String,
+  file: StaticString = #fileID, line: Int = #line, column: Int = #column,
+  function: StaticString = #function) {
+  let _message = message()
+  let messageCount = CInt(_message.count)
+  var _file = file
+  var _function = function
+
+  let flags = 0 // See: ExecutorCheckFlags
+
+  _message.withCString { messageBuf -> Void in
+    _file.withUTF8Buffer { fileBuf -> Void in
+      _function.withUTF8Buffer { functionBuf -> Void in
+
+        let options = _makeExecutorCheckOption_sourceLocation(
+          function: functionBuf.baseAddress!,
+          file: fileBuf.baseAddress!, line: line, column: column,
+          parent: nil)
+        defer { _destroyExecutorCheckOptions(options) }
+
+
+        _checkOnExpectedExecutor(
+          expectedSerialExecutor: actor.unownedExecutor,
+          message: messageBuf, messageLength: CInt(messageCount),
+          options: options,
+          flags: flags)
+      }
+    }
+  }
+}
+
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_isSameExclusiveExecutionContext")
 internal func _task_serialExecutor_isSameExclusiveExecutionContext<E>(current currentExecutor: E, executor: E) -> Bool
@@ -510,6 +547,31 @@ internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E)
   executor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
+
+@_spi(ConcurrencyDiagnostics)
+@available(SwiftStdlib 6.0, *)
+@_silgen_name("swift_task_checkOnExpectedExecutor")
+public func _checkOnExpectedExecutor(
+  expectedSerialExecutor: UnownedSerialExecutor,
+  message: UnsafePointer<Int8>, messageLength: CInt,
+  options: UnsafeRawBufferPointer?,
+  flags: Int)
+
+@available(SwiftStdlib 6.0, *)
+@_silgen_name("swift_task_makeExecutorCheckOption_sourceLocation")
+internal func _makeExecutorCheckOption_sourceLocation(
+  function: UnsafePointer<UInt8>,
+  file: UnsafePointer<UInt8>,
+  line: Int,
+  column: Int,
+  parent: UnsafeRawBufferPointer?
+) -> UnsafeRawBufferPointer?
+
+@available(SwiftStdlib 6.0, *)
+@_silgen_name("swift_task_destroyExecutorCheckOptions")
+internal func _destroyExecutorCheckOptions(
+  _ option: UnsafeRawBufferPointer?
+)
 
 #if SWIFT_CONCURRENCY_USES_DISPATCH
 // This must take a DispatchQueueShim, not something like AnyObject,

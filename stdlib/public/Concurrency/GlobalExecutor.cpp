@@ -54,6 +54,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "swift/ABI/ExecutorOptions.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"
@@ -196,6 +197,35 @@ uint64_t swift::swift_task_getJobTaskId(Job *job) {
     return task->getTaskId();
   } else {
     return job->getJobId();
+  }
+}
+
+
+SWIFT_CC(swift)
+ExecutorCheckOptionRecord*
+swift::swift_task_makeExecutorCheckOption_sourceLocation(
+        const char * _Nonnull functionName, const char * _Nonnull file,
+        uintptr_t line, uintptr_t column, ExecutorCheckOptionRecord *parent) {
+  // TODO: can we task local allocate it? then store a bit if we were able to do so
+  //  auto task = swift_task_getCurrent();
+  //  _swift_task_alloc_specific(task, sizeof class SourceLocationExecutorCheckOptionRecord);
+
+  parent = nullptr;
+  auto allocation = malloc(sizeof(class SourceLocationExecutorCheckOptionRecord));
+
+  auto option = new(allocation) SourceLocationExecutorCheckOptionRecord(
+      functionName, file, line, column, /*parent=*/parent);
+  return option;
+}
+
+SWIFT_CC(swift)
+void swift::swift_task_destroyExecutorCheckOptions(
+    ExecutorCheckOptionRecord *options) {
+  auto option = options;
+  while (option) {
+    auto parent = option->getParent();
+    free(option);
+    option = parent;
   }
 }
 

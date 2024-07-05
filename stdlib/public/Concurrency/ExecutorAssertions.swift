@@ -57,6 +57,8 @@ extension SerialExecutor {
       return
     }
 
+    // TODO: make message record and use checkOnExecutor with it and "crash" flag
+
     let expectationCheck = _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor)
 
     /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
@@ -105,6 +107,8 @@ extension Actor {
     guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
       return
     }
+
+    // TODO: make message record and use checkOnExecutor with it and "crash" flag
 
     // NOTE: This method will CRASH in new runtime versions,
     // if it would have previously returned `false`.

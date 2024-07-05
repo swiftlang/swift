@@ -51,6 +51,8 @@ extension DistributedActor {
       return
     }
 
+    // TODO: make message record and use checkOnExecutor with it and "crash" flag
+
     let unownedExecutor = self.unownedExecutor
     let expectationCheck = _taskIsCurrentExecutor(unownedExecutor._executor)
 

@@ -134,7 +134,6 @@ extension MainActor {
     /// as this is our "safe" version of this API.
     let executor: Builtin.Executor = Self.shared.unownedExecutor.executor
     guard _taskIsCurrentExecutor(executor) else {
-      // TODO: offer information which executor we actually got
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 

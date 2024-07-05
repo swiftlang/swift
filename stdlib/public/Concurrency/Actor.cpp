@@ -22,6 +22,8 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/ExecutorOptions.h"
+#include "swift/Basic/Defer.h"
 #include "TaskPrivate.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
@@ -73,6 +75,11 @@
 #if defined(_WIN32)
 #include <io.h>
 #endif
+
+#if defined(__APPLE__)
+#include <os/log.h>
+#endif
+
 
 #if SWIFT_OBJC_INTEROP
 extern "C" void *objc_autoreleasePoolPush();
@@ -387,6 +394,19 @@ static void checkIsCurrentExecutorMode(void *context) {
                                         : Swift6_UseCheckIsolated_AllowCrash;
 }
 
+#if defined(__APPLE__)
+#define SWIFT_LOG_APPLE_RUNTIME_ISSUES_SUBSYSTEM "com.apple.runtime-issues"
+#define SWIFT_LOG_ACTOR_CATEGORY "Actor"
+os_log_t IsolationWarningLog;
+#endif
+
+static void initIsolationWarningOsLog(void *context) {
+#if defined(__APPLE__)
+  IsolationWarningLog = os_log_create(SWIFT_LOG_APPLE_RUNTIME_ISSUES_SUBSYSTEM,
+                                      SWIFT_LOG_ACTOR_CATEGORY);
+#endif
+}
+
 // Implemented in Swift to avoid some annoying hard-coding about
 // TaskExecutor's protocol witness table.  We could inline this
 // with effort, though.
@@ -401,20 +421,17 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
 
-SWIFT_CC(swift)
-static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
+static bool swift_task_isCurrentExecutorCommon(
+    SerialExecutorRef expectedExecutor,
+    IsCurrentExecutorCheckMode checkMode,
+    ExecutorCheckOptionRecord *options,
+    ExecutorCheckFlags flags) {
   auto current = ExecutorTrackingInfo::current();
 
-  // To support old applications on apple platforms which assumed this call
-  // does not crash, try to use a more compatible mode for those apps.
-  //
-  // We only allow returning `false` directly from this function when operating
-  // in 'Legacy_NoCheckIsolated_NonCrashing' mode. If allowing crashes, we
-  // instead must call into 'checkIsolated' or crash directly.
-  //
-  // Whenever we confirm an executor equality, we can return true, in any mode.
-  static swift::once_t checkModeToken;
-  swift::once(checkModeToken, checkIsCurrentExecutorMode, nullptr);
+  if (flags.getDontCrash()) {
+    SWIFT_TASK_DEBUG_LOG("Override executor check mode with flag: don't crash; flags: %d", flags);
+    checkMode = Legacy_NoCheckIsolated_NonCrashing;
+  }
 
   if (!current) {
     // We have no current executor, i.e. we are running "outside" of Swift
@@ -432,7 +449,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
 
     // Otherwise, as last resort, let the expected executor check using
     // external means, as it may "know" this thread is managed by it etc.
-    if (isCurrentExecutorMode == Swift6_UseCheckIsolated_AllowCrash) {
+    if (checkMode == Swift6_UseCheckIsolated_AllowCrash) {
       swift_task_checkIsolated(expectedExecutor); // will crash if not same context
 
       // checkIsolated did not crash, so we are on the right executor, after all!
@@ -470,7 +487,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
   // the crashing 'dispatch_assert_queue(main queue)' which will either crash
   // or confirm we actually are on the main queue; or the custom expected
   // executor has a chance to implement a similar queue check.
-  if (isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing) {
+  if (checkMode == Legacy_NoCheckIsolated_NonCrashing) {
     if ((expectedExecutor.isMainExecutor() && !currentExecutor.isMainExecutor()) ||
         (!expectedExecutor.isMainExecutor() && currentExecutor.isMainExecutor())) {
       return false;
@@ -531,7 +548,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
   // Note that this only works because the closure in assumeIsolated is
   // synchronous, and will not cause suspensions, as that would require the
   // presence of a Task.
-  if (isCurrentExecutorMode == Swift6_UseCheckIsolated_AllowCrash) {
+  if (checkMode == Swift6_UseCheckIsolated_AllowCrash) {
     swift_task_checkIsolated(expectedExecutor); // will crash if not same context
 
     // The checkIsolated call did not crash, so we are on the right executor.
@@ -540,8 +557,156 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
 
   // In the end, since 'checkIsolated' could not be used, so we must assume
   // that the executors are not the same context.
-  assert(isCurrentExecutorMode == Legacy_NoCheckIsolated_NonCrashing);
+  assert(checkMode == Legacy_NoCheckIsolated_NonCrashing);
   return false;
+}
+
+SWIFT_CC(swift)
+static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
+  // To support old applications on apple platforms which assumed this call
+  // does not crash, try to use a more compatible mode for those apps.
+  //
+  // We only allow returning `false` directly from this function when operating
+  // in 'Legacy_NoCheckIsolated_NonCrashing' mode. If allowing crashes, we
+  // instead must call into 'checkIsolated' or crash directly.
+  //
+  // Whenever we confirm an executor equality, we can return true, in any mode.
+  static swift::once_t checkModeToken;
+  swift::once(checkModeToken, checkIsCurrentExecutorMode, nullptr);
+
+  return swift_task_isCurrentExecutorCommon(
+      expectedExecutor,
+      /*mode=*/isCurrentExecutorMode,
+      /*options=*/nullptr,
+      /*flags=*/ExecutorCheckFlags());
+}
+
+#define ISOLATION_WARNING_FORMAT "Unexpected actor isolation, expected %p%s%s but was %sisolated%s %p%s, in %s at %s:%lu:%lu! %.*s\n"
+
+static void logIsolationWarning(
+    SerialExecutorRef currentExecutor, SerialExecutorRef expectedExecutor,
+    const char *message, int messageLen,
+    const char *function, const char *file, uintptr_t line, uintptr_t column) {
+  assert(message);
+  assert(function);
+  assert(file);
+
+  static swift::once_t initializeOsLogToken;
+  swift::once(initializeOsLogToken, initIsolationWarningOsLog, nullptr);
+
+  auto getActorTypeName = [](SerialExecutorRef ref) {
+    char *nameBuf = nullptr;
+    if (ref.isDefaultActor()) {
+      auto tyName = swift_getTypeName(swift_getObjectType(ref.getDefaultActor()), true);
+      asprintf(&nameBuf, " (default actor %.*s)", (int)tyName.length, tyName.data);
+    } else if (!ref.isGeneric() && !ref.isMainExecutor()) {
+      // we have the executor reference; consider printing type name (if possible)
+      asprintf(&nameBuf, " (custom SerialExecutor)");
+    }
+    return nameBuf;
+  };
+
+  char *currentActorName = getActorTypeName(currentExecutor);
+  SWIFT_DEFER { free(currentActorName); };
+  char *expectedActorName = getActorTypeName(expectedExecutor);
+  SWIFT_DEFER { free(expectedActorName); };
+
+//#if defined(__APPLE__)
+  os_log_fault(IsolationWarningLog,
+               ISOLATION_WARNING_FORMAT,
+               // expected isolation
+               expectedExecutor.getIdentity(),
+               expectedActorName ? expectedActorName : "",
+               expectedActorName ? "" : expectedExecutor.getIdentityDebugName(),
+               // current isolation
+               currentExecutor.getIdentity() == 0 ? "non" : "",
+               currentExecutor.getIdentity() ? " to" : "",
+               currentExecutor.getIdentity(),
+               currentActorName ? currentActorName : currentExecutor.getIdentityDebugName(),
+               // message and location details
+               function, file, line, column,
+               messageLen, message);
+//#else
+  fprintf(stderr, ISOLATION_WARNING_FORMAT,
+          // expected isolation
+          expectedExecutor.getIdentity(),
+          expectedActorName ? expectedActorName : "",
+          expectedActorName ? "" : expectedExecutor.getIdentityDebugName(),
+          // current isolation
+          currentExecutor.getIdentity() == 0 ? "non" : "",
+          currentExecutor.getIdentity() ? " to" : "",
+          currentExecutor.getIdentity(),
+          currentActorName ? currentActorName : currentExecutor.getIdentityDebugName(),
+          // message and location details
+          function, file, line, column,
+          messageLen, message);
+  fflush(stderr);
+//#endif
+}
+
+/// SPI(ConcurrencyDiagnostics)
+///
+/// Attempt to check the current executor against the expected without crashing!
+SWIFT_CC(swift)
+static void swift_task_checkOnExpectedExecutorImpl(
+    SerialExecutorRef expectedExecutor,
+    const char *message, int messageLen,
+    ExecutorCheckOptionRecord *options,
+    ExecutorCheckFlags flags) {
+  // assert(flags.getDontCrash() && "check... API expects non crashing option"); // FIXME
+
+  // Regardless of the runtime check mode, we will never invoke `checkIsolated`
+  // (and thus potentially crash) when calling from here, because we need to
+  // issue a warning after all.
+  auto isSameExecutor = swift_task_isCurrentExecutorCommon(
+      expectedExecutor,
+      /*mode=*/Legacy_NoCheckIsolated_NonCrashing,
+      /*options=*/options,
+      /*flags=*/flags);
+
+  // Swift executor checks determined executor equality, don't issue a warning.
+  if (isSameExecutor) {
+    return;
+  }
+
+//  // Executors are not equal, but perhaps the executor is a dispatch queue?
+//  // Attempt checking using specialize dispatch API which would warn, without
+//  // giving us information back if we were on the "right" queue or not:
+//#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+//  auto dispatchMayHaveWarned = swift_dispatch_checkOnExpectedExecutor(
+//      expectedExecutor, message, messageLen, function, functionLen, file,
+//      fileLen, line, flags);
+//
+//  if (dispatchMayHaveWarned) {
+//    return;
+//  }
+//#endif
+
+  auto trackingInfo = ExecutorTrackingInfo::current();
+  auto currentExecutor =
+      (trackingInfo ? trackingInfo->getActiveExecutor()
+                    : SerialExecutorRef::generic());
+
+  const char *functionName = nullptr;
+  const char *file = nullptr;
+  uintptr_t line = 0;
+  uintptr_t column = 0;
+  for (auto _option = options; _option; _option = _option->getParent()) {
+    switch (_option->getKind()) {
+    case ExecutorCheckOptionRecordKind::SourceLocation: {
+      auto option = cast<SourceLocationExecutorCheckOptionRecord>(_option);
+      functionName = option->FunctionName;
+      file = option->File;
+      line = option->Line;
+      column = option->Column;
+      break;
+    }
+    }
+  }
+
+  logIsolationWarning(currentExecutor, expectedExecutor,
+                      message, messageLen,
+                      functionName, file, line, column);
 }
 
 /// Logging level for unexpected executors:

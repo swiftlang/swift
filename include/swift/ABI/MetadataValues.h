@@ -2590,6 +2590,21 @@ public:
                                 setIsDiscardingTask)
 };
 
+/// Flags for checking "current" executor creation.
+class ExecutorCheckFlags : public FlagSet<size_t> {
+public:
+  enum {
+    ExecutorCheck_dontCrash = 0,
+  };
+
+  explicit constexpr ExecutorCheckFlags(size_t bits) : FlagSet(bits) {}
+  constexpr ExecutorCheckFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(ExecutorCheck_dontCrash,
+                                getDontCrash,
+                                setDontCrash)
+};
+
 /// Flags for schedulable jobs.
 class JobFlags : public FlagSet<uint32_t> {
 public:
@@ -2701,6 +2716,12 @@ enum class TaskOptionRecordKind : uint8_t {
   InitialTaskExecutorOwned = 6,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
+};
+
+enum class ExecutorCheckOptionRecordKind : uint8_t {
+  /// Source location where the check was initiated from, may be used in further
+  /// improving crash/warning message, when available.
+  SourceLocation = 1,
 };
 
 /// Flags for TaskGroup.

@@ -18,6 +18,7 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/AsyncLet.h"
+#include "swift/ABI/ExecutorOptions.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 
@@ -758,6 +759,18 @@ uint64_t swift_task_getJobTaskId(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 
+///// Invoke Dispatch's "warn about executing on wrong queue isolation"
+/////
+///// Returns true if the dispatch api was able to be invoked on this executor,
+///// and therefore we may have already logged a warning.
+//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+//bool swift_dispatch_checkOnExpectedExecutor(
+//    SerialExecutorRef expectedExecutor,
+//    const unsigned char *message, int messageLen,
+//    const unsigned char *function, int functionLen,
+//    const unsigned char *file, int fileLen,
+//    int line, size_t flags);
+
 #endif
 
 /// A hook to take over global enqueuing.
@@ -789,11 +802,24 @@ SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
     int clock, Job *job,
     swift_task_enqueueGlobalWithDeadline_original original);
 
-typedef SWIFT_CC(swift) void (*swift_task_checkIsolated_original)(SerialExecutorRef executor);
+typedef SWIFT_CC(swift) void (*swift_task_checkIsolated_original)(
+    SerialExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_checkIsolated_hook)(
     SerialExecutorRef executor, swift_task_checkIsolated_original original);
 
+typedef SWIFT_CC(swift) void (*swift_task_checkOnExpectedExecutor_original)(
+    SerialExecutorRef expectedExecutor,
+    const char *message, int messageLen,
+    ExecutorCheckOptionRecord* options,
+    ExecutorCheckFlags flags);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_checkOnExpectedExecutor_hook)(
+    SerialExecutorRef expectedExecutor,
+    const char *message, int messageLen,
+    ExecutorCheckOptionRecord* options,
+    ExecutorCheckFlags flags,
+    swift_task_checkIsolated_original original);
 
 typedef SWIFT_CC(swift) bool (*swift_task_isOnExecutor_original)(
     HeapObject *executor,
@@ -966,12 +992,19 @@ SerialExecutorRef swift_task_getMainExecutor(void);
 /// they should be created as "forever" alive singletons, or otherwise
 /// guarantee their lifetime extends beyond all potential uses of them by tasks.
 ///
-/// Runtime availability: Swift 9999
+/// Runtime availability: Swift 6.0
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_checkOnExpectedExecutor(
+    SerialExecutorRef serialExecutor,
+    const char *message, int messageLen,
+    ExecutorCheckOptionRecord* options,
+    ExecutorCheckFlags flags);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
