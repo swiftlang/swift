@@ -34,7 +34,6 @@ void emitDistributedActorSystemWitnessCall(
   ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
   assert(DAS);
   auto systemASTType = base->getType().getASTType();
-  auto *module = M.getSwiftModule();
   ProtocolConformanceRef systemConfRef;
 
   // If the base is an existential open it.

@@ -155,8 +155,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
-    ModuleDecl *CurModule;
-
     /// The type of the parsed expression.
     Type T;
 
@@ -204,8 +202,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     LocalConsumer(DeclContext *DC, Type T,
                   llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
-        : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
-          Result(result) {}
+        : T(T), ExpectedTypes(expectedTypes), Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                    DynamicLookupInfo) override {

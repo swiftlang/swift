@@ -149,7 +149,6 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     return CheckTypeWitnessResult::forSuccess();
 
   const auto proto = Conf->getProtocol();
-  const auto dc = Conf->getDeclContext();
   const auto sig = proto->getGenericSignature();
 
   // FIXME: The RequirementMachine will assert on re-entrant construction.
