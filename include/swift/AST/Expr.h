@@ -5745,6 +5745,7 @@ public:
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
+    bool hasName = true;
 
     // Private constructor for subscript/unresolved application components.
     explicit Component(DeclNameOrRef decl, ArgumentList *argList,
@@ -5753,11 +5754,12 @@ public:
 
     // Private constructor for unresolved member, member or #keyPath
     // dictionary key.
-    explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc)
-        : Component(kind, type, loc) {
+    explicit Component(DeclNameOrRef decl, Kind kind, Type type, SourceLoc loc,
+                       bool hasName = true)
+        : Decl(decl), KindValue(kind), ComponentType(type), Loc(loc),
+          hasName(hasName) {
       assert(kind == Kind::Member || kind == Kind::UnresolvedMember ||
              kind == Kind::DictionaryKey);
-      Decl = decl;
     }
 
     // Private constructor for tuple element kind.
@@ -5774,9 +5776,11 @@ public:
     Component() : Component(Kind::Invalid, Type(), SourceLoc()) {}
 
     /// Create an unresolved component for a property.
+    /// Unresolved subscripts will not have DeclNameRef.
     static Component forUnresolvedMember(DeclNameRef UnresolvedName,
-                                         SourceLoc Loc) {
-      return Component(UnresolvedName, Kind::UnresolvedMember, Type(), Loc);
+                                         SourceLoc Loc, bool hasName = true) {
+      return Component(UnresolvedName, Kind::UnresolvedMember, Type(), Loc,
+                       hasName);
     }
 
     /// Create an unresolved component for application.
@@ -5945,6 +5949,27 @@ public:
       case Kind::DictionaryKey:
       case Kind::CodeCompletion:
         return {};
+      }
+      llvm_unreachable("unhandled kind");
+    }
+
+    // Unresolved members that are unresolved subscripts do not have DeclNameRef names.
+    bool hasUnresolvedDeclName() const {
+      switch (getKind()) {
+      case Kind::UnresolvedMember:
+      case Kind::DictionaryKey:
+      case Kind::Invalid:
+      case Kind::Subscript:
+      case Kind::UnresolvedApply:
+      case Kind::Apply:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::Member:
+      case Kind::Identity:
+      case Kind::TupleElement:
+      case Kind::CodeCompletion:
+        return hasName;
       }
       llvm_unreachable("unhandled kind");
     }

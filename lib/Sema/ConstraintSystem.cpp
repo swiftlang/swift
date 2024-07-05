@@ -7851,10 +7851,6 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     }
     case KeyPathExpr::Component::Kind::Member:
     case KeyPathExpr::Component::Kind::UnresolvedMember: {
-      if (!component.hasUnresolvedDeclName()) {
-        continue;
-      }
-
       auto *componentLoc =
           getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
       auto *calleeLoc = getCalleeLocator(componentLoc);

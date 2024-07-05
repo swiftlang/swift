@@ -3796,13 +3796,11 @@ namespace {
         // This should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Member: {
-          if (auto *path = E->getParsedPath()) {
-            if (auto SE = isa<SubscriptExpr>(path)) {
-              subscriptMemberTy = addSubscriptConstraints(
-                  E, base, /*decl*/ nullptr, /*args*/ nullptr, memberLocator,
-                  &componentTypeVars);
-              base = subscriptMemberTy;
-            }
+          if (!component.hasUnresolvedDeclName()) {
+            subscriptMemberTy = addSubscriptConstraints(
+                E, base, /*decl*/ nullptr, /*args*/ nullptr, memberLocator,
+                &componentTypeVars);
+            base = subscriptMemberTy;
           } else {
             auto memberTy = CS.createTypeVariable(resultLocator,
                                                   TVO_CanBindToLValue |
