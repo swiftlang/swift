@@ -1530,6 +1530,9 @@ END_CAN_TYPE_WRAPPER(AnyGenericType, Type)
 /// fields exist at the same offset in memory to improve code generation of the
 /// compiler itself.
 class NominalOrBoundGenericNominalType : public AnyGenericType {
+  friend class TypeBase;
+  SubstitutionMap ContextSubMap;
+
 public:
   template <typename... Args>
   NominalOrBoundGenericNominalType(Args &&...args)

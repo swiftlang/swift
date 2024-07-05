@@ -808,13 +808,28 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     const DeclContext *dc,
     GenericEnvironment *genericEnv) {
+  SubstitutionMap *cachedResult = nullptr;
+
+  // Fast path.
+  if (auto *nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(this)) {
+    if (dc == nominalTy->getDecl()) {
+      cachedResult = &nominalTy->ContextSubMap;
+      if (*cachedResult)
+        return *cachedResult;
+    }
+  }
+
   auto genericSig = dc->getGenericSignatureOfContext();
   if (genericSig.isNull())
     return SubstitutionMap();
-  return SubstitutionMap::get(
+  auto result = SubstitutionMap::get(
     genericSig,
     QueryTypeSubstitutionMap{getContextSubstitutions(dc, genericEnv)},
     LookUpConformanceInModule());
+
+  if (cachedResult)
+    *cachedResult = result;
+  return result;
 }
 
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(
