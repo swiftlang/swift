@@ -517,7 +517,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     }
 
     auto memberType = TypeChecker::substMemberTypeWithBase(
-        dc->getParentModule(), typeDecl, dc->getSelfInterfaceType());
+        typeDecl, dc->getSelfInterfaceType());
 
     // Type witnesses that resolve to constraint types are always
     // existential types. This can only happen when the type witness

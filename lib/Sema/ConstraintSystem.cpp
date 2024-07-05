@@ -2723,8 +2723,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
-    auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
-                                                         typeDecl, baseObjTy);
+    auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
     // If the member type is a constraint, e.g. because the
     // reference is to a typealias with an underlying protocol

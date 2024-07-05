@@ -322,13 +322,12 @@ void checkExistentialTypes(ASTContext &ctx,
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.
 ///
-/// \param module The module in which the substitution will be performed.
 /// \param member The member whose type projection is being computed.
 /// \param baseTy The base type that will be substituted for the 'Self' of the
 /// member.
 /// \param useArchetypes Whether to use context archetypes for outer generic
 /// parameters if the class is nested inside a generic function.
-Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
+Type substMemberTypeWithBase(TypeDecl *member, Type baseTy,
                              bool useArchetypes = true);
 
 /// Determine whether this is a "pass-through" typealias, which has the

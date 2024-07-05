@@ -475,8 +475,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                              typeDecl, type);
+    auto memberType = substMemberTypeWithBase(typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -516,7 +515,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         continue;
 
       auto memberType =
-          substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
+          substMemberTypeWithBase(typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
         result.addResult({typeDecl, memberType, assocType});
     }
