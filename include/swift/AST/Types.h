@@ -32,6 +32,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/UUID.h"
@@ -541,6 +542,13 @@ protected:
            "type variables must be solver allocated!");
     Bits.TypeBase.Properties = properties.getBits();
     assert(Bits.TypeBase.Properties == properties.getBits() && "Bits dropped!");
+  }
+
+  /// This is used when constructing GenericTypeParamTypes.
+  void setCanonicalType(CanType type) {
+    DEBUG_ASSERT(!Bits.TypeBase.IsCanonical);
+    DEBUG_ASSERT(CanonicalType.isNull());
+    CanonicalType = type;
   }
 
 public:
@@ -6953,17 +6961,38 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
 ///
 /// \sa GenericTypeParamDecl
 class GenericTypeParamType : public SubstitutableType {
-  static constexpr unsigned TYPE_SEQUENCE_BIT = (1 << 30);
+  /// A canonical generic parameter type is given by a depth, index and
+  /// parameter pack flag. A sugared generic parameter type stores a
+  /// declaration or an identifier.
+  union {
+    GenericTypeParamDecl *Decl;
+    Identifier Name;
+  };
 
-  using DepthIndexTy = llvm::PointerEmbeddedInt<unsigned, 31>;
-
-  /// The generic type parameter or depth/index.
-  llvm::PointerUnion<GenericTypeParamDecl *, DepthIndexTy> ParamOrDepthIndex;
+  unsigned IsParameterPack : 1;
+  unsigned Depth : 15;
+  unsigned IsDecl : 1;
+  unsigned Index : 15;
 
 public:
+  /// Retrieve a sugared generic type parameter type.
+  static GenericTypeParamType *get(GenericTypeParamDecl *decl,
+                                   const ASTContext &ctx);
+
+  /// Retrieve a sugared generic type parameter at the given depth and index.
+  static GenericTypeParamType *get(Identifier name, bool isParameterPack,
+                                   unsigned depth, unsigned index,
+                                   const ASTContext &ctx);
+
   /// Retrieve a generic type parameter at the given depth and index.
   static GenericTypeParamType *get(bool isParameterPack, unsigned depth,
                                    unsigned index, const ASTContext &ctx);
+
+  static unsigned getKey(bool isParameterPack,
+                         unsigned depth,
+                         unsigned index) {
+    return (depth << 16) | index << 1 | (isParameterPack ? 1 : 0);
+  }
 
   /// If this is an opaque parameter, return the declaration of the
   /// parameter, otherwise null.
@@ -6972,7 +7001,7 @@ public:
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
   GenericTypeParamDecl *getDecl() const {
-    return ParamOrDepthIndex.dyn_cast<GenericTypeParamDecl *>();
+    return (IsDecl ? Decl : nullptr);
   }
 
   /// Get the name of the generic type parameter.
@@ -6988,7 +7017,9 @@ public:
   /// \endcode
   ///
   /// Here 'T' has depth 0 and 'U' has depth 1. Both have index 0.
-  unsigned getDepth() const;
+  unsigned getDepth() const {
+    return Depth;
+  }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
@@ -7000,7 +7031,9 @@ public:
   /// \endcode
   ///
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
-  unsigned getIndex() const;
+  unsigned getIndex() const {
+    return Index;
+  }
 
   /// Returns \c true if this type parameter is declared as a pack.
   ///
@@ -7008,7 +7041,9 @@ public:
   /// func foo<T...>() { }
   /// struct Foo<T...> { }
   /// \endcode
-  bool isParameterPack() const;
+  bool isParameterPack() const {
+    return IsParameterPack;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -7019,16 +7054,19 @@ private:
   friend class GenericTypeParamDecl;
 
   explicit GenericTypeParamType(GenericTypeParamDecl *param,
-                                RecursiveTypeProperties props)
-    : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
-      ParamOrDepthIndex(param) { }
+                                RecursiveTypeProperties props);
+
+  /// Note: We have no way to recover an ASTContext from an Identifier, so the
+  /// initialization of an identifier-sugared generic parameter type receives
+  /// the canonical type.
+  explicit GenericTypeParamType(Identifier name, GenericTypeParamType *canType,
+                                bool isParameterPack, unsigned depth,
+                                unsigned index, RecursiveTypeProperties props,
+                                const ASTContext &ctx);
 
   explicit GenericTypeParamType(bool isParameterPack, unsigned depth,
                                 unsigned index, RecursiveTypeProperties props,
-                                const ASTContext &ctx)
-      : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
-        ParamOrDepthIndex(depth << 16 | index |
-                          ((isParameterPack ? 1 : 0) << 30)) {}
+                                const ASTContext &ctx);
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 static CanGenericTypeParamType get(bool isParameterPack, unsigned depth,

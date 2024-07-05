@@ -5543,20 +5543,23 @@ public:
     using namespace decls_block;
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
-    DeclID declIDOrDepth;
-    unsigned indexPlusOne;
+    DeclID declOrIdentifier = 0;
+    bool hasDecl = false;
+
     if (genericParam->getDecl() &&
         !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
           S.isDeclXRef(genericParam->getDecl()))) {
-      declIDOrDepth = S.addDeclRef(genericParam->getDecl());
-      indexPlusOne = 0;
-    } else {
-      declIDOrDepth = genericParam->getDepth();
-      indexPlusOne = genericParam->getIndex() + 1;
+      declOrIdentifier = S.addDeclRef(genericParam->getDecl());
+      hasDecl = true;
+    } else if (!genericParam->isCanonical()) {
+      declOrIdentifier = S.addDeclBaseNameRef(genericParam->getName());
     }
+
     GenericTypeParamTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                            genericParam->isParameterPack(),
-                                           declIDOrDepth, indexPlusOne);
+                                           genericParam->getDepth(),
+                                           genericParam->getIndex(),
+                                           hasDecl, declOrIdentifier);
   }
 
   void visitDependentMemberType(const DependentMemberType *dependent) {

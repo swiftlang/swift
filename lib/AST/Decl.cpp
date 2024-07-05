@@ -5616,13 +5616,6 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
     *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
   if (isParameterPack)
     *getTrailingObjects<SourceLoc>() = eachLoc;
-
-  auto &ctx = dc->getASTContext();
-  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
-  if (this->isParameterPack())
-    props |= RecursiveTypeProperties::HasParameterPack;
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
-  setInterfaceType(MetatypeType::get(type, ctx));
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(

@@ -7274,14 +7274,16 @@ Expected<Type>
 DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   bool parameterPack;
-  DeclID declIDOrDepth;
-  unsigned indexPlusOne;
+  unsigned depth;
+  unsigned index;
+  bool hasDecl;
+  DeclID declOrIdentifier;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, parameterPack, declIDOrDepth, indexPlusOne);
+      scratch, parameterPack, depth, index, hasDecl, declOrIdentifier);
 
-  if (indexPlusOne == 0) {
-    auto genericParamOrError = MF.getDeclChecked(declIDOrDepth);
+  if (hasDecl) {
+    auto genericParamOrError = MF.getDeclChecked(declOrIdentifier);
     if (!genericParamOrError)
       return genericParamOrError.takeError();
 
@@ -7290,11 +7292,21 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     if (!genericParam)
       return MF.diagnoseFatal();
 
+    ASSERT(parameterPack == genericParam->isParameterPack());
+    ASSERT(depth == genericParam->getDepth());
+    ASSERT(index == genericParam->getIndex());
+
     return genericParam->getDeclaredInterfaceType();
   }
 
-  return GenericTypeParamType::get(parameterPack, declIDOrDepth,
-                                   indexPlusOne - 1, MF.getContext());
+  if (declOrIdentifier == 0) {
+    return GenericTypeParamType::get(parameterPack, depth, index,
+                                     MF.getContext());
+  }
+
+  auto name = MF.getDeclBaseName(declOrIdentifier).getIdentifier();
+  return GenericTypeParamType::get(name, parameterPack, depth, index,
+                                   MF.getContext());
 }
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(

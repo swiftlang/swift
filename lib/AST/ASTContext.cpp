@@ -589,7 +589,9 @@ struct ASTContext::Implementation {
   };
 
   llvm::DenseMap<ModuleDecl*, ModuleType*> ModuleTypes;
-  llvm::DenseMap<std::pair<unsigned, unsigned>, GenericTypeParamType *>
+  llvm::DenseMap<unsigned, GenericTypeParamType *>
+    CanGenericParamTypes;
+  llvm::DenseMap<std::pair<Identifier, unsigned>, GenericTypeParamType *>
     GenericParamTypes;
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
@@ -3063,6 +3065,7 @@ size_t ASTContext::getTotalMemory() const {
     llvm::capacity_in_bytes(getImpl().ModuleLoaders) +
     llvm::capacity_in_bytes(getImpl().ModuleTypes) +
     llvm::capacity_in_bytes(getImpl().GenericParamTypes) +
+    llvm::capacity_in_bytes(getImpl().CanGenericParamTypes) +
     // getImpl().GenericFunctionTypes ?
     // getImpl().SILFunctionTypes ?
     llvm::capacity_in_bytes(getImpl().SILBlockStorageTypes) +
@@ -4644,12 +4647,44 @@ GenericFunctionType::GenericFunctionType(
   }
 }
 
+GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param,
+                                                const ASTContext &ctx) {
+  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (param->isParameterPack())
+    props |= RecursiveTypeProperties::HasParameterPack;
+
+  return new (ctx, AllocationArena::Permanent)
+      GenericTypeParamType(param, props);
+}
+
+GenericTypeParamType *GenericTypeParamType::get(Identifier name,
+                                                bool isParameterPack,
+                                                unsigned depth, unsigned index,
+                                                const ASTContext &ctx) {
+  unsigned key = GenericTypeParamType::getKey(isParameterPack, depth, index);
+  auto known = ctx.getImpl().GenericParamTypes.find({name, key});
+  if (known != ctx.getImpl().GenericParamTypes.end())
+    return known->second;
+
+  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (isParameterPack)
+    props |= RecursiveTypeProperties::HasParameterPack;
+
+  auto canType = GenericTypeParamType::get(isParameterPack, depth, index, ctx);
+
+  auto result = new (ctx, AllocationArena::Permanent)
+      GenericTypeParamType(name, canType, isParameterPack, depth, index,
+                           props, ctx);
+  ctx.getImpl().GenericParamTypes[{name, key}] = result;
+  return result;
+}
+
 GenericTypeParamType *GenericTypeParamType::get(bool isParameterPack,
                                                 unsigned depth, unsigned index,
                                                 const ASTContext &ctx) {
-  const auto depthKey = depth | ((isParameterPack ? 1 : 0) << 30);
-  auto known = ctx.getImpl().GenericParamTypes.find({depthKey, index});
-  if (known != ctx.getImpl().GenericParamTypes.end())
+  unsigned key = GenericTypeParamType::getKey(isParameterPack, depth, index);
+  auto known = ctx.getImpl().CanGenericParamTypes.find(key);
+  if (known != ctx.getImpl().CanGenericParamTypes.end())
     return known->second;
 
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
@@ -4658,7 +4693,7 @@ GenericTypeParamType *GenericTypeParamType::get(bool isParameterPack,
 
   auto result = new (ctx, AllocationArena::Permanent)
       GenericTypeParamType(isParameterPack, depth, index, props, ctx);
-  ctx.getImpl().GenericParamTypes[{depthKey, index}] = result;
+  ctx.getImpl().CanGenericParamTypes[key] = result;
   return result;
 }
 
