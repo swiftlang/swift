@@ -4755,12 +4755,14 @@ GenericFunctionType::GenericFunctionType(
   }
 }
 
-GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
+GenericTypeParamType *GenericTypeParamType::get(Identifier name,
+                                                GenericTypeParamKind paramKind,
                                                 unsigned depth, unsigned index,
                                                 Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType);
+  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
+                                name);
 
   void *insertPos;
   if (auto gpTy = ctx.getImpl().GenericParamTypes.FindNodeOrInsertPos(id, insertPos))
@@ -4774,6 +4776,23 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
       GenericTypeParamType(paramKind, depth, index, valueType, props, ctx);
   ctx.getImpl().GenericParamTypes.InsertNode(result, insertPos);
   return result;
+}
+
+GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param) {
+  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (param->isParameterPack())
+    props |= RecursiveTypeProperties::HasParameterPack;
+
+  return new (param->getASTContext(), AllocationArena::Permanent)
+      GenericTypeParamType(param, props);
+}
+
+GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
+                                                unsigned depth, unsigned index,
+                                                Type valueType,
+                                                const ASTContext &ctx) {
+  return GenericTypeParamType::get(Identifier(), paramKind, depth, index,
+                                   valueType, ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getType(unsigned depth,

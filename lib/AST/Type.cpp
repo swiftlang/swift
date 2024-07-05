@@ -1663,21 +1663,11 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::GenericTypeParam: {
     GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
     auto gpDecl = gp->getDecl();
-
-    // If we haven't set a depth for this generic parameter, try to do so.
-    // FIXME: This is a dreadful hack.
-    if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
-      auto *dc = gpDecl->getDeclContext();
-      auto *gpList = dc->getAsDecl()->getAsGenericContext()->getGenericParams();
-      gpList->setDepth(dc->getGenericContextDepth());
-    }
-
-    assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
-           "parameter hasn't been validated");
+    auto &C = gpDecl->getASTContext();
     Result =
-        GenericTypeParamType::get(gpDecl->getParamKind(), gpDecl->getDepth(),
-                                  gpDecl->getIndex(), gpDecl->getValueType(),
-                                  gpDecl->getASTContext());
+        GenericTypeParamType::get(gp->getParamKind(), gp->getDepth(),
+                                  gp->getIndex(), gp->getValueType(),
+                                  C);
     break;
   }
 
@@ -1986,35 +1976,46 @@ ArrayRef<Type> TypeAliasType::getDirectGenericArgs() const {
   return getSubstitutionMap().getInnermostReplacementTypes();
 }
 
-GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param) {
-  auto &ctx = param->getASTContext();
-
-  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
-  if (param->isParameterPack())
-    props |= RecursiveTypeProperties::HasParameterPack;
-
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(props);
-  type->ParamOrDepthIndex = param;
-  type->ParamKind = param->getParamKind();
-  return type;
+GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
+                                           RecursiveTypeProperties props)
+  : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
+    Decl(param) {
+  ASSERT(param->getDepth() != GenericTypeParamDecl::InvalidDepth);
+  Depth = param->getDepth();
+  IsDecl = true;
+  Index = param->getIndex();
+  ParamKind = param->getParamKind();
+  ValueType = param->getValueType();
 }
 
-unsigned GenericTypeParamType::getDepth() const {
-  if (auto param = getDecl()) {
-    return param->getDepth();
-  }
+GenericTypeParamType::GenericTypeParamType(Identifier name,
+                                           GenericTypeParamType *canType,
+                                           const ASTContext &ctx)
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr,
+                        canType->getRecursiveProperties()),
+      Decl(nullptr) {
+  Name = name;
+  Depth = canType->getDepth();
+  IsDecl = false;
+  Index = canType->getIndex();
+  ParamKind = canType->getParamKind();
+  ValueType = canType->getValueType();
 
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return (fixedNum & ~GenericTypeParamType::TYPE_SEQUENCE_BIT) >> 16;
+  setCanonicalType(CanType(canType));
 }
 
-unsigned GenericTypeParamType::getIndex() const {
-  if (auto param = getDecl()) {
-    return param->getIndex();
-  }
-
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return fixedNum & 0xFFFF;
+GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
+                                           unsigned depth, unsigned index,
+                                           Type valueType,
+                                           RecursiveTypeProperties props,
+                                           const ASTContext &ctx)
+    : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
+      Decl(nullptr) {
+  Depth = depth;
+  IsDecl = false;
+  Index = index;
+  ParamKind = paramKind;
+  ValueType = valueType;
 }
 
 GenericTypeParamDecl *GenericTypeParamType::getOpaqueDecl() const {
@@ -2028,14 +2029,19 @@ Identifier GenericTypeParamType::getName() const {
   // Use the declaration name if we still have that sugar.
   if (auto decl = getDecl())
     return decl->getName();
-  
+
+  if (!isCanonical())
+    return Name;
+
   // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
-  assert(isCanonical());
+
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
-  unsigned depthIndex = ParamOrDepthIndex.get<DepthIndexTy>();
-  auto cached = names.find(depthIndex);
+
+  auto key = (getDepth() << 16) | getIndex();
+
+  auto cached = names.find(key);
   if (cached != names.end())
     return cached->second;
   
@@ -2046,7 +2052,7 @@ Identifier GenericTypeParamType::getName() const {
 
   os << tau << getDepth() << '_' << getIndex();
   Identifier name = C.getIdentifier(os.str());
-  names.insert({depthIndex, name});
+  names.insert({key, name});
   return name;
 }
 

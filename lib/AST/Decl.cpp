@@ -5670,10 +5670,6 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
 
   if (this->isValue())
     *getTrailingObjects<SourceLoc>() = specifierLoc;
-
-  auto &ctx = dc->getASTContext();
-  auto type = GenericTypeParamType::get(this);
-  setInterfaceType(MetatypeType::get(type, ctx));
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(

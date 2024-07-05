@@ -1222,11 +1222,12 @@ namespace decls_block {
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
     GENERIC_TYPE_PARAM_TYPE,
-    GenericParamKindField,    // param kind
-    DeclIDField,              // generic type parameter decl or depth
-    BCVBR<4>,                 // index + 1, or zero if we have a generic type
-                              // parameter decl
-    TypeIDField               // value type (if param kind == Value)
+    GenericParamKindField, // param kind
+    BCFixed<1>,            // has decl?
+    BCFixed<15>,           // depth
+    BCFixed<16>,           // index
+    DeclIDField,           // generic type parameter decl or identifier
+    TypeIDField            // value type (if param kind == Value)
   );
 
   TYPE_LAYOUT(DependentMemberTypeLayout,

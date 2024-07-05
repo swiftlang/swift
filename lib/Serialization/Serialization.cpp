@@ -5568,18 +5568,18 @@ public:
     using namespace decls_block;
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
-    DeclID declIDOrDepth;
-    unsigned indexPlusOne;
+    DeclID declOrIdentifier = 0;
+    bool hasDecl = false;
     uint8_t paramKind = getRawStableGenericParamKind(genericParam->getParamKind());
-    TypeID valueTypeID;
+    TypeID valueTypeID = 0;
+
     if (genericParam->getDecl() &&
         !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
           S.isDeclXRef(genericParam->getDecl()))) {
-      declIDOrDepth = S.addDeclRef(genericParam->getDecl());
-      indexPlusOne = 0;
-    } else {
-      declIDOrDepth = genericParam->getDepth();
-      indexPlusOne = genericParam->getIndex() + 1;
+      declOrIdentifier = S.addDeclRef(genericParam->getDecl());
+      hasDecl = true;
+    } else if (!genericParam->isCanonical()) {
+      declOrIdentifier = S.addDeclBaseNameRef(genericParam->getName());
     }
 
     if (auto valueType = genericParam->getValueType()) {
@@ -5587,8 +5587,12 @@ public:
     }
 
     GenericTypeParamTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           paramKind, declIDOrDepth,
-                                           indexPlusOne, valueTypeID);
+                                           paramKind,
+                                           hasDecl,
+                                           genericParam->getDepth(),
+                                           genericParam->getIndex(),
+                                           declOrIdentifier,
+                                           valueTypeID);
   }
 
   void visitDependentMemberType(const DependentMemberType *dependent) {
