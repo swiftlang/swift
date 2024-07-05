@@ -480,9 +480,11 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
   for (auto *genParam : genericSig.getGenericParams()) {
-    auto *paramDecl = genParam->getDecl();
-    if (paramDecl->getDepth() != fnGenericParamsDepth)
+    if (genParam->getDepth() != fnGenericParamsDepth)
       continue;
+
+    auto *paramDecl = genericParams->getParams()[genParam->getIndex()];
+
     if (!referencedGenericParams.count(genParam->getCanonicalType())) {
       // Lazily search for generic params that are indirectly used in the
       // function signature. Do it only if there is a generic parameter
@@ -496,7 +498,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      if (paramDecl->isImplicit()) {
+      if (paramDecl->isOpaqueType()) {
         paramDecl->getASTContext().Diags
           .diagnose(paramDecl->getOpaqueTypeRepr()->getLoc(),
                     diag::unreferenced_generic_parameter,

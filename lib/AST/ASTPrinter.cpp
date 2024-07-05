@@ -1859,17 +1859,15 @@ void PrintAST::printSingleDepthOfGenericSignature(
   /// generic parameters. We only print the former.
   ArrayRef<GenericTypeParamType *> opaqueGenericParams;
   for (unsigned index : indices(genericParams)) {
-    auto gpDecl = genericParams[index]->getDecl();
+    auto gpDecl = genericParams[index]->getOpaqueDecl();
     if (!gpDecl)
       continue;
 
-    if (gpDecl->isOpaqueType() && gpDecl->isImplicit()) {
-      // We found the first implicit opaque type parameter. Split the
-      // generic parameters array at this position.
-      opaqueGenericParams = genericParams.slice(index);
-      genericParams = genericParams.slice(0, index);
-      break;
-    }
+    // We found the first implicit opaque type parameter. Split the
+    // generic parameters array at this position.
+    opaqueGenericParams = genericParams.slice(index);
+    genericParams = genericParams.slice(0, index);
+    break;
   }
 
   // Determines whether a given type is based on one of the opaque generic
@@ -7289,8 +7287,7 @@ public:
       if (T->isParameterPack()) printEach();
     };
 
-    auto decl = T->getDecl();
-    if (!decl) {
+    if (T->isCanonical()) {
       // If we have an alternate name for this type, use it.
       if (Options.AlternativeTypeNames) {
         auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
@@ -7305,12 +7302,10 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
-
-      decl = T->getDecl();
     }
 
     // Print opaque types as "some ..."
-    if (decl && decl->isOpaqueType()) {
+    if (auto *decl =T->getOpaqueDecl()) {
       // For SIL, we print opaque parameter types as canonical types, and parse
       // them that way too (because they're printed in this way in the SIL
       // generic parameter list).

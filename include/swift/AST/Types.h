@@ -6965,6 +6965,10 @@ public:
   static GenericTypeParamType *get(bool isParameterPack, unsigned depth,
                                    unsigned index, const ASTContext &ctx);
 
+  /// If this is an opaque parameter, return the declaration of the
+  /// parameter, otherwise null.
+  GenericTypeParamDecl *getOpaqueDecl() const;
+
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
   GenericTypeParamDecl *getDecl() const {
