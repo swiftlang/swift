@@ -758,6 +758,18 @@ uint64_t swift_task_getJobTaskId(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 
+/// Invoke Dispatch's "warn about executing on wrong queue isolation"
+///
+/// Returns true if the dispatch api was able to be invoked on this executor,
+/// and therefore we may have already logged a warning.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_dispatch_warnUnexpectedIsolation(
+    SerialExecutorRef expectedExecutor,
+    const unsigned char *message, int messageLen,
+    const unsigned char *function, int functionLen,
+    const unsigned char *file, int fileLen,
+    int line, size_t flags);
+
 #endif
 
 /// A hook to take over global enqueuing.
@@ -793,7 +805,6 @@ typedef SWIFT_CC(swift) void (*swift_task_checkIsolated_original)(SerialExecutor
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_checkIsolated_hook)(
     SerialExecutorRef executor, swift_task_checkIsolated_original original);
-
 
 typedef SWIFT_CC(swift) bool (*swift_task_isOnExecutor_original)(
     HeapObject *executor,
@@ -972,6 +983,14 @@ TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_warnUnexpectedIsolation(
+    SerialExecutorRef serialExecutor,
+    const unsigned char *message, int messageLen,
+    const unsigned char *function, int functionLen,
+    const unsigned char *file, int fileLen,
+    int line, size_t flags);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(

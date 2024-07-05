@@ -451,6 +451,49 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
 
+/// SPI which allows to warn but not crash about executing on unexpected executor or dispatch queue.
+@_unavailableInEmbedded
+@_spi(ConcurrencyDiagnostics)
+@available(SwiftStdlib 6.0, *)
+public func _warnUnexpectedIsolation(
+  expected actor: any Actor,
+  message: String,
+  function: String = #function, file: String = #fileID, line: Int = #line) {
+  // need vars since withUTF8 is mutating
+  var _message = message
+  let messageCount = CInt(message.count)
+  var _function = function
+  let functionCount = CInt(function.count)
+  var _file = file
+  let fileCount = CInt(file.count)
+
+  _message.withUTF8 { (messageBuf) -> Void in
+    _function.withUTF8 { (functionBuf) -> Void in
+      _file.withUTF8 { (fileBuf) -> Void in
+        _warnUnexpectedIsolation(
+          expectedSerialExecutor: actor.unownedExecutor,
+          message: messageBuf.baseAddress!, messageLength: CInt(messageCount),
+          function: functionBuf.baseAddress!, functionLength: functionCount,
+          file: fileBuf.baseAddress!, fileLength: fileCount,
+          line: CInt(line),
+          flags: /*unused*/0)
+      }
+    }
+  }
+}
+
+@_spi(ConcurrencyDiagnostics)
+@available(SwiftStdlib 6.0, *)
+@_silgen_name("swift_task_warnUnexpectedIsolation")
+public func _warnUnexpectedIsolation(
+  expectedSerialExecutor: UnownedSerialExecutor,
+  message: UnsafePointer<UInt8>, messageLength: CInt,
+  function: UnsafePointer<UInt8>, functionLength: CInt,
+  file: UnsafePointer<UInt8>, fileLength: CInt,
+  line: CInt,
+  flags: Int)
+
+
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_isSameExclusiveExecutionContext")
 internal func _task_serialExecutor_isSameExclusiveExecutionContext<E>(current currentExecutor: E, executor: E) -> Bool

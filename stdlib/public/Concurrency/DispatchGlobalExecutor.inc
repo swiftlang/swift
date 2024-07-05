@@ -448,3 +448,27 @@ static void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
   // TODO: can we swift_getTypeName(swift_getObjectType(executor.getIdentity()), false).data safely in the message here?
   swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
 }
+
+bool swift::swift_dispatch_warnUnexpectedIsolation(
+    SerialExecutorRef executor,
+    const unsigned char *message, int messageLen,
+    const unsigned char *function, int functionLen,
+    const unsigned char *file, int fileLen,
+    int line, size_t flags) {
+  // TODO: does this need to be passed for non SerialQueues as well? and just let Dispatch decide?
+  auto queue = getAsDispatchSerialQueue(executor);
+
+  if (!queue) {
+    return false;
+  }
+
+  // FIXME: INVOKE THE NEW DISPATCH METHOD
+  //   __dispatch_warn_if_not_on_queue(queue,
+  //          message, messageLen,
+  //          function, functionLen,
+  //          file, fileLen,
+  //          line,
+  //          /*unused flags*/0);
+
+  return true;
+}

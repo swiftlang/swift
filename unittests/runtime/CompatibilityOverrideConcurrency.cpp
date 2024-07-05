@@ -139,6 +139,8 @@ protected:
         swift_task_enqueueMainExecutor_override;
     swift_task_checkIsolated_hook =
         swift_task_checkIsolated_override;
+    swift_task_warnUnexpectedIsolation_hook =
+        swift_task_warnUnexpectedIsolation_override;
 #ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
     swift_task_asyncMainDrainQueue_hook =
         swift_task_asyncMainDrainQueue_override_fn;
@@ -330,8 +332,15 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
   swift_task_startOnMainActor(nullptr);
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
+  swift_task_startOnMainActor(nullptr);
+}
+
 #if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_asyncMainDrainQueue) {
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_warnUnexpectedIsolationImpl) {
+  swift_task_warnUnexpectedIsolation(SerialExecutorRef::generic(), nullptr, 0,
+                                     nullptr, 0, nullptr, 0, 0, 0);
+}
 
   auto runner = [](void *) -> void * {
     swift_task_asyncMainDrainQueue();
