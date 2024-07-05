@@ -748,7 +748,7 @@ void swift::conformToCxxSequenceIfNeeded(
           return declSelfTy;
         return Type(dependentType);
       },
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
@@ -786,7 +786,7 @@ void swift::conformToCxxSequenceIfNeeded(
             return declSelfTy;
           return Type(dependentType);
         },
-        LookUpConformanceInModule(module));
+        LookUpConformanceInModule());
 
     auto indicesTy = ctx.getRangeType();
     indicesTy = indicesTy.subst(
@@ -795,7 +795,7 @@ void swift::conformToCxxSequenceIfNeeded(
             return indexTy;
           return Type(dependentType);
         },
-        LookUpConformanceInModule(module));
+        LookUpConformanceInModule());
 
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);

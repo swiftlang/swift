@@ -1166,14 +1166,14 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule(module));
+                                LookUpConformanceInModule());
 
   // Form a sugared typealias reference.
   if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule(module));
+                                       LookUpConformanceInModule());
     resultType = TypeAliasType::get(typealias, parentTy, subMap, resultType);
   }
 
@@ -4099,7 +4099,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
     subMap = SubstitutionMap::get(
         genericSig, QueryTypeSubstitutionMap{genericArgMap},
-        LookUpConformanceInModule(getDeclContext()->getParentModule()));
+        LookUpConformanceInModule());
   }
 
   bool capturesGenerics = claim<CapturesGenericsTypeAttr>(attrs);
@@ -4307,7 +4307,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
     return SubstitutionMap::get(
                sig, QueryTypeSubstitutionMap{subsMap},
-               LookUpConformanceInModule(getDeclContext()->getParentModule()))
+               LookUpConformanceInModule())
         .getCanonical();
   };
 
@@ -5866,7 +5866,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     if (baseTy->is<ErrorType>())
       return ErrorType::get(memberType);
 
-    subs = baseTy->getMemberSubstitutionMap(module, member);
+    subs = baseTy->getMemberSubstitutionMap(member);
     resultType = memberType.subst(subs);
   } else {
     resultType = memberType;

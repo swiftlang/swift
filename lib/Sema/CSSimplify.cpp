@@ -11526,7 +11526,7 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     return SolutionKind::Error;
   }
 
-  auto resolvedType = wrapperType->getTypeOfMember(DC->getParentModule(), typeInfo.valueVar);
+  auto resolvedType = wrapperType->getTypeOfMember(typeInfo.valueVar);
   if (typeInfo.valueVar->isSettable(nullptr) && typeInfo.valueVar->isSetterAccessibleFrom(DC) &&
       !typeInfo.valueVar->isSetterMutating()) {
     resolvedType = LValueType::get(resolvedType);

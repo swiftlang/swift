@@ -1561,7 +1561,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                             results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
-  auto subs = regexType->getMemberSubstitutionMap(spModule, foundDecl);
+  auto subs = regexType->getMemberSubstitutionMap(foundDecl);
   return ConcreteDeclRef(foundDecl, subs);
 }
 

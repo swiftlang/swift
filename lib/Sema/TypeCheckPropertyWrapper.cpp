@@ -675,7 +675,6 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
       return wrappedValueType;
 
     wrappedValueType = wrappedValueType->getTypeOfMember(
-        dc->getParentModule(),
         wrappedInfo.valueVar,
         wrappedInfo.valueVar->getValueInterfaceType());
     if (wrappedValueType->hasError())
@@ -694,8 +693,7 @@ Type swift::computeProjectedValueType(const VarDecl *var, Type backingStorageTyp
 
   DeclContext *dc = var->getDeclContext();
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
-  return backingStorageType->getTypeOfMember(dc->getParentModule(),
-                                             wrapperInfo.projectedValueVar);
+  return backingStorageType->getTypeOfMember(wrapperInfo.projectedValueVar);
 }
 
 Expr *swift::buildPropertyWrapperInitCall(

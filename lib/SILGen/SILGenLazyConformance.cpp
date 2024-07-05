@@ -113,7 +113,7 @@ void SILGenModule::useConformancesFromType(CanType type) {
     if (!genericSig)
       return;
 
-    auto subMap = t->getContextSubstitutionMap(SwiftModule, decl);
+    auto subMap = t->getContextSubstitutionMap(decl);
     useConformancesFromSubstitutions(subMap);
     return;
   });

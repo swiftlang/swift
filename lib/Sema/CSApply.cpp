@@ -580,7 +580,7 @@ namespace {
 
       return SubstitutionMap::get(sig,
                                   QueryTypeSubstitutionMap{subs},
-                                  LookUpConformanceInModule(dc->getParentModule()));
+                                  LookUpConformanceInModule());
     }
 
     /// Determine whether the given reference is to a method on
@@ -7324,7 +7324,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           }
           return type;
         },
-        LookUpConformanceInModule(cs.DC->getParentModule()),
+        LookUpConformanceInModule(),
         SubstFlags::SubstituteOpaqueArchetypes);
 
       // Coerce the result expression to the underlying type.

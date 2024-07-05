@@ -5676,7 +5676,7 @@ static ManagedValue createDifferentiableFunctionThunk(
           AutoDiffDerivativeFunctionKind kind) -> CanAnyFunctionType {
     auto assocTy = fnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, kind,
-        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+        LookUpConformanceInModule());
     return cast<AnyFunctionType>(assocTy->getCanonicalType());
   };
   auto getDerivativeFnPattern =
@@ -5684,7 +5684,7 @@ static ManagedValue createDifferentiableFunctionThunk(
           AutoDiffDerivativeFunctionKind kind) -> AbstractionPattern {
     return pattern.getAutoDiffDerivativeFunctionType(
         parameterIndices, kind,
-        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+        LookUpConformanceInModule());
   };
   auto createDerivativeFnThunk =
       [&](AutoDiffDerivativeFunctionKind kind) -> ManagedValue {
@@ -6270,7 +6270,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler;

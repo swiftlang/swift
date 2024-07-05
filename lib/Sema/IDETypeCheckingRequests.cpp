@@ -171,7 +171,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   auto *module = DC->getParentModule();
   GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      module, ED->getExtendedNominal());
+      ED->getExtendedNominal());
   return checkRequirements(module,
                            genericSig.getRequirements(),
                            QuerySubstitutionMap{substMap}) ==
@@ -213,7 +213,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // outer generic parameters.
   auto *module = DC->getParentModule();
   auto substMap = BaseTy->getContextSubstitutionMap(
-      module, VD->getDeclContext(), genericDecl->getGenericEnvironment());
+      VD->getDeclContext(), genericDecl->getGenericEnvironment());
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();

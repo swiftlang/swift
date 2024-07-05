@@ -115,7 +115,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       // If our likeType is dependent, then all calls to try and lay it out will
       // be non-fixed, but in a concrete case we want a fixed layout, so try to
       // substitute it out.
-      auto subs = (*type)->getContextSubstitutionMap(IGM.getSwiftModule(), decl);
+      auto subs = (*type)->getContextSubstitutionMap(decl);
       auto loweredLikeType = IGM.getLoweredType(likeType->subst(subs));
       const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
                                       
@@ -151,7 +151,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       auto elementType = likeArray->first;
       unsigned count = likeArray->second;
       
-      auto subs = (*type)->getContextSubstitutionMap(IGM.getSwiftModule(), decl);
+      auto subs = (*type)->getContextSubstitutionMap(decl);
       auto loweredElementType = IGM.getLoweredType(elementType.subst(subs));
       const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredElementType);
       

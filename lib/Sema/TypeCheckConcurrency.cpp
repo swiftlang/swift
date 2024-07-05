@@ -4964,10 +4964,9 @@ static bool checkClassGlobalActorIsolation(
   case ActorIsolation::GlobalActor: {
     // If the global actors match, we're fine.
     Type superclassGlobalActor = superIsolation.getGlobalActor();
-    auto module = classDecl->getParentModule();
     SubstitutionMap subsMap = classDecl->getDeclaredInterfaceType()
       ->getSuperclassForDecl(superclassDecl)
-      ->getContextSubstitutionMap(module, superclassDecl);
+      ->getContextSubstitutionMap(superclassDecl);
     Type superclassGlobalActorInSub = superclassGlobalActor.subst(subsMap);
     if (isolation.getGlobalActor()->isEqual(superclassGlobalActorInSub))
       return false;
@@ -5007,8 +5006,7 @@ static ActorIsolation getOverriddenIsolationFor(ValueDecl *value) {
 
   SubstitutionMap subs;
   if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
-    subs = selfType->getMemberSubstitutionMap(
-        value->getModuleContext(), overridden);
+    subs = selfType->getMemberSubstitutionMap(overridden);
   }
   return isolation.subst(subs);
 }
@@ -5417,7 +5415,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
               return ActorIsolation::forUnspecified();
 
             SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
-                classDecl->getModuleContext(), classDecl);
+                classDecl);
             superclassIsolation = superclassIsolation.subst(subs);
           }
 

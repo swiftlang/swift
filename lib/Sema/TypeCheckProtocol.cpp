@@ -979,7 +979,7 @@ findMissingGenericRequirementForSolutionFix(
       [&](SubstitutableType *type) -> Type {
         return env->mapTypeIntoContext(type->mapTypeOutOfContext());
       },
-      LookUpConformanceInModule(conformance->getDeclContext()->getParentModule()));
+      LookUpConformanceInModule());
   }
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
@@ -2515,11 +2515,11 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 }
 
 /// Clean up the given declaration type for display purposes.
-static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
+static Type getTypeForDisplay(ValueDecl *decl) {
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     return AnyFunctionType::composeTuple(
-        module->getASTContext(),
+        decl->getASTContext(),
         ctor->getMethodInterfaceType()->castTo<FunctionType>()->getParams(),
         ParameterFlagHandling::IgnoreNonEmpty);
   }
@@ -2561,10 +2561,9 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
 }
 
 /// Clean up the given requirement type for display purposes.
-static Type getRequirementTypeForDisplay(ModuleDecl *module,
-                                         NormalProtocolConformance *conformance,
+static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
                                          ValueDecl *req) {
-  auto type = getTypeForDisplay(module, req);
+  auto type = getTypeForDisplay(req);
 
   auto substType = [&](Type type, bool isResult) -> Type {
     // Replace generic type parameters and associated types with their
@@ -2572,14 +2571,14 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
     auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
     auto substSelfTy = conformance->getType();
     if (isResult && substSelfTy->getClassOrBoundGenericClass())
-      substSelfTy = DynamicSelfType::get(selfTy, module->getASTContext());
+      substSelfTy = DynamicSelfType::get(selfTy, req->getASTContext());
     return type.subst([&](SubstitutableType *dependentType) {
                         if (dependentType->isEqual(selfTy))
                           return substSelfTy;
 
                         return Type(dependentType);
                       },
-                      LookUpConformanceInModule(module));
+                      LookUpConformanceInModule());
   };
 
   if (auto fnTy = type->getAs<AnyFunctionType>()) {
@@ -2844,7 +2843,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    auto witnessType = getTypeForDisplay(module, match.Witness);
+    auto witnessType = getTypeForDisplay(match.Witness);
 
     if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
       computeFixitsForOverriddenDeclaration(match.Witness, req, [&](bool){
@@ -3880,7 +3879,7 @@ static void diagnoseProtocolStubFixit(
 
     // Issue diagnostics for witness values.
     Type RequirementType =
-      getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
+      getRequirementTypeForDisplay(Conf, VD);
     if (AddFixit) {
       if (SameFile) {
         // If the protocol member decl is in the same file of the stub,
@@ -4490,8 +4489,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       NormalProtocolConformance *conformance) {
       auto dc = conformance->getDeclContext();
       // Determine the type that the requirement is expected to have.
-      Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
-                                                  conformance, requirement);
+      Type reqType = getRequirementTypeForDisplay(conformance, requirement);
 
       auto &diags = dc->getASTContext().Diags;
       auto diagnosticMessage = diag::ambiguous_witnesses;

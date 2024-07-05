@@ -2753,7 +2753,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     substitutionMap = SubstitutionMap::get(
       environment->getGenericSignature(),
       [&](SubstitutableType *type) { return nominal->getDeclaredType(); },
-      LookUpConformanceInModule(nominal->getModuleContext()));
+      LookUpConformanceInModule());
   } else {
     substitutionMap = SubstitutionMap();
   }
@@ -3848,8 +3848,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     // the requirements in the generic signature are satisfied.
     auto *module = nominalTypeDecl->getParentModule();
     auto baseMap =
-        typeEraser->getContextSubstitutionMap(module,
-                                              nominalTypeDecl);
+        typeEraser->getContextSubstitutionMap(nominalTypeDecl);
     QuerySubstitutionMap getSubstitution{baseMap};
 
     auto result = checkRequirements(
@@ -5799,7 +5798,7 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
   auto expectedLinearMapTypeOrError =
       originalFnRemappedTy->getAutoDiffDerivativeFunctionLinearMapType(
           diffParamIndices, AutoDiffLinearMapKind::Differential,
-          LookUpConformanceInModule(original->getModuleContext()),
+          LookUpConformanceInModule(),
           /*makeSelfParamFirst*/ true);
 
   // Helper for diagnosing derivative function type errors.
@@ -6421,7 +6420,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   auto expectedLinearMapTypeOrError =
       originalFnType->getAutoDiffDerivativeFunctionLinearMapType(
           resolvedDiffParamIndices, kind.getLinearMapKind(),
-          LookUpConformanceInModule(derivative->getModuleContext()),
+          LookUpConformanceInModule(),
           /*makeSelfParamFirst*/ true);
 
   // Helper for diagnosing derivative function type errors.

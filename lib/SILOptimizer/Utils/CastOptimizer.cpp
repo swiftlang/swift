@@ -519,7 +519,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
 
   // Get substitutions, if source is a bound generic type.
   auto subMap = sourceFormalType->getContextSubstitutionMap(
-      mod.getSwiftModule(), resultDecl->getDeclContext());
+      resultDecl->getDeclContext());
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)

@@ -280,13 +280,12 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
     // type's conformance to the associated type's protocol.
     if (auto *assocType = memberType->getAssocType()) {
       auto *proto = assocType->getProtocol();
-      auto *module = proto->getParentModule();
 
       // The 'Sendable' protocol does not declare any associated types, so the
       // 'allowMissing' value here is actually irrelevant.
       auto conformance = ((*substBaseType)->isTypeParameter()
                           ? ProtocolConformanceRef(proto)
-                          : module->lookupConformance(
+                          : ModuleDecl::lookupConformance(
                               *substBaseType, proto,
                               /*allowMissing=*/false));
 
@@ -307,7 +306,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
       return assocType->getDeclaredInterfaceType()
                       ->castTo<DependentMemberType>()
-                      ->substBaseType(module, *substBaseType);
+                      ->substBaseType(*substBaseType);
     }
 
     // An unresolved DependentMemberType stores an identifier. Handle this
@@ -328,8 +327,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
     // Substitute the base type into the member type.
     auto *dc = typeDecl->getDeclContext();
-    auto subMap = (*substBaseType)->getContextSubstitutionMap(
-        dc->getParentModule(), dc);
+    auto subMap = (*substBaseType)->getContextSubstitutionMap(dc);
     return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 

@@ -1969,9 +1969,8 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
 void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) {
   // Dig out the substitution map to use.
   SubstitutionMap subMap;
-  ModuleDecl *module;
+
   if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer())) {
-    module = Mod ? Mod : typeAlias->getDecl()->getModuleContext();
     subMap = typeAlias->getSubstitutionMap();
   } else {
     if (type->hasUnboundGenericType())
@@ -1980,8 +1979,7 @@ void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) 
     auto nominal = type->getAnyNominal();
     if (!nominal) return;
 
-    module = Mod ? Mod : nominal->getModuleContext();
-    subMap = type->getContextSubstitutionMap(module, nominal);
+    subMap = type->getContextSubstitutionMap(nominal);
   }
 
   appendRetroactiveConformances(subMap, sig);

@@ -2208,8 +2208,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
           sourceType
-              ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
-                                elt->getArgumentInterfaceType())
+              ->getTypeOfMember(elt, elt->getArgumentInterfaceType())
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -2470,7 +2469,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
+        sourceType->getTypeOfMember(eltDecl,
                                     eltDecl->getArgumentInterfaceType())
                   ->getCanonicalType();
 

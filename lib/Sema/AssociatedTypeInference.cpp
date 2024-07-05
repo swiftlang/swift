@@ -1931,11 +1931,9 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
                              genericFn->getExtInfo());
   }
 
-  ModuleDecl *module = conformance->getDeclContext()->getParentModule();
-
   if (!witness->getDeclContext()->getExtendedProtocolDecl()) {
     return type.subst(QueryTypeSubstitutionMap{substitutions},
-                      LookUpConformanceInModule(module));
+                      LookUpConformanceInModule());
   }
 
   auto proto = conformance->getProtocol();
@@ -1977,7 +1975,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 
     // Replace Self with the concrete conforming type.
     substType = substType.subst(QueryTypeSubstitutionMap{substitutions},
-                                LookUpConformanceInModule(module));
+                                LookUpConformanceInModule());
 
     // If we don't have enough type witnesses, leave it abstract.
     if (substType->hasError())
@@ -2667,8 +2665,6 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
         proto->getSelfInterfaceType()->getCanonicalType());
     substitutions[selfTy] = dc->mapTypeIntoContext(conformance->getType());
 
-    auto *module = dc->getParentModule();
-
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       if (conformance->hasTypeWitness(assocType))
         continue;
@@ -2700,7 +2696,7 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
 
           // Replace Self with the concrete conforming type.
           auto substType = Type(type).subst(QueryTypeSubstitutionMap{substitutions},
-                                            LookUpConformanceInModule(module),
+                                            LookUpConformanceInModule(),
                                             options);
 
           // If we don't have enough type witnesses to substitute fully,
