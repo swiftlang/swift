@@ -338,7 +338,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     // We have a property to map to. Ensure it's {En,De}codable.
     auto target = derived.getConformanceContext()->mapTypeIntoContext(
          it->second->getValueInterfaceType());
-    if (derived.getParentModule()->checkConformance(target, derived.Protocol)
+    if (ModuleDecl::checkConformance(target, derived.Protocol)
             .isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
@@ -1945,7 +1945,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (derived.getParentModule()->checkConformance(superType, proto)) {
+      if (ModuleDecl::checkConformance(superType, proto)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {

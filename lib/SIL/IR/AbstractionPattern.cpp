@@ -291,9 +291,9 @@ bool AbstractionPattern::conformsToKnownProtocol(
     = substTy->getASTContext().getProtocol(protocolKind);
     
   auto definitelyConforms = [&](CanType t) -> bool {
-    auto result = suppressible->getParentModule()
-      ->checkConformanceWithoutContext(t, suppressible,
-                                       /*allowMissing=*/false);
+    auto result =
+      ModuleDecl::checkConformanceWithoutContext(t, suppressible,
+                                                 /*allowMissing=*/false);
     return result.has_value() && !result.value().isInvalid();
   };
     

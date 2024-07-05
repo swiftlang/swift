@@ -193,7 +193,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->checkConformance(resultTy, Proto))
+        if (ModuleDecl::checkConformance(resultTy, Proto))
           return true;
       }
 

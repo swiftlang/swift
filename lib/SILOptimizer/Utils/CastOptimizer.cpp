@@ -1455,7 +1455,6 @@ static bool optimizeStaticallyKnownProtocolConformance(
   if (TargetType->isAnyExistentialType() &&
       !SourceType->isAnyExistentialType()) {
     auto &Ctx = Mod.getASTContext();
-    auto *SM = Mod.getSwiftModule();
 
     auto *Proto = dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal());
     if (!Proto)
@@ -1471,7 +1470,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // `foo(0)` but not for `foo("string")`. There are many cases where
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
-    auto Conformance = SM->checkConformance(SourceType, Proto);
+    auto Conformance = ModuleDecl::checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
       return false;
 

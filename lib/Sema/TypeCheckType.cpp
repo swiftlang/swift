@@ -3996,7 +3996,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !resolution.getDeclContext()->getParentModule()->checkConformance(
+               !ModuleDecl::checkConformance(
                   thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
@@ -4377,8 +4377,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       selfType = next;
     }
 
-    witnessMethodConformance = getDeclContext()->getParentModule()
-      ->checkConformance(selfType, protocolType->getDecl());
+    witnessMethodConformance = ModuleDecl::checkConformance(
+        selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }

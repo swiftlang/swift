@@ -4413,8 +4413,6 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
 
 bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
     VarDecl *wrappedVar, Type initializerType, Type propertyType) {
-  auto dc = wrappedVar->getInnermostDeclContext();
-
   Type wrappedValueType;
   Type wrapperType;
   auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();

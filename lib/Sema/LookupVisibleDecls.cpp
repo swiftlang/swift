@@ -446,7 +446,6 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
   if (!CurrNominal)
     return;
-  ModuleDecl *Module = FromContext->getParentModule();
 
   for (auto Conformance : CurrNominal->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
@@ -462,7 +461,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // couldn't be computed, so assume they conform in such cases.
     if (!BaseTy->hasUnboundGenericType()) {
       if (auto res = Conformance->getConditionalRequirementsIfAvailable()) {
-        if (!res->empty() && !Module->checkConformance(BaseTy, Proto))
+        if (!res->empty() && !ModuleDecl::checkConformance(BaseTy, Proto))
           continue;
       }
     }

@@ -6142,15 +6142,15 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   if (SGF.getLoweredType(eltTy).isTrivial(SGF.F))
     return;
 
-  auto *SM = SGF.getModule().getSwiftModule();
-  if (auto *bitwiseCopyableDecl = SM->getASTContext().getProtocol(
+  auto &ctx = SGF.getASTContext();
+  if (auto *bitwiseCopyableDecl = ctx.getProtocol(
         KnownProtocolKind::BitwiseCopyable)) {
-    if (SM->checkConformance(eltTy, bitwiseCopyableDecl))
+    if (ModuleDecl::checkConformance(eltTy, bitwiseCopyableDecl))
       return;
   }
-  if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
+  if (auto *fixedWidthIntegerDecl = ctx.getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (SM->checkConformance(eltTy, fixedWidthIntegerDecl))
+    if (ModuleDecl::checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 

@@ -147,7 +147,6 @@ static SubstitutionMap
 getSubstitutionMapForPrespecialization(GenericSignature genericSig,
                                        GenericSignature specSig) {
   auto CalleeGenericSig = genericSig;
-  auto SpecializedGenericSig = specSig;
   auto SpecializedGenericEnv = specSig.getGenericEnvironment();
 
   auto CalleeInterfaceToSpecializedInterfaceMap = SubstitutionMap::get(

@@ -11635,9 +11635,7 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
     auto baseType =
         memberRef->getBase()->getType()->getMetatypeInstanceType();
     if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
-      auto *dc = declRef.getDecl()->getDeclContext();
-      auto *module = dc->getParentModule();
-      auto conformance = module->checkConformance(baseType, globalActor);
+      auto conformance = ModuleDecl::checkConformance(baseType, globalActor);
       if (conformance &&
           conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
         return ActorIsolation::forGlobalActor(baseType);

@@ -13424,8 +13424,7 @@ lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {
     auto cand = cast<FuncDecl>(choice.getDecl());
-    return !isValidDynamicCallableMethod(cand, CS.DC->getParentModule(),
-                                         hasKeywordArgs);
+    return !isValidDynamicCallableMethod(cand, hasKeywordArgs);
   };
   candidates.erase(
       std::remove_if(candidates.begin(), candidates.end(), filter),

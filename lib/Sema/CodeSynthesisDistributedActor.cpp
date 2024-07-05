@@ -972,7 +972,6 @@ VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   auto &C = nominal->getASTContext();
-  auto module = nominal->getParentModule();
 
   auto DAS = C.getDistributedActorSystemDecl();
 
@@ -988,7 +987,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = module->checkConformance(
+        auto conformance = ModuleDecl::checkConformance(
             proto->mapTypeIntoContext(var->getInterfaceType()),
             DAS);
 
@@ -1063,9 +1062,9 @@ bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
     return false;
 
   return TypeChecker::conformsToKnownProtocol(
-             idTy, KnownProtocolKind::Decodable, actor->getParentModule()) &&
+             idTy, KnownProtocolKind::Decodable) &&
          TypeChecker::conformsToKnownProtocol(
-             idTy, KnownProtocolKind::Encodable, actor->getParentModule());
+             idTy, KnownProtocolKind::Encodable);
 }
 
 NormalProtocolConformance *

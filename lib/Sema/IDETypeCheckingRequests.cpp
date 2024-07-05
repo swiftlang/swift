@@ -138,8 +138,7 @@ static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
   if (selfType->is<ExistentialType>())
     return false;
 
-  auto *M = ED->getParentModule();
-  return ED->getExtendedNominal() == PD || M->checkConformance(selfType, PD);
+  return ED->getExtendedNominal() == PD || ModuleDecl::checkConformance(selfType, PD);
 }
 
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,

@@ -488,8 +488,7 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
   // Make sure this type conforms to OptionSet
   bool conformsToOptionSet =
     (bool)TypeChecker::conformsToKnownProtocol(DC->getSelfTypeInContext(),
-                                               KnownProtocolKind::OptionSet,
-                                               DC->getParentModule());
+                                               KnownProtocolKind::OptionSet);
   
   if (!conformsToOptionSet)
     return;
@@ -1421,11 +1420,9 @@ buildDefaultInitializerString(DeclContext *dc, Pattern *pattern) {
     // Special-case the various types we might see here.
     auto type = pattern->getType();
 
-    auto *module = dc->getParentModule();
-
     // For literal-convertible types, form the corresponding literal.
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                       \
-  if (TypeChecker::conformsToKnownProtocol(type, KnownProtocolKind::Kind, module)) \
+  if (TypeChecker::conformsToKnownProtocol(type, KnownProtocolKind::Kind)) \
     return std::string(String);
 
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")

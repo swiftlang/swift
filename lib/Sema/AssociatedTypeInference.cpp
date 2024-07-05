@@ -1385,10 +1385,9 @@ static bool isExtensionUsableForInference(const ExtensionDecl *extension,
   // in the first place. Only check conformances on the `Self` type,
   // because those have to be explicitly declared on the type somewhere
   // so won't be affected by whatever answer inference comes up with.
-  auto *module = conformanceDC->getParentModule();
   auto checkConformance = [&](ProtocolDecl *proto) {
     auto typeInContext = conformanceDC->mapTypeIntoContext(conformance->getType());
-    auto otherConf = module->checkConformance(typeInContext, proto);
+    auto otherConf = ModuleDecl::checkConformance(typeInContext, proto);
     return !otherConf.isInvalid();
   };
 

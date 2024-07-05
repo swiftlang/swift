@@ -1288,8 +1288,7 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
       if (!sendableProto)
         return true;
 
-      auto module = nominal->getParentModule();
-      auto conformance = module->checkConformance(type, sendableProto);
+      auto conformance = ModuleDecl::checkConformance(type, sendableProto);
       if (conformance.isInvalid())
         return true;
 
@@ -6213,8 +6212,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   // form an inherited conformance.
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
-      auto classModule = classDecl->getParentModule();
-      auto inheritedConformance = classModule->checkConformance(
+      auto inheritedConformance = ModuleDecl::checkConformance(
           classDecl->mapTypeIntoContext(superclass),
           proto, /*allowMissing=*/false);
       if (inheritedConformance.hasUnavailableConformance())

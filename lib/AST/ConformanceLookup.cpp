@@ -796,7 +796,7 @@ bool TypeBase::isSendableType() {
   if (auto *fas = getAs<AnyFunctionType>())
     return fas->isSendable();
 
-  auto conformance = proto->getParentModule()->checkConformance(
+  auto conformance = ModuleDecl::checkConformance(
       this, proto, false /*allow missing*/);
   return conformance && !conformance.hasUnavailableConformance();
 }
@@ -849,7 +849,7 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
                     SILTokenType>()));
 
   const bool conforms =
-      (bool) proto->getParentModule()->checkConformance(
+      (bool) ModuleDecl::checkConformance(
           type, proto,
           /*allowMissing=*/false);
 

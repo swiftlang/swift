@@ -5327,7 +5327,7 @@ void swift::diagnoseConformanceFailure(Type T,
       // Map it into context since we want to check conditional requirements.
       rawType = enumDecl->mapTypeIntoContext(rawType);
       if (!TypeChecker::conformsToKnownProtocol(
-              rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
+              rawType, KnownProtocolKind::Equatable)) {
         SourceLoc loc = enumDecl->getInherited().getStartLoc();
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
@@ -5431,16 +5431,15 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 }
 
 bool TypeChecker::conformsToKnownProtocol(
-    Type type, KnownProtocolKind protocol, ModuleDecl *module,
+    Type type, KnownProtocolKind protocol,
     bool allowMissing) {
-  if (auto *proto = module->getASTContext().getProtocol(protocol))
-    return (bool) module->checkConformance(type, proto, allowMissing);
+  if (auto *proto = type->getASTContext().getProtocol(protocol))
+    return (bool) ModuleDecl::checkConformance(type, proto, allowMissing);
   return false;
 }
 
 bool
-TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
-                                               ModuleDecl *M) {
+TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto) {
   // An existential may have a concrete underlying type with protocol conformances
   // we cannot know statically.
   if (type->isExistentialType())
@@ -5473,9 +5472,9 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   // as an intermediate collection cast can dynamically change if the conditions
   // are met or not.
   if (type->isKnownStdlibCollectionType())
-    return !M->lookupConformance(type, Proto, /*allowMissing=*/true)
+    return !ModuleDecl::lookupConformance(type, Proto, /*allowMissing=*/true)
                 .isInvalid();
-  return !M->checkConformance(type, Proto).isInvalid();
+  return !ModuleDecl::checkConformance(type, Proto).isInvalid();
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -6756,8 +6755,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoContext(defaultAssocType);
     auto requirementProto = req.getProtocolDecl();
-    auto conformance = module->checkConformance(defaultAssocTypeInContext,
-                                                requirementProto);
+    auto conformance = ModuleDecl::checkConformance(defaultAssocTypeInContext,
+                                                    requirementProto);
     if (conformance.isInvalid()) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.
