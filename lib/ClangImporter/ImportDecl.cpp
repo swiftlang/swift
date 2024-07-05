@@ -8721,7 +8721,7 @@ static void finishTypeWitnesses(
 
       auto memberType = typeDecl->getDeclaredInterfaceType();
       auto subMap = selfType->getContextSubstitutionMap(
-          module, typeDecl->getDeclContext());
+          typeDecl->getDeclContext());
       memberType = memberType.subst(subMap);
       conformance->setTypeWitness(assocType, memberType, typeDecl);
       satisfied = true;

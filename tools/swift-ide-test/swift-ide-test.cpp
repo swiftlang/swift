@@ -1232,8 +1232,7 @@ static int printConformingMethodList(
         llvm::outs() << "\n";
         for (auto VD : Result->Members) {
           auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
-          funcTy = Result->ExprType->getTypeOfMember(
-              Result->DC->getParentModule(), VD, funcTy);
+          funcTy = Result->ExprType->getTypeOfMember(VD, funcTy);
           auto resultTy = funcTy->castTo<FunctionType>()->getResult();
 
           llvm::outs() << "   - Name: ";

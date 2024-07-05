@@ -239,7 +239,7 @@ private:
         getWitness()->getDerivativeGenericSignature().getReducedType(
             type);
     return type->getAutoDiffTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+        LookUpConformanceInModule());
   }
 
   /// Returns the tangent value category of the given value.
@@ -1428,7 +1428,7 @@ public:
           recordTemporary(adjElt);
         } else {
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+              field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -3122,8 +3122,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
         if (field == tanField) {
           eltVals.push_back(adjResult);
         } else {
-          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+          auto substMap = tangentVectorTy->getMemberSubstitutionMap(field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());

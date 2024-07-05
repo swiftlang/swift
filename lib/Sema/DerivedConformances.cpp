@@ -474,10 +474,9 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
-    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
     auto subs = SubstitutionMap::get(generics, typeArgs,
-                                     LookUpConformanceInModule{builtinModule});
+                                     LookUpConformanceInModule{});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {

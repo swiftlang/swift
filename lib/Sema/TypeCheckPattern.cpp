@@ -1620,8 +1620,7 @@ Pattern *TypeChecker::coercePatternToType(
       
       Type elementType;
       if (argType)
-        elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                              elt, argType);
+        elementType = enumTy->getTypeOfMember(elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
       auto newSubOptions = subOptions;
@@ -1642,8 +1641,7 @@ Pattern *TypeChecker::coercePatternToType(
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                                 elt, argType);
+      Type elementType = enumTy->getTypeOfMember(elt, argType);
       SmallVector<TuplePatternElt, 8> elements;
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {

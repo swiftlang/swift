@@ -4448,7 +4448,7 @@ bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
     setType(typeExpr, wrapperType);
 
     wrappedValueType = wrapperType->getTypeOfMember(
-        dc->getParentModule(), wrapperInfo.valueVar);
+        wrapperInfo.valueVar);
   }
 
   // The property type must be equal to the wrapped value type

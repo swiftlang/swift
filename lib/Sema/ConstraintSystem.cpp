@@ -1030,12 +1030,11 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
   if (extension && extension->isConstrainedExtension()) {
     auto contextSubMap = parentTy->getContextSubstitutionMap(
-        extension->getParentModule(), extension->getSelfNominalTypeDecl());
+        extension->getSelfNominalTypeDecl());
     if (!subMap) {
       // The substitution map wasn't set above, meaning we should grab the map
       // for the extension itself.
-      subMap = parentTy->getContextSubstitutionMap(extension->getParentModule(),
-                                                   extension);
+      subMap = parentTy->getContextSubstitutionMap(extension);
     }
 
     if (auto signature = decl->getGenericSignature()) {
@@ -1372,8 +1371,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type =
-            baseType->getTypeOfMember(DC->getParentModule(), memberDecl, type);
+        type = baseType->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }

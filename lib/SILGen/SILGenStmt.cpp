@@ -1591,7 +1591,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
         SubstitutionMap subMap = SubstitutionMap::get(
             genericSig, [&](SubstitutableType *dependentType) {
               return exnMV.getType().getASTType();
-            }, LookUpConformanceInModule(getModule().getSwiftModule()));
+            }, LookUpConformanceInModule());
 
         // Generic errors are passed indirectly.
         if (!exnMV.getType().isAddress() && useLoweredAddresses()) {

@@ -692,8 +692,7 @@ RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement) const {
     // witness's parent. Don't use witness.getSubstitutions(), which
     // are written in terms of the witness thunk signature.
     auto subs =
-      getType()->getContextSubstitutionMap(getDeclContext()->getParentModule(),
-                                           witnessDecl->getDeclContext());
+      getType()->getContextSubstitutionMap(witnessDecl->getDeclContext());
     return ConcreteDeclRef(witness.getDecl(), subs);
   }
 
@@ -756,20 +755,17 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     // Substitute the conditional requirements so that they're phrased in
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
-    ModuleDecl *module;
     SubstitutionMap subMap;
     if (auto nominal = GenericConformance->getType()->getAnyNominal()) {
-      module = nominal->getModuleContext();
-      subMap = getType()->getContextSubstitutionMap(module, nominal);
+      subMap = getType()->getContextSubstitutionMap(nominal);
     } else {
-      module = getProtocol()->getModuleContext();
       subMap = getSubstitutionMap();
     }
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : *parentCondReqs) {
       auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
-                                 LookUpConformanceInModule(module));
+                                 LookUpConformanceInModule());
       newReqs.push_back(newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();

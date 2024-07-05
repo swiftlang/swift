@@ -121,8 +121,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILType dtorTy;
 
     auto subMap
-      = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                superclass);
+      = superclassTy->getContextSubstitutionMap(superclass);
 
     // We completely drop the generic signature if all generic parameters were
     // concrete.
@@ -635,8 +634,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   assert(superSelf->getOwnershipKind() == OwnershipKind::Owned);
 
   auto subMap
-    = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                              superclass);
+    = superclassTy->getContextSubstitutionMap(superclass);
 
   B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 

@@ -331,7 +331,7 @@ protected:
                 remappedOrigFnType->getDifferentiabilityResultIndices(),
                 dfei->getDerivativeFunctionKind(),
                 getBuilder().getModule().Types,
-                LookUpConformanceInModule(SwiftMod))
+                LookUpConformanceInModule())
             ->getWithoutDifferentiability();
     SILType remappedDerivativeFnType = getOpType(dfei->getType());
     // If remapped derivative type and derivative remapped type are equal, do

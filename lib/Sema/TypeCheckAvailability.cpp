@@ -4236,8 +4236,7 @@ public:
     if (isa<ProtocolType>(ty))
       return Action::Continue;
 
-    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
-    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap(ty->getDecl());
     (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
@@ -4245,8 +4244,7 @@ public:
   Action visitBoundGenericType(BoundGenericType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
-    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap(ty->getDecl());
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),

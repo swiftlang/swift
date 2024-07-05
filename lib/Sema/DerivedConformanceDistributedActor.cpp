@@ -720,7 +720,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
           return Type();
         },
-        LookUpConformanceInModule(getter->getParentModule())
+        LookUpConformanceInModule()
     );
     DeclRefExpr *buildRemoteExecutorExpr =
         new (ctx) DeclRefExpr(

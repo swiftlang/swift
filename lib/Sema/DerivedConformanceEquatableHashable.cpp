@@ -843,7 +843,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
         return Type(dependentType);
       },
-      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+      LookUpConformanceInModule());
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
 
   Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);

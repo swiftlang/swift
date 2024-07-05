@@ -239,8 +239,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     }
 
     auto *conformance = cast<NormalProtocolConformance>(conformances.front());
-    auto subMap = type->getContextSubstitutionMap(protocol->getParentModule(),
-                                                  conformance->getDeclContext());
+    auto subMap = type->getContextSubstitutionMap(conformance->getDeclContext());
 
     // TODO: labels
     auto *specialized = ctx.getSpecializedConformance(type, conformance, subMap);
@@ -728,8 +727,7 @@ LookupConformanceInModuleRequest::evaluate(
         conformanceDC = conformanceDC->getSelfNominalTypeDecl();
       }
 
-      auto subMap = type->getContextSubstitutionMap(protocol->getParentModule(),
-                                                    conformanceDC);
+      auto subMap = type->getContextSubstitutionMap(conformanceDC);
       return ProtocolConformanceRef(
           ctx.getSpecializedConformance(type, normalConf, subMap));
     }

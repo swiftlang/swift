@@ -199,7 +199,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
     return declaredType;
 
   auto *dc = aliasDecl->getDeclContext();
-  auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
+  auto subs = parent->getContextSubstitutionMap(dc);
 
   return declaredType.subst(subs);
 }
@@ -239,7 +239,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   // Build a SubstitutionMap.
   auto genericSig = nominalDecl->getGenericSignature();
   auto subs = createSubstitutionMapFromGenericArgs(
-      genericSig, args, LookUpConformanceInModule(decl->getParentModule()));
+      genericSig, args, LookUpConformanceInModule());
   if (!subs)
     return Type();
   auto origType = nominalDecl->getDeclaredInterfaceType();
@@ -278,7 +278,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
         opaqueDecl->getGenericSignature(), allArgs,
-        LookUpConformanceInModule(parentModule));
+        LookUpConformanceInModule());
     Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
     return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
   }
@@ -318,11 +318,9 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
       substTy;
   }
 
-  // FIXME: This is the wrong module
-  auto *moduleDecl = decl->getParentModule();
   auto subMap = SubstitutionMap::get(genericSig,
                                      QueryTypeSubstitutionMap{subs},
-                                     LookUpConformanceInModule(moduleDecl));
+                                     LookUpConformanceInModule());
   if (!subMap)
     return Type();
 

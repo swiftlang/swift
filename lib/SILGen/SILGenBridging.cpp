@@ -126,8 +126,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto typeSubMap = swiftValueType->getContextSubstitutionMap(
-      SGF.SGM.SwiftModule, dc);
+  auto typeSubMap = swiftValueType->getContextSubstitutionMap(dc);
 
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy.substGenericArgs(SGF.SGM.M, typeSubMap,
@@ -769,7 +768,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       [&](SubstitutableType *t) -> Type {
         return nativeType;
       },
-      LookUpConformanceInModule(SGF.SGM.SwiftModule));
+      LookUpConformanceInModule());
 
     // The intrinsic takes a T; reabstract to the generic abstraction
     // pattern.

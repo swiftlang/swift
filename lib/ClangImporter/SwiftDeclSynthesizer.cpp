@@ -442,8 +442,6 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   ASTContext &ctx = constructor->getASTContext();
   auto structDecl = static_cast<StructDecl *>(context);
 
-  auto *module = structDecl->getParentModule();
-
   // Use a builtin to produce a zero initializer, and assign it to self.
 
   // Construct the left-hand reference to self.
@@ -460,7 +458,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
       cast<FuncDecl>(getBuiltinValueDecl(ctx, zeroInitID));
   SubstitutionMap subMap = SubstitutionMap::get(
       zeroInitializerFunc->getGenericSignature(), llvm::ArrayRef(selfType),
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
   ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
@@ -828,8 +826,6 @@ synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = getterDecl->getASTContext();
   auto importedFieldDecl = static_cast<VarDecl *>(context);
 
-  auto *module = afd->getParentModule();
-
   auto selfDecl = getterDecl->getImplicitSelfDecl();
 
   auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -844,7 +840,7 @@ synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
       SubstitutionMap::get(
           reinterpretCast->getGenericSignature(),
           {selfDecl->getInterfaceType(), importedFieldDecl->getInterfaceType()},
-          LookUpConformanceInModule(module)));
+          LookUpConformanceInModule()));
   auto reinterpretCastRefExpr =
       new (ctx) DeclRefExpr(reinterpretCastRef, DeclNameLoc(),
                             /*implicit*/ true);
@@ -868,8 +864,6 @@ synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
 /// Synthesizer for the body of a union field setter.
 static std::pair<BraceStmt *, bool>
 synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
-  auto *module = afd->getParentModule();
-
   auto setterDecl = cast<AccessorDecl>(afd);
   ASTContext &ctx = setterDecl->getASTContext();
 
@@ -890,7 +884,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   ConcreteDeclRef addressofFnRef(
       addressofFn, SubstitutionMap::get(addressofFn->getGenericSignature(),
                                         {inoutSelfDecl->getInterfaceType()},
-                                        LookUpConformanceInModule(module)));
+                                        LookUpConformanceInModule()));
   auto addressofFnRefExpr =
       new (ctx) DeclRefExpr(addressofFnRef, DeclNameLoc(), /*implicit*/ true);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
@@ -912,7 +906,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   ConcreteDeclRef initializeFnRef(
       initializeFn, SubstitutionMap::get(initializeFn->getGenericSignature(),
                                          {newValueDecl->getInterfaceType()},
-                                         LookUpConformanceInModule(module)));
+                                         LookUpConformanceInModule()));
   auto initializeFnRefExpr =
       new (ctx) DeclRefExpr(initializeFnRef, DeclNameLoc(), /*implicit*/ true);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
@@ -1215,7 +1209,6 @@ static std::pair<BraceStmt *, bool>
 synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
                                       void *context) {
   ASTContext &ctx = afd->getASTContext();
-  auto *module = afd->getParentModule();
 
   auto ctorDecl = cast<ConstructorDecl>(afd);
   auto enumDecl = static_cast<EnumDecl *>(context);
@@ -1235,7 +1228,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
   auto enumTy = enumDecl->getDeclaredInterfaceType();
   SubstitutionMap subMap = SubstitutionMap::get(
       reinterpretCast->getGenericSignature(), {rawTy, enumTy},
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
   ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
   auto reinterpretCastRef =
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
@@ -1304,13 +1297,11 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
                                        /*implicit*/ true);
   selfRef->setType(selfDecl->getTypeInContext());
 
-  auto *module = afd->getParentModule();
-
   auto reinterpretCast = cast<FuncDecl>(
       getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
   SubstitutionMap subMap = SubstitutionMap::get(
       reinterpretCast->getGenericSignature(), {enumTy, rawTy},
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
   ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
 
   auto reinterpretCastRef =
@@ -1512,11 +1503,10 @@ Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
                                                             Expr *baseExpr) {
   auto reinterpretCast = cast<FuncDecl>(
       getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
-  auto *module = reinterpretCast->getParentModule();
 
   SubstitutionMap subMap = SubstitutionMap::get(
       reinterpretCast->getGenericSignature(), {givenType, exprType},
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
   ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
   auto reinterpretCastRef =
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
@@ -1539,8 +1529,6 @@ Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
 static std::pair<BraceStmt *, bool>
 synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
                                               void *context, bool isAddress) {
-  auto *module = afd->getParentModule();
-
   auto getterDecl = cast<AccessorDecl>(afd);
   auto getterImpl = static_cast<FuncDecl *>(context);
 
@@ -1573,7 +1561,7 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
     // Handle operator[] that returns a reference type.
     SubstitutionMap subMap = SubstitutionMap::get(
         ctx.getUnsafePointerDecl()->getGenericSignature(), {elementTy},
-        LookUpConformanceInModule(module));
+        LookUpConformanceInModule());
     auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(
         getterImplCallExpr, SourceLoc(),
         ConcreteDeclRef(pointeePropertyDecl, subMap), DeclNameLoc(),
@@ -1616,8 +1604,6 @@ synthesizeUnwrappingSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   ASTContext &ctx = setterDecl->getASTContext();
 
-  auto *module = afd->getParentModule();
-
   auto selfArg = createSelfArg(setterDecl);
   DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
   // For a subscript this decl will have two parameters, for a pointee property
@@ -1636,7 +1622,7 @@ synthesizeUnwrappingSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   SubstitutionMap subMap = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(), {elementTy},
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
   auto pointeePropertyRefExpr = new (ctx)
       MemberRefExpr(setterImplCallExpr, SourceLoc(),
                     ConcreteDeclRef(pointeePropertyDecl, subMap), DeclNameLoc(),

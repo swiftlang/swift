@@ -604,8 +604,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
     }
 
     BaseSubMap = derivedNominalTy->getContextSubstitutionMap(
-        baseNominal->getParentModule(), baseNominal,
-        genericEnv);
+        baseNominal, genericEnv);
 
     BaseSubMap = BaseSubMap.mapReplacementTypesOutOfContext();
   }

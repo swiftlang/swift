@@ -279,7 +279,7 @@ CanSILFunctionType SILFunctionType::getDifferentiableComponentType(
     return originalFnTy->getAutoDiffDerivativeFunctionType(
         getDifferentiabilityParameterIndices(),
         getDifferentiabilityResultIndices(), *derivativeKind, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+        LookUpConformanceInModule());
   }
   return originalFnTy;
 }
@@ -295,7 +295,7 @@ CanSILFunctionType SILFunctionType::getLinearComponentType(
   case LinearDifferentiableFunctionTypeComponent::Transpose:
     return originalFnTy->getAutoDiffTransposeFunctionType(
         getDifferentiabilityParameterIndices(), module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+        LookUpConformanceInModule());
   }
 }
 
@@ -4218,7 +4218,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
 
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
         loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
-        *this, LookUpConformanceInModule(&M));
+        *this, LookUpConformanceInModule());
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";

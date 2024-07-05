@@ -4930,8 +4930,7 @@ namespace {
     }
 
     SubstitutionMap genericSubstitutions() {
-      return type->getContextSubstitutionMap(IGM.getSwiftModule(),
-                                             type->getAnyNominal());
+      return type->getContextSubstitutionMap(type->getAnyNominal());
     }
 
     MetadataTrailingFlags getTrailingFlags() {

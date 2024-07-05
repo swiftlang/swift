@@ -97,10 +97,8 @@ using LookupConformanceFn = llvm::function_ref<GenericFunction>;
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
 /// conformance through a module.
 class LookUpConformanceInModule {
-  ModuleDecl *M;
 public:
-  explicit LookUpConformanceInModule(ModuleDecl *M)
-    : M(M) {}
+  explicit LookUpConformanceInModule() {}
 
   ProtocolConformanceRef operator()(CanType dependentType,
                                     Type conformingReplacementType,
@@ -120,16 +118,12 @@ public:
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
 /// conformances from a generic signature.
 class LookUpConformanceInSignature {
-  const GenericSignatureImpl *Sig;
 public:
-  LookUpConformanceInSignature(const GenericSignatureImpl *Sig)
-    : Sig(Sig) {
-      assert(Sig && "Cannot lookup conformance in null signature!");
-    }
+  LookUpConformanceInSignature(const GenericSignatureImpl *Sig) {}
 
-    ProtocolConformanceRef operator()(CanType dependentType,
-                                      Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.

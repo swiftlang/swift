@@ -332,7 +332,7 @@ CheckRequirementsResult swift::checkRequirements(
   SmallVector<Requirement, 4> substReqs;
   for (auto req : requirements) {
     substReqs.push_back(req.subst(substitutions,
-                              LookUpConformanceInModule(module), options));
+                              LookUpConformanceInModule(), options));
   }
 
   return checkRequirements(substReqs);

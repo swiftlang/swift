@@ -186,7 +186,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       // we might run into trouble with really complicated cases but the fake
       // archetype setup will mostly work.
       auto substitutions = T->getMemberSubstitutionMap(
-          CurModule, FD, FD->getGenericEnvironment());
+          FD, FD->getGenericEnvironment());
       auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
