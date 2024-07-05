@@ -2617,7 +2617,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
   // the input for `Optional<T>.TangentVector.init`.
   auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
-  if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
+  if (optionalOfWrappedTanType.isObject()) {
     // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
     //         %wrappedAdjoint : $T
     auto *enumInst = builder.createEnum(pbLoc, wrappedAdjoint, someEltDecl,
