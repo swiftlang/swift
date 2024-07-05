@@ -347,9 +347,9 @@ void RequireLiveness::process(Collection requireInstList) {
 
   // Then put all of our requires into our allRequires set.
   BasicBlockWorklist initializingWorklist(transferInst->getFunction());
-  for (auto *require : requireInstList) {
-    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << *require);
-    allRequires.insert(require);
+  for (auto require : requireInstList) {
+    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << **require);
+    allRequires.insert(*require);
     initializingWorklist.pushIfNotVisited(require->getParent());
   }
 
@@ -425,6 +425,26 @@ void RequireLiveness::process(Collection requireInstList) {
 
 namespace {
 
+struct InOutSendingNotDisconnectedInfo {
+  /// The function exiting inst where the 'inout sending' parameter was actor
+  /// isolated.
+  TermInst *functionExitingInst;
+
+  /// The 'inout sending' param that we are emitting an error for.
+  SILValue inoutSendingParam;
+
+  /// The dynamic actor isolated region info of our 'inout sending' value's
+  /// region at the terminator inst.
+  SILDynamicMergedIsolationInfo actorIsolatedRegionInfo;
+
+  InOutSendingNotDisconnectedInfo(
+      SILInstruction *functionExitingInst, SILValue inoutSendingParam,
+      SILDynamicMergedIsolationInfo actorIsolatedRegionInfo)
+      : functionExitingInst(cast<TermInst>(functionExitingInst)),
+        inoutSendingParam(inoutSendingParam),
+        actorIsolatedRegionInfo(actorIsolatedRegionInfo) {}
+};
+
 struct TransferredNonTransferrableInfo {
   /// The use that actually caused the transfer.
   Operand *transferredOperand;
@@ -454,12 +474,45 @@ struct TransferredNonTransferrableInfo {
         isolationRegionInfo(isolationRegionInfo) {}
 };
 
+/// Wrapper around a SILInstruction that internally specifies whether we are
+/// dealing with an inout reinitialization needed or if it is just a normal
+/// use after transfer.
+class RequireInst {
+public:
+  enum Kind {
+    UseAfterTransfer,
+    InOutReinitializationNeeded,
+  };
+
+private:
+  llvm::PointerIntPair<SILInstruction *, 1> instAndKind;
+
+  RequireInst(SILInstruction *inst, Kind kind) : instAndKind(inst, kind) {}
+
+public:
+  static RequireInst forUseAfterTransfer(SILInstruction *inst) {
+    return {inst, Kind::UseAfterTransfer};
+  }
+
+  static RequireInst forInOutReinitializationNeeded(SILInstruction *inst) {
+    return {inst, Kind::InOutReinitializationNeeded};
+  }
+
+  SILInstruction *getInst() const { return instAndKind.getPointer(); }
+  Kind getKind() const { return Kind(instAndKind.getInt()); }
+
+  SILInstruction *operator*() const { return getInst(); }
+  SILInstruction *operator->() const { return getInst(); }
+};
+
 class TransferNonSendableImpl {
   RegionAnalysisFunctionInfo *regionInfo;
-  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+  SmallFrozenMultiMap<Operand *, RequireInst, 8>
       transferOpToRequireInstMultiMap;
   SmallVector<TransferredNonTransferrableInfo, 8>
       transferredNonTransferrableInfoList;
+  SmallVector<InOutSendingNotDisconnectedInfo, 8>
+      inoutSendingNotDisconnectedInfoList;
 
 public:
   TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
@@ -472,6 +525,7 @@ private:
 
   void emitUseAfterTransferDiagnostics();
   void emitTransferredNonTransferrableDiagnostics();
+  void emitInOutSendingNotDisconnectedInfoList();
 };
 
 } // namespace
@@ -484,12 +538,12 @@ namespace {
 
 class UseAfterTransferDiagnosticEmitter {
   Operand *transferOp;
-  SmallVectorImpl<SILInstruction *> &requireInsts;
+  SmallVectorImpl<RequireInst> &requireInsts;
   bool emittedErrorDiagnostic = false;
 
 public:
-  UseAfterTransferDiagnosticEmitter(
-      Operand *transferOp, SmallVectorImpl<SILInstruction *> &requireInsts)
+  UseAfterTransferDiagnosticEmitter(Operand *transferOp,
+                                    SmallVectorImpl<RequireInst> &requireInsts)
       : transferOp(transferOp), requireInsts(requireInsts) {}
 
   ~UseAfterTransferDiagnosticEmitter() {
@@ -733,9 +787,20 @@ private:
   void emitRequireInstDiagnostics() {
     // Now actually emit the require notes.
     while (!requireInsts.empty()) {
-      auto *require = requireInsts.pop_back_val();
-      diagnoseNote(require, diag::regionbasedisolation_maybe_race)
-          .highlight(require->getLoc().getSourceRange());
+      auto require = requireInsts.pop_back_val();
+      switch (require.getKind()) {
+      case RequireInst::UseAfterTransfer:
+        diagnoseNote(*require, diag::regionbasedisolation_maybe_race)
+            .highlight(require->getLoc().getSourceRange());
+        continue;
+      case RequireInst::InOutReinitializationNeeded:
+        diagnoseNote(
+            *require,
+            diag::regionbasedisolation_inout_sending_must_be_reinitialized)
+            .highlight(require->getLoc().getSourceRange());
+        continue;
+      }
+      llvm_unreachable("Covered switch isn't covered?!");
     }
   }
 };
@@ -752,7 +817,7 @@ class UseAfterTransferDiagnosticInferrer {
 
 public:
   UseAfterTransferDiagnosticInferrer(
-      Operand *transferOp, SmallVectorImpl<SILInstruction *> &requireInsts,
+      Operand *transferOp, SmallVectorImpl<RequireInst> &requireInsts,
       RegionAnalysisValueMap &valueMap,
       TransferringOperandToStateMap &transferringOpToStateMap)
       : transferOp(transferOp), diagnosticEmitter(transferOp, requireInsts),
@@ -1073,17 +1138,17 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     ++blockLivenessInfoGeneration;
     liveness.process(requireInsts);
 
-    SmallVector<SILInstruction *, 8> requireInstsForError;
-    for (auto *require : requireInsts) {
+    SmallVector<RequireInst, 8> requireInstsForError;
+    for (auto require : requireInsts) {
       // We can have multiple of the same require insts if we had a require
       // and an assign from the same instruction. Our liveness checking
       // above doesn't care about that, but we still need to make sure we do
       // not emit twice.
-      if (!requireInstsUnique.insert(require))
+      if (!requireInstsUnique.insert(*require))
         continue;
 
       // If this was not a last require, do not emit an error.
-      if (!liveness.finalRequires.contains(require))
+      if (!liveness.finalRequires.contains(*require))
         continue;
 
       requireInstsForError.push_back(require);
@@ -1523,6 +1588,125 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
 }
 
 //===----------------------------------------------------------------------===//
+//              MARK: InOutSendingNotDisconnected Error Emitter
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class InOutSendingNotDisconnectedDiagnosticEmitter {
+  InOutSendingNotDisconnectedInfo info;
+  bool emittedErrorDiagnostic = false;
+
+public:
+  InOutSendingNotDisconnectedDiagnosticEmitter(
+      InOutSendingNotDisconnectedInfo info)
+      : info(info) {}
+
+  ~InOutSendingNotDisconnectedDiagnosticEmitter() {
+    // If we were supposed to emit a diagnostic and didn't emit an unknown
+    // pattern error.
+    if (!emittedErrorDiagnostic)
+      emitUnknownPatternError();
+  }
+
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return getDiagnosticBehaviorLimitForValue(info.inoutSendingParam);
+  }
+
+  void emitUnknownPatternError() {
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(info.functionExitingInst,
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
+  }
+
+  void emit();
+
+  ASTContext &getASTContext() const {
+    return info.functionExitingInst->getFunction()->getASTContext();
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilSwiftVersion(6));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+};
+
+} // namespace
+
+void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto varName = VariableNameInferrer::inferName(info.inoutSendingParam);
+  if (!varName) {
+    return emitUnknownPatternError();
+  }
+
+  // Then emit the note with greater context.
+  SmallString<64> descriptiveKindStr;
+  {
+    llvm::raw_svector_ostream os(descriptiveKindStr);
+    info.actorIsolatedRegionInfo.printForDiagnostics(os);
+    os << ' ';
+  }
+
+  diagnoseError(
+      info.functionExitingInst,
+      diag::regionbasedisolation_inout_sending_cannot_be_actor_isolated,
+      *varName, descriptiveKindStr)
+      .limitBehaviorIf(getBehaviorLimit());
+
+  diagnoseNote(
+      info.functionExitingInst,
+      diag::regionbasedisolation_inout_sending_cannot_be_actor_isolated_note,
+      *varName, descriptiveKindStr);
+}
+
+void TransferNonSendableImpl::emitInOutSendingNotDisconnectedInfoList() {
+  for (auto &info : inoutSendingNotDisconnectedInfoList) {
+    InOutSendingNotDisconnectedDiagnosticEmitter emitter(info);
+    emitter.emit();
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: Diagnostic Evaluator
 //===----------------------------------------------------------------------===//
 
@@ -1531,7 +1715,7 @@ namespace {
 struct DiagnosticEvaluator final
     : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
   RegionAnalysisFunctionInfo *info;
-  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+  SmallFrozenMultiMap<Operand *, RequireInst, 8>
       &transferOpToRequireInstMultiMap;
 
   /// First value is the operand that was transferred... second value is the
@@ -1539,18 +1723,28 @@ struct DiagnosticEvaluator final
   /// is what is non-transferrable.
   SmallVectorImpl<TransferredNonTransferrableInfo> &transferredNonTransferrable;
 
+  /// A list of state that tracks specific 'inout sending' parameters that were
+  /// actor isolated on function exit with the necessary state to emit the
+  /// error.
+  SmallVectorImpl<InOutSendingNotDisconnectedInfo>
+      &inoutSendingNotDisconnectedInfoList;
+
   DiagnosticEvaluator(Partition &workingPartition,
                       RegionAnalysisFunctionInfo *info,
-                      SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+                      SmallFrozenMultiMap<Operand *, RequireInst, 8>
                           &transferOpToRequireInstMultiMap,
                       SmallVectorImpl<TransferredNonTransferrableInfo>
                           &transferredNonTransferrable,
+                      SmallVectorImpl<InOutSendingNotDisconnectedInfo>
+                          &inoutSendingNotDisconnectedInfoList,
                       TransferringOperandToStateMap &operandToStateMap)
       : PartitionOpEvaluatorBaseImpl(
             workingPartition, info->getOperandSetFactory(), operandToStateMap),
         info(info),
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
-        transferredNonTransferrable(transferredNonTransferrable) {}
+        transferredNonTransferrable(transferredNonTransferrable),
+        inoutSendingNotDisconnectedInfoList(
+            inoutSendingNotDisconnectedInfoList) {}
 
   void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
                                    Element transferredVal,
@@ -1580,8 +1774,9 @@ struct DiagnosticEvaluator final
                << "        ID:  %%" << transferredVal << "\n"
                << "        Rep: " << *rep << "        Transferring Op Num: "
                << transferringOp->getOperandNumber() << '\n');
-    transferOpToRequireInstMultiMap.insert(transferringOp,
-                                           partitionOp.getSourceInst());
+    transferOpToRequireInstMultiMap.insert(
+        transferringOp,
+        RequireInst::forUseAfterTransfer(partitionOp.getSourceInst()));
   }
 
   void handleTransferNonTransferrable(
@@ -1601,6 +1796,27 @@ struct DiagnosticEvaluator final
 
     self->transferredNonTransferrable.emplace_back(
         partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
+  }
+
+  void handleInOutSendingNotDisconnectedAtExitError(
+      const PartitionOp &partitionOp, Element inoutSendingVal,
+      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
+    LLVM_DEBUG(llvm::dbgs()
+                   << "    Emitting InOut Sending ActorIsolated at end of "
+                      "Function Error!\n"
+                   << "        ID:  %%" << inoutSendingVal << "\n"
+                   << "        Rep: "
+                   << *info->getValueMap().getRepresentative(inoutSendingVal)
+                   << "        Dynamic Isolation Region: ";
+               isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+               llvm::dbgs() << '\n');
+    auto *self = const_cast<DiagnosticEvaluator *>(this);
+    auto nonTransferrableValue =
+        info->getValueMap().getRepresentative(inoutSendingVal);
+
+    self->inoutSendingNotDisconnectedInfoList.emplace_back(
+        partitionOp.getSourceInst(), nonTransferrableValue,
+        isolationRegionInfo);
   }
 
   void handleTransferNonTransferrable(
@@ -1644,6 +1860,24 @@ struct DiagnosticEvaluator final
           info->getValueMap().getRepresentative(transferredVal),
           isolationRegionInfo);
     }
+  }
+
+  void
+  handleInOutSendingNotInitializedAtExitError(const PartitionOp &partitionOp,
+                                              Element inoutSendingVal,
+                                              Operand *transferringOp) const {
+    auto rep = info->getValueMap().getRepresentative(inoutSendingVal);
+    LLVM_DEBUG(llvm::dbgs()
+               << "    Emitting InOut Not Reinitialized At End Of Function!\n"
+               << "        Transferring Inst: " << *transferringOp->getUser()
+               << "        Transferring Op Value: " << transferringOp->get()
+               << "        Require Inst: " << *partitionOp.getSourceInst()
+               << "        ID:  %%" << inoutSendingVal << "\n"
+               << "        Rep: " << *rep << "        Transferring Op Num: "
+               << transferringOp->getOperandNumber() << '\n');
+    transferOpToRequireInstMultiMap.insert(
+        transferringOp, RequireInst::forInOutReinitializationNeeded(
+                            partitionOp.getSourceInst()));
   }
 
   void handleUnknownCodePattern(const PartitionOp &op) const {
@@ -1713,6 +1947,7 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
     DiagnosticEvaluator eval(workingPartition, regionInfo,
                              transferOpToRequireInstMultiMap,
                              transferredNonTransferrableInfoList,
+                             inoutSendingNotDisconnectedInfoList,
                              regionInfo->getTransferringOpToStateMap());
 
     // And then evaluate all of our partition ops on the entry partition.
@@ -1745,6 +1980,7 @@ void TransferNonSendableImpl::emitDiagnostics() {
   runDiagnosticEvaluator();
   emitTransferredNonTransferrableDiagnostics();
   emitUseAfterTransferDiagnostics();
+  emitInOutSendingNotDisconnectedInfoList();
 }
 
 namespace {

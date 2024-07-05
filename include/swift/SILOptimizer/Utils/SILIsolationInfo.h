@@ -81,6 +81,12 @@ public:
     return value.getPointer();
   }
 
+  SILValue maybeGetValue() const {
+    if (getKind() != Kind::Value)
+      return SILValue();
+    return getValue();
+  }
+
   bool isValue() const { return getKind() == Kind::Value; }
 
   bool isAccessorInit() const { return getKind() == Kind::ActorAccessorInit; }
@@ -389,7 +395,7 @@ class SILDynamicMergedIsolationInfo {
 
 public:
   SILDynamicMergedIsolationInfo() : innerInfo() {}
-  SILDynamicMergedIsolationInfo(SILIsolationInfo innerInfo)
+  explicit SILDynamicMergedIsolationInfo(SILIsolationInfo innerInfo)
       : innerInfo(innerInfo) {}
 
   /// Returns nullptr only if both this isolation info and \p other are actor
@@ -404,12 +410,20 @@ public:
 
   operator bool() const { return bool(innerInfo); }
 
+  SILIsolationInfo *operator->() { return &innerInfo; }
+
   SILIsolationInfo getIsolationInfo() const { return innerInfo; }
 
   bool isDisconnected() const { return innerInfo.isDisconnected(); }
 
   bool hasSameIsolation(SILIsolationInfo other) const {
     return innerInfo.hasSameIsolation(other);
+  }
+
+  static SILDynamicMergedIsolationInfo
+  getDisconnected(bool isUnsafeNonIsolated) {
+    return SILDynamicMergedIsolationInfo(
+        SILIsolationInfo::getDisconnected(isUnsafeNonIsolated));
   }
 
   SWIFT_DEBUG_DUMP { innerInfo.dump(); }
