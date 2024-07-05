@@ -270,4 +270,76 @@ StdSpanTestSuite.test("Initialize Array from SpanOfString") {
   expectEqual(arr, newArr)
 }
 
+StdSpanTestSuite.test("Span inside C++ struct") {
+  let spb = getStructSpanBox()
+  expectEqual(spb.ispan.size(), 3)
+  expectFalse(spb.ispan.empty())
+  expectEqual(spb.sspan.size(), 3)
+  expectFalse(spb.sspan.empty())
+
+  var icount: Int32 = 1
+  for e in spb.ispan {
+    expectEqual(e, icount)
+    icount += 1
+  }
+
+  var scount = 0
+    for e in spb.sspan {
+      scount += e.length();
+    }
+
+  let imapResult = spb.ispan.map { $0 + 5 }
+  expectEqual(imapResult, [6, 7, 8])
+
+  let smapResult = spb.sspan.map { $0.length() }
+  expectEqual(smapResult, [0, 2, 3])
+
+  let ifilterResult = spb.ispan.filter { $0 > 2 }
+  expectEqual(ifilterResult.count, 1)
+  expectEqual(ifilterResult, [3])
+
+  let sfilterResult = spb.sspan.filter { $0.length() > 1}
+  expectEqual(sfilterResult.count, 2)
+  expectEqual(sfilterResult, ["ab", "abc"])
+}
+
+StdSpanTestSuite.test("Span inside Swift struct") {
+  struct SpanBox {
+    var ispan: Span
+    var sspan: SpanOfString
+  }
+
+  let spb = SpanBox(ispan: ispan, sspan: sspan)
+  expectEqual(spb.ispan.size(), 3)
+  expectFalse(spb.ispan.empty())
+  expectEqual(spb.sspan.size(), 3)
+  expectFalse(spb.sspan.empty())
+
+  var icount: Int32 = 1
+  for e in spb.ispan {
+    expectEqual(e, icount)
+    icount += 1
+  }
+
+  var scount = 0
+    for e in spb.sspan {
+      scount += e.length();
+    }
+
+  let imapResult = spb.ispan.map { $0 + 5 }
+  expectEqual(imapResult, [6, 7, 8])
+
+  let smapResult = spb.sspan.map { $0.length() }
+  expectEqual(smapResult, [0, 2, 3])
+
+  let ifilterResult = spb.ispan.filter { $0 > 2 }
+  expectEqual(ifilterResult.count, 1)
+  expectEqual(ifilterResult, [3])
+
+  let sfilterResult = spb.sspan.filter { $0.length() > 1}
+  expectEqual(sfilterResult.count, 2)
+  expectEqual(sfilterResult, ["ab", "abc"])
+}
+
+
 runAllTests()
