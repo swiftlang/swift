@@ -138,8 +138,7 @@ struct InferredFromContext {
     get { [] }
   }
 
-  nonisolated var status: Bool = true // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}{{3-15=}}{{3-15=}}{{14-14=(unsafe)}}
-  // expected-note@-1{{convert 'status' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
+  nonisolated var status: Bool = true // okay
 
   nonisolated let flag: Bool = false
 
@@ -1241,6 +1240,12 @@ func test_conforming_actor_to_global_actor_protocol() {
   @available(SwiftStdlib 5.1, *)
   actor MyValue : GloballyIsolatedProto {}
   // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
+}
+
+func test_nonisolated_variable() {
+  struct S: GloballyIsolatedProto {
+    nonisolated var x: Int = 0 // okay
+  }
 }
 
 func test_invalid_reference_to_actor_member_without_a_call_note() {

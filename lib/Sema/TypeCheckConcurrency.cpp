@@ -516,11 +516,10 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
     // A mutable storage of a value type accessed from within the module is
     // okay.
     if (dyn_cast_or_null<StructDecl>(var->getDeclContext()->getAsDecl()) &&
-        !var->isStatic() &&
-        var->hasStorage() &&
-        var->getTypeInContext()->isSendableType() &&
-        accessWithinModule) {
-      return true;
+        !var->isStatic() && var->hasStorage() &&
+        var->getTypeInContext()->isSendableType()) {
+      if (accessWithinModule || varIsolation.isNonisolated())
+        return true;
     }
     // Otherwise, must be immutable.
     return false;
