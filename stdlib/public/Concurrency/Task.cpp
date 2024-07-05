@@ -1777,6 +1777,11 @@ SWIFT_CC(swift)
 static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   AsyncTask * originalTask = _swift_task_clearCurrent();
   SerialExecutorRef mainExecutor = swift_task_getMainExecutor();
+
+  // NOTE: The swift_task_isCurrentExecutor call will crash if on unexpected
+  // executor, rather than returning false, in Swift 6. This is because
+  // calling into checkIsolated which cannot return true/false, and
+  // e.g. Dispatch implementations of it using `dispatchPrecondition`.
   if (!swift_task_isCurrentExecutor(mainExecutor))
     swift_Concurrency_fatalError(0, "Not on the main executor");
   swift_retain(task);

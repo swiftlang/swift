@@ -54,6 +54,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "swift/ABI/ExecutorOptions.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"
@@ -196,6 +197,48 @@ uint64_t swift::swift_task_getJobTaskId(Job *job) {
     return task->getTaskId();
   } else {
     return job->getJobId();
+  }
+}
+
+
+SWIFT_CC(swift)
+ExecutorCheckOptionRecord*
+swift::swift_task_makeExecutorCheckOption_sourceLocation(
+        const char * _Nonnull functionName, const char * _Nonnull file,
+        uintptr_t line, uintptr_t column, ExecutorCheckOptionRecord *parent) {
+  parent = nullptr; // FIXME:
+
+  ExecutorCheckOptionRecordFlags flags;
+  auto requiredSize = sizeof(class SourceLocationExecutorCheckOptionRecord);
+  auto task = swift_task_getCurrent();
+  flags.setIsTaskLocalAllocated(task != nullptr);
+  void *allocation = task ? _swift_task_alloc_specific(task, requiredSize)
+                          : malloc(requiredSize);
+
+  auto option = new(allocation) SourceLocationExecutorCheckOptionRecord(
+      flags, functionName, file, line, column, /*parent=*/parent);
+  return option;
+}
+
+SWIFT_CC(swift)
+void swift::swift_task_destroyExecutorCheckOptions(
+    ExecutorCheckOptionRecord *options) {
+  auto option = options;
+  while (option) {
+    auto parent = option->getParent();
+    option->destroy();
+    option = parent;
+  }
+}
+
+void ExecutorCheckOptionRecord::destroy() {
+  if (isTaskLocalAllocated()) {
+    auto task = swift_task_getCurrent();
+    assert(task && "expected task to deallocate executor check record!");
+    _swift_task_dealloc_specific(task, this);
+    return;
+  } else {
+    free(this);
   }
 }
 

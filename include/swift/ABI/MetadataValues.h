@@ -2590,6 +2590,57 @@ public:
                                 setIsDiscardingTask)
 };
 
+/// Flags for checking "current" executor creation.
+class ExecutorCheckFlags : public FlagSet<size_t> {
+public:
+  enum {
+    ExecutorCheck_dontCrash = 0,
+  };
+
+  explicit constexpr ExecutorCheckFlags(size_t bits) : FlagSet(bits) {}
+  constexpr ExecutorCheckFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(ExecutorCheck_dontCrash,
+                                getDontCrash,
+                                setDontCrash)
+};
+
+
+enum class ExecutorCheckOptionRecordKind : uint8_t {
+  /// Source location where the check was initiated from, may be used in further
+  /// improving crash/warning message, when available.
+  SourceLocation = 1,
+};
+
+/// Flags for executor check option records.
+class ExecutorCheckOptionRecordFlags : public FlagSet<size_t> {
+public:
+  enum {
+    Kind           = 0,
+    Kind_width     = 8,
+    // Set when the record was able to be task local allocated
+    // (as opposed to malloc-allocated).
+    //
+    // While we could bet on the record being destroyed in the same context as
+    // it was created, synchronously, betting on the same task being there when
+    // we destroy... this flag helps diagnose in case something would be
+    // misused with records, and codifies this assumption.
+    ExecutorCheckOptionRecord_TaskLocalAllocated     = 8,
+  };
+
+  explicit ExecutorCheckOptionRecordFlags(size_t bits) : FlagSet(bits) {}
+  constexpr ExecutorCheckOptionRecordFlags() {}
+  ExecutorCheckOptionRecordFlags(ExecutorCheckOptionRecordKind kind) {
+    setKind(kind);
+  }
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, ExecutorCheckOptionRecordKind,
+                                 getKind, setKind)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(ExecutorCheckOptionRecord_TaskLocalAllocated,
+                                isTaskLocalAllocated,
+                                setIsTaskLocalAllocated)
+};
+
 /// Flags for schedulable jobs.
 class JobFlags : public FlagSet<uint32_t> {
 public:
