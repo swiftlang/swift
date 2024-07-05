@@ -485,6 +485,10 @@ public:
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
     innerInfo.dumpForDiagnostics();
   }
+
+  void printForOneLineLogging(llvm::raw_ostream &os) const {
+    innerInfo.printForOneLineLogging(os);
+  }
 };
 
 } // namespace swift

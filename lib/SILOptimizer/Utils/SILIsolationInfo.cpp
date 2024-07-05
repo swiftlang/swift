@@ -364,49 +364,47 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
 
     if (auto *isolatedOp = fas.getIsolatedArgumentOperandOrNullPtr()) {
-      // First see if we have an enum inst.
-      if (auto *ei = dyn_cast<EnumInst>(isolatedOp->get())) {
-        if (ei->getElement()->getParentEnum()->isOptionalDecl()) {
-          // Pattern match from global actors being passed as isolated
-          // parameters. This gives us better type information. If we can
-          // pattern match... we should!
-          if (ei->hasOperand()) {
-            if (auto *ieri =
-                    dyn_cast<InitExistentialRefInst>(ei->getOperand())) {
-              CanType selfASTType = ieri->getFormalConcreteType();
+      // First look through ActorInstance agnostic values so we can find the
+      // type of the actual underlying actor (e.x.: copy_value,
+      // init_existential_ref, begin_borrow, etc).
+      auto actualIsolatedValue =
+          ActorInstance::lookThroughInsts(isolatedOp->get());
 
-              if (auto *nomDecl = selfASTType->getAnyActor()) {
-                // The SILValue() parameter doesn't matter until we have
-                // isolation history.
-                if (nomDecl->isGlobalActor())
-                  return SILIsolationInfo::getGlobalActorIsolated(SILValue(),
-                                                                  nomDecl);
-              }
-            }
-          } else {
-            // In this case, we have a .none so we are attempting to use the
-            // global queue. In such a case, we need to not use the enum as our
-            // value and instead need to grab the isolation of our apply.
-            if (auto isolationInfo = get(fas.getCallee())) {
-              return isolationInfo;
-            }
-          }
+      // First see if we have a .none enum inst. In such a case, we are actually
+      // on the nonisolated global queue.
+      if (auto *ei = dyn_cast<EnumInst>(actualIsolatedValue)) {
+        if (ei->getElement()->getParentEnum()->isOptionalDecl() &&
+            !ei->hasOperand()) {
+          // In this case, we have a .none so we are attempting to use the
+          // global queue. This means that the isolation effect of the
+          // function is disconnected since we are treating the function as
+          // nonisolated.
+          return SILIsolationInfo::getDisconnected(false);
         }
       }
 
-      // If we did not find an AST type, just see if we can find a value by
-      // looking through all optional types. This is conservatively correct.
-      CanType selfASTType = isolatedOp->get()->getType().getASTType();
+      // Then using that value, grab the AST type from the actual isolated
+      // value.
+      CanType selfASTType = actualIsolatedValue->getType().getASTType();
+
+      // Then look through optional types since in cases like where we have a
+      // function argument that is an Optional actor... like an optional actor
+      // returned from a function, we still need to be able to lookup the actor
+      // as being the underlying type.
       selfASTType =
           selfASTType->lookThroughAllOptionalTypes()->getCanonicalType();
-
       if (auto *nomDecl = selfASTType->getAnyActor()) {
+        // Then see if we have a global actor. This pattern matches the output
+        // for doing things like GlobalActor.shared.
+        if (nomDecl->isGlobalActor()) {
+          return SILIsolationInfo::getGlobalActorIsolated(SILValue(), nomDecl);
+        }
+
         // TODO: We really should be doing this based off of an Operand. Then
         // we would get the SILValue() for the first element. Today this can
         // only mess up isolation history.
-
         return SILIsolationInfo::getActorInstanceIsolated(
-            SILValue(), isolatedOp->get(), nomDecl);
+            SILValue(), actualIsolatedValue, nomDecl);
       }
     }
 
@@ -1147,9 +1145,31 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
         isa<MoveValueInst>(svi) || isa<ExplicitCopyValueInst>(svi) ||
         isa<BeginBorrowInst>(svi) ||
         isa<CopyableToMoveOnlyWrapperValueInst>(svi) ||
-        isa<MoveOnlyWrapperToCopyableValueInst>(svi)) {
+        isa<MoveOnlyWrapperToCopyableValueInst>(svi) ||
+        isa<InitExistentialRefInst>(svi) || isa<UncheckedRefCastInst>(svi) ||
+        isa<UnconditionalCheckedCastInst>(svi)) {
       value = lookThroughInsts(svi->getOperand(0));
       continue;
+    }
+
+    // Look Through extracting from optionals.
+    if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(svi)) {
+      if (uedi->getEnumDecl() ==
+          uedi->getFunction()->getASTContext().getOptionalDecl()) {
+        value = lookThroughInsts(uedi->getOperand());
+        continue;
+      }
+    }
+
+    // Look Through wrapping in an enum.
+    if (auto *ei = dyn_cast<EnumInst>(svi)) {
+      if (ei->hasOperand()) {
+        if (ei->getElement()->getParentEnum() ==
+            ei->getFunction()->getASTContext().getOptionalDecl()) {
+          value = lookThroughInsts(ei->getOperand());
+          continue;
+        }
+      }
     }
 
     break;
@@ -1213,7 +1233,7 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
 namespace swift::test {
 
 // Arguments:
-// - SILValue: value to emit a name for.
+// - SILValue: value to look up isolation for.
 // Dumps:
 // - The inferred isolation.
 static FunctionTest
@@ -1228,5 +1248,34 @@ static FunctionTest
                               info.printForOneLineLogging(llvm::outs());
                               llvm::outs() << "\n";
                             });
+
+// Arguments:
+// - SILValue: first value to merge
+// - SILValue: second value to merge
+// Dumps:
+// - The merged isolation.
+static FunctionTest IsolationMergeTest(
+    "sil-isolation-info-merged-inference",
+    [](auto &function, auto &arguments, auto &test) {
+      auto firstValue = arguments.takeValue();
+      auto secondValue = arguments.takeValue();
+      SILIsolationInfo firstValueInfo = SILIsolationInfo::get(firstValue);
+      SILIsolationInfo secondValueInfo = SILIsolationInfo::get(secondValue);
+      std::optional<SILDynamicMergedIsolationInfo> mergedInfo(firstValueInfo);
+      mergedInfo = mergedInfo->merge(secondValueInfo);
+      llvm::outs() << "First Value: " << *firstValue;
+      llvm::outs() << "First Isolation: ";
+      firstValueInfo.printForOneLineLogging(llvm::outs());
+      llvm::outs() << "\nSecond Value: " << *secondValue;
+      llvm::outs() << "Second Isolation: ";
+      secondValueInfo.printForOneLineLogging(llvm::outs());
+      llvm::outs() << "\nMerged Isolation: ";
+      if (mergedInfo) {
+        mergedInfo->printForOneLineLogging(llvm::outs());
+      } else {
+        llvm::outs() << "Merge failure!";
+      }
+      llvm::outs() << "\n";
+    });
 
 } // namespace swift::test
