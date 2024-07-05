@@ -691,9 +691,7 @@ public:
   void addConditionalRequirements() {
     SILWitnessTable::enumerateWitnessTableConditionalConformances(
         Conformance, [&](unsigned, CanType type, ProtocolDecl *protocol) {
-          auto conformance =
-              Conformance->getGenericSignature()->lookupConformance(type,
-                                                                    protocol);
+          auto conformance = ModuleDecl::lookupConformance(type, protocol);
           assert(conformance &&
                  "unable to find conformance that should be known");
 

@@ -3099,7 +3099,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
           llvm_unreachable("wrong generic signature for expected case value");
         }
       },
-      LookUpConformanceInSignature(genericSig.getPointer()));
+      LookUpConformanceInModule());
 
   SGF.emitApplyOfLibraryIntrinsic(
       loc, diagnoseFailure, subs,
@@ -3127,7 +3127,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   auto genericArgsMap = SubstitutionMap::get(
       diagnoseSignature,
       [&](SubstitutableType *type) -> Type { return ueci.subjectTy; },
-      LookUpConformanceInSignature(diagnoseSignature.getPointer()));
+      LookUpConformanceInModule());
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
                                   ueci.metatype, SGFContext());

@@ -261,14 +261,6 @@ operator()(CanType dependentType, Type conformingReplacementType,
   return ProtocolConformanceRef(conformedProtocol);
 }
 
-ProtocolConformanceRef LookUpConformanceInSignature::
-operator()(CanType dependentType, Type conformingReplacementType,
-           ProtocolDecl *conformedProtocol) const {
-  return ModuleDecl::lookupConformance(
-      conformingReplacementType->getCanonicalType(),
-      conformedProtocol);
-}
-
 Type DependentMemberType::substBaseType(Type substBase) {
   return substBaseType(substBase, LookUpConformanceInModule(),
                        std::nullopt);

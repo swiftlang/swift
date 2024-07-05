@@ -3979,7 +3979,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(genericSig.getPointer()));
+          LookUpConformanceInModule());
       }
 
       // Set up a substitution of Self => IndexType.

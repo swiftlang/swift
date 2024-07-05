@@ -2692,7 +2692,7 @@ namespace {
           auto sig = genericEnv->getGenericSignature();
           underlyingConformance = underlyingConformance.subst(
               underlyingType, QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(sig.getPointer()));
+              LookUpConformanceInModule());
 
           underlyingType = genericEnv->mapTypeIntoContext(underlyingType)
                                ->getCanonicalType();

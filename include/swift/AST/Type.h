@@ -114,17 +114,6 @@ public:
                                     Type conformingReplacementType,
                                     ProtocolDecl *conformedProtocol) const;
 };
-
-/// Functor class suitable for use as a \c LookupConformanceFn that fetches
-/// conformances from a generic signature.
-class LookUpConformanceInSignature {
-public:
-  LookUpConformanceInSignature(const GenericSignatureImpl *Sig) {}
-
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
-};
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
