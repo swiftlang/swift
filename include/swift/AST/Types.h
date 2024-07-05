@@ -7009,6 +7009,10 @@ public:
   /// Note: This should only be called by the GenericTypeParamDecl constructor.
   static GenericTypeParamType *get(GenericTypeParamDecl *param);
 
+  /// If this is an opaque parameter, return the declaration of the
+  /// parameter, otherwise null.
+  GenericTypeParamDecl *getOpaqueDecl() const;
+
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
   GenericTypeParamDecl *getDecl() const {

@@ -1657,10 +1657,8 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
   } else {
     // Record the generic parameters.
     for (auto *paramTy : sig.getGenericParams()) {
-      auto *decl = paramTy->getDecl();
-
       // For a full environment, add the name and canonicalize the param type.
-      Identifier paramName = decl ? decl->getName() : Identifier();
+      Identifier paramName = paramTy->isCanonical() ? Identifier() : paramTy->getName();
       rawParamIDs.push_back(addDeclBaseNameRef(paramName));
 
       paramTy = paramTy->getCanonicalType()->castTo<GenericTypeParamType>();

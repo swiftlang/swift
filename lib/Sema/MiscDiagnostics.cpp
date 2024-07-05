@@ -2578,14 +2578,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 bool TypeChecker::getDefaultGenericArgumentsString(
     SmallVectorImpl<char> &buf,
     const swift::GenericTypeDecl *typeDecl,
-    llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType) {
+    llvm::function_ref<Type(const GenericTypeParamType *)> getPreferredType) {
   llvm::raw_svector_ostream genericParamText{buf};
   genericParamText << "<";
 
   auto printGenericParamSummary =
       [&](GenericTypeParamType *genericParamTy) {
-    const GenericTypeParamDecl *genericParam = genericParamTy->getDecl();
-    if (Type result = getPreferredType(genericParam)) {
+    if (Type result = getPreferredType(genericParamTy)) {
       result.print(genericParamText);
       return;
     }
@@ -2608,7 +2607,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       return;
     }
 
-    genericParamText << "<#" << genericParam->getName() << ": ";
+    genericParamText << "<#" << genericParamTy->getName() << ": ";
     genericParamText << upperBound << "#>";
   };
 
@@ -6426,8 +6425,8 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 
   // Generic type parameters.
   if (auto genericParamTy = type->getAs<GenericTypeParamType>()) {
-    if (auto genericParam = genericParamTy->getDecl())
-      return genericParam->getName().str();
+    if (!genericParamTy->isCanonical())
+      return genericParamTy->getName().str();
 
     return "";
   }

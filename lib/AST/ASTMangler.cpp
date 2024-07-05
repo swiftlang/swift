@@ -1590,7 +1590,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto paramTy = cast<GenericTypeParamType>(tybase);
       // If this assertion fires, it probably means the type being mangled here
       // didn't go through getTypeForDWARFMangling().
-      assert(paramTy->getDecl() == nullptr &&
+      assert(paramTy->isCanonical() &&
              "cannot mangle non-canonical generic parameter");
       // A special mangling for the very first generic parameter. This shows up
       // frequently because it corresponds to 'Self' in protocol requirement

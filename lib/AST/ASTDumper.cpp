@@ -4280,8 +4280,8 @@ namespace {
       printCommon("generic_type_param_type", label);
       printField(T->getDepth(), "depth");
       printField(T->getIndex(), "index");
-      if (auto decl = T->getDecl())
-        printFieldQuoted(decl->printRef(), "decl");
+      if (!T->isCanonical())
+        printFieldQuoted(T->getName(), "name");
       printFlag(T->isParameterPack(), "pack");
 
       if (T->isValue())

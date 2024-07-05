@@ -4292,11 +4292,8 @@ void TypeChecker::checkParameterList(ParameterList *params,
               if (!genericParam)
                 return false;
 
-              auto genericParamDecl = genericParam->getDecl();
+              auto genericParamDecl = genericParam->getOpaqueDecl();
               if (!genericParamDecl)
-                return false;
-
-              if (!genericParamDecl->isOpaqueType())
                 return false;
 
               param->diagnose(

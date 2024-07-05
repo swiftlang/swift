@@ -550,9 +550,8 @@ void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
 
     // Handle 'some X' where the '& InvertibleProtocol' is implicit
     if (auto substTy = req.getFirstType()->getAs<GenericTypeParamType>())
-      if (auto gtpd = substTy->getDecl())
-        if (gtpd->isOpaqueType())
-          diag = diag::noncopyable_generics_implicit_composition;
+      if (substTy->getOpaqueDecl() != nullptr)
+        diag = diag::noncopyable_generics_implicit_composition;
 
     emitDiagnosticAt(anchor, diag, req.getFirstType(), req.getSecondType());
     return;
@@ -6668,7 +6667,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
                : nullptr;
   };
 
-  llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
+  llvm::SmallDenseMap<GenericTypeParamType *, Type> params;
   for (auto &entry : solution.typeBindings) {
     auto *typeVar = entry.first;
 
@@ -6687,11 +6686,11 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
                      }))
       continue;
 
-    params[GP->getDecl()] = type;
+    params[cast<GenericTypeParamType>(GP->getCanonicalType())] = type;
   }
 
-  auto getPreferredType = [&](const GenericTypeParamDecl *GP) -> Type {
-    auto type = params.find(GP);
+  auto getPreferredType = [&](const GenericTypeParamType *GP) -> Type {
+    auto type = params.find(cast<GenericTypeParamType>(GP->getCanonicalType()));
     return (type == params.end()) ? Type() : type->second;
   };
 
