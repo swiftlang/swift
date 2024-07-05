@@ -231,3 +231,16 @@ func withUnsafeContinuation_4a() async {
   }
   await useValueAsync(x)
 }
+
+public actor WithCheckedThrowingContinuationErrorAvoidance {
+  nonisolated func handle(reply: (Int) -> Void) {}
+
+  // make sure that we do not emit any errors on the following code.
+  func noError() async throws -> Int {
+    return try await withCheckedThrowingContinuation { continuation in 
+      handle { result in
+        continuation.resume(returning: result)
+      }
+    }
+  }
+}
