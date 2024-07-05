@@ -34,12 +34,12 @@ final class NaiveQueueExecutor: SerialExecutor {
 }
 
 actor SomeDefaultActor {
-  nonisolated func checkNonisolatedFunc() async {
-    _warnUnexpectedIsolation(expected: self, message: "Whoops, nonisolated but expected self")
+  nonisolated func checkNonisolatedFunc(line: Int) async {
+    _warnUnexpectedIsolation(expected: self, message: "Whoops, nonisolated but expected self", line: line)
   }
 
-  func checkIsolatedFunc() async {
-    _warnUnexpectedIsolation(expected: self, message: "Whoops!")
+  func checkIsolatedFunc(line: Int) async {
+    _warnUnexpectedIsolation(expected: self, message: "Whoops!", line: line)
   }
 }
 
@@ -54,37 +54,61 @@ actor ActorOnNaiveQueueExecutor {
     self.executor.asUnownedSerialExecutor()
   }
 
-  nonisolated func checkNonisolatedFunc() async {
-    _warnUnexpectedIsolation(expected: self, message: "Whoops, nonisolated but expected self")
+  nonisolated func checkNonisolatedFunc(line: Int) async {
+    _warnUnexpectedIsolation(expected: self, message: "Whoops, nonisolated but expected self", line: line)
   }
 
-  func checkIsolatedFunc() async {
+  func checkIsolatedFunc(line: Int) async {
     _warnUnexpectedIsolation(expected: self, message: "Whoops!")
   }
 }
 
 
 @MainActor
-func checkNonisolatedMainActorFunc(expected: any Actor) async {
+func checkNonisolatedMainActorFunc(expected: any Actor, line: Int) async {
   _warnUnexpectedIsolation(expected: expected, message: "Whoops, MainActor but expected actor")
 }
 
 @main struct Main {
   static func main() async {
     let defaultActor = SomeDefaultActor()
-    await defaultActor.checkNonisolatedFunc()
-    await checkNonisolatedMainActorFunc(expected: defaultActor)
+
+    await defaultActor.checkNonisolatedFunc(line: #line)
+    // CHECK: Unexpected actor isolation, expected [[DEFAULT_ACTOR:0x.*]]
+    // CHECK-SAME: (default actor a.SomeDefaultActor) but was nonisolated 0x0 (GenericExecutor)
+    // CHECK-SAME: in checkNonisolatedFunc(line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-1]]!
+    // CHECK-SAME: Whoops, nonisolated but expected self
+
+    await checkNonisolatedMainActorFunc(expected: defaultActor, line: #line)
+    // CHECK: Unexpected actor isolation, expected [[DEFAULT_ACTOR]] (default actor a.SomeDefaultActor)
+    // CHECK-SAME: but was isolated to [[MAIN_ACTOR:0x.*]] (MainActorExecutor),
+    // CHECK-SAME: in checkNonisolatedMainActorFunc(expected:line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-1]]!
+    // CHECK-SAME: Whoops, MainActor but expected actor
+
+    await defaultActor.checkIsolatedFunc(line: #line)
+    // OK
 
     let queueActor = ActorOnNaiveQueueExecutor()
-    await queueActor.checkNonisolatedFunc()
-    // CHECK: unexpected
+    await queueActor.checkNonisolatedFunc(line: #line)
+    // CHECK: Unexpected actor isolation, expected [[QUEUE_ACTOR:0x.*]]
+    // CHECK-SAME: but was nonisolated 0x0 (GenericExecutor)
+    // CHECK-SAME: in checkNonisolatedFunc(line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:58!
+    // CHECK-SAME: Whoops, nonisolated but expected self
 
-    await checkNonisolatedMainActorFunc(expected: queueActor)
-    // CHECK: NOPE
+    await checkNonisolatedMainActorFunc(expected: queueActor, line: #line)
+    // CHECK: Unexpected actor isolation, expected [[QUEUE_ACTOR]]
+    // CHECK-SAME: but was isolated to [[MAIN_ACTOR]] (MainActorExecutor),
+    // CHECK-SAME: in checkNonisolatedMainActorFunc(expected:line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-1]]!
+    // CHECK-SAME: Whoops, MainActor but expected actor
 
-    print("isolated func: ") // CHECK: isolated func:
-    await queueActor.checkIsolatedFunc()
+    await queueActor.checkIsolatedFunc(line: #line)
+    // OK
 
-    print("Done") // CHECK: Done
+    print("Done")
+    // CHECK: Done
   }
 }

@@ -1770,14 +1770,6 @@ static void swift_task_asyncMainDrainQueueImpl() {
 #endif
 }
 
-//SWIFT_CC(swift)
-//static void swift_task_warnUnexpectedIsolationImpl(
-//    SerialExecutorRef expectedExecutor,
-//    const unsigned char *message, int messageLen,
-//    const unsigned char *function, int functionLen,
-//    const unsigned char *file, int fileLen,
-//    int line, size_t flags) { }
-
 SWIFT_CC(swift)
 void (*swift::swift_task_asyncMainDrainQueue_hook)(
     swift_task_asyncMainDrainQueue_original original,

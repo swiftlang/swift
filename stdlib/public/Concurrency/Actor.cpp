@@ -589,12 +589,14 @@ static void logIsolationWarning(
   char *expectedActorName = getActorTypeName(expectedExecutor);
 
 #if defined(__APPLE__)
-  fprintf(stderr, "Unexpected actor isolation, expected %p%s%s but was isolated to %p%s%s, in %.*s at %.*s:%d! %.*s\n",
+  fprintf(stderr, "Unexpected actor isolation, expected %p%s%s but was %sisolated%s %p%s%s, in %.*s at %.*s:%d! %.*s\n",
           // expected isolation
           expectedExecutor.getIdentity(),
           expectedActorName ? expectedActorName : "",
           expectedActorName ? "" : expectedExecutor.getIdentityDebugName(),
           // current isolation
+          currentExecutor.getIdentity() == 0 ? "non" : "",
+          currentExecutor.getIdentity() ? " to" : "",
           currentExecutor.getIdentity(),
           currentActorName ? currentActorName : "",
           currentActorName ? "" : currentExecutor.getIdentityDebugName(),
@@ -604,12 +606,14 @@ static void logIsolationWarning(
           line,
           messageLen, message);
   os_log_fault(IsolationWarningLog,
-               "Unexpected actor isolation, expected %p%s%s but was isolated to %p%s%s, in %.*s at %.*s:%d! %.*s\n",
+               "Unexpected actor isolation, expected %p%s%s but was %sisolated%s %p%s%s, in %.*s at %.*s:%d! %.*s\n",
                // expected isolation
                expectedExecutor.getIdentity(),
                expectedActorName ? expectedActorName : "",
                expectedActorName ? "" : expectedExecutor.getIdentityDebugName(),
                // current isolation
+               currentExecutor.getIdentity() == 0 ? "non" : "",
+               currentExecutor.getIdentity() ? " to" : "",
                currentExecutor.getIdentity(),
                currentActorName ? currentActorName : "",
                currentActorName ? "" : currentExecutor.getIdentityDebugName(),
@@ -625,7 +629,6 @@ static void logIsolationWarning(
 
   free(currentActorName);
   free(expectedActorName);
-
 }
 
 /// SPI(ConcurrencyDiagnostics)

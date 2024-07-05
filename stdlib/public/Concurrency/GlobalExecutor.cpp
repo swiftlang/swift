@@ -150,16 +150,6 @@ void swift::swift_task_checkIsolated(SerialExecutorRef executor) {
     swift_task_checkIsolatedImpl(executor);
 }
 
-//SWIFT_CC(swift)
-//static void swift_task_warnUnexpectedIsolationImpl(
-//    SerialExecutorRef serialExecutor,
-//    const unsigned char *message, int messageLen,
-//    const unsigned char *function, int functionLen,
-//    const unsigned char *file, int fileLen,
-//    int line, size_t flags) {
-//  return swift_task_isCurrentExecutor(executorRef);
-//}
-
 // Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
 //
 // We could inline this with effort, though.
@@ -197,16 +187,6 @@ bool swift::swift_task_isOnExecutor(HeapObject *executor,
 bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
   return ref.isComplexEquality();
 }
-
-//SWIFT_CC(swift)
-//static void swift_task_warnUnexpectedIsolationImpl(SerialExecutorRef serialExecutor,
-//                                                   const unsigned char *message, int messageLen,
-//                                                   const unsigned char *function, int functionLen,
-//                                                   const unsigned char *file, int fileLen,
-//                                                   int line, size_t flags) {
-//  assert(false);
-//}
-
 
 uint64_t swift::swift_task_getJobTaskId(Job *job) {
   if (auto task = dyn_cast<AsyncTask>(job)) {
