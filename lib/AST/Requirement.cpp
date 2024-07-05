@@ -327,12 +327,12 @@ swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
 }
 
 CheckRequirementsResult swift::checkRequirements(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> substReqs;
   for (auto req : requirements) {
     substReqs.push_back(req.subst(substitutions,
-                              LookUpConformanceInModule(), options));
+                                  LookUpConformanceInModule(), options));
   }
 
   return checkRequirements(substReqs);

@@ -2844,7 +2844,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                sanitizedRequirements);
 
   switch (checkRequirements(
-      dc->getParentModule(), sanitizedRequirements,
+      sanitizedRequirements,
       QuerySubstitutionMap{substitutions}, options)) {
   case CheckRequirementsResult::RequirementFailure:
     ++NumSolutionStatesFailedCheck;
@@ -2892,7 +2892,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (checkRequirements(
-      dc->getParentModule(), ext->getGenericSignature().getRequirements(),
+      ext->getGenericSignature().getRequirements(),
       QueryTypeSubstitutionMap{subs}, options)) {
   case CheckRequirementsResult::Success:
   case CheckRequirementsResult::SubstitutionFailure:

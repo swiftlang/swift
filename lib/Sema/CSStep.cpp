@@ -681,7 +681,6 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
     return false;
 
   auto result = checkRequirements(
-      declA->getDeclContext()->getParentModule(),
       genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 

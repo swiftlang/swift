@@ -167,12 +167,10 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (isExtensionWithSelfBound(ED, BaseTypeProtocolDecl)) {
     return true;
   }
-  auto *module = DC->getParentModule();
   GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       ED->getExtendedNominal());
-  return checkRequirements(module,
-                           genericSig.getRequirements(),
+  return checkRequirements(genericSig.getRequirements(),
                            QuerySubstitutionMap{substMap}) ==
          CheckRequirementsResult::Success;
 }
@@ -210,7 +208,6 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // The context substitution map for the base type fixes the declaration's
   // outer generic parameters.
-  auto *module = DC->getParentModule();
   auto substMap = BaseTy->getContextSubstitutionMap(
       VD->getDeclContext(), genericDecl->getGenericEnvironment());
 
@@ -221,8 +218,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // We treat substitution failure as success, to ignore requirements
   // that involve innermost generic parameters.
-  return checkRequirements(module,
-                           genericSig.getRequirements(),
+  return checkRequirements(genericSig.getRequirements(),
                            [&](SubstitutableType *type) -> Type {
                              auto *paramTy = cast<GenericTypeParamType>(type);
                              if (paramTy->getDepth() == innerDepth)
