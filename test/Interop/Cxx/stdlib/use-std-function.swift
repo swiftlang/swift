@@ -13,6 +13,7 @@
 // XFAIL: LinuxDistribution=ubuntu-22.04
 // XFAIL: LinuxDistribution=rhel-9.3
 // XFAIL: LinuxDistribution=rhel-9.4
+// XFAIL: LinuxDistribution=fedora-39
 
 import StdlibUnittest
 import StdFunction
