@@ -503,7 +503,7 @@ SWIFT_REQUEST(TypeChecker, ExpandMacroExpansionExprRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandMemberAttributeMacros,
               ArrayRef<unsigned>(Decl *),
-              Cached, NoLocationInfo)
+              SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandAccessorMacros,
               ArrayRef<unsigned>(AbstractStorageDecl *),
               Cached, NoLocationInfo)

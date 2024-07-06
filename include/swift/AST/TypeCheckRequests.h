@@ -4503,7 +4503,8 @@ public:
 class ExpandMemberAttributeMacros
     : public SimpleRequest<ExpandMemberAttributeMacros,
                            ArrayRef<unsigned>(Decl *),
-                           RequestFlags::Cached> {
+                           RequestFlags::SeparatelyCached |
+                           RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -4514,6 +4515,9 @@ private:
 
 public:
   bool isCached() const { return true; }
+  std::optional<ArrayRef<unsigned>> getCachedResult() const;
+  void cacheResult(ArrayRef<unsigned> result) const;
+
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

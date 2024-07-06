@@ -357,7 +357,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -388,7 +388,11 @@ protected:
     /// True if \c ObjCInterfaceAndImplementationRequest has been computed
     /// and did \em not find anything. This is the fast path where we can bail
     /// out without checking other caches or computing anything.
-    LacksObjCInterfaceOrImplementation : 1
+    LacksObjCInterfaceOrImplementation : 1,
+
+    /// True if we're in the common case where the ExpandMemberAttributeMacros
+    /// request returned an empty array.
+    NoMemberAttributeMacros : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -827,6 +831,7 @@ protected:
   friend class MemberLookupTable;
   friend class DeclDeserializer;
   friend class RawCommentRequest;
+  friend class ExpandMemberAttributeMacros;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -845,6 +850,14 @@ private:
   /// Directly set the invalid bit
   void setInvalidBit();
 
+  bool hasNoMemberAttributeMacros() const {
+    return Bits.Decl.NoMemberAttributeMacros;
+  }
+
+  void setHasNoMemberAttributeMacros() {
+    Bits.Decl.NoMemberAttributeMacros = true;
+  }
+
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -857,6 +870,7 @@ protected:
     Bits.Decl.EscapedFromIfConfig = false;
     Bits.Decl.Hoisted = false;
     Bits.Decl.LacksObjCInterfaceOrImplementation = false;
+    Bits.Decl.NoMemberAttributeMacros = false;
   }
 
   /// Get the Clang node associated with this declaration.

@@ -2081,6 +2081,25 @@ void ExpandExtensionMacros::noteCycleStep(DiagnosticEngine &diags) const {
                  decl->getName());
 }
 
+std::optional<ArrayRef<unsigned>> ExpandMemberAttributeMacros::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->hasNoMemberAttributeMacros())
+    return ArrayRef<unsigned>();
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void ExpandMemberAttributeMacros::cacheResult(ArrayRef<unsigned> result) const {
+  auto decl = std::get<0>(getStorage());
+
+  if (result.empty()) {
+    decl->setHasNoMemberAttributeMacros();
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
 void ExpandMemberAttributeMacros::diagnoseCycle(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   if (auto value = dyn_cast<ValueDecl>(decl)) {
