@@ -131,15 +131,12 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x02,
 
-  /// Don't type check expressions for correct availability.
-  DisableExprAvailabilityChecking = 0x04,
-
   /// Don't expand macros.
-  DisableMacroExpansions = 0x08,
+  DisableMacroExpansions = 0x04,
 
   /// If set, typeCheckExpression will avoid invalidating the AST if
   /// type-checking fails. Do not add new uses of this.
-  AvoidInvalidatingAST = 0x10,
+  AvoidInvalidatingAST = 0x08,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
