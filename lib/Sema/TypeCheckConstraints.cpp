@@ -341,7 +341,6 @@ public:
     // We skip out-of-place expr checking here since we've already performed it.
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ std::nullopt,
                                     /*isExprStmt=*/false,
-                                    /*disableAvailabilityChecking*/ false,
                                     /*disableOutOfPlaceExprChecking*/ true);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -383,15 +382,14 @@ public:
 } // end anonymous namespace
 
 void constraints::performSyntacticDiagnosticsForTarget(
-    const SyntacticElementTarget &target, bool isExprStmt,
-    bool disableExprAvailabilityChecking) {
+    const SyntacticElementTarget &target, bool isExprStmt) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SyntacticElementTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
-    performSyntacticExprDiagnostics(
-        target.getAsExpr(), dc, target.getExprContextualTypePurpose(),
-        isExprStmt, disableExprAvailabilityChecking);
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc,
+                                    target.getExprContextualTypePurpose(),
+                                    isExprStmt);
     return;
   }
 
@@ -400,8 +398,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
 
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
-                                    CTP_ForEachSequence, isExprStmt,
-                                    disableExprAvailabilityChecking);
+                                    CTP_ForEachSequence, isExprStmt);
 
     if (auto *whereExpr = stmt->getWhere())
       performSyntacticExprDiagnostics(whereExpr, dc, CTP_Condition,
@@ -544,9 +541,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticDiagnosticsForTarget(
-        *resultTarget, isExprStmt,
-        options.contains(TypeCheckExprFlags::DisableExprAvailabilityChecking));
+    performSyntacticDiagnosticsForTarget(*resultTarget, isExprStmt);
   }
 
   return *resultTarget;
