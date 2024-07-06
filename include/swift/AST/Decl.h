@@ -357,7 +357,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -392,7 +392,11 @@ protected:
 
     /// True if we're in the common case where the ExpandMemberAttributeMacros
     /// request returned an empty array.
-    NoMemberAttributeMacros : 1
+    NoMemberAttributeMacros : 1,
+
+    /// True if we're in the common case where the GlobalActorAttributeRequest
+    /// request returned a pair of null pointers.
+    NoGlobalActorAttribute : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -832,6 +836,7 @@ protected:
   friend class DeclDeserializer;
   friend class RawCommentRequest;
   friend class ExpandMemberAttributeMacros;
+  friend class GlobalActorAttributeRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -858,6 +863,14 @@ private:
     Bits.Decl.NoMemberAttributeMacros = true;
   }
 
+  bool hasNoGlobalActorAttribute() const {
+    return Bits.Decl.NoGlobalActorAttribute;
+  }
+
+  void setHasNoGlobalActorAttribute() {
+    Bits.Decl.NoGlobalActorAttribute = true;
+  }
+
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -871,6 +884,7 @@ protected:
     Bits.Decl.Hoisted = false;
     Bits.Decl.LacksObjCInterfaceOrImplementation = false;
     Bits.Decl.NoMemberAttributeMacros = false;
+    Bits.Decl.NoGlobalActorAttribute = false;
   }
 
   /// Get the Clang node associated with this declaration.

@@ -1869,6 +1869,52 @@ void swift::simple_display(
 }
 
 //----------------------------------------------------------------------------//
+// GlobalActorAttributeRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<std::optional<CustomAttrNominalPair>>
+GlobalActorAttributeRequest::getCachedResult() const {
+  auto storage = getStorage();
+  auto subject = std::get<0>(storage);
+
+  if (auto decl = subject.dyn_cast<Decl *>()) {
+    if (decl->hasNoGlobalActorAttribute())
+      return std::optional(std::optional<CustomAttrNominalPair>());
+
+    return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+  } else {
+    auto closure = subject.get<ClosureExpr *>();
+    if (closure->hasNoGlobalActorAttribute())
+      return std::optional(std::optional<CustomAttrNominalPair>());
+
+    return closure->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+  }
+}
+
+void
+GlobalActorAttributeRequest::cacheResult(std::optional<CustomAttrNominalPair> value) const {
+  auto storage = getStorage();
+  auto subject = std::get<0>(storage);
+
+  if (auto decl = subject.dyn_cast<Decl *>()) {
+    if (!value) {
+      decl->setHasNoGlobalActorAttribute();
+      return;
+    }
+
+    decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(value));
+  } else {
+    auto closure = subject.get<ClosureExpr *>();
+    if (!value) {
+      closure->setHasNoGlobalActorAttribute();
+      return;
+    }
+
+    closure->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(value));
+  }
+}
+
+//----------------------------------------------------------------------------//
 // ResolveMacroRequest computation.
 //----------------------------------------------------------------------------//
 

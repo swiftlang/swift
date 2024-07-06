@@ -1507,7 +1507,8 @@ class GlobalActorAttributeRequest
     : public SimpleRequest<GlobalActorAttributeRequest,
                            std::optional<CustomAttrNominalPair>(
                                llvm::PointerUnion<Decl *, ClosureExpr *>),
-                           RequestFlags::Cached> {
+                           RequestFlags::SeparatelyCached |
+                           RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1515,13 +1516,15 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  std::optional<CustomAttrNominalPair>
   evaluate(Evaluator &evaluator,
            llvm::PointerUnion<Decl *, ClosureExpr *>) const;
 
 public:
-  // Caching
+  // Separate caching.
   bool isCached() const { return true; }
+  std::optional<std::optional<CustomAttrNominalPair>> getCachedResult() const;
+  void cacheResult(std::optional<CustomAttrNominalPair> value) const;
 };
 
 /// Determine the actor isolation for the given declaration.
