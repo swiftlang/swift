@@ -863,6 +863,35 @@ void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 }
 
 //----------------------------------------------------------------------------//
+// PropertyWrapperAuxiliaryVariablesRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<PropertyWrapperAuxiliaryVariables>
+PropertyWrapperAuxiliaryVariablesRequest::getCachedResult() const {
+  auto storage = getStorage();
+  auto *var = std::get<0>(storage);
+
+  if (var->hasNoPropertyWrapperAuxiliaryVariables())
+    return PropertyWrapperAuxiliaryVariables();
+
+  return var->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+
+void PropertyWrapperAuxiliaryVariablesRequest::cacheResult(
+    PropertyWrapperAuxiliaryVariables value) const {
+  auto storage = getStorage();
+  auto *var = std::get<0>(storage);
+
+  if (!value) {
+    var->setHasNoPropertyWrapperAuxiliaryVariables();
+    return;
+  }
+
+  var->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(value));
+}
+
+//----------------------------------------------------------------------------//
 // StructuralTypeRequest computation.
 //----------------------------------------------------------------------------//
 
