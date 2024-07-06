@@ -52,14 +52,14 @@ func foo() {
 
 // RUN: %sourcekitd-test -req=complete.open -pos=11:5 \
 // RUN:   -req-opts=filtertext=d %s -- %s > %t.d
-// RUN: %FileCheck -check-prefix=CHECKD %s < %t.d
+// RUN: %FileCheck -check-prefix=CHECKED %s < %t.d
 
-// CHECKD-NOT: key.name
-// CHECKD: ],
-// CHECKD-NEXT: key.kind: source.lang.swift.codecomplete.group
-// CHECKD-NEXT: key.name: ""
-// CHECKD-NEXT: key.nextrequeststart: 0
-// CHECKD-NEXT: }
+// CHECKED-NOT: key.name
+// CHECKED: ],
+// CHECKED-NEXT: key.kind: source.lang.swift.codecomplete.group
+// CHECKED-NEXT: key.name: ""
+// CHECKED-NEXT: key.nextrequeststart: 0
+// CHECKED-NEXT: }
 
 
 // RUN: %complete-test -tok=FOO %s | %FileCheck %s
