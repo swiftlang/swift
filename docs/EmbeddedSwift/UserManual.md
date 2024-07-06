@@ -252,11 +252,11 @@ For (2), external dependencies are also triggered by specific code needing them,
   - dependency: `void *__stack_chk_guard;`
   - dependency: `void __stack_chk_fail(void);`
   - stack protectors can be disabled with `-disable-stack-protector` swiftc flag
-- **atomics instrinsics**
+- **atomics intrinsics**
   - on CPU architectures that don't have direct load-acquire/store-release support in the ISA, LLVM calls helper functions for atomic operations
   - needed by refcounting in the Embedded Swift runtime (so any class usage will trigger this dependency)
   - also needed when using atomics from the Synchronization module
-- **multiplication/division/modulo instrinsics**
+- **multiplication/division/modulo intrinsics**
   - on CPU architectures that don't have direct support for the math operations in the ISA
   - dependency (on Mach-O): `__divti3`
   - dependency (on Mach-O): `__modti3`

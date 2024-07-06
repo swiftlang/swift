@@ -1377,7 +1377,7 @@ The generic signature queries from \SecRef{genericsigqueries} are methods on \te
 
 \IndexSource{canonical generic signature}
 \apiref{CanGenericSignature}{class}
-The \texttt{CanGenericSignature} class wraps a \texttt{GenericSignatureImpl *} pointer which is known to be canonical. The pointer can be recovered with the \texttt{getPointer()} method. There is an implicit conversion from \texttt{CanGenenericSiganture} to \texttt{GenericSignature}. The \texttt{operator->} forwards method calls to the underlying \texttt{GenericSignatureImpl}.
+The \texttt{CanGenericSignature} class wraps a \texttt{GenericSignatureImpl *} pointer which is known to be canonical. The pointer can be recovered with the \texttt{getPointer()} method. There is an implicit conversion from \texttt{CanGenericSignature} to \texttt{GenericSignature}. The \texttt{operator->} forwards method calls to the underlying \texttt{GenericSignatureImpl}.
 
 The \texttt{operator==} and \texttt{operator!=} operators are used to test \texttt{CanGenericSignature} for pointer equality. The \texttt{isEqual()} method of \texttt{GenericSignatureImpl} implements canonical equality on arbitrary generic signatures by first canonicalizing both sides, then checking the resulting canonical signatures for pointer equality. Therefore, the following are equivalent:
 \begin{Verbatim}
