@@ -120,8 +120,10 @@ func testWrite1(r: inout Lens<Rectangle>, p: Lens<Point>, a: inout Lens<[Int]>) 
 // CHECK: [[WBR_LINE:[0-9]+]]:17 | instance-property/Swift | y | [[PY_USR]] | Ref,Writ,RelCont | rel: 1
 // CHECK: [[WBR_LINE:[0-9]+]]:17 | instance-method/acc-set/Swift | setter:y | [[PY_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 
-  // FIXME: crashes typechecker rdar://problem/49533404
-  // a[0] = Lens(1)
+  a[0] = Lens(1)
+// => implicit dynamicMember subscript (a)
+// CHECK: [[@LINE-2]]:4 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Writ,Impl,RelCont | rel: 1
+// CHECK: [[@LINE-3]]:4 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 }
 
 func testExplicit(r: Lens<Rectangle>, a: Lens<[Int]>) {
