@@ -163,12 +163,11 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Var, name, type, type,
+      DerivedConformance::SynthesizedIntroducer::Var, name, type,
       /*isStatic=*/false, /*isFinal=*/false);
 
   // Define the getter.
-  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
-      propDecl, type);
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(propDecl);
 
   // Synthesize the body.
   synthesizer(getterDecl);

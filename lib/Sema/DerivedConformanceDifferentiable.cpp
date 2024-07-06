@@ -413,14 +413,16 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // causes the type checker to not guarantee the order of these members.
     auto memberContextualType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto memberTanType =
+    auto memberTanInterfaceType =
         getTangentVectorInterfaceType(memberContextualType, parentDC);
-    tangentProperty->setInterfaceType(memberTanType);
+    tangentProperty->setInterfaceType(memberTanInterfaceType);
+    auto memberTanContextType =
+        parentDC->mapTypeIntoContext(memberTanInterfaceType);
     Pattern *memberPattern =
-        NamedPattern::createImplicit(C, tangentProperty, memberTanType);
+        NamedPattern::createImplicit(C, tangentProperty, memberTanContextType);
     memberPattern =
-        TypedPattern::createImplicit(C, memberPattern, memberTanType);
-    memberPattern->setType(memberTanType);
+        TypedPattern::createImplicit(C, memberPattern, memberTanContextType);
+
     auto *memberBinding = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, memberPattern, /*initExpr*/ nullptr,
         structDecl);

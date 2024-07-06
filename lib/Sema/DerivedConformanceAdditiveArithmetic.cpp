@@ -292,22 +292,19 @@ deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl, void *) {
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   auto &C = derived.Context;
   auto *nominal = derived.Nominal;
-  auto *parentDC = derived.getConformanceContext();
 
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
-  auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
 
   // Create property declaration.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, C.Id_zero,
-      returnInterfaceTy, returnTy, /*isStatic*/ true,
-      /*isFinal*/ true);
+      returnInterfaceTy,
+      /*isStatic*/ true, /*isFinal*/ true);
 
   // Create property getter.
-  auto *getterDecl =
-      derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(propDecl);
   getterDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_zero, nullptr);
 
   derived.addMembersToConformanceContext({propDecl, pbDecl});

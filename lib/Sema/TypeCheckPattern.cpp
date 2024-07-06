@@ -753,6 +753,8 @@ Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
   ASTContext &ctx = dc->getASTContext();
   if (auto type = evaluateOrDefault(ctx.evaluator, PatternTypeRequest{pattern},
                                     Type())) {
+    ASSERT(!type->hasTypeParameter() &&
+           "pattern should have a contextual type");
     return type;
   }
 

@@ -160,22 +160,19 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
-  auto parentDC = derived.getConformanceContext();
   auto rawInterfaceType = enumDecl->getRawType();
-  auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, C.Id_rawValue,
-      rawInterfaceType, rawType, /*isStatic=*/false,
-      /*isFinal=*/false);
+      rawInterfaceType, /*isStatic=*/false, /*isFinal=*/false);
   addNonIsolatedToSynthesized(enumDecl, propDecl);
 
   // Define the getter.
-  auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
-      propDecl, rawType);
+  auto getterDecl =
+      DerivedConformance::addGetterToReadOnlyDerivedProperty(propDecl);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // If the containing module is not resilient, make sure clients can get at
