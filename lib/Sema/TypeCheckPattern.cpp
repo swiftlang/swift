@@ -1388,7 +1388,7 @@ Pattern *TypeChecker::coercePatternToType(
     if (numExtraOptionals > 0) {
       Pattern *sub = IP;
       auto extraOpts =
-          llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
+          llvm::drop_end(inputTypeOptionals, castTypeOptionals.size());
       for (auto extraOptTy : llvm::reverse(extraOpts)) {
         auto some = Context.getOptionalSomeDecl();
         auto *base = TypeExpr::createImplicit(extraOptTy, Context);
