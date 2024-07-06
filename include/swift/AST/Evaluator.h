@@ -283,6 +283,8 @@ public:
     return activeRequests.count(ActiveRequest(request));
   }
 
+  void dump(llvm::raw_ostream &out) { cache.dump(out); }
+
 private:
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
