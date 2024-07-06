@@ -2147,6 +2147,8 @@ public:
   }
 
   void checkMarkDependencInst(MarkDependenceInst *MDI) {
+    require(isa<SILUndef>(MDI->getValue()) || MDI->getValue() != MDI->getBase(),
+            "mark_dependence operands must be distinct");
     if (MDI->isNonEscaping()) {
       require(F.hasOwnership(), "mark_dependence [nonescaping] requires OSSA");
       require(MDI->getOwnershipKind() == OwnershipKind::Owned,
