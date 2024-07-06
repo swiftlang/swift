@@ -953,7 +953,7 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   if (signature)
     substs = createSubstitutionMapFromGenericArgs(
         signature, replacements,
-        LookUpConformanceInSignature(signature.getPointer()));
+        LookUpConformanceInModule());
   return SILBoxType::get(Ctx, layout, substs);
 }
 
@@ -1052,7 +1052,7 @@ SubstitutionMap
 ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
                                   ArrayRef<BuiltType> replacements) {
   return SubstitutionMap::get(sig, replacements,
-                              LookUpConformanceInSignature(sig.getPointer()));
+                              LookUpConformanceInModule());
 }
 
 Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {

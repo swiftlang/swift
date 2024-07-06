@@ -340,18 +340,6 @@ ASTContext &GenericSignatureImpl::getASTContext() const {
   return GenericSignature::getASTContext(getGenericParams(), getRequirements());
 }
 
-ProtocolConformanceRef
-GenericSignatureImpl::lookupConformance(CanType type,
-                                        ProtocolDecl *proto) const {
-  // FIXME: Actually implement this properly.
-  auto *M = proto->getParentModule();
-
-  if (type->isTypeParameter())
-    return ProtocolConformanceRef(proto);
-
-  return M->lookupConformance(type, proto, /*allowMissing=*/true);
-}
-
 bool GenericSignatureImpl::requiresClass(Type type) const {
   assert(type->isTypeParameter() &&
          "Only type parameters can have superclass requirements");
@@ -430,7 +418,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
 
           return type;
         },
-        LookUpConformanceInSignature(this));
+        LookUpConformanceInModule());
   }
 
   SmallVector<Requirement, 2> subReqs;

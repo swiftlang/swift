@@ -7128,7 +7128,7 @@ public:
       }
       llvm_unreachable("ran out of type parameters");
       return Type();
-    }, LookUpConformanceInSignature(sig.getPointer()));
+    }, LookUpConformanceInModule());
   }
 
   void visitElementArchetypeType(ElementArchetypeType *T) {
