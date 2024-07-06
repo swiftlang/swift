@@ -1362,11 +1362,11 @@ BridgedNullableVarDecl BridgedInstruction::AllocBox_getDecl() const {
 }
 
 BridgedNullableVarDecl BridgedInstruction::GlobalAddr_getDecl() const {
-  return {getAs<swift::DebugValueInst>()->getDecl()};
+  return {getAs<swift::GlobalAddrInst>()->getReferencedGlobal()->getDecl()};
 }
 
 BridgedNullableVarDecl BridgedInstruction::RefElementAddr_getDecl() const {
-  return {getAs<swift::DebugValueInst>()->getDecl()};
+  return {getAs<swift::RefElementAddrInst>()->getField()};
 }
 
 OptionalBridgedSILDebugVariable
