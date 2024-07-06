@@ -2,7 +2,7 @@ function(set_if_arch_bitness var_name)
   cmake_parse_arguments(
       SIA # prefix
       "" # options
-      "ARCH;CASE_32_BIT;CASE_64_BIT" # single-value args
+      "ARCH;CASE_16_BIT;CASE_32_BIT;CASE_64_BIT" # single-value args
       "" # multi-value args
       ${ARGN})
 
