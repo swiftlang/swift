@@ -4649,6 +4649,14 @@ GenericFunctionType::GenericFunctionType(
 
 GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param,
                                                 const ASTContext &ctx) {
+  if (!param->isOpaqueType()) {
+    return GenericTypeParamType::get(param->getName(),
+                                     param->isParameterPack(),
+                                     param->getDepth(),
+                                     param->getIndex(),
+                                     ctx);
+  }
+
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
   if (param->isParameterPack())
     props |= RecursiveTypeProperties::HasParameterPack;
