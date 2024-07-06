@@ -612,7 +612,7 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
   if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(dc->getParentModule()));
+      LookUpConformanceInModule());
   if (!tanSpace)
     return false;
   // If no `Self == Self.TangentVector` requirement, return true.

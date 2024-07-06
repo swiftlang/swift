@@ -1003,7 +1003,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
   SmallVector<WorklistItem, 4> worklist;
 
   for (auto req : llvm::reverse(requirements)) {
-    auto substReq = req.subst(substitutions, LookUpConformanceInModule(module));
+    auto substReq = req.subst(substitutions, LookUpConformanceInModule());
     worklist.emplace_back(req, substReq, ParentConditionalConformances{});
   }
 

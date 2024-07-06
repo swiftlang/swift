@@ -8069,10 +8069,10 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);
         if (!nominal)
           continue;
-        auto *module = nominal->getModuleContext();
+
         // Don't synthesize a conformance if one already exists.
         auto ty = nominal->getDeclaredInterfaceType();
-        if (module->lookupConformance(ty, protocol))
+        if (ModuleDecl::lookupConformance(ty, protocol))
           continue;
         auto conformance = SwiftContext.getNormalConformance(
             ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
@@ -8696,7 +8696,6 @@ static void finishTypeWitnesses(
     NormalProtocolConformance *conformance) {
   auto *dc = conformance->getDeclContext();
   auto nominal = dc->getSelfNominalTypeDecl();
-  auto *module = dc->getParentModule();
 
   auto *proto = conformance->getProtocol();
   auto selfType = conformance->getType();
@@ -8721,7 +8720,7 @@ static void finishTypeWitnesses(
 
       auto memberType = typeDecl->getDeclaredInterfaceType();
       auto subMap = selfType->getContextSubstitutionMap(
-          module, typeDecl->getDeclContext());
+          typeDecl->getDeclContext());
       memberType = memberType.subst(subMap);
       conformance->setTypeWitness(assocType, memberType, typeDecl);
       satisfied = true;

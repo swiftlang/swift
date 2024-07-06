@@ -147,7 +147,6 @@ static SubstitutionMap
 getSubstitutionMapForPrespecialization(GenericSignature genericSig,
                                        GenericSignature specSig) {
   auto CalleeGenericSig = genericSig;
-  auto SpecializedGenericSig = specSig;
   auto SpecializedGenericEnv = specSig.getGenericEnvironment();
 
   auto CalleeInterfaceToSpecializedInterfaceMap = SubstitutionMap::get(
@@ -155,7 +154,7 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
       [&](SubstitutableType *type) -> Type {
         return type;
       },
-      LookUpConformanceInSignature(CalleeGenericSig.getPointer()));
+      LookUpConformanceInModule());
 
   auto subs = SubstitutionMap::get(
       CalleeGenericSig,
@@ -165,7 +164,7 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
         return SpecializedGenericEnv->mapTypeIntoContext(
             SpecializedInterfaceTy);
       },
-      LookUpConformanceInSignature(SpecializedGenericSig.getPointer()));
+      LookUpConformanceInModule());
   return subs;
 }
 

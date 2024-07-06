@@ -1219,7 +1219,7 @@ void SILGenFunction::ForceTryEmission::finish() {
         subMap = SubstitutionMap::get(
             genericSig, [&](SubstitutableType *dependentType) {
               return error.getType().getObjectType().getASTType();
-            }, LookUpConformanceInModule(SGF.getModule().getSwiftModule()));
+            }, LookUpConformanceInModule());
 
         // Generic errors are passed indirectly.
         if (!error.getType().isAddress()) {
@@ -1509,10 +1509,8 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
   auto *fromDecl = fromCollection->getAnyNominal();
   auto *toDecl = toCollection->getAnyNominal();
 
-  auto fromSubMap = fromCollection->getContextSubstitutionMap(
-    SGM.SwiftModule, fromDecl);
-  auto toSubMap = toCollection->getContextSubstitutionMap(
-    SGM.SwiftModule, toDecl);
+  auto fromSubMap = fromCollection->getContextSubstitutionMap(fromDecl);
+  auto toSubMap = toCollection->getContextSubstitutionMap(toDecl);
 
   // Form type parameter substitutions.
   auto genericSig = fn->getGenericSignature();
@@ -3981,7 +3979,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(genericSig.getPointer()));
+          LookUpConformanceInModule());
       }
 
       // Set up a substitution of Self => IndexType.
@@ -4254,7 +4252,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     } else {
       componentTy =
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getTypeOfMember(SwiftModule, var)
+          ->getTypeOfMember(var)
           ->getReferenceStorageReferent()
           ->mapTypeOutOfContext()
           ->getCanonicalType();
@@ -6144,15 +6142,15 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   if (SGF.getLoweredType(eltTy).isTrivial(SGF.F))
     return;
 
-  auto *SM = SGF.getModule().getSwiftModule();
-  if (auto *bitwiseCopyableDecl = SM->getASTContext().getProtocol(
+  auto &ctx = SGF.getASTContext();
+  if (auto *bitwiseCopyableDecl = ctx.getProtocol(
         KnownProtocolKind::BitwiseCopyable)) {
-    if (SM->checkConformance(eltTy, bitwiseCopyableDecl))
+    if (ModuleDecl::checkConformance(eltTy, bitwiseCopyableDecl))
       return;
   }
-  if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
+  if (auto *fixedWidthIntegerDecl = ctx.getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (SM->checkConformance(eltTy, fixedWidthIntegerDecl))
+    if (ModuleDecl::checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 
@@ -6295,8 +6293,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
     getASTContext().getConvertInOutToPointerArgument();
 
   auto pointerType = pointerInfo.PointerType;
-  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                       getPointerProtocol());
+  auto subMap = pointerType->getContextSubstitutionMap(getPointerProtocol());
   return emitApplyOfLibraryIntrinsic(
              loc, converter, subMap,
              ManagedValue::forObjectRValueWithoutOwnership(pointer),
@@ -6357,11 +6354,10 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   }
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto *M = SGM.M.getSwiftModule();
   auto firstSubMap =
-      accessInfo.ArrayType->getContextSubstitutionMap(M, ctx.getArrayDecl());
+      accessInfo.ArrayType->getContextSubstitutionMap(ctx.getArrayDecl());
   auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
-      M, getPointerProtocol());
+      getPointerProtocol());
 
   auto genericSig = converter->getGenericSignature();
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
@@ -6405,8 +6401,7 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
   FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument();
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                       getPointerProtocol());
+  auto subMap = pointerType->getContextSubstitutionMap(getPointerProtocol());
   SmallVector<ManagedValue, 2> results;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, stringValue, SGFContext())
     .getAll(results);

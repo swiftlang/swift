@@ -485,9 +485,8 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
   else
     DC = D->getInnermostDeclContext()->getInnermostTypeContext();
 
-  swift::ModuleDecl *M = DC->getParentModule();
   if (isa<swift::NominalTypeDecl>(D) || isa<swift::ExtensionDecl>(D)) {
-    return BaseType->getContextSubstitutionMap(M, DC);
+    return BaseType->getContextSubstitutionMap(DC);
   }
 
   const swift::ValueDecl *SubTarget = D;
@@ -496,7 +495,7 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
     if (auto *FD = dyn_cast<swift::AbstractFunctionDecl>(DC))
       SubTarget = FD;
   }
-  return BaseType->getMemberSubstitutionMap(M, SubTarget);
+  return BaseType->getMemberSubstitutionMap(SubTarget);
 }
 
 void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {

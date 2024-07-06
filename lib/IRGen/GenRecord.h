@@ -209,8 +209,7 @@ public:
       if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
         if (rawLayout->shouldMoveAsLikeType()) {
           auto astT = T.getASTType();
-          auto subs = astT->getContextSubstitutionMap(IGF.IGM.getSwiftModule(),
-                                                      structDecl);
+          auto subs = astT->getContextSubstitutionMap(structDecl);
           auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
           auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
 
@@ -287,8 +286,7 @@ public:
       if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
         if (rawLayout->shouldMoveAsLikeType()) {
           auto astT = T.getASTType();
-          auto subs = astT->getContextSubstitutionMap(IGF.IGM.getSwiftModule(),
-                                                      structDecl);
+          auto subs = astT->getContextSubstitutionMap(structDecl);
           auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
           auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
 

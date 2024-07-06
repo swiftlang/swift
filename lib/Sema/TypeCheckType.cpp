@@ -310,8 +310,7 @@ Type TypeResolution::resolveDependentMemberType(
     }
   }
 
-  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
-                                              baseTy);
+  return TypeChecker::substMemberTypeWithBase(concrete, baseTy);
 }
 
 bool TypeResolution::areSameType(Type type1, Type type2) const {
@@ -580,7 +579,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   // Finally, substitute the base type into the member type.
   return TypeChecker::substMemberTypeWithBase(
-      fromDC->getParentModule(), typeDecl, selfType, /*useArchetypes=*/false);
+      typeDecl, selfType, /*useArchetypes=*/false);
 }
 
 /// This function checks if a bound generic type is UnsafePointer<Void> or
@@ -1166,14 +1165,14 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule(module));
+                                LookUpConformanceInModule());
 
   // Form a sugared typealias reference.
   if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule(module));
+                                       LookUpConformanceInModule());
     resultType = TypeAliasType::get(typealias, parentTy, subMap, resultType);
   }
 
@@ -1229,8 +1228,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (protocol) {
-    auto conformanceRef = dc->getParentModule()->lookupConformance(
-        parentTy, protocol);
+    auto conformanceRef = ModuleDecl::lookupConformance(parentTy, protocol);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
@@ -1872,8 +1870,7 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   // Phase 2: If a declaration has already been bound, use it.
   if (auto *typeDecl = repr->getBoundDecl()) {
     auto memberType =
-      TypeChecker::substMemberTypeWithBase(DC->getParentModule(), typeDecl,
-                                           parentTy);
+      TypeChecker::substMemberTypeWithBase(typeDecl, parentTy);
     return maybeDiagnoseBadMemberType(typeDecl, memberType, nullptr);
   }
 
@@ -3996,7 +3993,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !resolution.getDeclContext()->getParentModule()->checkConformance(
+               !ModuleDecl::checkConformance(
                   thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
@@ -4099,7 +4096,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
     subMap = SubstitutionMap::get(
         genericSig, QueryTypeSubstitutionMap{genericArgMap},
-        LookUpConformanceInModule(getDeclContext()->getParentModule()));
+        LookUpConformanceInModule());
   }
 
   bool capturesGenerics = claim<CapturesGenericsTypeAttr>(attrs);
@@ -4307,7 +4304,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
     return SubstitutionMap::get(
                sig, QueryTypeSubstitutionMap{subsMap},
-               LookUpConformanceInModule(getDeclContext()->getParentModule()))
+               LookUpConformanceInModule())
         .getCanonical();
   };
 
@@ -4377,8 +4374,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       selfType = next;
     }
 
-    witnessMethodConformance = getDeclContext()->getParentModule()
-      ->checkConformance(selfType, protocolType->getDecl());
+    witnessMethodConformance = ModuleDecl::checkConformance(
+        selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }
@@ -5796,8 +5793,7 @@ NeverNullType TypeResolver::buildProtocolType(
   return MetatypeType::get(instanceType, storedRepr);
 }
 
-Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
-                                          TypeDecl *member,
+Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
                                           Type baseTy,
                                           bool useArchetypes) {
   Type sugaredBaseTy = baseTy;
@@ -5866,7 +5862,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     if (baseTy->is<ErrorType>())
       return ErrorType::get(memberType);
 
-    subs = baseTy->getMemberSubstitutionMap(module, member);
+    subs = baseTy->getMemberSubstitutionMap(member);
     resultType = memberType.subst(subs);
   } else {
     resultType = memberType;

@@ -979,7 +979,7 @@ findMissingGenericRequirementForSolutionFix(
       [&](SubstitutableType *type) -> Type {
         return env->mapTypeIntoContext(type->mapTypeOutOfContext());
       },
-      LookUpConformanceInModule(conformance->getDeclContext()->getParentModule()));
+      LookUpConformanceInModule());
   }
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
@@ -2417,7 +2417,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-    if (Context.LangOpts.StrictConcurrencyLevel != StrictConcurrency::Complete)
+    // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+    // a Sendable conformance.
+    if (!Context.LangOpts.isSwiftVersionAtLeast(6))
       allowImpliedConditionalConformance = true;
   } else if (Proto->isMarkerProtocol()) {
     allowImpliedConditionalConformance = true;
@@ -2465,7 +2467,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
-      DC->getParentModule()->lookupConformance(T, InheritedProto);
+      ModuleDecl::lookupConformance(T, InheritedProto);
     if (InheritedConformance.isInvalid() ||
         !InheritedConformance.isConcrete()) {
       diagnoseConformanceFailure(T, InheritedProto, DC, ComplainLoc);
@@ -2513,11 +2515,11 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 }
 
 /// Clean up the given declaration type for display purposes.
-static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
+static Type getTypeForDisplay(ValueDecl *decl) {
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     return AnyFunctionType::composeTuple(
-        module->getASTContext(),
+        decl->getASTContext(),
         ctor->getMethodInterfaceType()->castTo<FunctionType>()->getParams(),
         ParameterFlagHandling::IgnoreNonEmpty);
   }
@@ -2559,10 +2561,9 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
 }
 
 /// Clean up the given requirement type for display purposes.
-static Type getRequirementTypeForDisplay(ModuleDecl *module,
-                                         NormalProtocolConformance *conformance,
+static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
                                          ValueDecl *req) {
-  auto type = getTypeForDisplay(module, req);
+  auto type = getTypeForDisplay(req);
 
   auto substType = [&](Type type, bool isResult) -> Type {
     // Replace generic type parameters and associated types with their
@@ -2570,14 +2571,14 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
     auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
     auto substSelfTy = conformance->getType();
     if (isResult && substSelfTy->getClassOrBoundGenericClass())
-      substSelfTy = DynamicSelfType::get(selfTy, module->getASTContext());
+      substSelfTy = DynamicSelfType::get(selfTy, req->getASTContext());
     return type.subst([&](SubstitutableType *dependentType) {
                         if (dependentType->isEqual(selfTy))
                           return substSelfTy;
 
                         return Type(dependentType);
                       },
-                      LookUpConformanceInModule(module));
+                      LookUpConformanceInModule());
   };
 
   if (auto fnTy = type->getAs<AnyFunctionType>()) {
@@ -2842,7 +2843,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    auto witnessType = getTypeForDisplay(module, match.Witness);
+    auto witnessType = getTypeForDisplay(match.Witness);
 
     if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
       computeFixitsForOverriddenDeclaration(match.Witness, req, [&](bool){
@@ -3878,7 +3879,7 @@ static void diagnoseProtocolStubFixit(
 
     // Issue diagnostics for witness values.
     Type RequirementType =
-      getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
+      getRequirementTypeForDisplay(Conf, VD);
     if (AddFixit) {
       if (SameFile) {
         // If the protocol member decl is in the same file of the stub,
@@ -4181,7 +4182,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
         auto conformance =
-            DC->getParentModule()->lookupConformance(Adoptee, derivableProto);
+            ModuleDecl::lookupConformance(Adoptee, derivableProto);
         if (conformance.isConcrete()) {
           (void) conformance.getConcrete()->getWitnessDecl(derivable);
         }
@@ -4488,8 +4489,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       NormalProtocolConformance *conformance) {
       auto dc = conformance->getDeclContext();
       // Determine the type that the requirement is expected to have.
-      Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
-                                                  conformance, requirement);
+      Type reqType = getRequirementTypeForDisplay(conformance, requirement);
 
       auto &diags = dc->getASTContext().Diags;
       auto diagnosticMessage = diag::ambiguous_witnesses;
@@ -5244,7 +5244,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
-      TypeChecker::containsProtocol(T, Proto, DC->getParentModule())) {
+      TypeChecker::containsProtocol(T, Proto)) {
 
     if (!T->isObjCExistentialType()) {
       Type constraintType = T;
@@ -5327,7 +5327,7 @@ void swift::diagnoseConformanceFailure(Type T,
       // Map it into context since we want to check conditional requirements.
       rawType = enumDecl->mapTypeIntoContext(rawType);
       if (!TypeChecker::conformsToKnownProtocol(
-              rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
+              rawType, KnownProtocolKind::Equatable)) {
         SourceLoc loc = enumDecl->getInherited().getStartLoc();
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
@@ -5378,7 +5378,7 @@ void swift::diagnoseConformanceFailure(Type T,
 }
 
 ProtocolConformanceRef
-TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
+TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
                               bool allowMissing) {
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
@@ -5390,7 +5390,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
       constraint = existential->getConstraintType();
     if (constraint->isEqual(Proto->getDeclaredInterfaceType()) &&
         Proto->requiresSelfConformanceWitnessTable()) {
-      auto &ctx = M->getASTContext();
+      auto &ctx = T->getASTContext();
       return ProtocolConformanceRef(ctx.getSelfConformance(Proto));
     }
 
@@ -5403,8 +5403,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
-      auto result = M->lookupConformance(superclass, Proto,
-                                         /*allowMissing=*/false);
+      auto result = ModuleDecl::lookupConformance(superclass, Proto,
+                                                  /*allowMissing=*/false);
       if (result) {
         return result;
       }
@@ -5427,20 +5427,19 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   }
 
   // For non-existential types, this is equivalent to checking conformance.
-  return M->lookupConformance(T, Proto, allowMissing);
+  return ModuleDecl::lookupConformance(T, Proto, allowMissing);
 }
 
 bool TypeChecker::conformsToKnownProtocol(
-    Type type, KnownProtocolKind protocol, ModuleDecl *module,
+    Type type, KnownProtocolKind protocol,
     bool allowMissing) {
-  if (auto *proto = module->getASTContext().getProtocol(protocol))
-    return (bool) module->checkConformance(type, proto, allowMissing);
+  if (auto *proto = type->getASTContext().getProtocol(protocol))
+    return (bool) ModuleDecl::checkConformance(type, proto, allowMissing);
   return false;
 }
 
 bool
-TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
-                                               ModuleDecl *M) {
+TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto) {
   // An existential may have a concrete underlying type with protocol conformances
   // we cannot know statically.
   if (type->isExistentialType())
@@ -5473,9 +5472,9 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   // as an intermediate collection cast can dynamically change if the conditions
   // are met or not.
   if (type->isKnownStdlibCollectionType())
-    return !M->lookupConformance(type, Proto, /*allowMissing=*/true)
+    return !ModuleDecl::lookupConformance(type, Proto, /*allowMissing=*/true)
                 .isInvalid();
-  return !M->checkConformance(type, Proto).isInvalid();
+  return !ModuleDecl::checkConformance(type, Proto).isInvalid();
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -6756,8 +6755,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoContext(defaultAssocType);
     auto requirementProto = req.getProtocolDecl();
-    auto conformance = module->checkConformance(defaultAssocTypeInContext,
-                                                requirementProto);
+    auto conformance = ModuleDecl::checkConformance(defaultAssocTypeInContext,
+                                                    requirementProto);
     if (conformance.isInvalid()) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.

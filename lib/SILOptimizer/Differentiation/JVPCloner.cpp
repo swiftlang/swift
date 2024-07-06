@@ -350,7 +350,7 @@ private:
     type = witness->getDerivativeGenericSignature().getReducedType(
         type);
     return type->getAutoDiffTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+        LookUpConformanceInModule());
   }
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
@@ -1619,7 +1619,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // binding all generic parameters to concrete types, JVP function type uses
   // all the concrete types and JVP generic signature is null.
   auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Parameters of the differential are:
   // - the tangent values of the wrt parameters.

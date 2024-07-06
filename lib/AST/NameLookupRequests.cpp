@@ -399,8 +399,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.PD);
   out << " for ";
   out << desc.Ty.getString();
-  out << " in ";
-  simple_display(out, desc.Mod);
 }
 
 //----------------------------------------------------------------------------//

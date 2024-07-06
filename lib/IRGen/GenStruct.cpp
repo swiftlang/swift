@@ -598,7 +598,7 @@ namespace {
 
       // Map the generic parameter to T
       auto subst = SubstitutionMap::get(sig, {T.getASTType()},
-                              LookUpConformanceInModule{IGF.getSwiftModule()});
+                              LookUpConformanceInModule());
       auto ptrType = ptrTypeDecl->getDeclaredInterfaceType().subst(subst);
       SILParameterInfo ptrParam(ptrType->getCanonicalType(),
                                 ParameterConvention::Direct_Unowned);
@@ -998,8 +998,7 @@ namespace {
         // The given struct type T that we're building is fully concrete, but
         // our like type is still in terms of the potential archetype of the
         // type.
-        auto subs = T.getASTType()->getContextSubstitutionMap(
-          IGM.getSwiftModule(), decl);
+        auto subs = T.getASTType()->getContextSubstitutionMap(decl);
 
         loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
 
@@ -1119,8 +1118,7 @@ namespace {
         // environment that is different than that which was built our
         // resolved rawLayout like type. Map our like type into the given
         // environment.
-        auto subs = T.getASTType()->getContextSubstitutionMap(
-          IGM.getSwiftModule(), decl);
+        auto subs = T.getASTType()->getContextSubstitutionMap(decl);
 
         loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
 
@@ -1700,7 +1698,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
         IGM.getSwiftModule()->getASTContext().getProtocol(
             KnownProtocolKind::BitwiseCopyable);
     if (bitwiseCopyableProtocol &&
-        IGM.getSwiftModule()->checkConformance(type, bitwiseCopyableProtocol)) {
+        ModuleDecl::checkConformance(type, bitwiseCopyableProtocol)) {
       return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, structAccessible);
     }
     return &getResilientStructTypeInfo(copyable, structAccessible);

@@ -319,13 +319,12 @@ void checkExistentialTypes(ASTContext &ctx,
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.
 ///
-/// \param module The module in which the substitution will be performed.
 /// \param member The member whose type projection is being computed.
 /// \param baseTy The base type that will be substituted for the 'Self' of the
 /// member.
 /// \param useArchetypes Whether to use context archetypes for outer generic
 /// parameters if the class is nested inside a generic function.
-Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
+Type substMemberTypeWithBase(TypeDecl *member, Type baseTy,
                              bool useArchetypes = true);
 
 /// Determine whether this is a "pass-through" typealias, which has the
@@ -802,20 +801,18 @@ Expr *addImplicitLoadExpr(
 /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        ModuleDecl *M,
                                         bool allowMissing=false);
 
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
-                             ModuleDecl *module, bool allowMissing = true);
+                             bool allowMissing = true);
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
 /// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final
 /// class where a subclass conforms to \p Proto.
 ///
 /// \returns True if \p T conforms to the protocol \p Proto, false otherwise.
-bool couldDynamicallyConformToProtocol(Type T, ProtocolDecl *Proto,
-                                       ModuleDecl *M);
+bool couldDynamicallyConformToProtocol(Type T, ProtocolDecl *Proto);
 
 /// Check all of the conformances in the given context.
 void checkConformancesInContext(IterableDeclContext *idc);
@@ -1305,13 +1302,13 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
+bool isValidDynamicCallableMethod(FuncDecl *decl,
                                   bool hasKeywordArguments);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, ModuleDecl *module,
+bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                          bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1319,7 +1316,7 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, ModuleDecl *module
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, ModuleDecl *module,
+bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
                                       bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of

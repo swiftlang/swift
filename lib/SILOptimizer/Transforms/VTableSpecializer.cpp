@@ -173,8 +173,7 @@ SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
     return nullptr;
   }
 
-  SubstitutionMap subs = astType->getContextSubstitutionMap(
-      classDecl->getParentModule(), classDecl);
+  SubstitutionMap subs = astType->getContextSubstitutionMap(classDecl);
 
   llvm::SmallVector<SILVTableEntry, 8> newEntries;
 
@@ -249,8 +248,7 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   if (!genClassTy) return false;
 
   ClassDecl *classDecl = genClassTy->getDecl();
-  SubstitutionMap subs = astType->getContextSubstitutionMap(
-      classDecl->getParentModule(), classDecl);
+  SubstitutionMap subs = astType->getContextSubstitutionMap(classDecl);
 
   SILType funcTy = cm->getType();
   SILType substitutedType =

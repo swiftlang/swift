@@ -1276,7 +1276,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         CanType substEltTy =
             value.getType()
                 .getASTType()
-                ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
+                ->getTypeOfMember(eltDecl,
                                   eltDecl->getArgumentInterfaceType())
                 ->getCanonicalType();
 

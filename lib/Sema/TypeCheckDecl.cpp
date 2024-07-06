@@ -1177,12 +1177,10 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
 
-  auto *module = ED->getParentModule();
-
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-    return TypeChecker::conformsToKnownProtocol(rawTy, protoKind, module);
+    return TypeChecker::conformsToKnownProtocol(rawTy, protoKind);
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -2538,8 +2536,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       ProtocolDecl *errorProto = Context.getErrorDecl();
       if (thrownTy && errorProto) {
         Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
-        if (!AFD->getParentModule()->checkConformance(
-                thrownTyInContext, errorProto)) {
+        if (!ModuleDecl::checkConformance(thrownTyInContext, errorProto)) {
           SourceLoc loc;
           if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
             loc = thrownTypeRepr->getLoc();

@@ -778,7 +778,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // satisfied by the derived class. In this case, we don't want to inherit
     // this initializer; there's no way to call it on the derived class.
     auto checkResult = checkRequirements(
-        classDecl->getParentModule(),
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(subMap);
@@ -1384,7 +1383,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = target->getParentModule()->lookupConformance(
+    auto ref = ModuleDecl::lookupConformance(
         targetType, protocol);
     if (ref.isInvalid()) {
       return false;

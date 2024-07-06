@@ -175,20 +175,19 @@ static LifetimeDependenceKind getLifetimeDependenceKindFromDecl(
                                   : LifetimeDependenceKind::Inherit;
 }
 
-static bool isBitwiseCopyable(Type type, ModuleDecl *mod, ASTContext &ctx) {
+static bool isBitwiseCopyable(Type type, ASTContext &ctx) {
   auto *bitwiseCopyableProtocol =
       ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol) {
     return false;
   }
-  return (bool)(mod->checkConformance(type, bitwiseCopyableProtocol));
+  return (bool)(ModuleDecl::checkConformance(type, bitwiseCopyableProtocol));
 }
 
 std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
-  auto *mod = afd->getModuleContext();
   auto &diags = ctx.Diags;
   auto capacity = afd->hasImplicitSelfDecl()
                       ? (afd->getParameters()->size() + 1)
@@ -216,7 +215,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd) {
     bool isCompatible = true;
     // Lifetime dependence always propagates through temporary BitwiseCopyable
     // values, even if the dependence is scoped.
-    if (!isBitwiseCopyable(paramType, mod, ctx)) {
+    if (!isBitwiseCopyable(paramType, ctx)) {
       isCompatible = isLifetimeDependenceCompatibleWithOwnership(
         lifetimeKind, ownership, afd);
     }
@@ -416,7 +415,6 @@ std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
-  auto *mod = afd->getModuleContext();
 
   if (!ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
     return std::nullopt;
@@ -450,7 +448,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
   if (!cd && afd->hasImplicitSelfDecl()) {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->isEscapable()) {
-      if (isBitwiseCopyable(selfTypeInContext, mod, ctx)) {
+      if (isBitwiseCopyable(selfTypeInContext, ctx)) {
           diags.diagnose(
               returnLoc,
               diag::lifetime_dependence_method_escapable_bitwisecopyable_self);
@@ -483,7 +481,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     }
     auto paramOwnership = param->getValueOwnership();
     if (paramTypeInContext->isEscapable()) {
-      if (isBitwiseCopyable(paramTypeInContext, mod, ctx)) {
+      if (isBitwiseCopyable(paramTypeInContext, ctx)) {
         continue;
       }
       if (paramOwnership == ValueOwnership::Default) {

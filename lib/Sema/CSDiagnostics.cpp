@@ -214,9 +214,7 @@ Type FailureDiagnostic::restoreGenericParameters(
 
 bool FailureDiagnostic::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol) const {
-  auto &cs = getConstraintSystem();
-  return TypeChecker::conformsToKnownProtocol(type, protocol,
-                                              cs.DC->getParentModule());
+  return TypeChecker::conformsToKnownProtocol(type, protocol);
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -2434,8 +2432,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
 
   auto *decl = member->choice.getDecl();
   if (isa<SubscriptDecl>(decl) &&
-      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl),
-                                          getParentModule())) {
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl))) {
     auto *subscript = cast<SubscriptDecl>(decl);
     // If this is a keypath dynamic member lookup, we have to
     // adjust the locator to find member referred by it.
@@ -3196,7 +3193,7 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   if (auto errorCodeProtocol =
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
-    auto conformance = getParentModule()->checkConformance(
+    auto conformance = ModuleDecl::checkConformance(
         errorCodeType, errorCodeProtocol);
     if (conformance && toErrorExistential) {
       Type errorType =
@@ -3437,7 +3434,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
-    if (!getParentModule()->checkConformance(fromType, protocol)) {
+    if (!ModuleDecl::checkConformance(fromType, protocol)) {
       auto protoTy = protocol->getDeclaredInterfaceType();
       missingProtoTypeStrings.push_back(protoTy->getString());
       missingProtocols.push_back(protocol);
@@ -9064,14 +9061,16 @@ bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
   const auto fromType = getFromType();
   const auto toType = getToType();
   auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
-  // FIXME(https://github.com/apple/swift/issues/54529): This literal diagnostics needs to be revisited by a proposal to unify casting semantics for literals.
+  // FIXME(https://github.com/apple/swift/issues/54529): This literal
+  // diagnostics needs to be revisited by a proposal to unify casting
+  // semantics for literals.
   auto &ctx = getASTContext();
-  auto *dc = getDC();
+
   if (isa<LiteralExpr>(sub)) {
     auto *protocol = TypeChecker::getLiteralProtocol(ctx, sub);
     // Special handle for literals conditional checked cast when they can
     // be statically coerced to the cast type.
-    if (protocol && dc->getParentModule()->checkConformance(toType, protocol)) {
+    if (protocol && ModuleDecl::checkConformance(toType, protocol)) {
       emitDiagnostic(diag::literal_conditional_downcast_to_coercion, fromType,
                      toType);
       return true;

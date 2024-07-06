@@ -3410,10 +3410,9 @@ public:
           bool conforms = llvm::all_of(
               OpaqueDecl->getOpaqueInterfaceGenericSignature()
                   .getRequirements(),
-              [&exprType, this](auto requirement) {
+              [&exprType](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = Implementation->getModuleContext()
-                      ->checkConformance(
+                  auto conformance = ModuleDecl::checkConformance(
                       exprType->getRValueType(),
                       requirement.getProtocolDecl(),
                       /*allowMissing=*/false);
@@ -5975,11 +5974,10 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
   class ComparisonWithNaNFinder : public ASTWalker {
     const ASTContext &C;
-    const DeclContext *DC;
 
   public:
     ComparisonWithNaNFinder(const DeclContext *dc)
-        : C(dc->getASTContext()), DC(dc) {}
+        : C(dc->getASTContext()) {}
 
     void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
       ValueDecl *comparisonDecl = nullptr;
@@ -6019,11 +6017,9 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
       // Both arguments must conform to FloatingPoint protocol.
       if (!TypeChecker::conformsToKnownProtocol(firstArg->getType(),
-                                                KnownProtocolKind::FloatingPoint,
-                                                DC->getParentModule()) ||
+                                                KnownProtocolKind::FloatingPoint) ||
           !TypeChecker::conformsToKnownProtocol(secondArg->getType(),
-                                                KnownProtocolKind::FloatingPoint,
-                                                DC->getParentModule())) {
+                                                KnownProtocolKind::FloatingPoint)) {
         return;
       }
 

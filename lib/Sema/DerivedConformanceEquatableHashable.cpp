@@ -843,7 +843,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
         return Type(dependentType);
       },
-      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+      LookUpConformanceInModule());
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
 
   Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
@@ -878,15 +878,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
   if (!TypeChecker::conformsToKnownProtocol(
-          intType, KnownProtocolKind::Hashable,
-          derived.getParentModule())) {
+          intType, KnownProtocolKind::Hashable)) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   if (!TypeChecker::conformsToKnownProtocol(
-          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
-          derived.getParentModule())) {
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
