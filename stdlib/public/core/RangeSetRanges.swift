@@ -265,6 +265,77 @@ extension RangeSet.Ranges {
     
     return Self(_ranges: result)
   }
+  
+  @usableFromInline
+  internal func _union(_ other: Self) -> Self {
+    // Empty cases
+    if other.isEmpty {
+      return self
+    } else if self.isEmpty {
+      return other
+    }
+    
+    // Instead of naively inserting the ranges of `other` into `self`,
+    // which can cause reshuffling with every insertion, this approach
+    // uses the guarantees that each array of ranges is non-overlapping and in
+    // increasing order to directly derive the union.
+    //
+    // Each range in the resulting range set is found by:
+    //
+    //    1. Finding the current lowest bound of the two range sets.
+    //    2. Searching for the first upper bound that is outside the merged
+    //       boundaries of the two range sets.
+    
+    // Use temporaries so that we can swap a/b, to simplify the logic below
+    var a = self._storage
+    var b = other._storage
+    var aIndex = a.startIndex
+    var bIndex = b.startIndex
+    
+    var result: [Range<Bound>] = []
+    while aIndex < a.endIndex, bIndex < b.endIndex {
+      // Make sure that `a` is the source of the lower bound and `b` is the
+      // potential source for the upper bound.
+      if b[bIndex].lowerBound < a[aIndex].lowerBound {
+        swap(&a, &b)
+        swap(&aIndex, &bIndex)
+      }
+      
+      var candidateRange = a[aIndex]
+      aIndex += 1
+      
+      // Look for the correct upper bound, which is the first upper bound that
+      // isn't contained in the next range of the "other" ranges array.
+      while bIndex < b.endIndex, candidateRange.upperBound >= b[bIndex].lowerBound {
+        if candidateRange.upperBound >= b[bIndex].upperBound {
+          // The range `b[bIndex]` is entirely contained by `candidateRange`,
+          // so we need to advance and look at the next range in `b`.
+          bIndex += 1
+        } else {
+          // The range `b[bIndex]` extends past `candidateRange`, so:
+          //
+          //   1. We grow `candidateRange` to the upper bound of `b[bIndex]`
+          //   2. We swap the two range arrays, so that we're looking for the
+          //      new upper bound in the other array.
+          candidateRange = candidateRange.lowerBound ..< b[bIndex].upperBound
+          bIndex += 1
+          swap(&a, &b)
+          swap(&aIndex, &bIndex)
+        }
+      }
+      
+      result.append(candidateRange)
+    }
+    
+    // Collect any remaining ranges without needing to merge.
+    if aIndex < a.endIndex {
+      result.append(contentsOf: a[aIndex...])
+    } else if bIndex < b.endIndex {
+      result.append(contentsOf: b[bIndex...])
+    }
+
+    return Self(_ranges: result)
+  }
 }
 
 @available(SwiftStdlib 6.0, *)
