@@ -292,7 +292,7 @@ public:
   };
 
 protected:
-#if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+#if SWIFT_THREADING_NONE || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   // Synchronization is simple here. In a single threaded mode, all swift tasks
   // run on a single thread so no coordination is needed. In a task-to-thread
   // model, only the parent task which created the task group can
