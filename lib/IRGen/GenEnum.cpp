@@ -7324,8 +7324,8 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       IGM.getSwiftModule()->getASTContext().getProtocol(
           KnownProtocolKind::BitwiseCopyable);
   if (bitwiseCopyableProtocol &&
-      IGM.getSwiftModule()->checkConformance(Type.getASTType(),
-                                             bitwiseCopyableProtocol)) {
+      ModuleDecl::checkConformance(Type.getASTType(),
+                                   bitwiseCopyableProtocol)) {
     return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
   }
   return registerEnumTypeInfo(

@@ -419,8 +419,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
   assert([&]() -> bool {
     return TypeChecker::conformsToKnownProtocol(
-        rawType, KnownProtocolKind::Equatable,
-        derived.getParentModule());
+        rawType, KnownProtocolKind::Equatable);
   }());
 
   auto *rawDecl = new (C)
@@ -477,8 +476,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
 
   // The raw type must be Equatable, so that we have a suitable ~= for
   // synthesized switch statements.
-  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable,
-                                            DC->getParentModule()))
+  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable))
     return false;
 
   auto &C = type->getASTContext();

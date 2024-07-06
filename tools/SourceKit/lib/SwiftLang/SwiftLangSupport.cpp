@@ -922,8 +922,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
   OS << VD->getBaseName().userFacingName();
 
   // Parameters.
-  auto *M = VD->getModuleContext();
-  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
+  auto substMap = baseTy->getMemberSubstitutionMap(VD);
   auto printSingleParam = [&](ParamDecl *param) {
     auto paramTy = param->getInterfaceType();
 

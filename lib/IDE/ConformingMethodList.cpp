@@ -155,8 +155,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
-    ModuleDecl *CurModule;
-
     /// The type of the parsed expression.
     Type T;
 
@@ -186,14 +184,14 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       // we might run into trouble with really complicated cases but the fake
       // archetype setup will mostly work.
       auto substitutions = T->getMemberSubstitutionMap(
-          CurModule, FD, FD->getGenericEnvironment());
+          FD, FD->getGenericEnvironment());
       auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->checkConformance(resultTy, Proto))
+        if (ModuleDecl::checkConformance(resultTy, Proto))
           return true;
       }
 
@@ -204,8 +202,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     LocalConsumer(DeclContext *DC, Type T,
                   llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
-        : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
-          Result(result) {}
+        : T(T), ExpectedTypes(expectedTypes), Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                    DynamicLookupInfo) override {

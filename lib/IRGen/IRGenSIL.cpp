@@ -2865,7 +2865,7 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
     auto derivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
         i->getParameterIndices(), i->getResultIndices(), kind,
         i->getModule().Types,
-        LookUpConformanceInModule(i->getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *undef = SILUndef::get(
         i->getFunction(), SILType::getPrimitiveObjectType(derivativeFnType));
     return getLoweredExplosion(undef);

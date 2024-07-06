@@ -154,7 +154,7 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto conformance = DC->getParentModule()->lookupConformance(
+      auto conformance = ModuleDecl::lookupConformance(
           conformingType, foundProto);
       if (conformance.isInvalid()) {
         if (foundInType->isExistentialType()) {
@@ -475,8 +475,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                              typeDecl, type);
+    auto memberType = substMemberTypeWithBase(typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -491,7 +490,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      auto conformance = dc->getParentModule()->lookupConformance(type, protocol);
+      auto conformance = ModuleDecl::lookupConformance(type, protocol);
       if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
@@ -516,7 +515,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         continue;
 
       auto memberType =
-          substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
+          substMemberTypeWithBase(typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
         result.addResult({typeDecl, memberType, assocType});
     }

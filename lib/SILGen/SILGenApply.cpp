@@ -5936,7 +5936,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
         assert(outerErrorType == SILType::getExceptionType(getASTContext()));
 
         ProtocolConformanceRef conformances[1] = {
-          getModule().getSwiftModule()->checkConformance(
+          ModuleDecl::checkConformance(
             innerError->getType().getASTType(),
             getASTContext().getErrorDecl())
         };
@@ -6622,8 +6622,7 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   auto allocate = Ctx.getAllocateUninitializedArray();
 
   // Invoke the intrinsic, which returns a tuple.
-  auto subMap = ArrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = ArrayTy->getContextSubstitutionMap(Ctx.getArrayDecl());
   auto result = emitApplyOfLibraryIntrinsic(
       Loc, allocate, subMap,
       ManagedValue::forObjectRValueWithoutOwnership(Length), SGFContext());
@@ -6648,8 +6647,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   CanType arrayTy = array->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap(Ctx.getArrayDecl());
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanagedOwnedValue(array),
                               SGFContext());
@@ -6672,8 +6670,7 @@ ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
   CanType arrayTy = arrayVal->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap(Ctx.getArrayDecl());
   RValue result = emitApplyOfLibraryIntrinsic(
       loc, finalize, subMap, ManagedValue::forUnmanagedOwnedValue(arrayVal),
       SGFContext());

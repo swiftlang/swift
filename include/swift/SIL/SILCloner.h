@@ -50,7 +50,7 @@ struct SubstitutionMapWithLocalArchetypes {
                                     Type substType,
                                     ProtocolDecl *proto) {
     if (isa<LocalArchetypeType>(origType))
-      return proto->getParentModule()->lookupConformance(substType, proto);
+      return ModuleDecl::lookupConformance(substType, proto);
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 

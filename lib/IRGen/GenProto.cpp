@@ -2989,8 +2989,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     GenericTypeRequirements requirements(IGF.IGM, nominal);
     auto &requirement = requirements.getRequirements()[reqtIndex];
 
-    auto module = IGF.getSwiftModule();
-    auto subs = sourceKey.Type->getContextSubstitutionMap(module, nominal);
+    auto subs = sourceKey.Type->getContextSubstitutionMap(nominal);
     auto sub = requirement.getTypeParameter().subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.

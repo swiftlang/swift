@@ -324,7 +324,7 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
                                           AbstractionPattern &origType) {
   if (needsFieldSubstitutions(origType)) {
     auto subMap = ty.getASTType()->getContextSubstitutionMap(
-                    &TC.M, field->getDeclContext());
+                    field->getDeclContext());
     origType = origType.withSubstitutions(subMap);
   }
 }
@@ -348,7 +348,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     // to ensure that we can correctly get our substituted field type. If we
     // need to rewrap the type layer, we do it below.
     substFieldTy =
-        getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
+        getASTType()->getTypeOfMember(field)->getCanonicalType();
   }
 
   auto loweredTy =
@@ -413,7 +413,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
   addFieldSubstitutionsIfNeeded(TC, *this, elt, origEltType);
 
   auto substEltTy = getASTType()->getTypeOfMember(
-      &TC.M, elt, elt->getArgumentInterfaceType());
+      elt, elt->getArgumentInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
@@ -899,7 +899,7 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 
 bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()
-      ->getAutoDiffTangentSpace(LookUpConformanceInModule(M.getSwiftModule()))
+      ->getAutoDiffTangentSpace(LookUpConformanceInModule())
       .has_value();
 }
 

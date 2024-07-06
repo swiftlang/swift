@@ -2127,9 +2127,7 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
 
   // Gather substitutions from the self type, and apply them to the original
   // superclass type to form the substituted superclass type.
-  ModuleDecl *module = classDecl->getModuleContext();
-  auto subMap = getContextSubstitutionMap(module,
-                                          classDecl,
+  auto subMap = getContextSubstitutionMap(classDecl,
                                           (useArchetypes
                                            ? classDecl->getGenericEnvironment()
                                            : nullptr));
@@ -2245,11 +2243,10 @@ public:
                llvm::dbgs() << "\nto subst type:\n";
                substType->print(llvm::dbgs()););
     
-    auto *moduleDecl = decl->getParentModule();
     auto origSubMap = origType->getContextSubstitutionMap(
-        moduleDecl, decl, decl->getGenericEnvironment());
+        decl, decl->getGenericEnvironment());
     auto substSubMap = substType->getContextSubstitutionMap(
-        moduleDecl, decl, decl->getGenericEnvironment());
+        decl, decl->getGenericEnvironment());
 
     auto genericSig = decl->getGenericSignature();
     
@@ -2304,13 +2301,13 @@ public:
       if (didChange) {
         auto newSubstTy = req.getFirstType().subst(
           QueryTypeSubstitutionMap{newParamsMap},
-          LookUpConformanceInModule(moduleDecl));
+          LookUpConformanceInModule());
         
         if (newSubstTy->isTypeParameter()) {
           newConformances.push_back(ProtocolConformanceRef(proto));
         } else {
           auto newConformance
-            = moduleDecl->lookupConformance(
+            = ModuleDecl::lookupConformance(
                   newSubstTy, proto, /*allowMissing=*/true);
           if (!newConformance)
             return CanType();
@@ -3046,7 +3043,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       auto specialized = type->getASTContext()
         .getSpecializedConformance(type,
              cast<NormalProtocolConformance>(result.getConformance()),
-             boundGenericType->getContextSubstitutionMap(dc->getParentModule(),
+             boundGenericType->getContextSubstitutionMap(
                                                  boundGenericType->getDecl()));
       result = ForeignRepresentationInfo::forBridged(specialized);
     }
@@ -3677,7 +3674,7 @@ void ParameterizedProtocolType::getRequirements(
     auto *assocType = assocTypes[i];
     auto subjectType = assocType->getDeclaredInterfaceType()
         ->castTo<DependentMemberType>()
-        ->substBaseType(protoDecl->getParentModule(), baseType);
+        ->substBaseType(baseType);
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
@@ -4468,7 +4465,7 @@ case TypeKind::Id:
     auto newSubMap =
       SubstitutionMap::get(sig,
         QueryReplacementTypeArray{sig, newSubs},
-        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
+        LookUpConformanceInModule());
     return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                         opaque->getInterfaceType(),
                                         newSubMap);

@@ -188,8 +188,8 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
-                                                 protocol)) {
+    if (!ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
+                                      protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -294,7 +294,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = nominal->getParentModule()->lookupConformance(
+    auto conformance = ModuleDecl::lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
@@ -474,10 +474,9 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
-    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
     auto subs = SubstitutionMap::get(generics, typeArgs,
-                                     LookUpConformanceInModule{builtinModule});
+                                     LookUpConformanceInModule{});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {
@@ -843,8 +842,8 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
-                                                  protocol).isInvalid()) {
+      if (ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
+                                       protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }

@@ -327,7 +327,7 @@ bool ArrayAllocation::replaceAppendContentOf() {
     SILType ArrayType = ArrayValue->getType();
     auto *NTD = ArrayType.getASTType()->getAnyNominal();
     SubstitutionMap ArraySubMap = ArrayType.getASTType()
-      ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
+      ->getContextSubstitutionMap(NTD);
 
     AppendContentsOf.replaceByAppendingValues(AppendFn, ReserveFn,
                                               ElementValueVector,

@@ -2689,10 +2689,9 @@ namespace {
             substitutions.lookupConformance(underlyingDependentType, P);
 
         if (underlyingType->hasTypeParameter()) {
-          auto sig = genericEnv->getGenericSignature();
           underlyingConformance = underlyingConformance.subst(
               underlyingType, QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(sig.getPointer()));
+              LookUpConformanceInModule());
 
           underlyingType = genericEnv->mapTypeIntoContext(underlyingType)
                                ->getCanonicalType();
@@ -4930,8 +4929,7 @@ namespace {
     }
 
     SubstitutionMap genericSubstitutions() {
-      return type->getContextSubstitutionMap(IGM.getSwiftModule(),
-                                             type->getAnyNominal());
+      return type->getContextSubstitutionMap(type->getAnyNominal());
     }
 
     MetadataTrailingFlags getTrailingFlags() {
@@ -5425,7 +5423,6 @@ IRGenFunction::emitValueWitnessTableRefForMetadata(llvm::Value *metadata) {
       *this, metadata, &addrOfWitnessTablePtr, -1, IGM.WitnessTablePtrTy,
       ".valueWitnesses");
 
-  const auto &ptrAuthOpts = IGM.getOptions().PointerAuth;
   if (auto schema = IGM.getOptions().PointerAuth.ValueWitnessTable) {
     llvm::Value *signedWitnessTablePtr = loadOfWitnessTablePtr;
     llvm::Value *witnessTablePtr = emitPointerAuthAuth(

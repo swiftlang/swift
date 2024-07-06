@@ -291,9 +291,9 @@ bool AbstractionPattern::conformsToKnownProtocol(
     = substTy->getASTContext().getProtocol(protocolKind);
     
   auto definitelyConforms = [&](CanType t) -> bool {
-    auto result = suppressible->getParentModule()
-      ->checkConformanceWithoutContext(t, suppressible,
-                                       /*allowMissing=*/false);
+    auto result =
+      ModuleDecl::checkConformanceWithoutContext(t, suppressible,
+                                                 /*allowMissing=*/false);
     return result.has_value() && !result.value().isInvalid();
   };
     
@@ -2066,7 +2066,7 @@ const {
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
-    auto memberTy = getType()->getTypeOfMember(member->getModuleContext(),
+    auto memberTy = getType()->getTypeOfMember(
                                       member, origMemberInterfaceType)
                              ->getReducedType(getGenericSignature());
       
@@ -2524,9 +2524,8 @@ public:
     
     auto decl = orig->getAnyNominal();
 
-    auto moduleDecl = decl->getParentModule();
-    auto origSubMap = orig->getContextSubstitutionMap(moduleDecl, decl);
-    auto substSubMap = subst->getContextSubstitutionMap(moduleDecl, decl);
+    auto origSubMap = orig->getContextSubstitutionMap(decl);
+    auto substSubMap = subst->getContextSubstitutionMap(decl);
     
     auto nomGenericSig = decl->getGenericSignature();
     
@@ -2543,7 +2542,7 @@ public:
     }
 
     auto newSubMap = SubstitutionMap::get(nomGenericSig, replacementTypes,
-      LookUpConformanceInModule(moduleDecl));
+      LookUpConformanceInModule());
     
     for (auto reqt : nomGenericSig.getRequirements()) {
       // Skip conformance requirements to Copyable and Escapable.

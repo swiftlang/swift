@@ -924,7 +924,7 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
       fnTy->getDifferentiabilityParameterIndices(),
       fnTy->getDifferentiabilityResultIndices(), *kindOpt, module.Types,
-      LookUpConformanceInModule(module.getSwiftModule()));
+      LookUpConformanceInModule());
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 
@@ -954,7 +954,7 @@ getExtracteeType(
   case LinearDifferentiableFunctionTypeComponent::Transpose:
     auto transposeFnTy = originalFnTy->getAutoDiffTransposeFunctionType(
         fnTy->getDifferentiabilityParameterIndices(), module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }
   llvm_unreachable("invalid extractee");
@@ -981,14 +981,14 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
         witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, *derivativeKind, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig,
+        LookUpConformanceInModule(), witnessCanGenSig,
         isReabstractionThunk);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
   assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
   auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
       parameterIndices, module.Types,
-      LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+      LookUpConformanceInModule(), witnessCanGenSig);
   return SILType::getPrimitiveObjectType(transposeFnTy);
 }
 
