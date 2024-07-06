@@ -271,6 +271,31 @@ public:
     recorder.clearRequest<Request>(request);
   }
 
+  /// Store a value in the request evaluator's cache for a split-cached request.
+  /// The request chooses to do this itself for storing some suitable definition of
+  /// "non-empty" value.
+  template<typename Request,
+           typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
+  void cacheNonEmptyOutput(const Request &request,
+                           typename Request::OutputType &&output) {
+    bool inserted = cache.insert<Request>(request, std::move(output));
+    assert(inserted && "Request result was already cached");
+    (void) inserted;
+  }
+
+  /// Consults the request evaluator's cache for a split-cached request.
+  /// The request should perform this check after consulting it's own optimized
+  /// representation for storing an empty value.
+  template<typename Request,
+           typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
+  std::optional<typename Request::OutputType>
+  getCachedNonEmptyOutput(const Request &request) {
+    auto found = cache.find_as(request);
+    if (found == cache.end<Request>())
+      return std::nullopt;
+    return found->second;
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
