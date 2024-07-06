@@ -848,7 +848,7 @@ namespace {
                 SmallVector<Space, 4> constElemSpaces;
                 if (auto payloadTy = eed->getArgumentInterfaceType()) {
                   auto eedTy = tp->getCanonicalType()->getTypeOfMember(
-                      E->getModuleContext(), eed, payloadTy);
+                      eed, payloadTy);
                   if (auto *TTy = eedTy->getAs<TupleType>()) {
                     Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
                   } else if (auto *TTy =

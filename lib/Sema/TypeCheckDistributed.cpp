@@ -404,7 +404,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 }
 
 static bool checkDistributedTargetResultType(
-    ModuleDecl *module, ValueDecl *valueDecl,
+    ValueDecl *valueDecl,
     Type serializationRequirement,
     bool diagnose) {
   auto &C = valueDecl->getASTContext();
@@ -442,7 +442,7 @@ static bool checkDistributedTargetResultType(
 
   for (auto serializationReq: serializationRequirements) {
     auto conformance =
-        module->checkConformance(resultType, serializationReq);
+        ModuleDecl::checkConformance(resultType, serializationReq);
     if (conformance.isInvalid()) {
       if (diagnose) {
         llvm::StringRef conformanceToSuggest = isCodableRequirement ?
@@ -535,7 +535,6 @@ bool CheckDistributedFunctionRequest::evaluate(
   }
 
   auto &C = func->getASTContext();
-  auto module = func->getParentModule();
 
   /// If no distributed module is available, then no reason to even try checks.
   if (!C.getLoadedModule(C.Id_Distributed)) {
@@ -560,7 +559,7 @@ bool CheckDistributedFunctionRequest::evaluate(
 
       auto srl = serializationReqType->getExistentialLayout();
       for (auto req: srl.getProtocols()) {
-        if (module->checkConformance(paramTy, req).isInvalid()) {
+        if (ModuleDecl::checkConformance(paramTy, req).isInvalid()) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
               param->getArgumentName().str(), param->getInterfaceType(),
@@ -611,7 +610,7 @@ bool CheckDistributedFunctionRequest::evaluate(
   }
 
   // --- Result type must be either void or a serialization requirement conforming type
-  if (checkDistributedTargetResultType(module, func, serializationReqType,
+  if (checkDistributedTargetResultType(func, serializationReqType,
                                        /*diagnose=*/true)) {
     return true;
   }
@@ -657,8 +656,7 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   auto serializationRequirement =
       getDistributedActorSerializationType(var->getDeclContext());
 
-  auto module = var->getModuleContext();
-  if (checkDistributedTargetResultType(module, var, serializationRequirement, diagnose)) {
+  if (checkDistributedTargetResultType(var, serializationRequirement, diagnose)) {
     return true;
   }
 

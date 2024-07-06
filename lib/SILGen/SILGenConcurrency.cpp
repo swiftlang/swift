@@ -257,9 +257,9 @@ SILGenFunction::emitLoadOfGlobalActorShared(SILLocation loc, CanType actorType) 
   VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
   assert(sharedInstanceDecl && "no shared actor field in global actor");
   SubstitutionMap subs =
-    actorType->getContextSubstitutionMap(SGM.SwiftModule, nominal);
+    actorType->getContextSubstitutionMap(nominal);
   Type instanceType =
-    actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
+    actorType->getTypeOfMember(sharedInstanceDecl);
 
   auto metaRepr =
     nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion())
@@ -315,7 +315,7 @@ emitDistributedActorIsolation(SILGenFunction &SGF, SILLocation loc,
   // simple case that it's okay.
   auto sig = distributedActorProto->getGenericSignature();
   auto distributedActorConf =
-    SGF.SGM.SwiftModule->lookupConformance(actorType, distributedActorProto);
+    ModuleDecl::lookupConformance(actorType, distributedActorProto);
   auto distributedActorSubs = SubstitutionMap::get(sig, {actorType},
                                                    {distributedActorConf});
 

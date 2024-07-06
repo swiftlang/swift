@@ -1768,7 +1768,6 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     return CheckedCastKind::BridgingCoercion;
   }
 
-  auto *module = dc->getParentModule();
   bool optionalToOptionalCast = false;
 
   // Local function to indicate failure.
@@ -1993,8 +1992,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       auto archetype = toType->castTo<ArchetypeType>();
       conformsToAllProtocols = llvm::all_of(archetype->getConformsTo(),
         [&](ProtocolDecl *proto) {
-          return module->checkConformance(fromType, proto,
-                                          /*allowMissing=*/false);
+          return ModuleDecl::checkConformance(fromType, proto,
+                                              /*allowMissing=*/false);
         });
     }
 
@@ -2139,7 +2138,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       constraint = existential->getConstraintType();
     if (auto *protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(constraint->getAnyNominal())) {
-      if (!couldDynamicallyConformToProtocol(toType, protocolDecl, module)) {
+      if (!couldDynamicallyConformToProtocol(toType, protocolDecl)) {
         return failed();
       }
     } else if (auto protocolComposition =
@@ -2149,7 +2148,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
                                  protocolType->getAnyNominal())) {
                            return !couldDynamicallyConformToProtocol(
-                               toType, protocolDecl, module);
+                               toType, protocolDecl);
                          }
                          return false;
                        })) {
@@ -2245,7 +2244,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (module->checkConformance(toType, errorTypeProto)) {
+      if (ModuleDecl::checkConformance(toType, errorTypeProto)) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -2255,7 +2254,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         }
       }
 
-      if (module->checkConformance(fromType, errorTypeProto)) {
+      if (ModuleDecl::checkConformance(fromType, errorTypeProto)) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||
              (nsErrorTy && toType->isEqual(nsErrorTy)))

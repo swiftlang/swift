@@ -1030,12 +1030,11 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
   if (extension && extension->isConstrainedExtension()) {
     auto contextSubMap = parentTy->getContextSubstitutionMap(
-        extension->getParentModule(), extension->getSelfNominalTypeDecl());
+        extension->getSelfNominalTypeDecl());
     if (!subMap) {
       // The substitution map wasn't set above, meaning we should grab the map
       // for the extension itself.
-      subMap = parentTy->getContextSubstitutionMap(extension->getParentModule(),
-                                                   extension);
+      subMap = parentTy->getContextSubstitutionMap(extension);
     }
 
     if (auto signature = decl->getGenericSignature()) {
@@ -1372,8 +1371,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type =
-            baseType->getTypeOfMember(DC->getParentModule(), memberDecl, type);
+        type = baseType->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }
@@ -2725,8 +2723,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
-    auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
-                                                         typeDecl, baseObjTy);
+    auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
     // If the member type is a constraint, e.g. because the
     // reference is to a typealias with an underlying protocol
@@ -7775,8 +7772,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
     return cachedConformance->second;
 
   auto conformance =
-      DC->getParentModule()->lookupConformance(type, protocol,
-                                               /*allowMissing=*/true);
+      ModuleDecl::lookupConformance(type, protocol, /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
 }

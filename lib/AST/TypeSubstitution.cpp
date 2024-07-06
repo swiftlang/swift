@@ -191,32 +191,32 @@ operator()(CanType dependentType, Type conformingReplacementType,
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
 
-  assert(M && "null module in conformance lookup");
-  return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol,
-                              /*allowMissing=*/true);
+  return ModuleDecl::lookupConformance(conformingReplacementType,
+                                       conformedProtocol,
+                                       /*allowMissing=*/true);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  auto result = Subs.lookupConformance(dependentType, conformedProtocol);
-  if (!result.isInvalid())
-    return result;
-
   // Lookup conformances for archetypes that conform concretely
   // via a superclass.
   if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    return conformedProtocol->getModuleContext()->lookupConformance(
+    return ModuleDecl::lookupConformance(
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
   }
 
+  auto result = Subs.lookupConformance(dependentType, conformedProtocol);
+  if (!result.isInvalid())
+    return result;
+
   // Otherwise, the original type might be fixed to a concrete type in
   // the substitution map's input generic signature.
   if (auto genericSig = Subs.getGenericSignature()) {
-    if (genericSig->isConcreteType(dependentType)) {
-      return conformedProtocol->getModuleContext()->lookupConformance(
+    if (genericSig->isValidTypeParameter(dependentType) &&
+        genericSig->isConcreteType(dependentType)) {
+      return ModuleDecl::lookupConformance(
           conformingReplacementType, conformedProtocol,
           /*allowMissing=*/true);
     }
@@ -255,30 +255,14 @@ operator()(CanType dependentType, Type conformingReplacementType,
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
     if (auto superclassType = archetypeType->getSuperclass()) {
-      return conformedProtocol->getModuleContext()->lookupConformance(
-          archetypeType, conformedProtocol);
+      return ModuleDecl::lookupConformance(archetypeType, conformedProtocol);
     }
   }
   return ProtocolConformanceRef(conformedProtocol);
 }
 
-ProtocolConformanceRef LookUpConformanceInSignature::
-operator()(CanType dependentType, Type conformingReplacementType,
-           ProtocolDecl *conformedProtocol) const {
-  // Lookup conformances for opened existential.
-  if (conformingReplacementType->isOpenedExistential()) {
-    return conformedProtocol->getModuleContext()->lookupConformance(
-        conformingReplacementType, conformedProtocol);
-  }
-
-  // FIXME: Should pass dependentType instead, once
-  // GenericSignature::lookupConformance() does the right thing
-  return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),
-                                conformedProtocol);
-}
-
-Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
-  return substBaseType(substBase, LookUpConformanceInModule(module),
+Type DependentMemberType::substBaseType(Type substBase) {
+  return substBaseType(substBase, LookUpConformanceInModule(),
                        std::nullopt);
 }
 
@@ -822,7 +806,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 }
 
 SubstitutionMap TypeBase::getContextSubstitutionMap(
-    ModuleDecl *module, const DeclContext *dc,
+    const DeclContext *dc,
     GenericEnvironment *genericEnv) {
   auto genericSig = dc->getGenericSignatureOfContext();
   if (genericSig.isNull())
@@ -830,7 +814,7 @@ SubstitutionMap TypeBase::getContextSubstitutionMap(
   return SubstitutionMap::get(
     genericSig,
     QueryTypeSubstitutionMap{getContextSubstitutions(dc, genericEnv)},
-    LookUpConformanceInModule(module));
+    LookUpConformanceInModule());
 }
 
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(
@@ -875,8 +859,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
 }
 
 SubstitutionMap TypeBase::getMemberSubstitutionMap(
-    ModuleDecl *module, const ValueDecl *member,
-    GenericEnvironment *genericEnv) {
+    const ValueDecl *member, GenericEnvironment *genericEnv) {
   auto genericSig = member->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
   if (genericSig.isNull())
@@ -885,14 +868,14 @@ SubstitutionMap TypeBase::getMemberSubstitutionMap(
   return SubstitutionMap::get(
       genericSig,
       QueryTypeSubstitutionMap{subs},
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
 }
 
-Type TypeBase::getTypeOfMember(ModuleDecl *module, const VarDecl *member) {
-  return getTypeOfMember(module, member, member->getInterfaceType());
+Type TypeBase::getTypeOfMember(const VarDecl *member) {
+  return getTypeOfMember(member, member->getInterfaceType());
 }
 
-Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
+Type TypeBase::getTypeOfMember(const ValueDecl *member,
                                Type memberType) {
   assert(memberType);
   assert(!memberType->is<GenericFunctionType>() &&
@@ -903,11 +886,11 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
 
   if (auto *lvalue = getAs<LValueType>()) {
     auto objectTy = lvalue->getObjectType();
-    return objectTy->getTypeOfMember(module, member, memberType);
+    return objectTy->getTypeOfMember(member, memberType);
   }
 
   // Perform the substitution.
-  auto substitutions = getMemberSubstitutionMap(module, member);
+  auto substitutions = getMemberSubstitutionMap(member);
   return memberType.subst(substitutions);
 }
 
@@ -1222,10 +1205,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     // SIL type lowering may have already substituted away the opaque type, in
     // which case we'll end up "substituting" the same type.
     if (maybeOpaqueType->isEqual(replacementType)) {
-      const auto *inContext = getContext();
-      assert(inContext && "Need context for already-substituted opaque types");
-      return inContext->getParentModule()
-                      ->lookupConformance(replacementType, protocol);
+      return ModuleDecl::lookupConformance(replacementType, protocol);
     }
     
     llvm_unreachable("origType should have been an opaque type or type parameter");

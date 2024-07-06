@@ -1309,8 +1309,7 @@ public:
   /// \param genericEnv If non-null and the type is nested inside of a
   /// generic function, generic parameters of the outer context are
   /// mapped to context archetypes of this generic environment.
-  SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
-                                            const DeclContext *dc,
+  SubstitutionMap getContextSubstitutionMap(const DeclContext *dc,
                                             GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
@@ -1322,8 +1321,7 @@ public:
   ///
   /// \param genericEnv If non-null, generic parameters of the member are
   /// mapped to context archetypes of this generic environment.
-  SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
-                                           const ValueDecl *member,
+  SubstitutionMap getMemberSubstitutionMap(const ValueDecl *member,
                                            GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
@@ -1340,7 +1338,7 @@ public:
   /// \param member The property whose type we are substituting.
   ///
   /// \returns The resulting property type.
-  Type getTypeOfMember(ModuleDecl *module, const VarDecl *member);
+  Type getTypeOfMember(const VarDecl *member);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -1371,8 +1369,7 @@ public:
   /// method's generic parameters.
   ///
   /// \returns The resulting member type.
-  Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       Type memberType);
+  Type getTypeOfMember(const ValueDecl *member, Type memberType);
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
@@ -7075,7 +7072,7 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(ModuleDecl *M, Type base);
+  Type substBaseType(Type base);
 
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new

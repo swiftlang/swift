@@ -861,13 +861,12 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   Type getTransformedType(Type T) {
     if (CurrentType && Current && CurrentType->mayHaveMembers()) {
-      auto *M = Current->getDeclContext()->getParentModule();
       SubstitutionMap subMap;
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(Current))
-        subMap = CurrentType->getContextSubstitutionMap(M, NTD);
+        subMap = CurrentType->getContextSubstitutionMap(NTD);
       else if (auto *ED = dyn_cast<ExtensionDecl>(Current))
-        subMap = CurrentType->getContextSubstitutionMap(M, ED);
+        subMap = CurrentType->getContextSubstitutionMap(ED);
       else {
         Decl *subTarget = Current;
         if (isa<ParamDecl>(Current)) {
@@ -876,7 +875,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
             subTarget = FD;
         }
         subMap = CurrentType->getMemberSubstitutionMap(
-          M, cast<ValueDecl>(subTarget));
+          cast<ValueDecl>(subTarget));
       }
 
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
@@ -1135,7 +1134,7 @@ public:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         assert(Options.CurrentModule);
         auto Subs = CurrentType->getContextSubstitutionMap(
-          Options.CurrentModule, NTD->getDeclContext());
+          NTD->getDeclContext());
         setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
       }
     }
@@ -1832,12 +1831,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
   unsigned typeContextDepth = 0;
   SubstitutionMap subMap;
-  ModuleDecl *M = nullptr;
+
   if (CurrentType && Current) {
     if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      M = DC->getParentModule();
-      subMap = CurrentType->getContextSubstitutionMap(M, DC);
+      subMap = CurrentType->getContextSubstitutionMap(DC);
       typeContextDepth = subMap.getGenericSignature().getNextDepth();
     }
   }
@@ -1853,7 +1851,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         return type;
       },
       [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return M->lookupConformance(substType, proto);
+        return ModuleDecl::lookupConformance(substType, proto);
       });
   };
 
@@ -7130,7 +7128,7 @@ public:
       }
       llvm_unreachable("ran out of type parameters");
       return Type();
-    }, LookUpConformanceInSignature(sig.getPointer()));
+    }, LookUpConformanceInModule());
   }
 
   void visitElementArchetypeType(ElementArchetypeType *T) {

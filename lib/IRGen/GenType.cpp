@@ -2942,8 +2942,7 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
          && !deinitTy->hasError()
          && "deinit should have only one parameter");
 
-  auto substitutions = ty->getContextSubstitutionMap(IGF.getSwiftModule(),
-                                                     nominal);
+  auto substitutions = ty->getContextSubstitutionMap(nominal);
                                                      
   CalleeInfo info(deinitTy,
                   deinitTy->substGenericArgs(IGF.getSILModule(),

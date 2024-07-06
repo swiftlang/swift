@@ -92,7 +92,7 @@ static CanType unwrapExistential(CanType e) {
 /// into an existential type by performing a static check
 /// of protocol conformances if it is possible.
 static DynamicCastFeasibility
-classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
+classifyDynamicCastToProtocol(CanType source, CanType target,
                               bool isWholeModuleOpts) {
   assert(target.isExistentialType() &&
          "target should be an existential type");
@@ -114,7 +114,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   // If checkConformance() returns a valid conformance, then all conditional
   // requirements were satisfied.
-  if (M->checkConformance(source, TargetProtocol))
+  if (ModuleDecl::checkConformance(source, TargetProtocol))
     return DynamicCastFeasibility::WillSucceed;
 
   auto *SourceNominalTy = source.getAnyNominal();
@@ -152,7 +152,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   // the checkConformance interface needs to be reformulated as a query, and
   // the implementation, including checkGenericArguments, needs to be taught to
   // recognize that types with archetypes may potentially succeed.
-  if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
+  if (auto conformance = ModuleDecl::lookupConformance(source, TargetProtocol)) {
     assert(!conformance.getConditionalRequirements().empty());
     return DynamicCastFeasibility::MaySucceed;
   }
@@ -372,29 +372,29 @@ bool SILDynamicCastInst::isRCIdentityPreserving() const {
 }
 
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
-bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
+bool swift::isObjectiveCBridgeable(CanType Ty) {
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto =
-      M->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+      Ty->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
-    return (bool)M->lookupConformance(Ty, bridgedProto);
+    return (bool)ModuleDecl::lookupConformance(Ty, bridgedProto);
   }
   return false;
 }
 
 /// Check if a given type conforms to _Error protocol.
-bool swift::isError(ModuleDecl *M, CanType Ty) {
+bool swift::isError(CanType Ty) {
   // Retrieve the Error protocol.
   auto errorTypeProto =
-      M->getASTContext().getProtocol(KnownProtocolKind::Error);
+      Ty->getASTContext().getProtocol(KnownProtocolKind::Error);
 
   if (errorTypeProto) {
     // Find the conformance of the value type to Error.
     // Check whether the type conforms to Error.
-    return (bool)M->lookupConformance(Ty, errorTypeProto);
+    return (bool)ModuleDecl::lookupConformance(Ty, errorTypeProto);
   }
   return false;
 }
@@ -435,7 +435,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
   return DynamicCastFeasibility::WillFail;
 }
 
-CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
+CanType swift::getNSBridgedClassOfCFClass(CanType type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
@@ -451,15 +451,14 @@ CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
   return CanType();
 }
 
-static bool isCFBridgingConversion(ModuleDecl *M,
-                                   CanType sourceFormalType,
+static bool isCFBridgingConversion(CanType sourceFormalType,
                                    CanType targetFormalType) {
   if (auto bridgedTarget =
-        getNSBridgedClassOfCFClass(M, targetFormalType)) {
+        getNSBridgedClassOfCFClass(targetFormalType)) {
     return bridgedTarget->isExactSuperclassOf(sourceFormalType);
   }
   if (auto bridgedSource =
-        getNSBridgedClassOfCFClass(M, sourceFormalType)) {
+        getNSBridgedClassOfCFClass(sourceFormalType)) {
     return targetFormalType->isExactSuperclassOf(bridgedSource);
   }
   
@@ -508,7 +507,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
                          DynamicCastFeasibility::MaySucceed);
     if (target.isExistentialType()) {
       result = atWorst(result, classifyDynamicCastToProtocol(
-                                   M, source, target, isWholeModuleOpts));
+                                   source, target, isWholeModuleOpts));
     }
     return result;
   }
@@ -522,7 +521,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
     // Check conversions from non-protocol types into protocol types.
     if (!source.isExistentialType() &&
         target.isExistentialType())
-      return classifyDynamicCastToProtocol(M, source, target,
+      return classifyDynamicCastToProtocol(source, target,
                                            isWholeModuleOpts);
 
     // Check conversions from protocol types to non-protocol types.
@@ -552,7 +551,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // Hashable is not actually a legal existential type right now, but
       // the check doesn't care about that.
       if (auto hashable = getHashableExistentialType(M)) {
-        return classifyDynamicCastToProtocol(M, source, hashable,
+        return classifyDynamicCastToProtocol(source, hashable,
                                              isWholeModuleOpts);
       }
     }
@@ -589,7 +588,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
     if (targetMetatype.isAnyExistentialType() && target->isExistentialType()) {
       auto Feasibility =
-          classifyDynamicCastToProtocol(M, source, target, isWholeModuleOpts);
+          classifyDynamicCastToProtocol(source, target, isWholeModuleOpts);
       // Cast from existential metatype to existential metatype may still
       // succeed, even if we cannot prove anything statically.
       if (Feasibility != DynamicCastFeasibility::WillFail ||
@@ -747,8 +746,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
       // As a backup, consider whether either type is a CF class type
       // with an NS bridged equivalent.
-      CanType bridgedSource = getNSBridgedClassOfCFClass(M, source);
-      CanType bridgedTarget = getNSBridgedClassOfCFClass(M, target);
+      CanType bridgedSource = getNSBridgedClassOfCFClass(source);
+      CanType bridgedTarget = getNSBridgedClassOfCFClass(target);
 
       // If neither type qualifies, we're done.
       if (!bridgedSource && !bridgedTarget)
@@ -842,7 +841,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
   }
 
   // Check if it is a cast between bridged error types.
-  if (isError(M, source) && isError(M, target)) {
+  if (isError(source) && isError(target)) {
     // TODO: Cast to NSError succeeds always.
     return DynamicCastFeasibility::MaySucceed;
   }
@@ -944,11 +943,10 @@ namespace {
     SILModule &M;
     ASTContext &Ctx;
     SILLocation Loc;
-    ModuleDecl *SwiftModule;
+
   public:
-    CastEmitter(SILBuilder &B, ModuleDecl *swiftModule, SILLocation loc)
-      : B(B), M(B.getModule()), Ctx(M.getASTContext()), Loc(loc),
-        SwiftModule(swiftModule) {}
+    CastEmitter(SILBuilder &B, SILLocation loc)
+      : B(B), M(B.getModule()), Ctx(M.getASTContext()), Loc(loc) {}
 
     Source emitTopLevel(Source source, Target target) {
       unsigned sourceOptDepth = getOptionalDepth(source.FormalType);
@@ -1033,8 +1031,7 @@ namespace {
       auto targetFormalTy = target.FormalType;
       auto targetLoweredTy =
           SILType::getPrimitiveObjectType(target.LoweredType.getASTType());
-      if (isCFBridgingConversion(SwiftModule,
-                                 source.FormalType,
+      if (isCFBridgingConversion(source.FormalType,
                                  targetFormalTy)) {
         value = B.createUncheckedRefCast(Loc, value, targetLoweredTy);
       } else {
@@ -1242,7 +1239,7 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
 
   Source source(value, sourceFormalType);
   Target target(targetLoweredType, targetFormalType);
-  Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
+  Source result = CastEmitter(B, loc).emitTopLevel(source, target);
   assert(!result.isAddress());
   assert(result.Value->getType() == targetLoweredType);
   return result.Value;
@@ -1298,7 +1295,7 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
 
   Source source(src, sourceFormalType);
   Target target(dest, targetFormalType);
-  Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
+  Source result = CastEmitter(B, loc).emitTopLevel(source, target);
   assert(result.isAddress());
   assert(result.Value == dest);
   (void) result;

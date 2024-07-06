@@ -78,7 +78,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool) DC->getParentModule()->checkConformance(varType, proto);
+    return (bool) ModuleDecl::checkConformance(varType, proto);
   });
 }
 
@@ -110,10 +110,9 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
 
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
-    auto module = nominal->getModuleContext();
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = module->lookupConformance(memberType, proto);
+    auto confRef = ModuleDecl::lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
     // Get member type's math operator, e.g. `Member.+`.
@@ -249,8 +248,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
           new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                                 /*Implicit*/ true);
     }
-    auto *module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(memberType, proto);
+    auto confRef = ModuleDecl::lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to `AdditiveArithmetic`");
     // If conformance reference is not concrete, then concrete witness
     // declaration for property cannot be resolved. Return reference to

@@ -154,14 +154,13 @@ public:
 };
 
 /// Get the bridgeToObjectiveC witness for the type.
-static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
-                                        ModuleDecl *SwiftModule) {
-  auto &Ctx = SwiftModule->getASTContext();
+static SILDeclRef getBridgeToObjectiveC(CanType NativeType) {
+  auto &Ctx = NativeType->getASTContext();
   auto Proto = Ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!Proto)
     return SILDeclRef();
   auto ConformanceRef =
-      SwiftModule->lookupConformance(NativeType, Proto);
+      ModuleDecl::lookupConformance(NativeType, Proto);
   if (ConformanceRef.isInvalid())
     return SILDeclRef();
 
@@ -178,14 +177,13 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
 }
 
 /// Get the _unconditionallyBridgeFromObjectiveC witness for the type.
-SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
-                                   ModuleDecl *SwiftModule) {
-  auto &Ctx = SwiftModule->getASTContext();
+SILDeclRef getBridgeFromObjectiveC(CanType NativeType) {
+  auto &Ctx = NativeType->getASTContext();
   auto Proto = Ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!Proto)
     return SILDeclRef();
   auto ConformanceRef =
-      SwiftModule->lookupConformance(NativeType, Proto);
+      ModuleDecl::lookupConformance(NativeType, Proto);
   if (ConformanceRef.isInvalid())
     return SILDeclRef();
   auto Conformance = ConformanceRef.getConcrete();
@@ -513,10 +511,9 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   // Check that we call the _unconditionallyBridgeFromObjectiveC witness.
   auto NativeType = Apply->getType().getASTType();
   auto *BridgeFun = FunRef->getReferencedFunction();
-  auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
   // getBridgeFromObjectiveC returns SILDeclRef().
-  auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
+  auto bridgeWitness = getBridgeFromObjectiveC(NativeType);
   if (bridgeWitness == SILDeclRef() ||
       BridgeFun->getName() != bridgeWitness.mangle())
     return false;
@@ -910,10 +907,9 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // Make sure we are calling the actual bridge witness.
   auto NativeType = BridgedValue->getType().getASTType();
   auto *BridgeFun = FunRef->getReferencedFunction();
-  auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
   // getBridgeToObjectiveC returns SILDeclRef().
-  auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
+  auto bridgeWitness = getBridgeToObjectiveC(NativeType);
   if (bridgeWitness == SILDeclRef() ||
       BridgeFun->getName() != bridgeWitness.mangle())
     return BridgedArgument();

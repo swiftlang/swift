@@ -2436,7 +2436,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  return DC->getParentModule()->lookupConformance(castTy, protocol)
+  return ModuleDecl::lookupConformance(castTy, protocol)
              ? CoerceExpr::forLiteralInit(getASTContext(), literal,
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())

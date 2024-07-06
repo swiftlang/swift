@@ -73,8 +73,7 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
 
 /// Similar to ModuleDecl::conformsToProtocol, but doesn't introduce a
 /// dependency on Sema.
-static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
-                               ModuleDecl *module) {
+static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isInvalid())
     return false;
   if (!conformanceRef.isConcrete())
@@ -83,7 +82,7 @@ static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
   auto subMap = conformance->getSubstitutionMap();
   return llvm::all_of(subMap.getConformances(),
                       [&](ProtocolConformanceRef each) -> bool {
-                        return isConcreteAndValid(each, module);
+                        return isConcreteAndValid(each);
                       });
 }
 
@@ -205,7 +204,6 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
 static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
   auto binaryIntegerProto =
       decl->getASTContext().getProtocol(KnownProtocolKind::BinaryInteger);
-  auto module = decl->getModuleContext();
 
   auto isValid = [&](ValueDecl *minusOp) -> bool {
     auto minus = dyn_cast<FuncDecl>(minusOp);
@@ -228,8 +226,8 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
       return false;
     auto returnTy = minus->getResultInterfaceType();
     auto conformanceRef =
-        module->lookupConformance(returnTy, binaryIntegerProto);
-    if (!isConcreteAndValid(conformanceRef, module))
+        ModuleDecl::lookupConformance(returnTy, binaryIntegerProto);
+    if (!isConcreteAndValid(conformanceRef))
       return false;
     return true;
   };
@@ -722,10 +720,9 @@ void swift::conformToCxxSequenceIfNeeded(
     return;
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  ModuleDecl *module = decl->getModuleContext();
   auto rawIteratorConformanceRef =
-      module->lookupConformance(rawIteratorTy, cxxIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+      ModuleDecl::lookupConformance(rawIteratorTy, cxxIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
@@ -748,7 +745,7 @@ void swift::conformToCxxSequenceIfNeeded(
           return declSelfTy;
         return Type(dependentType);
       },
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
@@ -771,9 +768,8 @@ void swift::conformToCxxSequenceIfNeeded(
 
     // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
     auto rawIteratorRAConformanceRef =
-        decl->getModuleContext()->lookupConformance(rawIteratorTy,
-                                                    cxxRAIteratorProto);
-    if (!isConcreteAndValid(rawIteratorRAConformanceRef, module))
+        ModuleDecl::lookupConformance(rawIteratorTy, cxxRAIteratorProto);
+    if (!isConcreteAndValid(rawIteratorRAConformanceRef))
       return false;
 
     // CxxRandomAccessCollection always uses Int as an Index.
@@ -786,7 +782,7 @@ void swift::conformToCxxSequenceIfNeeded(
             return declSelfTy;
           return Type(dependentType);
         },
-        LookUpConformanceInModule(module));
+        LookUpConformanceInModule());
 
     auto indicesTy = ctx.getRangeType();
     indicesTy = indicesTy.subst(
@@ -795,7 +791,7 @@ void swift::conformToCxxSequenceIfNeeded(
             return indexTy;
           return Type(dependentType);
         },
-        LookUpConformanceInModule(module));
+        LookUpConformanceInModule());
 
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
@@ -893,10 +889,9 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
 
   auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
   // Check if RawMutableIterator conforms to UnsafeCxxInputIterator.
-  ModuleDecl *module = decl->getModuleContext();
   auto rawIteratorConformanceRef =
-      module->lookupConformance(rawMutableIteratorTy, cxxIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+      ModuleDecl::lookupConformance(rawMutableIteratorTy, cxxIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
@@ -977,16 +972,15 @@ void swift::conformToCxxDictionaryIfNeeded(
   auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  ModuleDecl *module = decl->getModuleContext();
   auto rawIteratorConformanceRef =
-      module->lookupConformance(rawIteratorTy, cxxInputIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+      ModuleDecl::lookupConformance(rawIteratorTy, cxxInputIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
 
   // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
-  auto rawMutableIteratorConformanceRef = module->lookupConformance(
+  auto rawMutableIteratorConformanceRef = ModuleDecl::lookupConformance(
       rawMutableIteratorTy, cxxMutableInputIteratorProto);
-  if (!isConcreteAndValid(rawMutableIteratorConformanceRef, module))
+  if (!isConcreteAndValid(rawMutableIteratorConformanceRef))
     return;
 
   // Make the original subscript that returns a non-optional value unavailable.
@@ -1044,10 +1038,9 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
   auto rawIteratorTy = iterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-  ModuleDecl *module = decl->getModuleContext();
   auto rawIteratorConformanceRef =
-      module->lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
+      ModuleDecl::lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,

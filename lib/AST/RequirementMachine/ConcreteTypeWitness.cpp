@@ -140,10 +140,6 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     if (!checkRulePairOnce(concreteRuleID, conformanceRuleID))
       continue;
 
-    // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
-    // or pass the correct one down in here.
-    auto *module = proto->getParentModule();
-
     // For conformance to 'Sendable', allow synthesis of a missing conformance
     // if the requirement is a concrete type requirement, that is, if we're
     // looking at a signature of the form 'T == Foo, T : Sendable'.
@@ -154,9 +150,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = (requirementKind == RequirementKind::SameType);
 
-    auto conformance = module->lookupConformance(concreteType,
-                                                 const_cast<ProtocolDecl *>(proto),
-                                                 allowMissing);
+    auto conformance = ModuleDecl::lookupConformance(concreteType,
+                                                     const_cast<ProtocolDecl *>(proto),
+                                                     allowMissing);
     if (!allowMissing &&
         proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
         conformance.hasUnavailableConformance()) {

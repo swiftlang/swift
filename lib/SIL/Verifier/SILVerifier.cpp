@@ -322,7 +322,7 @@ void verifyKeyPathComponent(SILModule &M,
               "property");
     }
 
-    auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
+    auto fieldTy = baseTy->getTypeOfMember(property)
                          ->getReferenceStorageReferent()
                          ->getCanonicalType();
     require(getTypeInExpansionContext(fieldTy) ==
@@ -5907,7 +5907,7 @@ public:
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(M));
+          LookUpConformanceInModule());
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
                       SILType::getPrimitiveObjectType(expectedJVPType),
                       "JVP type does not match expected JVP type");
@@ -5919,7 +5919,7 @@ public:
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(M));
+          LookUpConformanceInModule());
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
                       SILType::getPrimitiveObjectType(expectedVJPType),
                       "VJP type does not match expected VJP type");
@@ -5946,7 +5946,7 @@ public:
       require(!transposeType->isDifferentiable(),
               "The transpose function must not be differentiable");
       auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
-          lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
+          lfi->getParameterIndices(), TC, LookUpConformanceInModule());
       // TODO: Consider tightening verification. This requires changes to
       // `SILFunctionType::getAutoDiffTransposeFunctionType`.
       requireSameType(
@@ -6283,8 +6283,7 @@ public:
                                    Type conformingType,
                                    ProtocolDecl *protocol) -> ProtocolConformanceRef {
         // FIXME: This violates the spirit of this verifier check.
-        return protocol->getParentModule()
-            ->lookupConformance(conformingType, protocol);
+        return ModuleDecl::lookupConformance(conformingType, protocol);
       };
 
       // If the pack components and expected element types are SIL types,

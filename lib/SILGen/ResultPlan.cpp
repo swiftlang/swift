@@ -973,7 +973,7 @@ public:
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+                                         LookUpConformanceInModule());
 
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,

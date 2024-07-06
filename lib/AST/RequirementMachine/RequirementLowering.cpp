@@ -606,7 +606,7 @@ struct InferRequirementsWalker : public TypeWalker {
                                          AssociatedTypeDecl *assocType) {
           auto secondType = assocType->getDeclaredInterfaceType()
               ->castTo<DependentMemberType>()
-              ->substBaseType(module, firstType);
+              ->substBaseType(firstType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});
@@ -649,7 +649,7 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Continue;
 
     /// Retrieve the substitution.
-    auto subMap = ty->getContextSubstitutionMap(module, decl);
+    auto subMap = ty->getContextSubstitutionMap(decl);
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.

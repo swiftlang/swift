@@ -217,7 +217,7 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   auto &ctx = cs.getASTContext();
 
   if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-      if (!cs.DC->getParentModule()->lookupConformance(unwrappedDict, proto))
+      if (!ModuleDecl::lookupConformance(unwrappedDict, proto))
         return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);

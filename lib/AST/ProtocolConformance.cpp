@@ -237,10 +237,16 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
   case ProtocolConformanceKind::Self:
     // If we have a normal or inherited protocol conformance, look for its
     // generic signature.
+
+    // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+    // a Sendable conformance. The implied conformance is unconditional so it uses
+    // the generic signature of the nominal type and not the generic signature of
+    // the extension that declared the (implying) conditional conformance.
     if (getSourceKind() == ConformanceEntryKind::Implied &&
         getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       return getDeclContext()->getSelfNominalTypeDecl()->getGenericSignature();
     }
+
     return getDeclContext()->getGenericSignatureOfContext();
 
   case ProtocolConformanceKind::Builtin:
@@ -416,6 +422,10 @@ ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
     return {};
   }
 
+  // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+  // a Sendable conformance. We ask the conformance for its generic signature,
+  // which will always be the generic signature of `ext` except in this case,
+  // where it's the generic signature of the extended nominal.
   const auto extensionSig = NPC->getGenericSignature();
 
   // The extension signature should be a superset of the type signature, meaning
@@ -682,8 +692,7 @@ RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement) const {
     // witness's parent. Don't use witness.getSubstitutions(), which
     // are written in terms of the witness thunk signature.
     auto subs =
-      getType()->getContextSubstitutionMap(getDeclContext()->getParentModule(),
-                                           witnessDecl->getDeclContext());
+      getType()->getContextSubstitutionMap(witnessDecl->getDeclContext());
     return ConcreteDeclRef(witness.getDecl(), subs);
   }
 
@@ -746,20 +755,17 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     // Substitute the conditional requirements so that they're phrased in
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
-    ModuleDecl *module;
     SubstitutionMap subMap;
     if (auto nominal = GenericConformance->getType()->getAnyNominal()) {
-      module = nominal->getModuleContext();
-      subMap = getType()->getContextSubstitutionMap(module, nominal);
+      subMap = getType()->getContextSubstitutionMap(nominal);
     } else {
-      module = getProtocol()->getModuleContext();
       subMap = getSubstitutionMap();
     }
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : *parentCondReqs) {
       auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
-                                 LookUpConformanceInModule(module));
+                                 LookUpConformanceInModule());
       newReqs.push_back(newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();
@@ -1276,8 +1282,7 @@ findSynthesizedConformance(
   if (!cvProto)
     return nullptr;
 
-  auto module = dc->getParentModule();
-  auto conformance = module->lookupConformance(
+  auto conformance = ModuleDecl::lookupConformance(
       nominal->getDeclaredInterfaceType(), cvProto);
   if (!conformance || !conformance.isConcrete())
     return nullptr;

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-swift-emit-silgen %s -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -strict-concurrency=complete
+// RUN: %target-swift-emit-silgen %s -swift-version 5 -strict-concurrency=complete
 
 protocol P: Sendable {}
 protocol Q: Sendable {}

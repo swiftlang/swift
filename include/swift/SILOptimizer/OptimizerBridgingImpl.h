@@ -416,8 +416,7 @@ void BridgedPassContext::loadFunction(BridgedFunction function, bool loadCallees
 BridgedSubstitutionMap BridgedPassContext::getContextSubstitutionMap(BridgedType type) const {
   swift::SILType ty = type.unbridged();
   auto *ntd = ty.getASTType()->getAnyNominal();
-  auto *mod = invocation->getPassManager()->getModule()->getSwiftModule();
-  return ty.getASTType()->getContextSubstitutionMap(mod, ntd);
+  return ty.getASTType()->getContextSubstitutionMap(ntd);
 }
 
 BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
