@@ -64,6 +64,6 @@ TEST_F(ScanTest, TestDoesNotHaveArgumentQuery) {
   bool hasOption;
   hasOption = optionSet.find("-clearly-not-a-compiler-flag") != optionSet.end();
   EXPECT_EQ(hasOption, false);
-  hasOption = optionSet.find("-emit-modul") != optionSet.end();
+  hasOption = optionSet.find("-emit-module") != optionSet.end();
   EXPECT_EQ(hasOption, false);
 }
