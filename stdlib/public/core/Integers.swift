@@ -1787,7 +1787,7 @@ extension BinaryInteger {
 //===--- Ambiguity breakers -----------------------------------------------===//
 //
 // These two versions of the operators are not ordered with respect to one
-// another, but the compiler choses the second one, and that results in infinite
+// another, but the compiler chooses the second one, and that results in infinite
 // recursion.
 //
 //     <T: Comparable>(T, T) -> Bool

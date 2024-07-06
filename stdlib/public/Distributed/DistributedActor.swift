@@ -325,7 +325,7 @@ extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable 
   /// on, in order to obtain the instance this initializer should return.
   ///
   /// - Parameter decoder: used to decode the ``ID`` of this distributed actor.
-  /// - Throws: If the actor system value in `decoder.userInfo` is missing or mis-typed;
+  /// - Throws: If the actor system value in `decoder.userInfo` is missing or mistyped;
   ///           the `ID` fails to decode from the passed `decoder`;
   //            or if the ``DistributedActor/resolve(id:using:)`` method invoked by this initializer throws.
   nonisolated public init(from decoder: Decoder) throws {
