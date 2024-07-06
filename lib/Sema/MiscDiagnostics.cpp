@@ -6373,7 +6373,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 void swift::performSyntacticExprDiagnostics(
     const Expr *E, const DeclContext *DC,
     std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-    bool disableExprAvailabilityChecking, bool disableOutOfPlaceExprChecking) {
+    bool disableOutOfPlaceExprChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6385,7 +6385,7 @@ void swift::performSyntacticExprDiagnostics(
   diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
-  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabilityChecking)
+  if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
