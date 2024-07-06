@@ -190,6 +190,74 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
 SWIFT_NAME("getter:BridgedASTContext.majorLanguageVersion(self:)")
 unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext);
 
+SWIFT_NAME("BridgedASTContext.langOptsCustomConditionSet(self:_:)")
+bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
+                                                  BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsHasFeatureNamed(self:_:)")
+bool BridgedASTContext_langOptsHasFeatureNamed(BridgedASTContext cContext,
+                                               BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsHasAttributeNamed(self:_:)")
+bool BridgedASTContext_langOptsHasAttributeNamed(BridgedASTContext cContext,
+                                                 BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetOS(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetOS(BridgedASTContext cContext,
+                                                BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetArchitecture(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetArchitecture(BridgedASTContext cContext,
+                                                          BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetEnvironment(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetEnvironment(BridgedASTContext cContext,
+                                                         BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetRuntime(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetRuntime(BridgedASTContext cContext,
+                                                     BridgedStringRef cName);
+
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetPtrAuth(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
+                                                     BridgedStringRef cName);
+
+SWIFT_NAME("getter:BridgedASTContext.langOptsTargetPointerBitWidth(self:)")
+unsigned BridgedASTContext_langOptsTargetPointerBitWidth(BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedASTContext.langOptsGetTargetAtomicBitWidths(self:_:)")
+SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(BridgedASTContext cContext,
+                                                      SwiftInt* _Nullable * _Nonnull cComponents);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
+  EndianLittle,
+  EndianBig,
+};
+
+SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
+BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedASTContext.langOptsGetLanguageVersion(self:_:)")
+SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
+                                                      SwiftInt* _Nullable * _Nonnull cComponents);
+
+SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
+SwiftInt BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
+                                                      SwiftInt* _Nullable * _Nonnull cComponents);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCanImportVersion : size_t {
+  CanImportUnversioned,
+  CanImportVersion,
+  CanImportUnderlyingVersion,
+};
+
+SWIFT_NAME("BridgedASTContext.canImport(self:importPath:versionKind:versionComponents:numVersionComponents:)")
+bool BridgedASTContext_canImport(BridgedASTContext cContext,
+                                 BridgedStringRef importPath,
+                                 BridgedCanImportVersion versionKind,
+                                 const SwiftInt * _Nullable versionComponents,
+                                 SwiftInt numVersionComponents);
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
