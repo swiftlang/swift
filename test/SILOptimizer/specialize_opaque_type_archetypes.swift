@@ -364,10 +364,10 @@ public func testResilientInlinableProperty2() {
 }
 
 // CHECK-LABEL: sil @$s1A035testResilientInlinablePropertyCallsbC0yyF : $@convention(thin) () -> () {
-// CHECK:   [[CONTAINTER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
+// CHECK:   [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvg
-// CHECK:  apply [[FUN]]([[RES]], [[CONTAINTER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
 public func testResilientInlinablePropertyCallsResilientInlinable() {
   let r = ResilientContainer2()
   useP(r.inlineablePropertyCallsResilientInlineable.myValue3())

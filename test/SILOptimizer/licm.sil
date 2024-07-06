@@ -226,7 +226,7 @@ public protocol P : class {
 }
 
 // Check that LICM does not hoist a metatype instruction before
-// the open_existential instruction which creates the archtype,
+// the open_existential instruction which creates the archetype,
 // because this would break the dominance relation between them.
 // CHECK-LABEL: sil @dont_hoist_metatype
 // CHECK-NOT: metatype
@@ -1096,7 +1096,7 @@ bb3:
 }
 
 // Test multiple stores to disjoint access paths with a single load
-// that spans both of them. The load should be split and hosited and
+// that spans both of them. The load should be split and hoisted and
 // and the stores be sunk.
 // testCommonSplitLoad
 // CHECK-LABEL: sil shared @testCommonSplitLoad : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, Int64, Int64) {
