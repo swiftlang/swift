@@ -357,7 +357,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -393,6 +393,10 @@ protected:
     /// True if we're in the common case where the ExpandMemberAttributeMacros
     /// request returned an empty array.
     NoMemberAttributeMacros : 1,
+
+    /// True if we're in the common case where the ExpandPeerMacroRequest
+    /// request returned an empty array.
+    NoPeerMacros : 1,
 
     /// True if we're in the common case where the GlobalActorAttributeRequest
     /// request returned a pair of null pointers.
@@ -519,7 +523,7 @@ protected:
 
     /// Whether this function is a distributed thunk for a distributed
     /// function or computed property.
-    DistributedThunk: 1
+    DistributedThunk : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl,
@@ -843,6 +847,7 @@ protected:
   friend class DeclDeserializer;
   friend class RawCommentRequest;
   friend class ExpandMemberAttributeMacros;
+  friend class ExpandPeerMacroRequest;
   friend class GlobalActorAttributeRequest;
   friend class SPIGroupsRequest;
 
@@ -869,6 +874,14 @@ private:
 
   void setHasNoMemberAttributeMacros() {
     Bits.Decl.NoMemberAttributeMacros = true;
+  }
+
+  bool hasNoPeerMacros() const {
+    return Bits.Decl.NoPeerMacros;
+  }
+
+  void setHasNoPeerMacros() {
+    Bits.Decl.NoPeerMacros = true;
   }
 
   bool hasNoGlobalActorAttribute() const {
