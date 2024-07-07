@@ -969,13 +969,10 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
 
     if (caseBody) {
       // generate: case .<Case>:
-      auto pat = new (C) EnumElementPattern(
-          TypeExpr::createImplicit(
-              DC->mapTypeIntoContext(
-                  targetElt->getParentEnum()->getDeclaredInterfaceType()),
-              C),
-          SourceLoc(), DeclNameLoc(), DeclNameRef(), targetElt, subpattern, DC);
-      pat->setImplicit();
+      auto parentTy = DC->mapTypeIntoContext(
+          targetElt->getParentEnum()->getDeclaredInterfaceType());
+      auto *pat = EnumElementPattern::createImplicit(parentTy, targetElt,
+                                                     subpattern, DC);
 
       auto labelItem = CaseLabelItem(pat);
       auto stmt =

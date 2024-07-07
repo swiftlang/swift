@@ -510,11 +510,9 @@ CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
   return callExpr;
 }
 
-AccessorDecl *DerivedConformance::
-addGetterToReadOnlyDerivedProperty(VarDecl *property,
-                                   Type propertyContextType) {
-  auto getter =
-    declareDerivedPropertyGetter(property, propertyContextType);
+AccessorDecl *
+DerivedConformance::addGetterToReadOnlyDerivedProperty(VarDecl *property) {
+  auto getter = declareDerivedPropertyGetter(property);
 
   property->setImplInfo(StorageImplInfo::getImmutableComputed());
   property->setAccessors(SourceLoc(), {getter}, SourceLoc());
@@ -523,8 +521,7 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
 }
 
 AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
-                                                 Type propertyContextType) {
+DerivedConformance::declareDerivedPropertyGetter(VarDecl *property) {
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
@@ -558,7 +555,6 @@ std::pair<VarDecl *, PatternBindingDecl *>
 DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
                                            Identifier name,
                                            Type propertyInterfaceType,
-                                           Type propertyContextType,
                                            bool isStatic, bool isFinal) {
   auto parentDC = getConformanceContext();
 
@@ -569,11 +565,13 @@ DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 
+  auto propertyContextType =
+      getConformanceContext()->mapTypeIntoContext(propertyInterfaceType);
+
   Pattern *propPat =
       NamedPattern::createImplicit(Context, propDecl, propertyContextType);
 
   propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
-  propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
       Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
@@ -770,7 +768,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   // generate: var indexVar
   Pattern *indexPat = NamedPattern::createImplicit(C, indexVar, intType);
   indexPat = TypedPattern::createImplicit(C, indexPat, intType);
-  indexPat->setType(intType);
+
   auto *indexBind = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
 
@@ -785,12 +783,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
     }
 
     // generate: case .<Case>:
-    auto pat = new (C)
-        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(), elt, nullptr,
-                           /*DC*/ funcDecl);
-    pat->setImplicit();
-    pat->setType(enumType);
+    auto *pat = EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ funcDecl);
 
     auto labelItem = CaseLabelItem(pat);
 
@@ -947,12 +941,8 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
 
   auto createElementPattern = [&]() -> EnumElementPattern * {
     // .<elt>
-    EnumElementPattern *eltPattern = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
-        DeclNameRef(elt->getBaseIdentifier()), elt, nullptr, /*DC*/ parentDC);
-    eltPattern->setImplicit();
-    eltPattern->setType(enumType);
-    return eltPattern;
+    return EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ parentDC);
   };
 
   Pattern *labelItemPattern;

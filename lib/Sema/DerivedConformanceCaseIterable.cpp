@@ -101,14 +101,14 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = declareDerivedProperty(
-      SynthesizedIntroducer::Var, Context.Id_allCases, returnTy, returnTy,
+      SynthesizedIntroducer::Var, Context.Id_allCases, returnTy,
       /*isStatic=*/true, /*isFinal=*/true);
 
   propDecl->getAttrs().add(
               new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // Define the getter.
-  auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
+  auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl);
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 
