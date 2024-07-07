@@ -1635,8 +1635,9 @@ public:
               if (originalMergedInfo)
                   originalMergedInfo->printForDiagnostics(llvm::dbgs());
               else llvm::dbgs() << "nil";
-              llvm::dbgs() << "\nValue: "
+              llvm::dbgs() << "\nValue Rep: "
                            << value->getRepresentative().getValue();
+              llvm::dbgs() << "Original Src: " << src;
               llvm::dbgs() << "Value Info: ";
               value->getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
               llvm::dbgs() << "\n");
