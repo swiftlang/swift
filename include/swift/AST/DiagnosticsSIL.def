@@ -1022,6 +1022,10 @@ NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
 
+NOTE(regionbasedisolation_named_transfer_nt_asynclet_capture, none,
+      "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
+      (Identifier, StringRef))
+
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,
       "task or actor isolated value cannot be sent", ())
