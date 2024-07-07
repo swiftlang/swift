@@ -2621,6 +2621,20 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a placeholder type in an invalid place, e.g:
+///
+/// \code
+/// y as? _
+/// \endcode
+class InvalidPlaceholderFailure final : public FailureDiagnostic {
+public:
+  InvalidPlaceholderFailure(const Solution &solution,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose situations where there is no context to determine the type of a
 /// placeholder, e.g.,
 ///
