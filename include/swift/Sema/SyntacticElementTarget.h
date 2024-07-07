@@ -149,6 +149,7 @@ private:
 
     struct {
       CaseLabelItem *caseLabelItem;
+      Type convertTy;
       DeclContext *dc;
     } caseLabelItem;
 
@@ -210,9 +211,11 @@ public:
     function.body = body;
   }
 
-  SyntacticElementTarget(CaseLabelItem *caseLabelItem, DeclContext *dc) {
+  SyntacticElementTarget(CaseLabelItem *caseLabelItem, Type convertTy,
+                         DeclContext *dc) {
     kind = Kind::caseLabelItem;
     this->caseLabelItem.caseLabelItem = caseLabelItem;
+    this->caseLabelItem.convertTy = convertTy;
     this->caseLabelItem.dc = dc;
   }
 
@@ -298,6 +301,12 @@ public:
   /// Form a target for the match expression of an ExprPattern.
   static SyntacticElementTarget forExprPattern(ExprPattern *pattern);
 
+  static SyntacticElementTarget forCaseLabelItem(CaseLabelItem *caseLabelItem,
+                                                 Type convertTy,
+                                                 DeclContext *dc) {
+    return {caseLabelItem, convertTy, dc};
+  }
+
   /// This is useful for code completion.
   ASTNode getAsASTNode() const {
     switch (kind) {
@@ -372,7 +381,11 @@ public:
       if (auto *wrappedVar = uninitializedVar.declaration.dyn_cast<VarDecl *>())
         return wrappedVar->getDeclContext();
 
-      return uninitializedVar.binding->getInitContext(uninitializedVar.index);
+      auto *PBD = uninitializedVar.binding;
+      if (auto *DC = PBD->getInitContext(uninitializedVar.index))
+        return DC;
+
+      return PBD->getDeclContext();
     }
 
     case Kind::forEachPreamble:
@@ -461,9 +474,11 @@ public:
     return expression.pattern;
   }
 
-  ExprPattern *getExprPattern() const {
-    assert(kind == Kind::expression);
-    assert(getExprContextualTypePurpose() == CTP_ExprPattern);
+  ExprPattern *getAsExprPattern() const {
+    if (kind != Kind::expression ||
+        getExprContextualTypePurpose() != CTP_ExprPattern)
+      return nullptr;
+
     return cast<ExprPattern>(expression.pattern);
   }
 
@@ -482,6 +497,11 @@ public:
 
   /// Whether this target is for a for-in preamble, excluding the body.
   bool isForEachPreamble() const { return kind == Kind::forEachPreamble; }
+
+  Pattern *getForEachPattern() const {
+    assert(kind == Kind::forEachPreamble);
+    return forEachStmt.pattern;
+  }
 
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
@@ -648,6 +668,11 @@ public:
       return stmtCondition.stmtCondition;
     }
     llvm_unreachable("invalid statement kind");
+  }
+
+  Type getCaseLabelItemConvertType() const {
+    assert(kind == Kind::caseLabelItem);
+    return caseLabelItem.convertTy;
   }
 
   std::optional<CaseLabelItem *> getAsCaseLabelItem() const {

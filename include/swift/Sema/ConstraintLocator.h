@@ -306,6 +306,8 @@ public:
   /// Determine whether this locator is for a macro expansion.
   bool isForMacroExpansion() const;
 
+  bool isForEnumElementPatternMember() const;
+
   /// Whether this locator identifies a conjunction for the branches of a
   /// SingleValueStmtExpr.
   bool isForSingleValueStmtConjunction() const;
@@ -334,6 +336,14 @@ public:
   template <typename E> bool directlyAt() const {
     if (auto *expr = getAnchor().dyn_cast<Expr *>())
       return isa<E>(expr) && getPath().empty();
+    return false;
+  }
+
+  /// Determine whether this locator points directly to a given pattern.
+  template <typename P>
+  bool directlyAtPattern() const {
+    if (auto *pattern = getAnchor().dyn_cast<Pattern *>())
+      return isa<P>(pattern) && getPath().empty();
     return false;
   }
 

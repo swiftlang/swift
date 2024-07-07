@@ -159,11 +159,11 @@ func f(x: Any, arr: [Int]) {
 
     switch x {
     case is _: break // expected-error {{type placeholder not allowed here}}
-    case is [_]: break // expected-error {{type placeholder not allowed here}}
-    case is () -> _: break // expected-error {{type placeholder not allowed here}}
+    case is [_]: break // expected-error {{could not infer type for placeholder}}
+    case is () -> _: break // expected-error {{could not infer type for placeholder}}
     case let y as _: break // expected-error {{type placeholder not allowed here}}
-    case let y as [_]: break // expected-error {{type placeholder not allowed here}}
-    case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
+    case let y as [_]: break // expected-error {{could not infer type for placeholder}}
+    case let y as () -> _: break // expected-error {{could not infer type for placeholder}}
     }
 
     if case is _ = x {} // expected-error {{type placeholder not allowed here}}
@@ -185,11 +185,11 @@ func f(x: Any, arr: [Int]) {
 
     switch arr {
     case is _: break // expected-error {{type placeholder not allowed here}}
-    case is [_]: break // expected-error {{type placeholder not allowed here}}
-    case is () -> _: break // expected-error {{type placeholder not allowed here}}
+    case is [_]: break // expected-error {{could not infer type for placeholder}}
+    case is () -> _: break // expected-error {{could not infer type for placeholder}}
     case let y as _: break // expected-error {{type placeholder not allowed here}}
-    case let y as [_]: break // expected-error {{type placeholder not allowed here}}
-    case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
+    case let y as [_]: break // expected-error {{could not infer type for placeholder}}
+    case let y as () -> _: break // expected-error {{could not infer type for placeholder}}
     }
 }
 

@@ -564,6 +564,8 @@ public:
                                     EnumElementDecl *decl, Pattern *subPattern,
                                     DeclContext *DC) {
     auto &ctx = DC->getASTContext();
+    // !SOURCE-BREAKING
+    decl = nullptr;
     return new (ctx) EnumElementPattern(parentExpr, dotLoc, nameLoc, name, decl,
                                         subPattern, DC);
   }
@@ -692,7 +694,10 @@ public:
                  SourceLoc questionLoc = SourceLoc());
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
   SourceRange getSourceRange() const {
+    if (QuestionLoc.isInvalid())
+      return SubPattern->getSourceRange();
     return SourceRange(SubPattern->getStartLoc(), QuestionLoc);
   }
 

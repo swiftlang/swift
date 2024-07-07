@@ -1451,7 +1451,8 @@ namespace {
             SequenceExprDepth == 0) {
           ctx.Diags.diagnose(expr->getLoc(),
                              diag::discard_expr_outside_of_assignment);
-          return Action::Stop();
+          return Action::Continue(
+              new (ctx) ErrorExpr(DAE->getSourceRange(), Type(), DAE));
         }
       }
 
@@ -2471,6 +2472,16 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
     hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors);
     // Even if the pre-check fails, expression still has to be re-set.
     target.setExpr(expr);
+  }
+
+  if (auto caseLabelItem = target.getAsCaseLabelItem()) {
+    auto *guardExpr = (*caseLabelItem)->getGuardExpr();
+    if (guardExpr) {
+      hadErrors |= preCheckExpression(guardExpr, DC,
+                                      /*replaceInvalidRefsWithErrors=*/true);
+    }
+    if (!hadErrors)
+      (*caseLabelItem)->setGuardExpr(guardExpr);
   }
 
   if (target.isForEachPreamble()) {

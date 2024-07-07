@@ -409,9 +409,13 @@ enum SE0036 {
 
   func staticReferenceInSwitchInInstanceMethod() {
     switch self {
-    case A: break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
-    case B(_): break // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
-    case C(let x): _ = x; break // expected-error {{enum case 'C' cannot be used as an instance member}} {{10-10=.}}
+    case A: break
+      // expected-error@-1 {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
+    case B(_): break
+      // expected-error@-1 {{enum case 'B' cannot be used as an instance member}} {{10-10=.}}
+      // expected-error@-2 {{'_' can only appear in a pattern or on the left side of an assignment}}
+    case C(let x): _ = x; break
+      // expected-error@-1 {{enum case 'C' cannot be used as an instance member}} {{10-10=.}}
     }
   }
 
@@ -454,7 +458,10 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
+    case A(_): break
+      // expected-error@-1 {{enum case 'A' cannot be used as an instance member}}
+      // expected-error@-2 {{'_' can only appear in a pattern or on the left side of an assignment}}
+      // expected-error@-3 {{missing argument label 'x:' in call}}
     }
 
     switch self {

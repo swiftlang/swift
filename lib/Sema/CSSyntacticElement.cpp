@@ -680,6 +680,7 @@ private:
   void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
     Type patternType = cs.generateConstraints(
         pattern, locator, /*bindPatternVarsOneWay=*/false,
+        /*openOpaqueTypes*/ true,
         /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!patternType) {
@@ -1089,6 +1090,10 @@ private:
 
     SmallVector<ElementInfo, 4> elements;
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
+      SyntacticElementTarget target(&caseLabelItem, contextualTy,
+                                    context.getAsDeclContext());
+      cs.setTargetFor(&caseLabelItem, target);
+
       elements.push_back(
           makeElement(&caseLabelItem, caseLoc, {contextualTy, CTP_CaseStmt}));
     }
@@ -1997,10 +2002,9 @@ private:
   void visitCaseStmtPreamble(CaseStmt *caseStmt) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
-      SyntacticElementTarget caseTarget(&caseItem, context.getAsDeclContext());
-      if (!rewriteTarget(caseTarget)) {
+      auto target = *solution.getTargetFor(&caseItem);
+      if (!rewriteTarget(target))
         hadError = true;
-      }
     }
 
     bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
@@ -2714,15 +2718,17 @@ void ConjunctionElement::findReferencedVariables(
   }
 }
 
-Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {
-  auto *var = PB->getSingleVar();
+Type constraints::isPlaceholderVar(Pattern *pattern) {
+  if (!pattern->hasType())
+    return Type();
+
+  auto *var = pattern->getSingleVar();
   if (!var)
     return Type();
 
   if (!var->getName().hasDollarPrefix())
     return Type();
 
-  auto *pattern = PB->getPattern(0);
   if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
     auto type = typedPattern->getType();
     if (type && type->hasPlaceholder())
@@ -2730,4 +2736,11 @@ Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {
   }
 
   return Type();
+}
+
+Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {
+  if (PB->getNumPatternEntries() != 1)
+    return Type();
+
+  return isPlaceholderVar(PB->getPattern(0));
 }

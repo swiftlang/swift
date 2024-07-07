@@ -325,13 +325,23 @@ void ParentConditionalConformance::diagnoseConformanceStack(
 }
 
 namespace {
-/// Produce any additional syntactic diagnostics for the body of a function
-/// that had a result builder applied.
-class FunctionSyntacticDiagnosticWalker : public ASTWalker {
+/// Produce any additional syntactic diagnostics for an AST node.
+class SyntacticDiagnosticWalker : public ASTWalker {
   SmallVector<DeclContext *, 4> dcStack;
 
+  SyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
+
 public:
-  FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
+  static void check(ASTNode node, DeclContext *dc) {
+    // Check for out of place expressions. This needs to be done on the entire
+    // node rather than on individual expressions since we need the context of
+    // the parent nodes.
+    diagnoseOutOfPlaceExprs(dc->getASTContext(), node,
+                            /*contextualPurpose*/ std::nullopt);
+
+    auto walker = SyntacticDiagnosticWalker(dc);
+    node.walk(walker);
+  }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
@@ -369,9 +379,6 @@ public:
     return Action::Continue(stmt);
   }
 
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
-    return Action::SkipNode(pattern);
-  }
   PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
     return Action::SkipNode();
   }
@@ -407,20 +414,18 @@ void constraints::performSyntacticDiagnosticsForTarget(
   }
 
   case SyntacticElementTarget::Kind::function: {
-    // Check for out of place expressions. This needs to be done on the entire
-    // function body rather than on individual expressions since we need the
-    // context of the parent nodes.
     auto *body = target.getFunctionBody();
-    diagnoseOutOfPlaceExprs(dc->getASTContext(), body,
-                            /*contextualPurpose*/ std::nullopt);
+    SyntacticDiagnosticWalker::check(body, dc);
+    return;
+  }
 
-    FunctionSyntacticDiagnosticWalker walker(dc);
-    body->walk(walker);
+  case SyntacticElementTarget::Kind::caseLabelItem: {
+    auto *caseLabelItem = *target.getAsCaseLabelItem();
+    SyntacticDiagnosticWalker::check(caseLabelItem, dc);
     return;
   }
   case SyntacticElementTarget::Kind::closure:
   case SyntacticElementTarget::Kind::stmtCondition:
-  case SyntacticElementTarget::Kind::caseLabelItem:
   case SyntacticElementTarget::Kind::patternBinding:
   case SyntacticElementTarget::Kind::uninitializedVar:
     // Nothing to do for these.
@@ -971,30 +976,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       expr, dc,
       /*contextualInfo=*/{boolDecl->getDeclaredInterfaceType(), CTP_Condition});
   return !resultTy;
-}
-
-/// Find the `~=` operator that can compare an expression inside a pattern to a
-/// value of a given type.
-bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
-                                       Type rhsType) {
-  auto &Context = DC->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats,
-                                  "typecheck-expr-pattern", EP);
-  PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
-
-  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
-
-  // Check the expression as a condition.
-  auto target = SyntacticElementTarget::forExprPattern(EP);
-  auto result = typeCheckExpression(target);
-  if (!result)
-    return true;
-
-  // Save the type-checked expression in the pattern.
-  EP->setMatchExpr(result->getAsExpr());
-  // Set the type on the pattern.
-  EP->setType(rhsType);
-  return false;
 }
 
 static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,

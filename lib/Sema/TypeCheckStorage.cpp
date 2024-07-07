@@ -541,11 +541,11 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
                         binding->getInit(entryNumber)->getType());
     }
   } else {
-    // Coerce the pattern to the computed type.
-    if (auto newPattern = TypeChecker::coercePatternToType(
-            contextualPattern, patternType,
-            TypeResolverContext::PatternBindingDecl)) {
-      pattern = newPattern;
+    using namespace constraints;
+    auto target = SyntacticElementTarget::forUninitializedVar(
+        binding, entryNumber, patternType);
+    if (auto result = TypeChecker::typeCheckTarget(target)) {
+      pattern = result->getInitializationPattern();
     } else {
       binding->setInvalid();
       pattern->setType(ErrorType::get(Context));

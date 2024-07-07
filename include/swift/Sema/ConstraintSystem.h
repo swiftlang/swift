@@ -732,11 +732,25 @@ T *getAsStmt(ASTNode node) {
   return nullptr;
 }
 
+template <typename T>
+bool isPattern(ASTNode node) {
+  if (node.isNull() || !node.is<Pattern *>())
+    return false;
+
+  auto *P = node.get<Pattern *>();
+  return isa<T>(P);
+}
+
 template <typename T = Pattern>
 T *getAsPattern(ASTNode node) {
   if (auto *P = node.dyn_cast<Pattern *>())
     return dyn_cast_or_null<T>(P);
   return nullptr;
+}
+
+template <typename T = Pattern>
+T *castToPattern(ASTNode node) {
+  return cast<T>(node.get<Pattern *>());
 }
 
 template <typename T = Stmt> T *castToStmt(ASTNode node) {
@@ -1229,6 +1243,7 @@ public:
     expr,
     closure,
     stmt,
+    caseLabelItem,
     pattern,
     patternBindingEntry,
     varDecl,
@@ -1240,6 +1255,8 @@ private:
 
   union {
     const StmtConditionElement *stmtCondElement;
+
+    const CaseLabelItem *caseLabelItem;
 
     const Expr *expr;
 
@@ -1283,6 +1300,11 @@ public:
     storage.stmt = stmt;
   }
 
+  SyntacticElementTargetKey(const CaseLabelItem *caseLabelItem) {
+    kind = Kind::caseLabelItem;
+    storage.caseLabelItem = caseLabelItem;
+  }
+
   SyntacticElementTargetKey(const Pattern *pattern) {
     kind = Kind::pattern;
     storage.pattern = pattern;
@@ -1324,6 +1346,9 @@ public:
 
     case Kind::stmt:
       return lhs.storage.stmt == rhs.storage.stmt;
+
+    case Kind::caseLabelItem:
+      return lhs.storage.caseLabelItem == rhs.storage.caseLabelItem;
 
     case Kind::pattern:
       return lhs.storage.pattern == rhs.storage.pattern;
@@ -1372,6 +1397,11 @@ public:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.stmt));
+
+    case Kind::caseLabelItem:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.caseLabelItem));
 
     case Kind::pattern:
       return hash_combine(
@@ -1822,6 +1852,14 @@ public:
 
     return result->second;
   }
+
+  CaseLabelItemInfo getCaseLabelItemInfo(CaseLabelItem *labelItem) {
+    auto result = caseLabelItems.find(labelItem);
+    assert(result != caseLabelItems.end());
+    return result->second;
+  }
+
+  ContextualPattern getContextualPattern(SyntacticElementTarget target);
 
   /// This method implements functionality of `Expr::isTypeReference`
   /// with data provided by a given solution.
@@ -4656,6 +4694,7 @@ public:
   /// Generate constraints for a given SingleValueStmtExpr.
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
+  [[nodiscard]]
   bool generateConstraints(SingleValueStmtExpr *E);
 
   /// Generate constraints for an array of ExprPatterns, forming a conjunction
@@ -4675,7 +4714,7 @@ public:
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   [[nodiscard]]
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
-                           bool bindPatternVarsOneWay,
+                           bool bindPatternVarsOneWay, bool openOpaqueTypes,
                            PatternBindingDecl *patternBinding,
                            unsigned patternIndex);
 
@@ -4685,6 +4724,10 @@ public:
   /// if generation succeeded.
   [[nodiscard]]
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
+
+  [[nodiscard]]
+  bool generateConstraints(CaseLabelItem *caseLabelItem, DeclContext *dc,
+                           Type convertTy, ConstraintLocator *locator);
 
   /// Generate constraints for a given set of overload choices.
   ///
@@ -6546,6 +6589,7 @@ ASTNode findAsyncNode(ClosureExpr *closure);
 /// \returns The currently assigned type if it's a placeholder,
 /// empty type otherwise.
 Type isPlaceholderVar(PatternBindingDecl *PB);
+Type isPlaceholderVar(Pattern *pattern);
 
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);

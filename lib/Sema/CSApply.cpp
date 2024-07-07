@@ -9170,59 +9170,673 @@ static Expr *wrapAsyncLetInitializer(
   return resultInit;
 }
 
-static Pattern *rewriteExprPattern(const SyntacticElementTarget &matchTarget,
-                                   Type patternTy,
-                                   RewriteTargetFn rewriteTarget) {
-  auto *EP = matchTarget.getExprPattern();
+namespace {
+class PatternRewriter
+    : public PatternVisitor<PatternRewriter, NullablePtr<Pattern>> {
+public:
+  ConstraintSystem &CS;
+  ASTContext &Ctx;
+  DeclContext *DC;
+  Solution &S;
+  SyntacticElementTarget Target;
+  RewriteTargetFn RewriteTarget;
+  bool ShouldReconsituteSugar = true;
 
-  // See if we can simplify to another kind of pattern.
-  if (auto simplified = TypeChecker::trySimplifyExprPattern(EP, patternTy))
-    return simplified.get();
+  PatternRewriter(Solution &S, SyntacticElementTarget target,
+                  RewriteTargetFn rewriteTarget)
+      : CS(S.getConstraintSystem()), Ctx(CS.getASTContext()),
+        DC(target.getDeclContext()), S(S), Target(target),
+        RewriteTarget(rewriteTarget) {}
 
-  auto resultTarget = rewriteTarget(matchTarget);
-  if (!resultTarget)
+  Type getPatternType(Pattern *pattern) {
+    // If this is a placeholder variable, let's override its type with
+    // inferred one.
+    using Kind = SyntacticElementTarget::Kind;
+    if (Target.isForInitialization() || Target.kind == Kind::uninitializedVar) {
+      if (auto *P = Target.getInitializationPattern()) {
+        if (isPlaceholderVar(P))
+          return S.getResolvedType(P->getSingleVar());
+      }
+    }
+    auto ty = S.getResolvedType(pattern)->getRValueType();
+    if (ShouldReconsituteSugar)
+      ty = ty->reconstituteSugar(/*recursive=*/false);
+
+    return ty;
+  }
+
+#define SIMPLE(Name)                                                           \
+  NullablePtr<Pattern> visit##Name##Pattern(Name##Pattern *P) {                \
+    P->setType(getPatternType(P));                                             \
+    return P;                                                                  \
+  }
+
+  SIMPLE(Paren)
+  SIMPLE(Tuple)
+  SIMPLE(Binding)
+  SIMPLE(Typed)
+  SIMPLE(Bool)
+  SIMPLE(Any)
+  SIMPLE(OptionalSome)
+
+#undef SIMPLE
+
+  NullablePtr<Pattern> visitNamedPattern(NamedPattern *NP) {
+    auto *var = NP->getDecl();
+
+    // In SIL mode, VarDecls are written as having reference storage types.
+    auto patternTy = getPatternType(NP);
+    patternTy = patternTy->getReferenceStorageReferent();
+
+    // Note that the pattern's type does not include the reference storage type.
+    NP->setType(patternTy);
+    var->setNamingPattern(NP);
+
+    // FIXME: This call can be removed once pattern binding validation is
+    // sufficiently requestified.
+    TypeChecker::checkForForbiddenPrefix(Ctx, var->getBaseName());
+    return NP;
+  }
+
+  /// Attempt to simplify an ExprPattern into a BoolPattern or
+  /// OptionalSomePattern. Returns \c nullptr if the pattern could not be
+  /// simplified.
+  NullablePtr<Pattern> trySimplifyExprPattern(ExprPattern *EP, Type patternTy) {
+    auto *subExpr = EP->getSubExpr();
+    auto &ctx = EP->getDeclContext()->getASTContext();
+
+    if (patternTy->isBool()) {
+      // The type is Bool.
+      // Check if the pattern is a Bool literal
+      auto *semanticSubExpr = subExpr->getSemanticsProvidingExpr();
+      if (auto *BLE = dyn_cast<BooleanLiteralExpr>(semanticSubExpr)) {
+        auto *BP = new (ctx) BoolPattern(BLE->getLoc(), BLE->getValue());
+        BP->setType(patternTy);
+        return BP;
+      }
+    }
+
+    // case nil is equivalent to .none when switching on Optionals.
+    if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+      if (patternTy->getOptionalObjectType()) {
+        auto *NoneEnumElement = ctx.getOptionalNoneDecl();
+        return EnumElementPattern::createImplicit(
+            patternTy, NLE->getLoc(), DeclNameLoc(NLE->getLoc()),
+            NoneEnumElement,
+            /*subPattern*/ nullptr, EP->getDeclContext());
+      } else {
+        // ...but for non-optional types it can never match! Diagnose it.
+        ctx.Diags
+            .diagnose(NLE->getLoc(),
+                      diag::value_type_comparison_with_nil_illegal, patternTy)
+            .warnUntilSwiftVersion(6);
+
+        if (ctx.isSwiftVersionAtLeast(6))
+          return nullptr;
+      }
+    }
     return nullptr;
+  }
 
-  EP->setMatchExpr(resultTarget->getAsExpr());
-  EP->getMatchVar()->setInterfaceType(patternTy->mapTypeOutOfContext());
-  EP->setType(patternTy);
-  return EP;
-}
+  NullablePtr<Pattern> visitExprPattern(ExprPattern *EP) {
+    auto patternTy = getPatternType(EP);
+    if (auto P = trySimplifyExprPattern(EP, patternTy))
+      return P;
 
-/// Attempt to rewrite either an ExprPattern, or a pattern that was solved as
-/// an ExprPattern, e.g an EnumElementPattern that could not refer to an enum
-/// case.
-static std::optional<Pattern *>
-tryRewriteExprPattern(Pattern *P, Solution &solution, Type patternTy,
-                      RewriteTargetFn rewriteTarget) {
-  // See if we have a match expression target.
-  auto matchTarget = solution.getTargetFor(P);
-  if (!matchTarget)
-    return std::nullopt;
+    auto target = *S.getTargetFor(EP);
+    auto newTarget = RewriteTarget(target);
+    if (!newTarget)
+      return nullptr;
 
-  return rewriteExprPattern(*matchTarget, patternTy, rewriteTarget);
-}
+    target = *newTarget;
 
-NullablePtr<Pattern> ExprWalker::rewritePattern(Pattern *pattern,
-                                                DeclContext *DC) {
-  auto &solution = Rewriter.solution;
+    EP->getMatchVar()->setInterfaceType(patternTy->mapTypeOutOfContext());
+    EP->setMatchExpr(target.getAsExpr());
+    EP->setType(patternTy);
+    return EP;
+  }
 
-  // Figure out the pattern type.
-  auto patternTy = solution.getResolvedType(pattern);
-  patternTy = patternTy->reconstituteSugar(/*recursive=*/false);
+  /// Potentially tuple/untuple a pattern before passing it to the pattern
+  /// engine.
+  ///
+  /// We need to allow particular matches for backwards compatibility, so we
+  /// "repair" the pattern if needed. This ensures that the pattern engine
+  /// receives well-formed input, avoiding the need to implement an additional
+  /// compatibility hack there, as doing that is lot more tricky due to the
+  /// different cases that need to handled.
+  ///
+  /// We also emit diagnostics and potentially a fix-it to help the user.
+  ///
+  /// See https://github.com/apple/swift/issues/53557 and
+  /// https://github.com/apple/swift/issues/53611 for more discussion.
+  //
+  // type ~ (T1, ..., Tn) (n >= 2)
+  //   1a. pat ~ ((P1, ..., Pm)) (m >= 2) -> untuple the pattern
+  //   1b. pat (a single pattern, not a tuple) -> tuple the pattern
+  // type ~ ((T1, ..., Tn)) (n >= 2)
+  //   2. pat ~ (P1, ..., Pm) (m >= 2) -> tuple the pattern
+  void repairTupleOrAssociatedValuePatternIfApplicable(
+      Pattern *&enumElementInnerPat, Type enumPayloadType,
+      const EnumElementDecl *enumCase) {
+    auto &DE = Ctx.Diags;
+    auto addDeclNote = [&]() {
+      DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here, enumCase);
+    };
 
-  // Coerce the pattern to its appropriate type.
-  TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-  patternOptions |= TypeResolutionFlags::OverrideType;
+    // First check to see if we have a single-element tuple pattern matching a
+    // a non-single-element tuple, e.g `case .x(y: let a)` for `case x(Int)`.
+    // The label in this case (haha) doesn't matter, and it should decay to a
+    // paren pattern.
+    if (auto *TP = dyn_cast<TuplePattern>(enumElementInnerPat)) {
+      auto *payloadTyPtr = enumPayloadType.getPointer();
+      if (TP->getNumElements() == 1 &&
+          (!isa<TupleType>(payloadTyPtr) ||
+            cast<TupleType>(payloadTyPtr)->getNumElements() != 1)) {
+        auto *sub = TP->getElement(0).getPattern();
+        auto *PP = ParenPattern::createImplicit(Ctx, sub);
+        PP->setType(ParenType::get(Ctx, sub->getType()));
+        enumElementInnerPat = PP;
+      }
+    }
 
-  auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-    return ::tryRewriteExprPattern(
-        EP, solution, ty, [&](auto target) { return rewriteTarget(target); });
-  };
+    if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
+      if (enumElementInnerPat->getKind() != PatternKind::Paren)
+        return;
 
-  auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
-  return TypeChecker::coercePatternToType(contextualPattern, patternTy,
-                                          patternOptions, tryRewritePattern);
+      auto *PP = cast<ParenPattern>(enumElementInnerPat);
+      auto *subPattern = PP->getSubPattern();
+      if (tupleType->getNumElements() == 1) {
+        // We're trying to match e.g `case e(x: Int)` with a paren pattern
+        // `.e(let x)`. Change it into a TuplePattern `.e(x: let x)`.
+        auto elt = tupleType->getElement(0);
+        auto newSubPattern = TuplePatternElt(
+            elt.getName(), /*labelLoc*/ SourceLoc(), subPattern);
+        auto *TP = TuplePattern::create(Ctx, PP->getLParenLoc(),
+                                        {newSubPattern}, PP->getRParenLoc());
+        TP->setImplicit();
+        TP->setType(tupleType);
+        enumElementInnerPat = TP;
+        return;
+      }
+      if (tupleType->getNumElements() >= 2) {
+        auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
+        if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
+          if (tuplePattern->getNumElements() >= 2) {
+            auto diag = DE.diagnose(
+                tuplePattern->getLoc(),
+                diag::converting_tuple_into_several_associated_values,
+                enumCase->getNameStr(), tupleType->getNumElements());
+
+            // We might also have code like
+            //
+            // enum Upair { case upair(Int, Int) }
+            // func f(u: Upair) { switch u { case .upair(let (x, y)): () } }
+            //
+            // This needs a more complex rearrangement to fix the code. So
+            // only apply the fix-it if we have a tuple immediately inside.
+            if (subPattern->getKind() == PatternKind::Tuple) {
+              auto leadingParen =
+                  SourceRange(enumElementInnerPat->getStartLoc());
+              auto trailingParen =
+                  SourceRange(enumElementInnerPat->getEndLoc());
+              diag.fixItRemove(leadingParen).fixItRemove(trailingParen);
+            }
+            diag.flush();
+
+            addDeclNote();
+            enumElementInnerPat = semantic;
+          }
+        } else {
+          DE.diagnose(enumElementInnerPat->getLoc(),
+                      diag::found_one_pattern_for_several_associated_values,
+                      enumCase->getNameStr(), tupleType->getNumElements());
+          addDeclNote();
+        }
+      }
+      return;
+    }
+
+    if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
+      if (tupleType->getNumElements() >= 2) {
+        if (isa<TuplePattern>(enumElementInnerPat)) {
+          DE.diagnose(enumElementInnerPat->getLoc(),
+                      diag::converting_several_associated_values_into_tuple,
+                      enumCase->getNameStr(), tupleType->getNumElements())
+              .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
+              .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
+          addDeclNote();
+          auto *PP = ParenPattern::createImplicit(Ctx, enumElementInnerPat);
+          PP->setType(ParenType::get(Ctx, enumElementInnerPat->getType()));
+          enumElementInnerPat = PP;
+        }
+      }
+    }
+  }
+
+  /// Whether the type contains an enum element or static var member with the
+  /// given name.
+  static bool hasEnumElementOrStaticVarMember(DeclContext *DC, Type ty,
+                                              DeclNameRef name,
+                                              SourceLoc UseLoc) {
+    if (!ty->mayHaveMembers())
+      return false;
+
+    auto foundElements = TypeChecker::lookupMember(DC, ty, name, UseLoc,
+                                                   defaultMemberLookupOptions);
+    return llvm::any_of(foundElements, [](const LookupResultEntry &result) {
+      auto *VD = result.getValueDecl();
+      if (isa<VarDecl>(VD) && VD->isStatic())
+        return true;
+
+      if (isa<EnumElementDecl>(VD))
+        return true;
+
+      return false;
+    });
+  }
+
+  void diagnoseOptionalNoneAmbiguity(EnumElementPattern *EEP, Type patternTy) {
+    // Don't diagnose if the parent type is explicitly specified.
+    if (EEP->getParentType())
+      return;
+
+    // Emit an ambiguous none diagnostic if:
+    // 1) We have an Optional<T> type.
+    // 2) We're matching a 'none' enum case.
+    // 3) The 'none' enum case exists in T too.
+    if (!EEP->getName().isSimpleName("none") ||
+        !patternTy->getOptionalObjectType()) {
+      return;
+    }
+    SmallVector<Type, 4> allOptionals;
+    auto baseTyUnwrapped = patternTy->lookThroughAllOptionalTypes(allOptionals);
+    if (!hasEnumElementOrStaticVarMember(DC, baseTyUnwrapped, EEP->getName(),
+                                         EEP->getLoc())) {
+      return;
+    }
+    auto baseTyName = patternTy->getCanonicalType().getString();
+    auto baseTyUnwrappedName = baseTyUnwrapped->getString();
+    Ctx.Diags.diagnoseWithNotes(
+        Ctx.Diags.diagnose(EEP->getLoc(), diag::optional_ambiguous_case_ref,
+                           baseTyName, baseTyUnwrappedName, "none"),
+        [&]() {
+          // Emit a note to swap '.none' with 'nil' to match with
+          // the 'none' case in Optional<T>.
+          Ctx.Diags
+              .diagnose(EEP->getLoc(),
+                        diag::optional_fixit_ambiguous_case_ref_switch)
+              .fixItReplace(EEP->getSourceRange(), "nil");
+          // Emit a note to swap '.none' with 'none?' to match with the
+          // 'none' case in T. Add as many '?' as needed to look though
+          // all the optionals.
+          std::string fixItString = "none";
+          llvm::for_each(allOptionals, [&](const Type) { fixItString += "?"; });
+          Ctx.Diags
+              .diagnose(EEP->getLoc(),
+                        diag::type_fixit_optional_ambiguous_case_ref_switch,
+                        fixItString)
+              .fixItReplace(EEP->getNameLoc().getSourceRange(), fixItString);
+        });
+  }
+
+  /// Wraps the given pattern in a suitable number of OptionalSomePatterns
+  /// to account for any difference in optionality between the source type
+  /// and destination type.
+  Type unwrapOptionalsIfNeeded(Type srcType, Type destType,
+                               SmallVectorImpl<Type> &unwrappedOptionals) {
+    // Determine whether we have an imbalance in the number of optionals.
+    SmallVector<Type, 2> srcOptionals;
+    srcType->lookThroughAllOptionalTypes(srcOptionals);
+    SmallVector<Type, 2> destOptionals;
+    destType->lookThroughAllOptionalTypes(destOptionals);
+
+    int numExtraOptionals = srcOptionals.size() - destOptionals.size();
+    if (numExtraOptionals <= 0)
+      return srcType;
+
+    auto extraOpts = ArrayRef(srcOptionals).drop_back(destOptionals.size());
+    for (auto extraOptTy : extraOpts)
+      unwrappedOptionals.push_back(extraOptTy);
+
+    return extraOpts.back()->getOptionalObjectType();
+  }
+
+  // Counterpart to `unwrapOptionalsIfNeeded` which inserts the necessary
+  // OptionalSomePatterns.
+  Pattern *insertOptionalUnwraps(Pattern *P,
+                                 SmallVectorImpl<Type> &unwrappedOptionals) {
+    for (auto unwrapTy : llvm::reverse(unwrappedOptionals)) {
+      P = OptionalSomePattern::createImplicit(Ctx, P);
+      P->setType(unwrapTy);
+    }
+    return P;
+  }
+
+  NullablePtr<Pattern> visitEnumElementPattern(EnumElementPattern *EEP) {
+    auto patternTy = getPatternType(EEP);
+    diagnoseOptionalNoneAmbiguity(EEP, patternTy);
+
+    auto *calleeLoc = S.getCalleeLocator(CS.getConstraintLocator(EEP));
+    auto overload = S.getOverloadChoice(calleeLoc);
+
+    auto enumTy = S.simplifyType(overload.choice.getBaseType())
+                      ->getMetatypeInstanceType();
+    auto *elt = cast<EnumElementDecl>(overload.choice.getDecl());
+
+    // If there is a subpattern, push the enum element type down onto it.
+    auto argType = elt->getArgumentInterfaceType();
+    if (EEP->hasSubPattern()) {
+      assert(elt->hasAssociatedValues());
+
+      // FIXME: Can we do better here?
+      Type elementType;
+      if (argType) {
+        elementType = enumTy->getTypeOfMember(elt, argType);
+      } else {
+        elementType = TupleType::getEmpty(Ctx);
+      }
+
+      auto *sub = EEP->getSubPattern();
+      repairTupleOrAssociatedValuePatternIfApplicable(sub, elementType, elt);
+      // If the tuple pattern had a label for the tuple element, it must match
+      // the label for the tuple type being matched.
+      // FIXME: This should be moved into the solver.
+      // FIXME: Haven't put too much thought into whether we can guarentee
+      // that the types match up here.
+      if (auto *tupleTy = elementType->getAs<TupleType>()) {
+        if (auto *tuplePat = dyn_cast<TuplePattern>(sub)) {
+          for (auto i : indices(tuplePat->getElements())) {
+            const auto &elt = tuplePat->getElement(i);
+            if (!elt.getLabel().empty() &&
+                elt.getLabel() != tupleTy->getElement(i).getName()) {
+              Ctx.Diags.diagnose(
+                  elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                  elt.getLabel(), tupleTy->getElement(i).getName());
+              return nullptr;
+            }
+          }
+        }
+      }
+      EEP->setSubPattern(sub);
+    } else if (argType) {
+      // Else if the element pattern has no sub-pattern but the element type has
+      // associated values, expand it to be semantically equivalent to an
+      // element pattern of wildcards.
+      Type elementType = enumTy->getTypeOfMember(elt, argType);
+      SmallVector<TuplePatternElt, 8> elements;
+      if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
+        for (auto &elt : TTy->getElements()) {
+          auto *subPattern = AnyPattern::createImplicit(Ctx);
+          subPattern->setType(elt.getType());
+          elements.push_back(
+              TuplePatternElt(elt.getName(), SourceLoc(), subPattern));
+        }
+      } else {
+        auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
+        assert(parenTy && "Associated value type is neither paren nor tuple?");
+        (void)parenTy;
+
+        auto *subPattern = AnyPattern::createImplicit(Ctx);
+        subPattern->setType(parenTy);
+        elements.push_back(
+            TuplePatternElt(Identifier(), SourceLoc(), subPattern));
+      }
+      Pattern *sub =
+          TuplePattern::createSimple(Ctx, SourceLoc(), elements, SourceLoc());
+      sub->setImplicit();
+      sub->setType(elementType);
+      EEP->setSubPattern(sub);
+    }
+
+    EEP->setElementDecl(elt);
+    EEP->setType(enumTy);
+    EEP->setParentType(enumTy);
+
+    // Unwrap optionals from the pattern type if needed.
+    SmallVector<Type, 2> unwrappedOptionals;
+    patternTy = unwrapOptionalsIfNeeded(patternTy, enumTy, unwrappedOptionals);
+
+    // If we needed a cast, wrap the pattern in a cast pattern.
+    Pattern *P = EEP;
+    if (!patternTy->isEqual(enumTy)) {
+      // See if we can introduce a cast pattern to resolve the type difference.
+      auto castKind = TypeChecker::typeCheckCheckedCast(
+          patternTy, enumTy, CheckedCastContextKind::EnumElementPattern, DC);
+
+      // If the cast failed, we can't resolve the pattern.
+      if (castKind < CheckedCastKind::First_Resolved) {
+        Ctx.Diags
+            .diagnose(EEP->getLoc(), diag::downcast_to_unrelated, patternTy,
+                      enumTy)
+            .highlight(EEP->getSourceRange());
+        return nullptr;
+      }
+      auto *isPattern = IsPattern::createImplicit(Ctx, enumTy, P, castKind);
+      CS.setType(isPattern, patternTy);
+      auto result = visit(isPattern);
+      if (!result)
+        return nullptr;
+
+      P = result.get();
+    }
+    return insertOptionalUnwraps(P, unwrappedOptionals);
+  }
+
+  NullablePtr<Pattern> visitIsPattern(IsPattern *IP) {
+    auto patternTy = getPatternType(IP);
+    auto castType = IP->getCastTypeRepr()
+                        ? S.getResolvedType(IP->getCastTypeRepr())
+                        : IP->getCastType();
+    assert(!castType->hasError());
+    IP->setCastType(castType);
+
+    SmallVector<Type, 2> unwrappedOptionals;
+    patternTy = unwrapOptionalsIfNeeded(patternTy, castType,
+                                        unwrappedOptionals);
+
+    auto castKind = TypeChecker::typeCheckCheckedCast(
+        patternTy, castType, CheckedCastContextKind::IsPattern, DC);
+    switch (castKind) {
+    case CheckedCastKind::Unresolved:
+      if (!IP->isImplicit()) {
+        Ctx.Diags
+            .diagnose(IP->getLoc(), diag::downcast_to_unrelated, patternTy,
+                      castType)
+            .highlight(IP->getLoc())
+            .highlight(IP->getCastTypeRepr()->getSourceRange());
+      }
+      IP->setCastKind(CheckedCastKind::ValueCast);
+      break;
+    case CheckedCastKind::Coercion:
+    case CheckedCastKind::BridgingCoercion:
+      // If this is an 'as' pattern coercing between two different types, then
+      // it is "useful" because it is providing a different type to the
+      // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
+      // types are the same, then produce a warning.
+      if (!IP->isImplicit() &&
+          (!IP->getSubPattern() || patternTy->isEqual(castType))) {
+        Ctx.Diags.diagnose(IP->getLoc(), diag::isa_is_always_true,
+                           IP->getSubPattern() ? "as" : "is");
+      }
+      IP->setCastKind(castKind);
+      break;
+
+      // Valid checks.
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::ValueCast:
+      IP->setCastKind(castKind);
+      break;
+    }
+    IP->setType(patternTy);
+    return insertOptionalUnwraps(IP, unwrappedOptionals);
+  }
+};
+
+class PatternWalker : public ASTWalker {
+  PatternRewriter &Rewriter;
+
+  /// A stack of boolean values that indicate whether the current pattern
+  /// under consideration has its type inferred purely from context.
+  SmallVector<bool> IsPurelyInferredPatternStack;
+
+public:
+  PatternWalker(PatternRewriter &Rewriter) : Rewriter(Rewriter) {}
+
+  void diagnoseUnintendedVarType(NamedPattern *NP) {
+    auto &ctx = Rewriter.Ctx;
+    auto &target = Rewriter.Target;
+    auto patternTy = NP->getType();
+    auto *var = NP->getDecl();
+
+    // If this pattern didn't have its type purely inferred from context
+    // (e.g there's an explicit type annotation), don't emit the warning.
+    if (!IsPurelyInferredPatternStack.back())
+      return;
+
+    // If the whole pattern is implicit, the user didn't write it.
+    // Assume the compiler knows what it's doing.
+    if (NP->isImplicit())
+      return;
+
+    // Don't diagnose for the pattern of a for-each.
+    if (target.isForEachPreamble())
+      return;
+
+    // Don't diagnose for an initialization of an editor placeholder.
+    if (target.isForInitialization()) {
+      auto *init = target.getAsExpr()->getSemanticsProvidingExpr();
+      if (isa<EditorPlaceholderExpr>(init))
+        return;
+    }
+
+    // "()", "[()]", an uninhabited type, or optional thereof, emit a
+    // diagnostic. They are probably missing a cast or didn't mean to bind to a
+    // variable. We always tell them that they can silence the warning with an
+    // explicit type annotation (and provide a fixit) as a note.
+    auto diagTy = patternTy->lookThroughAllOptionalTypes();
+    bool isOptional = !patternTy->getOptionalObjectType().isNull();
+
+    auto diag = diag::type_inferred_to_undesirable_type;
+    bool shouldRequireType = false;
+
+    if (diagTy->isEqual(ctx.TheEmptyTupleType)) {
+      shouldRequireType = true;
+    } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
+      if (MTT->getInstanceType()->isAnyObject())
+        shouldRequireType = true;
+    } else if (diagTy->isStructurallyUninhabited()) {
+      shouldRequireType = true;
+      diag = isOptional ? diag::type_inferred_to_undesirable_type
+                        : diag::type_inferred_to_uninhabited_type;
+
+      if (diagTy->is<TupleType>()) {
+        diag = isOptional ? diag::type_inferred_to_undesirable_type
+                          : diag::type_inferred_to_uninhabited_tuple_type;
+      } else {
+        assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
+               "unknown structurally uninhabited type");
+      }
+    } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
+      if (BST->isArray())
+        shouldRequireType = BST->getGenericArgs()[0]->isVoid();
+    }
+    if (!shouldRequireType)
+      return;
+
+    ctx.Diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), patternTy,
+                       NP->getDecl()->isLet());
+    ctx.Diags
+        .diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
+        .fixItInsertAfter(var->getNameLoc(),
+                          ": " + patternTy->getWithoutParens()->getString());
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    // Don't walk into the VarDecls of NamedPatterns.
+    return Action::SkipNode();
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    // Don't walk into expression patterns Expr nodes, we'll walk them as
+    // a part of the rewrite.
+    return Action::SkipNode(E);
+  }
+
+  bool purelyPropagatesType(Pattern *P) {
+    switch (P->getKind()) {
+    case PatternKind::Paren:
+    case PatternKind::Tuple:
+    case PatternKind::Named:
+    case PatternKind::Any:
+    case PatternKind::Binding:
+      return true;
+
+    case PatternKind::OptionalSome:
+    case PatternKind::EnumElement:
+    case PatternKind::Is:
+    case PatternKind::Bool:
+    case PatternKind::Expr:
+      return false;
+
+    case PatternKind::Typed:
+      // Doesn't propagate, unless the type had unresolved type variables.
+      return !isPlaceholderVar(P) && Rewriter.S.getType(P)->hasTypeVariable();
+    }
+  }
+
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    if (auto *EEP = dyn_cast<EnumElementPattern>(P)) {
+      // Check to see if we've turned this into an ExprPattern.
+      if (auto exprTarget = Rewriter.S.getTargetFor(EEP)) {
+        auto *result = exprTarget->getAsExprPattern()->walk(*this);
+        if (!result)
+          return Action::Stop();
+        return Action::SkipNode(result);
+      }
+    }
+
+    // Check to see if the pattern in question purely propagates type
+    // information from the context to sub patterns.
+    if (purelyPropagatesType(P)) {
+      // Propagate if the parent propagates.
+      auto propagates = IsPurelyInferredPatternStack.empty()
+                            ? true
+                            : IsPurelyInferredPatternStack.back();
+      IsPurelyInferredPatternStack.push_back(propagates);
+    } else {
+      IsPurelyInferredPatternStack.push_back(false);
+    }
+
+    return Action::Continue(P);
+  }
+
+  PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
+    Rewriter.ShouldReconsituteSugar = IsPurelyInferredPatternStack.back();
+    SWIFT_DEFER {
+      IsPurelyInferredPatternStack.pop_back();
+    };
+    auto result = Rewriter.visit(P);
+    if (!result)
+      return Action::Stop();
+
+    if (auto *NP = dyn_cast<NamedPattern>(result.get()))
+      diagnoseUnintendedVarType(NP);
+
+    return Action::Continue(result.get());
+  }
+};
+} // end anonymous namespace
+
+static NullablePtr<Pattern>
+applySolutionToPattern(Solution &solution, SyntacticElementTarget target,
+                       RewriteTargetFn rewriteTarget) {
+  PatternRewriter rewriter(solution, target, rewriteTarget);
+  PatternWalker walker(rewriter);
+
+  auto *pattern = solution.getContextualPattern(target).getPattern();
+  return pattern->walk(walker);
 }
 
 /// Apply the given solution to the initialization target.
@@ -9275,15 +9889,6 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
     wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
   }
 
-  // Coerce the pattern to the type of the initializer.
-  TypeResolutionOptions options =
-      isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
-      ? TypeResolverContext::EditorPlaceholderExpr
-      : target.getInitializationPatternBindingDecl()
-        ? TypeResolverContext::PatternBindingDecl
-        : TypeResolverContext::InExpression;
-  options |= TypeResolutionFlags::OverrideType;
-
   // Determine the type of the pattern.
   Type finalPatternType = initializer->getType();
   if (wrappedVar) {
@@ -9294,17 +9899,10 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
   if (finalPatternType->hasDependentMember())
     return std::nullopt;
 
-  finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
-
-  auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-    return ::tryRewriteExprPattern(EP, solution, ty, rewriteTarget);
-  };
-
   // Apply the solution to the pattern as well.
-  auto contextualPattern = target.getContextualPattern();
-  if (auto coercedPattern = TypeChecker::coercePatternToType(
-          contextualPattern, finalPatternType, options, tryRewritePattern)) {
-    resultTarget.setPattern(coercedPattern);
+  if (auto coercedPattern =
+          applySolutionToPattern(solution, target, rewriteTarget)) {
+    resultTarget.setPattern(coercedPattern.get());
   } else {
     return std::nullopt;
   }
@@ -9546,22 +10144,14 @@ static std::optional<SyntacticElementTarget> applySolutionToForEachStmt(
 
   // Coerce the pattern to the element type.
   {
-    TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
-    options |= TypeResolutionFlags::OverrideType;
-
-    auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-      return ::tryRewriteExprPattern(EP, solution, ty, rewriteTarget);
-    };
-
     // Apply the solution to the pattern as well.
-    auto contextualPattern = target.getContextualPattern();
-    auto coercedPattern = TypeChecker::coercePatternToType(
-        contextualPattern, rewrittenPatternType, options, tryRewritePattern);
+    auto coercedPattern =
+        applySolutionToPattern(solution, target, rewriteTarget);
     if (!coercedPattern)
       return std::nullopt;
 
-    stmt->setPattern(coercedPattern);
-    resultTarget.setPattern(coercedPattern);
+    stmt->setPattern(coercedPattern.get());
+    resultTarget.setPattern(coercedPattern.get());
   }
 
   return resultTarget;
@@ -9582,6 +10172,10 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       Rewriter.ExprStack);
   auto &solution = Rewriter.solution;
 
+  auto rewriteTargetFn = [&](SyntacticElementTarget target) {
+    return rewriteTarget(target);
+  };
+
   // Apply the solution to the target.
   SyntacticElementTarget result = target;
   if (auto expr = target.getAsExpr()) {
@@ -9593,8 +10187,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     switch (target.getExprContextualTypePurpose()) {
     case CTP_Initialization: {
       auto initResultTarget = applySolutionToInitialization(
-          solution, target, rewrittenExpr,
-          [&](auto target) { return rewriteTarget(target); });
+          solution, target, rewrittenExpr, rewriteTargetFn);
       if (!initResultTarget)
         return std::nullopt;
 
@@ -9681,14 +10274,14 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
     return target;
   } else if (auto caseLabelItem = target.getAsCaseLabelItem()) {
-    ConstraintSystem &cs = solution.getConstraintSystem();
-    auto info = *cs.getCaseLabelItemInfo(*caseLabelItem);
+    auto &cs = solution.getConstraintSystem();
+    auto info = solution.getCaseLabelItemInfo(*caseLabelItem);
 
-    auto pattern = rewritePattern(info.pattern, target.getDeclContext());
+    auto pattern = applySolutionToPattern(solution, target, rewriteTargetFn);
     if (!pattern)
       return std::nullopt;
 
-    (*caseLabelItem)->setPattern(pattern.get(), /*resolved=*/true);
+    (*caseLabelItem)->setPattern(pattern.get(), /*resolved*/ true);
 
     // If there is a guard expression, coerce that.
     if (auto *guardExpr = info.guardExpr) {
@@ -9742,29 +10335,11 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
         wrappedVar, backingType->mapTypeOutOfContext());
 
     return target;
-  } else if (auto *pattern = target.getAsUninitializedVar()) {
-    TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
-
-    auto contextualPattern = target.getContextualPattern();
-    auto patternType = target.getTypeOfUninitializedVar();
-    auto *PB = target.getPatternBindingOfUninitializedVar();
-
-    // If this is a placeholder variable, let's override its type with
-    // inferred one.
-    if (isPlaceholderVar(PB)) {
-      patternType = solution.getResolvedType(PB->getSingleVar());
-      options |= TypeResolutionFlags::OverrideType;
-    }
-
-    auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-      return ::tryRewriteExprPattern(
-          EP, solution, ty, [&](auto target) { return rewriteTarget(target); });
-    };
-
-    if (auto coercedPattern = TypeChecker::coercePatternToType(
-            contextualPattern, patternType, options, tryRewritePattern)) {
+  } else if (target.getAsUninitializedVar()) {
+    if (auto coercedPattern =
+            applySolutionToPattern(solution, target, rewriteTargetFn)) {
       auto resultTarget = target;
-      resultTarget.setPattern(coercedPattern);
+      resultTarget.setPattern(coercedPattern.get());
       return resultTarget;
     }
 

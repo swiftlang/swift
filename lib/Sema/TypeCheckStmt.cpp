@@ -1461,50 +1461,19 @@ public:
     return S;
   }
 
-  void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
-                                 CaseParentKind parentKind,
-                                 bool &limitExhaustivityChecks,
-                                 Type subjectType) {
-    Pattern *pattern = labelItem.getPattern();
-    if (!labelItem.isPatternResolved()) {
-      pattern = TypeChecker::resolvePattern(
-          pattern, DC, /*isStmtCondition*/ false);
-      if (!pattern) {
-        return;
-      }
-    }
+  void checkCaseLabelItem(CaseLabelItem &labelItem,
+                          bool &limitExhaustivityChecks, Type subjectType) {
+    using namespace constraints;
+    auto target =
+        SyntacticElementTarget::forCaseLabelItem(&labelItem, subjectType, DC);
 
-    // Coerce the pattern to the subject's type.
-    bool coercionError = false;
-    if (subjectType) {
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
-      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-      if (parentKind == CaseParentKind::DoCatch)
-        patternOptions |= TypeResolutionFlags::SilenceNeverWarnings;
-
-      auto coercedPattern = TypeChecker::coercePatternToType(
-          contextualPattern, subjectType, patternOptions);
-      if (coercedPattern)
-        pattern = coercedPattern;
-      else
-        coercionError = true;
-    }
-
-    if (!subjectType || coercionError) {
+    if (!TypeChecker::typeCheckTarget(target))
       limitExhaustivityChecks = true;
 
-      // If that failed, mark any variables binding pieces of the pattern
-      // as invalid to silence follow-on errors.
-      pattern->forEachVariable([&](VarDecl *VD) {
-        VD->setInvalid();
-      });
-    }
-    labelItem.setPattern(pattern, /*resolved=*/true);
-
-    // Otherwise for each variable in the pattern, make sure its type is
-    // identical to the initial case decl and stash the previous case decl as
-    // the parent of the decl.
-    pattern->forEachVariable([&](VarDecl *vd) {
+    // For each variable in the pattern, make sure its type is identical to the
+    // initial case decl and stash the previous case decl as the parent of the
+    // decl.
+    labelItem.getPattern()->forEachVariable([&](VarDecl *vd) {
       if (!vd->hasName() || vd->isInvalid())
         return;
 
@@ -1579,18 +1548,8 @@ public:
       bindSwitchCasePatternVars(DC, caseBlock);
 
       auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
-      for (auto &labelItem : caseLabelItemArray) {
-        // Resolve the pattern in our case label if it has not been resolved and
-        // check that our var decls follow invariants.
-        checkCaseLabelItemPattern(caseBlock, labelItem, parentKind,
-                                  limitExhaustivityChecks, subjectType);
-
-        // Check the guard expression, if present.
-        if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TypeChecker::typeCheckCondition(guard, DC);
-          labelItem.setGuardExpr(guard);
-        }
-      }
+      for (auto &labelItem : caseLabelItemArray)
+        checkCaseLabelItem(labelItem, limitExhaustivityChecks, subjectType);
 
       // Setup the types of our case body var decls.
       for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {

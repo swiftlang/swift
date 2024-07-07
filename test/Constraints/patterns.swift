@@ -623,6 +623,29 @@ func testMultiStmtClosureExprPattern(_ x: Int) {
   if case { (); return x }() = x {}
 }
 
+func testTuplePattern(_ labeledTuple: (a: Bool, b: Bool), _ unlabeledTuple: (Bool, Bool)) {
+  switch labeledTuple {
+  case (true, true):
+    break
+  case (a: false, true):
+    break
+  case (x: true, b: false): // expected-error {{pattern of type '(x: Bool, b: Bool)' cannot match '(a: Bool, b: Bool)'}}
+    break
+  default:
+    break
+  }
+  switch unlabeledTuple {
+  case (a: true, b: true): // expected-error {{pattern of type '(a: Bool, b: Bool)' cannot match '(Bool, Bool)'}}
+    break
+  case (true, c: false): // expected-error {{pattern of type '(Bool, c: Bool)' cannot match '(Bool, Bool)'}}
+    break
+  case (_: false, true):
+    break
+  default:
+    break
+  }
+}
+
 func testExprPatternIsolation() {
   // We type-check ExprPatterns separately, so these are illegal.
   if case 0 = nil {} // expected-error {{'nil' requires a contextual type}}
