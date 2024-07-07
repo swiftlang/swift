@@ -742,7 +742,7 @@ We record a rewrite loop defining rule (*8) via rule (4), (6) and (7):
 \arrow[u, Rightarrow, "\ttgp{0}{0}.(\assocsym{P}{A}.\assocsym{Q}{B}\Rightarrow\assocsym{P}{A}.\texttt{B})"']&&
 \end{tikzcd}
 \]
-Note that this was an overlap of the first kind, so rule (7) is now marked \index{left-simplified rule}\textbf{left-simplified}. Thus, rule (*8) completely supercedes rule (7). Rule (*8) survives minimization and maps to the requirement $\ConfReq{\ttgp{0}{0}.[P]A.[Q]B}{R}$, which appears in the generic signature that we output for this protocol extension:
+Note that this was an overlap of the first kind, so rule (7) is now marked \index{left-simplified rule}\textbf{left-simplified}. Thus, rule (*8) completely supersedes rule (7). Rule (*8) survives minimization and maps to the requirement $\ConfReq{\ttgp{0}{0}.[P]A.[Q]B}{R}$, which appears in the generic signature that we output for this protocol extension:
 \begin{quote}
 \begin{verbatim}
 <τ_0_0 where τ_0_0: P, τ_0_0.[P]A.[Q]B: R>
@@ -1075,7 +1075,7 @@ Let $\Sigma_{\ConfReq{X}{S}}$ be the \index{protocol substitution map}protocol s
 \end{gather*}
 We see that applying $\Sigma_{\ConfReq{X}{S}}$ to \texttt{\ttgp{0}{0}.[S]A} and \texttt{\ttgp{0}{0}.[S]C.[S]B} also outputs identical types: $\AssocType{[S]A}\otimes\ConfReq{X}{S}=\AssocType{[S]B}\otimes\ConfReq{Y}{S}=\texttt{Int}$. Is this the case for \emph{every} conformance to \texttt{S}? That is, is it true that $G_\texttt{S}\vDash\SameReq{\texttt{\ttgp{0}{0}.A}}{\texttt{\ttgp{0}{0}.C.B}}$?
 
-We will see the answer is ``yes,'' proving that our function \texttt{f()} type checks. For a visual perspective, we turn to the \index{type parameter graph}type parameter graph\footnote{In our previous formulation, the type parameter graph has a distinguished root node, with every generic parameter as a child of this root. Now, our generic signature only has one generic parameter, so a root node would be superflous; we omit it in what follows.} for $G_\texttt{S}$. \FigRef{protocol s fig} constructs this graph in three steps. Between each step, we have a \index{graph homomorphism}graph homomorphism---in fact, a \index{covering map}covering map, in the sense of \SecRef{protocol component}---transforming one graph into the other:
+We will see the answer is ``yes,'' proving that our function \texttt{f()} type checks. For a visual perspective, we turn to the \index{type parameter graph}type parameter graph\footnote{In our previous formulation, the type parameter graph has a distinguished root node, with every generic parameter as a child of this root. Now, our generic signature only has one generic parameter, so a root node would be superfluous; we omit it in what follows.} for $G_\texttt{S}$. \FigRef{protocol s fig} constructs this graph in three steps. Between each step, we have a \index{graph homomorphism}graph homomorphism---in fact, a \index{covering map}covering map, in the sense of \SecRef{protocol component}---transforming one graph into the other:
 \begin{enumerate}
 \item The first step shows the graph as it would be without the protocol stating any same-type requirements; we get an infinite tree where each interior node is the parent of one other interior node, and two leaf nodes.
 
@@ -1681,7 +1681,7 @@ We saw that completion still fails; we get the following \index{infinite monoid 
 \[M_2^{\prime} := \Pres{a,b,n,q}{nn\sim n,\,na\sim b,\,bn\sim b,\,ba\sim bb,\,qb^iq\sim qb^i,\, qb^ia\sim qb^{i+1}}\]
 However, we then add $c$ with defining rewrite rule $qa\sim c$:
 \[M_3 := \Pres{a,b,c,n,q}{nn\sim n,\, qq\sim q,\, qn\sim q,\, nan\sim na,\,qaq\sim qa,\,na\sim b,\,qa\sim c}\]
-Completion suceeds on $M_3$ using a reduction order where $c<b<a$ and $p<n$, and we get a finite convergent rewrite system. We've already listed the numerous rules once, so we won't do it again. Let's call this finite convergent presentation $M_2^\prime$:
+Completion succeeds on $M_3$ using a reduction order where $c<b<a$ and $p<n$, and we get a finite convergent rewrite system. We've already listed the numerous rules once, so we won't do it again. Let's call this finite convergent presentation $M_2^\prime$:
 \[M_3^\prime := \Pres{a,b,c,n,q}{\mbox{\ldots 15 rewrite rules \ldots}}\]
 The minimized rewrite system corresponds to this presentation:
 \[M_4 :=\Pres{a,b,c,n,q}{nn\sim n,\, na\sim b,\, bn\sim b,\, qq\sim q,\, qa\sim c,\, qn\sim q,\, cq\sim c}\]
