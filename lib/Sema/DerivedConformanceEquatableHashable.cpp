@@ -919,7 +919,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
-  hashValuePat->setType(intType);
 
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,

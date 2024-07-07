@@ -140,8 +140,7 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
 
   auto propertyPair = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
-      executorType, executorType,
-      /*static*/ false, /*final*/ false);
+      executorType, /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
@@ -164,8 +163,7 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   AvailabilityInference::applyInferredAvailableAttrs(
       property, asAvailableAs, ctx);
 
-  auto getter =
-    derived.addGetterToReadOnlyDerivedProperty(property, executorType);
+  auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyActor_unownedExecutor);
 
   derived.addMembersToConformanceContext(
