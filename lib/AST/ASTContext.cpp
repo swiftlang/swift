@@ -804,6 +804,8 @@ ASTContext::ASTContext(
 }
 
 ASTContext::~ASTContext() {
+  if (LangOpts.AnalyzeRequestEvaluator)
+    evaluator.dump(llvm::dbgs());
   getImpl().~Implementation();
 }
 

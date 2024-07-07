@@ -531,6 +531,9 @@ namespace swift {
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
 
+    /// Dumps request evaluator cache statistics at the end of compilation.
+    bool AnalyzeRequestEvaluator = false;
+
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;
 

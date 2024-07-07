@@ -415,6 +415,10 @@ def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
 def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
   HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
 
+def analyze_request_evaluator : Flag<["-"], "analyze-request-evaluator">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Print out request evaluator cache statistics at the end of the compilation job">;
+
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;
