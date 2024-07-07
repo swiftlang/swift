@@ -584,6 +584,8 @@ struct ASTContext::Implementation {
     }
 
     size_t getTotalMemory() const;
+
+    void dump(llvm::raw_ostream &out) const;
   };
 
   llvm::DenseMap<ModuleDecl*, ModuleType*> ModuleTypes;
@@ -672,6 +674,8 @@ struct ASTContext::Implementation {
   BuiltinTupleType *TheTupleType = nullptr;
 
   std::array<ProtocolDecl *, NumInvertibleProtocols> InvertibleProtocolDecls = {};
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 ASTContext::Implementation::Implementation()
@@ -803,9 +807,59 @@ ASTContext::ASTContext(
   }
 }
 
+void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
+  os << "-------------------------------------------------\n";
+  os << "Arena\t0\t" << Allocator.getBytesAllocated() << "\n";
+  Permanent.dump(os);
+
+#define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
+#define SIZE_AND_BYTES(Name) os << #Name << "\t"                          \
+                                << Name.size() << "\t"                    \
+                                << llvm::capacity_in_bytes(Name) << "\n"
+
+  SIZE(LoadedModules);
+  SIZE(IdentifierTable);
+  SIZE(Cleanups);
+  SIZE_AND_BYTES(ModuleLoaders);
+  SIZE_AND_BYTES(ExternalSourceLocs);
+  SIZE_AND_BYTES(ForeignErrorConventions);
+  SIZE_AND_BYTES(ForeignAsyncConventions);
+  SIZE_AND_BYTES(AssociativityCache);
+  SIZE_AND_BYTES(DelayedConformanceDiags);
+  SIZE_AND_BYTES(LazyContexts);
+  SIZE_AND_BYTES(ExistentialSignatures);
+  SIZE_AND_BYTES(ElementSignatures);
+  SIZE_AND_BYTES(Overrides);
+  SIZE_AND_BYTES(DefaultWitnesses);
+  SIZE_AND_BYTES(DefaultTypeWitnesses);
+  SIZE_AND_BYTES(DefaultAssociatedConformanceWitnesses);
+  SIZE_AND_BYTES(DefaultTypeRequestCaches);
+  SIZE_AND_BYTES(PropertyWrapperBackingVarTypes);
+  SIZE_AND_BYTES(OriginalWrappedProperties);
+  SIZE_AND_BYTES(BuiltinInitWitness);
+  SIZE_AND_BYTES(OriginalBodySourceRanges);
+  SIZE_AND_BYTES(NextMacroDiscriminator);
+  SIZE_AND_BYTES(NextDiscriminator);
+  SIZE_AND_BYTES(ModuleTypes);
+  SIZE_AND_BYTES(GenericParamTypes);
+  SIZE_AND_BYTES(SILBlockStorageTypes);
+  SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
+  SIZE_AND_BYTES(IntegerTypes);
+  SIZE_AND_BYTES(OpenedExistentialEnvironments);
+  SIZE_AND_BYTES(OpenedElementEnvironments);
+  SIZE_AND_BYTES(ForeignRepresentableCache);
+  SIZE(SearchPathsSet);
+
+#undef SIZE
+#undef SIZE_AND_BYTES
+}
+
 ASTContext::~ASTContext() {
-  if (LangOpts.AnalyzeRequestEvaluator)
+  if (LangOpts.AnalyzeRequestEvaluator) {
     evaluator.dump(llvm::dbgs());
+    getImpl().dump(llvm::dbgs());
+  }
+
   getImpl().~Implementation();
 }
 
@@ -3062,6 +3116,56 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // SpecializedConformances ?
     // InheritedConformances ?
     // BuiltinConformances ?
+}
+
+void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
+#define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
+#define SIZE_AND_BYTES(Name) os << #Name << "\t"                          \
+                                << Name.size() << "\t"                    \
+                                << llvm::capacity_in_bytes(Name) << "\n"
+
+    SIZE_AND_BYTES(ErrorTypesWithOriginal);
+    SIZE(TypeAliasTypes);
+    SIZE(TupleTypes);
+    SIZE(PackTypes);
+    SIZE(PackExpansionTypes);
+    SIZE(PackElementTypes);
+    SIZE_AND_BYTES(MetatypeTypes);
+    SIZE_AND_BYTES(ExistentialMetatypeTypes);
+    SIZE_AND_BYTES(ArraySliceTypes);
+    SIZE_AND_BYTES(VariadicSequenceTypes);
+    SIZE_AND_BYTES(DictionaryTypes);
+    SIZE_AND_BYTES(OptionalTypes);
+    SIZE_AND_BYTES(ParenTypes);
+    SIZE_AND_BYTES(ReferenceStorageTypes);
+    SIZE_AND_BYTES(LValueTypes);
+    SIZE_AND_BYTES(InOutTypes);
+    SIZE_AND_BYTES(DependentMemberTypes);
+    SIZE(ErrorUnionTypes);
+    SIZE_AND_BYTES(PlaceholderTypes);
+    SIZE_AND_BYTES(DynamicSelfTypes);
+    SIZE_AND_BYTES(EnumTypes);
+    SIZE_AND_BYTES(StructTypes);
+    SIZE_AND_BYTES(ClassTypes);
+    SIZE_AND_BYTES(ProtocolTypes);
+    SIZE_AND_BYTES(ExistentialTypes);
+    SIZE(UnboundGenericTypes);
+    SIZE(BoundGenericTypes);
+    SIZE(ProtocolCompositionTypes);
+    SIZE(ParameterizedProtocolTypes);
+    SIZE(LayoutConstraints);
+    SIZE_AND_BYTES(OpaqueArchetypeEnvironments);
+    SIZE(FunctionTypes);
+    SIZE(NormalConformances);
+    SIZE(SelfConformances);
+    SIZE(SpecializedConformances);
+    SIZE(InheritedConformances);
+    SIZE_AND_BYTES(BuiltinConformances);
+    SIZE(PackConformances);
+    SIZE(SubstitutionMaps);
+
+#undef SIZE
+#undef SIZE_AND_BYTES
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(
