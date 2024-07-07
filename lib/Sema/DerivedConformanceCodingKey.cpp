@@ -214,12 +214,9 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   } else {
     SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
-      auto *baseTE = TypeExpr::createImplicit(enumType, C);
-      auto *pat = new (C) EnumElementPattern(baseTE, SourceLoc(), DeclNameLoc(),
-                                             DeclNameRef(), elt, nullptr,
-                                             /*DC*/ strValDecl);
-      pat->setImplicit();
-
+      auto *pat = EnumElementPattern::createImplicit(enumType, elt,
+                                                     /*subPattern*/ nullptr,
+                                                     /*DC*/ strValDecl);
       auto labelItem = CaseLabelItem(pat);
 
       auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),

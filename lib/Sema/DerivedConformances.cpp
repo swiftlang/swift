@@ -785,12 +785,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
     }
 
     // generate: case .<Case>:
-    auto pat = new (C)
-        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(), elt, nullptr,
-                           /*DC*/ funcDecl);
-    pat->setImplicit();
-    pat->setType(enumType);
+    auto *pat = EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ funcDecl);
 
     auto labelItem = CaseLabelItem(pat);
 
@@ -947,12 +943,8 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
 
   auto createElementPattern = [&]() -> EnumElementPattern * {
     // .<elt>
-    EnumElementPattern *eltPattern = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
-        DeclNameRef(elt->getBaseIdentifier()), elt, nullptr, /*DC*/ parentDC);
-    eltPattern->setImplicit();
-    eltPattern->setType(enumType);
-    return eltPattern;
+    return EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ parentDC);
   };
 
   Pattern *labelItemPattern;
