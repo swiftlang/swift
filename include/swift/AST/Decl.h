@@ -2807,6 +2807,10 @@ private:
     /// allows the entity to be replaced at runtime.
     unsigned isDynamic : 1;
 
+    /// Whether the DynamicallyReplacedDeclRequest request was evaluated and
+    /// output a null pointer.
+    unsigned noDynamicallyReplacedDecl : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2835,6 +2839,7 @@ private:
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
   friend class ActorIsolationRequest;
+  friend class DynamicallyReplacedDeclRequest;
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
 protected:

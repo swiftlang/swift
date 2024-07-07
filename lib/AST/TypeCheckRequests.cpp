@@ -352,6 +352,31 @@ void IsDynamicRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// DynamicallyReplacedDeclRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ValueDecl *> DynamicallyReplacedDeclRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+
+  if (decl->LazySemanticInfo.noDynamicallyReplacedDecl)
+    return std::optional(nullptr);
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+
+void DynamicallyReplacedDeclRequest::cacheResult(ValueDecl *result) const {
+  auto *decl = std::get<0>(getStorage());
+
+  if (!result) {
+    decl->LazySemanticInfo.noDynamicallyReplacedDecl = 1;
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // RequirementSignatureRequest computation.
 //----------------------------------------------------------------------------//
 

@@ -86,7 +86,7 @@ SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
-              Cached, NoLocationInfo)
+              SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ABIMembersRequest,
               ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AllMembersRequest,

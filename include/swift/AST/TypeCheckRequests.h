@@ -3270,7 +3270,9 @@ public:
 
 class DynamicallyReplacedDeclRequest
     : public SimpleRequest<DynamicallyReplacedDeclRequest,
-                           ValueDecl *(ValueDecl *), RequestFlags::Cached> {
+                           ValueDecl *(ValueDecl *),
+                           RequestFlags::SeparatelyCached |
+                           RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -3281,8 +3283,11 @@ private:
   ValueDecl * evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
-  // Caching.
+  // Separate caching.
   bool isCached() const { return true; }
+  std::optional<ValueDecl *> getCachedResult() const;
+  void cacheResult(ValueDecl *result) const;
+
 };
 
 class SpecializeAttrTargetDeclRequest
