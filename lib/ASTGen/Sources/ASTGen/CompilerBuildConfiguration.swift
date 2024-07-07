@@ -12,6 +12,7 @@
 
 import ASTBridging
 import SwiftIfConfig
+import SwiftSyntax
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
@@ -143,4 +144,53 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     componentsBuf?.deallocate()
     return version
   }
+}
+
+/// Extract the #if clause range information for the given source file.
+@_cdecl("swift_ASTGen_configuredRegions")
+public func configuredRegions(
+  astContext: BridgedASTContext,
+  sourceFilePtr: UnsafeRawPointer,
+  cRegionsOut: UnsafeMutablePointer<UnsafeMutablePointer<BridgedIfConfigClauseRangeInfo>?>
+) -> Int {
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+  let configuration = CompilerBuildConfiguration(ctx: astContext)
+  let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
+
+  var cRegions: [BridgedIfConfigClauseRangeInfo] = []
+  for (ifConfig, state) in regions {
+    let kind: BridgedIfConfigClauseKind
+    switch state {
+    case .active: kind = .IfConfigActive
+    case .inactive, .unparsed: kind = .IfConfigInactive
+    }
+
+    let bodyLoc: AbsolutePosition
+    if let elements = ifConfig.elements {
+      bodyLoc = elements.position
+    } else if let condition = ifConfig.condition {
+      bodyLoc = condition.endPosition
+    } else {
+      bodyLoc = ifConfig.endPosition
+    }
+
+    cRegions.append(
+      .init(
+        directiveLoc: sourceFilePtr.pointee.sourceLoc(
+          at: ifConfig.poundKeyword.positionAfterSkippingLeadingTrivia
+        ),
+        bodyLoc: sourceFilePtr.pointee.sourceLoc(at: bodyLoc),
+        endLoc: sourceFilePtr.pointee.sourceLoc(
+          at: ifConfig.endPosition
+        ),
+        kind: kind
+      )
+    )
+  }
+
+  let cRegionsBuf: UnsafeMutableBufferPointer<BridgedIfConfigClauseRangeInfo> =
+    .allocate(capacity: cRegions.count)
+  _ = cRegionsBuf.initialize(from: cRegions)
+  cRegionsOut.pointee = cRegionsBuf.baseAddress
+  return cRegionsBuf.count
 }

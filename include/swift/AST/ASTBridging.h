@@ -26,6 +26,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Stmt.h"
 #endif
 
@@ -1911,6 +1912,49 @@ SWIFT_NAME("BridgedParameterList.createParsed(_:leftParenLoc:parameters:"
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc);
+
+//===----------------------------------------------------------------------===//
+// MARK: #if handling
+//===----------------------------------------------------------------------===//
+
+/// Bridged version of IfConfigClauseRangeInfo::ClauseKind.
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIfConfigClauseKind : size_t {
+  IfConfigActive,
+  IfConfigInactive,
+  IfConfigEnd
+};
+
+/// Bridged version of IfConfigClauseRangeInfo.
+struct BridgedIfConfigClauseRangeInfo {
+  BridgedSourceLoc directiveLoc;
+  BridgedSourceLoc bodyLoc;
+  BridgedSourceLoc endLoc;
+  BridgedIfConfigClauseKind kind;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::IfConfigClauseRangeInfo unbridged() const {
+    swift::IfConfigClauseRangeInfo::ClauseKind clauseKind;
+    switch (kind) {
+    case IfConfigActive:
+      clauseKind = swift::IfConfigClauseRangeInfo::ActiveClause;
+      break;
+
+    case IfConfigInactive:
+      clauseKind = swift::IfConfigClauseRangeInfo::InactiveClause;
+      break;
+
+    case IfConfigEnd:
+      clauseKind = swift::IfConfigClauseRangeInfo::EndDirective;
+      break;
+    }
+
+    return swift::IfConfigClauseRangeInfo(directiveLoc.unbridged(),
+                                          bodyLoc.unbridged(),
+                                          endLoc.unbridged(),
+                                          clauseKind);
+  }
+#endif
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins

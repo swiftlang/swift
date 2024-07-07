@@ -47,6 +47,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
@@ -2964,6 +2965,21 @@ void SourceFile::recordIfConfigClauseRangeInfo(
 }
 
 ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (!IfConfigClauseRanges.IsSorted) {
+    IfConfigClauseRanges.Ranges.clear();
+
+    BridgedIfConfigClauseRangeInfo *regions;
+    intptr_t numRegions = swift_ASTGen_configuredRegions(
+        getASTContext(), getExportedSourceFile(), &regions);
+    IfConfigClauseRanges.Ranges.reserve(numRegions);
+    for (intptr_t i = 0; i != numRegions; ++i)
+      IfConfigClauseRanges.Ranges.push_back(regions[i].unbridged());
+    free(regions);
+
+    IfConfigClauseRanges.IsSorted = true;
+  }
+#else
   if (!IfConfigClauseRanges.IsSorted) {
     auto &SM = getASTContext().SourceMgr;
     // Sort the ranges if we need to.
@@ -2987,6 +3003,7 @@ ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
                                       IfConfigClauseRanges.Ranges.end());
     IfConfigClauseRanges.IsSorted = true;
   }
+#endif
 
   return IfConfigClauseRanges.Ranges;
 }

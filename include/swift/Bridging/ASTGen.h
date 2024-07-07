@@ -151,6 +151,11 @@ bool swift_ASTGen_parseRegexLiteral(BridgedStringRef inputPtr,
                                     BridgedSourceLoc diagLoc,
                                     BridgedDiagnosticEngine diagEngine);
 
+intptr_t swift_ASTGen_configuredRegions(
+    BridgedASTContext astContext,
+    void *_Nonnull sourceFile,
+    BridgedIfConfigClauseRangeInfo *_Nullable *_Nonnull);
+
 #ifdef __cplusplus
 }
 #endif
