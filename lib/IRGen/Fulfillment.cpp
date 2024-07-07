@@ -361,7 +361,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   bool hadFulfillment = false;
 
-  auto subs = type->getContextSubstitutionMap(nominal);
+  auto subs = type->getContextSubstitutionMap();
 
   GenericTypeRequirements requirements(IGM, nominal);
 

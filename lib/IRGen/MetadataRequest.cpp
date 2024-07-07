@@ -870,7 +870,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
 
   // Analyze the substitution map to determine if everything can be referenced
   // statically.
-  auto substitutions = type->getContextSubstitutionMap(nominal);
+  auto substitutions = type->getContextSubstitutionMap();
 
   // If we cannot statically reference type metadata for our replacement types,
   // we cannot specialize.
@@ -2719,7 +2719,7 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   assert(!theType->hasUnboundGenericType());
 
   auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
-  auto substitutions = theType->getContextSubstitutionMap(nominal);
+  auto substitutions = theType->getContextSubstitutionMap();
   for (auto requirement : requirements.getRequirements()) {
     if (requirement.isAnyWitnessTable()) {
       continue;

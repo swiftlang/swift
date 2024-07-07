@@ -1289,26 +1289,22 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
-  /// Determine the set of substitutions that should be applied to a
-  /// type spelled within the given DeclContext to treat it as a
-  /// member of this type.
+  /// Assumes this is a nominal type. Returns a substitution map that sends each
+  /// generic parameter of the declaration's generic signature to the corresponding
+  /// generic argument of this nominal type.
   ///
-  /// For example, given:
-  /// \code
-  /// struct X<T, U> { }
-  /// extension X {
-  ///   typealias SomeArray = [T]
-  /// }
-  /// \endcode
+  /// Eg: Array<Int> ---> { Element := Int }
+  SubstitutionMap getContextSubstitutionMap();
+
+  /// More general form of the above that handles additional cases:
   ///
-  /// Asking for the member substitutions of \c X<Int,String> within
-  /// the context of the extension above will produce substitutions T
-  /// -> Int and U -> String suitable for mapping the type of
-  /// \c SomeArray.
+  /// 1) dc is the nominal type itself or an unconstrained extension
+  /// 2) dc is a superclass
+  /// 3) dc is a protocol
   ///
-  /// \param genericEnv If non-null and the type is nested inside of a
-  /// generic function, generic parameters of the outer context are
-  /// mapped to context archetypes of this generic environment.
+  /// In Case 2) and 3), the substitution map has the generic signature of the dc,
+  /// and not the nominal. In Case 1), this is the same as the no-argument overload
+  /// of getContextSubstitutionMap().
   SubstitutionMap getContextSubstitutionMap(const DeclContext *dc,
                                             GenericEnvironment *genericEnv=nullptr);
 

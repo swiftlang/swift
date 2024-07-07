@@ -805,6 +805,10 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getContextSubstitutionMap() {
+  return getContextSubstitutionMap(getAnyNominal(), nullptr);
+}
+
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     const DeclContext *dc,
     GenericEnvironment *genericEnv) {
