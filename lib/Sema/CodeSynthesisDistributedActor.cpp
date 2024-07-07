@@ -100,9 +100,10 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyType);
 
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
-  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
-  propPat->setType(propertyType);
+  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
+  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
@@ -150,9 +151,10 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyType);
 
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
-  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
-  propPat->setType(propertyType);
+  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
+  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
