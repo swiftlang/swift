@@ -377,6 +377,24 @@ void DynamicallyReplacedDeclRequest::cacheResult(ValueDecl *result) const {
 }
 
 //----------------------------------------------------------------------------//
+// ApplyAccessNoteRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<evaluator::SideEffect>
+ApplyAccessNoteRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.accessNoteApplied)
+    return evaluator::SideEffect();
+  return std::nullopt;
+}
+
+
+void ApplyAccessNoteRequest::cacheResult(evaluator::SideEffect result) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.accessNoteApplied = 1;
+}
+
+//----------------------------------------------------------------------------//
 // RequirementSignatureRequest computation.
 //----------------------------------------------------------------------------//
 

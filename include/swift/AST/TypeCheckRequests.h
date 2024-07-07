@@ -3316,7 +3316,7 @@ public:
 class ApplyAccessNoteRequest
     : public SimpleRequest<ApplyAccessNoteRequest,
                            evaluator::SideEffect(ValueDecl *),
-                           RequestFlags::Cached> {
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -3326,10 +3326,11 @@ private:
   evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
-  // Cached.
+  // Separate caching.
   bool isCached() const { return true; }
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect value) const;
 };
-
 
 class TypeCheckSourceFileRequest
     : public SimpleRequest<

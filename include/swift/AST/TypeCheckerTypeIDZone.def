@@ -22,7 +22,7 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
                                          bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
-              evaluator::SideEffect(ValueDecl *), Cached, NoLocationInfo)
+              evaluator::SideEffect(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedResultBuilderRequest,
               CustomAttr *(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest,
