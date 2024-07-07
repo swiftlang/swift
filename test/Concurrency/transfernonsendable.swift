@@ -40,6 +40,7 @@ actor MyActor {
   func useSendableFunction(_: @Sendable () -> Void) {}
   func useNonSendableFunction(_: () -> Void) {}
   func doSomething() {}
+  @MainActor func useKlassMainActor(_ x: NonSendableKlass) {}
 }
 
 final actor FinalActor {
@@ -1808,4 +1809,17 @@ actor FunctionWithSendableResultAndIsolationActor {
     func string(someCondition: Bool = false) -> String {
         return ""
     }
+}
+
+@MainActor
+func testThatGlobalActorTakesPrecedenceOverActorIsolationOnMethods() async {
+  let a = MyActor()
+  let ns = NonSendableKlass()
+
+  // 'ns' should be main actor isolated since useKlassMainActor is @MainActor
+  // isolated. Previously we would let MyActor take precedence here...
+  a.useKlassMainActor(ns)
+
+  // Meaning we would get an error here.
+  Task { @MainActor in print(ns) }
 }

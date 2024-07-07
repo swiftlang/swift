@@ -180,6 +180,12 @@ public:
     return parameterIndex;
   }
 
+  /// Returns true if this actor-instance isolation appllies to the self
+  /// parameter of a method.
+  bool isActorInstanceForSelfParameter() const {
+    return getActorInstanceParameter() == 0;
+  }
+
   bool isSILParsed() const { return silParsed; }
 
   bool isActorIsolated() const {
