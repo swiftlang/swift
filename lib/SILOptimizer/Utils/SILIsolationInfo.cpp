@@ -358,6 +358,11 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
+    // Check if we have SIL based "faked" isolation crossings that we use for
+    // testing purposes.
+    //
+    // NOTE: Please do not use getWithIsolationCrossing in more places! We only
+    // want to use it here!
     if (auto crossing = fas.getIsolationCrossing()) {
       if (auto info = SILIsolationInfo::getWithIsolationCrossing(*crossing))
         return info;
@@ -754,19 +759,6 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // Try to infer using SIL first since we might be able to get the source name
-  // of the actor.
-  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
-    if (auto crossing = apply->getIsolationCrossing()) {
-      if (auto info = SILIsolationInfo::getWithIsolationCrossing(*crossing))
-        return info;
-
-      if (crossing->getCalleeIsolation().isNonisolated()) {
-        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
-      }
-    }
-  }
-
   if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
     if (asi->isFromVarDecl()) {
       if (auto *varDecl = asi->getLoc().getAsASTNode<VarDecl>()) {
@@ -797,6 +789,23 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             }
           }
         }
+      }
+    }
+  }
+
+  // Check if we have an ApplyInst with nonisolated.
+  //
+  // NOTE: We purposely avoid using other isolation info from an ApplyExpr since
+  // when we use the isolation crossing on the ApplyExpr at this point,w e are
+  // unable to find out what the appropriate instance is (since we would have
+  // found it earlier if we could). This ensures that we can eliminate a case
+  // where we get a SILIsolationInfo with actor isolation and without a SILValue
+  // actor instance. This prevents a class of bad SILIsolationInfo merge errors
+  // caused by the actor instances not matching.
+  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
+    if (auto crossing = apply->getIsolationCrossing()) {
+      if (crossing->getCalleeIsolation().isNonisolated()) {
+        return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
   }
