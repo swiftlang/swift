@@ -1472,6 +1472,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
+  Opts.AnalyzeRequestEvaluator = Args.hasArg(
+      OPT_analyze_request_evaluator);
+
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
