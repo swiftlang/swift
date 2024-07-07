@@ -110,7 +110,7 @@ getTransferringApplyCalleeInfo(SILInstruction *inst) {
     return {};
 
   auto *decl = declRef->getDecl();
-  if (!decl->hasName())
+  if (!decl || !decl->hasName())
     return {};
 
   return {{decl->getDescriptiveKind(), decl->getName()}};
