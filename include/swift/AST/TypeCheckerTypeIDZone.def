@@ -177,7 +177,7 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
               ActorIsolationState(ValueDecl *),
-              Cached, NoLocationInfo)
+              SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
               bool(ValueDecl *),
               Uncached, NoLocationInfo)

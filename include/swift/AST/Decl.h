@@ -2820,6 +2820,10 @@ private:
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
+
+    /// Whether we're in the common case where the ActorIsolationRequest
+    /// request returned ActorIsolation::forUnspecified().
+    unsigned noActorIsolation : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2830,6 +2834,7 @@ private:
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
+  friend class ActorIsolationRequest;
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
 protected:
