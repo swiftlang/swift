@@ -28,7 +28,8 @@ SWIFT_REQUEST(TypeChecker, AttachedResultBuilderRequest,
 SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest,
               Type(VarDecl *, unsigned), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
-              llvm::TinyPtrVector<CustomAttr *>(VarDecl *), Cached,
+              llvm::TinyPtrVector<CustomAttr *>(VarDecl *),
+              SeparatelyCached | SplitCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)

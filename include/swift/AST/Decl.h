@@ -452,7 +452,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
@@ -471,6 +471,9 @@ protected:
 
     /// Whether this is a lazily top-level global variable from the main file.
     IsTopLevelGlobal : 1,
+
+    /// Whether this variable has no attached property wrappers.
+    NoAttachedPropertyWrappers : 1,
 
     /// Whether this variable has no property wrapper auxiliary variables.
     NoPropertyWrapperAuxiliaryVariables : 1
@@ -6158,11 +6161,19 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
+  friend class AttachedPropertyWrappersRequest;
   friend class PropertyWrapperAuxiliaryVariablesRequest;
 
   NamedPattern *NamingPattern = nullptr;
 
-  /// True if this is a top-level global variable from the main source file.
+  bool hasNoAttachedPropertyWrappers() const {
+    return Bits.VarDecl.NoAttachedPropertyWrappers;
+  }
+
+  void setHasNoAttachedPropertyWrappers() {
+    Bits.VarDecl.NoAttachedPropertyWrappers = true;
+  }
+
   bool hasNoPropertyWrapperAuxiliaryVariables() const {
     return Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables;
   }

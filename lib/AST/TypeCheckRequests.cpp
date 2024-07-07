@@ -648,6 +648,33 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 //----------------------------------------------------------------------------//
+// AttachedPropertyWrappersRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<llvm::TinyPtrVector<CustomAttr *>>
+AttachedPropertyWrappersRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+
+  if (decl->hasNoAttachedPropertyWrappers())
+    return llvm::TinyPtrVector<CustomAttr *>();
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+
+void AttachedPropertyWrappersRequest::cacheResult(
+    llvm::TinyPtrVector<CustomAttr *> result) const {
+  auto *decl = std::get<0>(getStorage());
+
+  if (result.empty()) {
+    decl->setHasNoAttachedPropertyWrappers();
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // SelfAccessKindRequest computation.
 //----------------------------------------------------------------------------//
 

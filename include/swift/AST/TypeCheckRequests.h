@@ -800,7 +800,8 @@ public:
 class AttachedPropertyWrappersRequest :
     public SimpleRequest<AttachedPropertyWrappersRequest,
                          llvm::TinyPtrVector<CustomAttr *>(VarDecl *),
-                         RequestFlags::Cached> {
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -812,8 +813,10 @@ private:
   evaluate(Evaluator &evaluator, VarDecl *) const;
 
 public:
-  // Caching
+  // Separate caching.
   bool isCached() const { return true; }
+  std::optional<llvm::TinyPtrVector<CustomAttr *>> getCachedResult() const;
+  void cacheResult(llvm::TinyPtrVector<CustomAttr *> result) const;
 };
 
 /// Request the raw (possibly unbound generic) type of the property wrapper
