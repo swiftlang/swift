@@ -3747,7 +3747,7 @@ of ``scalar_pack_index``, ``pack_pack_index``, or ``dynamic_pack_index``),
 and it must index into a pack type with the same shape as the indexed
 pack type.
 
-Third, additional restrictions must be satisifed depending on which
+Third, additional restrictions must be satisfied depending on which
 pack indexing instruction the pack index is:
 
 - For ``scalar_pack_index``, the projected element type must be the

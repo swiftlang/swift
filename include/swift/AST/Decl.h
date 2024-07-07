@@ -357,7 +357,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -388,7 +388,23 @@ protected:
     /// True if \c ObjCInterfaceAndImplementationRequest has been computed
     /// and did \em not find anything. This is the fast path where we can bail
     /// out without checking other caches or computing anything.
-    LacksObjCInterfaceOrImplementation : 1
+    LacksObjCInterfaceOrImplementation : 1,
+
+    /// True if we're in the common case where the ExpandMemberAttributeMacros
+    /// request returned an empty array.
+    NoMemberAttributeMacros : 1,
+
+    /// True if we're in the common case where the ExpandPeerMacroRequest
+    /// request returned an empty array.
+    NoPeerMacros : 1,
+
+    /// True if we're in the common case where the GlobalActorAttributeRequest
+    /// request returned a pair of null pointers.
+    NoGlobalActorAttribute : 1,
+
+    /// True if we're in the common case where the SPIGroupsRequest
+    /// request returned an empty array of identifiers.
+    NoSPIGroups : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -436,7 +452,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
@@ -454,7 +470,13 @@ protected:
     IsPropertyWrapperBackingProperty : 1,
 
     /// Whether this is a lazily top-level global variable from the main file.
-    IsTopLevelGlobal : 1
+    IsTopLevelGlobal : 1,
+
+    /// Whether this variable has no attached property wrappers.
+    NoAttachedPropertyWrappers : 1,
+
+    /// Whether this variable has no property wrapper auxiliary variables.
+    NoPropertyWrapperAuxiliaryVariables : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
@@ -504,7 +526,7 @@ protected:
 
     /// Whether this function is a distributed thunk for a distributed
     /// function or computed property.
-    DistributedThunk: 1
+    DistributedThunk : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl,
@@ -827,6 +849,10 @@ protected:
   friend class MemberLookupTable;
   friend class DeclDeserializer;
   friend class RawCommentRequest;
+  friend class ExpandMemberAttributeMacros;
+  friend class ExpandPeerMacroRequest;
+  friend class GlobalActorAttributeRequest;
+  friend class SPIGroupsRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -845,6 +871,38 @@ private:
   /// Directly set the invalid bit
   void setInvalidBit();
 
+  bool hasNoMemberAttributeMacros() const {
+    return Bits.Decl.NoMemberAttributeMacros;
+  }
+
+  void setHasNoMemberAttributeMacros() {
+    Bits.Decl.NoMemberAttributeMacros = true;
+  }
+
+  bool hasNoPeerMacros() const {
+    return Bits.Decl.NoPeerMacros;
+  }
+
+  void setHasNoPeerMacros() {
+    Bits.Decl.NoPeerMacros = true;
+  }
+
+  bool hasNoGlobalActorAttribute() const {
+    return Bits.Decl.NoGlobalActorAttribute;
+  }
+
+  void setHasNoGlobalActorAttribute() {
+    Bits.Decl.NoGlobalActorAttribute = true;
+  }
+
+  bool hasNoSPIGroups() const {
+    return Bits.Decl.NoSPIGroups;
+  }
+
+  void setHasNoSPIGroups() {
+    Bits.Decl.NoSPIGroups = true;
+  }
+
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -857,6 +915,9 @@ protected:
     Bits.Decl.EscapedFromIfConfig = false;
     Bits.Decl.Hoisted = false;
     Bits.Decl.LacksObjCInterfaceOrImplementation = false;
+    Bits.Decl.NoMemberAttributeMacros = false;
+    Bits.Decl.NoGlobalActorAttribute = false;
+    Bits.Decl.NoSPIGroups = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -2749,6 +2810,10 @@ private:
     /// allows the entity to be replaced at runtime.
     unsigned isDynamic : 1;
 
+    /// Whether the DynamicallyReplacedDeclRequest request was evaluated and
+    /// output a null pointer.
+    unsigned noDynamicallyReplacedDecl : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2762,6 +2827,13 @@ private:
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
+
+    /// Whether we're in the common case where the ActorIsolationRequest
+    /// request returned ActorIsolation::forUnspecified().
+    unsigned noActorIsolation : 1;
+
+    /// Whether we've evaluated the ApplyAccessNoteRequest.
+    unsigned accessNoteApplied : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2772,6 +2844,9 @@ private:
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
+  friend class ActorIsolationRequest;
+  friend class DynamicallyReplacedDeclRequest;
+  friend class ApplyAccessNoteRequest;
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
 protected:
@@ -6090,7 +6165,26 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
+  friend class AttachedPropertyWrappersRequest;
+  friend class PropertyWrapperAuxiliaryVariablesRequest;
+
   NamedPattern *NamingPattern = nullptr;
+
+  bool hasNoAttachedPropertyWrappers() const {
+    return Bits.VarDecl.NoAttachedPropertyWrappers;
+  }
+
+  void setHasNoAttachedPropertyWrappers() {
+    Bits.VarDecl.NoAttachedPropertyWrappers = true;
+  }
+
+  bool hasNoPropertyWrapperAuxiliaryVariables() const {
+    return Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables;
+  }
+
+  void setHasNoPropertyWrapperAuxiliaryVariables() {
+    Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables = true;
+  }
 
 public:
   enum class Introducer : uint8_t {
@@ -7416,6 +7510,7 @@ protected:
   friend class ParseAbstractFunctionBodyRequest;
   friend class TypeCheckFunctionBodyRequest;
   friend class IsFunctionBodySkippedRequest;
+  friend class LifetimeDependenceInfoRequest;
 
   CaptureInfo Captures;
 
@@ -7431,6 +7526,7 @@ protected:
   struct {
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
+    unsigned NoLifetimeDependenceInfo : 1;
   } LazySemanticInfo = { };
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
