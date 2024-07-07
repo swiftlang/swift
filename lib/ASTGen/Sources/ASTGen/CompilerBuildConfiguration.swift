@@ -158,7 +158,61 @@ public func configuredRegions(
   let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
 
   var cRegions: [BridgedIfConfigClauseRangeInfo] = []
+
+  // Keep track of the enclosing #ifs so that we can emit and "#endif" directive
+  // right before moving on to the next #if (and at the end).
+  var ifConfigStack: [IfConfigDeclSyntax] = []
+
+  /// Emit the #endif location for the given #if declaration.
+  func flushSingleIfConfig(_ topIfConfigDecl: IfConfigDeclSyntax) {
+    cRegions.append(
+      .init(
+        directiveLoc: sourceFilePtr.pointee.sourceLoc(
+          at: topIfConfigDecl.poundEndif.positionAfterSkippingLeadingTrivia
+        ),
+        bodyLoc: sourceFilePtr.pointee.sourceLoc(
+          at: topIfConfigDecl.poundEndif.endPosition
+        ),
+        endLoc: sourceFilePtr.pointee.sourceLoc(
+          at: topIfConfigDecl.poundEndif.endPosition
+        ),
+        kind: .IfConfigEnd
+      )
+    )
+  }
+
+  /// Push a new #if declaration into the stack so that we'll insert #endifs
+  /// in the right places.
+  func pushIfConfig(_ currentIfConfigDecl: IfConfigDeclSyntax) {
+    // Go through the current stack of #if declarations.
+    while let topIfConfig = ifConfigStack.last {
+      // If the top of the stack is the same as this #if, we're done.
+      if topIfConfig == currentIfConfigDecl {
+        return
+      }
+
+      // If the top of the stack is not an ancestor of this #if, flush it
+      // and keep going.
+      if !topIfConfig.isAncestor(of: currentIfConfigDecl) {
+        flushSingleIfConfig(topIfConfig)
+        ifConfigStack.removeLast()
+        continue
+      }
+
+      break
+    }
+
+    // Add this #if to the stack.
+    ifConfigStack.append(currentIfConfigDecl)
+  }
+
+  // Translate all of the configured regions.
   for (ifConfig, state) in regions {
+    // Note that we're handling an #if now.
+    if let currentIfConfigDecl = ifConfig.parent?.parent?.as(IfConfigDeclSyntax.self) {
+      pushIfConfig(currentIfConfigDecl)
+    }
+
     let kind: BridgedIfConfigClauseKind
     switch state {
     case .active: kind = .IfConfigActive
@@ -174,18 +228,28 @@ public func configuredRegions(
       bodyLoc = ifConfig.endPosition
     }
 
+    let endLoc: AbsolutePosition
+    if let nextToken = ifConfig.nextToken(viewMode: .sourceAccurate) {
+      endLoc = nextToken.positionAfterSkippingLeadingTrivia
+    } else {
+      endLoc = ifConfig.endPosition
+    }
+
     cRegions.append(
       .init(
         directiveLoc: sourceFilePtr.pointee.sourceLoc(
           at: ifConfig.poundKeyword.positionAfterSkippingLeadingTrivia
         ),
         bodyLoc: sourceFilePtr.pointee.sourceLoc(at: bodyLoc),
-        endLoc: sourceFilePtr.pointee.sourceLoc(
-          at: ifConfig.endPosition
-        ),
+        endLoc: sourceFilePtr.pointee.sourceLoc(at: endLoc),
         kind: kind
       )
     )
+  }
+
+  // Flush the remaining #ifs.
+  while let topIfConfig = ifConfigStack.popLast() {
+    flushSingleIfConfig(topIfConfig)
   }
 
   let cRegionsBuf: UnsafeMutableBufferPointer<BridgedIfConfigClauseRangeInfo> =
@@ -193,4 +257,21 @@ public func configuredRegions(
   _ = cRegionsBuf.initialize(from: cRegions)
   cRegionsOut.pointee = cRegionsBuf.baseAddress
   return cRegionsBuf.count
+}
+
+extension SyntaxProtocol {
+  /// Determine whether this node is an ancestor of the given `other` node.
+  func isAncestor(of other: some SyntaxProtocol) -> Bool {
+    var other = Syntax(other)
+    let selfSyntax = Syntax(self)
+    while let otherParent = other.parent {
+      if otherParent == selfSyntax {
+        return true
+      }
+
+      other = otherParent
+    }
+
+    return false
+  }
 }
