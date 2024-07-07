@@ -1026,7 +1026,7 @@ function Build-CMakeProject {
 
       if ($Platform -eq "Windows") {
         $SwiftArgs += @("-Xlinker", "/INCREMENTAL:NO")
-        # Swift Requires COMDAT folding and de-duplication
+        # Swift requires COMDAT folding and de-duplication
         $SwiftArgs += @("-Xlinker", "/OPT:REF")
         $SwiftArgs += @("-Xlinker", "/OPT:ICF")
       }
