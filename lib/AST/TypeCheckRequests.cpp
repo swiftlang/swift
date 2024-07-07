@@ -2466,6 +2466,36 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
                  decl->getName());
 }
 
+//----------------------------------------------------------------------------//
+// LifetimeDependenceInfoRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<std::optional<LifetimeDependenceInfo>>
+LifetimeDependenceInfoRequest::getCachedResult() const {
+  auto *func = std::get<0>(getStorage());
+
+  if (func->LazySemanticInfo.NoLifetimeDependenceInfo)
+    return std::optional(std::optional<LifetimeDependenceInfo>());
+
+  return func->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void LifetimeDependenceInfoRequest::cacheResult(
+    std::optional<LifetimeDependenceInfo> result) const {
+  auto *func = std::get<0>(getStorage());
+  
+  if (!result) {
+    func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
+  }
+
+  func->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
+// CaptureInfoRequest computation.
+//----------------------------------------------------------------------------//
+
 std::optional<CaptureInfo>
 CaptureInfoRequest::getCachedResult() const {
   auto *func = std::get<0>(getStorage());
@@ -2476,6 +2506,10 @@ void CaptureInfoRequest::cacheResult(CaptureInfo info) const {
   auto *func = std::get<0>(getStorage());
   return func->setCaptureInfo(info);
 }
+
+//----------------------------------------------------------------------------//
+// ParamCaptureInfoRequest computation.
+//----------------------------------------------------------------------------//
 
 std::optional<CaptureInfo>
 ParamCaptureInfoRequest::getCachedResult() const {

@@ -4995,7 +4995,8 @@ class LifetimeDependenceInfoRequest
     : public SimpleRequest<LifetimeDependenceInfoRequest,
                            std::optional<LifetimeDependenceInfo>(
                                AbstractFunctionDecl *),
-                           RequestFlags::Cached> {
+                           RequestFlags::SeparatelyCached |
+                           RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -5006,9 +5007,10 @@ private:
   evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
 
 public:
-  // Caching.
+  // Separate caching.
   bool isCached() const { return true; }
-
+  std::optional<std::optional<LifetimeDependenceInfo>> getCachedResult() const;
+  void cacheResult(std::optional<LifetimeDependenceInfo> value) const;
 };
 
 class CaptureInfoRequest :

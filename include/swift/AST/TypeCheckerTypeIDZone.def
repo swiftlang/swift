@@ -574,7 +574,8 @@ SWIFT_REQUEST(TypeChecker, ImportDeclRequest,
                   const SourceFile *sf, const ModuleDecl *mod),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LifetimeDependenceInfoRequest,
-              LifetimeDependenceInfo(AbstractFunctionDecl *), Cached, NoLocationInfo)
+              LifetimeDependenceInfo(AbstractFunctionDecl *),
+              SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SuppressesConformanceRequest,
               bool(NominalTypeDecl *decl, KnownProtocolKind kp),
               SeparatelyCached, NoLocationInfo)

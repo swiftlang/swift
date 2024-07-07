@@ -7490,6 +7490,7 @@ protected:
   friend class ParseAbstractFunctionBodyRequest;
   friend class TypeCheckFunctionBodyRequest;
   friend class IsFunctionBodySkippedRequest;
+  friend class LifetimeDependenceInfoRequest;
 
   CaptureInfo Captures;
 
@@ -7505,6 +7506,7 @@ protected:
   struct {
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
+    unsigned NoLifetimeDependenceInfo : 1;
   } LazySemanticInfo = { };
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
