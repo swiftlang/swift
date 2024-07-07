@@ -3374,7 +3374,8 @@ public:
 class SPIGroupsRequest :
     public SimpleRequest<SPIGroupsRequest,
                          llvm::ArrayRef<Identifier>(const Decl *),
-                         RequestFlags::Cached> {
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -3387,6 +3388,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  std::optional<llvm::ArrayRef<Identifier>> getCachedResult() const;
+  void cacheResult(llvm::ArrayRef<Identifier> result) const;
 };
 
 

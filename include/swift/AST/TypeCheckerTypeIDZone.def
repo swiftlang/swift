@@ -409,7 +409,7 @@ SWIFT_REQUEST(TypeChecker, ResolveRawLayoutLikeTypeRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
-              Cached, NoLocationInfo)
+              SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveEffectiveMemberwiseInitRequest,
