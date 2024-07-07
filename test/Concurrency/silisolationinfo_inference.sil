@@ -23,6 +23,8 @@ class NonSendableKlass {
 
 actor MyActor {
   var ns: NonSendableKlass
+
+  func doSomething() async -> NonSendableKlass
 }
 
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
@@ -33,6 +35,7 @@ sil @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @o
 sil @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> ()
 
 sil @useActor : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+sil @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
 
 ///////////////////////
 // MARK: Basic Tests //
@@ -720,4 +723,99 @@ bb0(%0 : @owned $MyActor):
   destroy_value %1 : $MyActor
   destroy_value %1b : $MyActor
   return %3 : $NonSendableKlass
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_1: sil-isolation-info-inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_1: sil-isolation-info-inference with: @trace[0]
+sil [ossa] @isolated_variable_test_1 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil-isolation-info-inference @trace[0]"
+  %0 = enum $Optional<MyActor>, #Optional.none
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  //debug_value [trace] %1 : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_2:
+// CHECK-NEXT: First Value:   %3 = apply %2(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: 'self'-isolated
+// CHECK-NEXT: Second Value:   %6 = apply %4(%5) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Isolation: 'self'-isolated
+// CHECK-NEXT: Merged Isolation: 'self'-isolated
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_2: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] @isolated_variable_test_2 : $@convention(thin) @async (@guaranteed Optional<MyActor>) -> () {
+bb0(%0 : @guaranteed $Optional<MyActor>):
+  debug_value %0 : $Optional<MyActor>, let, name "self"
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %3 = function_ref @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %0a = unchecked_enum_data %0 : $Optional<MyActor>, #Optional.some!enumelt
+  %4 = apply %3(%0a) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_3:
+// CHECK-NEXT: First Value:   %4 = apply %2(%3) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: 'self'-isolated
+// CHECK-NEXT: Second Value:   %6 = apply %5(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Isolation: 'self'-isolated
+// CHECK-NEXT: Merged Isolation: 'self'-isolated
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_3: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] @isolated_variable_test_3 : $@convention(thin) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "self"
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %0a = enum $Optional<MyActor>, #Optional.some!enumelt, %0 : $MyActor
+  %2 = apply %1(%0a) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %3 = function_ref @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %4 = apply %3(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_4:
+// CHECK-NEXT: First Value:   %8 = apply %2(%7) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: 'self'-isolated
+// CHECK-NEXT: Second Value:   %10 = apply %9(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Isolation: 'self'-isolated
+// CHECK-NEXT: Merged Isolation: 'self'-isolated
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_4: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] @isolated_variable_test_4 : $@convention(thin) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "self"
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %0a = init_existential_ref %0 : $MyActor : $MyActor, $AnyObject
+  %0b = unconditional_checked_cast %0a : $AnyObject to MyActor
+  %0c = unchecked_ref_cast %0b : $MyActor to $AnyObject
+  %0d = unchecked_ref_cast %0c : $AnyObject to $MyActor
+  %0e = enum $Optional<MyActor>, #Optional.some!enumelt, %0d : $MyActor
+  %2 = apply %1(%0e) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %3 = function_ref @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %4 = apply %3(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
 }
