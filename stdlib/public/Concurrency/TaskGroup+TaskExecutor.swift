@@ -70,7 +70,7 @@ extension TaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   If `nil` is passed explicitly, that parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
@@ -135,7 +135,7 @@ extension ThrowingTaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   If `nil` is passed explicitly, that parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
@@ -245,7 +245,7 @@ extension DiscardingTaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   If `nil` is passed explicitly, that parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
@@ -295,7 +295,7 @@ extension DiscardingTaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   If `nil` is passed explicitly, that parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
@@ -360,7 +360,7 @@ extension ThrowingDiscardingTaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   If `nil` is passed explicitly, that parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
@@ -410,7 +410,7 @@ extension ThrowingDiscardingTaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   If `nil` is passed explicitly, that parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.

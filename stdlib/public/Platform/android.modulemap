@@ -12,7 +12,7 @@
 // The module map for the Android NDK.
 // A portion of the modules in this file are prefixed
 // with an underscore, to discourage users from importing them from
-// Swift directly, as these modules might be overriden by the C++ stdlib.
+// Swift directly, as these modules might be overridden by the C++ stdlib.
 // Instead, users should import 'Android' or another
 // umbrella module that includes these headers.
 

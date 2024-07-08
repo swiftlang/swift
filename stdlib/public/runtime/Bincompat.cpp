@@ -261,7 +261,7 @@ bool useLegacySwiftObjCHashing() {
 // * The `swift_task_isCurrentExecutorImpl` cannot crash
 // * This means cases where no "current" executor is present cannot be diagnosed correctly
 //    * The runtime can NOT use 'SerialExecutor/checkIsolated'
-//    * The runtime can NOT use 'dispatch_precondition' which is able ot handle some dispatch and main actor edge cases
+//    * The runtime can NOT use 'dispatch_precondition' which is able to handle some dispatch and main actor edge cases
 //
 // New behavior in "swift6" "crash" mode:
 // * The 'swift_task_isCurrentExecutorImpl' will CRASH rather than return 'false'

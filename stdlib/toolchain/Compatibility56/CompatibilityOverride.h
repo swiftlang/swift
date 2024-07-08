@@ -1,4 +1,4 @@
-//===--- CompatibiltyOverride.h - Back-deploying compatibility fixes --*- C++ -*-===//
+//===--- CompatibilityOverride.h - Back-deploying compatibility fixes --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -77,7 +77,7 @@ namespace swift {
 
 #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
-# error Back-deployment library must always be built with compatibilty overrides
+# error Back-deployment library must always be built with compatibility overrides
 
 #else // #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
