@@ -10,14 +10,11 @@ protocol Conforms {}
 struct Works: Hashable, Conforms {}
 struct Fails: Hashable {}
 
-extension Array: SameType where Element == Works {}
-// expected-note@-1 3 {{requirement from conditional conformance of '[Fails]' to 'SameType'}}
-extension Dictionary: SameType where Value == Works {}
-// expected-note@-1 3 {{requirement from conditional conformance of '[Int : Fails]' to 'SameType'}}
-extension Array: Conforms where Element: Conforms {}
-// expected-note@-1 7 {{requirement from conditional conformance of '[Fails]' to 'Conforms'}}
+extension Array: SameType where Element == Works {} // expected-note 2 {{requirement from conditional conformance of '[Fails]' to 'SameType'}}
+extension Dictionary: SameType where Value == Works {} // expected-note 2 {{requirement from conditional conformance of '[Int : Fails]' to 'SameType'}}
+extension Array: Conforms where Element: Conforms {} // expected-note 6 {{requirement from conditional conformance of '[Fails]' to 'Conforms'}}
 extension Dictionary: Conforms where Value: Conforms {}
-// expected-note@-1 5 {{requirement from conditional conformance of '[Int : Fails]' to 'Conforms'}}
+// expected-note@-1 4 {{requirement from conditional conformance of '[Int : Fails]' to 'Conforms'}}
 // expected-note@-2 2 {{requirement from conditional conformance of '[Int : any Conforms]' to 'Conforms'}}
 
 let works = Works()
@@ -44,8 +41,8 @@ func arraySameType() {
     // expected-error@-1 {{cannot convert value of type 'Fails' to expected element type 'Works'}}
 
     let _: SameType = arrayWorks as SameType
-    let _: SameType = arrayFails as SameType
-    // expected-error@-1 {{generic struct 'Array' requires the types 'Fails' and 'Works' be equivalent}}
+    let _: SameType = arrayFails as SameType // expected-note {{did you mean to use 'as!' to force downcast?}}
+    // expected-error@-1 {{'[Fails]' is not convertible to 'any SameType'}}
 }
 
 func dictionarySameType() {
@@ -69,8 +66,8 @@ func dictionarySameType() {
     // expected-error@-1 {{cannot convert value of type 'Fails' to expected dictionary value type 'Works'}}
 
     let _: SameType = dictWorks as SameType
-    let _: SameType = dictFails as SameType
-    // expected-error@-1 {{generic struct 'Dictionary' requires the types 'Fails' and 'Works' be equivalent}}
+    let _: SameType = dictFails as SameType // expected-note {{did you mean to use 'as!' to force downcast?}}
+    // expected-error@-1 {{'[Int : Fails]' is not convertible to 'any SameType'}}
 }
 
 func arrayConforms() {
@@ -94,8 +91,8 @@ func arrayConforms() {
     // expected-error@-1 {{generic struct 'Array' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = arrayWorks as Conforms
-    let _: Conforms = arrayFails as Conforms
-    // expected-error@-1 {{generic struct 'Array' requires that 'Fails' conform to 'Conforms'}}
+    let _: Conforms = arrayFails as Conforms // expected-note {{did you mean to use 'as!' to force downcast?}}
+    // expected-error@-1 {{'[Fails]' is not convertible to 'any Conforms'}}
 }
 
 func dictionaryConforms() {
@@ -119,8 +116,8 @@ func dictionaryConforms() {
     // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = dictWorks as Conforms
-    let _: Conforms = dictFails as Conforms
-    // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
+    let _: Conforms = dictFails as Conforms // expected-note {{did you mean to use 'as!' to force downcast?}}
+    // expected-error@-1 {{'[Int : Fails]' is not convertible to 'any Conforms'}}
 }
 
 func combined() {

@@ -277,7 +277,7 @@ func rdar_60185506() {
 func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
-  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two '(any Error)?' operands}}
+  myAssertion(e, ==, nil) // expected-error {{type of expression is ambiguous without a type annotation}}
 }
 
 // https://github.com/apple/swift/issues/54877
@@ -295,7 +295,6 @@ func rdar_62054241() {
 
   func test(_ arr: [Foo]) -> [Foo] {
     return arr.sorted(by: <) // expected-error {{no exact matches in reference to operator function '<'}}
-    // expected-note@-1 {{found candidate with type '(Foo, Foo) -> Bool'}}
   }
 }
 

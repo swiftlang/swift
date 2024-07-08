@@ -1124,10 +1124,13 @@ func rdar17170728() {
     // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 
-  let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
-    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout @escaping (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
+  let _ = [i, j, k].reduce(0 as Int?) { // expected-error 3 {{cannot convert value of type 'Int?' to expected element type 'Int'}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
+    // expected-error@-1 2 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-2 2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+    // expected-error@-3 {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-4 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }
 
@@ -1145,7 +1148,7 @@ func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   // Notes, attached to declarations, explain that there is a difference between Array.init(_:) and
   // RangeReplaceableCollection.init(_:) which are both applicable in this case.
-  let array = [Int](sequence)
+  let array = [Int](sequence) // expected-note {{candidate expects value of type 'AnyObject' for parameter #1 (got 'AnySequence<[Int]>')}}
   // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
@@ -1552,19 +1555,19 @@ func testNilCoalescingOperatorRemoveFix() {
   let _ = "" /* This is a comment */ ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{13-43=}}
 
   let _ = "" // This is a comment
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1554:13-1555:10=}}
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:13-+0:10=}}
 
   let _ = "" // This is a comment
-    /*
-     * The blank line below is part of the test case, do not delete it
-     */
-    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1557:13-1561:10=}}
+  /*
+   * The blank line below is part of the test case, do not delete it
+   */
+    ?? "" // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-4:13-+0:10=}}
 
-  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-1564:9=}}
+  if ("" ?? // This is a comment // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{9-+1:9=}}
       "").isEmpty {}
 
   if ("" // This is a comment
-      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{1566:9-1567:12=}}
+      ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
 // https://github.com/apple/swift/issues/74617
@@ -1576,4 +1579,15 @@ func testAddMemberVsRemoveCall() {
   let a = Foo_74617()
   let b = Foo_74617()
   let c = (a + b).bar() // expected-error {{cannot call value of non-function type 'Float'}} {{22-24=}}
+}
+
+// https://github.com/apple/swift/issues/73029
+func testBinaryOpWrongTypesFix() {
+  struct S<T> {
+    static func ==(lhs: S, rhs: S) -> Bool {
+      true
+    }
+  }
+  func getS<T>(value: T) -> S<T> {}
+  let _ = getS(value: "") == getS(value: 0) // expected-error {{binary operator '==' cannot be applied to operands of type 'S<String>' and 'S<Int>'}}
 }
