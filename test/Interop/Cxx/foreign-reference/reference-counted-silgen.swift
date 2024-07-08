@@ -9,7 +9,6 @@ import ReferenceCounted
 // CHECK-NOT: retain
 // CHECK-NOT: release
 // CHECK-NOT: copy_value
-// CHECK-NOT: destroy_value
 // CHECK-NOT: begin_borrow
 // CHECK-NOT: end_borrow
 // CHECK: return

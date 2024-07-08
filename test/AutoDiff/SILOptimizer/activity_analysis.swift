@@ -220,11 +220,11 @@ func checked_cast_addr_active_result<T: Differentiable>(x: T) -> T {
 // CHECK: bb3:
 // CHECK: [ACTIVE] %14 = argument of bb3 : $Optional<Float>
 // CHECK: bb4:
-// CHECK: [ACTIVE] %16 = argument of bb4 : $Float
-// CHECK: [ACTIVE]   %19 = alloc_stack $Float
+// CHECK: [ACTIVE] [[ARG4:%.*]] = argument of bb4 : $Float
+// CHECK: [ACTIVE]   [[ALLOC4:%.*]] = alloc_stack $Float
 // CHECK: bb5:
 // CHECK: bb6:
-// CHECK: [NONE]   %27 = tuple ()
+// CHECK: [NONE]   %{{[0-9]+}} = tuple ()
 
 // CHECK-LABEL: sil hidden [ossa] @${{.*}}checked_cast_addr_active_result{{.*}} : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
 // CHECK:   checked_cast_addr_br take_always T in %3 : $*T to Float in %5 : $*Float, bb1, bb2
@@ -832,15 +832,15 @@ func testActiveEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
 // CHECK: bb2:
 // CHECK: [ACTIVE] %6 = argument of bb2 : $Float
 // CHECK: bb3:
-// CHECK: [ACTIVE] %9 = argument of bb3 : $(Float, Float)
-// CHECK: [ACTIVE] (**%10**, %11) = destructure_tuple %9 : $(Float, Float)
-// CHECK: [ACTIVE] (%10, **%11**) = destructure_tuple %9 : $(Float, Float)
-// CHECK: [USEFUL]   %14 = metatype $@thin Float.Type
+// CHECK: [ACTIVE] [[ARG3:%.*]] = argument of bb3 : $(Float, Float)
+// CHECK: [ACTIVE] (**[[D1:%.*]]**, [[D2:%.*]]) = destructure_tuple [[ARG3]] : $(Float, Float)
+// CHECK: [ACTIVE] ([[D1]], **[[D2]]**) = destructure_tuple [[ARG3]] : $(Float, Float)
+// CHECK: [USEFUL]   %{{.*}} = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref static Float.+ infix(_:_:)
-// CHECK:   %15 = function_ref @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
-// CHECK: [ACTIVE]   %16 = apply %15(%10, %11, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK:   %{{.*}} = function_ref @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %{{.*}} = apply %{{[0-9]+}}(%{{[0-9]+}}, %{{[0-9]+}}, %{{[0-9]+}}) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK: bb4:
-// CHECK: [ACTIVE] %18 = argument of bb4 : $Float
+// CHECK: [ACTIVE] %{{[0-9]+}} = argument of bb4 : $Float
 
 enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
   case case1(T)
