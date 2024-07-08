@@ -3804,8 +3804,19 @@ static void printParameterFlags(ASTPrinter &printer,
     break;
   }
 
-  if (!options.SuppressSendingArgsAndResults && flags.isSending())
-    printer.printAttrName("sending ");
+  if (flags.isSending()) {
+    if (!options.SuppressSendingArgsAndResults) {
+      printer.printAttrName("sending ");
+    } else if (flags.getOwnershipSpecifier() ==
+               ParamSpecifier::ImplicitlyCopyableConsuming) {
+      // Ok. We are suppressing sending. If our ownership specifier was
+      // originally implicitly copyable consuming our argument was being passed
+      // at +1. By not printing sending, we would be changing the API
+      // potentially to take the parameter at +0 instead of +1. To work around
+      // this, print out consuming so that we preserve the +1 parameter.
+      printer.printKeyword("consuming", options, " ");
+    }
+  }
 
   if (flags.isIsolated()) {
     if (!(param && param->getInterfaceType()->isOptional() &&
