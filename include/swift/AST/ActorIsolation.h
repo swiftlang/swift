@@ -180,7 +180,7 @@ public:
     return parameterIndex;
   }
 
-  /// Returns true if this actor-instance isolation appllies to the self
+  /// Returns true if this actor-instance isolation applies to the self
   /// parameter of a method.
   bool isActorInstanceForSelfParameter() const {
     return getActorInstanceParameter() == 0;
