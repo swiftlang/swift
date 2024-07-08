@@ -1195,7 +1195,7 @@ private:
   /// It can be done when actor transitions from Idle to Scheduled or
   /// when actor gets a priority override and we schedule a stealer.
   ///
-  /// When the task executor is `undefined` ths task will be scheduled on the
+  /// When the task executor is `undefined` the task will be scheduled on the
   /// default global executor.
   void scheduleActorProcessJob(JobPriority priority, TaskExecutorRef taskExecutor);
 

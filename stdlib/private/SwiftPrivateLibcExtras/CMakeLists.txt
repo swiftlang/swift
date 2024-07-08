@@ -15,9 +15,9 @@ else()
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_private_libc_extras_darwin_depencencies Darwin)
+set(swift_private_libc_extras_darwin_dependencies Darwin)
 else()
-set(swift_private_libc_extras_darwin_depencencies)
+set(swift_private_libc_extras_darwin_dependencies)
 endif()
 
 add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -31,12 +31,12 @@ add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUIL
 
   SWIFT_MODULE_DEPENDS SwiftPrivate
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} ${swift_private_libc_extras_flags}
-  SWIFT_MODULE_DEPENDS_OSX ${swift_private_libc_extras_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_IOS ${swift_private_libc_extras_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_TVOS ${swift_private_libc_extras_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_private_libc_extras_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_XROS ${swift_private_libc_extras_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_private_libc_extras_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_private_libc_extras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_IOS ${swift_private_libc_extras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_private_libc_extras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_private_libc_extras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_XROS ${swift_private_libc_extras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_private_libc_extras_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}"
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc

@@ -596,7 +596,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-swift-version" "5")
   endif()
 
-  # Avoiding emiting ABI descriptor files while building stdlib.
+  # Avoiding emitting ABI descriptor files while building stdlib.
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-empty-abi-descriptor")
   endif()

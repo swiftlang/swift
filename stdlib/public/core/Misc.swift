@@ -200,7 +200,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// all of the following pairs of declarations are equivalent:
 ///
 ///     struct MyStructure { }
-///     struct MyStructere: Copyable { }
+///     struct MyStructure: Copyable { }
 ///
 ///     protocol MyProtocol { }
 ///     protocol MyProtocol: Copyable { }
