@@ -1,4 +1,4 @@
-//===--- ASTBridging.h - header for the swift SILBridging module ----------===//
+//===--- IfConfigClauseRangeInfo.h - header for #if clauses -=====---------===//
 //
 // This source file is part of the Swift.org open source project
 //

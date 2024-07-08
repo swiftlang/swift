@@ -238,7 +238,7 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
 
   // FIXME: The source location here is empty because build configurations
   // are supposed to be completely separated from source code. We could re-plumb
-  // things to have any errors reported up thruough the "canImportModule"
+  // things to have any errors reported up through the "canImportModule"
   // API.
   ImportPath::Module::Builder builder(
       cContext.unbridged(), importPath.unbridged(), /*separator=*/'.',

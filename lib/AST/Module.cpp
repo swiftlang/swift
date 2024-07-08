@@ -2960,8 +2960,12 @@ IfConfigClauseRangeInfo::getWholeRange(const SourceManager &SM) const {
 
 void SourceFile::recordIfConfigClauseRangeInfo(
     const IfConfigClauseRangeInfo &range) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Don't record ranges; they'll be extracted from swift-syntax when needed.
+#else
   IfConfigClauseRanges.Ranges.push_back(range);
   IfConfigClauseRanges.IsSorted = false;
+#endif
 }
 
 ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
