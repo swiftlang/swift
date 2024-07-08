@@ -818,8 +818,8 @@ class RefCounts {
   HeapObject *increment(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
-    // constant propagation will remove this in swift_retain, it should only
-    // be present in swift_retain_n
+    // Constant propagation will remove this in swift_retain, it should only
+    // be present in swift_retain_n.
     if (inc != 1 && oldbits.isImmortal(true)) {
       return getHeapObject();
     }
@@ -842,8 +842,8 @@ class RefCounts {
   void incrementNonAtomic(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
-    // constant propagation will remove this in swift_retain, it should only
-    // be present in swift_retain_n
+    // Constant propagation will remove this in swift_retain, it should only
+    // be present in swift_retain_n.
     if (inc != 1 && oldbits.isImmortal(true)) {
       return;
     }
@@ -921,7 +921,7 @@ class RefCounts {
   // Non-atomically release the last strong reference and mark the
   // object as deiniting.
   //
-  // Precondition: the reference count must be 1
+  // Precondition: the reference count must be 1.
   SWIFT_ALWAYS_INLINE
   void decrementFromOneNonAtomic() {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
@@ -1062,8 +1062,8 @@ class RefCounts {
     bool deinitNow;
     auto newbits = oldbits;
     
-    // constant propagation will remove this in swift_release, it should only
-    // be present in swift_release_n
+    // Constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
@@ -1110,8 +1110,8 @@ class RefCounts {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     
-    // constant propagation will remove this in swift_release, it should only
-    // be present in swift_release_n
+    // Constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
