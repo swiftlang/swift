@@ -1167,7 +1167,7 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
       continue;
     }
 
-    // Look Through extracting from optionals.
+    // Look through extracting from optionals.
     if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(svi)) {
       if (uedi->getEnumDecl() ==
           uedi->getFunction()->getASTContext().getOptionalDecl()) {
@@ -1176,7 +1176,7 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
       }
     }
 
-    // Look Through wrapping in an enum.
+    // Look through wrapping in an optional.
     if (auto *ei = dyn_cast<EnumInst>(svi)) {
       if (ei->hasOperand()) {
         if (ei->getElement()->getParentEnum() ==
