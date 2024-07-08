@@ -741,6 +741,13 @@ isIsolationInferenceBoundaryClosure(const AbstractClosureExpr *closure,
     }
   }
 
+  // An autoclosure for an async let acts as a boundary. It is non-Sendable
+  // regardless of its context.
+  if (auto *autoclosure = dyn_cast<AutoClosureExpr>(closure)) {
+    if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
+      return true;
+  }
+
   return isSendableClosure(closure, forActorIsolation);
 }
 
