@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
@@ -1694,6 +1695,39 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back("-platform-availability-inheritance-map-path");
     GenericArgs.push_back(ArgSaver.save(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath));
     genericSubInvocation.setPlatformAvailabilityInheritanceMapPath(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
+  }
+
+  for (auto &entry : SearchPathOpts.PluginSearchOpts) {
+    switch (entry.getKind()) {
+    case PluginSearchOption::Kind::LoadPluginLibrary: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginLibrary>();
+      GenericArgs.push_back("-load-plugin-library");
+      GenericArgs.push_back(ArgSaver.save(val.LibraryPath));
+      break;
+    }
+    case PluginSearchOption::Kind::LoadPluginExecutable: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
+      for (auto &moduleName : val.ModuleNames) {
+        GenericArgs.push_back("-load-plugin-executable");
+        GenericArgs.push_back(
+            ArgSaver.save(val.ExecutablePath + "#" + moduleName));
+      }
+      break;
+    }
+    case PluginSearchOption::Kind::PluginPath: {
+      auto &val = entry.get<PluginSearchOption::PluginPath>();
+      GenericArgs.push_back("-plugin-path");
+      GenericArgs.push_back(ArgSaver.save(val.SearchPath));
+      break;
+    }
+    case PluginSearchOption::Kind::ExternalPluginPath: {
+      auto &val = entry.get<PluginSearchOption::ExternalPluginPath>();
+      GenericArgs.push_back("-external-plugin-path");
+      GenericArgs.push_back(
+          ArgSaver.save(val.SearchPath + "#" + val.ServerPath));
+      break;
+    }
+    }
   }
 
   genericSubInvocation.getFrontendOptions().InputMode

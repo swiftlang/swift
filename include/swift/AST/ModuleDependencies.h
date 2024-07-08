@@ -247,7 +247,7 @@ struct CommonSwiftTextualModuleDependencyDetails {
   std::vector<std::string> bridgingModuleDependencies;
 
   /// The macro dependencies.
-  llvm::StringMap<MacroPluginDependency> macroDependencies;
+  std::map<std::string, MacroPluginDependency> macroDependencies;
 
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
@@ -315,7 +315,7 @@ public:
   void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
                           StringRef executablePath) {
     textualModuleDetails.macroDependencies.insert(
-        {macroModuleName, {libraryPath.str(), executablePath.str()}});
+        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
   }
 };
 
@@ -372,7 +372,7 @@ public:
   void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
                           StringRef executablePath) {
     textualModuleDetails.macroDependencies.insert(
-        {macroModuleName, {libraryPath.str(), executablePath.str()}});
+        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
   }
 };
 
@@ -779,7 +779,7 @@ public:
   /// For a Source dependency, register a `Testable` import
   void addTestableImport(ImportPath::Module module);
 
-  /// For a Source dependency, register a macro dependency.
+  /// For a Source/Textual dependency, register a macro dependency.
   void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
                           StringRef executablePath);
 
