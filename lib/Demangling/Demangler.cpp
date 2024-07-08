@@ -224,6 +224,8 @@ llvm::StringRef swift::Demangle::dropSwiftManglingPrefix(StringRef mangledName){
 }
 
 static bool isAliasNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isAliasNode(Node->getChild(0));
@@ -241,6 +243,8 @@ bool swift::Demangle::isAlias(llvm::StringRef mangledName) {
 }
 
 static bool isClassNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isClassNode(Node->getChild(0));
@@ -259,6 +263,8 @@ bool swift::Demangle::isClass(llvm::StringRef mangledName) {
 }
 
 static bool isEnumNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isEnumNode(Node->getChild(0));
@@ -277,6 +283,8 @@ bool swift::Demangle::isEnum(llvm::StringRef mangledName) {
 }
 
 static bool isProtocolNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isProtocolNode(Node->getChild(0));
@@ -296,6 +304,8 @@ bool swift::Demangle::isProtocol(llvm::StringRef mangledName) {
 }
 
 static bool isStructNode(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
   switch (Node->getKind()) {
   case Demangle::Node::Kind::Type:
     return isStructNode(Node->getChild(0));
@@ -774,12 +784,16 @@ NodePointer Demangler::demangleType(StringRef MangledName,
         std::function<SymbolicReferenceResolver_t> Resolver) {
   DemangleInitRAII state(*this, MangledName, std::move(Resolver));
 
-  parseAndPushNodes();
+  if (!parseAndPushNodes())
+    return nullptr;
 
-  if (NodePointer Result = popNode())
-    return Result;
+  NodePointer Result = popNode();
 
-  return createNode(Node::Kind::Suffix, Text);
+  // The result is only valid if it was the only node on the stack.
+  if (popNode())
+    return nullptr;
+
+  return Result;
 }
 
 bool Demangler::parseAndPushNodes() {
