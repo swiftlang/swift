@@ -79,7 +79,7 @@ func simpleTest() async {
   useValue(y)
 }
 
-// Since y is transfered, we should emit the error on useValue(x). We generally
+// Since y is transferred, we should emit the error on useValue(x). We generally
 // emit the first seen error on a path, so if we were to emit an error on
 // useValue(y), we would have emitted that error.
 func simpleTest2() async {
