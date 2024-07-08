@@ -157,6 +157,46 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
   }
 }
 
+static bool hasGenericValueDeinit(SILType ty, SILFunction *f) {
+  if (!ty.isMoveOnly())
+    return false;
+  NominalTypeDecl *nominal = ty.getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return false;
+
+  if (nominal->getGenericSignature() && nominal->getValueTypeDestructor())
+    return true;
+
+  if (isa<StructDecl>(nominal)) {
+    for (unsigned i = 0, n = ty.getNumNominalFields(); i < n; ++i) {
+      if (hasGenericValueDeinit(ty.getFieldType(i, f), f))
+        return true;
+    }
+  } else if (auto *en = dyn_cast<EnumDecl>(nominal)) {
+    for (EnumElementDecl *element : en->getAllElements()) {
+      if (element->hasAssociatedValues()) {
+        if (hasGenericValueDeinit(ty.getEnumElementType(element, f), f))
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+static bool allocsGenericValueTypeWithDeinit(AllocBoxInst *abi) {
+  CanSILBoxType boxTy = abi->getBoxType();
+  SILFunction *f = abi->getFunction();
+  unsigned numFields = boxTy->getLayout()->getFields().size();
+  for (unsigned fieldIdx = 0; fieldIdx < numFields; ++fieldIdx) {
+    SILType fieldTy = getSILBoxFieldType(TypeExpansionContext(*f), boxTy,
+                                         abi->getModule().Types, fieldIdx);
+    if (hasGenericValueDeinit(fieldTy, f))
+      return true;
+  }
+  return false;
+}
+
 /// Prints Embedded Swift specific performance diagnostics (no existentials,
 /// no metatypes, optionally no allocations) for \p function.
 bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
@@ -219,6 +259,16 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
           break;
         default:
           break;
+        }
+      } else if (auto *abi = dyn_cast<AllocBoxInst>(&inst)) {
+        // It needs a bit of work to support alloc_box of generic non-copyable
+        // structs/enums with deinit, because we need to specialize the deinit
+        // functions, though they are not explicitly referenced in SIL.
+        // Until this is supported, give an error in such cases. Otherwise
+        // IRGen would crash.
+        if (allocsGenericValueTypeWithDeinit(abi)) {
+          LocWithParent loc(abi->getLoc().getSourceLoc(), parentLoc);
+          diagnose(loc, diag::embedded_capture_of_generic_value_with_deinit);
         }
       }
     }
