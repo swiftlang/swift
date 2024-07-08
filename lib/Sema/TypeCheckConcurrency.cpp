@@ -5242,7 +5242,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // Determine the default isolation for this declaration, which may still be
   // overridden by other inference rules.
-  ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
+  ActorIsolation defaultIsolation =
+      ActorIsolation::forUnspecified().withPreconcurrency(
+          value->hasClangNode());
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     // A @Sendable function is assumed to be actor-independent.
