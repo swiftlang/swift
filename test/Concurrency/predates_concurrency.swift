@@ -252,3 +252,53 @@ extension MainActorPreconcurrency: NotIsolated {
     }
   }
 }
+
+// Override matching with @preconcurrency properties.
+do {
+  class Base {
+    @preconcurrency
+    open var test1 : ([any Sendable])? // expected-note {{overridden declaration is here}}
+
+    @preconcurrency
+    open var test2: [String: [Int: any Sendable]] // expected-note {{overridden declaration is here}}
+
+    @preconcurrency
+    open var test3: any Sendable // expected-note {{overridden declaration is here}}
+
+    @preconcurrency
+    open var test4: (((Any)?) -> Void)? { // expected-note {{overridden declaration is here}}
+      nil
+    }
+
+    init() {
+      self.test1 = nil
+      self.test2 = [:]
+      self.test3 = 42
+    }
+  }
+
+  class Test : Base {
+    override var test1: [Any]? {
+      // expected-warning@-1 {{declaration 'test1' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      get { nil }
+      set { }
+    }
+
+    override var test2: [String: [Int: Any]] {
+      // expected-warning@-1 {{declaration 'test2' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      get { [:] }
+      set {}
+    }
+
+    override var test3: Any {
+      // expected-warning@-1 {{declaration 'test3' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      get { 42 }
+      set { }
+    }
+
+    override var test4: (((any Sendable)?) -> Void)? {
+      // expected-warning@-1 {{declaration 'test4' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      nil
+    }
+  }
+}
