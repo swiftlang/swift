@@ -1220,6 +1220,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_Nothing;
       break;
 
+    case options::OPT_emit_supported_features:
+      OI.CompilerOutputType = file_types::TY_JSONFeatures;
+      break;
+
     case options::OPT_i:
       // Keep the default output/mode; this flag was removed and should already
       // have been diagnosed above.
