@@ -105,13 +105,13 @@ public class CType {}
 @interface DType
 @end
 
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=14:57 -print-raw-response | %FileCheck %s --check-prefix=CHECKED
-// CHECKED: key.name: "DType"
-// CHECKED: key.line: [[@LINE-5]]
-// CHECKED: key.column: 12
-// CHECKED: key.filepath: {{.*}}LibD.h
-// CHECKED: key.modulename: "LibD"
-// CHECKED: key.decl_lang: source.lang.objc
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=14:57 -print-raw-response | %FileCheck %s --check-prefix=CHECKD
+// CHECKD: key.name: "DType"
+// CHECKD: key.line: [[@LINE-5]]
+// CHECKD: key.column: 12
+// CHECKD: key.filepath: {{.*}}LibD.h
+// CHECKD: key.modulename: "LibD"
+// CHECKD: key.decl_lang: source.lang.objc
 
 //--- mods/module.map
 module LibD {
