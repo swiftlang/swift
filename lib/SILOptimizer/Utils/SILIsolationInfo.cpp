@@ -601,40 +601,55 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         bool isNonIsolatedUnsafe = exprAnalysis.hasNonisolatedUnsafe();
         {
           auto isolation = swift::getActorIsolation(dre->getDecl());
-          if (isolation.isActorIsolated() &&
-              (isolation.getKind() != ActorIsolation::ActorInstance ||
-               isolation.getActorInstanceParameter() == 0)) {
-            if (cmi->getOperand()->getType().isAnyActor()) {
-              return SILIsolationInfo::getActorInstanceIsolated(
-                  cmi, cmi->getOperand(),
-                  cmi->getOperand()
-                      ->getType()
-                      .getNominalOrBoundGenericNominal());
-            }
-            return SILIsolationInfo::getGlobalActorIsolated(
-                cmi, isolation.getGlobalActor());
-          }
 
-          isNonIsolatedUnsafe |= isolation.isNonisolatedUnsafe();
+          if (isolation.isActorIsolated()) {
+            // Check if we have a global actor and handle it appropriately.
+            if (isolation.getKind() == ActorIsolation::GlobalActor) {
+              bool localNonIsolatedUnsafe =
+                  isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
+              return SILIsolationInfo::getGlobalActorIsolated(
+                         cmi, isolation.getGlobalActor())
+                  .withUnsafeNonIsolated(localNonIsolatedUnsafe);
+            }
+
+            // In this case, we have an actor instance that is self.
+            if (isolation.getKind() != ActorIsolation::ActorInstance &&
+                isolation.isActorInstanceForSelfParameter()) {
+              bool localNonIsolatedUnsafe =
+                  isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
+              return SILIsolationInfo::getActorInstanceIsolated(
+                         cmi, cmi->getOperand(),
+                         cmi->getOperand()
+                             ->getType()
+                             .getNominalOrBoundGenericNominal())
+                  .withUnsafeNonIsolated(localNonIsolatedUnsafe);
+            }
+          }
         }
 
         if (auto type = dre->getType()->getNominalOrBoundGenericNominal()) {
           if (auto isolation = swift::getActorIsolation(type)) {
-            if (isolation.isActorIsolated() &&
-                (isolation.getKind() != ActorIsolation::ActorInstance ||
-                 isolation.getActorInstanceParameter() == 0)) {
-              if (cmi->getOperand()->getType().isAnyActor()) {
+            if (isolation.isActorIsolated()) {
+              // Check if we have a global actor and handle it appropriately.
+              if (isolation.getKind() == ActorIsolation::GlobalActor) {
+                bool localNonIsolatedUnsafe =
+                    isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
+                return SILIsolationInfo::getGlobalActorIsolated(
+                           cmi, isolation.getGlobalActor())
+                    .withUnsafeNonIsolated(localNonIsolatedUnsafe);
+              }
+
+              // In this case, we have an actor instance that is self.
+              if (isolation.getKind() != ActorIsolation::ActorInstance &&
+                  isolation.isActorInstanceForSelfParameter()) {
+                bool localNonIsolatedUnsafe =
+                    isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
                 return SILIsolationInfo::getActorInstanceIsolated(
                            cmi, cmi->getOperand(),
                            cmi->getOperand()
                                ->getType()
                                .getNominalOrBoundGenericNominal())
-                    .withUnsafeNonIsolated(isNonIsolatedUnsafe);
-              }
-
-              if (auto globalIso = SILIsolationInfo::getGlobalActorIsolated(
-                      cmi, isolation.getGlobalActor())) {
-                return globalIso.withUnsafeNonIsolated(isNonIsolatedUnsafe);
+                    .withUnsafeNonIsolated(localNonIsolatedUnsafe);
               }
             }
           }
