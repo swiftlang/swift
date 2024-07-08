@@ -8668,7 +8668,21 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
   return true;
 }
 
+bool InvalidPlaceholderFailure::diagnoseAsError() {
+  auto elt = getLocator()->castLastElementTo<LocatorPathElt::PlaceholderType>();
+  emitDiagnosticAt(elt.getPlaceholderRepr()->getLoc(),
+                   diag::placeholder_type_not_allowed);
+  return true;
+}
+
 bool CouldNotInferPlaceholderType::diagnoseAsError() {
+  // When placeholder type appears in an editor placeholder i.e.
+  // `<#T##() -> _#>` we rely on the parser to produce a diagnostic
+  // about editor placeholder and glance over all placeholder type
+  // inference issues.
+  if (isExpr<EditorPlaceholderExpr>(getAnchor()))
+    return true;
+
   // If this placeholder was explicitly written out by the user, they can maybe
   // fix things by specifying an actual type.
   if (auto *typeExpr = getAsExpr<TypeExpr>(getAnchor())) {
@@ -8678,12 +8692,13 @@ bool CouldNotInferPlaceholderType::diagnoseAsError() {
     }
   }
 
-  // When placeholder type appears in an editor placeholder i.e.
-  // `<#T##() -> _#>` we rely on the parser to produce a diagnostic
-  // about editor placeholder and glance over all placeholder type
-  // inference issues.
-  if (isExpr<EditorPlaceholderExpr>(getAnchor()))
+  // Also check for a placeholder path element.
+  auto *loc = getLocator();
+  if (auto elt = loc->getLastElementAs<LocatorPathElt::PlaceholderType>()) {
+    emitDiagnosticAt(elt->getPlaceholderRepr()->getLoc(),
+                     diag::could_not_infer_placeholder);
     return true;
+  }
 
   return false;
 }
