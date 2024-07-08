@@ -610,9 +610,6 @@ public:
   bool hasDebugTrace() const;
 
   /// Does this SILValue begin a VarDecl scope? Only true in OSSA.
-  ///
-  /// If this is true, the value must be a SingleValueInstruction whose first
-  /// operand is the variable's initial value.
   bool isFromVarDecl();
 
   static bool classof(SILNodePointer node) {
