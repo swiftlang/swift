@@ -22,8 +22,8 @@ A typical setup and build + run cycle for an embedded development board involves
 - (1) Getting an SDK with the C compilers, headers and libraries for the target
 - (2) Building the C source code, and Swift source code into object files.
 - (3) Linking all the libraries, C object files, and Swift object files.
-- (4) Post-processing the linked firmware into a flashable format (UF2, BIN, or bespoke formats)
-- (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool or by copying it to a fake USB Mass Storage volume presented by the board.
+- (4) Post-processing the linked firmware into a flashable format (UF2, BIN, HEX, or bespoke formats)
+- (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool, by copying it to a fake USB Mass Storage volume presented by the board or a custom platform bootloader.
 - (6) Restarting the board, observing physical effects of the firmware (LEDs light up) or UART output over USB, or presence on network, etc.
 
 Most of these steps are out of scope for this document, instead refer to the vendor provided documentation. This document only focuses on (2) from the list above, and it's important that you first get familiar with the details of firmware development for your board without Swift in the mix. Even if you want to build a completely pure Swift firmware, you are still going to need the vendor provided tooling for linking, post-processing, uploading, etc.
