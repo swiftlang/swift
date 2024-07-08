@@ -32,7 +32,7 @@
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO013instanceReturncD0ACyF",
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO014instanceReturncD0ACyF",
       key.modulename: "complete_typerelation",
       key.sourcetext: "instanceReturnMyEnum(<#T##self: MyEnum##MyEnum#>)"
     },
