@@ -101,6 +101,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "s390x",
   "wasm32",
   "riscv64",
+  "avr"
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -540,6 +541,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
+    break;
+  case llvm::Triple::ArchType::avr:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "avr");
     break;
   default:
     UnsupportedArch = true;
