@@ -2123,6 +2123,18 @@ SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
 }
 
+bool IgnoreInvalidPlaceholder::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  InvalidPlaceholderFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreInvalidPlaceholder *
+IgnoreInvalidPlaceholder::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidPlaceholder(cs, locator);
+}
+
 bool SpecifyTypeForPlaceholder::diagnose(const Solution &solution,
                                            bool asNote) const {
   CouldNotInferPlaceholderType failure(solution, getLocator());
