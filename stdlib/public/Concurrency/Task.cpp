@@ -1161,7 +1161,9 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   }
 
   ResultTypeInfo futureResultType;
+#if !SWIFT_CONCURRENCY_EMBEDDED
   futureResultType.metadata = futureResultTypeMetadata;
+#endif
 
   // Unpack the asynchronous function pointer.
   FutureAsyncSignature::FunctionType *closure;
@@ -1194,7 +1196,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t taskCreateFlags = 1 << TaskCreateFlags::Task_IsInlineTask;
 
   auto taskAndContext = swift_task_create_common(
-      taskCreateFlags, &option, futureResultType.metadata,
+      taskCreateFlags, &option, futureResultTypeMetadata,
       reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
       /*initialContextSize=*/closureContextSize);
 
