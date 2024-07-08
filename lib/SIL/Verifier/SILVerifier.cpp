@@ -2702,14 +2702,18 @@ public:
   }
 
   void checkExtendLifetimeInst(ExtendLifetimeInst *I) {
-    require(!I->getOperand()->getType().isTrivial(*I->getFunction())
-            || F.getModule().getStage() == SILStage::Raw,
-            "Source value should be non-trivial after diagnostics");
     require(F.hasOwnership(),
             "extend_lifetime is only valid in functions with qualified "
             "ownership");
+    // In Raw SIL, extend_lifetime marks the end of variable scopes.
+    if (F.getModule().getStage() == SILStage::Raw)
+      return;
+
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial after diagnostics");
     require(getDeadEndBlocks().isDeadEnd(I->getParent()),
-            "extend_lifetime in non-dead-end!?");
+            "extend_lifetime in non-dead-end after diagnostics");
+
     auto value = I->getOperand();
     LinearLiveness linearLiveness(value,
                                   LinearLiveness::DoNotIncludeExtensions);

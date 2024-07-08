@@ -607,8 +607,8 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
 
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     ArrayRef<Operand *> regularUses, ArrayRef<Operand *> extendLifetimeUses) {
-  if (extendLifetimeUses.size()) {
-  }
+  if (value->getOwnershipKind() == OwnershipKind::None)
+    return true;
 
   LLVM_DEBUG(llvm::dbgs() << "No lifetime ending users?! Bailing early.\n");
   if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
