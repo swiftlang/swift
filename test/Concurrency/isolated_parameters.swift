@@ -131,7 +131,7 @@ actor MyActor {
   func hello() {} // expected-typechecker-note {{calls to instance method 'hello()' from outside of its actor context are implicitly asynchronous}}
 }
 
-// Compiler >= 5.3 is eneded to suppress the parser error
+// Compiler >= 5.3 is ended to suppress the parser error
 #if compiler(>=5.3) && ALLOW_TYPECHECKER_ERRORS
 typealias MyFn = (isolated: Int) -> Void // expected-typechecker-error {{function types cannot have argument labels; use '_' before 'isolated'}}
 #endif

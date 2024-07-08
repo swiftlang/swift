@@ -121,7 +121,7 @@ func useValue<T>(_ x: T) { }
 
 @CustomActor
 func test_CallerSyncNormal_CalleeSyncNonIsolated() async {
-    // Just to help start our pattern matchin since the closure #$NUM line
+    // Just to help start our pattern matching since the closure #$NUM line
     // appears in other parts of the file.
     // CHECK-LABEL: } // end sil function '$s54transfernonsendable_closureliterals_isolationinference028test_CallerSyncNormal_CalleeF11NonIsolatedyyYaF'
 
@@ -270,7 +270,7 @@ func test_CallerSyncInheritsActorContext_CalleeAsyncMainActorIsolated() async {
 
 @CustomActor
 func test_CallerAsyncNormal_CalleeSyncNonIsolated() async {
-    // Just to help start our pattern matchin since the closure #$NUM line
+    // Just to help start our pattern matching since the closure #$NUM line
     // appears in other parts of the file.
     // CHECK-LABEL: } // end sil function '$s54transfernonsendable_closureliterals_isolationinference44test_CallerAsyncNormal_CalleeSyncNonIsolatedyyYaF'
 
@@ -582,7 +582,7 @@ extension MyActor {
 extension MyActor {
 
     func test_CallerAsyncNormal_CalleeSyncNonIsolated() async {
-        // Just to help start our pattern matchin since the closure #$NUM line
+        // Just to help start our pattern matching since the closure #$NUM line
         // appears in other parts of the file.
         // CHECK-LABEL: } // end sil function '$s54transfernonsendable_closureliterals_isolationinference7MyActorC44test_CallerAsyncNormal_CalleeSyncNonIsolatedyyYaF'
 

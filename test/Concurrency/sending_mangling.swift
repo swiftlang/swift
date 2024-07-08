@@ -32,8 +32,8 @@ func testNoRemoveFunctionResultSubTypeResult() -> sending S<() -> sending NonSen
 // CHECK: sil hidden [ossa] @sending_mangling.testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(thin) () -> @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
 func testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> ((sending NonSendableKlass) -> ()) { fatalError() }
 
-// CHECK: sil hidden [ossa] @sending_mangling.testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(thin) () -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
-func testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
+// CHECK: sil hidden [ossa] @sending_mangling.testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(thin) () -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
+func testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
 
 struct MethodTest {
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.init(__owned sending_mangling.NonSendableKlass) -> sending_mangling.MethodTest : $@convention(method) (@sil_sending @owned NonSendableKlass, @thin MethodTest.Type) -> MethodTest {
@@ -61,8 +61,8 @@ struct MethodTest {
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(method) (MethodTest) -> @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
   func testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> ((sending NonSendableKlass) -> ()) { fatalError() }
 
-  // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(method) (MethodTest) -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
-  func testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
+  // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(method) (MethodTest) -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
+  func testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
 }
 
 protocol SendingProtocol {
@@ -107,6 +107,6 @@ struct ConstructorSharedTest {
 
   // This is a func which takes its parameter at +0 so we should suppress both.
   //
-  // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.functionSupressed(sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, ConstructorSharedTest) -> () {
-  func functionSupressed(_ x: __shared sending NonSendableKlass) {}
+  // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.functionSuppressed(sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, ConstructorSharedTest) -> () {
+  func functionSuppressed(_ x: __shared sending NonSendableKlass) {}
 }
