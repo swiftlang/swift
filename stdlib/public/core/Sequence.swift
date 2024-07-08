@@ -706,6 +706,7 @@ extension Sequence {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
   func __rethrows_map<T>(
