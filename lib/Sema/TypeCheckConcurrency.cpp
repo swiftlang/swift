@@ -5290,7 +5290,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
           break;
 
         case OverrideIsolationResult::Disallowed:
-          inferred = *overriddenIso;
+          if (overriddenValue->hasClangNode() &&
+              overriddenIso->isUnspecified()) {
+            inferred = overriddenIso->withPreconcurrency(true);
+          } else {
+            inferred = *overriddenIso;
+          }
           break;
         }
       }
