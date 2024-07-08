@@ -472,7 +472,6 @@ private:
   void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
                             PrunedLivenessBoundary &boundary);
 
-  void findDestroysOutsideBoundary(SmallVectorImpl<SILInstruction *> &destroys);
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);

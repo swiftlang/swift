@@ -252,26 +252,16 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   return true;
 }
 
-void CanonicalizeOSSALifetime::findDestroysOutsideBoundary(
-    SmallVectorImpl<SILInstruction *> &outsideDestroys) {
-  for (auto destroy : destroys) {
-    if (liveness->isWithinBoundary(destroy))
-      continue;
-    outsideDestroys.push_back(destroy);
-  }
-}
-
 void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
-  SmallVector<SILInstruction *, 4> outsideDestroys;
-  findDestroysOutsideBoundary(outsideDestroys);
-
   // OSSALifetimeCompletion: With complete lifetimes, creating completeLiveness
   // and using it to visit unreachable lifetime ends should be deleted.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks(this->discoveredBlocks);
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
 
-  for (auto *end : outsideDestroys) {
-    completeLiveness.updateForUse(end, /*lifetimeEnding*/ true);
+  for (auto destroy : destroys) {
+    if (liveness->isWithinBoundary(destroy))
+      continue;
+    completeLiveness.updateForUse(destroy, /*lifetimeEnding*/ true);
   }
 
   OSSALifetimeCompletion::visitAvailabilityBoundary(
