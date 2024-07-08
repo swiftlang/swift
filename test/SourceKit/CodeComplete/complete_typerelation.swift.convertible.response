@@ -57,7 +57,7 @@
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
       key.not_recommended: 1,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO27instanceReturnVoidDeprecatedyyF",
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO28instanceReturnVoidDeprecatedyyF",
       key.modulename: "complete_typerelation",
       key.sourcetext: "instanceReturnVoidDeprecated(<#T##self: MyEnum##MyEnum#>)"
     },
