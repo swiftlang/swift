@@ -398,6 +398,8 @@ ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
+ERROR(embedded_capture_of_generic_value_with_deinit,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
