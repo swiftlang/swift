@@ -285,20 +285,22 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
         });
       });
 
-  ArrayRef<SILInstruction *> ends = {};
-  SmallVector<SILInstruction *, 8> lexicalEnds;
+  SmallVector<SILInstruction *, 8> ends;
   if (currentLexicalLifetimeEnds.size() > 0) {
     visitExtendedUnconsumedBoundary(
         currentLexicalLifetimeEnds,
-        [&lexicalEnds](auto *instruction, auto lifetimeEnding) {
+        [&ends](auto *instruction, auto lifetimeEnding) {
           instruction->visitSubsequentInstructions([&](auto *next) {
-            lexicalEnds.push_back(next);
+            ends.push_back(next);
             return true;
           });
         });
-    ends = lexicalEnds;
   } else {
-    ends = outsideDestroys;
+    for (auto destroy : destroys) {
+      if (destroy->getOperand(0) != getCurrentDef())
+        continue;
+      ends.push_back(destroy);
+    }
   }
 
   auto *def = getCurrentDef()->getDefiningInstruction();
