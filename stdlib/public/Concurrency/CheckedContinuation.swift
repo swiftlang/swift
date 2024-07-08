@@ -267,7 +267,7 @@ extension CheckedContinuation {
 /// indefinitely which will result in the task "hanging" as well as being leaked with
 /// no possibility to destroy it.
 ///
-/// The checked continuation offers detection of mis-use, and dropping the last reference
+/// The checked continuation offers detection of misuse, and dropping the last reference
 /// to it, without having resumed it will trigger a warning. Resuming a continuation twice
 /// is also diagnosed and will cause a crash.
 ///
@@ -328,7 +328,7 @@ internal func __abi_withCheckedContinuation<T>(
 /// indefinitely which will result in the task "hanging" as well as being leaked with
 /// no possibility to destroy it.
 ///
-/// The checked continuation offers detection of mis-use, and dropping the last reference
+/// The checked continuation offers detection of misuse, and dropping the last reference
 /// to it, without having resumed it will trigger a warning. Resuming a continuation twice
 /// is also diagnosed and will cause a crash.
 ///

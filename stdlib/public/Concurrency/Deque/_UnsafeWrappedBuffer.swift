@@ -153,7 +153,7 @@ extension _UnsafeMutableWrappedBuffer {
     // Note: Array._copyContents traps when not given enough space, so we
     // need to check if we have enough contiguous space available above.
     //
-    // FIXME: Add suppport for segmented (a.k.a. piecewise contiguous)
+    // FIXME: Add support for segmented (a.k.a. piecewise contiguous)
     // collections to the stdlib.
     var (it, copied) = elements._copyContents(initializing: first)
     if copied == first.count, let second = second {
