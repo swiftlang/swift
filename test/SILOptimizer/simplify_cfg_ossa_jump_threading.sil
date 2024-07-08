@@ -183,7 +183,7 @@ bb9:
 // not know how to allocate for multiple partial applies.
 //
 // rdar://119768691 (OwnershipModelEliminator triggers assertion when
-// lowering certain [on_stack] partial_applies in certain
+// lowering certain [on_stack] partial_applys in certain
 // circumstances)
 
 sil @test_simple_jump_thread_clone_partial_apply_closure : $@convention(thin) (@inout_aliasable Klass) -> ()

@@ -9,7 +9,7 @@ public struct S {
     mutating func doSomething() { }
 }
 
-// Check that all partial_applies can be optimized away so that no closure context needs to be allocated.
+// Check that all partial_applys can be optimized away so that no closure context needs to be allocated.
 
 // CHECK-LABEL: sil @$s4test6testit_1xySDySiAA1SVGz_SitF :
 // CHECK-NOT:     partial_apply

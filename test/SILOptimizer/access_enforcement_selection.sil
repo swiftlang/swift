@@ -67,7 +67,7 @@ sil [ossa] @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @gu
 sil [ossa] @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
 
 // Test static enforcement of box addresses that escape via closure
-// partial_applies.
+// partial_applys.
 // application.
 // CHECK-LABEL: sil hidden [ossa] @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
 // CHECK: bb0:
@@ -99,7 +99,7 @@ bb0:
   return %9 : $()
 }
 
-sil [dynamically_replaceable] [ossa] @closureCapturingByStorageAddress2 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+sil [dynamically_replacable] [ossa] @closureCapturingByStorageAddress2 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
 
 // Make sure that we handle dynamic_function_ref.
 sil hidden [ossa] @escapeAsArgumentToPartialApplyDynamic : $@convention(thin) () -> () {
