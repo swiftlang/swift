@@ -1944,13 +1944,7 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleParamLifetimeDependence(Node *node,
-                                                       unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-
-ManglingError Remangler::mangleSelfLifetimeDependence(Node *node,
-                                                      unsigned depth) {
+ManglingError Remangler::mangleLifetimeDependence(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 

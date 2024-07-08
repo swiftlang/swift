@@ -556,14 +556,15 @@ protected:
                                FunctionManglingKind functionMangling,
                                bool isRecursedInto = true);
 
-  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
-                               LifetimeDependenceInfo lifetimeDependenceInfo,
+  void appendFunctionInputType(AnyFunctionType *fnType,
+                               ArrayRef<AnyFunctionType::Param> params,
                                GenericSignature sig,
                                const ValueDecl *forDecl = nullptr,
                                bool isRecursedInto = true);
-  void appendFunctionResultType(Type resultType,
-                                GenericSignature sig,
-                                const ValueDecl *forDecl = nullptr);
+  void appendFunctionResultType(
+      Type resultType, GenericSignature sig,
+      std::optional<LifetimeDependenceInfo> lifetimeDependence,
+      const ValueDecl *forDecl = nullptr);
 
   void appendTypeList(Type listTy, GenericSignature sig,
                       const ValueDecl *forDecl = nullptr);
@@ -573,7 +574,7 @@ protected:
                              const ValueDecl *forDecl = nullptr);
   void appendParameterTypeListElement(
       Identifier name, Type elementType, ParameterTypeFlags flags,
-      std::optional<LifetimeDependenceKind> lifetimeDependenceKind,
+      std::optional<LifetimeDependenceInfo> lifetimeDependence,
       GenericSignature sig, const ValueDecl *forDecl = nullptr);
   void appendTupleTypeListElement(Identifier name, Type elementType,
                                   GenericSignature sig,
@@ -749,8 +750,7 @@ protected:
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
 
-  void appendLifetimeDependenceKind(LifetimeDependenceKind kind,
-                                    bool isSelfDependence);
+  void appendLifetimeDependence(LifetimeDependenceInfo info);
 };
 
 } // end namespace Mangle

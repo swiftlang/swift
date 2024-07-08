@@ -727,7 +727,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? self-lifetime-dependence? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -749,10 +749,8 @@ Types
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
  #if SWIFT_RUNTIME_VERSION >= 5.TBD
-  lifetime-dependence ::= 'Yli'              // inherit lifetime dependence on param
-  lifetime-dependence ::= 'Yls'              // scoped lifetime dependence on param
-  self-lifetime-dependence ::= 'YLi'         // inherit lifetime dependence on self
-  self-lifetime-dependence ::= 'YLs'         // scoped lifetime dependence on self
+  lifetime-dependence ::= 'Yli' INDEX-SUBSET '_'         // inherit lifetime dependence
+  lifetime-dependence ::= 'Yls' INDEX-SUBSET '_'         // scoped lifetime dependence
 #endif
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list

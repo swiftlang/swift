@@ -389,8 +389,7 @@ NODE(AsyncRemoved)
 
 // Added in Swift 5.TBD
 NODE(ObjectiveCProtocolSymbolicReference)
-NODE(ParamLifetimeDependence)
-NODE(SelfLifetimeDependence)
+NODE(LifetimeDependence)
 
 NODE(OutlinedInitializeWithCopyNoValueWitness)
 NODE(OutlinedAssignWithTakeNoValueWitness)

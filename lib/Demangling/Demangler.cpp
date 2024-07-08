@@ -990,10 +990,11 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'u':
     return createType(
         createWithChild(Node::Kind::Sending, popTypeAndGetChild()));
-  case 'l':
-    return demangleLifetimeDependenceKind(/*isSelfDependence*/ false);
-  case 'L':
-    return demangleLifetimeDependenceKind(/*isSelfDependence*/ true);
+  case 'l': {
+    auto *node = demangleLifetimeDependence();
+    addChild(node, popTypeAndGetChild());
+    return createType(node);
+  }
   default:
     return nullptr;
   }
@@ -1594,7 +1595,6 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
-  addChild(FuncType, popNode(Node::Kind::SelfLifetimeDependence));
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
   addChild(FuncType, popNode(Node::Kind::SendingResultFunctionType));
@@ -1637,9 +1637,6 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::SelfLifetimeDependence)
-    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::GlobalActorFunctionType)
     ++FirstChildIdx;
@@ -1662,9 +1659,6 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::AsyncAnnotation)
-    ++FirstChildIdx;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::ParamLifetimeDependence)
     ++FirstChildIdx;
   auto ParameterType = FuncType->getChild(FirstChildIdx);
 
@@ -3161,26 +3155,29 @@ NodePointer Demangler::demangleDifferentiableFunctionType() {
       Node::Kind::DifferentiableFunctionType, (Node::IndexType)kind);
 }
 
-NodePointer Demangler::demangleLifetimeDependenceKind(bool isSelfDependence) {
-  MangledLifetimeDependenceKind kind;
-  switch (auto c = nextChar()) {
+static std::optional<MangledLifetimeDependenceKind>
+getMangledLifetimeDependenceKind(char nextChar) {
+  switch (auto c = nextChar) {
   case 's':
-    kind = MangledLifetimeDependenceKind::Scope;
-    break;
+    return MangledLifetimeDependenceKind::Scope;
   case 'i':
-    kind = MangledLifetimeDependenceKind::Inherit;
-    break;
-  default:
+    return MangledLifetimeDependenceKind::Inherit;
+  }
+  return std::nullopt;
+}
+
+NodePointer Demangler::demangleLifetimeDependence() {
+  auto kind = getMangledLifetimeDependenceKind(nextChar());
+  if (!kind.has_value()) {
     return nullptr;
   }
-  if (isSelfDependence) {
-    return createNode(Node::Kind::SelfLifetimeDependence,
-                      (Node::IndexType)kind);
-  }
-  auto node = createWithChildren(Node::Kind::ParamLifetimeDependence,
-                                 createNode(Node::Kind::Index, unsigned(kind)),
-                                 popTypeAndGetChild());
-  return createType(node);
+  auto result = createNode(Node::Kind::LifetimeDependence);
+  result =
+      addChild(result, createNode(Node::Kind::Index, (Node::IndexType)*kind));
+  result = addChild(result, demangleIndexSubset());
+  if (!nextIf('_'))
+    return nullptr;
+  return result;
 }
 
 std::string Demangler::demangleBridgedMethodParams() {
