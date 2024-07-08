@@ -27,6 +27,8 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   func asyncCall() async {}
   func asyncCallWithIsolatedParameter(isolation: isolated (any Actor)? = #isolation) async {
   }
+
+  func getSendableGenericStructAsync() async -> SendableGenericStruct { fatalError() }
 }
 
 class SendableKlass : @unchecked Sendable {}
@@ -81,6 +83,10 @@ class TwoFieldKlassClassBox {
   var k1 = NonSendableKlass()
   var k2 = NonSendableKlass()
   var recursive: TwoFieldKlassClassBox? = nil
+}
+
+struct SendableGenericStruct : Sendable {
+  var x = SendableKlass()
 }
 
 ////////////////////////////
@@ -1810,6 +1816,16 @@ actor FunctionWithSendableResultAndIsolationActor {
     func string(someCondition: Bool = false) -> String {
         return ""
     }
+}
+
+// This was a test case that we used to emit an "pattern the compiler doesn't
+// understand" error. We now accept it, so lets make sure we keep doing so!
+@MainActor
+func previouslyBrokenTestCase(ns: NonSendableKlass) async -> SendableGenericStruct? {
+  return await { () -> SendableGenericStruct? in
+    return await ns.getSendableGenericStructAsync() // expected-tns-warning {{sending 'ns' risks causing data races}}
+    // expected-tns-note @-1 {{sending main actor-isolated 'ns' to nonisolated instance method 'getSendableGenericStructAsync()' risks causing data races between nonisolated and main actor-isolated uses}}
+  }()
 }
 
 @MainActor
