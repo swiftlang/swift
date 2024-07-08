@@ -532,7 +532,8 @@ _swift_tryAuxExePath(const char *name, const char *path, ...)
 void
 _swift_initRuntimePath(void *) {
 #if APPLE_OS_SYSTEM
-  const char *path = dyld_image_path_containing_address(_swift_initRuntimePath);
+  const char *path =
+      dyld_image_path_containing_address((const void *)_swift_initRuntimePath);
 
   // No need to ::strdup() this, as the return value is guaranteed to remain
   // valid as long as the library is loaded.
