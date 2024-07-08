@@ -44,7 +44,7 @@
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO17instanceReturnVoidyyF",
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO18instanceReturnVoidyyF",
       key.modulename: "complete_typerelation",
       key.sourcetext: "instanceReturnVoid(<#T##self: MyEnum##MyEnum#>)"
     },
