@@ -772,7 +772,11 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   //
   // This should not be done for withTaskExecutorPreference executors,
   // however in that case, we would not enter this function here to clean up.
-  swift_release(executorIdentityToRelease);
+  //
+  // NOTE: This MUST NOT assume that the object is a swift object (and use
+  // swift_release), because a dispatch_queue_t conforms to TaskExecutor,
+  // and may be passed in here; in which case swift_releasing it would be incorrect.
+  swift_unknownObjectRelease(executorIdentityToRelease);
 }
 
 /**************************************************************************/
