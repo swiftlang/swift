@@ -6941,15 +6941,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     if (var->hasStorage()) {
       {
         // 'nonisolated' can not be applied to mutable stored properties unless
-        // qualified as 'unsafe', or is of a Sendable type on a
-        // globally-isolated value type.
+        // qualified as 'unsafe', or is of a Sendable type on a Sendable
+        // value type.
         bool canBeNonisolated = false;
-        if (dc->isTypeContext()) {
-          if (auto nominal = dc->getSelfStructDecl()) {
-            if (!var->isStatic() && type->isSendableType() &&
-                getActorIsolation(nominal).isGlobalActor()) {
-              canBeNonisolated = true;
-            }
+        if (auto nominal = dc->getSelfStructDecl()) {
+          if (nominal->getDeclaredTypeInContext()->isSendableType() &&
+              !var->isStatic() && type->isSendableType()) {
+            canBeNonisolated = true;
           }
         }
 
