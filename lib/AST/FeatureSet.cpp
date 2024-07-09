@@ -249,7 +249,6 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>();
 }
 
-UNINTERESTING_FEATURE(BitwiseCopyable)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
