@@ -218,7 +218,7 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// less than zero, the minimum representable `UInt8` value:
   ///
   ///     var x: UInt8 = 21
-  ///     x - 50
+  ///     x -= 50
   ///     // Overflow error
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
@@ -238,7 +238,7 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// the maximum representable `Int8` value:
   ///
   ///     var x: Int8 = 21
-  ///     x * 21
+  ///     x *= 21
   ///     // Overflow error
   ///
   /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
