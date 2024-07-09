@@ -378,6 +378,11 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 }
 
 static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
+  // Before a check if the value we are attempting to access is Sendable. In
+  // such a case, just return early.
+  if (!SILIsolationInfo::isNonSendableType(value))
+    return UnderlyingTrackedValueInfo(value);
+
   // Look through a project_box, so that we process it like its operand object.
   if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
     value = pbi->getOperand();
@@ -386,6 +391,7 @@ static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
     SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
 
+    // If we do not have a load inst, just return the value.
     if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
       return UnderlyingTrackedValueInfo(underlyingValue);
     }

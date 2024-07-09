@@ -1131,9 +1131,11 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
 // NOTE: We special case RawPointer and NativeObject to ensure they are
 // treated as non-Sendable and strict checking is applied to it.
 bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
-  // Treat Builtin.NativeObject and Builtin.RawPointer as non-Sendable.
+  // Treat Builtin.NativeObject, Builtin.RawPointer, and Builtin.BridgeObject as
+  // non-Sendable.
   if (type.getASTType()->is<BuiltinNativeObjectType>() ||
-      type.getASTType()->is<BuiltinRawPointerType>()) {
+      type.getASTType()->is<BuiltinRawPointerType>() ||
+      type.getASTType()->is<BuiltinBridgeObjectType>()) {
     return true;
   }
 
