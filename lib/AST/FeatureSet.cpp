@@ -148,10 +148,6 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
       [](const InheritedEntry &entry) { return entry.isRetroactive(); });
 }
 
-static bool usesFeatureExtensionMacroAttr(Decl *decl) {
-  return usesFeatureExtensionMacros(decl);
-}
-
 static bool usesFeatureOptionalIsolatedParameters(Decl *decl) {
   auto *value = dyn_cast<ValueDecl>(decl);
   if (!value)

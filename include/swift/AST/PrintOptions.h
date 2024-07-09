@@ -608,11 +608,6 @@ struct PrintOptions {
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
 
-  /// Whether or not to print `@attached(extension)` attributes on
-  /// macro declarations. This is used for feature suppression in
-  /// Swift interface printing.
-  bool PrintExtensionMacroAttributes = true;
-
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;

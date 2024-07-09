@@ -3027,14 +3027,6 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   }
 }
 
-static void suppressingFeatureExtensionMacroAttr(PrintOptions &options,
-                                                 llvm::function_ref<void()> action) {
-  bool originalPrintExtensionMacroAttrs = options.PrintExtensionMacroAttributes;
-  options.PrintExtensionMacroAttributes = false;
-  action();
-  options.PrintExtensionMacroAttributes = originalPrintExtensionMacroAttrs;
-}
-
 static void suppressingFeatureSpecializeAttributeWithAvailability(
                                         PrintOptions &options,
                                         llvm::function_ref<void()> action) {
