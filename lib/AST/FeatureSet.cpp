@@ -175,7 +175,6 @@ static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
   return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
 }
 
-UNINTERESTING_FEATURE(BuiltinStoreRaw)
 UNINTERESTING_FEATURE(BuiltinAddressOfRawLayout)
 
 // ----------------------------------------------------------------------------
