@@ -906,7 +906,7 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
 
   SourceLoc startLoc = loc;
   unsigned startBufferID = bufferID;
-  while (std::optional<GeneratedSourceInfo> info =
+  while (const GeneratedSourceInfo *info =
              SM.getGeneratedSourceInfo(bufferID)) {
     switch (info->kind) {
 #define MACRO_ROLE(Name, Description)  \
