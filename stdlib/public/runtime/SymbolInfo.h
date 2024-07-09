@@ -43,13 +43,73 @@ namespace swift {
 struct SymbolInfo {
 private:
 #if defined(_WIN32) && !defined(__CYGWIN__)
-  SYMBOL_INFO_PACKAGE _package;
+  const void *_symbolAddress;
+  const char *_symbolName;
+  const char *_moduleFileName;
+  const void *_moduleBaseAddress;
 #elif SWIFT_STDLIB_HAS_DLADDR
   Dl_info _info;
 #endif
 
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  SymbolInfo(const void *symbolAddress,
+             const char *symbolName,
+             const char *moduleFileName,
+             const void *moduleBaseAddress)
+    : _symbolAddress(symbolAddress),
+      _symbolName(symbolName),
+      _moduleFileName(moduleFileName),
+      _moduleBaseAddress(moduleBaseAddress)
+  {}
+#endif
+
 public:
   SymbolInfo() {}
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  SymbolInfo(const SymbolInfo &other) {
+    _symbolName = nullptr;
+    _moduleFileName = nullptr;
+    *this = other;
+  }
+  SymbolInfo(SymbolInfo &&other) {
+    *this = std::move(other);
+  }
+  ~SymbolInfo() {
+    if (_moduleFileName)
+      ::free((void *)_moduleFileName);
+    if (_symbolName)
+      ::free((void *)_symbolName);
+  }
+
+  SymbolInfo &operator=(const SymbolInfo &other) {
+    if (this != &other) {
+      if (_moduleFileName)
+        ::free((void *)_moduleFileName);
+      if (_symbolName)
+        ::free((void *)_symbolName);
+
+      _symbolAddress = other._symbolAddress;
+      _symbolName = ::strdup(other._symbolName);
+      _moduleFileName = ::strdup(other._moduleFileName);
+      _moduleBaseAddress = other._moduleBaseAddress;
+    }
+
+    return *this;
+  }
+  SymbolInfo &operator=(SymbolInfo &&other) {
+    if (this != &other) {
+      _symbolAddress = other._symbolAddress;
+      _symbolName = other._symbolName;
+      other._symbolName = nullptr;
+      _moduleFileName = other._moduleFileName;
+      other._moduleFileName = nullptr;
+      _moduleBaseAddress = other._moduleBaseAddress;
+    }
+
+    return *this;
+  }
+#endif
 
   /// Get the file name of the image where the symbol was found.
   ///
