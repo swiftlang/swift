@@ -372,10 +372,6 @@ struct PrintOptions {
   /// Whether to suppress printing of custom attributes that are expanded macros.
   bool SuppressExpandedMacros = true;
 
-  /// Whether we're supposed to slap a @rethrows on `AsyncSequence` /
-  /// `AsyncIteratorProtocol` for backward-compatibility reasons.
-  bool AsyncSequenceRethrows = false;
-
   /// Suppress the @isolated(any) attribute.
   bool SuppressIsolatedAny = false;
 

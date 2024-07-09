@@ -150,19 +150,6 @@ static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   return false;
 }
 
-static bool isImplicitRethrowsProtocol(const ProtocolDecl *proto) {
-  return proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence) ||
-         proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol);
-}
-
-static bool usesFeatureAsyncSequenceFailure(Decl *decl) {
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    return isImplicitRethrowsProtocol(proto);
-  }
-
-  return false;
-}
-
 static bool usesFeatureMacros(Decl *decl) { return isa<MacroDecl>(decl); }
 
 static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
