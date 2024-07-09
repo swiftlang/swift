@@ -6978,7 +6978,7 @@ public:
       // pack at the appropriate index.  We only expect to actually do
       // this once for each type, so it's fine to do it in the callback.
       unsigned nextIndex = 0;
-      for (auto *genericParam : params) {
+      for (auto genericParam : params) {
         if (!genericParam->isParameterPack())
           continue;
 

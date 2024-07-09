@@ -36,7 +36,7 @@ class SubstitutionMap::Storage final
   friend TrailingObjects;
 
   /// The generic signature for which we are performing substitutions.
-  GenericSignature genericSig;
+  CanGenericSignature genericSig;
 
   /// The number of conformance requirements, cached to avoid constantly
   /// recomputing it on conformance-buffer access.
@@ -44,7 +44,7 @@ class SubstitutionMap::Storage final
 
   Storage() = delete;
 
-  Storage(GenericSignature genericSig,
+  Storage(CanGenericSignature genericSig,
           ArrayRef<Type> replacementTypes,
           ArrayRef<ProtocolConformanceRef> conformances);
 
@@ -66,13 +66,13 @@ private:
 public:
   /// Form storage for the given generic signature and its replacement
   /// types and conformances.
-  static Storage *get(GenericSignature genericSig,
+  static Storage *get(CanGenericSignature genericSig,
                       ArrayRef<Type> replacementTypes,
                       ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Retrieve the generic signature that describes the shape of this
   /// storage.
-  GenericSignature getGenericSignature() const { return genericSig; }
+  CanGenericSignature getGenericSignature() const { return genericSig; }
 
   /// Retrieve the array of replacement types, which line up with the
   /// generic parameters.
@@ -108,7 +108,7 @@ public:
 
   /// Profile the substitution map storage, for use with LLVM's FoldingSet.
   static void Profile(llvm::FoldingSetNodeID &id,
-                      GenericSignature genericSig,
+                      CanGenericSignature genericSig,
                       ArrayRef<Type> replacementTypes,
                       ArrayRef<ProtocolConformanceRef> conformances);
 };

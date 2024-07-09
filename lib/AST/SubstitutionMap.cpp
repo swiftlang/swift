@@ -43,7 +43,7 @@
 using namespace swift;
 
 SubstitutionMap::Storage::Storage(
-                              GenericSignature genericSig,
+                              CanGenericSignature genericSig,
                               ArrayRef<Type> replacementTypes,
                               ArrayRef<ProtocolConformanceRef> conformances)
   : genericSig(genericSig),
@@ -62,7 +62,8 @@ SubstitutionMap::SubstitutionMap(
                                 GenericSignature genericSig,
                                 ArrayRef<Type> replacementTypes,
                                 ArrayRef<ProtocolConformanceRef> conformances)
-  : storage(Storage::get(genericSig, replacementTypes, conformances)) {
+  : storage(Storage::get(genericSig.getCanonicalSignature(),
+                         replacementTypes, conformances)) {
 #ifndef NDEBUG
   if (genericSig->getASTContext().LangOpts.VerifyAllSubstitutionMaps)
     verify();
@@ -87,7 +88,7 @@ ArrayRef<Type> SubstitutionMap::getInnermostReplacementTypes() const {
       getGenericSignature().getInnermostGenericParams().size());
 }
 
-GenericSignature SubstitutionMap::getGenericSignature() const {
+CanGenericSignature SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
 
@@ -127,11 +128,8 @@ bool SubstitutionMap::isCanonical() const {
   return true;
 }
 
-SubstitutionMap SubstitutionMap::getCanonical(bool canonicalizeSignature) const {
+SubstitutionMap SubstitutionMap::getCanonical() const {
   if (empty()) return *this;
-
-  auto sig = getGenericSignature();
-  if (canonicalizeSignature) sig = sig.getCanonicalSignature();
 
   SmallVector<Type, 4> replacementTypes;
   for (Type replacementType : getReplacementTypes()) {
@@ -143,7 +141,7 @@ SubstitutionMap SubstitutionMap::getCanonical(bool canonicalizeSignature) const 
     conformances.push_back(conf.getCanonicalConformanceRef());
   }
 
-  return SubstitutionMap::get(sig,
+  return SubstitutionMap::get(getGenericSignature(),
                               ArrayRef<Type>(replacementTypes),
                               ArrayRef<ProtocolConformanceRef>(conformances));
 }

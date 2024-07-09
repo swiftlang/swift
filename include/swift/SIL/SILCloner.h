@@ -273,8 +273,7 @@ public:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    auto substSubs = asImpl().remapSubstitutionMap(Subs)
-                   .getCanonical(/*canonicalizeSignature*/false);
+    auto substSubs = asImpl().remapSubstitutionMap(Subs).getCanonical();
 
 #ifndef NDEBUG
     for (auto substConf : substSubs.getConformances()) {

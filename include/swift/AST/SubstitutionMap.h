@@ -117,9 +117,8 @@ public:
   static SubstitutionMap get(GenericSignature genericSig,
                              InFlightSubstitution &IFS);
 
-  /// Retrieve the generic signature describing the environment in which
-  /// substitutions occur.
-  GenericSignature getGenericSignature() const;
+  /// Retrieve the substitution map's input generic signature.
+  CanGenericSignature getGenericSignature() const;
 
   /// Retrieve the array of protocol conformances, which line up with the
   /// requirements of the generic signature.
@@ -157,7 +156,7 @@ public:
   bool isCanonical() const;
 
   /// Return the canonical form of this substitution map.
-  SubstitutionMap getCanonical(bool canonicalizeSignature = true) const;
+  SubstitutionMap getCanonical() const;
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.

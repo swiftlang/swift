@@ -5377,7 +5377,7 @@ Type OpenedArchetypeType::getAny(Type existential) {
 
 void SubstitutionMap::Storage::Profile(
                                llvm::FoldingSetNodeID &id,
-                               GenericSignature genericSig,
+                               CanGenericSignature genericSig,
                                ArrayRef<Type> replacementTypes,
                                ArrayRef<ProtocolConformanceRef> conformances) {
   id.AddPointer(genericSig.getPointer());
@@ -5393,7 +5393,7 @@ void SubstitutionMap::Storage::Profile(
 }
 
 SubstitutionMap::Storage *SubstitutionMap::Storage::get(
-                            GenericSignature genericSig,
+                            CanGenericSignature genericSig,
                             ArrayRef<Type> replacementTypes,
                             ArrayRef<ProtocolConformanceRef> conformances) {
   // If there is no generic signature, we need no storage.
