@@ -181,7 +181,7 @@ BASELINE_LANGUAGE_FEATURE(MoveOnlyResilientTypes, 390, "non-@frozen noncopyable 
 BASELINE_LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs")
 BASELINE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations")
 BASELINE_LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
-SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
+BASELINE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 BASELINE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 BASELINE_LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
 BASELINE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")

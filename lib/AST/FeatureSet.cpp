@@ -63,16 +63,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureRetroactiveAttribute(Decl *decl) {
-  auto ext = dyn_cast<ExtensionDecl>(decl);
-  if (!ext)
-    return false;
-
-  return llvm::any_of(
-      ext->getInherited().getEntries(),
-      [](const InheritedEntry &entry) { return entry.isRetroactive(); });
-}
-
 static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
   return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
 }
