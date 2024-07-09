@@ -3792,6 +3792,10 @@ public:
                                            targetIndex);
   }
 
+  std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
+    return getLifetimeDependenceFor(getNumParams());
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     std::optional<ExtInfo> info = std::nullopt;
     if (hasExtInfo())
@@ -4465,8 +4469,12 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out,
-             const PrintOptions &options = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+             const PrintOptions &options = PrintOptions(),
+             std::optional<LifetimeDependenceInfo> lifetimeDependence =
+                 std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options,
+             std::optional<LifetimeDependenceInfo> lifetimeDependence =
+                 std::nullopt) const;
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                                        SILParameterInfo type) {
     type.print(out);
@@ -5361,6 +5369,16 @@ public:
       return std::nullopt;
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             NumLifetimeDependencies};
+  }
+
+  std::optional<LifetimeDependenceInfo>
+  getLifetimeDependenceFor(unsigned targetIndex) const {
+    return swift::getLifetimeDependenceFor(getLifetimeDependencies(),
+                                           targetIndex);
+  }
+
+  std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
+    return getLifetimeDependenceFor(getNumParameters());
   }
 
   /// Returns true if the function type stores a Clang type that cannot

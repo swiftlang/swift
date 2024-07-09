@@ -4667,6 +4667,7 @@ void Requirement::dump(raw_ostream &out) const {
 }
 
 void SILParameterInfo::dump() const {
+  // TODO: Fix LifetimeDependenceInfo printing here.
   print(llvm::errs());
   llvm::errs() << '\n';
 }
