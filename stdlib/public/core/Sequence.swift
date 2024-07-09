@@ -1273,9 +1273,7 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 
 extension IteratorSequence: IteratorProtocol, Sequence {
 
-  #if $NoncopyableGenerics
-    public typealias Element = Base.Element
-  #endif
+  public typealias Element = Base.Element
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
