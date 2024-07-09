@@ -73,25 +73,6 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
       [](const InheritedEntry &entry) { return entry.isRetroactive(); });
 }
 
-static bool usesFeatureOptionalIsolatedParameters(Decl *decl) {
-  auto *value = dyn_cast<ValueDecl>(decl);
-  if (!value)
-    return false;
-
-  auto *paramList = getParameterList(value);
-  if (!paramList)
-    return false;
-
-  for (auto param : *paramList) {
-    if (param->isIsolated()) {
-      auto paramType = param->getInterfaceType();
-      return !paramType->getOptionalObjectType().isNull();
-    }
-  }
-
-  return false;
-}
-
 static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
   return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
 }

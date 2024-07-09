@@ -3049,14 +3049,6 @@ static void suppressingFeatureIsolatedAny(PrintOptions &options,
   action();
 }
 
-static void suppressingFeatureOptionalIsolatedParameters(
-    PrintOptions &options,
-    llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(
-      options.SuppressOptionalIsolatedParams, true);
-  action();
-}
-
 static void
 suppressingFeatureSendingArgsAndResults(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
