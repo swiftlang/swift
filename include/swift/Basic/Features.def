@@ -183,7 +183,7 @@ BASELINE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexi
 BASELINE_LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
 SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
-LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
+BASELINE_LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")

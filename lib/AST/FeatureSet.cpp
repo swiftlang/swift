@@ -166,19 +166,6 @@ static bool usesFeatureExtensionMacroAttr(Decl *decl) {
   return usesFeatureExtensionMacros(decl);
 }
 
-static bool usesFeatureTypedThrows(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    return usesTypeMatching(decl, [](Type ty) {
-      if (auto funcType = ty->getAs<AnyFunctionType>())
-        return funcType->hasThrownError();
-
-      return false;
-    });
-  }
-
-  return false;
-}
-
 static bool usesFeatureOptionalIsolatedParameters(Decl *decl) {
   auto *value = dyn_cast<ValueDecl>(decl);
   if (!value)
