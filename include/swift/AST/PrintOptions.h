@@ -385,12 +385,6 @@ struct PrintOptions {
   /// Suppress 'sending' on arguments and results.
   bool SuppressSendingArgsAndResults = false;
 
-  /// Suppress Noncopyable generics.
-  bool SuppressNoncopyableGenerics = false;
-
-  /// Suppress printing of `borrowing` and `consuming`.
-  bool SuppressNoncopyableOwnershipModifiers = false;
-
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
 
