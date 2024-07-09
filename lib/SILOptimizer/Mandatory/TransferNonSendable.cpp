@@ -713,16 +713,6 @@ public:
     emitRequireInstDiagnostics();
   }
 
-  void emitTypedRaceWithUnknownIsolationCrossing(SILLocation loc,
-                                                 Type inferredType) {
-    diagnoseError(loc,
-                  diag::regionbasedisolation_transfer_yields_race_no_isolation,
-                  inferredType)
-        .highlight(loc.getSourceRange())
-        .limitBehaviorIf(getBehaviorLimit());
-    emitRequireInstDiagnostics();
-  }
-
   void emitNamedIsolationCrossingDueToCapture(
       SILLocation loc, Identifier name,
       SILIsolationInfo namedValuesIsolationInfo,

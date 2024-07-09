@@ -948,12 +948,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 // Old Transfer Non Sendable Diagnostics
 //
 
-ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
-      "sending value of non-Sendable type %0 with later accesses risks causing data races",
-      (Type))
-ERROR(regionbasedisolation_transfer_yields_race_with_isolation, none,
-      "sending value of non-Sendable type %0 with later accesses from %1 context to %2 context risks causing data races",
-      (Type, ActorIsolation, ActorIsolation))
 ERROR(regionbasedisolation_isolated_capture_yields_race, none,
       "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
       (Type, ActorIsolation, ActorIsolation))
