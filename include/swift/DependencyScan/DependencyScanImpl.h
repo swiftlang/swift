@@ -73,6 +73,12 @@ struct swiftscan_link_library_info_s {
   bool forceLoad;
 };
 
+struct swiftscan_macro_dependency_s {
+  swiftscan_string_ref_t moduleName;
+  swiftscan_string_ref_t libraryPath;
+  swiftscan_string_ref_t executablePath;
+};
+
 /// Swift modules to be built from a module interface, may have a bridging
 /// header.
 typedef struct {
@@ -123,6 +129,9 @@ typedef struct {
 
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
+
+  /// Macro dependecies.
+  swiftscan_macro_dependency_set_t *macro_dependencies;
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.

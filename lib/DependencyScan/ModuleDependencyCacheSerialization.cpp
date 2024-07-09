@@ -305,7 +305,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!moduleCacheKeyID)
         llvm::report_fatal_error("Bad moduleCacheKey");
 
-      // TODO: LinkLibraries
+      // TODO: LinkLibraries, MacroDependencies
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
           outputModulePath.value(), optionalSwiftInterfaceFile.value(),

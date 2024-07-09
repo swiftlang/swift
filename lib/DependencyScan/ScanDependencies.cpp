@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/PrettyStackTrace.h"
 
 #include "swift/AST/ASTContext.h"
@@ -256,14 +257,6 @@ static llvm::Error resolveExplicitModuleInputs(
                        : interfaceDepDetails->moduleCacheKey;
       commandLine.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
                             path);
-      // Add the exported macro from interface into current module.
-      llvm::for_each(
-          interfaceDepDetails->textualModuleDetails.macroDependencies,
-          [&](const auto &entry) {
-            dependencyInfoCopy.addMacroDependency(entry.first(),
-                                                  entry.second.LibraryPath,
-                                                  entry.second.ExecutablePath);
-          });
     } break;
     case swift::ModuleDependencyKind::SwiftBinary: {
       auto binaryDepDetails = depInfo.getAsSwiftBinaryModule();
@@ -282,7 +275,7 @@ static llvm::Error resolveExplicitModuleInputs(
             {bridgingHeaderDepName, ModuleDependencyKind::Clang});
         const auto bridgingHeaderDepModuleDetails =
           optionalBridgingHeaderDepModuleInfo.getAsClangModule();
-	commandLine.push_back("-Xcc");
+        commandLine.push_back("-Xcc");
         commandLine.push_back(
             "-fmodule-map-file=" +
             remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));
@@ -372,6 +365,10 @@ static llvm::Error resolveExplicitModuleInputs(
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [&tracker](const std::string &file) { tracker->trackFile(file); });
+      llvm::for_each(textualDep->textualModuleDetails.macroDependencies,
+                     [&tracker](const auto &entry) {
+                       tracker->trackFile(entry.second.LibraryPath);
+                     });
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return root.takeError();
@@ -642,6 +639,28 @@ static swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
   return diagnosticOutput;
 }
 
+static swiftscan_macro_dependency_set_t *createMacroDependencySet(
+    const std::map<std::string, MacroPluginDependency> &macroDeps) {
+  swiftscan_macro_dependency_set_t *set = new swiftscan_macro_dependency_set_t;
+  if (macroDeps.empty()) {
+    set->count = 0;
+    set->macro_dependencies = nullptr;
+    return set;
+  }
+  set->count = macroDeps.size();
+  set->macro_dependencies = new swiftscan_macro_dependency_t[set->count];
+  unsigned SI = 0;
+  for (auto &entry : macroDeps) {
+    set->macro_dependencies[SI] = new swiftscan_macro_dependency_s;
+    set->macro_dependencies[SI]->moduleName = create_clone(entry.first.c_str());
+    set->macro_dependencies[SI]->libraryPath =
+        create_clone(entry.second.LibraryPath.c_str());
+    set->macro_dependencies[SI]->executablePath =
+        create_clone(entry.second.ExecutablePath.c_str());
+  }
+  return set;
+}
+
 static swiftscan_dependency_graph_t
 generateFullDependencyGraph(const CompilerInstance &instance,
                             const DependencyScanDiagnosticCollector *diagnosticCollector,
@@ -732,7 +751,9 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                              .CASFileSystemRootID.c_str()),
             create_clone(swiftTextualDeps->textualModuleDetails
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
-            create_clone(swiftTextualDeps->moduleCacheKey.c_str())};
+            create_clone(swiftTextualDeps->moduleCacheKey.c_str()),
+            createMacroDependencySet(
+                swiftTextualDeps->textualModuleDetails.macroDependencies)};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
@@ -767,7 +788,9 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             /*IncludeTree*/
             create_clone(swiftSourceDeps->textualModuleDetails
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
-            /*CacheKey*/ create_clone("")};
+            /*CacheKey*/ create_clone(""),
+            createMacroDependencySet(
+                swiftSourceDeps->textualModuleDetails.macroDependencies)};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
