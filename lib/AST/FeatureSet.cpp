@@ -116,7 +116,6 @@ static bool usesFeatureCodeItemMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::CodeItem);
 }
 
-UNINTERESTING_FEATURE(BodyMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
 
