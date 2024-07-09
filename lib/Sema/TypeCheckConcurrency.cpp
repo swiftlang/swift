@@ -2003,8 +2003,7 @@ bool swift::isAsyncDecl(ConcreteDeclRef declRef) {
   return false;
 }
 
-/// Find an enclosing function that has @
-static AbstractFunctionDecl *enclosingUnsafeInheritsExecutor(
+AbstractFunctionDecl *swift::enclosingUnsafeInheritsExecutor(
     const DeclContext *dc) {
   for (; dc; dc = dc->getParent()) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {

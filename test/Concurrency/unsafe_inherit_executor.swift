@@ -63,7 +63,6 @@ func unsafeCallerC(x: Int, fn: () -> Void, fn2: () -> Void) async {
 }
 
 @_unsafeInheritExecutor
-func unsafeCallerB(x: some AsyncSequence<Int, Never>) async {
-  for await _ in x { }
-  // expected-error@-1 2{{#isolation cannot be used within an `@_unsafeInheritExecutor` function}}
+func unsafeCallerAvoidsNewLoop(x: some AsyncSequence<Int, Never>) async throws {
+  for try await _ in x { }
 }

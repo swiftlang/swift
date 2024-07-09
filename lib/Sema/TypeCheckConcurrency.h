@@ -648,6 +648,9 @@ bool isPotentiallyIsolatedActor(
 bool diagnoseApplyArgSendability(
     swift::ApplyExpr *apply, const DeclContext *declContext);
 
+/// If the enclosing function has @_unsafeInheritExecutorAttr, return it.
+AbstractFunctionDecl *enclosingUnsafeInheritsExecutor(const DeclContext *dc);
+
 } // end namespace swift
 
 namespace llvm {
