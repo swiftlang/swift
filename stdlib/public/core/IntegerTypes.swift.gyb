@@ -62,7 +62,7 @@ maskingShifts = [
 #===-----------------------------------------------------------------------===//
 
 
-# documentation for binary operators: +, -, <<, &, etc
+# documentation for binary operators: +, -, *
 def operatorComment(operator, fixedWidth):
     comments = {
         '+': """\
@@ -186,7 +186,7 @@ def operatorComment(operator, fixedWidth):
   }
     return comments[operator].rstrip()
 
-# documentation for assignment operators: +=, -=, <<=, etc
+# documentation for assignment operators: +=, -=, *=
 def assignmentOperatorComment(operator, fixedWidth):
     comments = {
         '+': """\
