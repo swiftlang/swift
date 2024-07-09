@@ -3915,17 +3915,38 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
-const LifetimeDependenceInfo *
-AnyFunctionType::getLifetimeDependenceInfoOrNull() const {
+llvm::ArrayRef<LifetimeDependenceInfo>
+AnyFunctionType::getLifetimeDependencies() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getLifetimeDependenceInfoOrNull();
+    return cast<FunctionType>(this)->getLifetimeDependencies();
   case TypeKind::GenericFunction:
-    return cast<GenericFunctionType>(this)->getLifetimeDependenceInfoOrNull();
+    return cast<GenericFunctionType>(this)->getLifetimeDependencies();
 
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
+}
+
+std::optional<LifetimeDependenceInfo>
+AnyFunctionType::getLifetimeDependenceFor(unsigned targetIndex) const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getLifetimeDependenceFor(targetIndex);
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getLifetimeDependenceFor(
+        targetIndex);
+
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
+std::optional<LifetimeDependenceInfo>
+AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
+  auto resultIndex =
+      decl->hasCurriedSelf() ? getNumParams() + 1 : getNumParams();
+  return getLifetimeDependenceFor(resultIndex);
 }
 
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
@@ -3967,7 +3988,7 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError, getLifetimeDependenceInfo());
+                 globalActor, thrownError, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -3999,17 +4020,6 @@ ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   assert(!info->empty() &&
          "If the ClangTypeInfo was empty, we shouldn't have stored it.");
   return *info;
-}
-
-const LifetimeDependenceInfo *SILFunctionType::
-getLifetimeDependenceInfoOrNull() const {
-  if (!Bits.SILFunctionType.HasLifetimeDependenceInfo)
-    return nullptr;
-  auto *info = getTrailingObjects<LifetimeDependenceInfo>();
-  assert(
-      !info->empty() &&
-      "If the LifetimeDependenceInfo was empty, we shouldn't have stored it.");
-  return info;
 }
 
 bool SILFunctionType::hasNonDerivableClangType() {

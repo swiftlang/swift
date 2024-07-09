@@ -4354,12 +4354,14 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
-      info.has_value() && !info.value().getLifetimeDependenceInfo().empty();
-
+      info.has_value() ? !info->getLifetimeDependencies().empty() : false;
+  auto numLifetimeDependencies =
+      hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo,
-                                      Type, LifetimeDependenceInfo>(
+                                      Type, size_t, LifetimeDependenceInfo>(
       params.size(), hasClangInfo ? 1 : 0, numTypes,
-      hasLifetimeDependenceInfo ? 1 : 0);
+      hasLifetimeDependenceInfo ? 1 : 0,
+      hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
 
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
@@ -4416,9 +4418,12 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     }
     if (Type thrownError = info->getThrownError())
       getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
-    auto lifetimeDependenceInfo = info->getLifetimeDependenceInfo();
+    auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
-      *getTrailingObjects<LifetimeDependenceInfo>() = lifetimeDependenceInfo;
+      *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
+      std::uninitialized_copy(lifetimeDependenceInfo.begin(),
+                              lifetimeDependenceInfo.end(),
+                              getTrailingObjects<LifetimeDependenceInfo>());
     }
   }
 }
@@ -4496,13 +4501,16 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (globalActor && !sig->isReducedType(globalActor))
     isCanonical = false;
 
-  bool hasLifetimeDependenceInfo =
-      info.has_value() && !info.value().getLifetimeDependenceInfo().empty();
-
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
-  size_t allocSize =
-      totalSizeToAlloc<AnyFunctionType::Param, Type, LifetimeDependenceInfo>(
-          params.size(), numTypes, hasLifetimeDependenceInfo ? 1 : 0);
+  bool hasLifetimeDependenceInfo =
+      info.has_value() ? !info->getLifetimeDependencies().empty() : false;
+  auto numLifetimeDependencies =
+      hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
+
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type, size_t,
+                                      LifetimeDependenceInfo>(
+      params.size(), numTypes, hasLifetimeDependenceInfo ? 1 : 0,
+      hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
@@ -4533,9 +4541,12 @@ GenericFunctionType::GenericFunctionType(
     if (Type thrownError = info->getThrownError())
       getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
 
-    auto lifetimeDependenceInfo = info->getLifetimeDependenceInfo();
+    auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
-      *getTrailingObjects<LifetimeDependenceInfo>() = lifetimeDependenceInfo;
+      *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
+      std::uninitialized_copy(lifetimeDependenceInfo.begin(),
+                              lifetimeDependenceInfo.end(),
+                              getTrailingObjects<LifetimeDependenceInfo>());
     }
   }
 }
@@ -4622,8 +4633,6 @@ SILFunctionType::SILFunctionType(
   static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   Bits.SILFunctionType.HasClangTypeInfo = !ext.getClangTypeInfo().empty();
-  Bits.SILFunctionType.HasLifetimeDependenceInfo =
-      !ext.getLifetimeDependenceInfo().empty();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   assert((coroutineKind == SILCoroutineKind::None && yields.empty()) ||
@@ -4674,10 +4683,12 @@ SILFunctionType::SILFunctionType(
   if (!ext.getClangTypeInfo().empty())
     *getTrailingObjects<ClangTypeInfo>() = ext.getClangTypeInfo();
 
-  if (!ext.getLifetimeDependenceInfo().empty())
-    *getTrailingObjects<LifetimeDependenceInfo>() =
-        ext.getLifetimeDependenceInfo();
-
+  if (!ext.getLifetimeDependencies().empty()) {
+    NumLifetimeDependencies = ext.getLifetimeDependencies().size();
+    memcpy(getMutableLifetimeDependenceInfo().data(),
+           ext.getLifetimeDependencies().data(),
+           NumLifetimeDependencies * sizeof(LifetimeDependenceInfo));
+  }
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
     assert(!WitnessMethodConformance.isInvalid() &&
@@ -4868,7 +4879,9 @@ CanSILFunctionType SILFunctionType::get(
       params.size(), normalResults.size() + (errorResult ? 1 : 0),
       yields.size(), (patternSubs ? 1 : 0) + (invocationSubs ? 1 : 0),
       hasResultCache ? 2 : 0, ext.getClangTypeInfo().empty() ? 0 : 1,
-      ext.getLifetimeDependenceInfo().empty() ? 0 : 1);
+      !ext.getLifetimeDependencies().empty()
+          ? ext.getLifetimeDependencies().size()
+          : 0);
 
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 

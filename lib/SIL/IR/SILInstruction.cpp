@@ -1813,7 +1813,7 @@ visitRecursivelyLifetimeEndingUses(
     }
     if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
       auto fnTy = ret->getFunction()->getLoweredFunctionType();
-      assert(!fnTy->getLifetimeDependenceInfo().empty());
+      assert(!fnTy->getLifetimeDependencies().empty());
       if (!visitScopeEnd(use)) {
         return false;
       }

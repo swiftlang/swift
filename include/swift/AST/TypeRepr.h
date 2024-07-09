@@ -1119,7 +1119,6 @@ public:
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
-           T->getKind() == TypeReprKind::Transferring ||
            T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }

@@ -7981,8 +7981,8 @@ ERROR(lifetime_dependence_invalid_self_ownership, none,
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_invalid_return_type, none,
-      "lifetime dependence can only be specified on ~Escapable results", ())
+ERROR(lifetime_dependence_invalid_type, none,
+      "lifetime dependence can only be specified on ~Escapable types", ())
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
  ERROR(lifetime_dependence_cannot_infer_no_candidates, none,

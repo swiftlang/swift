@@ -4998,25 +4998,27 @@ public:
 };
 
 class LifetimeDependenceInfoRequest
-    : public SimpleRequest<LifetimeDependenceInfoRequest,
-                           std::optional<LifetimeDependenceInfo>(
-                               AbstractFunctionDecl *),
-                           RequestFlags::SeparatelyCached |
-                           RequestFlags::SplitCached> {
+    : public SimpleRequest<
+          LifetimeDependenceInfoRequest,
+          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(
+              AbstractFunctionDecl *),
+          RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  std::optional<LifetimeDependenceInfo>
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<std::optional<LifetimeDependenceInfo>> getCachedResult() const;
-  void cacheResult(std::optional<LifetimeDependenceInfo> value) const;
+  std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
+  getCachedResult() const;
+  void cacheResult(
+      std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> value) const;
 };
 
 class CaptureInfoRequest :

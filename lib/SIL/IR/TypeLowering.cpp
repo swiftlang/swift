@@ -3910,7 +3910,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
-          .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
+          .withLifetimeDependencies(funcType->getLifetimeDependencies())
           .withSendingResult(funcType->hasSendingResult())
           .build();
 
