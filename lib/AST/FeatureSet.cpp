@@ -63,10 +63,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
-  return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
-}
-
 UNINTERESTING_FEATURE(BuiltinAddressOfRawLayout)
 
 // ----------------------------------------------------------------------------
