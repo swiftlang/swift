@@ -124,8 +124,6 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
   return usesFeatureRethrowsProtocol(decl, checked);
 }
 
-UNINTERESTING_FEATURE(BuiltinAllocVector)
-
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
 }
