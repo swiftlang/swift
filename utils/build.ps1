@@ -1669,7 +1669,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation `
+      -Src $SourceCache\swift-corelibs-foundation-windows `
       -Bin $FoundationBinaryCache `
       -InstallTo $InstallPath `
       -Arch $Arch `
