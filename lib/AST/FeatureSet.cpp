@@ -223,29 +223,6 @@ static bool hasParameterPacks(Decl *decl) {
   return false;
 }
 
-/// A declaration needs the $ParameterPacks feature if it declares a
-/// generic parameter pack, or if its type references a generic nominal
-/// or type alias which declares a generic parameter pack.
-static bool usesFeatureParameterPacks(Decl *decl) {
-  if (hasParameterPacks(decl))
-    return true;
-
-  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (valueDecl->getInterfaceType().findIf([&](Type t) {
-          if (auto *alias = dyn_cast<TypeAliasType>(t.getPointer()))
-            return hasParameterPacks(alias->getDecl());
-          if (auto *nominal = t->getAnyNominal())
-            return hasParameterPacks(nominal);
-
-          return false;
-        })) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static bool usesFeatureLexicalLifetimes(Decl *decl) {
   return decl->getAttrs().hasAttribute<EagerMoveAttr>() ||
          decl->getAttrs().hasAttribute<NoEagerMoveAttr>() ||
