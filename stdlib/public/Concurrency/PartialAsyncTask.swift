@@ -730,21 +730,23 @@ public func withUnsafeThrowingContinuation<T>(
   }
 }
 
-// HACK: a version of withUnsafeContinuation that uses the unsafe
-// @_unsafeInheritExecutor.
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @_unsafeInheritExecutor
 public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
-) async -> T {
+) async -> sending T {
   return await Builtin.withUnsafeContinuation {
     fn(UnsafeContinuation<T, Never>($0))
   }
 }
 
-// HACK: a version of withUnsafeThrowingContinuation that uses the unsafe
-// @_unsafeInheritExecutor.
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @_unsafeInheritExecutor
