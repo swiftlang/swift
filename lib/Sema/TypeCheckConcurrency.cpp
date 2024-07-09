@@ -2097,6 +2097,62 @@ void swift::replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
   diag.fixItInsert(insertionLoc, newParameterText);
 }
 
+/// Whether this declaration context is in the _Concurrency module.
+static bool inConcurrencyModule(const DeclContext *dc) {
+  return dc->getParentModule()->getName().str().equals("_Concurrency");
+}
+
+void swift::introduceUnsafeInheritExecutorReplacements(
+    const DeclContext *dc, SourceLoc loc, SmallVectorImpl<ValueDecl *> &decls) {
+  if (decls.empty())
+    return;
+
+  auto isReplaceable = [&](ValueDecl *decl) {
+    return isa<FuncDecl>(decl) && inConcurrencyModule(decl->getDeclContext()) &&
+        decl->getDeclContext()->isModuleScopeContext();
+  };
+
+  // Make sure at least some of the entries are functions in the _Concurrency
+  // module.
+  ModuleDecl *concurrencyModule = nullptr;
+  for (auto decl: decls) {
+    if (isReplaceable(decl)) {
+      concurrencyModule = decl->getDeclContext()->getParentModule();
+      break;
+    }
+  }
+  if (!concurrencyModule)
+    return;
+
+  // Dig out the name.
+  auto baseName = decls.front()->getName().getBaseName();
+  if (baseName.isSpecial())
+    return;
+
+  // Look for entities with the _unsafeInheritExecutor_ prefix on the name.
+  ASTContext &ctx = decls.front()->getASTContext();
+  Identifier newIdentifier = ctx.getIdentifier(
+      ("_unsafeInheritExecutor_" + baseName.getIdentifier().str()).str());
+
+  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  LookupResult lookup = TypeChecker::lookupUnqualified(
+      const_cast<DeclContext *>(dc), DeclNameRef(newIdentifier), loc,
+      lookupOptions);
+  if (!lookup)
+    return;
+
+  // Drop all of the _Concurrency entries in favor of the ones found by this
+  // lookup.
+  decls.erase(std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) {
+                return isReplaceable(decl);
+              }),
+              decls.end());
+  for (const auto &lookupResult: lookup) {
+    if (auto decl = lookupResult.getValueDecl())
+      decls.push_back(decl);
+  }
+}
+
 /// Check if it is safe for the \c globalActor qualifier to be removed from
 /// \c ty, when the function value of that type is isolated to that actor.
 ///
@@ -3845,9 +3901,7 @@ namespace {
         std::tie(diagLoc, inDefaultArgument) = adjustPoundIsolationDiagLoc(
             isolationExpr, getDeclContext()->getParentModule());
 
-        bool inConcurrencyModule = getDeclContext()->getParentModule()->getName()
-            .str().equals("_Concurrency");
-
+        bool inConcurrencyModule = ::inConcurrencyModule(getDeclContext());
         auto diag = ctx.Diags.diagnose(diagLoc,
                                        diag::isolation_in_inherits_executor,
                                        inDefaultArgument);

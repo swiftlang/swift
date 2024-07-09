@@ -78,3 +78,34 @@ func unsafeCallerAvoidsNewLoop(x: some AsyncSequence<Int, Never>) async throws {
 
   for try await _ in x { }
 }
+
+// -------------------------------------------------------------------------
+// Type checker hack to use _unsafeInheritExecutor_-prefixed versions of
+// some concurrency library functions.
+// -------------------------------------------------------------------------
+
+@_unsafeInheritExecutor
+func unsafeCallerAvoidsNewLoop() async throws {
+  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+
+  _ = await withUnsafeContinuation { (continuation: UnsafeContinuation<Int, Never>) in
+    continuation.resume(returning: 5)
+  }
+
+  _ = try await withUnsafeThrowingContinuation { (continuation: UnsafeContinuation<Int, any Error>) in
+    continuation.resume(returning: 5)
+  }
+
+  _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+    continuation.resume(returning: 5)
+  }
+
+  _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, any Error>) in
+    continuation.resume(returning: 5)
+  }
+
+  _ = await withTaskCancellationHandler {
+    5
+  } onCancel: {
+  }
+}
