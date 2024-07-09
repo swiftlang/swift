@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=targeted
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=targeted
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: asserts
 
@@ -83,6 +83,11 @@ func unsafeCallerAvoidsNewLoop(x: some AsyncSequence<Int, Never>) async throws {
 // some concurrency library functions.
 // -------------------------------------------------------------------------
 
+enum TL {
+  @TaskLocal
+  static var string: String = "<undefined>"
+}
+
 @_unsafeInheritExecutor
 func unsafeCallerAvoidsNewLoop() async throws {
   // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
@@ -106,5 +111,9 @@ func unsafeCallerAvoidsNewLoop() async throws {
   _ = await withTaskCancellationHandler {
     5
   } onCancel: {
+  }
+
+  TL.$string.withValue("hello") {
+    print(TL.string)
   }
 }
