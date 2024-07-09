@@ -417,7 +417,7 @@ protected:
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasThrownError : 1,
-    HasLifetimeDependenceInfo : 1,
+    HasLifetimeDependencies : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -3366,7 +3366,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError =
           !Info.value().getThrownError().isNull();
       assert(!Bits.AnyFunctionType.HasThrownError || Info->isThrowing());
-      Bits.AnyFunctionType.HasLifetimeDependenceInfo =
+      Bits.AnyFunctionType.HasLifetimeDependencies =
           !Info.value().getLifetimeDependencies().empty();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
@@ -3379,7 +3379,7 @@ protected:
       Bits.AnyFunctionType.HasClangTypeInfo = false;
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasThrownError = false;
-      Bits.AnyFunctionType.HasLifetimeDependenceInfo = false;
+      Bits.AnyFunctionType.HasLifetimeDependencies = false;
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -3426,8 +3426,8 @@ public:
     return Bits.AnyFunctionType.HasThrownError;
   }
 
-  bool hasLifetimeDependenceInfo() const {
-    return Bits.AnyFunctionType.HasLifetimeDependenceInfo;
+  bool hasLifetimeDependencies() const {
+    return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
 
   ClangTypeInfo getClangTypeInfo() const;
@@ -3735,11 +3735,11 @@ class FunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
-    return hasLifetimeDependenceInfo() ? 1 : 0;
+    return hasLifetimeDependencies() ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
-    return hasLifetimeDependenceInfo() ? getNumLifetimeDependencies() : 0;
+    return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
   }
 
 public:
@@ -3774,13 +3774,13 @@ public:
   }
 
   inline size_t getNumLifetimeDependencies() const {
-    if (!hasLifetimeDependenceInfo())
+    if (!hasLifetimeDependencies())
       return 0;
     return getTrailingObjects<size_t>()[0];
   }
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
-    if (!hasLifetimeDependenceInfo())
+    if (!hasLifetimeDependencies())
       return std::nullopt;
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
@@ -3905,11 +3905,11 @@ class GenericFunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
-    return hasLifetimeDependenceInfo() ? 1 : 0;
+    return hasLifetimeDependencies() ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
-    return hasLifetimeDependenceInfo() ? getNumLifetimeDependencies() : 0;
+    return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
   }
 
   /// Construct a new generic function type.
@@ -3941,13 +3941,13 @@ public:
   }
 
   inline size_t getNumLifetimeDependencies() const {
-    if (!hasLifetimeDependenceInfo())
+    if (!hasLifetimeDependencies())
       return 0;
     return getTrailingObjects<size_t>()[0];
   }
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
-    if (!hasLifetimeDependenceInfo())
+    if (!hasLifetimeDependencies())
       return std::nullopt;
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
@@ -5352,12 +5352,12 @@ public:
 
   ClangTypeInfo getClangTypeInfo() const;
 
-  bool hasLifetimeDependenceInfo() const {
+  bool hasLifetimeDependencies() const {
     return NumLifetimeDependencies != 0;
   }
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
-    if (!hasLifetimeDependenceInfo())
+    if (!hasLifetimeDependencies())
       return std::nullopt;
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             NumLifetimeDependencies};
