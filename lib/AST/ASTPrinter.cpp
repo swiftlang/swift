@@ -3068,15 +3068,6 @@ static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
 }
 
 static void
-suppressingFeatureAssociatedTypeAvailability(
-    PrintOptions &options, llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::Available);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
 suppressingFeatureAsyncSequenceFailure(
     PrintOptions &options, llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> saved(options.AsyncSequenceRethrows, true);

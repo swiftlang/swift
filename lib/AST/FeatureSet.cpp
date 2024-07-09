@@ -150,11 +150,6 @@ static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureAssociatedTypeAvailability(Decl *decl) {
-  return isa<AssociatedTypeDecl>(decl) &&
-         decl->getAttrs().hasAttribute<AvailableAttr>();
-}
-
 static bool isImplicitRethrowsProtocol(const ProtocolDecl *proto) {
   return proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence) ||
          proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol);
