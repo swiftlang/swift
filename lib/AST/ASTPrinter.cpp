@@ -983,12 +983,7 @@ public:
   /// The default generic signature flags for printing requirements.
   static unsigned 
   defaultGenericRequirementFlags(const PrintOptions &options) {
-    unsigned flags = PrintRequirements;
-
-    if (!options.SuppressNoncopyableGenerics)
-      flags |= PrintInverseRequirements;
-
-    return flags;
+    return PrintRequirements | PrintInverseRequirements;
   }
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -1148,18 +1143,8 @@ public:
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
     if (Options.PrintCompatibilityFeatureChecks) {
-      printWithCompatibilityFeatureChecks(Printer, Options, D, [&] {
-        // If we are in a scope where non-copyable generics are being suppressed
-        // and we are also printing a decl that has @_preInverseGenerics, make
-        // sure we also suppress printing ownership modifiers that were added
-        // to satisfy the requirements of non-copyability.
-        llvm::SaveAndRestore<bool> scope(
-            Options.SuppressNoncopyableOwnershipModifiers,
-            Options.SuppressNoncopyableGenerics &&
-                D->getAttrs().hasAttribute<PreInverseGenericsAttr>());
-
-        ASTVisitor::visit(D);
-      });
+      printWithCompatibilityFeatureChecks(Printer, Options, D,
+                                          [&] { ASTVisitor::visit(D); });
     } else {
       ASTVisitor::visit(D);
     }
@@ -1642,9 +1627,8 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
   // The invertible protocols themselves do not need to state inverses in their
   // inheritance clause, because they do not gain any default requirements.
   // HACK: also exclude Sendable from getting inverses printed.
-  if (!proto->getInvertibleProtocolKind()
-      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-      !Options.SuppressNoncopyableGenerics)
+  if (!proto->getInvertibleProtocolKind() &&
+      !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
     flags |= PrintInverseRequirements;
 
   printRequirementSignature(
@@ -1701,18 +1685,6 @@ void PrintAST::printGenericSignature(GenericSignature genericSig,
                         AllInverses());
 }
 
-// Erase any requirements involving invertible protocols.
-static void eraseInvertibleProtocolConformances(
-    SmallVectorImpl<Requirement> &requirements) {
-  llvm::erase_if(requirements, [&](Requirement req) {
-      if (req.getKind() != RequirementKind::Conformance)
-        return false;
-
-      return req.getProtocolDecl()
-          ->getInvertibleProtocolKind().has_value();
-    });
-}
-
 InversesAtDepth::InversesAtDepth(GenericContext *level) {
   includedDepth = std::nullopt;
   // Does this generic context have its own generic parameters?
@@ -1745,9 +1717,6 @@ void PrintAST::printGenericSignature(
   } else {
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
-
-    if (Options.SuppressNoncopyableGenerics)
-      eraseInvertibleProtocolConformances(requirements);
   }
 
   if (flags & InnermostOnly) {
@@ -2026,9 +1995,6 @@ void PrintAST::printRequirementSignature(ProtocolDecl *owner,
   } else {
     requirements.append(sig.getRequirements().begin(),
                         sig.getRequirements().end());
-
-    if (Options.SuppressNoncopyableGenerics)
-      eraseInvertibleProtocolConformances(requirements);
   }
 
   if (attachingTo) {
@@ -3172,17 +3138,6 @@ static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
-static void suppressingFeatureNoncopyableGenerics(
-    PrintOptions &options,
-    llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::PreInverseGenerics);
-  llvm::SaveAndRestore<bool> scope(
-      options.SuppressNoncopyableGenerics, true);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
 static void
 suppressingFeatureConformanceSuppression(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
@@ -3783,14 +3738,10 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("inout", options, " ");
     break;
   case ParamSpecifier::Borrowing:
-    if (!options.SuppressNoncopyableOwnershipModifiers) {
-      printer.printKeyword("borrowing", options, " ");
-    }
+    printer.printKeyword("borrowing", options, " ");
     break;
   case ParamSpecifier::Consuming:
-    if (!options.SuppressNoncopyableOwnershipModifiers) {
-      printer.printKeyword("consuming", options, " ");
-    }
+    printer.printKeyword("consuming", options, " ");
     break;
   case ParamSpecifier::LegacyShared:
     printer.printKeyword("__shared", options, " ");
@@ -7481,7 +7432,7 @@ void GenericSignature::print(ASTPrinter &Printer,
   }
 
   auto flags = PrintAST::PrintParams | PrintAST::PrintRequirements;
-  if (Opts.PrintInverseRequirements && !Opts.SuppressNoncopyableGenerics)
+  if (Opts.PrintInverseRequirements)
     flags |= PrintAST::PrintInverseRequirements;
   PrintAST(Printer, Opts).printGenericSignature(*this, flags);
 }
@@ -7497,7 +7448,7 @@ void RequirementSignature::print(ProtocolDecl *owner,
                                  ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   auto flags = PrintAST::PrintParams | PrintAST::PrintRequirements;
-  if (Opts.PrintInverseRequirements && !Opts.SuppressNoncopyableGenerics)
+  if (Opts.PrintInverseRequirements)
     flags |= PrintAST::PrintInverseRequirements;
   PrintAST(Printer, Opts).printRequirementSignature(owner, *this, flags, nullptr);
 }
@@ -7898,10 +7849,6 @@ swift::getInheritedForPrinting(
 
       // Preserve any inverses that appeared in the unprintable type.
       if (foundUnprintable) {
-        if (printableInverses.contains(InvertibleProtocolKind::Copyable)
-            && options.SuppressNoncopyableGenerics)
-          printableInverses.remove(InvertibleProtocolKind::Copyable);
-
         if (!printableInverses.empty()) {
           auto inversesTy = ProtocolCompositionType::get(decl->getASTContext(),
                                                          /*members=*/{},
@@ -7910,26 +7857,6 @@ swift::getInheritedForPrinting(
           Results.push_back(InheritedEntry(TypeLoc::withoutLoc(inversesTy)));
         }
         continue;
-      }
-
-      // Suppress Copyable and ~Copyable.
-      if (options.SuppressNoncopyableGenerics) {
-        if (auto pct = ty->getAs<ProtocolCompositionType>()) {
-          auto inverses = pct->getInverses();
-          if (inverses.contains(InvertibleProtocolKind::Copyable)) {
-            inverses.remove(InvertibleProtocolKind::Copyable);
-            ty = ProtocolCompositionType::get(decl->getASTContext(),
-                                              pct->getMembers(),
-                                              inverses,
-                                              pct->hasExplicitAnyObject());
-            if (ty->isAny())
-              continue;
-          }
-        }
-
-        if (auto protoTy = ty->getAs<ProtocolType>())
-          if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Copyable))
-            continue;
       }
     }
     if (options.SuppressConformanceSuppression &&
