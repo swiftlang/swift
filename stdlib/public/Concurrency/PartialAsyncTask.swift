@@ -730,6 +730,32 @@ public func withUnsafeThrowingContinuation<T>(
   }
 }
 
+// HACK: a version of withUnsafeContinuation that uses the unsafe
+// @_unsafeInheritExecutor.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Never>) -> Void
+) async -> T {
+  return await Builtin.withUnsafeContinuation {
+    fn(UnsafeContinuation<T, Never>($0))
+  }
+}
+
+// HACK: a version of withUnsafeThrowingContinuation that uses the unsafe
+// @_unsafeInheritExecutor.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
 /// A hack to mark an SDK that supports swift_continuation_await.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient

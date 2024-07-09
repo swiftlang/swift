@@ -300,11 +300,10 @@ public func withCheckedContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @_unavailableInEmbedded
 @_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
-internal func __abi_withCheckedContinuation<T>(
+public func _unsafeInheritExecutor_withCheckedContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> T {
@@ -361,11 +360,10 @@ public func withCheckedThrowingContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @_unavailableInEmbedded
 @_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
-internal func __abi_withCheckedThrowingContinuation<T>(
+public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> T {

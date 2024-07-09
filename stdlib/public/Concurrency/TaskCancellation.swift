@@ -84,9 +84,8 @@ public func withTaskCancellationHandler<T>(
 
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
 @_silgen_name("$ss27withTaskCancellationHandler9operation8onCancelxxyYaKXE_yyYbXEtYaKlF")
-internal func __abi_withTaskCancellationHandler<T>(
+public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void
 ) async rethrows -> T {
