@@ -3107,6 +3107,7 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
           refDC);
     }
   }
+  return false;
 }
 
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
