@@ -39,3 +39,31 @@ actor MyActor {
     await useNonSendable(object: self.object)
   }
 }
+
+// Note: the tests below are line-number-sensitive.
+func inheritsIsolationProperly(isolation: isolated (any Actor)? = #isolation) async { }
+
+// @_unsafeInheritExecutor does not work with #isolation
+@_unsafeInheritExecutor
+func unsafeCallerA(x: Int) async {
+  await inheritsIsolationProperly()
+  // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{47:1-24=}}{{48:26-26=, isolation: isolated (any Actor)? = #isolation}}
+}
+
+@_unsafeInheritExecutor
+func unsafeCallerB() async {
+  await inheritsIsolationProperly(isolation: #isolation)
+  // expected-error@-1{{#isolation cannot be used within an '@_unsafeInheritExecutor' function}}{{53:1-24=}}{{54:20-20=isolation: isolated (any Actor)? = #isolation}}
+}
+
+@_unsafeInheritExecutor
+func unsafeCallerC(x: Int, fn: () -> Void, fn2: () -> Void) async {
+  await inheritsIsolationProperly()
+  // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{59:1-24=}}{{60:28-28=, isolation: isolated (any Actor)? = #isolation, }}
+}
+
+@_unsafeInheritExecutor
+func unsafeCallerB(x: some AsyncSequence<Int, Never>) async {
+  for await _ in x { }
+  // expected-error@-1 2{{#isolation cannot be used within an `@_unsafeInheritExecutor` function}}
+}
