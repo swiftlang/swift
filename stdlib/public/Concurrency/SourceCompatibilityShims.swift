@@ -62,6 +62,9 @@ public func withTaskCancellationHandler<T>(
   try await withTaskCancellationHandler(operation: operation, onCancel: handler)
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @_unsafeInheritExecutor

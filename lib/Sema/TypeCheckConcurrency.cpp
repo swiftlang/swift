@@ -3894,6 +3894,10 @@ namespace {
 
     void recordCurrentContextIsolation(
         CurrentContextIsolationExpr *isolationExpr) {
+      // If an actor has already been assigned, we're done.
+      if (isolationExpr->getActor())
+        return;
+
       // #isolation does not work within an `@_unsafeInheritExecutor` function.
       if (auto func = enclosingUnsafeInheritsExecutor(getDeclContext())) {
         // This expression is always written as a macro #isolation in source,
@@ -3910,10 +3914,6 @@ namespace {
         diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
         replaceUnsafeInheritExecutorWithDefaultedIsolationParam(func, diag);
       }
-
-      // If an actor has already been assigned, we're done.
-      if (isolationExpr->getActor())
-        return;
 
       auto loc = isolationExpr->getLoc();
       auto isolation = getActorIsolationOfContext(

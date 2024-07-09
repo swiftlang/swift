@@ -53,7 +53,6 @@ func unsafeCallerA(x: Int) async {
 
   await inheritsIsolationProperly()
   // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{50:1-24=}}{{51:26-26=, isolation: isolated (any Actor)? = #isolation}}
-t 6)
 }
 
 @_unsafeInheritExecutor
