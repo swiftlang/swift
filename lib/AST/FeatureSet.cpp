@@ -155,12 +155,6 @@ static bool hasParameterPacks(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureLexicalLifetimes(Decl *decl) {
-  return decl->getAttrs().hasAttribute<EagerMoveAttr>() ||
-         decl->getAttrs().hasAttribute<NoEagerMoveAttr>() ||
-         decl->getAttrs().hasAttribute<LexicalLifetimesAttr>();
-}
-
 static bool usesFeatureRetroactiveAttribute(Decl *decl) {
   auto ext = dyn_cast<ExtensionDecl>(decl);
   if (!ext)
