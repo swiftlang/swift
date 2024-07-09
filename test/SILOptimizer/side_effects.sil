@@ -447,12 +447,12 @@ bb0(%0 : @owned $SP):
   return %0 : $SP
 }
 
-// CHECK-LABEL: sil [ossa] @store_destoys
+// CHECK-LABEL: sil [ossa] @store_destroys
 // CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @store_destoys : $@convention(thin) (@inout X, @owned X) -> () {
+sil [ossa] @store_destroys : $@convention(thin) (@inout X, @owned X) -> () {
 bb0(%0 : $*X, %1 : @owned $X):
   store %1 to [assign] %0 : $*X
   %2 = tuple ()
@@ -482,24 +482,24 @@ bb0(%0 : $*X, %1 : @owned $X):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_destoys
+// CHECK-LABEL: sil [ossa] @copy_destroys
 // CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @copy_destoys : $@convention(thin) (@inout X, @in_guaranteed X) -> () {
+sil [ossa] @copy_destroys : $@convention(thin) (@inout X, @in_guaranteed X) -> () {
 bb0(%0 : $*X, %1 : $*X):
   copy_addr %1 to %0 : $*X
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_doesnt_destoy
+// CHECK-LABEL: sil [ossa] @copy_doesnt_destroy
 // CHECK-NEXT:  [%0: write v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @copy_doesnt_destoy : $@convention(thin) (@in_guaranteed X) -> @out X {
+sil [ossa] @copy_doesnt_destroy : $@convention(thin) (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
   copy_addr %1 to [init] %0 : $*X
   %2 = tuple ()
