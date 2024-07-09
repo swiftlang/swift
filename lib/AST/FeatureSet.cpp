@@ -141,48 +141,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureMoveOnly(Decl *decl) {
-  if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto *nominal = extension->getExtendedNominal())
-      return usesFeatureMoveOnly(nominal);
-    return false;
-  }
-
-  auto hasInverseInType = [&](Type type) {
-    return type.findIf([&](Type type) -> bool {
-      if (auto *NTD = type->getAnyNominal()) {
-        if (NTD->getAttrs().hasAttribute<MoveOnlyAttr>())
-          return true;
-      }
-      return false;
-    });
-  };
-
-  if (auto *TD = dyn_cast<TypeDecl>(decl)) {
-    if (auto *alias = dyn_cast<TypeAliasDecl>(TD))
-      return hasInverseInType(alias->getUnderlyingType());
-
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(TD)) {
-      if (NTD->getAttrs().hasAttribute<MoveOnlyAttr>())
-        return true;
-    }
-
-    return false;
-  }
-
-  if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-    return hasInverseInType(VD->getInterfaceType());
-  }
-
-  return false;
-}
-
-static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
-  if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl))
-    return nomDecl->isResilient() && usesFeatureMoveOnly(decl);
-  return false;
-}
-
 static bool hasParameterPacks(Decl *decl) {
   if (auto genericContext = decl->getAsGenericContext()) {
     auto sig = genericContext->getGenericSignature();
@@ -341,29 +299,15 @@ static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(LazyImmediate)
-
-static bool usesFeatureMoveOnlyClasses(Decl *decl) {
-  return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
-}
+UNINTERESTING_FEATURE(MoveOnlyClasses)
 
 static bool usesFeatureNoImplicitCopy(Decl *decl) {
   return decl->isNoImplicitCopy();
 }
 
 UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
-
-static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
-  if (auto *ei = dyn_cast<EnumDecl>(decl)) {
-    return usesFeatureMoveOnly(ei) && ei->getValueTypeDestructor();
-  }
-  return false;
-}
-
+UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
-
-// Partial consumption does not affect declarations directly.
-UNINTERESTING_FEATURE(MoveOnlyPartialConsumption)
-
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
 
 UNINTERESTING_FEATURE(OneWayClosureParameters)
