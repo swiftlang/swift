@@ -327,9 +327,12 @@ func stripActor(_ expr: @Sendable @autoclosure () -> (() -> ())) async {
   return await stripActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
 }
 
-// NOTE: this warning is correct, but is only being caught by TypeCheckConcurrency's extra check.
+// We used to not emit an error here with strict-concurrency enabled since we
+// were inferring the async let to main actor isolated (which was incorrect). We
+// now always treat async let as non-isolated, so we get the same error in all
+// contexts.
 @MainActor func exampleWhereConstraintSolverHasWrongDeclContext_v2() async -> Int {
-  async let a: () = noActor(mainActorFn) // expected-without-transferring-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+  async let a: () = noActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   await a
 }
 

@@ -7,7 +7,7 @@
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {} // expected-note {{}}
+class NonSendableKlass {} // expected-note 2{{}}
 
 struct NonSendableStruct {
   var first = NonSendableKlass()
@@ -17,6 +17,8 @@ struct NonSendableStruct {
 func getValue<T>() -> T { fatalError() }
 func getValueAsync<T>() async -> T { fatalError() }
 func getValueAsyncTransferring<T>() async -> sending T { fatalError() }
+@MainActor func getMainActorValueAsync<T>() async -> T { fatalError() }
+@MainActor func getMainActorValueAsyncTransferring<T>() async -> sending T { fatalError() }
 
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
@@ -209,9 +211,22 @@ func asyncLetReabstractionThunkTest() async {
   let _ = await newValue2
 }
 
+func asyncLetReabstractionThunkTest2() async {
+  // We emit the error here since we are returning a main actor isolated value.
+  async let newValue: NonSendableKlass = await getMainActorValueAsync()
+  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+
+  let _ = await newValue
+
+  // Without thunk.
+  async let newValue2: NonSendableKlass = await getMainActorValueAsyncTransferring()
+  let _ = await newValue2
+}
+
 @MainActor func asyncLetReabstractionThunkTestGlobalActor() async {
-  // With thunk. We emit the sema error here.
-  async let newValue: NonSendableKlass = await getValueAsync() // expected-warning {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
+  // With thunk we do not emit an error since our async let is not main actor
+  // isolated despite being in an @MainActor function.
+  async let newValue: NonSendableKlass = await getValueAsync()
   let _ = await newValue
 
   // Without thunk.
@@ -219,4 +234,14 @@ func asyncLetReabstractionThunkTest() async {
   let _ = await newValue2
 }
 
+@MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
+  // We emit the error here since we are returning a main actor isolated value.
+  async let newValue: NonSendableKlass = await getMainActorValueAsync()
+  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
 
+  let _ = await newValue
+
+  // Without thunk.
+  async let newValue2: NonSendableKlass = await getMainActorValueAsyncTransferring()
+  let _ = await newValue2
+}
