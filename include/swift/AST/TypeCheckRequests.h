@@ -1537,8 +1537,7 @@ public:
 class ActorIsolationRequest :
     public SimpleRequest<ActorIsolationRequest,
                          ActorIsolation(ValueDecl *),
-                         RequestFlags::SeparatelyCached |
-                         RequestFlags::SplitCached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1548,10 +1547,8 @@ private:
   ActorIsolation evaluate(Evaluator &evaluator, ValueDecl *value) const;
 
 public:
-  // Separate.
+  // Caching
   bool isCached() const { return true; }
-  std::optional<ActorIsolation> getCachedResult() const;
-  void cacheResult(ActorIsolation value) const;
 };
 
 /// Determine whether the given function should have an isolated 'self'.

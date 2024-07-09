@@ -2014,28 +2014,6 @@ GlobalActorAttributeRequest::cacheResult(std::optional<CustomAttrNominalPair> va
 }
 
 //----------------------------------------------------------------------------//
-// ActorIsolationRequest computation.
-//----------------------------------------------------------------------------//
-
-std::optional<ActorIsolation> ActorIsolationRequest::getCachedResult() const {
-  auto *decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.noActorIsolation)
-    return ActorIsolation::forUnspecified();
-
-  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
-}
-
-void ActorIsolationRequest::cacheResult(ActorIsolation value) const {
-  auto *decl = std::get<0>(getStorage());
-  if (value.isUnspecified()) {
-    decl->LazySemanticInfo.noActorIsolation = 1;
-    return;
-  }
-
-  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(value));
-}
-
-//----------------------------------------------------------------------------//
 // ResolveMacroRequest computation.
 //----------------------------------------------------------------------------//
 
