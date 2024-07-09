@@ -971,6 +971,16 @@ ERROR(regionbasedisolation_named_transfer_yields_race, none,
 NOTE(regionbasedisolation_type_is_non_sendable, none,
       "%0 is a non-Sendable type",
       (Type))
+ERROR(regionbasedisolation_type_transfer_yields_race, none,
+      "sending value of non-Sendable type %0 risks causing data races",
+      (Type))
+
+NOTE(regionbasedisolation_type_use_after_transfer, none,
+      "sending value of non-Sendable type %0 to %1 callee risks causing data races between %1 and local %2 uses",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_type_use_after_transfer_callee, none,
+      "sending value of non-Sendable type %0 to %1 %2 %3 risks causing data races between %1 and local %4 uses",
+      (Type, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 
 ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
       "'inout sending' parameter %0 cannot be %1at end of function",

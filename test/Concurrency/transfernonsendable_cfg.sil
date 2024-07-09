@@ -45,6 +45,7 @@ bb3:
   %transferKlass = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferKlass(%klass) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
+  // expected-note @-2 {{}}
   %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %useKlass(%klass) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access can happen concurrently}}

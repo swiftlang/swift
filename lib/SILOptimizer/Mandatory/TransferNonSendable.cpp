@@ -701,12 +701,21 @@ public:
 
   void emitTypedIsolationCrossing(SILLocation loc, Type inferredType,
                                   ApplyIsolationCrossing isolationCrossing) {
-    diagnoseError(
-        loc, diag::regionbasedisolation_transfer_yields_race_with_isolation,
-        inferredType, isolationCrossing.getCallerIsolation(),
-        isolationCrossing.getCalleeIsolation())
-        .highlight(loc.getSourceRange())
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
         .limitBehaviorIf(getBehaviorLimit());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_type_use_after_transfer_callee,
+                   inferredType, isolationCrossing.getCalleeIsolation(),
+                   calleeInfo->first, calleeInfo->second,
+                   isolationCrossing.getCallerIsolation());
+    } else {
+      diagnoseNote(loc, diag::regionbasedisolation_type_use_after_transfer,
+                   inferredType, isolationCrossing.getCalleeIsolation(),
+                   isolationCrossing.getCallerIsolation());
+    }
     emitRequireInstDiagnostics();
   }
 
