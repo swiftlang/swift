@@ -3943,6 +3943,12 @@ namespace {
             if (result == ActorReferenceResult::SameConcurrencyDomain)
               break;
 
+            // An isolated key-path component requires being formed in the same
+            // isolation domain. Record the required isolation here if we're
+            // computing the isolation of a stored property initializer.
+            if (refineRequiredIsolation(isolation))
+              break;
+
             LLVM_FALLTHROUGH;
           }
 
