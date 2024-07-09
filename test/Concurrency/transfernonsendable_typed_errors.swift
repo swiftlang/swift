@@ -29,3 +29,12 @@ func simpleUseAfterFree() async {
   // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   print(x) // expected-note {{access can happen concurrently}}
 }
+
+func isolatedClosureTest() async {
+  let x = NonSendableKlass()
+  let _ = { @MainActor in
+      print(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+      // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to main actor-isolated closure due to closure capture risks causing races in between main actor-isolated and nonisolated uses}}
+  }
+  print(x) // expected-note {{access can happen concurrently}}
+}

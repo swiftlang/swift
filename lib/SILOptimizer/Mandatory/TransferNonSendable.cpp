@@ -779,11 +779,13 @@ public:
   void emitTypedIsolationCrossingDueToCapture(
       SILLocation loc, Type inferredType,
       ApplyIsolationCrossing isolationCrossing) {
-    diagnoseError(loc, diag::regionbasedisolation_isolated_capture_yields_race,
-                  inferredType, isolationCrossing.getCalleeIsolation(),
-                  isolationCrossing.getCallerIsolation())
-        .highlight(loc.getSourceRange())
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
         .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_type_isolated_capture_yields_race,
+                 inferredType, isolationCrossing.getCalleeIsolation(),
+                 isolationCrossing.getCallerIsolation());
     emitRequireInstDiagnostics();
   }
 

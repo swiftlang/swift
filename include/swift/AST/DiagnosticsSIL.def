@@ -948,9 +948,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 // Old Transfer Non Sendable Diagnostics
 //
 
-ERROR(regionbasedisolation_isolated_capture_yields_race, none,
-      "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
-      (Type, ActorIsolation, ActorIsolation))
 ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
       "value of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
@@ -981,6 +978,9 @@ NOTE(regionbasedisolation_type_use_after_transfer, none,
 NOTE(regionbasedisolation_type_use_after_transfer_callee, none,
       "sending value of non-Sendable type %0 to %1 %2 %3 risks causing data races between %1 and local %4 uses",
       (Type, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
+      "sending value of non-Sendable type %0 to %1 closure due to closure capture risks causing races in between %1 and %2 uses",
+      (Type, ActorIsolation, ActorIsolation))
 
 ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
       "'inout sending' parameter %0 cannot be %1at end of function",
