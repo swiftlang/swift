@@ -579,28 +579,6 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
   }
 }
 
-static swiftscan_macro_dependency_set_t *createMacroDependencySet(
-    const std::map<std::string, MacroPluginDependency> &macroDeps) {
-  swiftscan_macro_dependency_set_t *set = new swiftscan_macro_dependency_set_t;
-  if (macroDeps.empty()) {
-    set->count = 0;
-    set->macro_dependencies = nullptr;
-    return set;
-  }
-  set->count = macroDeps.size();
-  set->macro_dependencies = new swiftscan_macro_dependency_t[set->count];
-  unsigned SI = 0;
-  for (auto &entry : macroDeps) {
-    set->macro_dependencies[SI] = new swiftscan_macro_dependency_s;
-    set->macro_dependencies[SI]->moduleName = create_clone(entry.first.c_str());
-    set->macro_dependencies[SI]->libraryPath =
-        create_clone(entry.second.LibraryPath.c_str());
-    set->macro_dependencies[SI]->executablePath =
-        create_clone(entry.second.ExecutablePath.c_str());
-  }
-  return set;
-}
-
 static swiftscan_dependency_graph_t
 generateFullDependencyGraph(const CompilerInstance &instance,
                             const DependencyScanDiagnosticCollector *diagnosticCollector,

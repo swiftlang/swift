@@ -189,6 +189,71 @@ swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
   return diagnosticOutput;
 }
 
+// Generate an instance of the `swiftscan_dependency_graph_s` which contains no
+// module dependnecies but captures the diagnostics emitted during the attempted
+// scan query.
+static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
+    const DependencyScanDiagnosticCollector &ScanDiagnosticConsumer) {
+  // Create a dependency graph instance
+  swiftscan_dependency_graph_t hollowResult = new swiftscan_dependency_graph_s;
+
+  // Populate the `modules` with a single info for the main module
+  // containing no dependencies
+  swiftscan_dependency_set_t *dependencySet = new swiftscan_dependency_set_t;
+  dependencySet->count = 1;
+  dependencySet->modules = new swiftscan_dependency_info_t[1];
+  swiftscan_dependency_info_s *hollowMainModuleInfo =
+      new swiftscan_dependency_info_s;
+  dependencySet->modules[0] = hollowMainModuleInfo;
+  hollowResult->dependencies = dependencySet;
+
+  // Other main module details empty
+  hollowMainModuleInfo->direct_dependencies =
+      c_string_utils::create_empty_set();
+  hollowMainModuleInfo->source_files = c_string_utils::create_empty_set();
+  hollowMainModuleInfo->module_path = c_string_utils::create_null();
+  hollowResult->main_module_name = c_string_utils::create_clone("unknown");
+  hollowMainModuleInfo->module_name =
+      c_string_utils::create_clone("swiftTextual:unknown");
+
+  // Hollow info details
+  swiftscan_module_details_s *hollowDetails = new swiftscan_module_details_s;
+  hollowDetails->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
+  hollowDetails->swift_textual_details = {c_string_utils::create_null(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_null(),
+                                          false,
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_null()};
+  hollowMainModuleInfo->details = hollowDetails;
+
+  // Populate the diagnostic info
+  hollowResult->diagnostics =
+      mapCollectedDiagnosticsForOutput(&ScanDiagnosticConsumer);
+  return hollowResult;
+}
+
+// Generate an instance of the `swiftscan_import_set_t` which contains no
+// imports but captures the diagnostics emitted during the attempted
+// scan query.
+static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
+    const DependencyScanDiagnosticCollector &ScanDiagnosticConsumer) {
+  // Create an dependency graph instance
+  swiftscan_import_set_t hollowResult = new swiftscan_import_set_s;
+  hollowResult->imports = c_string_utils::create_empty_set();
+  hollowResult->diagnostics =
+      mapCollectedDiagnosticsForOutput(&ScanDiagnosticConsumer);
+  return hollowResult;
+}
+
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
       VersionedPCMInstanceCacheCache(
@@ -203,18 +268,13 @@ DependencyScanningTool::getDependencies(
   // There may be errors as early as in instance initialization, so we must ensure
   // we can catch those.
   auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-  auto produceDiagnosticStateOnFailure = [&ScanDiagnosticConsumer]() {
-    swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
-    result->diagnostics = mapCollectedDiagnosticsForOutput(ScanDiagnosticConsumer.get());
-    return result;
-  };
 
   // The primary instance used to scan the query Swift source-code
   auto QueryContextOrErr = initCompilerInstanceForScan(Command,
                                                        WorkingDirectory,
                                                        ScanDiagnosticConsumer);
   if (QueryContextOrErr.getError())
-    return produceDiagnosticStateOnFailure();
+    return generateHollowDiagnosticOutput(*ScanDiagnosticConsumer);
 
   auto QueryContext = std::move(*QueryContextOrErr);
 
@@ -228,9 +288,9 @@ DependencyScanningTool::getDependencies(
                                              QueryContext.ScanDiagnostics.get(),
                                              cache);
   if (DependenciesOrErr.getError())
-    return produceDiagnosticStateOnFailure();
+    return generateHollowDiagnosticOutput(*ScanDiagnosticConsumer);
 
-  return std::move(*DependenciesOrErr);;
+  return std::move(*DependenciesOrErr);
 }
 
 llvm::ErrorOr<swiftscan_import_set_t>
@@ -243,11 +303,9 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
   auto QueryContextOrErr = initCompilerInstanceForScan(Command,
                                                        WorkingDirectory,
                                                        ScanDiagnosticConsumer);
-  if (QueryContextOrErr.getError()) {
-    swiftscan_import_set_t result = new swiftscan_import_set_s;
-    result->diagnostics = mapCollectedDiagnosticsForOutput(ScanDiagnosticConsumer.get());
-    return result;
-  }
+  if (QueryContextOrErr.getError())
+    return generateHollowDiagnosticOutputImportSet(*ScanDiagnosticConsumer);
+
   auto QueryContext = std::move(*QueryContextOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
@@ -259,10 +317,9 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
                                                 QueryContext.ScanDiagnostics.get(),
                                                 cache);
   if (DependenciesOrErr.getError())
-    return std::make_error_code(std::errc::not_supported);
-  auto Dependencies = std::move(*DependenciesOrErr);
+    return generateHollowDiagnosticOutputImportSet(*ScanDiagnosticConsumer);
 
-  return Dependencies;
+  return std::move(*DependenciesOrErr);
 }
 
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
