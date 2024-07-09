@@ -166,7 +166,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_special
 BASELINE_LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
 BASELINE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor")
-SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types")
+BASELINE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types")
 BASELINE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync")
 BASELINE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)")
 BASELINE_LANGUAGE_FEATURE(AssociatedTypeAvailability, 0, "Availability on associated types")

@@ -141,15 +141,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
-    if (protoDecl->getPrimaryAssociatedTypes().size() > 0)
-      return true;
-  }
-
-  return false;
-}
-
 static bool usesFeatureMacros(Decl *decl) { return isa<MacroDecl>(decl); }
 
 static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {

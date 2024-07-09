@@ -3043,14 +3043,6 @@ static void suppressingFeatureSpecializeAttributeWithAvailability(
   action();
 }
 
-static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
-                                         llvm::function_ref<void()> action) {
-  bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
-  options.PrintPrimaryAssociatedTypes = false;
-  action();
-  options.PrintPrimaryAssociatedTypes = originalPrintPrimaryAssociatedTypes;
-}
-
 static void
 suppressingFeatureLexicalLifetimes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
@@ -3646,10 +3638,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
         Printer.printName(name);
       });
 
-    if (Options.PrintPrimaryAssociatedTypes) {
-      printPrimaryAssociatedTypes(decl);
-    }
-
+    printPrimaryAssociatedTypes(decl);
     printInheritedFromRequirementSignature(decl, decl);
 
     // The trailing where clause is a syntactic thing, which isn't serialized
