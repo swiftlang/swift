@@ -258,8 +258,9 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // Find the index of the replacement type based on the generic parameter we
   // have.
+  GenericSignature genericSig = getGenericSignature();
   auto genericParam = cast<GenericTypeParamType>(type);
-  auto genericParams = getGenericSignature().getGenericParams();
+  auto genericParams = genericSig.getGenericParams();
   auto replacementIndex =
     GenericParamKey(genericParam).findIndexIn(genericParams);
 
