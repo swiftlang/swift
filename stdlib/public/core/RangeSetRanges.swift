@@ -75,7 +75,8 @@ extension RangeSet {
           let newUpper = Swift.max(
             _storage[lastValid].upperBound,
             _storage[current].upperBound)
-          _storage[lastValid] = _storage[lastValid].lowerBound ..< newUpper
+          _storage[lastValid] = Range(
+            uncheckedBounds: (_storage[lastValid].lowerBound, newUpper))
         } else {
           // Otherwise, this is a valid new range to add to the range set: 
           // swap it into place at the end of the valid section.
