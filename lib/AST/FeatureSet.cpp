@@ -63,8 +63,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-UNINTERESTING_FEATURE(BuiltinAddressOfRawLayout)
-
 // ----------------------------------------------------------------------------
 // MARK: - Upcoming Features
 // ----------------------------------------------------------------------------
