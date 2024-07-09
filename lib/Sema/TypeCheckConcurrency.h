@@ -651,6 +651,11 @@ bool diagnoseApplyArgSendability(
 /// If the enclosing function has @_unsafeInheritExecutorAttr, return it.
 AbstractFunctionDecl *enclosingUnsafeInheritsExecutor(const DeclContext *dc);
 
+/// Add Fix-Its to the given function to replace the @_unsafeInheritExecutor
+/// attribute with a defaulted isolation parameter.
+void replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
+    AbstractFunctionDecl *func, InFlightDiagnostic &diag);
+
 } // end namespace swift
 
 namespace llvm {

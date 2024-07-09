@@ -2058,9 +2058,7 @@ static std::pair<SourceLoc, bool> adjustPoundIsolationDiagLoc(
   };
 }
 
-/// Replace the @_unsafeInheritExecutor with a defaulted isolation
-/// parameter.
-static void replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
+void swift::replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
     AbstractFunctionDecl *func, InFlightDiagnostic &diag) {
   auto attr = func->getAttrs().getAttribute<UnsafeInheritExecutorAttr>();
   assert(attr && "Caller didn't validate the presence of the attribute");

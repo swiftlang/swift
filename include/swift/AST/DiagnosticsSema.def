@@ -3980,6 +3980,9 @@ ERROR(inherits_executor_without_async,none,
 ERROR(isolation_in_inherits_executor,none,
       "#isolation%select{| (introduced by a default argument)}0 cannot be used "
       "within an '@_unsafeInheritExecutor' function", (bool))
+ERROR(unsafe_inherits_executor_deprecated,none,
+        "@_unsafeInheritExecutor attribute is deprecated; consider an "
+        "'isolated' parameter defaulted to '#isolation' instead", ())
 
 ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
       (DeclAttribute))
