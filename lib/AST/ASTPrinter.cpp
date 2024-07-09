@@ -3065,17 +3065,6 @@ static void suppressingFeatureAssociatedTypeImplements(PrintOptions &options,
 }
 
 static void
-suppressingFeatureConformanceSuppression(PrintOptions &options,
-                                         llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::PreInverseGenerics);
-  llvm::SaveAndRestore<bool> scope(options.SuppressConformanceSuppression,
-                                   true);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
 suppressingFeatureBitwiseCopyable2(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
