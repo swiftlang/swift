@@ -646,7 +646,28 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool shouldEmitFunctionBody(const AbstractFunctionDecl *AFD) {
-  return AFD->hasBody() && !AFD->isBodySkipped();
+  if (!AFD->hasBody())
+    return false;
+
+  if (AFD->isBodySkipped())
+    return false;
+
+  auto &ctx = AFD->getASTContext();
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    // Force the function body to be type-checked and then skip it if there
+    // have been any errors.
+    (void)AFD->getTypecheckedBody();
+
+    // FIXME: Only skip bodies that contain type checking errors.
+    // It would be ideal to only skip the function body if it is specifically
+    // the source of an error. However, that information isn't available today
+    // so instead we avoid emitting all function bodies as soon as any error is
+    // encountered.
+    if (ctx.hadError())
+      return false;
+  }
+
+  return true;
 }
 
 static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
