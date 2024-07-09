@@ -316,10 +316,8 @@ extension _UnsafeBitset.Word {
 // iterator, not the original word.
 extension _UnsafeBitset.Word: Sequence, IteratorProtocol {
 
-#if $NoncopyableGenerics
   @usableFromInline
   typealias Element = Int
-#endif
 
   @inlinable
   internal var count: Int {
