@@ -1458,7 +1458,6 @@ extension UnsafeMutableRawPointer {
       "storeBytes only supports storing the bytes of BitwiseCopyable types."
     )
 
-#if $TypedThrows
     withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1468,17 +1467,6 @@ extension UnsafeMutableRawPointer {
         /*volatile:*/ false._value
       )
     }
-#else
-    try! __abi_withUnsafePointer(to: value) { source in
-      // FIXME: to be replaced by _memcpy when conversions are implemented.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        (self + offset)._rawValue,
-        source._rawValue,
-        UInt64(MemoryLayout<T>.size)._value,
-        /*volatile:*/ false._value
-      )
-    }
-#endif
   }
 
   // This obsolete implementation uses the expected mangled name
@@ -1504,7 +1492,6 @@ extension UnsafeMutableRawPointer {
       "storeBytes to misaligned raw pointer")
 
     var temp = value
-#if $TypedThrows
     withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.
@@ -1512,15 +1499,6 @@ extension UnsafeMutableRawPointer {
         (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
         /*volatile:*/ false._value)
     }
-#else
-    __abi_se0413_withUnsafeMutablePointer(to: &temp) { source in
-      let rawSrc = UnsafeMutableRawPointer(source)._rawValue
-      // FIXME: to be replaced by _memcpy when conversions are implemented.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
-        /*volatile:*/ false._value)
-    }
-#endif
   }
 
   /// Copies the specified number of bytes from the given raw pointer's memory
