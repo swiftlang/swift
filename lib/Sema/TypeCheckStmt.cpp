@@ -3289,6 +3289,11 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   if (!nextElement)
     return ctx.getAsyncIteratorNext();
 
+  // If the enclosing function has @_unsafeInheritsExecutor, then #isolation
+  // does not work and we need to avoid relying on it.
+  if (enclosingUnsafeInheritsExecutor(dc))
+    return ctx.getAsyncIteratorNext();
+
   // If availability checking is disabled, use next(_:).
   if (ctx.LangOpts.DisableAvailabilityChecking || loc.isInvalid())
     return nextElement;
