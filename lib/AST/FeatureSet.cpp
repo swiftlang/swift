@@ -68,25 +68,7 @@ UNINTERESTING_FEATURE(ForwardTrailingClosures)
 UNINTERESTING_FEATURE(StrictConcurrency)
 UNINTERESTING_FEATURE(BareSlashRegexLiterals)
 UNINTERESTING_FEATURE(DeprecateApplicationMain)
-
-static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
-  ClangNode clangNode = decl->getClangNode();
-  if (!clangNode)
-    return false;
-
-  const clang::Decl *clangDecl = clangNode.getAsDecl();
-  if (!clangDecl)
-    return false;
-
-  if (auto objCInterfaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
-    return !objCInterfaceDecl->hasDefinition();
-
-  if (auto objCProtocolDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl))
-    return !objCProtocolDecl->hasDefinition();
-
-  return false;
-}
-
+UNINTERESTING_FEATURE(ImportObjcForwardDeclarations)
 UNINTERESTING_FEATURE(DisableOutwardActorInference)
 UNINTERESTING_FEATURE(InternalImportsByDefault)
 UNINTERESTING_FEATURE(IsolatedDefaultValues)
@@ -103,53 +85,19 @@ UNINTERESTING_FEATURE(ImplicitOpenExistentials)
 UNINTERESTING_FEATURE(StaticAssert)
 UNINTERESTING_FEATURE(NamedOpaqueTypes)
 UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
-
-static bool usesFeatureCodeItemMacros(Decl *decl) {
-  auto macro = dyn_cast<MacroDecl>(decl);
-  if (!macro)
-    return false;
-
-  return macro->getMacroRoles().contains(MacroRole::CodeItem);
-}
-
+UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-
-static bool usesFeatureSymbolLinkageMarkers(Decl *decl) {
-  auto &attrs = decl->getAttrs();
-  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
-    if (isa<UsedAttr>(attr))
-      return true;
-    if (isa<SectionAttr>(attr))
-      return true;
-    return false;
-  });
-}
-
+UNINTERESTING_FEATURE(SymbolLinkageMarkers)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
-
-static bool usesFeatureNoImplicitCopy(Decl *decl) {
-  return decl->isNoImplicitCopy();
-}
-
+UNINTERESTING_FEATURE(NoImplicitCopy)
 UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
 UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
-
 UNINTERESTING_FEATURE(OneWayClosureParameters)
-
-static bool usesFeatureLayoutPrespecialization(Decl *decl) {
-  auto &attrs = decl->getAttrs();
-  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
-    if (auto *specialize = dyn_cast<SpecializeAttr>(attr)) {
-      return !specialize->getTypeErasedParams().empty();
-    }
-    return false;
-  });
-}
-
+UNINTERESTING_FEATURE(LayoutPrespecialization)
 UNINTERESTING_FEATURE(AccessLevelOnImport)
 UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
 UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
@@ -169,65 +117,21 @@ UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
 UNINTERESTING_FEATURE(ImportSymbolicCXXDecls)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
-
-static bool usesFeatureReferenceBindings(Decl *decl) {
-  auto *vd = dyn_cast<VarDecl>(decl);
-  return vd && vd->getIntroducer() == VarDecl::Introducer::InOut;
-}
-
+UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
 UNINTERESTING_FEATURE(PlaygroundExtendedCallbacks)
 UNINTERESTING_FEATURE(ThenStatements)
 UNINTERESTING_FEATURE(DoExpressions)
 UNINTERESTING_FEATURE(ImplicitLastExprResults)
-
-static bool usesFeatureRawLayout(Decl *decl) {
-  return decl->getAttrs().hasAttribute<RawLayoutAttr>();
-}
-
+UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
-
-static bool disallowFeatureSuppression(StringRef featureName, Decl *decl);
-
-static bool usesFeatureStructLetDestructuring(Decl *decl) {
-  auto sd = dyn_cast<StructDecl>(decl);
-  if (!sd)
-    return false;
-
-  for (auto member : sd->getStoredProperties()) {
-    if (!member->isLet())
-      continue;
-
-    auto init = member->getParentPattern();
-    if (!init)
-      continue;
-
-    if (!init->getSingleVar())
-      return true;
-  }
-
-  return false;
-}
-
-static bool usesFeatureNonescapableTypes(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<NonEscapableAttr>() ||
-      decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
-    return true;
-  }
-  return false;
-}
-
-static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
-  return decl->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>();
-}
-
-static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
-  return decl->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>();
-}
-
+UNINTERESTING_FEATURE(StructLetDestructuring)
+UNINTERESTING_FEATURE(NonescapableTypes)
+UNINTERESTING_FEATURE(StaticExclusiveOnly)
+UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 
@@ -282,9 +186,7 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
-
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
-
 UNINTERESTING_FEATURE(ClosureIsolation)
 
 static bool usesFeatureBitwiseCopyable2(Decl *decl) {
@@ -311,19 +213,11 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
 
 UNINTERESTING_FEATURE(MemberImportVisibility)
 UNINTERESTING_FEATURE(IsolatedAny2)
-
-static bool usesFeatureGlobalActorIsolatedTypesUsability(Decl *decl) {
-  return false;
-}
-
+UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 UNINTERESTING_FEATURE(CImplementation)
-
-static bool usesFeatureSensitive(Decl *decl) {
-  return decl->getAttrs().hasAttribute<SensitiveAttr>();
-}
-
+UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
