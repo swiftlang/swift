@@ -141,32 +141,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureMacros(Decl *decl) { return isa<MacroDecl>(decl); }
-
-static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
-  auto macro = dyn_cast<MacroDecl>(decl);
-  if (!macro)
-    return false;
-
-  return macro->getMacroRoles().contains(MacroRole::Expression);
-}
-
-static bool usesFeatureAttachedMacros(Decl *decl) {
-  auto macro = dyn_cast<MacroDecl>(decl);
-  if (!macro)
-    return false;
-
-  return static_cast<bool>(macro->getMacroRoles() & getAttachedMacroRoles());
-}
-
-static bool usesFeatureExtensionMacros(Decl *decl) {
-  auto macro = dyn_cast<MacroDecl>(decl);
-  if (!macro)
-    return false;
-
-  return macro->getMacroRoles().contains(MacroRole::Extension);
-}
-
 static bool usesFeatureMoveOnly(Decl *decl) {
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getExtendedNominal())
@@ -227,14 +201,6 @@ static bool usesFeatureLexicalLifetimes(Decl *decl) {
   return decl->getAttrs().hasAttribute<EagerMoveAttr>() ||
          decl->getAttrs().hasAttribute<NoEagerMoveAttr>() ||
          decl->getAttrs().hasAttribute<LexicalLifetimesAttr>();
-}
-
-static bool usesFeatureFreestandingMacros(Decl *decl) {
-  auto macro = dyn_cast<MacroDecl>(decl);
-  if (!macro)
-    return false;
-
-  return macro->getMacroRoles().contains(MacroRole::Declaration);
 }
 
 static bool usesFeatureRetroactiveAttribute(Decl *decl) {
