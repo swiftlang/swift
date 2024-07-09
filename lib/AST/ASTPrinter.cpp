@@ -3043,17 +3043,6 @@ static void suppressingFeatureSpecializeAttributeWithAvailability(
   action();
 }
 
-static void
-suppressingFeatureLexicalLifetimes(PrintOptions &options,
-                                   llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::EagerMove);
-  options.ExcludeAttrList.push_back(DeclAttrKind::NoEagerMove);
-  options.ExcludeAttrList.push_back(DeclAttrKind::LexicalLifetimes);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
 static void suppressingFeatureRetroactiveAttribute(
   PrintOptions &options,
   llvm::function_ref<void()> action) {

@@ -138,20 +138,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool hasParameterPacks(Decl *decl) {
-  if (auto genericContext = decl->getAsGenericContext()) {
-    auto sig = genericContext->getGenericSignature();
-    if (llvm::any_of(sig.getGenericParams(),
-                     [&](const GenericTypeParamType *GP) {
-                       return GP->isParameterPack();
-                     })) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static bool usesFeatureRetroactiveAttribute(Decl *decl) {
   auto ext = dyn_cast<ExtensionDecl>(decl);
   if (!ext)
