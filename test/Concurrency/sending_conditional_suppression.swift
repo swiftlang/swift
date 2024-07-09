@@ -206,7 +206,7 @@ public struct TestInStruct {
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
 // to make sure we do not fail if we fail to parse sending in the if block.
 
-// CHECK-LABEL: #if compiler(>=5.3) && $OptionalIsolatedParameters && $ExpressionMacroDefaultArguments // Suppression Count: 24
+// CHECK-LABEL: #if compiler(>=5.3) && $OptionalIsolatedParameters // Suppression Count: 24
 // CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> sending T {
 // CHECK-NEXT:   fatalError()

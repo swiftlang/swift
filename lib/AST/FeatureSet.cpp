@@ -179,18 +179,6 @@ static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
   return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
 }
 
-static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    for (auto param : *func->getParameters()) {
-      if (param->getDefaultArgumentKind() ==
-          DefaultArgumentKind::ExpressionMacro)
-        return true;
-    }
-  }
-
-  return false;
-}
-
 UNINTERESTING_FEATURE(BuiltinStoreRaw)
 UNINTERESTING_FEATURE(BuiltinAddressOfRawLayout)
 
