@@ -2317,6 +2317,9 @@ function Stage-BuildArtifacts($Arch) {
 #-------------------------------------------------------------------
 try {
 
+Get-ChildItem Env:
+throw "test done"
+
 if (-not $SkipBuild) {
   Fetch-Dependencies
 }
