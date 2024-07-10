@@ -1138,6 +1138,7 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Indirect_Inout: return 'l';
     case ParameterConvention::Indirect_InoutAliasable: return 'b';
     case ParameterConvention::Indirect_In_Guaranteed: return 'n';
+    case ParameterConvention::Indirect_In_CXX: return 'X';
     case ParameterConvention::Direct_Owned: return 'x';
     case ParameterConvention::Direct_Unowned: return 'y';
     case ParameterConvention::Direct_Guaranteed: return 'g';
@@ -1968,9 +1969,8 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
 void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) {
   // Dig out the substitution map to use.
   SubstitutionMap subMap;
-  ModuleDecl *module;
+
   if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer())) {
-    module = Mod ? Mod : typeAlias->getDecl()->getModuleContext();
     subMap = typeAlias->getSubstitutionMap();
   } else {
     if (type->hasUnboundGenericType())
@@ -1979,8 +1979,7 @@ void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) 
     auto nominal = type->getAnyNominal();
     if (!nominal) return;
 
-    module = Mod ? Mod : nominal->getModuleContext();
-    subMap = type->getContextSubstitutionMap(module, nominal);
+    subMap = type->getContextSubstitutionMap(nominal);
   }
 
   appendRetroactiveConformances(subMap, sig);
@@ -2062,7 +2061,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   case SILFunctionTypeIsolation::Unknown:
     break;
   case SILFunctionTypeIsolation::Erased:
-    OpArgs.push_back('A');
+    if (AllowIsolatedAny)
+      OpArgs.push_back('A');
     break;
   }
 
@@ -2165,7 +2165,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     appendType(param.getInterfaceType(), sig, forDecl);
   }
 
-  // Mangle if we have a transferring result.
+  // Mangle if we have a sending result.
   if (isInRecursion && fn->hasSendingResult())
     OpArgs.push_back('T');
 
@@ -3060,7 +3060,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   if (fn->isSendable())
     appendOperator("Yb");
   if (auto thrownError = fn->getEffectiveThrownErrorType()) {
-    if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())){
+    if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())
+        || !AllowTypedThrows) {
       appendOperator("K");
     } else {
       appendType(*thrownError, sig);
@@ -3096,7 +3097,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Yc");
     break;
   case FunctionTypeIsolation::Kind::Erased:
-    appendOperator("YA");
+    if (AllowIsolatedAny)
+      appendOperator("YA");
     break;
   }
 

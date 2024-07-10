@@ -1440,8 +1440,8 @@ private:
     assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
-    printFunctionClangAttributes(FD, funcTy);
     os << " SWIFT_NOEXCEPT";
+    printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << ";\n";
   }
@@ -2914,6 +2914,9 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
       if (auto *params = elementDecl->getParameterList()) {
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
+          // TODO: properly support exporting these optionals. rdar://131112273 
+          if (paramType->isOptional() && paramType->getOptionalObjectType()->isTypeParameter())
+            return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
                   printer, enumDecl->getModuleContext(), paramType)

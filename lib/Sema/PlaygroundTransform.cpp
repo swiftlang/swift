@@ -662,7 +662,7 @@ public:
       return nullptr;
     }
 
-    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
+    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr() == "self") {
       // Don't log "self" in a constructor
       return nullptr;
     }
@@ -950,7 +950,9 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
-        if (!FD->isImplicit() && !FD->isBodySkipped()) {
+        // Skip any functions that do not have user-written source code.
+        if (!FD->isImplicit() && !FD->isBodySkipped() &&
+            !FD->isInMacroExpansionInContext()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
             Instrumenter I(ctx, FD, RNG, Options, TmpNameIndex);

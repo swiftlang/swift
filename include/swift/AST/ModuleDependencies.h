@@ -90,6 +90,12 @@ enum class ModuleDependencyKind : int8_t {
   LastKind = SwiftPlaceholder + 1
 };
 
+/// This is used to idenfity a specific macro plugin dependency.
+struct MacroPluginDependency {
+  std::string LibraryPath;
+  std::string ExecutablePath;
+};
+
 /// This is used to identify a specific module.
 struct ModuleDependencyID {
   std::string ModuleName;
@@ -246,6 +252,9 @@ struct CommonSwiftTextualModuleDependencyDetails {
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
 
+  /// The macro dependencies.
+  std::map<std::string, MacroPluginDependency> macroDependencies;
+
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
   std::vector<std::string> buildCommandLine;
@@ -311,6 +320,12 @@ public:
   void updateCommandLine(const std::vector<std::string> &newCommandLine) {
     textualModuleDetails.buildCommandLine = newCommandLine;
   }
+
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath) {
+    textualModuleDetails.macroDependencies.insert(
+        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
+  }
 };
 
 /// Describes the dependencies of a Swift module
@@ -361,6 +376,12 @@ public:
   void addTestableImport(ImportPath::Module module) {
     testableImports.insert(module.front().Item.str());
   }
+
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath) {
+    textualModuleDetails.macroDependencies.insert(
+        {macroModuleName.str(), {libraryPath.str(), executablePath.str()}});
+  }
 };
 
 /// Describes the dependencies of a pre-built Swift module (with no
@@ -376,12 +397,14 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
-      bool isFramework, bool isStatic, StringRef moduleCacheKey)
+      StringRef definingModuleInterface, bool isFramework, bool isStatic,
+      StringRef moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), headerImport(headerImport),
+        definingModuleInterfacePath(definingModuleInterface),
         isFramework(isFramework), isStatic(isStatic) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -400,6 +423,10 @@ public:
   /// The path of the .h dependency of this module.
   const std::string headerImport;
 
+  /// The path of the defining .swiftinterface that this
+  /// binary .swiftmodule was built from, if one exists.
+  const std::string definingModuleInterfacePath;
+
   /// Source files on which the header inputs depend.
   std::vector<std::string> headerSourceFiles;
 
@@ -411,6 +438,15 @@ public:
 
   /// A flag that indicates this dependency is associated with a static archive
   const bool isStatic;
+
+  /// Return the path to the defining .swiftinterface of this module
+  /// of one was determined. Otherwise, return the .swiftmodule path
+  /// itself.
+  std::string getDefiningModulePath() const {
+    if (definingModuleInterfacePath.empty())
+      return compiledModulePath;
+    return definingModuleInterfacePath;
+  }
 
   static bool classof(const ModuleDependencyInfoStorageBase *base) {
     return base->dependencyKind == ModuleDependencyKind::SwiftBinary;
@@ -567,12 +603,13 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
-      bool isFramework, bool isStatic, StringRef moduleCacheKey) {
+      StringRef definingModuleInterface, bool isFramework,
+      bool isStatic, StringRef moduleCacheKey) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
             compiledModulePath, moduleDocPath, sourceInfoPath, moduleImports,
-            optionalModuleImports, linkLibraries, headerImport, isFramework,
-            isStatic, moduleCacheKey));
+            optionalModuleImports, linkLibraries, headerImport,
+            definingModuleInterface,isFramework, isStatic, moduleCacheKey));
   }
 
   /// Describe the main Swift module.
@@ -758,6 +795,10 @@ public:
 
   /// For a Source dependency, register a `Testable` import
   void addTestableImport(ImportPath::Module module);
+
+  /// For a Source/Textual dependency, register a macro dependency.
+  void addMacroDependency(StringRef macroModuleName, StringRef libraryPath,
+                          StringRef executablePath);
 
   /// Whether or not a queried module name is a `@Testable` import dependency
   /// of this module. Can only return `true` for Swift source modules.

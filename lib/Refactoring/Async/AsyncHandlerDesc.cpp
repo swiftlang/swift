@@ -17,10 +17,10 @@ using namespace swift;
 using namespace swift::refactoring::asyncrefactorings;
 
 /// Whether the given type is (or conforms to) the stdlib Error type
-static bool isErrorType(Type Ty, ModuleDecl *MD) {
+static bool isErrorType(Type Ty) {
   if (!Ty)
     return false;
-  return !MD->checkConformance(Ty, Ty->getASTContext().getErrorDecl())
+  return !ModuleDecl::checkConformance(Ty, Ty->getASTContext().getErrorDecl())
               .isInvalid();
 }
 
@@ -70,8 +70,7 @@ AsyncHandlerDesc AsyncHandlerDesc::get(const ValueDecl *Handler,
     HandlerDesc.Type = HandlerType::PARAMS;
     if (!HandlerParams.empty()) {
       auto LastParamTy = HandlerParams.back().getParameterType();
-      HandlerDesc.HasError = isErrorType(LastParamTy->getOptionalObjectType(),
-                                         Handler->getModuleContext());
+      HandlerDesc.HasError = isErrorType(LastParamTy->getOptionalObjectType());
     }
   }
 

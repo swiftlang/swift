@@ -804,6 +804,8 @@ ASTContext::ASTContext(
 }
 
 ASTContext::~ASTContext() {
+  if (LangOpts.AnalyzeRequestEvaluator)
+    evaluator.dump(llvm::dbgs());
   getImpl().~Implementation();
 }
 
@@ -1341,6 +1343,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
+  case KnownProtocolKind::CxxSpan:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
@@ -1530,7 +1533,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
 
   auto type = decl->getDeclaredInterfaceType();
   auto builtinProtocol = getProtocol(builtinProtocolKind);
-  auto builtinConformance = getStdlibModule()->lookupConformance(
+  auto builtinConformance = ModuleDecl::lookupConformance(
       type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
     assert(false && "Missing required conformance");
@@ -1560,7 +1563,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                             results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
-  auto subs = regexType->getMemberSubstitutionMap(spModule, foundDecl);
+  auto subs = regexType->getMemberSubstitutionMap(foundDecl);
   return ConcreteDeclRef(foundDecl, subs);
 }
 
@@ -2713,6 +2716,9 @@ ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       NormalProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
+  CONDITIONAL_ASSERT(substitutions.getGenericSignature().getCanonicalSignature()
+                     == generic->getGenericSignature().getCanonicalSignature());
+
   // If the specialization is a no-op, use the root conformance instead.
   if (collapseSpecializedConformance(type, generic, substitutions)) {
     ++NumCollapsedSpecializedProtocolConformances;
@@ -5667,7 +5673,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (nominal != dc->getASTContext().getOptionalDecl()) {
       if (auto objcBridgeable
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-        auto conformance = dc->getParentModule()->lookupConformance(
+        auto conformance = ModuleDecl::lookupConformance(
             nominal->getDeclaredInterfaceType(), objcBridgeable);
         if (conformance) {
           result =
@@ -5819,7 +5825,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (!proto)
       return ProtocolConformanceRef::forInvalid();
 
-    return dc->getParentModule()->lookupConformance(type, proto);
+    return ModuleDecl::lookupConformance(type, proto);
   };
 
   // Do we conform to _ObjectiveCBridgeable?

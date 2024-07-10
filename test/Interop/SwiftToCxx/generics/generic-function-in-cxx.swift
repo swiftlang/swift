@@ -2,12 +2,12 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions-evo.h
 // RUN: %FileCheck %s < %t/functions-evo.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions-evo.h -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions-evo.h -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public func genericPrintFunctionTwoArg<T>(_ x: T, _ y: Int) {
     print("X:", x)

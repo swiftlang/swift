@@ -6201,7 +6201,7 @@ public:
        if (req.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::BaseProtocol) {
          ++result;
-         // We currently assume that base protocol requirements preceed other
+         // We currently assume that base protocol requirements precede other
          // requirements i.e we store the base protocol pointers sequentially in
          // instantiateRelativeWitnessTable starting at index 1.
          assert(currIdx == result &&
@@ -6270,7 +6270,7 @@ using RelativeBaseWitness = RelativeDirectPointer<void, true /*nullable*/>;
 //
 // The layout of a dynamically allocated relative witness table is:
 //             [ conditional conformance n] ... private area
-//             [ conditional conformance 0]     (negatively adressed)
+//             [ conditional conformance 0]     (negatively addressed)
 // pointer ->  [ pointer to relative witness table (pattern) ]
 //             [ base protocol witness table pointer 0 ] ... base protocol
 //             [ base protocol witness table pointer n ]     pointers

@@ -781,6 +781,8 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
     return nullptr;
   if (!FieldLayout.isFixedLayout())
     return nullptr;
+  if (!FieldLayout.isFixedSize())
+    return nullptr;
 
   // Calculate the total size needed.
   // The first part is the size of the class itself.

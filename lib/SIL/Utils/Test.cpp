@@ -117,6 +117,10 @@ DominanceInfo *FunctionTest::getDominanceInfo() {
   return dependencies->getDominanceInfo();
 }
 
+DeadEndBlocks *FunctionTest::getDeadEndBlocks() {
+  return dependencies->getDeadEndBlocks();
+}
+
 SILPassManager *FunctionTest::getPassManager() {
   return dependencies->getPassManager();
 }

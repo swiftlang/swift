@@ -152,10 +152,12 @@ if ($PinnedBuild -eq "") {
     "AMD64" {
       $PinnedBuild = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
       $PinnedSHA256 = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
+      $PinnedVersion = "5.10.1"
     }
     "ARM64" {
-      # TODO(hjyamauchi) once we have an arm64 release, fill in PinnedBuild and PinnedSHA256.
-      throw "Missing pinned toolchain for ARM64"
+      $PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
+      $PinnedSHA256 = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
+      $PinnedVersion = "0.0.0"
     }
     default { throw "Unsupported processor architecture" }
   }
@@ -739,6 +741,13 @@ function Get-PinnedToolchainRuntime() {
   return "$BinaryCache\toolchains\${PinnedToolchain}\PFiles64\Swift\runtime-development\usr\bin"
 }
 
+function Get-PinnedToolchainVersion() {
+  if (Test-Path variable:PinnedVersion) {
+    return $PinnedVersion
+  }
+  return "5.10.1"
+}
+
 function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
   if (-not $Hashtable.Contains($Key)) {
     $Hashtable.Add($Key, $Value)
@@ -1311,6 +1320,14 @@ function Build-Compilers() {
       }
     }
 
+    # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
+    # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
+    # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
+    $SwiftFlags = @();
+    if ([System.Version](Get-PinnedToolchainVersion) -lt [System.Version]"6.0") {
+      $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
+    }
+
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
       -Bin $CompilersBinaryCache `
@@ -1323,6 +1340,7 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+        CMAKE_Swift_FLAGS = $SwiftFlags;
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
@@ -1593,8 +1611,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
-        # FIXME: re-enable after https://github.com/apple/swift/issues/74186 is fixed.
-        SWIFT_ENABLE_SYNCHRONIZATION = if (($Platform -eq "Android") -and ($Arch -eq $AndroidARMv7)) { "NO" } else { "YES" };
+        SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -1653,7 +1670,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation `
+      -Src $SourceCache\swift-corelibs-foundation-windows `
       -Bin $FoundationBinaryCache `
       -InstallTo $InstallPath `
       -Arch $Arch `
@@ -1762,8 +1779,12 @@ function Install-Platform([Platform]$Platform, $Arch) {
   # Copy SDK header files
   Copy-Directory "$($Arch.SDKInstallRoot)\usr\include\swift\SwiftRemoteMirror" $SDKInstallRoot\usr\include\swift
   Copy-Directory "$($Arch.SDKInstallRoot)\usr\lib\swift\shims" $SDKInstallRoot\usr\lib\swift
-  foreach ($Module in ("Block", "dispatch", "os")) {
-    Copy-Directory "$($Arch.SDKInstallRoot)\usr\lib\swift\$Module" $SDKInstallRoot\usr\include
+  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
+    $ModuleDirectory = "$($Arch.SDKInstallRoot)\usr\lib\swift\$Module"
+    $DestinationDirectory = "$SDKInstallRoot\usr\include"
+    if (Test-Path $ModuleDirectory) {
+      Copy-Directory $ModuleDirectory $DestinationDirectory
+    }
   }
 
   # Copy SDK share folder

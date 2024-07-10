@@ -316,25 +316,6 @@ public:
           os << " __strong";
         printInoutTypeModifier();
       }
-      if (isa<clang::CXXRecordDecl>(cd->getClangDecl())) {
-        if (std::find_if(
-                cd->getClangDecl()->getAttrs().begin(),
-                cd->getClangDecl()->getAttrs().end(), [](clang::Attr *attr) {
-                  if (auto *sa = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-                    llvm::StringRef value = sa->getAttribute();
-                    if ((value.starts_with("retain:") ||
-                         value.starts_with("release:")) &&
-                        !value.ends_with(":immortal"))
-                      return true;
-                  }
-                  return false;
-                }) != cd->getClangDecl()->getAttrs().end()) {
-          // This is a shared FRT. Do not bridge it back to
-          // C++ as its ownership is not managed automatically
-          // in C++ yet.
-          return ClangRepresentation::unsupported;
-        }
-      }
       // FIXME: Mark that this is only ObjC representable.
       return ClangRepresentation::representable;
     }

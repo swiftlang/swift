@@ -548,27 +548,49 @@ class EnumElementPattern : public Pattern {
   Pattern /*nullable*/ *SubPattern;
   DeclContext *DC;
 
-public:
   EnumElementPattern(TypeExpr *ParentType, SourceLoc DotLoc,
                      DeclNameLoc NameLoc, DeclNameRef Name,
-                     EnumElementDecl *Element, Pattern *SubPattern,
-                     DeclContext *DC)
+                     PointerUnion<EnumElementDecl *, Expr *> ElementOrOriginal,
+                     Pattern *SubPattern, DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(ParentType),
         DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern),
-        DC(DC) {
-    assert(ParentType && "Missing parent type?");
+        ElementDeclOrUnresolvedOriginalExpr(ElementOrOriginal),
+        SubPattern(SubPattern), DC(DC) {}
+
+public:
+  /// Create an EnumElementPattern with a parent expression, e.g `E.foo`.
+  static EnumElementPattern *create(TypeExpr *parentExpr, SourceLoc dotLoc,
+                                    DeclNameLoc nameLoc, DeclNameRef name,
+                                    EnumElementDecl *decl, Pattern *subPattern,
+                                    DeclContext *DC) {
+    auto &ctx = DC->getASTContext();
+    return new (ctx) EnumElementPattern(parentExpr, dotLoc, nameLoc, name, decl,
+                                        subPattern, DC);
   }
 
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
-  EnumElementPattern(SourceLoc DotLoc, DeclNameLoc NameLoc, DeclNameRef Name,
-                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr,
-                     DeclContext *DC)
-      : Pattern(PatternKind::EnumElement), ParentType(nullptr), DotLoc(DotLoc),
-        NameLoc(NameLoc), Name(Name),
-        ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
-        SubPattern(SubPattern), DC(DC) {}
+  static EnumElementPattern *create(SourceLoc dotLoc, DeclNameLoc nameLoc,
+                                    DeclNameRef name,
+                                    Expr *unresolvedOriginalExpr,
+                                    Pattern *subPattern, DeclContext *DC) {
+    auto &ctx = DC->getASTContext();
+    return new (ctx)
+        EnumElementPattern(/*parent*/ nullptr, dotLoc, nameLoc, name,
+                           unresolvedOriginalExpr, subPattern, DC);
+  }
+
+  static EnumElementPattern *
+  createImplicit(Type parentTy, SourceLoc dotLoc, DeclNameLoc nameLoc,
+                 EnumElementDecl *decl, Pattern *subPattern, DeclContext *DC);
+
+  static EnumElementPattern *createImplicit(Type parentTy,
+                                            EnumElementDecl *decl,
+                                            Pattern *subPattern,
+                                            DeclContext *DC) {
+    return createImplicit(parentTy, SourceLoc(), DeclNameLoc(), decl,
+                          subPattern, DC);
+  }
 
   bool hasSubPattern() const { return SubPattern; }
 

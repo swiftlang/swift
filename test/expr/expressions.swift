@@ -868,7 +868,7 @@ func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide
   print(z)
 }
 
-_ = _.foo // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+_ = _.foo // expected-error {{type placeholder not allowed here}}
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {

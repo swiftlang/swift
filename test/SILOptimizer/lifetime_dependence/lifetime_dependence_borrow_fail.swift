@@ -64,3 +64,9 @@ func bv_incorrect_annotation2(_ w1: borrowing Wrapper, _ w2: borrowing Wrapper) 
   return w1.bv                                                                                        // expected-note @-1{{it depends on the lifetime of argument 'w1'}}
 }                                                                                                     // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
 
+let ptr = UnsafeRawPointer(bitPattern: 1)!
+let nc = NC(ptr, 0) // expected-error {{lifetime-dependent variable 'nc' escapes its scope}}
+
+func bv_global(dummy: BV) -> BV {
+  nc.getBV()
+} // expected-note {{this use causes the lifetime-dependent value to escape}}

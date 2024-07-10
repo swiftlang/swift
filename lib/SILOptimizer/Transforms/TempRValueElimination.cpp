@@ -528,7 +528,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (!storage.base)
       return;
     if (auto *arg = dyn_cast<SILFunctionArgument>(storage.base))
-      if (arg->getOwnershipKind() != OwnershipKind::Guaranteed)
+      if (!arg->getArgumentConvention().isGuaranteedConventionInCallee())
         return;
   }
 
@@ -963,7 +963,7 @@ void TempRValueOptPass::run() {
   }
 
   // Call the utlity to complete ossa lifetime.
-  OSSALifetimeCompletion completion(function, da->get(function));
+  OSSALifetimeCompletion completion(function, da->get(function), deBlocks);
   for (auto it : valuesToComplete) {
     completion.completeOSSALifetime(it,
                                     OSSALifetimeCompletion::Boundary::Liveness);

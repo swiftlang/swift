@@ -110,7 +110,6 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
           .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
-          .Case("swift-api-extract", DriverKind::APIExtract)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
           .Case("swift-parse-test", DriverKind::ParseTest)
@@ -936,7 +935,7 @@ void Driver::buildInputs(const ToolChain &TC,
       file_types::ID Ty = file_types::TY_INVALID;
 
       // stdin must be handled specially.
-      if (Value.equals("-")) {
+      if (Value == "-") {
         // By default, treat stdin as Swift input.
         Ty = file_types::TY_Swift;
       } else {
@@ -3102,7 +3101,6 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
-  case DriverKind::APIExtract:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:
   case DriverKind::ParseTest:

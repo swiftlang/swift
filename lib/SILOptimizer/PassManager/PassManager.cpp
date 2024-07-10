@@ -1422,8 +1422,8 @@ FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
 }
 
 BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
-  require(numBlockSetsAllocated < BlockSetCapacity,
-          "too many BasicBlockSets allocated");
+  ASSERT(numBlockSetsAllocated < BlockSetCapacity &&
+         "too many BasicBlockSets allocated");
 
   auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
   BasicBlockSet *set = new (storage) BasicBlockSet(function);
@@ -1446,8 +1446,8 @@ void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
 }
 
 NodeSet *SwiftPassInvocation::allocNodeSet() {
-  require(numNodeSetsAllocated < NodeSetCapacity,
-          "too many NodeSets allocated");
+  ASSERT(numNodeSetsAllocated < NodeSetCapacity &&
+         "too many NodeSets allocated");
 
   auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
   NodeSet *set = new (storage) NodeSet(function);
@@ -1470,8 +1470,8 @@ void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
 }
 
 OperandSet *SwiftPassInvocation::allocOperandSet() {
-  require(numOperandSetsAllocated < OperandSetCapacity,
-          "too many OperandSets allocated");
+  ASSERT(numOperandSetsAllocated < OperandSetCapacity &&
+         "too many OperandSets allocated");
 
   auto *storage = (OperandSet *)operandSetStorage + numOperandSetsAllocated;
   OperandSet *set = new (storage) OperandSet(function);
@@ -1591,9 +1591,6 @@ SwiftPassInvocation::~SwiftPassInvocation() {}
 //===----------------------------------------------------------------------===//
 //                           SIL Bridging
 //===----------------------------------------------------------------------===//
-bool BridgedFunction::mayBindDynamicSelf() const {
-  return swift::mayBindDynamicSelf(getFunction());
-}
 
 bool BridgedFunction::isTrapNoReturn() const {
   return swift::isTrapNoReturnFunction(getFunction());

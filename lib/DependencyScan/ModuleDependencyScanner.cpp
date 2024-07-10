@@ -327,9 +327,10 @@ ModuleDependencyScanner::getModuleDependencies(ModuleDependencyID moduleID,
   }
 
   // Resolve cross-import overlays.
-  discoverCrossImportOverlayDependencies(
-      moduleID.ModuleName, allModules.getArrayRef().slice(1), cache,
-      [&](ModuleDependencyID id) { allModules.insert(id); });
+  if (ScanCompilerInvocation.getLangOptions().EnableCrossImportOverlays)
+    discoverCrossImportOverlayDependencies(
+        moduleID.ModuleName, allModules.getArrayRef().slice(1), cache,
+        [&](ModuleDependencyID id) { allModules.insert(id); });
 
   return allModules.takeVector();
 }

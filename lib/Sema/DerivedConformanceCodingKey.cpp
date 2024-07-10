@@ -163,12 +163,11 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Var, name, type, type,
+      DerivedConformance::SynthesizedIntroducer::Var, name, type,
       /*isStatic=*/false, /*isFinal=*/false);
 
   // Define the getter.
-  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
-      propDecl, type);
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(propDecl);
 
   // Synthesize the body.
   synthesizer(getterDecl);
@@ -214,12 +213,9 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   } else {
     SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
-      auto *baseTE = TypeExpr::createImplicit(enumType, C);
-      auto *pat = new (C) EnumElementPattern(baseTE, SourceLoc(), DeclNameLoc(),
-                                             DeclNameRef(), elt, nullptr,
-                                             /*DC*/ strValDecl);
-      pat->setImplicit();
-
+      auto *pat = EnumElementPattern::createImplicit(enumType, elt,
+                                                     /*subPattern*/ nullptr,
+                                                     /*DC*/ strValDecl);
       auto labelItem = CaseLabelItem(pat);
 
       auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),

@@ -396,6 +396,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         llvm_unreachable("address value passed to indirect parameter");
 
       // If this is an in-parameter, it is like a load.
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
         Uses.emplace_back(User, PMOUseKind::IndirectIn);

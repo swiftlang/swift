@@ -278,6 +278,13 @@ extension Function {
 
   public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
   
+  public var dynamicSelfMetadata: FunctionArgument? {
+    if bridged.hasDynamicSelfMetadata() {
+      return arguments.last!
+    }
+    return nil
+  }
+
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
 
   public var resultType: Type { bridged.getSILResultType().type }

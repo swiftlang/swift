@@ -241,8 +241,7 @@ checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
-CheckRequirementsResult checkRequirements(ModuleDecl *module,
-                                          ArrayRef<Requirement> requirements,
+CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements,
                                           TypeSubstitutionFn substitutions,
                                           SubstOptions options = std::nullopt);
 

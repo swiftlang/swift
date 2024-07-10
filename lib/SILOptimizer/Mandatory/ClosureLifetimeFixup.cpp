@@ -41,6 +41,12 @@ llvm::cl::opt<bool> DisableConvertEscapeToNoEscapeSwitchEnumPeephole(
         "Disable the convert_escape_to_noescape switch enum peephole. "),
     llvm::cl::Hidden);
 
+llvm::cl::opt<bool> DisableCopyEliminationOfCopyableCapture(
+    "sil-disable-copy-elimination-of-copyable-closure-capture",
+    llvm::cl::init(false),
+    llvm::cl::desc("Don't eliminate copy_addr of Copyable closure captures "
+                   "inserted by SILGen"));
+
 using namespace swift;
 
 /// Given an optional diamond, return the bottom of the diamond.
@@ -554,6 +560,18 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
   }
 }
 
+static bool lookThroughMarkDependenceChainForValue(MarkDependenceInst *mark,
+                                                   PartialApplyInst *pai) {
+  if (mark->getValue() == pai) {
+    return true;
+  }
+  auto *markChain = dyn_cast<MarkDependenceInst>(mark->getValue());
+  if (!markChain) {
+    return false;
+  }
+  return lookThroughMarkDependenceChainForValue(markChain, pai);
+}
+
 /// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
 /// apply/try_apply user to a partial_apply [stack] terminated with a
 /// dealloc_stack placed after the apply.
@@ -722,7 +740,7 @@ static SILValue tryRewriteToPartialApplyStack(
   SmallVector<SILInstruction *, 4> lifetimeEnds;
   collectStackClosureLifetimeEnds(lifetimeEnds, closureOp);
   
-  // For noncopyable address-only captures, see if we can eliminate the copy
+  // For address-only captures, see if we can eliminate the copy
   // that SILGen emitted to allow the original partial_apply to take ownership.
   // We do this here because otherwise the move checker will see the copy as an
   // attempt to consume the value, which we don't want.
@@ -735,7 +753,6 @@ static SILValue tryRewriteToPartialApplyStack(
   unsigned appliedArgStartIdx =
         newPA->getOrigCalleeType()->getNumParameters() - newPA->getNumArguments();
 
-  MarkDependenceInst *markDepChain = nullptr;
   for (unsigned i : indices(newPA->getArgumentOperands())) {
     auto &arg = newPA->getArgumentOperands()[i];
     SILValue copy = arg.get();
@@ -749,14 +766,14 @@ static SILValue tryRewriteToPartialApplyStack(
       LLVM_DEBUG(llvm::dbgs() << "-- not an alloc_stack\n");
       continue;
     }
-    
-    // This would be a nice optimization to attempt for all types, but for now,
-    // limit the effect to move-only types.
-    if (!copy->getType().isMoveOnly()) {
-      LLVM_DEBUG(llvm::dbgs() << "-- not move-only\n");
-      continue;
+
+    if (DisableCopyEliminationOfCopyableCapture) {
+      if (!copy->getType().isMoveOnly()) {
+        LLVM_DEBUG(llvm::dbgs() << "-- not move-only\n");
+        continue;
+      }
     }
-    
+
     // Is the capture a borrow?
 
     auto paramIndex = i + appliedArgStartIdx;
@@ -775,6 +792,7 @@ static SILValue tryRewriteToPartialApplyStack(
     CopyAddrInst *initialization = nullptr;
     MarkDependenceInst *markDep = nullptr;
     for (auto *use : stack->getUses()) {
+      auto *user = use->getUser();
       // Since we removed the `dealloc_stack`s from the capture arguments,
       // the only uses of this stack slot should be the initialization, the
       // partial application, and possibly a mark_dependence from the
@@ -788,51 +806,39 @@ static SILValue tryRewriteToPartialApplyStack(
         //    %md = mark_dependence %pai on %0
         //    %md2 = mark_dependence %md on %1
         // to tie all of those operands together on the same partial_apply.
-        //
-        // FIXME: Should we not be chaining like this and just emit independent
-        // mark_dependence?
-        if (markDepChain && mark->getValue() == markDepChain) {
-          markDep = mark;
-          markDepChain = mark;
-          continue;
-        }
 
-        // If we're marking dependence of the current partial_apply on this
-        // stack slot, that's fine.
-        if (mark->getValue() != newPA
-            || mark->getBase() != stack) {
+        // Check if we're marking dependence on this stack slot for the current
+        // partial_apply or it's chain of mark_dependences.
+        if (!lookThroughMarkDependenceChainForValue(mark, newPA) ||
+            mark->getBase() != stack) {
           LLVM_DEBUG(llvm::dbgs() << "-- had unexpected mark_dependence use\n";
-                     use->getUser()->print(llvm::dbgs());
-                     llvm::dbgs() << "\n");
-          
+                     use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
+          initialization = nullptr;
           break;
         }
         markDep = mark;
 
-        if (!markDepChain) {
-          markDepChain = mark;
-        }
-
         continue;
       }
-      
+
       // If we saw more than just the initialization, this isn't a pattern we
       // recognize.
       if (initialization) {
-        LLVM_DEBUG(llvm::dbgs() << "-- had non-initialization, non-partial-apply use\n";
-                   use->getUser()->print(llvm::dbgs());
-                   llvm::dbgs() << "\n");
-                   
+        LLVM_DEBUG(llvm::dbgs()
+                       << "-- had non-initialization, non-partial-apply use\n";
+                   use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
+
         initialization = nullptr;
         break;
       }
       if (auto possibleInit = dyn_cast<CopyAddrInst>(use->getUser())) {
         // Should copy the source and initialize the destination.
-        if (possibleInit->isTakeOfSrc()
-            || !possibleInit->isInitializationOfDest()) {
-          LLVM_DEBUG(llvm::dbgs() << "-- had non-initialization, non-partial-apply use\n";
-                     use->getUser()->print(llvm::dbgs());
-                     llvm::dbgs() << "\n");
+        if (possibleInit->isTakeOfSrc() ||
+            !possibleInit->isInitializationOfDest()) {
+          LLVM_DEBUG(
+              llvm::dbgs()
+                  << "-- had non-initialization, non-partial-apply use\n";
+              use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
 
           break;
         }
@@ -840,7 +846,13 @@ static SILValue tryRewriteToPartialApplyStack(
         initialization = possibleInit;
         continue;
       }
+      if (isa<DebugValueInst>(user) || isa<DestroyAddrInst>(user) ||
+          isa<DeallocStackInst>(user)) {
+        continue;
+      }
       LLVM_DEBUG(llvm::dbgs() << "-- unrecognized use\n");
+      // Reset initialization on an unrecognized use
+      initialization = nullptr;
       break;
     }
     if (!initialization) {
@@ -854,33 +866,36 @@ static SILValue tryRewriteToPartialApplyStack(
     LLVM_DEBUG(llvm::dbgs() << "++ found original:\n";
                orig->print(llvm::dbgs());
                llvm::dbgs() << "\n");
-               
-    bool origIsUnusedDuringClosureLifetime = true;
 
-    class OrigUnusedDuringClosureLifetimeWalker
+    bool origIsUnmodifiedDuringClosureLifetime = true;
+
+    class OrigUnmodifiedDuringClosureLifetimeWalker
         : public TransitiveAddressWalker<
-              OrigUnusedDuringClosureLifetimeWalker> {
+              OrigUnmodifiedDuringClosureLifetimeWalker> {
       SSAPrunedLiveness &closureLiveness;
-      bool &origIsUnusedDuringClosureLifetime;
+      bool &origIsUnmodifiedDuringClosureLifetime;
+
     public:
-      OrigUnusedDuringClosureLifetimeWalker(SSAPrunedLiveness &closureLiveness,
-                                        bool &origIsUnusedDuringClosureLifetime)
-        : closureLiveness(closureLiveness),
-          origIsUnusedDuringClosureLifetime(origIsUnusedDuringClosureLifetime)
-      {}
+      OrigUnmodifiedDuringClosureLifetimeWalker(
+          SSAPrunedLiveness &closureLiveness,
+          bool &origIsUnmodifiedDuringClosureLifetime)
+          : closureLiveness(closureLiveness),
+            origIsUnmodifiedDuringClosureLifetime(
+                origIsUnmodifiedDuringClosureLifetime) {}
 
       bool visitUse(Operand *origUse) {
         LLVM_DEBUG(llvm::dbgs() << "looking at use\n";
                    origUse->getUser()->printInContext(llvm::dbgs());
                    llvm::dbgs() << "\n");
-        
+
         // If the user doesn't write to memory, then it's harmless.
         if (!origUse->getUser()->mayWriteToMemory()) {
           return true;
         }
         if (closureLiveness.isWithinBoundary(origUse->getUser())) {
-          origIsUnusedDuringClosureLifetime = false;
-          LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing use during closure lifetime\n";
+          origIsUnmodifiedDuringClosureLifetime = false;
+          LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing "
+                                     "use during closure lifetime\n";
                      origUse->getUser()->print(llvm::dbgs());
                      llvm::dbgs() << "\n");
           return false;
@@ -889,12 +904,12 @@ static SILValue tryRewriteToPartialApplyStack(
       }
     };
 
-    OrigUnusedDuringClosureLifetimeWalker origUseWalker(closureLiveness,
-                                             origIsUnusedDuringClosureLifetime);
+    OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(
+        closureLiveness, origIsUnmodifiedDuringClosureLifetime);
     auto walkResult = std::move(origUseWalker).walk(orig);
-    
-    if (walkResult == AddressUseKind::Unknown
-        || !origIsUnusedDuringClosureLifetime) {
+
+    if (walkResult == AddressUseKind::Unknown ||
+        !origIsUnmodifiedDuringClosureLifetime) {
       continue;
     }
 

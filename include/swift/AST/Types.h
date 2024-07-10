@@ -1309,8 +1309,7 @@ public:
   /// \param genericEnv If non-null and the type is nested inside of a
   /// generic function, generic parameters of the outer context are
   /// mapped to context archetypes of this generic environment.
-  SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
-                                            const DeclContext *dc,
+  SubstitutionMap getContextSubstitutionMap(const DeclContext *dc,
                                             GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
@@ -1322,8 +1321,7 @@ public:
   ///
   /// \param genericEnv If non-null, generic parameters of the member are
   /// mapped to context archetypes of this generic environment.
-  SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
-                                           const ValueDecl *member,
+  SubstitutionMap getMemberSubstitutionMap(const ValueDecl *member,
                                            GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
@@ -1340,7 +1338,7 @@ public:
   /// \param member The property whose type we are substituting.
   ///
   /// \returns The resulting property type.
-  Type getTypeOfMember(ModuleDecl *module, const VarDecl *member);
+  Type getTypeOfMember(const VarDecl *member);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -1371,8 +1369,7 @@ public:
   /// method's generic parameters.
   ///
   /// \returns The resulting member type.
-  Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       Type memberType);
+  Type getTypeOfMember(const ValueDecl *member, Type memberType);
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
@@ -2429,7 +2426,7 @@ public:
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
                               /*compileTimeConst*/ false,
-                              /*is transferring*/ false);
+                              /*is sending*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -4068,6 +4065,12 @@ enum class ParameterConvention : uint8_t {
   /// convention used by mutable captures in @noescape closures.
   Indirect_InoutAliasable,
 
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory. The callee may modify, but does not destroy the
+  /// object. This corresponds to the parameter-passing convention of the
+  /// Itanium C++ ABI, which is used ubiquitously on non-Windows targets.
+  Indirect_In_CXX,
+
   /// This argument is passed directly.  Its type is non-trivial, and the callee
   /// is responsible for destroying it.
   Direct_Owned,
@@ -4108,6 +4111,7 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In_Guaranteed:
     return true;
 
@@ -4129,7 +4133,8 @@ bool isConsumedParameter(ParameterConvention conv) {
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Pack_Owned:
     return true;
-
+  case ParameterConvention::Indirect_In_CXX:
+    return !InCallee;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Direct_Unowned:
@@ -4160,7 +4165,8 @@ bool isGuaranteedParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Pack_Guaranteed:
     return true;
-
+  case ParameterConvention::Indirect_In_CXX:
+    return InCallee;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
@@ -4185,6 +4191,7 @@ inline bool isMutatingParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Pack_Inout:
     return true;
 
@@ -4211,6 +4218,7 @@ inline bool isPackParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
@@ -4289,6 +4297,10 @@ public:
 
   bool isIndirectIn() const {
     return getConvention() == ParameterConvention::Indirect_In;
+  }
+
+  bool isIndirectInCXX() const {
+    return getConvention() == ParameterConvention::Indirect_In_CXX;
   }
 
   bool isIndirectInOut() const {
@@ -7060,7 +7072,7 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(ModuleDecl *M, Type base);
+  Type substBaseType(Type base);
 
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new

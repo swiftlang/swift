@@ -473,6 +473,11 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
                                  COMPONENT sdk-overlay)
     endif()
   endforeach()
+
+  swift_install_in_component(FILES
+      posix_filesystem.apinotes
+    DESTINATION "share"
+    COMPONENT sdk-overlay)
 endif()
 add_custom_target(android_modulemap DEPENDS ${android_modulemap_target_list})
 set_property(TARGET android_modulemap PROPERTY FOLDER "Miscellaneous")

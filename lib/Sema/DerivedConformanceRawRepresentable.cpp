@@ -113,11 +113,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C)
-        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(), elt, nullptr,
-                           /*DC*/ toRawDecl);
-    pat->setImplicit();
+    auto *pat = EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ toRawDecl);
 
     auto labelItem = CaseLabelItem(pat);
 
@@ -160,22 +157,19 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
-  auto parentDC = derived.getConformanceContext();
   auto rawInterfaceType = enumDecl->getRawType();
-  auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, C.Id_rawValue,
-      rawInterfaceType, rawType, /*isStatic=*/false,
-      /*isFinal=*/false);
+      rawInterfaceType, /*isStatic=*/false, /*isFinal=*/false);
   addNonIsolatedToSynthesized(enumDecl, propDecl);
 
   // Define the getter.
-  auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
-      propDecl, rawType);
+  auto getterDecl =
+      DerivedConformance::addGetterToReadOnlyDerivedProperty(propDecl);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // If the containing module is not resilient, make sure clients can get at
@@ -419,8 +413,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
   assert([&]() -> bool {
     return TypeChecker::conformsToKnownProtocol(
-        rawType, KnownProtocolKind::Equatable,
-        derived.getParentModule());
+        rawType, KnownProtocolKind::Equatable);
   }());
 
   auto *rawDecl = new (C)
@@ -477,8 +470,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
 
   // The raw type must be Equatable, so that we have a suitable ~= for
   // synthesized switch statements.
-  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable,
-                                            DC->getParentModule()))
+  if (!TypeChecker::conformsToKnownProtocol(rawType, KnownProtocolKind::Equatable))
     return false;
 
   auto &C = type->getASTContext();

@@ -869,6 +869,10 @@ bool swift::isRepresentableInObjC(
         ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
           .build());
 
+    // @objcImpl member implementations need to allow a nil completion handler.
+    if (AFD->isObjCMemberImplementation())
+      completionHandlerType = OptionalType::get(completionHandlerType);
+
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType->getCanonicalType(), completionHandlerParamIndex,
         completionHandlerErrorParamIndex,

@@ -870,8 +870,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
 
   // Analyze the substitution map to determine if everything can be referenced
   // statically.
-  auto substitutions =
-      type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal);
+  auto substitutions = type->getContextSubstitutionMap(nominal);
 
   // If we cannot statically reference type metadata for our replacement types,
   // we cannot specialize.
@@ -916,6 +915,15 @@ bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
     IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality) {
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
+    if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (type->hasArchetype()) {
+        llvm::errs() << "Cannot get metadata of generic class for type "
+                     << type << "\n";
+        llvm::report_fatal_error("cannot get metadata");
+      }
+      return true;
+    }
+
     // TODO: On platforms without ObjC interop, we can do direct access to
     // class metadata.
     return false;
@@ -1414,7 +1422,7 @@ getFunctionTypeFlags(CanFunctionType type) {
       auto proto =
         type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
       if (proto &&
-          proto->getParentModule()->lookupConformance(type, proto).isInvalid())
+          ModuleDecl::lookupConformance(type, proto).isInvalid())
         InvertedProtocols.insert(invertibleKind);
       break;
     }
@@ -2711,8 +2719,7 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   assert(!theType->hasUnboundGenericType());
 
   auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
-  auto substitutions =
-      theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
+  auto substitutions = theType->getContextSubstitutionMap(nominal);
   for (auto requirement : requirements.getRequirements()) {
     if (requirement.isAnyWitnessTable()) {
       continue;

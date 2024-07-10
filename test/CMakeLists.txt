@@ -51,6 +51,7 @@ function(get_test_dependencies SDK result_var_name)
 
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
+      libMockPlugin
       lldb-moduleimport-test
       swift-frontend
       swift-demangle
@@ -63,6 +64,10 @@ function(get_test_dependencies SDK result_var_name)
 
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)
+    endif()
+
+    if(SWIFT_BUILD_SWIFT_SYNTAX)
+      list(APPEND deps_binaries swift-plugin-server)
     endif()
   endif()
 

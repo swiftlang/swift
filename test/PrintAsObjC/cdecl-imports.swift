@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
 // RUN: %FileCheck %s < %t/swift.h
 // RUN: %check-in-clang %t/swift.h
+// RUN: %check-in-clang-cxx %t/swift.h
 
 // REQUIRES: objc_interop
 
@@ -12,7 +13,7 @@ import Foundation
 // CHECK-NOT: @import Foundation;
 
 // CHECK: @class Bee;
-// CHECK-LABEL: Bee * _Nonnull fwd_declares_bee(void) SWIFT_WARN_UNUSED_RESULT SWIFT_NOEXCEPT;
+// CHECK-LABEL: Bee * _Nonnull fwd_declares_bee(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
 @_cdecl("fwd_declares_bee")
 public func fwdDeclaresBee() -> Bee { fatalError() }

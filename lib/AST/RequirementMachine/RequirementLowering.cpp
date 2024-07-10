@@ -606,7 +606,7 @@ struct InferRequirementsWalker : public TypeWalker {
                                          AssociatedTypeDecl *assocType) {
           auto secondType = assocType->getDeclaredInterfaceType()
               ->castTo<DependentMemberType>()
-              ->substBaseType(module, firstType);
+              ->substBaseType(firstType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});
@@ -649,7 +649,7 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Continue;
 
     /// Retrieve the substitution.
-    auto subMap = ty->getContextSubstitutionMap(module, decl);
+    auto subMap = ty->getContextSubstitutionMap(decl);
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
@@ -1072,7 +1072,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
   // Collect all typealiases from inherited protocols recursively.
   llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
-  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
+  for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
     for (auto req : inheritedProto->getMembers()) {
       if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
         if (!isSuitableType(typeReq))

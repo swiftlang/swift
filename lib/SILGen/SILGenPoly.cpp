@@ -667,7 +667,7 @@ ManagedValue Transform::transform(ManagedValue v,
   if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
-    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+    auto conformance = ModuleDecl::lookupConformance(
         inputSubstType, protocol);
     auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
     auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,
@@ -2067,6 +2067,7 @@ private:
       return processIntoGuaranteed(innerOrigType, innerSubstType,
                                    outerOrigType, outerSubstType,
                                    outer, innerTy);
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In: {
       if (SGF.silConv.useLoweredAddresses()) {
         return processIndirect(innerOrigType, innerSubstType,
@@ -2261,6 +2262,7 @@ private:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("not a pack convention");
@@ -2700,6 +2702,7 @@ ManagedValue TranslateArguments::expandPackInnerParam(
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -2846,6 +2849,7 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
   case ParameterConvention::Pack_Inout:
     return ManagedValue::forLValue(value);
   case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(value);
@@ -5672,7 +5676,7 @@ static ManagedValue createDifferentiableFunctionThunk(
           AutoDiffDerivativeFunctionKind kind) -> CanAnyFunctionType {
     auto assocTy = fnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, kind,
-        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+        LookUpConformanceInModule());
     return cast<AnyFunctionType>(assocTy->getCanonicalType());
   };
   auto getDerivativeFnPattern =
@@ -5680,7 +5684,7 @@ static ManagedValue createDifferentiableFunctionThunk(
           AutoDiffDerivativeFunctionKind kind) -> AbstractionPattern {
     return pattern.getAutoDiffDerivativeFunctionType(
         parameterIndices, kind,
-        LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+        LookUpConformanceInModule());
   };
   auto createDerivativeFnThunk =
       [&](AutoDiffDerivativeFunctionKind kind) -> ManagedValue {
@@ -6266,7 +6270,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler;

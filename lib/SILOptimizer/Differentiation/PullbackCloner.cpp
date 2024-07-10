@@ -239,7 +239,7 @@ private:
         getWitness()->getDerivativeGenericSignature().getReducedType(
             type);
     return type->getAutoDiffTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+        LookUpConformanceInModule());
   }
 
   /// Returns the tangent value category of the given value.
@@ -1428,7 +1428,7 @@ public:
           recordTemporary(adjElt);
         } else {
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+              field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -1801,6 +1801,57 @@ public:
     builder.emitDestroyAddrAndFold(uccai->getLoc(), castBuf);
     builder.createDeallocStack(uccai->getLoc(), castBuf);
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
+  }
+
+  /// Handle `enum` instruction.
+  ///   Original: y = enum $Enum, #Enum.some!enumelt, x
+  ///    Adjoint: adj[x] += adj[y]
+  void visitEnumInst(EnumInst *ei) {
+    SILBasicBlock *bb = ei->getParent();
+    SILLocation loc = ei->getLoc();
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+
+    // Only `Optional`-typed operands are supported for now. Diagnose all other
+    // enum operand types.
+    if (ei->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Unsupported enum type in PullbackCloner: " << *ei);
+      getContext().emitNondifferentiabilityError(
+          ei, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+
+    auto adjOpt = getAdjointValue(bb, ei);
+    auto adjStruct = materializeAdjointDirect(adjOpt, loc);
+    StructDecl *adjStructDecl =
+        adjStruct->getType().getStructOrBoundGenericStruct();
+
+    VarDecl *adjOptVar = nullptr;
+    if (adjStructDecl) {
+      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
+      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
+    }
+
+    EnumDecl *adjOptDecl =
+        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
+                  : nullptr;
+
+    // Optional<T>.TangentVector should be a struct with a single
+    // Optional<T.TangentVector> property. This is an implementation detail of
+    // OptionalDifferentiation.swift
+    // TODO: Maybe it would be better to have getters / setters here that we
+    // can call and hide this implementation detail?
+    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
+      llvm_unreachable("Unexpected type of Optional.TangentVector");
+
+    auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
+
+    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
+    auto *adjData = builder.createUncheckedEnumData(loc, adjVal, someElemDecl);
+
+    addAdjointValue(bb, ei->getOperand(), makeConcreteAdjointValue(adjData), loc);
   }
 
   /// Handle a sequence of `init_enum_data_addr` and `inject_enum_addr`
@@ -2617,7 +2668,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
   // the input for `Optional<T>.TangentVector.init`.
   auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
-  if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
+  if (optionalOfWrappedTanType.isObject()) {
     // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
     //         %wrappedAdjoint : $T
     auto *enumInst = builder.createEnum(pbLoc, wrappedAdjoint, someEltDecl,
@@ -2646,9 +2697,8 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-  auto *swiftModule = getModule().getSwiftModule();
   auto diffConf =
-      swiftModule->lookupConformance(wrappedType.getASTType(), diffProto);
+      ModuleDecl::lookupConformance(wrappedType.getASTType(), diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto subMap = SubstitutionMap::get(
       initFn->getLoweredFunctionType()->getSubstGenericSignature(),
@@ -3071,8 +3121,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
         if (field == tanField) {
           eltVals.push_back(adjResult);
         } else {
-          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+          auto substMap = tangentVectorTy->getMemberSubstitutionMap(field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -3555,12 +3604,11 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
       ctx.getIntType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
-  auto *swiftModule = getModule().getSwiftModule();
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = swiftModule->lookupConformance(eltTanType, diffProto);
+  auto diffConf = ModuleDecl::lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf = swiftModule->lookupConformance(eltTanType, addArithProto);
+  auto addArithConf = ModuleDecl::lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},

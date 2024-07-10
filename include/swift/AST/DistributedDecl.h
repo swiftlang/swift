@@ -118,7 +118,7 @@ getDistributedActorAsActorConformanceRef(ASTContext &C);
 /// the DistributedActor-as-Actor conformance.
 ExtensionDecl *
 findDistributedActorAsActorExtension(
-    ProtocolDecl *distributedActorProto, ModuleDecl *module);
+    ProtocolDecl *distributedActorProto);
 
 bool isDistributedActorAsLocalActorComputedProperty(VarDecl *var);
 

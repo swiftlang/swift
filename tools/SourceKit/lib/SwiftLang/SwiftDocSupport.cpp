@@ -274,7 +274,6 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   // substitution).
   unsigned TypeContextDepth = 0;
   SubstitutionMap SubMap;
-  ModuleDecl *M = nullptr;
   Type BaseType;
   if (SynthesizedTarget) {
     BaseType = SynthesizedTarget.getBaseNominal()->getDeclaredInterfaceType();
@@ -284,8 +283,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = cast<ExtensionDecl>(D)->getExtendedNominal();
       else
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
-      M = DC->getParentModule();
-      SubMap = BaseType->getContextSubstitutionMap(M, DC);
+      SubMap = BaseType->getContextSubstitutionMap(DC);
       TypeContextDepth = SubMap.getGenericSignature().getNextDepth();
     }
   }
@@ -301,7 +299,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         return type;
       },
       [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return M->lookupConformance(substType, proto);
+        return ModuleDecl::lookupConformance(substType, proto);
       },
       SubstFlags::DesugarMemberTypes);
   };

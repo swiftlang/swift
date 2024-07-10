@@ -89,8 +89,7 @@ func testNil3(_ x: Bool) {
   let _: _? = if x { 42 } else { nil }
 }
 func testNil4(_ x: Bool) {
-  // FIXME: Bad diagnostic (#63130)
-  let _: _? = if x { nil } else { 42 } // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: _? = if x { nil } else { 42 } // expected-error {{could not infer type for placeholder}}
 }
 
 enum F<T> {

@@ -303,6 +303,7 @@ public:
   void completeStmtLabel(StmtKind ParentKind) override;
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
   void completeTypeAttrBeginning() override;
+  void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
   void completeWithoutConstraintType() override;
 
@@ -655,6 +656,11 @@ void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   Kind = CompletionKind::TypeAttrBeginning;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeAttrInheritanceBeginning() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::TypeAttrInheritanceBeginning;
+}
+
 bool swift::ide::isDynamicLookup(Type T) {
   return T->getRValueType()->isAnyObject();
 }
@@ -983,6 +989,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PrecedenceGroup:
   case CompletionKind::StmtLabel:
   case CompletionKind::TypeAttrBeginning:
+  case CompletionKind::TypeAttrInheritanceBeginning:
   case CompletionKind::OptionalBinding:
   case CompletionKind::WithoutConstraintType:
     break;
@@ -1844,6 +1851,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       if (*AttTargetDK != DeclKind::Param) {
         ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
       }
+      if (AbstractFunctionDecl::isKind(*AttTargetDK))
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::FunctionMacro;
     } else {
       // If we don't know on which decl kind we are completing, suggest all
       // attribute kinds.
@@ -1853,6 +1862,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::FunctionMacro;
     }
 
     Lookup.setExpectedTypes(/*Types=*/{}, /*isImpliedResult=*/false,
@@ -1928,14 +1938,14 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     Lookup.getStmtLabelCompletions(Loc, ParentStmtKind == StmtKind::Continue);
     break;
   }
-  case CompletionKind::TypeAttrBeginning: {
-    Lookup.getTypeAttributeKeywordCompletions();
+  case CompletionKind::TypeAttrBeginning:
+  case CompletionKind::TypeAttrInheritanceBeginning: {
+    Lookup.getTypeAttributeKeywordCompletions(Kind);
 
     // Type names at attribute position after '@'.
     Lookup.getTypeCompletionsInDeclContext(
       P.Context.SourceMgr.getIDEInspectionTargetLoc());
     break;
-
   }
   case CompletionKind::OptionalBinding: {
     SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();

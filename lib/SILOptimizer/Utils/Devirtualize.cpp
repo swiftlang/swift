@@ -420,7 +420,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
     if (auto metatypeType = derivedClass->getAs<MetatypeType>())
       derivedClass = metatypeType->getInstanceType();
     baseSubMap = derivedClass->getContextSubstitutionMap(
-        module.getSwiftModule(), baseClassDecl);
+        baseClassDecl);
   }
 
   SubstitutionMap origSubMap = applySite.getSubstitutionMap();
@@ -797,6 +797,17 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
     newArgs.push_back(castRes.first);
     changedCFG |= castRes.second;
     ++indirectResultArgIter;
+  }
+
+  if (SILType errorTy = substConv.getIndirectErrorResultType(applySite.getFunction()->getTypeExpansionContext())) {
+    auto errorArgs = applySite.getIndirectSILErrorResults();
+    ASSERT(errorArgs.size() == 1);
+    SILValue errorArg = errorArgs[0];
+    auto castRes = castValueToABICompatibleType(
+        &builder, pm, loc, errorArg, errorArg->getType(),
+        errorTy, {applySite.getInstruction()});
+    newArgs.push_back(castRes.first);
+    changedCFG |= castRes.second;
   }
 
   auto paramArgIter = applySite.getArgumentsWithoutIndirectResults().begin();

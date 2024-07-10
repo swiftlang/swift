@@ -464,7 +464,7 @@ protocol Pet {
 func celebratePetBirthday(_ age: Pet.Age) {}
 \end{Verbatim}
 
-Due to pecularities of type substitution, protocol type aliases that are also \index{generic type alias}generic are always considered to depend on \texttt{Self}, even if their underlying type does not reference \texttt{Self}, so they \index{limitation!generic type alias with protocol base}cannot be referenced with a protocol base. (In structural resolution stage, a generic type alias cannot be referenced with a \index{limitation!generic type alias with type parameter base}type parameter base, either. Perhaps it is best not to stick generic type aliases inside protocols, at all.)
+Due to peculiarities of type substitution, protocol type aliases that are also \index{generic type alias}generic are always considered to depend on \texttt{Self}, even if their underlying type does not reference \texttt{Self}, so they \index{limitation!generic type alias with protocol base}cannot be referenced with a protocol base. (In structural resolution stage, a generic type alias cannot be referenced with a \index{limitation!generic type alias with type parameter base}type parameter base, either. Perhaps it is best not to stick generic type aliases inside protocols, at all.)
 
 \paragraph{General principle.} Let's say that $H$ is the generic signature of the current context, and \texttt{T} is the resolved base type of our member type representation, obtained via a recursive call to type resolution. We perform a \index{qualified lookup}qualified lookup after considering the base type \texttt{T}:
 \begin{itemize}

@@ -113,6 +113,29 @@ void InheritedProtocolsRequest::writeDependencySink(
   }
 }
 
+//----------------------------------------------------------------------------//
+// AllInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ArrayRef<ProtocolDecl *>>
+AllInheritedProtocolsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areAllInheritedProtocolsValid())
+    return std::nullopt;
+
+  return proto->AllInheritedProtocols;
+}
+
+void AllInheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->AllInheritedProtocols = PDs;
+  proto->setAllInheritedProtocolsValid();
+}
+
+//----------------------------------------------------------------------------//
+// ProtocolRequirementsRequest computation.
+//----------------------------------------------------------------------------//
+
 std::optional<ArrayRef<ValueDecl *>>
 ProtocolRequirementsRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
@@ -376,8 +399,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.PD);
   out << " for ";
   out << desc.Ty.getString();
-  out << " in ";
-  simple_display(out, desc.Mod);
 }
 
 //----------------------------------------------------------------------------//
@@ -446,6 +467,28 @@ void UnqualifiedLookupRequest::writeDependencySink(
     const LookupResult &res) const {
   auto &desc = std::get<0>(getStorage());
   track.addTopLevelName(desc.Name.getBaseName());
+}
+
+//----------------------------------------------------------------------------//
+// SPIGroupsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<llvm::ArrayRef<Identifier>> SPIGroupsRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->hasNoSPIGroups())
+    return ArrayRef<Identifier>();
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void SPIGroupsRequest::cacheResult(llvm::ArrayRef<Identifier> result) const {
+  auto *decl = std::get<0>(getStorage());
+  if (result.empty()) {
+    const_cast<Decl *>(decl)->setHasNoSPIGroups();
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 // The following clang importer requests have some definitions here to prevent

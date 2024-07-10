@@ -119,7 +119,7 @@ extension TestActor {
   func passStateIntoDifferentClassMethod() async {
     let other = NonAsyncClass()
     let otherCurry = other.modifyOtherAsync
-    // expected-targeted-complete-tns-warning @-1 {{non-sendable type 'NonAsyncClass' exiting actor-isolated context in call to non-isolated instance method 'modifyOtherAsync' cannot cross actor boundary}}
+    // expected-targeted-complete-tns-warning @-1 {{non-sendable type 'NonAsyncClass' exiting actor-isolated context in call to nonisolated instance method 'modifyOtherAsync' cannot cross actor boundary}}
     await other.modifyOtherAsync(&value2)
     // expected-error @-1 {{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
 
@@ -194,7 +194,7 @@ actor MyActor {
 
     // expected-error@+1{{cannot pass immutable value of type 'Int' as inout argument}}
     await modifyAsynchronously(&(maybePoint?.z)!)
-    // expected-error@+2{{actor-isolated property 'position' can not be used 'inout' on a non-isolated actor instance}}
+    // expected-error@+2{{actor-isolated property 'position' can not be used 'inout' on a nonisolated actor instance}}
     // expected-error@+1{{actor-isolated property 'myActor' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&myActor.position.x)
   }
@@ -219,8 +219,8 @@ struct MyGlobalActor {
 if #available(SwiftStdlib 5.1, *) {
   let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
   // expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-  // expected-minimal-error @-2 {{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a non-isolated context}}
-  // expected-complete-tns-error @-3 {{main actor-isolated var 'number' can not be used 'inout' from a non-isolated context}}
+  // expected-minimal-error @-2 {{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a nonisolated context}}
+  // expected-complete-tns-error @-3 {{main actor-isolated var 'number' can not be used 'inout' from a nonisolated context}}
 }
 
 // attempt to pass global state owned by the global actor to another async function
@@ -288,11 +288,11 @@ actor ProtectArray {
   func test() async {
     // FIXME: this is invalid too!
     _ = await array.mutateAsynchronously
-    // expected-targeted-complete-tns-warning@-1 {{non-sendable type '@lvalue [Int]' exiting actor-isolated context in call to non-isolated property 'mutateAsynchronously' cannot cross actor boundary}}
+    // expected-targeted-complete-tns-warning@-1 {{non-sendable type '@lvalue [Int]' exiting actor-isolated context in call to nonisolated property 'mutateAsynchronously' cannot cross actor boundary}}
 
     _ = await array[mutateAsynchronously: 0]
     // expected-error@-1 {{actor-isolated property 'array' cannot be passed 'inout' to 'async' function call}}
-    // expected-targeted-complete-tns-warning@-2 {{non-sendable type 'inout Array<Int>' exiting actor-isolated context in call to non-isolated subscript 'subscript(mutateAsynchronously:)' cannot cross actor boundary}}
+    // expected-targeted-complete-tns-warning@-2 {{non-sendable type 'inout Array<Int>' exiting actor-isolated context in call to nonisolated subscript 'subscript(mutateAsynchronously:)' cannot cross actor boundary}}
 
     await passToAsync(array[0])
 

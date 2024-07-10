@@ -49,6 +49,9 @@ typedef struct swiftscan_dependency_info_s *swiftscan_dependency_info_t;
 /// Opaque container to a link library info.
 typedef struct swiftscan_link_library_info_s *swiftscan_link_library_info_t;
 
+/// Opaque container to a macro dependency.
+typedef struct swiftscan_macro_dependency_s *swiftscan_macro_dependency_t;
+
 /// Opaque container to an overall result of a dependency scan.
 typedef struct swiftscan_dependency_graph_s *swiftscan_dependency_graph_t;
 
@@ -72,6 +75,12 @@ typedef struct {
   swiftscan_link_library_info_t *link_libraries;
   size_t count;
 } swiftscan_link_library_set_t;
+
+/// Set of macro dependency
+typedef struct {
+  swiftscan_macro_dependency_t *macro_dependencies;
+  size_t count;
+} swiftscan_macro_dependency_set_t;
 
 typedef enum {
   SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR = 0,

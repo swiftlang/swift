@@ -19,7 +19,6 @@ public func advance<T: Generator>(by n: Int, _ t: inout T) {
     }
 }
 
-#if $NoncopyableGenerics
 public enum Maybe<Wrapped: ~Copyable>: ~Copyable {
     case just(Wrapped)
     case none
@@ -33,5 +32,3 @@ public protocol Either<Left, Right>: ~Copyable {
     associatedtype Left: ~Copyable
     associatedtype Right: ~Copyable
 }
-#endif
-

@@ -4483,7 +4483,8 @@ bool Parser::canParseTypeAttribute() {
   TypeOrCustomAttr result; // ignored
   PatternBindingInitializer *initContext = nullptr;
   return !parseTypeAttribute(result, /*atLoc=*/SourceLoc(),
-                             /*atEndLoc=*/SourceLoc(), initContext,
+                             /*atEndLoc=*/SourceLoc(),
+                             ParseTypeReason::Unspecified, initContext,
                              /*justChecking*/ true)
               .isError();
 }
@@ -4684,6 +4685,7 @@ bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
 ///   no need to actually record the attribute
 ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         SourceLoc AtLoc, SourceLoc AtEndLoc,
+                                        ParseTypeReason reason,
                                         PatternBindingInitializer *&initContext,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
@@ -4699,7 +4701,14 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     if (Tok.is(tok::code_complete)) {
       if (!justChecking) {
         if (CodeCompletionCallbacks) {
-          CodeCompletionCallbacks->completeTypeAttrBeginning();
+          switch (reason) {
+          case ParseTypeReason::InheritanceClause:
+            CodeCompletionCallbacks->completeTypeAttrInheritanceBeginning();
+            break;
+          default:
+            CodeCompletionCallbacks->completeTypeAttrBeginning();
+            break;
+          }
         }
       }
       consumeToken(tok::code_complete);
@@ -4850,11 +4859,12 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
       kind = IsolatedTypeAttr::IsolationKind::Dynamic;
 
     // Add new kinds of isolation here; be sure to update the text for
-    // attr_isolated_expected_kind.
+    // attr_isolated_expected_kind, and change the associated fix-it below.
 
     } else {
       if (!justChecking) {
-        diagnose(Tok, diag::attr_isolated_expected_kind);
+        diagnose(Tok, diag::attr_isolated_expected_kind)
+          .fixItReplace(Tok.getLoc(), "any");
       }
       invalid = true;
       consumeIf(tok::identifier);
@@ -5377,7 +5387,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
         // or witness something static.
         if (isStartOfSwiftDecl() || (isa<ClassDecl>(CurDeclContext) &&
                                      (Tok.is(tok::code_complete) ||
-                                      Tok.getRawText().equals("override")))) {
+                                      Tok.getRawText() == "override"))) {
           /* We're OK */
         } else {
           // This 'class' is a real ClassDecl introducer.
@@ -5452,40 +5462,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
-    // Perform an extra check for transferring. Since it is a specifier, we use
-    // the actual parsing logic below.
-    if (Tok.isContextualKeyword("transferring")) {
-      // Now that we have sending, warn users to convert 'transferring' to
-      // 'sendable'.
-      P.diagnose(Tok, diag::transferring_is_now_sendable);
-
-      // Do not allow for transferring to be parsed after a specifier has been
-      // parsed.
-      //
-      // Example: We want to force users to write transferring consuming, not
-      // consuming transferring.
-      if (SpecifierLoc.isValid()) {
-        P.diagnose(Tok, diag::transferring_after_parameter_specifier,
-                   getNameForParamSpecifier(Specifier))
-            .fixItRemove(Tok.getLoc());
-      }
-
-      // Only allow for transferring to be written once.
-      if (TransferringLoc.isValid()) {
-        P.diagnose(Tok, diag::transferring_repeated).fixItRemove(Tok.getLoc());
-      }
-
-      // If we have already seen 'sending', emit an error to the user and give a
-      // fixit that removes the transferring.
-      if (SendingLoc.isValid()) {
-        P.diagnose(Tok, diag::sending_and_transferring_used_together)
-            .fixItRemove(Tok.getLoc());
-      }
-
-      TransferringLoc = P.consumeToken();
-      continue;
-    }
-
     // Perform an extra check for 'sending'. Since it is a specifier, we use
     // the actual parsing logic below.
     if (Tok.isContextualKeyword("sending")) {
@@ -5497,13 +5473,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       // Only allow for 'sending' to be written once.
       if (SendingLoc.isValid()) {
         P.diagnose(Tok, diag::sending_repeated).fixItRemove(Tok.getLoc());
-      }
-
-      // If 'transferring' was written before 'sending', suggest the user remove
-      // 'transferring' since 'sendable' is the final form.
-      if (TransferringLoc.isValid()) {
-        P.diagnose(Tok, diag::sending_and_transferring_used_together)
-            .fixItRemove(TransferringLoc);
       }
 
       // If we already saw a specifier, check if we have borrowing. In such a
@@ -5536,13 +5505,13 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (Tok.is(tok::kw_inout)) {
         Specifier = ParamDecl::Specifier::InOut;
       } else if (Tok.is(tok::identifier)) {
-        if (Tok.getRawText().equals("__shared")) {
+        if (Tok.getRawText() == "__shared") {
           Specifier = ParamDecl::Specifier::LegacyShared;
-        } else if (Tok.getRawText().equals("__owned")) {
+        } else if (Tok.getRawText() == "__owned") {
           Specifier = ParamDecl::Specifier::LegacyOwned;
-        } else if (Tok.getRawText().equals("borrowing")) {
+        } else if (Tok.getRawText() == "borrowing") {
           Specifier = ParamDecl::Specifier::Borrowing;
-        } else if (Tok.getRawText().equals("consuming")) {
+        } else if (Tok.getRawText() == "consuming") {
           Specifier = ParamDecl::Specifier::Consuming;
         }
       }
@@ -5551,13 +5520,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (bool(Specifier) && SendingLoc.isValid()) {
         P.diagnose(Tok, diag::sending_before_parameter_specifier,
                    getNameForParamSpecifier(Specifier));
-      }
-
-      // We cannot use transferring with borrowing.
-      if (TransferringLoc.isValid() &&
-          Specifier == ParamDecl::Specifier::Borrowing) {
-        P.diagnose(TransferringLoc, diag::sending_cannot_be_used_with_borrowing,
-                   "transferring");
       }
     }
     Tok.setKind(tok::contextual_keyword);
@@ -5572,7 +5534,8 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     TypeOrCustomAttr result;
     SourceLoc AtEndLoc = Tok.getRange().getEnd();
     SourceLoc AtLoc = P.consumeToken();
-    status |= P.parseTypeAttribute(result, AtLoc, AtEndLoc, initContext);
+    status |=
+        P.parseTypeAttribute(result, AtLoc, AtEndLoc, ParseReason, initContext);
     if (status.isError())
       return status;
     if (result)
@@ -5859,7 +5822,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // The protocol keyword needs more checking to reject "protocol<Int>".
   if (Tok.is(tok::kw_protocol)) {
     const Token &Tok2 = peekToken();
-    return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
+    return !Tok2.isAnyOperator() || Tok2.getText() != "<";
   }
 
   // The 'try' case is only for simple local recovery, so we only bother to
@@ -6853,7 +6816,8 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    auto ParsedTypeResult = parseType();
+    auto ParsedTypeResult =
+        parseType(diag::expected_type, ParseTypeReason::InheritanceClause);
     Status |= ParsedTypeResult;
 
     // Record the type if its a single type.
@@ -10139,7 +10103,7 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
     if (Tk.is(tok::identifier)) {
-      if (Tk.getText().equals("$") ||
+      if (Tk.getText() == "$" ||
           !DeclAttribute::getAttrKindFromString(Tk.getText())) {
         diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
         return true;

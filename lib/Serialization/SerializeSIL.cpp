@@ -1036,9 +1036,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::DeallocBoxInst: {
     auto DBI = cast<DeallocBoxInst>(&SI);
-    writeOneTypeOneOperandLayout(DBI->getKind(), 0,
-                                 DBI->getOperand()->getType(),
-                                 DBI->getOperand());
+    unsigned Attr = unsigned(DBI->isDeadEnd());
+    writeOneTypeOneOperandLayout(
+        DBI->getKind(), Attr, DBI->getOperand()->getType(), DBI->getOperand());
     break;
   }
   case SILInstructionKind::DeallocExistentialBoxInst: {
@@ -1575,7 +1575,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
       Attr = HTE->isMandatory();
     } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
-      Attr = DVI->poisonRefs();
+      Attr = unsigned(DVI->poisonRefs()) | (unsigned(DVI->isDeadEnd()) << 1);
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
@@ -1602,6 +1602,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *I = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(&SI)) {
       Attr = I->getForwardingOwnershipKind() == OwnershipKind::Owned ? true
                                                                      : false;
+    } else if (auto *LB = dyn_cast<LoadBorrowInst>(&SI)) {
+      Attr = LB->isUnchecked();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

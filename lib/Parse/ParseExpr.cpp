@@ -1727,7 +1727,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       // If we have a generic argument list, this is something like
       // "case let E<Int>.e(y)", and 'E' should be parsed as a normal name, not
       // a binding.
-      if (peekToken().isAnyOperator() && peekToken().getText().equals("<")) {
+      if (peekToken().isAnyOperator() && peekToken().getText() == "<") {
         BacktrackingScope S(*this);
         consumeToken();
         return !canParseAsGenericArgumentList();

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -emit-sil -O -g %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

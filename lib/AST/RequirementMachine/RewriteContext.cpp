@@ -250,41 +250,10 @@ void RewriteContext::endTimer(StringRef name) {
 
 }
 
-const llvm::TinyPtrVector<const ProtocolDecl *> &
-RewriteContext::getInheritedProtocols(const ProtocolDecl *proto) {
-  auto found = AllInherited.find(proto);
-  if (found != AllInherited.end())
-    return found->second;
-
-  AllInherited.insert(std::make_pair(proto, TinyPtrVector<const ProtocolDecl *>()));
-
-  llvm::SmallDenseSet<const ProtocolDecl *, 4> visited;
-  llvm::TinyPtrVector<const ProtocolDecl *> protos;
-
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    if (!visited.insert(inheritedProto).second)
-      continue;
-
-    protos.push_back(inheritedProto);
-    const auto &allInherited = getInheritedProtocols(inheritedProto);
-
-    for (auto *otherProto : allInherited) {
-      if (!visited.insert(otherProto).second)
-        continue;
-
-      protos.push_back(otherProto);
-    }
-  }
-
-  auto &result = AllInherited[proto];
-  std::swap(protos, result);
-  return result;
-}
-
 int RewriteContext::compareProtocols(const ProtocolDecl *lhs,
                                      const ProtocolDecl *rhs) {
-  unsigned lhsSupport = getInheritedProtocols(lhs).size();
-  unsigned rhsSupport = getInheritedProtocols(rhs).size();
+  unsigned lhsSupport = lhs->getAllInheritedProtocols().size();
+  unsigned rhsSupport = rhs->getAllInheritedProtocols().size();
 
   if (lhsSupport != rhsSupport)
     return rhsSupport - lhsSupport;

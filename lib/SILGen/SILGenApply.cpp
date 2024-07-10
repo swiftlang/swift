@@ -5616,6 +5616,7 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Inout:
@@ -5935,7 +5936,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
         assert(outerErrorType == SILType::getExceptionType(getASTContext()));
 
         ProtocolConformanceRef conformances[1] = {
-          getModule().getSwiftModule()->checkConformance(
+          ModuleDecl::checkConformance(
             innerError->getType().getASTType(),
             getASTContext().getErrorDecl())
         };
@@ -5992,6 +5993,11 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SubstitutionMap subs,
                                           ArrayRef<SILValue> args,
                                           SmallVectorImpl<SILValue> &yields) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
@@ -6616,8 +6622,7 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   auto allocate = Ctx.getAllocateUninitializedArray();
 
   // Invoke the intrinsic, which returns a tuple.
-  auto subMap = ArrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = ArrayTy->getContextSubstitutionMap(Ctx.getArrayDecl());
   auto result = emitApplyOfLibraryIntrinsic(
       Loc, allocate, subMap,
       ManagedValue::forObjectRValueWithoutOwnership(Length), SGFContext());
@@ -6642,8 +6647,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   CanType arrayTy = array->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap(Ctx.getArrayDecl());
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanagedOwnedValue(array),
                               SGFContext());
@@ -6666,8 +6670,7 @@ ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
   CanType arrayTy = arrayVal->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap(Ctx.getArrayDecl());
   RValue result = emitApplyOfLibraryIntrinsic(
       loc, finalize, subMap, ManagedValue::forUnmanagedOwnedValue(arrayVal),
       SGFContext());
@@ -6866,6 +6869,7 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_CXX:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
     // rdar://problem/19782170

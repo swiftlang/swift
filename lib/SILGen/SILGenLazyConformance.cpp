@@ -113,7 +113,7 @@ void SILGenModule::useConformancesFromType(CanType type) {
     if (!genericSig)
       return;
 
-    auto subMap = t->getContextSubstitutionMap(SwiftModule, decl);
+    auto subMap = t->getContextSubstitutionMap(decl);
     useConformancesFromSubstitutions(subMap);
     return;
   });
@@ -141,13 +141,13 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
 
     if (objectiveCBridgeable) {
       if (auto subConformance =
-              SwiftModule->lookupConformance(t, objectiveCBridgeable))
+              ModuleDecl::lookupConformance(t, objectiveCBridgeable))
         useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
       if (auto subConformance =
-              SwiftModule->lookupConformance(t, bridgedStoredNSError))
+              ModuleDecl::lookupConformance(t, bridgedStoredNSError))
         useConformance(subConformance);
     }
   });

@@ -619,6 +619,16 @@ public enum MultiPayloadError {
     case error2(Int, Error)
 }
 
+public enum TwoPayloadInner {
+    case x(AnyObject)
+    case y(Int)
+}
+
+public enum TwoPayloadOuter {
+    case x(Int)
+    case y(TwoPayloadInner)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}

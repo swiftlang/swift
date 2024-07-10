@@ -42,10 +42,8 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
   if (!superclass)
     return false;
 
-  return !superclass
-              ->getModuleContext()
-              ->lookupConformance(target->getSuperclass(),
-                                  target->getASTContext().getProtocol(kpk))
+  return !ModuleDecl::lookupConformance(target->getSuperclass(),
+                                        target->getASTContext().getProtocol(kpk))
               .isInvalid();
 }
 
@@ -271,7 +269,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!derived.getParentModule()->lookupConformance(codingKeysType, codingKeyProto)) {
+  if (!ModuleDecl::lookupConformance(codingKeysType, codingKeyProto)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -338,7 +336,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     // We have a property to map to. Ensure it's {En,De}codable.
     auto target = derived.getConformanceContext()->mapTypeIntoContext(
          it->second->getValueInterfaceType());
-    if (derived.getParentModule()->checkConformance(target, derived.Protocol)
+    if (ModuleDecl::checkConformance(target, derived.Protocol)
             .isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
@@ -971,13 +969,10 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
 
     if (caseBody) {
       // generate: case .<Case>:
-      auto pat = new (C) EnumElementPattern(
-          TypeExpr::createImplicit(
-              DC->mapTypeIntoContext(
-                  targetElt->getParentEnum()->getDeclaredInterfaceType()),
-              C),
-          SourceLoc(), DeclNameLoc(), DeclNameRef(), targetElt, subpattern, DC);
-      pat->setImplicit();
+      auto parentTy = DC->mapTypeIntoContext(
+          targetElt->getParentEnum()->getDeclaredInterfaceType());
+      auto *pat = EnumElementPattern::createImplicit(parentTy, targetElt,
+                                                     subpattern, DC);
 
       auto labelItem = CaseLabelItem(pat);
       auto stmt =
@@ -1407,7 +1402,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             });
         auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
         bool conformsToEncodable =
-            conformanceDC->getParentModule()->lookupConformance(
+            ModuleDecl::lookupConformance(
                 targetDecl->getDeclaredInterfaceType(), encodableProto) != nullptr;
 
         // Strategy to use for CodingKeys enum diagnostic part - this is to
@@ -1945,7 +1940,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (derived.getParentModule()->checkConformance(superType, proto)) {
+      if (ModuleDecl::checkConformance(superType, proto)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {

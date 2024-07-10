@@ -84,7 +84,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  return (bool)SGM.SwiftModule->lookupConformance(type, errorProtocol);
+  return (bool)ModuleDecl::lookupConformance(type, errorProtocol);
 }
 
 /// Bridge the given Swift value to its corresponding Objective-C
@@ -126,8 +126,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto typeSubMap = swiftValueType->getContextSubstitutionMap(
-      SGF.SGM.SwiftModule, dc);
+  auto typeSubMap = swiftValueType->getContextSubstitutionMap(dc);
 
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy.substGenericArgs(SGF.SGM.M, typeSubMap,
@@ -319,12 +318,19 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     return ManagedValue::forLValue(value);
 
   case ParameterConvention::Indirect_In_Guaranteed:
+    if (!value->getType().isAddress())
+      return ManagedValue::forBorrowedObjectRValue(value);
+
     if (valueTL.isLoadable()) {
       return SGF.B.createLoadBorrow(
           loc, ManagedValue::forBorrowedAddressRValue(value));
     } else {
       return ManagedValue::forBorrowedAddressRValue(value);
     }
+
+  case ParameterConvention::Indirect_In_CXX:
+    // Don't emit a cleanup if the parameter is @in_cxx.
+    return ManagedValue::forOwnedRValue(value, CleanupHandle::invalid());
 
   case ParameterConvention::Indirect_In:
     if (valueTL.isLoadable()) {
@@ -440,6 +446,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Pack_Guaranteed:
       case ParameterConvention::Pack_Owned:
       case ParameterConvention::Pack_Inout:
@@ -761,7 +768,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       [&](SubstitutableType *t) -> Type {
         return nativeType;
       },
-      LookUpConformanceInModule(SGF.SGM.SwiftModule));
+      LookUpConformanceInModule());
 
     // The intrinsic takes a T; reabstract to the generic abstraction
     // pattern.
@@ -1309,7 +1316,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
                                            SILValue arg) {
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If address-only, make a +1 copy and operate on that.
-  if (lowering.isAddressOnly()) {
+  if (lowering.isAddressOnly() && SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
@@ -2187,6 +2194,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         case ParameterConvention::Indirect_InoutAliasable:
           param = ManagedValue::forLValue(paramValue);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In:
           param = emitManagedRValueWithCleanup(paramValue);
           break;

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Properties -clang-header-expose-decls=all-public -emit-clang-header-path %t/properties.h
 // RUN: %FileCheck %s < %t/properties.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/properties.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/properties.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public struct FirstSmallStruct {
     public let x: UInt32

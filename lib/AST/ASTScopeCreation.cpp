@@ -290,7 +290,11 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
-    case MacroRole::CodeItem:
+    case MacroRole::CodeItem: {
+      parentLoc = SF->getMacroInsertionRange().Start;
+      break;
+    }
+
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
     case MacroRole::Conformance:

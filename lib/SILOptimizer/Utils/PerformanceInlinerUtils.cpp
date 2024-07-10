@@ -15,7 +15,6 @@
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Require.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -853,8 +852,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
         !Callee->hasValidLinkageForFragileRef(Caller->getSerializedKind())) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
       llvm::errs() << "callee: " << Callee->getName() << "\n";
-      require(false, "Should never be inlining a resilient function into "
-                     "a fragile function");
+      ASSERT(false && "Should never be inlining a resilient function into "
+                      "a fragile function");
     }
     return nullptr;
   }

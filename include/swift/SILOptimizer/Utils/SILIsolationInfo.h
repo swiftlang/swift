@@ -55,10 +55,16 @@ public:
   ActorInstance(SILValue value, Kind kind)
       : value(value, std::underlying_type<Kind>::type(kind)) {}
 
+  /// We want to look through certain instructions like end_init_ref that have
+  /// the appropriate actor type but could disguise the actual underlying value
+  /// that we want to represent our actor.
+  static SILValue lookThroughInsts(SILValue value);
+
 public:
   ActorInstance() : ActorInstance(SILValue(), Kind::Value) {}
 
   static ActorInstance getForValue(SILValue value) {
+    value = lookThroughInsts(value);
     return ActorInstance(value, Kind::Value);
   }
 
@@ -73,6 +79,12 @@ public:
   SILValue getValue() const {
     assert(getKind() == Kind::Value);
     return value.getPointer();
+  }
+
+  SILValue maybeGetValue() const {
+    if (getKind() != Kind::Value)
+      return SILValue();
+    return getValue();
   }
 
   bool isValue() const { return getKind() == Kind::Value; }
@@ -102,6 +114,10 @@ public:
   }
 };
 
+/// The isolation info inferred for a specific SILValue. Use
+/// SILIsolationInfo::get() to compute these. It is intended to be a
+/// conservatively correct model that we expand over time with more pattern
+/// matching.
 class SILIsolationInfo {
 public:
   /// The lattice is:
@@ -115,6 +131,23 @@ public:
     Task,
     Actor,
   };
+
+  enum class Flag : uint8_t {
+    None,
+
+    /// If set, this means that the element that we derived this from was marked
+    /// with nonisolated(unsafe).
+    UnsafeNonIsolated = 0x1,
+
+    /// If set, this means that this actor isolation is from an isolated
+    /// parameter and should be allowed to merge into a self parameter.
+    UnappliedIsolatedAnyParameter = 0x2,
+
+    /// The maximum number of bits used by a Flag.
+    MaxNumBits = 2,
+  };
+
+  using Options = OptionSet<Flag>;
 
 private:
   /// The actor isolation if this value has one. The default unspecified case
@@ -130,13 +163,13 @@ private:
   ActorInstance actorInstance;
 
   unsigned kind : 8;
-  unsigned unsafeNonIsolated : 1;
+  unsigned options : 8;
 
   SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
-                   ActorIsolation actorIsolation, bool isUnsafeNonIsolated)
+                   ActorIsolation actorIsolation, Options options = Options())
       : actorIsolation(actorIsolation), isolatedValue(isolatedValue),
         actorInstance(ActorInstance::getForValue(actorInstance)), kind(Actor),
-        unsafeNonIsolated(isUnsafeNonIsolated) {
+        options(options.toRaw()) {
     assert((!actorInstance ||
             (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
              actorInstance->getType()
@@ -147,24 +180,22 @@ private:
   }
 
   SILIsolationInfo(SILValue isolatedValue, ActorInstance actorInstance,
-                   ActorIsolation actorIsolation, bool isUnsafeNonIsolated)
+                   ActorIsolation actorIsolation, Options options = Options())
       : actorIsolation(actorIsolation), isolatedValue(isolatedValue),
-        actorInstance(actorInstance), kind(Actor),
-        unsafeNonIsolated(isUnsafeNonIsolated) {
+        actorInstance(actorInstance), kind(Actor), options(options.toRaw()) {
     assert(actorInstance);
     assert(actorIsolation.getKind() == ActorIsolation::ActorInstance);
   }
 
   SILIsolationInfo(Kind kind, SILValue isolatedValue)
-      : actorIsolation(), isolatedValue(isolatedValue), kind(kind),
-        unsafeNonIsolated(false) {}
+      : actorIsolation(), isolatedValue(isolatedValue), kind(kind), options(0) {
+  }
 
-  SILIsolationInfo(Kind kind, bool isUnsafeNonIsolated)
-      : actorIsolation(), kind(kind), unsafeNonIsolated(isUnsafeNonIsolated) {}
+  SILIsolationInfo(Kind kind, Options options = Options())
+      : actorIsolation(), kind(kind), options(options.toRaw()) {}
 
 public:
-  SILIsolationInfo()
-      : actorIsolation(), kind(Kind::Unknown), unsafeNonIsolated(false) {}
+  SILIsolationInfo() : actorIsolation(), kind(Kind::Unknown), options(0) {}
 
   operator bool() const { return kind != Kind::Unknown; }
 
@@ -176,12 +207,43 @@ public:
   bool isActorIsolated() const { return kind == Kind::Actor; }
   bool isTaskIsolated() const { return kind == Kind::Task; }
 
-  bool isUnsafeNonIsolated() const { return unsafeNonIsolated; }
+  Options getOptions() const { return Options(options); }
+
+  void setOptions(Options newOptions) { options = newOptions.toRaw(); }
+
+  bool isUnsafeNonIsolated() const {
+    return getOptions().contains(Flag::UnsafeNonIsolated);
+  }
 
   SILIsolationInfo withUnsafeNonIsolated(bool newValue = true) const {
     assert(*this && "Cannot be unknown");
     auto self = *this;
-    self.unsafeNonIsolated = newValue;
+    if (newValue) {
+      self.options = (self.getOptions() | Flag::UnsafeNonIsolated).toRaw();
+    } else {
+      self.options =
+          self.getOptions().toRaw() & ~Options(Flag::UnsafeNonIsolated).toRaw();
+    }
+    return self;
+  }
+
+  /// Returns true if this actor isolation is derived from an unapplied
+  /// isolation parameter. When merging, we allow for this to be merged with a
+  /// more specific isolation kind.
+  bool isUnappliedIsolatedAnyParameter() const {
+    return getOptions().contains(Flag::UnappliedIsolatedAnyParameter);
+  }
+
+  SILIsolationInfo withUnappliedIsolatedParameter(bool newValue = true) const {
+    assert(*this && "Cannot be unknown");
+    auto self = *this;
+    if (newValue) {
+      self.options =
+          (self.getOptions() | Flag::UnappliedIsolatedAnyParameter).toRaw();
+    } else {
+      self.options = self.getOptions().toRaw() &
+                     ~Options(Flag::UnappliedIsolatedAnyParameter).toRaw();
+    }
     return self;
   }
 
@@ -231,7 +293,8 @@ public:
   }
 
   static SILIsolationInfo getDisconnected(bool isUnsafeNonIsolated) {
-    return {Kind::Disconnected, isUnsafeNonIsolated};
+    return {Kind::Disconnected,
+            isUnsafeNonIsolated ? Flag::UnsafeNonIsolated : Flag::None};
   }
 
   /// Create an actor isolation for a value that we know is actor isolated to a
@@ -249,7 +312,7 @@ public:
   getFlowSensitiveActorIsolated(SILValue isolatedValue,
                                 ActorIsolation actorIsolation) {
     return {isolatedValue, SILValue(), actorIsolation,
-            false /*nonisolated(unsafe)*/};
+            Flag::UnappliedIsolatedAnyParameter};
   }
 
   /// Only use this as a fallback if we cannot find better information.
@@ -258,8 +321,7 @@ public:
     if (crossing.getCalleeIsolation().isActorIsolated()) {
       // SIL level, just let it through
       return SILIsolationInfo(SILValue(), SILValue(),
-                              crossing.getCalleeIsolation(),
-                              false /*nonisolated(unsafe)*/);
+                              crossing.getCalleeIsolation());
     }
 
     return {};
@@ -275,8 +337,7 @@ public:
       return {};
     }
     return {isolatedValue, actorInstance,
-            ActorIsolation::forActorInstanceSelf(typeDecl),
-            false /*nonisolated(unsafe)*/};
+            ActorIsolation::forActorInstanceSelf(typeDecl)};
   }
 
   static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
@@ -289,8 +350,7 @@ public:
       return {};
     }
     return {isolatedValue, actorInstance,
-            ActorIsolation::forActorInstanceSelf(typeDecl),
-            false /*nonisolated(unsafe)*/};
+            ActorIsolation::forActorInstanceSelf(typeDecl)};
   }
 
   /// A special actor instance isolated for partial apply cases where we do not
@@ -306,14 +366,13 @@ public:
     }
     return {isolatedValue, SILValue(),
             ActorIsolation::forActorInstanceSelf(typeDecl),
-            false /*nonisolated(unsafe)*/};
+            Flag::UnappliedIsolatedAnyParameter};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(SILValue value,
                                                  Type globalActorType) {
     return {value, SILValue() /*no actor instance*/,
-            ActorIsolation::forGlobalActor(globalActorType),
-            false /*nonisolated(unsafe)*/};
+            ActorIsolation::forGlobalActor(globalActorType)};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(SILValue value,
@@ -370,6 +429,9 @@ public:
   bool isEqual(const SILIsolationInfo &other) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const;
+
+private:
+  void printOptions(llvm::raw_ostream &os) const;
 };
 
 /// A SILIsolationInfo that has gone through merging and represents the dynamic
@@ -398,6 +460,8 @@ public:
 
   operator bool() const { return bool(innerInfo); }
 
+  SILIsolationInfo *operator->() { return &innerInfo; }
+
   SILIsolationInfo getIsolationInfo() const { return innerInfo; }
 
   bool isDisconnected() const { return innerInfo.isDisconnected(); }
@@ -406,10 +470,24 @@ public:
     return innerInfo.hasSameIsolation(other);
   }
 
+  static SILDynamicMergedIsolationInfo
+  getDisconnected(bool isUnsafeNonIsolated) {
+    return SILDynamicMergedIsolationInfo(
+        SILIsolationInfo::getDisconnected(isUnsafeNonIsolated));
+  }
+
   SWIFT_DEBUG_DUMP { innerInfo.dump(); }
 
   void printForDiagnostics(llvm::raw_ostream &os) const {
     innerInfo.printForDiagnostics(os);
+  }
+
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
+    innerInfo.dumpForDiagnostics();
+  }
+
+  void printForOneLineLogging(llvm::raw_ostream &os) const {
+    innerInfo.printForOneLineLogging(os);
   }
 };
 

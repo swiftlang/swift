@@ -452,7 +452,7 @@ This soundness hole was finally discovered and addressed in \IndexSwift{4.1}Swif
 \item The witness must be in a protocol extension. If the witness is a method on the class, there is no way to observe the concrete substitution for the protocol \texttt{Self} type, because it is not a generic parameter of the class method.
 \item (The hack) The interface type of the protocol requirement must not mention any associated types.
 \end{enumerate}
-The determination of whether to use a static or covariant \texttt{Self} type for a class conformance is implemented by the type cheker function \texttt{matchWitness()}.
+The determination of whether to use a static or covariant \texttt{Self} type for a class conformance is implemented by the type checker function \texttt{matchWitness()}.
 
 Indeed, Condition~3 is a hack; it opens up an exception where the soundness hole we worked so hard to close is once again allowed. In an ideal world, Conditions 1~and~2 would be sufficient, but by the time the soundness hole was discovered and closed, existing code had already been written taking advantage of it. The scenario necessitating Condition~3 is when the default implementation appears in a \emph{constrained} protocol extension:
 \begin{Verbatim}

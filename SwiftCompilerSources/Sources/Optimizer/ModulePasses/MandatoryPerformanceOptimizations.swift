@@ -204,6 +204,12 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return true
   }
 
+  if callee.mayBindDynamicSelf {
+    // We don't support inlining a function that binds dynamic self into a global-init function
+    // because the global-init function cannot provide the self metadata.
+    return false
+  }
+
   if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
     // Some arithmetic operations, like integer conversions, are not transparent but `inline(__always)`.
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
@@ -349,6 +355,9 @@ private extension Value {
 private extension Function {
   /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
   func getInitializedGlobal() -> GlobalVariable? {
+    if !isDefinition {
+      return nil
+    }
     for inst in self.entryBlock.instructions {
       switch inst {
       case let agi as AllocGlobalInst:

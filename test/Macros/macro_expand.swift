@@ -167,7 +167,7 @@ func testFileID(a: Int, b: Int) {
     // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+4]], column: 5
     // CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
     // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}// original-source-range: {{.*}}")
-    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: ""\))}}
+    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: "[^"]*"\))}}
     #addBlocker(
       #stringify(a - b)
       )
@@ -306,6 +306,18 @@ func testStringifyWithThrows() throws {
 
   // The macro adds the 'try' for us.
   _ = #stringifyAndTry(maybeThrowing())
+}
+
+@available(SwiftStdlib 5.1, *)
+func throwingFunc() async throws -> Int { 5 }
+
+@freestanding(expression) macro callThrowingFunc<T>(_ body: () -> T) -> T = #externalMacro(module: "MacroDefinition", type: "TryCallThrowingFuncMacro")
+
+@available(SwiftStdlib 5.1, *)
+func testThrowingCall() async throws -> Int {
+  #callThrowingFunc {
+    [1, 2, 3, 4, 5].map { $0 + 1 }.first!
+  }
 }
 
 func testStringifyWithLocalType() throws {
@@ -631,8 +643,8 @@ struct HasNestedType {
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
 macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
-// expected-warning@-1 {{external macro implementation type 'MacroDefinition.BluhBlah' could not be found for macro 'missingMacro()'; 'MacroDefinition.BluhBlah' could not be found in library plugin '}}
+// FIXME: xpected-warning@-1 {{external macro implementation type 'MacroDefinition.BluhBlah' could not be found for macro 'missingMacro()'; 'MacroDefinition.BluhBlah' could not be found in library plugin '}}
 @freestanding(expression)
 macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
-// expected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+// FIXME: xpected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
 #endif

@@ -361,7 +361,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   bool hadFulfillment = false;
 
-  auto subs = type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal);
+  auto subs = type->getContextSubstitutionMap(nominal);
 
   GenericTypeRequirements requirements(IGM, nominal);
 

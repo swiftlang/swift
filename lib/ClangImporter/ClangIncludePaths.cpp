@@ -396,23 +396,47 @@ static void getLibStdCxxFileMapping(
 
 namespace {
 std::string
-GetWindowsAuxiliaryFile(StringRef modulemap, const SearchPathOptions &Options) {
+GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
+                         const SearchPathOptions &Options) {
   StringRef SDKPath = Options.getSDKPath();
   if (!SDKPath.empty()) {
     llvm::SmallString<261> path{SDKPath};
-    llvm::sys::path::append(path, "usr", "share", modulemap);
+    llvm::sys::path::append(path, "usr", "share", File);
     if (llvm::sys::fs::exists(path))
       return path.str().str();
   }
 
   if (!Options.RuntimeResourcePath.empty()) {
     llvm::SmallString<261> path{Options.RuntimeResourcePath};
-    llvm::sys::path::append(path, "windows", modulemap);
+    llvm::sys::path::append(path, Platform, File);
     if (llvm::sys::fs::exists(path))
       return path.str().str();
   }
 
   return "";
+}
+
+SmallVector<std::pair<std::string, std::string>, 2>
+GetAndroidFileMappings(
+    ASTContext &Context, const std::string &sysroot,
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &VFS) {
+  const llvm::Triple &Triple = Context.LangOpts.Target;
+  const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
+  SmallVector<std::pair<std::string, std::string>, 2> Mappings;
+  std::string AuxiliaryFile;
+
+  if (!Triple.isAndroid()) return Mappings;
+
+  llvm::SmallString<261> NDKInjection{sysroot};
+  llvm::sys::path::append(NDKInjection, "posix_filesystem.apinotes");
+
+  AuxiliaryFile =
+      GetPlatformAuxiliaryFile("android", "posix_filesystem.apinotes",
+                               SearchPathOpts);
+  if (!AuxiliaryFile.empty())
+    Mappings.emplace_back(std::string(NDKInjection), AuxiliaryFile);
+
+  return Mappings;
 }
 
 SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
@@ -449,7 +473,8 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
       llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
     llvm::sys::path::append(WinSDKInjection, "module.modulemap");
 
-    AuxiliaryFile = GetWindowsAuxiliaryFile("winsdk.modulemap", SearchPathOpts);
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "winsdk.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty())
       Mappings.emplace_back(std::string(WinSDKInjection), AuxiliaryFile);
   }
@@ -465,7 +490,8 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
     llvm::sys::path::append(UCRTInjection, "Include", UCRTSDK.Version, "ucrt");
     llvm::sys::path::append(UCRTInjection, "module.modulemap");
 
-    AuxiliaryFile = GetWindowsAuxiliaryFile("ucrt.modulemap", SearchPathOpts);
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty()) {
       // The ucrt module map has the C standard library headers all together.
       // That leads to module cycles with the clang _Builtin_ modules. e.g.
@@ -502,14 +528,16 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
 
     llvm::sys::path::append(VCToolsInjection, "module.modulemap");
     AuxiliaryFile =
-        GetWindowsAuxiliaryFile("vcruntime.modulemap", SearchPathOpts);
+        GetPlatformAuxiliaryFile("windows", "vcruntime.modulemap",
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
       Mappings.emplace_back(std::string(VCToolsInjection), AuxiliaryFile);
 
     llvm::sys::path::remove_filename(VCToolsInjection);
     llvm::sys::path::append(VCToolsInjection, "vcruntime.apinotes");
     AuxiliaryFile =
-        GetWindowsAuxiliaryFile("vcruntime.apinotes", SearchPathOpts);
+        GetPlatformAuxiliaryFile("windows", "vcruntime.apinotes",
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
       Mappings.emplace_back(std::string(VCToolsInjection), AuxiliaryFile);
   }
@@ -525,6 +553,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     vfs = llvm::vfs::getRealFileSystem();
 
   const llvm::Triple &triple = ctx.LangOpts.Target;
+  llvm::SmallString<256> sysroot;
 
   // For modulemaps that have all the C standard library headers together in
   // a single module, we end up with module cycles with the clang _Builtin_
@@ -560,6 +589,11 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     StringRef headerFiles[] = {"SwiftAndroidNDK.h", "SwiftBionic.h"};
     libcFileMapping =
         getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs);
+
+    if (!libcFileMapping.empty()) {
+      sysroot = libcFileMapping[0].first;
+      llvm::sys::path::remove_filename(sysroot);
+    }
   } else if (triple.isOSGlibc() || triple.isOSOpenBSD() ||
              triple.isOSFreeBSD()) {
     // BSD/Linux Mappings
@@ -576,6 +610,9 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   result.redirectedFiles.append(GetWindowsFileMappings(
       ctx, vfs, result.requiresBuiltinHeadersInSystemModules));
+
+  result.redirectedFiles.append(GetAndroidFileMappings(ctx, sysroot.str().str(),
+                                                       vfs));
 
   return result;
 }

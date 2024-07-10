@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Frontend/Frontend.h"
 
 #include "ArgsToFrontendOptionsConverter.h"
@@ -186,6 +187,37 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
       }
     }
   }
+}
+
+void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
+  if (!SearchPathOpts.InProcessPluginServerPath.empty())
+    return;
+  if (FrontendOpts.MainExecutablePath.empty())
+    return;
+
+  // '/usr/bin/swift'
+  SmallString<64> serverLibPath{FrontendOpts.MainExecutablePath};
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'swift'
+
+#if defined(_WIN32)
+  // Windows: usr\bin\SwiftInProcPluginServer.dll
+  llvm::sys::path::append(serverLibPath, "SwiftInProcPluginServer.dll");
+
+#elif defined(__APPLE__)
+  // Darwin: usr/lib/swift/host/libSwiftInProcPluginServer.dylib
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'bin'
+  llvm::sys::path::append(serverLibPath, "lib", "swift", "host");
+  llvm::sys::path::append(serverLibPath, "libSwiftInProcPluginServer.dylib");
+
+#else
+  // Other: usr/lib/swift/host/libSwiftInProcPluginServer.so
+  llvm::sys::path::remove_filename(serverLibPath); // remove 'bin'
+  llvm::sys::path::append(serverLibPath, "lib", "swift", "host");
+  llvm::sys::path::append(serverLibPath, "libSwiftInProcPluginServer.so");
+
+#endif
+
+  SearchPathOpts.InProcessPluginServerPath = serverLibPath.str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -428,6 +460,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
+  Opts.DisablePackageNameForNonPackageInterface |= Args.hasArg(OPT_disable_print_package_name_for_non_package_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
@@ -443,6 +476,10 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 /// Checks if an arg is generally allowed to be included
 /// in a module interface
 static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
+  if (!A->getOption().hasFlag(options::ModuleInterfaceOption) &&
+      !A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable))
+    return false;
+
   if (!A->getOption().matches(options::OPT_enable_experimental_feature))
     return true;
 
@@ -453,6 +490,16 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   return true;
 }
 
+static bool IsPackageInterfaceFlag(const Arg *A, ArgList &Args) {
+  return A->getOption().matches(options::OPT_package_name) &&
+         Args.hasArg(
+             options::OPT_disable_print_package_name_for_non_package_interface);
+}
+
+static bool IsPrivateInterfaceFlag(const Arg *A, ArgList &Args) {
+  return A->getOption().matches(options::OPT_project_name);
+}
+
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
@@ -460,39 +507,52 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                                     ArgList &Args, DiagnosticEngine &Diags) {
   if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
-  ArgStringList RenderedArgs;
-  ArgStringList RenderedArgsIgnorable;
-  ArgStringList RenderedArgsIgnorablePrivate;
+
+  struct RenderedInterfaceArgs {
+    ArgStringList Standard = {};
+    ArgStringList Ignorable = {};
+  };
+
+  RenderedInterfaceArgs PublicArgs{};
+  RenderedInterfaceArgs PrivateArgs{};
+  RenderedInterfaceArgs PackageArgs{};
+
+  auto interfaceArgListForArg = [&](Arg *A) -> ArgStringList & {
+    bool ignorable =
+        A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable);
+    if (IsPackageInterfaceFlag(A, Args))
+      return ignorable ? PackageArgs.Ignorable : PackageArgs.Standard;
+
+    if (IsPrivateInterfaceFlag(A, Args))
+      return ignorable ? PrivateArgs.Ignorable : PrivateArgs.Standard;
+
+    return ignorable ? PublicArgs.Ignorable : PublicArgs.Standard;
+  };
+
   for (auto A : Args) {
     if (!ShouldIncludeModuleInterfaceArg(A))
       continue;
 
-    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorablePrivate)) {
-      A->render(Args, RenderedArgsIgnorablePrivate);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
-      A->render(Args, RenderedArgsIgnorable);
-    } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
-      A->render(Args, RenderedArgs);
-    }
+    ArgStringList &ArgList = interfaceArgListForArg(A);
+    A->render(Args, ArgList);
   }
-  {
-    llvm::raw_string_ostream OS(Opts.Flags);
-    interleave(RenderedArgs,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
-    interleave(RenderedArgsIgnorablePrivate,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
-  {
-    llvm::raw_string_ostream OS(Opts.IgnorableFlags);
-    interleave(RenderedArgsIgnorable,
-               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-               [&] { OS << " "; });
-  }
+
+  auto updateInterfaceOpts = [](ModuleInterfaceOptions::InterfaceFlags &Flags,
+                                RenderedInterfaceArgs &RenderedArgs) {
+    auto printFlags = [](std::string &str, ArgStringList argList) {
+      llvm::raw_string_ostream OS(str);
+      interleave(
+          argList,
+          [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+          [&] { OS << " "; });
+    };
+    printFlags(Flags.Flags, RenderedArgs.Standard);
+    printFlags(Flags.IgnorableFlags, RenderedArgs.Ignorable);
+  };
+
+  updateInterfaceOpts(Opts.PublicFlags, PublicArgs);
+  updateInterfaceOpts(Opts.PrivateFlags, PrivateArgs);
+  updateInterfaceOpts(Opts.PackageFlags, PackageArgs);
 }
 
 enum class CxxCompatMode {
@@ -1413,6 +1473,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
+  Opts.AnalyzeRequestEvaluator = Args.hasArg(
+      OPT_analyze_request_evaluator);
+
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
@@ -1975,6 +2038,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   }
   Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
+  if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
+    Opts.InProcessPluginServerPath = A->getValue();
+
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'
   // are grouped, and plugins are searched by the order of these options.
@@ -2163,8 +2229,12 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
-  // If no style options are specified, default to Swift style.
-  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
+  // If no style options are specified, default to Swift style, unless it is
+  // under swift caching, which llvm style is preferred because LLVM style
+  // replays a lot faster.
+  Opts.PrintedFormattingStyle = Args.hasArg(OPT_cache_compile_job)
+                                    ? DiagnosticOptions::FormattingStyle::LLVM
+                                    : DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
     if (contents == "llvm") {
@@ -2177,9 +2247,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       return true;
     }
   }
-  // Swift style is not fully supported in cached mode yet.
-  if (Args.hasArg(OPT_cache_compile_job))
-    Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
 
   for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
     StringRef contents = arg->getValue();
@@ -2741,9 +2808,9 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   for (auto A : ReducedArgs) {
     StringRef Arg(A);
     // FIXME: this should distinguish between key and value.
-    if (!haveSDKPath && Arg.equals("-sdk"))
+    if (!haveSDKPath && Arg == "-sdk")
       haveSDKPath = true;
-    if (!haveResourceDir && Arg.equals("-resource-dir"))
+    if (!haveResourceDir && Arg == "-resource-dir")
       haveResourceDir = true;
   }
   if (!haveSDKPath) {
@@ -3148,19 +3215,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
-      if (version.equals("none")) {
+      if (version == "none") {
         runtimeCompatibilityVersion = std::nullopt;
-      } else if (version.equals("5.0")) {
+      } else if (version == "5.0") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
-      } else if (version.equals("5.1")) {
+      } else if (version == "5.1") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
-      } else if (version.equals("5.5")) {
+      } else if (version == "5.5") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
-      } else if (version.equals("5.6")) {
+      } else if (version == "5.6") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
-      } else if (version.equals("5.8")) {
+      } else if (version == "5.8") {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-      } else if (version.equals("6.0")) {
+      } else if (version == "6.0") {
         runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -3521,6 +3588,7 @@ bool CompilerInvocation::parseArgs(
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
+  setDefaultInProcessPluginServerPathIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);

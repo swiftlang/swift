@@ -138,8 +138,7 @@ static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
   if (selfType->is<ExistentialType>())
     return false;
 
-  auto *M = ED->getParentModule();
-  return ED->getExtendedNominal() == PD || M->checkConformance(selfType, PD);
+  return ED->getExtendedNominal() == PD || ModuleDecl::checkConformance(selfType, PD);
 }
 
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
@@ -168,12 +167,10 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (isExtensionWithSelfBound(ED, BaseTypeProtocolDecl)) {
     return true;
   }
-  auto *module = DC->getParentModule();
   GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      module, ED->getExtendedNominal());
-  return checkRequirements(module,
-                           genericSig.getRequirements(),
+      ED->getExtendedNominal());
+  return checkRequirements(genericSig.getRequirements(),
                            QuerySubstitutionMap{substMap}) ==
          CheckRequirementsResult::Success;
 }
@@ -211,9 +208,8 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // The context substitution map for the base type fixes the declaration's
   // outer generic parameters.
-  auto *module = DC->getParentModule();
   auto substMap = BaseTy->getContextSubstitutionMap(
-      module, VD->getDeclContext(), genericDecl->getGenericEnvironment());
+      VD->getDeclContext(), genericDecl->getGenericEnvironment());
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();
@@ -222,8 +218,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // We treat substitution failure as success, to ignore requirements
   // that involve innermost generic parameters.
-  return checkRequirements(module,
-                           genericSig.getRequirements(),
+  return checkRequirements(genericSig.getRequirements(),
                            [&](SubstitutableType *type) -> Type {
                              auto *paramTy = cast<GenericTypeParamType>(type);
                              if (paramTy->getDepth() == innerDepth)

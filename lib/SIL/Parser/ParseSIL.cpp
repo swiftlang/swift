@@ -1126,7 +1126,8 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   // Parse attributes.
-  Parser::ParsedTypeAttributeList parsedAttrs;
+  Parser::ParsedTypeAttributeList parsedAttrs(
+      Parser::ParseTypeReason::Unspecified);
   parsedAttrs.parse(P);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
@@ -1765,11 +1766,10 @@ static bool getConformancesForSubstitution(Parser &P,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
-  auto M = P.SF.getParentModule();
   subReplacement = subReplacement->getReferenceStorageReferent();
 
   for (auto protoDecl : protocols) {
-    auto conformance = M->lookupConformance(subReplacement, protoDecl);
+    auto conformance = ModuleDecl::lookupConformance(subReplacement, protoDecl);
     if (conformance.isInvalid()) {
       P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
                  protoDecl->getDeclaredInterfaceType());
@@ -1821,9 +1821,8 @@ SubstitutionMap getApplySubstitutionsFromParsed(
       },
       [&](CanType dependentType, Type replacementType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
-        auto M = SP.P.SF.getParentModule();
         replacementType = replacementType->getReferenceStorageReferent();
-        if (auto conformance = M->lookupConformance(replacementType, proto))
+        if (auto conformance = ModuleDecl::lookupConformance(replacementType, proto))
           return conformance;
 
         SP.P.diagnose(loc, diag::sil_substitution_mismatch, replacementType,
@@ -2301,8 +2300,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
            contextFormalTy = patternSig.getGenericEnvironment()
               ->mapTypeIntoContext(formalTy);
          }
-         auto lookup = P.SF.getParentModule()->lookupConformance(
-                                                 contextFormalTy, proto);
+         auto lookup = ModuleDecl::lookupConformance(contextFormalTy, proto);
          if (lookup.isInvalid()) {
            P.diagnose(formalTyLoc,
                       diag::sil_keypath_index_not_hashable,
@@ -2609,13 +2607,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
-      if (attrName.equals("dynamic_lifetime")) {
+      if (attrName == "dynamic_lifetime") {
         hasDynamicLifetime = HasDynamicLifetime;
-      } else if (attrName.equals("reflection")) {
+      } else if (attrName == "reflection") {
         hasReflection = true;
-      } else if (attrName.equals("moveable_value_debuginfo")) {
+      } else if (attrName == "moveable_value_debuginfo") {
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
-      } else if (attrName.equals("pointer_escape")) {
+      } else if (attrName == "pointer_escape") {
         hasPointerEscape = HasPointerEscape;
       } else {
         P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
@@ -3352,11 +3350,24 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::DestroyValueInst: {
-    bool poisonRefs = false;
-    if (parseSILOptional(poisonRefs, *this, "poison")
-        || parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+    PoisonRefs_t poisonRefs = DontPoisonRefs;
+    IsDeadEnd_t isDeadEnd = IsntDeadEnd;
+    StringRef attributeName;
+    SourceLoc attributeLoc;
+    while (parseSILOptional(attributeName, attributeLoc, *this)) {
+      if (attributeName == "poison")
+        poisonRefs = PoisonRefs;
+      else if (attributeName == "dead_end")
+        isDeadEnd = IsDeadEnd;
+      else {
+        P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
+                   attributeName, "destroy_value");
+        return true;
+      }
+    }
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDestroyValue(InstLoc, Val, poisonRefs);
+    ResultVal = B.createDestroyValue(InstLoc, Val, poisonRefs, isDeadEnd);
     break;
   }
   case SILInstructionKind::BeginCOWMutationInst: {
@@ -3391,7 +3402,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::DebugValueInst: {
-    bool poisonRefs = false;
+    PoisonRefs_t poisonRefs = DontPoisonRefs;
     bool hasTrace = false;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
@@ -3402,7 +3413,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc attributeLoc;
     while (parseSILOptional(attributeName, attributeLoc, *this)) {
       if (attributeName == "poison")
-        poisonRefs = true;
+        poisonRefs = PoisonRefs;
       else if (attributeName == "trace")
         hasTrace = true;
       else if (attributeName == "moveable_value_debuginfo")
@@ -3552,7 +3563,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     
     auto Strict = MarkUnresolvedNonCopyableValueInst::IsNotStrict;
-    if (AttrName.equals("strict")) {
+    if (AttrName == "strict") {
       Strict = MarkUnresolvedNonCopyableValueInst::IsStrict;
       if (!parseSILOptional(AttrName, *this)) {
         auto diag = diag::sil_markmustcheck_requires_attribute;
@@ -3734,12 +3745,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::LoadBorrowInst: {
     SourceLoc AddrLoc;
+    
+    bool IsUnchecked = false;
+    StringRef AttrName;
+    SourceLoc AttrLoc;
+    if (parseSILOptional(AttrName, AttrLoc, *this)) {
+      if (AttrName == "unchecked") {
+        IsUnchecked = true;
+      } else {
+        P.diagnose(InstLoc.getSourceLoc(),
+                   diag::sil_invalid_attribute_for_instruction, AttrName,
+                   "load_borrow");
+        return true;
+      }
+    }
 
     if (parseTypedValueRef(Val, AddrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createLoadBorrow(InstLoc, Val);
+    auto LB = B.createLoadBorrow(InstLoc, Val);
+    LB->setUnchecked(IsUnchecked);
+    ResultVal = LB;
     break;
   }
 
@@ -4027,7 +4054,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
-        if (attrName.equals("not_guaranteed"))
+        if (attrName == "not_guaranteed")
           not_guaranteed = true;
         else
           return true;
@@ -4049,7 +4076,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (Opcode == SILInstructionKind::ConvertFunctionInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
-        if (attrName.equals("without_actually_escaping"))
+        if (attrName == "without_actually_escaping")
           without_actually_escaping = true;
         else
           return true;
@@ -4161,13 +4188,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (attr.empty())
         return true;
 
-      if (attr.equals("strict"))
+      if (attr == "strict")
         isStrict = true;
 
-      if (attr.equals("invariant"))
+      if (attr == "invariant")
         isInvariant = true;
 
-      if (attr.equals("align"))
+      if (attr == "align")
         alignment = llvm::Align(std::get<uint64_t>(*parsedValue));
     }
 
@@ -4942,12 +4969,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createDeallocPartialRef(InstLoc, Instance, Metatype);
     break;
   }
-    case SILInstructionKind::DeallocBoxInst:
-      if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
-        return true;
+  case SILInstructionKind::DeallocBoxInst: {
+    bool isDeadEnd = false;
+    if (parseSILOptional(isDeadEnd, *this, "dead_end") ||
+        parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
 
-      ResultVal = B.createDeallocBox(InstLoc, Val);
-      break;
+    ResultVal = B.createDeallocBox(InstLoc, Val, IsDeadEnd_t(isDeadEnd));
+    break;
+  }
     case SILInstructionKind::ValueMetatypeInst:
     case SILInstructionKind::ExistentialMetatypeInst: {
       SILType Ty;
@@ -5417,8 +5447,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         P.diagnose(TyLoc, diag::sil_witness_method_not_protocol);
         return true;
       }
-      auto conformance =
-          P.SF.getParentModule()->lookupConformance(LookupTy, proto);
+      auto conformance = ModuleDecl::lookupConformance(LookupTy, proto);
       if (conformance.isInvalid()) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
@@ -6648,37 +6677,37 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   std::optional<ApplyIsolationCrossing> isolationCrossing;
 
   while (parseSILOptional(AttrName, AttrLoc, AttrValue, AttrValueLoc, *this)) {
-    if (AttrName.equals("nothrow")) {
+    if (AttrName == "nothrow") {
       assert(!bool(AttrValue));
       ApplyOpts |= ApplyFlags::DoesNotThrow;
       continue;
     }
 
-    if (AttrName.equals("noasync")) {
+    if (AttrName == "noasync") {
       assert(!bool(AttrValue));
       ApplyOpts |= ApplyFlags::DoesNotAwait;
       continue;
     }
 
-    if (AttrName.equals("callee_guaranteed")) {
+    if (AttrName == "callee_guaranteed") {
       assert(!bool(AttrValue));
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
       continue;
     }
 
-    if (AttrName.equals("isolated_any")) {
+    if (AttrName == "isolated_any") {
       assert(!bool(AttrValue));
       PartialApplyIsolation = SILFunctionTypeIsolation::Erased;
       continue;
     }
 
-    if (AttrName.equals("on_stack")) {
+    if (AttrName == "on_stack") {
       assert(!bool(AttrValue));
       IsNoEscape = true;
       continue;
     }
 
-    if (AttrName.equals("callee_isolation")) {
+    if (AttrName == "callee_isolation") {
       auto applyIsolation =
           ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
@@ -6691,7 +6720,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
-    if (AttrName.equals("caller_isolation")) {
+    if (AttrName == "caller_isolation") {
       auto applyIsolation =
           ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
@@ -7813,7 +7842,7 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
   Type lookupTy = ConformingTy;
   if (auto bound = lookupTy->getAs<BoundGenericType>())
     lookupTy = bound->getDecl()->getDeclaredType();
-  auto lookup = P.SF.getParentModule()->lookupConformance(lookupTy, proto);
+  auto lookup = ModuleDecl::lookupConformance(lookupTy, proto);
   if (lookup.isInvalid()) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return ProtocolConformanceRef();

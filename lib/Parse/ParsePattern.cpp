@@ -125,8 +125,6 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("__shared") &&
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
-        (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
-         !Tok.isContextualKeyword("transferring")) &&
         (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
          !Tok.isContextualKeyword("sending")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat))
@@ -161,7 +159,7 @@ SourceLoc Parser::tryCompleteFunctionParamTypeBeginning() {
   // Skip over any starting parameter specifiers.
   {
     CancellableBacktrackingScope backtrack(*this);
-    ParsedTypeAttributeList attrs;
+    ParsedTypeAttributeList attrs(ParseTypeReason::Unspecified);
     attrs.parse(*this);
     if (!Tok.is(tok::code_complete))
       return SourceLoc();
@@ -284,31 +282,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
 
         if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-            Tok.isContextualKeyword("transferring")) {
-          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
-                    .warnUntilSwiftVersion(6);
-          if (param.TransferringLoc.isValid()) {
-            diagnose(Tok, diag::parameter_specifier_repeated)
-                .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
-
-          diagnose(Tok, diag::transferring_is_now_sendable)
-              .fixItReplace(Tok.getLoc(), "sending");
-
-          if (param.SendingLoc.isValid()) {
-            diagnose(Tok, diag::sending_and_transferring_used_together)
-                .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
-
-          param.TransferringLoc = consumeToken();
-          continue;
-        }
-
-        if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
             Tok.isContextualKeyword("sending")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
@@ -316,13 +289,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           if (param.SendingLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
                 .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
-
-          if (param.TransferringLoc.isValid()) {
-            diagnose(Tok, diag::sending_and_transferring_used_together)
-                .fixItRemove(param.TransferringLoc);
             consumeToken();
             continue;
           }
@@ -645,12 +611,6 @@ mapParsedParameters(Parser &parser,
         param->setCompileTimeConst();
       }
 
-      if (paramInfo.TransferringLoc.isValid()) {
-        type = new (parser.Context)
-            TransferringTypeRepr(type, paramInfo.TransferringLoc);
-        param->setSending();
-      }
-
       if (paramInfo.SendingLoc.isValid()) {
         type = new (parser.Context) SendingTypeRepr(type, paramInfo.SendingLoc);
         param->setSending();
@@ -681,8 +641,6 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             else if (isa<CompileTimeConstTypeRepr>(STR))
               param->setCompileTimeConst(true);
-            else if (isa<TransferringTypeRepr>(STR))
-              param->setSending(true);
             else if (isa<SendingTypeRepr>(STR))
               param->setSending(true);
             unwrappedType = STR->getBase();
@@ -1412,7 +1370,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     // binding, which isn't yet supported.
     if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
                           tok::l_square)
-        || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
+        || (peekToken().isAnyOperator() && peekToken().getText() == "<")) {
 
       // Diagnose the unsupported production.
       diagnose(Tok.getLoc(),
