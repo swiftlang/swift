@@ -637,7 +637,9 @@ struct InferRequirementsWalker : public TypeWalker {
       }
     }
 
-    if (!ty->isSpecialized())
+    // Both is<ExistentialType>() and isSpecialized() end up being true if we
+    // have invalid code where a protocol is nested inside a generic nominal.
+    if (ty->is<ExistentialType>() || !ty->isSpecialized())
       return Action::Continue;
 
     // Infer from generic nominal types.
