@@ -213,3 +213,13 @@ class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
 }
 
 
+class ConformInExtension {}
+extension ConformInExtension: InferMainActor {}
+
+class InheritConformance: ConformInExtension {
+  func f() {}
+}
+
+func testInheritedMainActorConformance() {
+  InheritConformance().f() // okay; this is not main actor isolated
+}
