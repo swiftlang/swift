@@ -1668,8 +1668,15 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
+    if ($env:CI) {
+      # Use the windows-specific checkout on CI that provides
+      # a checkout that does not yet use swift-foundation.
+      $RepoName = "swift-corelibs-foundation-windows";
+    } else {
+      $RepoName = "swift-corelibs-foundation";
+    }
     Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation-windows `
+      -Src $SourceCache\$RepoName `
       -Bin $FoundationBinaryCache `
       -InstallTo $InstallPath `
       -Arch $Arch `
