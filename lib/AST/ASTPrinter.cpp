@@ -3661,7 +3661,7 @@ static void printParameterFlags(ASTPrinter &printer,
       // at +1. By not printing sending, we would be changing the API
       // potentially to take the parameter at +0 instead of +1. To work around
       // this, print out consuming so that we preserve the +1 parameter.
-      printer.printKeyword("consuming", options, " ");
+      printer.printKeyword("__owned", options, " ");
     }
   }
 
