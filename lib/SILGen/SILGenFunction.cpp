@@ -285,7 +285,7 @@ static DeclContext *getInnermostFunctionContext(DeclContext *DC) {
 }
 
 /// Return location of the macro expansion and the macro name.
-static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
+static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
                               DeclContext *FunctionDC) {
   MacroInfo Result(Info.generatedSourceRange.getStart(),
                    Info.originalSourceRange.getStart());

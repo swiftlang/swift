@@ -75,7 +75,7 @@ public:
 
   /// The name of the source file on disk that was created to hold the
   /// contents of this file for external clients.
-  StringRef onDiskBufferCopyFileName = StringRef();
+  mutable StringRef onDiskBufferCopyFileName = StringRef();
 
   /// Contains the ancestors of this source buffer, starting with the root source
   /// buffer and ending at this source buffer.
@@ -213,8 +213,7 @@ public:
   bool hasGeneratedSourceInfo(unsigned bufferID);
 
   /// Retrieve the generated source information for the given buffer.
-  std::optional<GeneratedSourceInfo>
-  getGeneratedSourceInfo(unsigned bufferID) const;
+  const GeneratedSourceInfo *getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Retrieve the list of ancestors of the given source buffer, starting with
   /// the root buffer and proceding to the given buffer ID at the end.
