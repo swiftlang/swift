@@ -567,6 +567,15 @@ extension _ArrayBuffer {
     }
   }
 
+  @inlinable
+  static var associationKey: UnsafeRawPointer {
+    withUnsafePointer(to: &_emptyArrayStorage) {
+      //emptyArrayStorage is immortal so this doesn't dangle
+      //also we never dereference it
+      $0
+    }
+  }
+  
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
@@ -579,7 +588,27 @@ extension _ArrayBuffer {
       return try body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try ContiguousArray(self).withUnsafeBufferPointer(body)
+    if let associatedBuffer = _swift_stdlib_objc_getAssociatedObject(
+      owner,
+      associationKey
+    ) {
+      let contigBuffer = unsafeBitCast(
+        associatedBuffer,
+        to: _ContiguousArrayBuffer<Element>.self
+      )
+      return try ContiguousArray(
+        _buffer: contigBuffer
+      ).withUnsafeBufferPointer(body)
+    } else {
+      let contig = ContiguousArray(self)
+      _swift_stdlib_objc_setAssociatedObject(
+        owner,
+        associationKey,
+        contig._buffer,
+        0o1401 //OBJC_ASSOCIATION_RETAIN
+      )
+      return try contig.withUnsafeBufferPointer(body)
+    }
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
