@@ -187,9 +187,6 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// Enable optimization to bypass resilience checks in a package
-    bool EnableBypassResilienceInPackage = false;
-
     /// Optimization mode for unavailable declarations.
     std::optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 
@@ -583,7 +580,7 @@ namespace swift {
     /// Skips decls that cannot be referenced externally.
     bool SkipNonExportableDecls = false;
 
-    /// True if -experimental-allow-non-resilient-access is passed and built
+    /// True if -allow-non-resilient-access is passed and built
     /// from source.
     bool AllowNonResilientAccess = false;
 

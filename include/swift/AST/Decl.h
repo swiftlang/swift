@@ -780,10 +780,10 @@ protected:
     /// Whether this module has been built with C++ interoperability enabled.
     HasCxxInteroperability : 1,
 
-    /// Whether this module has been built with -experimental-allow-non-resilient-access.
+    /// Whether this module has been built with -allow-non-resilient-access.
     AllowNonResilientAccess : 1,
 
-    /// Whether this module has been built with -experimental-package-cmo.
+    /// Whether this module has been built with -package-cmo.
     SerializePackageEnabled : 1
   );
 

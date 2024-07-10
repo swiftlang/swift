@@ -786,10 +786,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
-  Opts.EnableBypassResilienceInPackage =
-      Args.hasArg(OPT_experimental_package_bypass_resilience) ||
-      Opts.hasFeature(Feature::ClientBypassResilientAccessInPackage);
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   if (Args.hasArg(OPT_check_api_availability_only))
@@ -1239,13 +1235,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.AllowNonResilientAccess =
       Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
+      Args.hasArg(OPT_allow_non_resilient_access) ||
       Opts.hasFeature(Feature::AllowNonResilientAccessInPackage);
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-exportable-decls",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
       Opts.SkipNonExportableDecls = false;
     }
     // If built from interface, non-resilient access should not be allowed.
@@ -1254,7 +1251,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             FrontendOpts.RequestedAction)) {
       Diags.diagnose(
           SourceLoc(), diag::warn_ignore_option_overriden_by,
-          "-experimental-allow-non-resilient-access",
+          "-allow-non-resilient-access",
           "-compile-module-from-interface or -typecheck-module-from-interface");
       Opts.AllowNonResilientAccess = false;
     }
@@ -1671,7 +1668,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-inlinable-function-bodies-without-types",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinableWithoutTypes;
   }
@@ -1682,7 +1679,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-non-inlinable-function-bodies",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
   }
@@ -1691,7 +1688,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-tbd-is-installapi",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
   }
@@ -1700,7 +1697,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     if (LangOpts.AllowNonResilientAccess)
       Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                      "-experimental-skip-all-function-bodies",
-                     "-experimental-allow-non-resilient-access");
+                     "-allow-non-resilient-access");
     else
       Opts.SkipFunctionBodies = FunctionBodySkipping::All;
   }
@@ -1774,7 +1771,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Opts.EnableLazyTypecheck) {
     Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
                    "-experimental-lazy-typecheck",
-                   "-experimental-allow-non-resilient-access");
+                   "-allow-non-resilient-access");
     Opts.EnableLazyTypecheck = false;
   }
 
@@ -2608,11 +2605,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_ExperimentalPackageCMO) ||
+      Args.hasArg(OPT_PackageCMO) ||
       LangOpts.hasFeature(Feature::PackageCMO)) {
     if (!LangOpts.AllowNonResilientAccess) {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-experimental-package-cmo",
-                     "-experimental-allow-non-resilient-access");
+                     "-package-cmo",
+                     "-allow-non-resilient-access");
     } else {
       Opts.EnableSerializePackage = true;
       Opts.CMOMode = CrossModuleOptimizationMode::Default;
