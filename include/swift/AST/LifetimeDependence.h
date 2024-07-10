@@ -230,6 +230,20 @@ public:
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   get(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
       ArrayRef<SILResultInfo> results, DeclContext *dc);
+
+  bool operator==(const LifetimeDependenceInfo &other) const {
+    return this->isImmortal() == other.isImmortal() &&
+           this->getTargetIndex() == other.getTargetIndex() &&
+           this->getInheritIndices() == other.getInheritIndices() &&
+           this->getScopeIndices() == other.getScopeIndices();
+  }
+
+  bool operator!=(const LifetimeDependenceInfo &other) const {
+    return this->isImmortal() != other.isImmortal() &&
+           this->getTargetIndex() != other.getTargetIndex() &&
+           this->getInheritIndices() != other.getInheritIndices() &&
+           this->getScopeIndices() != other.getScopeIndices();
+  }
 };
 
 std::optional<LifetimeDependenceInfo>

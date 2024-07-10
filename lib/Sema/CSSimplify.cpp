@@ -3248,7 +3248,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
 
-  if (func1->getLifetimeDependenceInfo() != func2->getLifetimeDependenceInfo()) {
+  if (func1->getLifetimeDependencies() != func2->getLifetimeDependencies()) {
     return getTypeMatchFailure(locator);
   }
 
