@@ -95,6 +95,7 @@ EXPECTED_DEFAULTS = {
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_swift_libexec': True,
+    'build_swift_testing': False,
     'build_early_swift_driver': True,
     'build_early_swiftsyntax': True,
     'build_swiftsyntax': False,
