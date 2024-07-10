@@ -1136,11 +1136,6 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // those of the current scanner invocation.
       updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
     } else {
-      // We must reset option occurrences because we are handling an unrelated command-line
-      // to those parsed before. We must do so because LLVM options parsing is done
-      // using a managed static `GlobalParser`.
-      llvm::cl::ResetAllOptionOccurrences();
-
       // Create a new instance by the arguments and save it in the map.
       auto newService = std::make_unique<SwiftDependencyScanningService>();
       auto newInstance = std::make_unique<CompilerInstance>();
