@@ -2035,6 +2035,8 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
   auto normalizedTargetTriple =
       getTargetSpecificModuleTriple(genericSubInvocation.getLangOptions().Target);
   std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
+  const auto ExtraArgs = genericSubInvocation.getClangImporterOptions()
+                             .getReducedExtraArgsForSwiftModuleDependency();
 
   llvm::hash_code H = hash_combine(
       // Start with the compiler version (which will be either tag names or
@@ -2075,6 +2077,10 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // Whether or not caching is enabled affects if the instance is able to
       // correctly load the dependencies.
       genericSubInvocation.getCASOptions().getModuleScanningHashComponents(),
+
+      // Clang ExtraArgs that affects how clang types are imported into swift
+      // module.
+      llvm::hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
 
       // Whether or not OSSA modules are enabled.
       //
