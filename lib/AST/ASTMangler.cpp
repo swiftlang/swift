@@ -3247,7 +3247,7 @@ void ASTMangler::appendFunctionResultType(
     appendType(resultType, sig, forDecl);
   }
 
-  if (lifetimeDependence.has_value()) {
+  if (AllowLifetimeDependencies && lifetimeDependence.has_value()) {
     appendLifetimeDependence(*lifetimeDependence);
   }
 }
@@ -3302,7 +3302,7 @@ void ASTMangler::appendParameterTypeListElement(
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
 
-  if (lifetimeDependence) {
+  if (AllowLifetimeDependencies && lifetimeDependence) {
     appendLifetimeDependence(*lifetimeDependence);
   }
 
