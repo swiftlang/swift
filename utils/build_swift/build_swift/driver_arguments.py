@@ -811,6 +811,11 @@ def create_argument_parser():
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
 
+    option('--swift-testing', toggle_true('build_swift_testing'),
+           help='build swift-testing')
+    option('--install-swift-testing', toggle_true('install_swift_testing'),
+           help='install swift-testing')
+
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
