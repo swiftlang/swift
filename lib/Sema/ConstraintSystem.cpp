@@ -293,6 +293,13 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name,
   result = TypeChecker::lookupMember(DC, base, name, loc,
                                      defaultMemberLookupOptions);
 
+  // If we are in an @_unsafeInheritExecutor context, swap out
+  // declarations for their _unsafeInheritExecutor_ counterparts if they
+  // exist.
+  if (enclosingUnsafeInheritsExecutor(DC)) {
+    introduceUnsafeInheritExecutorReplacements(DC, base, loc, *result);
+  }
+
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
     return *result;
