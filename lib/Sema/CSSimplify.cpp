@@ -3248,6 +3248,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
 
+  if (func1->getLifetimeDependenceInfo() != func2->getLifetimeDependenceInfo()) {
+    return getTypeMatchFailure(locator);
+  }
+
   // To contextual type increase the score to avoid ambiguity when solver can
   // find more than one viable binding different only in representation e.g.
   //   let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {}
