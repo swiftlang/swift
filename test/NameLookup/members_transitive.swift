@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 import members_C
-// expected-member-visibility-note 6{{add import of module 'members_B'}}{{1-1=import members_B\n}}
+// expected-member-visibility-note 11{{add import of module 'members_B'}}{{1-1=import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -15,7 +15,7 @@ func testExtensionMembers(x: X, y: Y<Z>) {
   y.YinA()
 
   x.XinB() // expected-member-visibility-error{{instance method 'XinB()' is not available due to missing import of defining module 'members_B'}}
-  x.XinB_package() // expected-member-visibility-error{{'XinB_package' is inaccessible due to 'package' protection level}}
+  x.XinB_package() // expected-member-visibility-error{{instance method 'XinB_package()' is not available due to missing import of defining module 'members_B'}}
   y.YinB() // expected-member-visibility-error{{instance method 'YinB()' is not available due to missing import of defining module 'members_B'}}
 
   x.XinC()
@@ -38,7 +38,7 @@ extension X {
     return (
       propXinA,
       propXinB, // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
-      propXinB_package, // expected-member-visibility-error{{'propXinB_package' is inaccessible due to 'package' protection level}}
+      propXinB_package, // expected-member-visibility-error{{property 'propXinB_package' is not available due to missing import of defining module 'members_B}}
       propXinC
     )
   }
@@ -46,19 +46,19 @@ extension X {
   func testNestedTypes() {
     _ = NestedInA.self
     _ = NestedInB.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
-    _ = NestedInB_package.self // expected-member-visibility-error{{'NestedInB_package' is inaccessible due to 'package' protection level}}
+    _ = NestedInB_package.self // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInC.self
   }
 
   var nestedInA: NestedInA { fatalError() }
   var nestedInB: NestedInB { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
-  var nestedInB_package: NestedInB_package { fatalError() } // expected-member-visibility-error{{'NestedInB_package' is inaccessible due to 'package' protection level}}
+  var nestedInB_package: NestedInB_package { fatalError() } // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
   var nestedInC: NestedInC { fatalError() }
 }
 
 extension X.NestedInA {}
 extension X.NestedInB {} // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
-extension X.NestedInB_package {} // expected-member-visibility-error{{'NestedInB_package' is inaccessible due to 'package' protection level}}
+extension X.NestedInB_package {} // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
 extension X.NestedInC {}
 
 func testTopLevelTypes() {

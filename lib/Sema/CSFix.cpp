@@ -1152,16 +1152,16 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 
 bool AllowInaccessibleMember::diagnose(const Solution &solution,
                                        bool asNote) const {
-  InaccessibleMemberFailure failure(solution, getMember(), getLocator());
+  InaccessibleMemberFailure failure(solution, getMember(), getLocator(),
+                                    IsMissingImport);
   return failure.diagnose(asNote);
 }
 
-AllowInaccessibleMember *
-AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
-                                ValueDecl *member, DeclNameRef name,
-                                ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowInaccessibleMember(cs, baseType, member, name, locator);
+AllowInaccessibleMember *AllowInaccessibleMember::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclNameRef name,
+    ConstraintLocator *locator, bool isMissingImport) {
+  return new (cs.getAllocator()) AllowInaccessibleMember(
+      cs, baseType, member, name, locator, isMissingImport);
 }
 
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
