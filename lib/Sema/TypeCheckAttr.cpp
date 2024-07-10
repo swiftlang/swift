@@ -6937,18 +6937,30 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
+    auto type = var->getTypeInContext();
     if (var->hasStorage()) {
-      // 'nonisolated' can not be applied to mutable stored properties unless
-      // qualified as 'unsafe'.
-      if (var->supportsMutation() && !attr->isUnsafe()) {
-        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-            .fixItInsertAfter(attr->getRange().End, "(unsafe)");
-        var->diagnose(diag::nonisolated_mutable_storage_note, var);
-        return;
+      {
+        // 'nonisolated' can not be applied to mutable stored properties unless
+        // qualified as 'unsafe', or is of a Sendable type on a Sendable
+        // value type.
+        bool canBeNonisolated = false;
+        if (auto nominal = dc->getSelfStructDecl()) {
+          if (nominal->getDeclaredTypeInContext()->isSendableType() &&
+              !var->isStatic() && type->isSendableType()) {
+            canBeNonisolated = true;
+          }
+        }
+
+        if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+          var->diagnose(diag::nonisolated_mutable_storage_note, var);
+          return;
+        }
       }
 
-      // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable variables.
-      auto type = var->getTypeInContext();
+      // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
+      // variables.
       if (!attr->isUnsafe() && !type->hasError()) {
         bool diagnosed = diagnoseIfAnyNonSendableTypes(
             type,

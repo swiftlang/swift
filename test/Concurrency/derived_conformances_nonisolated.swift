@@ -14,7 +14,7 @@ struct X1: Equatable, Hashable, Codable {
 @MainActor
 struct X2: Equatable, Hashable, Codable {
   let x: Int
-  var y: String
+  nonisolated var y: String // okay
 }
 
 class NonSendable {
