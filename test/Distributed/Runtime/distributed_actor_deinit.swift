@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-stdlib -parse-as-library) | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib -parse-as-library -module-name=main %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: libdispatch
 // REQUIRES: executable_test

@@ -43,10 +43,6 @@ func isCurrent(_ a: AnyActor) -> Bool {
   return isCurrentExecutor(getExecutor(a))
 }
 
-func isMainExecutor() -> Bool {
-  isCurrentExecutor(Builtin.buildMainActorExecutorRef())
-}
-
 actor Foo {
     let name: String
     let child: Foo?

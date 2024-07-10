@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-stdlib %import-libdispatch)
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking -parse-stdlib %import-libdispatch %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %t/a.out
 
 // REQUIRES: libdispatch
 // REQUIRES: executable_test
