@@ -113,7 +113,10 @@ func unsafeCallerAvoidsNewLoop() async throws {
   } onCancel: {
   }
 
-  TL.$string.withValue("hello") {
+  await TL.$string.withValue("hello") {
     print(TL.string)
   }
+
+  func operation() async throws -> Int { 7 }
+  try await TL.$string.withValue("hello", operation: operation)
 }

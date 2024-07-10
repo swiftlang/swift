@@ -44,6 +44,7 @@ class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
+class LookupResult;
 class PatternBindingDecl;
 class ProtocolConformance;
 class TopLevelCodeDecl;
@@ -667,6 +668,18 @@ void replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
 /// we route them to the @_unsafeInheritExecutor versions implicitly.
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, SourceLoc loc, SmallVectorImpl<ValueDecl *> &decls);
+
+/// Replace any functions in this list that were found in the _Concurrency
+/// module as a member on "base" and have _unsafeInheritExecutor_-prefixed
+/// versions with those _unsafeInheritExecutor_-prefixed versions.
+///
+/// This function is an egregious hack that allows us to introduce the
+/// #isolation-based versions of functions into the concurrency library
+/// without breaking clients that use @_unsafeInheritExecutor. Since those
+/// clients can't use #isolation (it doesn't work with @_unsafeInheritExecutor),
+/// we route them to the @_unsafeInheritExecutor versions implicitly.
+void introduceUnsafeInheritExecutorReplacements(
+    const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
 
 } // end namespace swift
 

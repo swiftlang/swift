@@ -2115,17 +2115,18 @@ void swift::introduceUnsafeInheritExecutorReplacements(
   // Make sure at least some of the entries are functions in the _Concurrency
   // module.
   ModuleDecl *concurrencyModule = nullptr;
+  DeclBaseName baseName;
   for (auto decl: decls) {
     if (isReplaceable(decl)) {
       concurrencyModule = decl->getDeclContext()->getParentModule();
+      baseName = decl->getName().getBaseName();
       break;
     }
   }
   if (!concurrencyModule)
     return;
 
-  // Dig out the name.
-  auto baseName = decls.front()->getName().getBaseName();
+  // Ignore anything with a special name.
   if (baseName.isSpecial())
     return;
 
@@ -2150,6 +2151,60 @@ void swift::introduceUnsafeInheritExecutorReplacements(
   for (const auto &lookupResult: lookup) {
     if (auto decl = lookupResult.getValueDecl())
       decls.push_back(decl);
+  }
+}
+
+void swift::introduceUnsafeInheritExecutorReplacements(
+    const DeclContext *dc, Type base, SourceLoc loc, LookupResult &lookup) {
+  if (lookup.empty())
+    return;
+
+  auto baseNominal = base->getAnyNominal();
+  if (!baseNominal || !inConcurrencyModule(baseNominal))
+    return;
+
+  auto isReplaceable = [&](ValueDecl *decl) {
+    return isa<FuncDecl>(decl) && inConcurrencyModule(decl->getDeclContext());
+  };
+
+  // Make sure at least some of the entries are functions in the _Concurrency
+  // module.
+  ModuleDecl *concurrencyModule = nullptr;
+  DeclBaseName baseName;
+  for (auto &result: lookup) {
+    auto decl = result.getValueDecl();
+    if (isReplaceable(decl)) {
+      concurrencyModule = decl->getDeclContext()->getParentModule();
+      baseName = decl->getBaseName();
+      break;
+    }
+  }
+  if (!concurrencyModule)
+    return;
+
+  // Ignore anything with a special name.
+  if (baseName.isSpecial())
+    return;
+
+  // Look for entities with the _unsafeInheritExecutor_ prefix on the name.
+  ASTContext &ctx = base->getASTContext();
+  Identifier newIdentifier = ctx.getIdentifier(
+      ("_unsafeInheritExecutor_" + baseName.getIdentifier().str()).str());
+
+  LookupResult replacementLookup = TypeChecker::lookupMember(
+      const_cast<DeclContext *>(dc), base, DeclNameRef(newIdentifier), loc,
+      defaultMemberLookupOptions);
+  if (replacementLookup.innerResults().empty())
+    return;
+
+  // Drop all of the _Concurrency entries in favor of the ones found by this
+  // lookup.
+  lookup.filter([&](const LookupResultEntry &entry, bool) {
+    return !isReplaceable(entry.getValueDecl());
+  });
+
+  for (const auto &entry: replacementLookup.innerResults()) {
+    lookup.add(entry, /*isOuter=*/false);
   }
 }
 
