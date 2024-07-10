@@ -4877,8 +4877,19 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     return std::nullopt;
 
   std::optional<ActorIsolation> foundIsolation;
-  for (auto proto :
-       nominal->getLocalProtocols(ConformanceLookupKind::NonStructural)) {
+  for (auto conformance :
+       nominal->getLocalConformances(ConformanceLookupKind::NonStructural)) {
+
+    // Don't include inherited conformances. If a conformance is inherited
+    // from a superclass, the isolation of the subclass should be inferred
+    // from the superclass, which is done directly in ActorIsolationRequest.
+    // If the superclass has opted out of global actor inference, such as
+    // by conforming to the protocol in an extension, then the subclass should
+    // not infer isolation from the protocol.
+    if (conformance->getKind() == ProtocolConformanceKind::Inherited)
+      continue;
+
+    auto *proto = conformance->getProtocol();
     switch (auto protoIsolation = getActorIsolation(proto)) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
