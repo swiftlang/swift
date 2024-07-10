@@ -1404,11 +1404,7 @@ extension UnsafeMutableRawPointer {
   public func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-#if $BuiltinStoreRaw
     Builtin.storeRaw(value, (self + offset)._rawValue)
-#else
-    fatalError("Unsupported swift compiler!")
-#endif
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.

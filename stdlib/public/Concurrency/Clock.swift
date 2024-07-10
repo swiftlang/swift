@@ -68,7 +68,6 @@ extension Clock {
   ///       }
   @available(SwiftStdlib 5.7, *)
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(OptionalIsolatedParameters)
   public func measure(
     isolation: isolated (any Actor)? = #isolation,
     _ work: () async throws -> Void
