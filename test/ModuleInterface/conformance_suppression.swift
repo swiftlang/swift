@@ -3,11 +3,6 @@
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface -module-name Mojuel)
 
-// CHECK:      #if compiler(>=5.3) && $ConformanceSuppression
-// CHECK-NEXT: public enum RecollectionOrganization<T> : ~Swift.BitwiseCopyable, Swift.Copyable where T : ~Copyable {
+// CHECK:     public enum RecollectionOrganization<T> : ~Swift.BitwiseCopyable, Swift.Copyable where T : ~Copyable {
 // CHECK-NEXT: }
-// CHECK-NEXT: #else
-// CHECK-NEXT: public enum RecollectionOrganization<T> : Swift.Copyable where T : ~Copyable {
-// CHECK-NEXT: }
-// CHECK-NEXT: #endif
 public enum RecollectionOrganization<T : ~Copyable> : ~BitwiseCopyable, Copyable {}
