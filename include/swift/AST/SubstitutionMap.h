@@ -115,6 +115,15 @@ public:
   /// This function should generally only be used by the substitution
   /// subsystem.
   static SubstitutionMap get(GenericSignature genericSig,
+                             ArrayRef<Type> replacementTypes,
+                             InFlightSubstitution &IFS);
+
+  /// Build a substitution map from the substitutions represented by
+  /// the given in-flight substitution.
+  ///
+  /// This function should generally only be used by the substitution
+  /// subsystem.
+  static SubstitutionMap get(GenericSignature genericSig,
                              InFlightSubstitution &IFS);
 
   /// Retrieve the substitution map's input generic signature.

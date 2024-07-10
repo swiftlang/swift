@@ -166,9 +166,28 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      ArrayRef<Type> types,
                                      LookupConformanceFn lookupConformance) {
-  return get(genericSig,
-             QueryReplacementTypeArray{genericSig, types},
-             lookupConformance);
+  QueryReplacementTypeArray subs{genericSig, types};
+  InFlightSubstitution IFS(subs, lookupConformance, std::nullopt);
+  return get(genericSig, types, IFS);
+}
+
+SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
+                                     ArrayRef<Type> types,
+                                     InFlightSubstitution &IFS) {
+  // Form the stored conformances.
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (const auto &req : genericSig.getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance) continue;
+
+    CanType depTy = req.getFirstType()->getCanonicalType();
+    auto replacement = depTy.subst(IFS);
+    auto *proto = req.getProtocolDecl();
+    auto conformance = IFS.lookupConformance(depTy, replacement, proto,
+                                             /*level=*/0);
+    conformances.push_back(conformance);
+  }
+
+  return SubstitutionMap(genericSig, types, conformances);
 }
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
@@ -192,20 +211,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     replacementTypes.push_back(replacement);
   }
 
-  // Form the stored conformances.
-  SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (const auto &req : genericSig.getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance) continue;
-
-    CanType depTy = req.getFirstType()->getCanonicalType();
-    auto replacement = depTy.subst(IFS);
-    auto *proto = req.getProtocolDecl();
-    auto conformance = IFS.lookupConformance(depTy, replacement, proto,
-                                             /*level=*/0);
-    conformances.push_back(conformance);
-  }
-
-  return SubstitutionMap(genericSig, replacementTypes, conformances);
+  return SubstitutionMap::get(genericSig, replacementTypes, IFS);
 }
 
 Type SubstitutionMap::lookupSubstitution(GenericTypeParamType *genericParam) const {
