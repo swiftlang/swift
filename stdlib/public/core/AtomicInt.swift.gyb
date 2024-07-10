@@ -74,6 +74,9 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
 #elseif _pointerBitWidth(_32)
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int32(
     target._rawValue, expected.pointee._value, desired._value)
+#elseif _pointerBitWidth(_16)
+  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int16(
+    target._rawValue, expected.pointee._value, desired._value)
 #else
 #error("Unknown platform")
 #endif
@@ -93,6 +96,9 @@ func _swift_stdlib_atomicLoadInt(
 #elseif _pointerBitWidth(_32)
   let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
   return Int(value)
+#elseif _pointerBitWidth(_16)
+  let value = Builtin.atomicload_seqcst_Int16(target._rawValue)
+  return Int(value)
 #else
 #error("Unknown platform")
 #endif
@@ -106,6 +112,8 @@ internal func _swift_stdlib_atomicStoreInt(
   Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
 #elseif _pointerBitWidth(_32)
   Builtin.atomicstore_seqcst_Int32(target._rawValue, desired._value)
+#elseif _pointerBitWidth(_16)
+  Builtin.atomicstore_seqcst_Int16(target._rawValue, desired._value)
 #else
 #error("Unknown platform")
 #endif
@@ -128,13 +136,17 @@ func _swift_stdlib_atomicFetch${operation}Int(
   let value = _swift_stdlib_atomicFetch${operation}Int32(
     object: rawTarget.assumingMemoryBound(to: Int32.self),
     operand: Int32(operand))
+#elseif _pointerBitWidth(_16)
+  let value = _swift_stdlib_atomicFetch${operation}Int16(
+    object: rawTarget.assumingMemoryBound(to: Int16.self),
+    operand: Int16(operand))
 #else
 #error("Unknown platform")
 #endif
   return Int(value)
 }
 
-%   for bits in [ 32, 64 ]:
+%   for bits in [ 16, 32, 64 ]:
 
 // Warning: no overflow checking.
 @usableFromInline // used by SwiftPrivate._stdlib_AtomicInt

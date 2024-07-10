@@ -201,7 +201,7 @@ extension _StringGuts {
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
-    #elseif _pointerBitWidth(_32)
+    #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
