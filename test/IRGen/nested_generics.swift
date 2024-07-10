@@ -2,7 +2,7 @@
 // RUN: %FileCheck %s --check-prefix=CHECK < %t.txt
 // RUN: %FileCheck %s --check-prefix=CHECK-CONSTANTS < %t.txt
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 func blah<T>(_: T.Type) {}
 
