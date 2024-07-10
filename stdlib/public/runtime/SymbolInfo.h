@@ -61,38 +61,40 @@ private:
       _moduleFileName(moduleFileName),
       _moduleBaseAddress(moduleBaseAddress)
   {}
+
+  void initializeFrom(const SymbolInfo &other) {
+    _symbolAddress = other._symbolAddress;
+    _symbolName = ::strdup(other._symbolName);
+    _moduleFileName = ::strdup(other._moduleFileName);
+    _moduleBaseAddress = other._moduleBaseAddress;
+  }
+
+  void deinitialize() {
+    ::free((void *)_moduleFileName);
+    ::free((void *)_symbolName);
+    _moduleFileName = nullptr;
+    _symbolName = nullptr;
+  }
 #endif
 
 public:
-  SymbolInfo() {}
-
 #if defined(_WIN32) && !defined(__CYGWIN__)
+  SymbolInfo() : _symbolName(nullptr), _moduleFileName(nullptr) {}
+
   SymbolInfo(const SymbolInfo &other) {
-    _symbolName = nullptr;
-    _moduleFileName = nullptr;
-    *this = other;
+    initializeFrom(other);
   }
   SymbolInfo(SymbolInfo &&other) {
     *this = std::move(other);
   }
   ~SymbolInfo() {
-    if (_moduleFileName)
-      ::free((void *)_moduleFileName);
-    if (_symbolName)
-      ::free((void *)_symbolName);
+    deinitialize();
   }
 
   SymbolInfo &operator=(const SymbolInfo &other) {
     if (this != &other) {
-      if (_moduleFileName)
-        ::free((void *)_moduleFileName);
-      if (_symbolName)
-        ::free((void *)_symbolName);
-
-      _symbolAddress = other._symbolAddress;
-      _symbolName = ::strdup(other._symbolName);
-      _moduleFileName = ::strdup(other._moduleFileName);
-      _moduleBaseAddress = other._moduleBaseAddress;
+      deinitialize();
+      initializeFrom(other);
     }
 
     return *this;
@@ -109,6 +111,8 @@ public:
 
     return *this;
   }
+#else
+  SymbolInfo() {}
 #endif
 
   /// Get the file name of the image where the symbol was found.

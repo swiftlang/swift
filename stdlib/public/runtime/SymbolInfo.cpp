@@ -77,7 +77,7 @@ struct Win32ModuleInfo {
 };
 
 // Get the filename and base of the module that contains the specified
-// address.  N.B. This returns a malloc()ed copy of the filename in the
+// address.  N.B. This returns a `malloc`-ed copy of the filename in the
 // Win32ModuleInfo struct; you are responsible for freeing that.
 static Win32ModuleInfo moduleInfoFromAddress(const void *address) {
   HMODULE hModule;
@@ -89,12 +89,12 @@ static Win32ModuleInfo moduleInfoFromAddress(const void *address) {
 
     if (!GetModuleInformation(GetCurrentProcess(), hModule,
                               &mi, sizeof(mi))) {
-      ::memset(&mi, 0, sizeof(mi));
+      ZeroMemory(&mi, sizeof(mi));
     }
 
     WCHAR wszBuffer[256];
     LPWSTR pwszFileName = wszBuffer;
-    DWORD dwCapacity = sizeof(wszBuffer) / sizeof(WCHAR);
+    DWORD dwCapacity = sizeof(wszBuffer) / sizeof(*wszBuffer);
     DWORD dwRet = GetModuleFileNameW(hModule, pwszFileName, dwCapacity);
 
     if (dwRet == dwCapacity) {
