@@ -7213,6 +7213,13 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  } else {
+    bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
+        .str().equals("_Concurrency");
+    auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
+    diag.warnUntilSwiftVersion(6);
+    diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
+    replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
 }
 
