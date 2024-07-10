@@ -177,6 +177,10 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
   if (isa<SILFunctionArgument>(V))
     return true;
 
+  auto rootVal = lookThroughAddressAndValueProjections(V);
+  if (rootVal != V) {
+    return isIdentifiedUnderlyingArrayObject(rootVal);
+  }
   return false;
 }
 

@@ -69,6 +69,9 @@ SILValue stripAddressProjections(SILValue V);
 /// Look through any projections that transform an address -> an address.
 SILValue lookThroughAddressToAddressProjections(SILValue v);
 
+/// Look through address and value projections
+SILValue lookThroughAddressAndValueProjections(SILValue V);
+
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
 ///
