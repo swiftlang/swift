@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTVisitor.h"
@@ -736,6 +737,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           isa<TypeDecl>(ResultValues.front())) {
         return buildTypeExpr(cast<TypeDecl>(ResultValues.front()));
       }
+    }
+
+    // If we are in an @_unsafeInheritExecutor context, swap out
+    // declarations for their _unsafeInheritExecutor_ counterparts if they
+    // exist.
+    if (enclosingUnsafeInheritsExecutor(DC)) {
+      introduceUnsafeInheritExecutorReplacements(
+          DC, UDRE->getNameLoc().getBaseNameLoc(), ResultValues);
     }
 
     return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
