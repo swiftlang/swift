@@ -3962,7 +3962,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
+  if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
           repr->getResultTypeRepr())) {
     diagnoseInvalid(lifetimeRepr, lifetimeRepr->getLoc(),
                     diag::lifetime_dependence_function_type);
@@ -4518,8 +4518,8 @@ bool TypeResolver::resolveSingleSILResult(
 
   options.setContext(TypeResolverContext::FunctionResult);
 
-  // Look through LifetimeDependentReturnTypeRepr.
-  // LifetimeDependentReturnTypeRepr will be processed separately when building
+  // Look through LifetimeDependentTypeRepr.
+  // LifetimeDependentTypeRepr will be processed separately when building
   // SILFunctionType.
   if (auto *lifetimeDependentTypeRepr =
           dyn_cast<LifetimeDependentTypeRepr>(repr)) {
