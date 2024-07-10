@@ -30,6 +30,7 @@ from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .staticswiftlinux import StaticSwiftLinuxConfig
 from .swift import Swift
+from .swift_testing import SwiftTesting
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
@@ -68,6 +69,7 @@ __all__ = [
     'SwiftInspect',
     'SwiftPM',
     'SwiftDriver',
+    'SwiftTesting',
     'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',
