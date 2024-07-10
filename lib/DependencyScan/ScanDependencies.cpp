@@ -1272,15 +1272,15 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  SwiftDependencyScanningService service;
+  SwiftDependencyScanningService *service = Context.Allocate<SwiftDependencyScanningService>();
   if (opts.ReuseDependencyScannerCache)
-    deserializeDependencyCache(instance, service);
+    deserializeDependencyCache(instance, *service);
 
-  if (service.setupCachingDependencyScanningService(instance))
+  if (service->setupCachingDependencyScanningService(instance))
     return true;
 
   ModuleDependenciesCache cache(
-      service, instance.getMainModule()->getNameStr().str(),
+      *service, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
@@ -1291,7 +1291,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
   if (opts.SerializeDependencyScannerCache)
-    serializeDependencyCache(instance, service);
+    serializeDependencyCache(instance, *service);
 
   if (dependenciesOrErr.getError())
     return true;
@@ -1315,9 +1315,9 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  SwiftDependencyScanningService singleUseService;
+  SwiftDependencyScanningService *singleUseService = Context.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(
-      singleUseService, instance.getMainModule()->getNameStr().str(),
+      *singleUseService, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
