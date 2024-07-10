@@ -1,8 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
+
 // RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %t/a.out
-// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy not --crash %target-run %t/a.out
+// RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %{python} %S/../../Inputs/not.py "%target-run %t/a.out"
+
+// NOTE: not.py is used above instead of "not --crash" because %target-run
+// doesn't pass through the crash, and `not` may not be available when running
+// on a remote host. See also test/backtrace.swift.
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
