@@ -186,7 +186,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
           Args.push_back("-direct-clang-cc1-module-build");
           auto *importer =
               static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args()) {
+          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args(
+                   /*isInterface=*/true)) {
             Args.push_back("-Xcc");
             Args.push_back(Arg);
           }
