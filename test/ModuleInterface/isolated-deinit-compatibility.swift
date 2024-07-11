@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -module-name IsolatedDeinitCompatibility
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name IsolatedDeinitCompatibility
+// RUN: %target-swift-frontend -disable-availability-checking -emit-silgen -verify %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -disable-availability-checking -module-name IsolatedDeinitCompatibility
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -disable-availability-checking -module-name IsolatedDeinitCompatibility
 // RUN: %FileCheck %s < %t.swiftinterface
 
 // MARK: Sync deinit in class

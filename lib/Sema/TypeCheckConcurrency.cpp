@@ -4722,20 +4722,24 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     struct NameAndRange {
       StringRef name;
       SourceRange range;
+
+      NameAndRange(StringRef _name, SourceRange _range)
+          : name(_name), range(_range) {}
     };
 
     llvm::SmallVector<NameAndRange, 3> attributes;
     if (isolatedAttr) {
-      attributes.push_back({.name = isolatedAttr->getAttrName(),
-                            .range = isolatedAttr->getRangeWithAt()});
+      attributes.push_back(NameAndRange(isolatedAttr->getAttrName(),
+                                        isolatedAttr->getRangeWithAt()));
     }
     if (nonisolatedAttr) {
-      attributes.push_back({.name = nonisolatedAttr->getAttrName(),
-                            .range = nonisolatedAttr->getRangeWithAt()});
+      attributes.push_back(NameAndRange(nonisolatedAttr->getAttrName(),
+                                        nonisolatedAttr->getRangeWithAt()));
     }
     if (globalActorAttr) {
-      attributes.push_back({.name = globalActorAttr->second->getName().str(),
-                            .range = globalActorAttr->first->getRangeWithAt()});
+      attributes.push_back(
+          NameAndRange(globalActorAttr->second->getName().str(),
+                       globalActorAttr->first->getRangeWithAt()));
     }
     if (attributes.size() == 3) {
       decl->diagnose(diag::actor_isolation_multiple_attr_3, decl,
