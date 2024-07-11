@@ -72,8 +72,6 @@ const void *SymbolInfo::getSymbolAddress() const {
 struct Win32ModuleInfo {
   const char *name;
   const void *base;
-
-  Win32ModuleInfo(const char *n, const void *b) : name(n), base(b) {}
 };
 
 // Get the filename and base of the module that contains the specified
@@ -117,7 +115,7 @@ static Win32ModuleInfo moduleInfoFromAddress(const void *address) {
       if (pwszFileName != wszBuffer)
         ::free(pwszFileName);
 
-      return Win32ModuleInfo(::strdup("<unknown>"), mi.lpBaseOfDll);
+      return { ::strdup("<unknown>"), mi.lpBaseOfDll };
     }
 
     const char *result = _swift_win32_copyUTF8FromWide(pwszFileName);
@@ -125,9 +123,9 @@ static Win32ModuleInfo moduleInfoFromAddress(const void *address) {
     if (pwszFileName != wszBuffer)
       ::free((void *)pwszFileName);
 
-    return Win32ModuleInfo(result, mi.lpBaseOfDll);
+    return { result, mi.lpBaseOfDll };
   } else {
-    return Win32ModuleInfo(::strdup("<unknown>"), nullptr);
+    return { ::strdup("<unknown>"), nullptr };
   }
 }
 #endif

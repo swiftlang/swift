@@ -106,7 +106,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
   // UnDecorateSymbolName() will not fail for Swift symbols, so detect them
   // up-front and let Swift handle them.
-  if (!Demangle::isMangledName(syminfo.getSymbolName())) {
+  if (!Demangle::isMangledName(szSymbolName)) {
     char szUndName[1024];
     DWORD dwResult;
     dwResult = _swift_win32_withDbgHelpLibrary([&] (HANDLE hProcess) -> DWORD {
@@ -119,7 +119,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
       dwFlags |= UNDNAME_32_BIT_DECODE;
 #endif
 
-      return UnDecorateSymbolName(syminfo.getSymbolName(), szUndName,
+      return UnDecorateSymbolName(szSymbolName, szUndName,
                                   sizeof(szUndName), dwFlags);
     });
 
