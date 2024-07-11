@@ -501,7 +501,8 @@ func testNonSendableCaptures(ns: NotSendable, a: isolated MyActor) {
 
   // FIXME: The `a` in the capture list and `isolated a` are the same,
   // but the actor isolation checker doesn't know that.
-  Task { [a] in // expected-tns-warning {{'a'-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
+  Task { [a] in // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-tns-note @-1 {{Passing 'a'-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween 'a'-isolated uses and uses reachable from the callee}}
     _ = a
     _ = ns
   }

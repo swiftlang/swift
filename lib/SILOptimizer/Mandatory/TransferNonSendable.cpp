@@ -1315,17 +1315,30 @@ public:
         .limitBehaviorIf(getBehaviorLimit());
   }
 
-  void emitFunctionArgumentApply(SILLocation loc, Type type,
-                                 ApplyIsolationCrossing crossing) {
+  void emitPassToApply(SILLocation loc, Type inferredType,
+                       ApplyIsolationCrossing crossing) {
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
       getIsolationRegionInfo().printForDiagnostics(os);
     }
-    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
-                  descriptiveKindStr, type, crossing.getCalleeIsolation())
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
-        .limitBehaviorIf(getBehaviorLimit());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc,
+          diag::regionbasedisolation_typed_transferneversendable_via_arg_callee,
+          descriptiveKindStr, inferredType, crossing.getCalleeIsolation(),
+          calleeInfo->first, calleeInfo->second);
+    } else {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_typed_transferneversendable_via_arg,
+          descriptiveKindStr, inferredType, crossing.getCalleeIsolation());
+    }
   }
 
   void emitNamedFunctionArgumentClosure(SILLocation loc, Identifier name,
@@ -1695,7 +1708,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       }
     }
 
-    diagnosticEmitter.emitFunctionArgumentApply(loc, type, *isolation);
+    diagnosticEmitter.emitPassToApply(loc, type, *isolation);
     return true;
   }
 
@@ -1710,8 +1723,8 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   // See if we are in SIL and have an apply site specified isolation.
   if (auto fas = FullApplySite::isa(op->getUser())) {
     if (auto isolation = fas.getIsolationCrossing()) {
-      diagnosticEmitter.emitFunctionArgumentApply(
-          loc, op->get()->getType().getASTType(), *isolation);
+      diagnosticEmitter.emitPassToApply(loc, op->get()->getType().getASTType(),
+                                        *isolation);
       return true;
     }
   }

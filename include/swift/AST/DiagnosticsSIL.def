@@ -944,18 +944,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
 
-//===---
-// Old Transfer Non Sendable Diagnostics
-//
-
-ERROR(regionbasedisolation_arg_transferred, none,
-      "sending %0 value of type %1 with later accesses to %2 context risks causing data races",
-      (StringRef, Type, ActorIsolation))
-
-//===---
-// New Transfer Non Sendable Diagnostics
-//
-
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
       "sending %0 risks causing data races",
       (Identifier))
@@ -1030,7 +1018,7 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks causing races inbetween %0 uses and uses reachable from the callee",
      (StringRef, Type))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
-     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %2 %3 risks causing races inbetween %0 uses and uses reachable from %2",
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %2 %3 risks causing races inbetween %0 uses and uses reachable from %3",
      (StringRef, Type, DescriptiveDeclKind, DeclName))
 
 NOTE(regionbasedisolation_named_transfer_nt_asynclet_capture, none,
@@ -1043,6 +1031,13 @@ NOTE(regionbasedisolation_typed_use_after_sending, none,
 NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument to %1 %2 risks causing races in between local and caller code",
       (Type, DescriptiveDeclKind, DeclName))
+
+NOTE(regionbasedisolation_typed_transferneversendable_via_arg, none,
+      "sending %0 value of non-Sendable type %1 to %2 callee risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation))
+NOTE(regionbasedisolation_typed_transferneversendable_via_arg_callee, none,
+      "sending %0 value of non-Sendable type %1 to %2 %3 %4 risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation, DescriptiveDeclKind, DeclName))
 
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,
