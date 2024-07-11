@@ -77,13 +77,18 @@ public struct FunctionConvention : CustomStringConvertible {
   /// Collection of LifetimeDependenceConvention indexed on the
   /// function parameter.
   public var resultDependencies: ResultDependencies? {
-    let deps = bridgedFunctionType.SILFunctionType_getLifetimeDependenceInfo()
-    if deps.empty() {
-      return nil
+    let bridgedDependencies = bridgedFunctionType.SILFunctionType_getLifetimeDependencies()
+    let dependencies = LifetimeDependencies(bridged: bridgedDependencies)
+    let targetIndex = parameters.count
+
+    for dependence in dependencies {
+      if dependence.getTargetIndex() == targetIndex {
+        return ResultDependencies(bridged: dependence,
+                                  parameterCount: parameters.count,
+                                  hasSelfParameter: hasSelfParameter)
+      }
     }
-    return ResultDependencies(bridged: deps,
-                                         parameterCount: parameters.count,
-                                         hasSelfParameter: hasSelfParameter)
+    return nil
   }
 
   public var description: String {
@@ -238,6 +243,26 @@ public enum LifetimeDependenceConvention : CustomStringConvertible {
       return "inherit"
     case .scope:
       return "scope"
+    }
+  }
+}
+
+extension FunctionConvention {
+  struct LifetimeDependencies : Collection {
+    let bridged: BridgedLifetimeDependenceInfoArray
+
+    var startIndex: Int { 0 }
+
+    var endIndex: Int { bridged.count() }
+
+    func index(after index: Int) -> Int {
+      return index + 1
+    }
+    // Create a Swift LifetimeDependenceInfo for BridgedLifetimeDependenceInfo if this method needs
+    // to be exposed outside FunctionConvention.
+    // That will likely need bridging IndexSubset to Swift.
+    subscript(_ index: Int) -> BridgedLifetimeDependenceInfo {
+      return bridged.at(index)
     }
   }
 }

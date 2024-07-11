@@ -3051,9 +3051,11 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                                          const ValueDecl *forDecl,
                                          FunctionManglingKind functionMangling,
                                          bool isRecursedInto) {
-  appendFunctionResultType(fn->getResult(), sig, forDecl);
-  appendFunctionInputType(fn->getParams(), fn->getLifetimeDependenceInfo(), sig,
-                          forDecl, isRecursedInto);
+  appendFunctionResultType(fn->getResult(), sig,
+                           forDecl ? fn->getLifetimeDependenceForResult(forDecl)
+                                   : std::nullopt,
+                           forDecl);
+  appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3103,18 +3105,6 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
 
   if (isRecursedInto && fn->hasSendingResult()) {
     appendOperator("YT");
-  }
-
-  if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(forDecl)) {
-    if (afd->hasImplicitSelfDecl()) {
-      auto lifetimeDependenceKind =
-          fn->getLifetimeDependenceInfo().getLifetimeDependenceOnParam(
-              /*selfIndex*/ afd->getParameters()->size());
-      if (lifetimeDependenceKind) {
-        appendLifetimeDependenceKind(*lifetimeDependenceKind,
-                                     /*isSelfDependence*/ true);
-      }
-    }
   }
 }
 
@@ -3188,9 +3178,8 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
 }
 
 void ASTMangler::appendFunctionInputType(
-    ArrayRef<AnyFunctionType::Param> params,
-    LifetimeDependenceInfo lifetimeDependenceInfo, GenericSignature sig,
-    const ValueDecl *forDecl, bool isRecursedInto) {
+    AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Param> params,
+    GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
   auto defaultSpecifier = getDefaultOwnership(forDecl);
   
   switch (params.size()) {
@@ -3214,8 +3203,8 @@ void ASTMangler::appendFunctionInputType(
           Identifier(), type,
           getParameterFlagsForMangling(param.getParameterFlags(),
                                        defaultSpecifier, isRecursedInto),
-          lifetimeDependenceInfo.getLifetimeDependenceOnParam(/*paramIndex*/ 0),
-          sig, nullptr);
+          getLifetimeDependenceFor(fnType->getLifetimeDependencies(), 0), sig,
+          nullptr);
       break;
     }
 
@@ -3236,8 +3225,9 @@ void ASTMangler::appendFunctionInputType(
           Identifier(), param.getPlainType(),
           getParameterFlagsForMangling(param.getParameterFlags(),
                                        defaultSpecifier, isRecursedInto),
-          lifetimeDependenceInfo.getLifetimeDependenceOnParam(paramIndex), sig,
-          nullptr);
+          getLifetimeDependenceFor(fnType->getLifetimeDependencies(),
+                                   paramIndex),
+          sig, nullptr);
       appendListSeparator(isFirstParam);
       paramIndex++;
     }
@@ -3246,10 +3236,19 @@ void ASTMangler::appendFunctionInputType(
   }
 }
 
-void ASTMangler::appendFunctionResultType(Type resultType, GenericSignature sig,
-                                          const ValueDecl *forDecl) {
-  return resultType->isVoid() ? appendOperator("y")
-                              : appendType(resultType, sig, forDecl);
+void ASTMangler::appendFunctionResultType(
+    Type resultType, GenericSignature sig,
+    std::optional<LifetimeDependenceInfo> lifetimeDependence,
+    const ValueDecl *forDecl) {
+  if (resultType->isVoid()) {
+    appendOperator("y");
+  } else {
+    appendType(resultType, sig, forDecl);
+  }
+
+  if (AllowLifetimeDependencies && lifetimeDependence.has_value()) {
+    appendLifetimeDependence(*lifetimeDependence);
+  }
 }
 
 void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
@@ -3271,7 +3270,7 @@ void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
 
 void ASTMangler::appendParameterTypeListElement(
     Identifier name, Type elementType, ParameterTypeFlags flags,
-    std::optional<LifetimeDependenceKind> lifetimeDependenceKind,
+    std::optional<LifetimeDependenceInfo> lifetimeDependence,
     GenericSignature sig, const ValueDecl *forDecl) {
   if (auto *fnType = elementType->getAs<FunctionType>())
     appendFunctionType(fnType, sig, flags.isAutoClosure(), forDecl);
@@ -3302,9 +3301,8 @@ void ASTMangler::appendParameterTypeListElement(
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
 
-  if (lifetimeDependenceKind) {
-    appendLifetimeDependenceKind(*lifetimeDependenceKind,
-                                 /*isSelfDependence*/ false);
+  if (AllowLifetimeDependencies && lifetimeDependence) {
+    appendLifetimeDependence(*lifetimeDependence);
   }
 
   if (!name.empty())
@@ -3313,21 +3311,18 @@ void ASTMangler::appendParameterTypeListElement(
     appendOperator("d");
 }
 
-void ASTMangler::appendLifetimeDependenceKind(LifetimeDependenceKind kind,
-                                              bool isSelfDependence) {
-  if (kind == LifetimeDependenceKind::Scope) {
-    if (isSelfDependence) {
-      appendOperator("YLs");
-    } else {
-      appendOperator("Yls");
-    }
-  } else {
-    assert(kind == LifetimeDependenceKind::Inherit);
-    if (isSelfDependence) {
-      appendOperator("YLi");
-    } else {
-      appendOperator("Yli");
-    }
+void ASTMangler::appendLifetimeDependence(LifetimeDependenceInfo info) {
+  if (auto *inheritIndices = info.getInheritIndices()) {
+    assert(!inheritIndices->isEmpty());
+    appendOperator("Yli");
+    appendIndexSubset(inheritIndices);
+    appendOperator("_");
+  }
+  if (auto *scopeIndices = info.getScopeIndices()) {
+    assert(!scopeIndices->isEmpty());
+    appendOperator("Yls");
+    appendIndexSubset(scopeIndices);
+    appendOperator("_");
   }
 }
 

@@ -25,7 +25,7 @@
  }
 
  func testTransfer(nc: consuming NC) {
-   let transferred = applyTransfer(ne: nc.ne, transfer: transfer) // expected-error{{cannot convert value of type '(NE) -> _inherit(0)  NE' to expected argument type '(NE) -> NE'}}
+   let transferred = applyTransfer(ne: nc.ne, transfer: transfer) // expected-error{{cannot convert value of type '(NE) -> _inherit(0) NE' to expected argument type '(NE) -> NE'}}
 
    _ = consume nc
    _ = transfer(transferred)
@@ -40,7 +40,7 @@
  }
 
  func testBorrow(nc: consuming NC) {
-   let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '(borrowing NC) -> _scope(0)  NE' to expected argument type '(borrowing NC) -> NE}}
+   let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '(borrowing NC) -> _scope(0) NE' to expected argument type '(borrowing NC) -> NE}}
    _ = consume nc
    _ = transfer(borrowed)
  }
