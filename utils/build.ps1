@@ -1027,7 +1027,7 @@ function Build-CMakeProject {
 
       if ($Platform -eq "Windows") {
         $SwiftArgs += @("-Xlinker", "/INCREMENTAL:NO")
-        # Swift Requries COMDAT folding and de-duplication
+        # Swift requires COMDAT folding and de-duplication
         $SwiftArgs += @("-Xlinker", "/OPT:REF")
         $SwiftArgs += @("-Xlinker", "/OPT:ICF")
       }
@@ -1194,7 +1194,7 @@ function Build-WiXProject() {
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
     # but Packages still require a purely numerical version number, 
-    # so trim any semantic versionning suffixes
+    # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
 

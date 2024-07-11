@@ -47,7 +47,7 @@ void disposeCancellationToken(SourceKitCancellationToken CancellationToken);
 
 /// Returns \c true if \p Request is of a request kind that should be issued as
 /// a dispatch barrier of the message handling queue. In practice, this returns
-/// \c true for open, edit and close requets.
+/// \c true for open, edit and close requests.
 ///
 /// This does not check if dispatch barriers have been enabled by the sourckitd
 /// client.

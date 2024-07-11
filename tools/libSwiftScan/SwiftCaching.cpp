@@ -246,7 +246,7 @@ bool swiftscan_cas_prune_ondisk_data(swiftscan_cas_t cas,
   return false;
 }
 
-/// Expand the invocation if there is repsonseFile into Args that are passed in
+/// Expand the invocation if there is responseFile into Args that are passed in
 /// the parameter. Return swift-frontend arguments in an ArrayRef, which has the
 /// first "-frontend" option dropped if needed.
 static llvm::ArrayRef<const char *>
@@ -966,7 +966,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
               return Proxy.takeError();
 
             if (Kind == file_types::ID::TY_CachedDiagnostics) {
-              assert(!DiagnosticsOutput && "more than 1 diagnotics found");
+              assert(!DiagnosticsOutput && "more than 1 diagnostics found");
               DiagnosticsOutput = std::move(*Proxy);
             } else
               OutputProxies.emplace_back(
