@@ -2966,8 +2966,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           } else {
             blockTemporaries[getPullbackBlock(predBB)].insert(
               concreteBBArgAdjCopy);
-            setAdjointValue(predBB, incomingValue,
-                            makeConcreteAdjointValue(concreteBBArgAdjCopy));
+            addAdjointValue(predBB, incomingValue,
+                            makeConcreteAdjointValue(concreteBBArgAdjCopy), pbLoc);
           }
         }
         break;
