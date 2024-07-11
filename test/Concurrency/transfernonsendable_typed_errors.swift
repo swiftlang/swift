@@ -17,6 +17,8 @@
 
 class NonSendableKlass {}
 
+actor MyActor {}
+
 @MainActor func transferToMain<T>(_ t: T) async {}
 
 /////////////////
@@ -37,4 +39,35 @@ func isolatedClosureTest() async {
       // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to main actor-isolated closure due to closure capture risks causing races in between main actor-isolated and nonisolated uses}}
   }
   print(x) // expected-note {{access can happen concurrently}}
+}
+
+func sendingError() async {
+  func test(_ x: sending NonSendableKlass) {}
+  let x = NonSendableKlass()
+  test(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{Passing value of non-Sendable type 'NonSendableKlass' as a 'sending' argument to local function 'test' risks causing races in between local and caller code}}
+  print(x) // expected-note {{access can happen concurrently}}
+}
+
+extension MyActor {
+  func testNonSendableCaptures(sc: NonSendableKlass) {
+    Task {
+      _ = self
+      _ = sc
+
+      Task { [sc,self] in
+        _ = self
+        _ = sc
+
+        Task { // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+          // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument risks causing races in between local and caller code}}
+          _ = sc
+        }
+
+        Task { // expected-note {{access can happen concurrently}}
+          _ = sc
+        }
+      }
+    }
+  }
 }

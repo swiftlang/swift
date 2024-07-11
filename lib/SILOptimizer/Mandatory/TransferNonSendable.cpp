@@ -739,13 +739,17 @@ public:
 
   void emitTypedUseOfStronglyTransferredValue(SILLocation loc,
                                               Type inferredType) {
-    diagnoseError(
-        loc,
-        diag::
-            regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
-        inferredType)
-        .highlight(loc.getSourceRange())
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
         .limitBehaviorIf(getBehaviorLimit());
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_typed_use_after_sending_callee,
+                   inferredType, calleeInfo->first, calleeInfo->second);
+    } else {
+      diagnoseNote(loc, diag::regionbasedisolation_typed_use_after_sending,
+                   inferredType);
+    }
     emitRequireInstDiagnostics();
   }
 
@@ -1108,9 +1112,18 @@ void UseAfterTransferDiagnosticInferrer::infer() {
             baseLoc, rootValueAndName->first);
       }
 
+      // See if we have an ApplyExpr and if we can infer a better type.
+      Type type = baseInferredType;
+      if (auto *applyExpr =
+              transferOp->getUser()->getLoc().getAsASTNode<ApplyExpr>()) {
+        if (auto *foundExpr =
+                inferArgumentExprFromApplyExpr(applyExpr, fas, transferOp))
+          type = foundExpr->findOriginalType();
+      }
+
       // Otherwise, emit the typed diagnostic.
-      return diagnosticEmitter.emitTypedUseOfStronglyTransferredValue(
-          baseLoc, baseInferredType);
+      return diagnosticEmitter.emitTypedUseOfStronglyTransferredValue(baseLoc,
+                                                                      type);
     }
   }
 

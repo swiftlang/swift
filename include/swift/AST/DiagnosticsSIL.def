@@ -948,9 +948,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 // Old Transfer Non Sendable Diagnostics
 //
 
-ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
-      "value of non-Sendable type %0 accessed after being transferred; later accesses could race",
-      (Type))
 ERROR(regionbasedisolation_arg_transferred, none,
       "sending %0 value of type %1 with later accesses to %2 context risks causing data races",
       (StringRef, Type, ActorIsolation))
@@ -1036,6 +1033,13 @@ NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
 NOTE(regionbasedisolation_named_transfer_nt_asynclet_capture, none,
       "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
       (Identifier, StringRef))
+
+NOTE(regionbasedisolation_typed_use_after_sending, none,
+      "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
+      (Type))
+NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
+      "Passing value of non-Sendable type %0 as a 'sending' argument to %1 %2 risks causing races in between local and caller code",
+      (Type, DescriptiveDeclKind, DeclName))
 
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,

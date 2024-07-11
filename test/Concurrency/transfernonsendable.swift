@@ -1762,7 +1762,8 @@ extension MyActor {
         _ = self
         _ = sc
 
-        Task { // expected-tns-warning {{value of non-Sendable type '@isolated(any) @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' accessed after being transferred}}
+        Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument risks causing races in between local and caller code}}
           _ = sc
         }
 
