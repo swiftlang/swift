@@ -1367,10 +1367,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
       auto formalAccess = first->getFormalAccess();
       auto nameLoc = repr->getNameLoc();
-      if (formalAccess >= AccessLevel::Public &&
-          diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
-        return ErrorType::get(ctx);
-
       diags.diagnose(nameLoc, diag::candidate_inaccessible, first,
                      formalAccess);
 
@@ -1379,6 +1375,20 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       for (auto lookupResult : inaccessibleResults)
         lookupResult.getValueDecl()->diagnose(diag::kind_declared_here,
                                               DescriptiveDeclKind::Type);
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if we do.
+      return ErrorType::get(ctx);
+    }
+
+    // Try ignoring missing imports.
+    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    auto nonImportedResults = TypeChecker::lookupUnqualifiedType(
+        dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
+    if (!nonImportedResults.empty()) {
+      auto first = cast<TypeDecl>(nonImportedResults.front().getValueDecl());
+      auto nameLoc = repr->getNameLoc();
+      diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -1463,10 +1473,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     const TypeDecl *first = inaccessibleMembers.front().Member;
     auto formalAccess = first->getFormalAccess();
     auto nameLoc = repr->getNameLoc();
-    if (formalAccess >= AccessLevel::Public &&
-        diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
-      return ErrorType::get(ctx);
-
     diags.diagnose(nameLoc, diag::candidate_inaccessible, first, formalAccess);
 
     // FIXME: If any of the candidates (usually just one) are in the same module
@@ -1475,6 +1481,19 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       lookupResult.Member->diagnose(diag::kind_declared_here,
                                     DescriptiveDeclKind::Type);
 
+    // Don't try to recover here; we'll get more access-related diagnostics
+    // downstream if we do.
+    return ErrorType::get(ctx);
+  }
+
+  // Try ignoring missing imports.
+  relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+  auto nonImportedMembers = TypeChecker::lookupMemberType(
+      dc, parentType, repr->getNameRef(), repr->getLoc(), relookupOptions);
+  if (nonImportedMembers) {
+    const TypeDecl *first = nonImportedMembers.front().Member;
+    auto nameLoc = repr->getNameLoc();
+    diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
     // Don't try to recover here; we'll get more access-related diagnostics
     // downstream if we do.
     return ErrorType::get(ctx);
@@ -1491,7 +1510,8 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     // Let's try to look any member of the parent type with the given name,
     // even if it is not a type, allowing for a more precise diagnostic.
     NLOptions memberLookupOptions = (NL_QualifiedDefault |
-                                     NL_IgnoreAccessControl);
+                                     NL_IgnoreAccessControl |
+                                     NL_IgnoreMissingImports);
     SmallVector<ValueDecl *, 2> results;
     dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
                         memberLookupOptions, results);

@@ -6076,14 +6076,15 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
   else
     swiftName = func->getName();
 
+  NLOptions options = NL_IgnoreAccessControl | NL_IgnoreMissingImports;
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
     ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        NL_QualifiedDefault | NL_IgnoreAccessControl, results);
+                        NL_QualifiedDefault | options, results);
   }
   else {
     auto mod = func->getDeclContext()->getParentModule();
     mod->lookupQualified(mod, DeclNameRef(swiftName), func->getLoc(),
-                         NL_RemoveOverridden | NL_IgnoreAccessControl, results);
+                         NL_RemoveOverridden | options, results);
   }
 }
 

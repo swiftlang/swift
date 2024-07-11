@@ -1923,11 +1923,14 @@ public:
 };
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
+  bool IsMissingImport;
+
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
                           ValueDecl *member, DeclNameRef name,
-                          ConstraintLocator *locator)
+                          ConstraintLocator *locator, bool isMissingImport)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
-                              member, name, locator) {}
+                              member, name, locator),
+        IsMissingImport(isMissingImport) {}
 
 public:
   std::string getName() const override {
@@ -1942,7 +1945,8 @@ public:
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
-                                         ConstraintLocator *locator);
+                                         ConstraintLocator *locator,
+                                         bool isMissingImport);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInaccessibleMember;
