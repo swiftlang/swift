@@ -158,6 +158,9 @@ enum class NameLookupFlags {
   IncludeUsableFromInline = 1 << 2,
   /// This lookup should exclude any names introduced by macro expansions.
   ExcludeMacroExpansions = 1 << 3,
+  /// Whether to include members that would otherwise be filtered out because
+  /// they come from a module that has not been imported.
+  IgnoreMissingImports = 1 << 4,
 };
 
 /// A set of options that control name lookup.

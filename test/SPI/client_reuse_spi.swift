@@ -20,8 +20,8 @@
 //--- C.swift
 
 @_spi(B) import B
-// expected-note{{add import of module 'A'}}{{1-1=@_spi(A) import A\n}}
+
 var a = foo() // OK
-a.bar() // expected-error{{instance method 'bar()' is not available due to missing import of defining module 'A'}}
+a.bar() // expected-error{{'bar' is inaccessible due to '@_spi' protection level}}
 
 var b = SecretStruct() // expected-error{{cannot find 'SecretStruct' in scope}}

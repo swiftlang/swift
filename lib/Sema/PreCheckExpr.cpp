@@ -525,10 +525,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
       auto accessLevel =
           first->getFormalAccessScope().accessLevelForDiagnostics();
-      if (accessLevel == AccessLevel::Public &&
-          diagnoseMissingImportForMember(first, DC, Loc))
-        return errorResult();
-
       Context.Diags.diagnose(Loc, diag::candidate_inaccessible, first,
                              accessLevel);
 
@@ -538,6 +534,19 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         auto *VD = lookupResult.getValueDecl();
         VD->diagnose(diag::decl_declared_here, VD);
       }
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if the type of the inaccessible decl is also inaccessible.
+      return errorResult();
+    }
+
+    // Try ignoring missing imports.
+    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    auto nonImportedResults =
+        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
+    if (nonImportedResults) {
+      const ValueDecl *first = nonImportedResults.front().getValueDecl();
+      diagnoseMissingImportForMember(first, DC, Loc);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if the type of the inaccessible decl is also inaccessible.
