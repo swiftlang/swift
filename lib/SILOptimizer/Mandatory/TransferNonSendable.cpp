@@ -703,6 +703,7 @@ public:
                                   ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
                   inferredType)
+        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     if (auto calleeInfo = getTransferringCalleeInfo()) {
@@ -741,6 +742,7 @@ public:
                                               Type inferredType) {
     diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
                   inferredType)
+        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
     if (auto calleeInfo = getTransferringCalleeInfo()) {
       diagnoseNote(loc,
@@ -785,6 +787,7 @@ public:
       ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
                   inferredType)
+        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
     diagnoseNote(loc,
                  diag::regionbasedisolation_type_isolated_capture_yields_race,
