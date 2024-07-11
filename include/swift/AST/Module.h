@@ -726,7 +726,7 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
-  /// Returns true if -experimental-allow-non-resilient-access was passed
+  /// Returns true if -allow-non-resilient-access was passed
   /// and the module is built from source.
   bool allowNonResilientAccess() const {
     return Bits.ModuleDecl.AllowNonResilientAccess &&
@@ -736,11 +736,12 @@ public:
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
-  /// Returns true if -experimental-package-cmo was passed, which
+  /// Returns true if -package-cmo was passed, which
   /// enables serialization of package, public, and inlinable decls in a
-  /// package. This requires -experimental-allow-non-resilient-access.
+  /// package. This requires -allow-non-resilient-access.
   bool serializePackageEnabled() const {
-    return Bits.ModuleDecl.SerializePackageEnabled;
+    return Bits.ModuleDecl.SerializePackageEnabled &&
+           allowNonResilientAccess();
   }
   void setSerializePackageEnabled(bool flag = true) {
     Bits.ModuleDecl.SerializePackageEnabled = flag;

@@ -391,10 +391,10 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
-    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    /// Whether this module is built with -allow-non-resilient-access.
     unsigned AllowNonResilientAccess : 1;
 
-    /// Whether this module is built with -experimental-package-cmo.
+    /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
     // Explicitly pad out to the next word boundary.
