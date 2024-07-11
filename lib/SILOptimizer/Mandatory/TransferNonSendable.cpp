@@ -55,6 +55,16 @@ using Region = PartitionPrimitives::Region;
 
 } // namespace
 
+// This option is used so we can test typed errors. Typed errors are a fallback
+// case which are emitted when we are unable to infer the name of a value. We in
+// most cases do succeed inferring, so it makes sense to add an asserts only
+// option that can be used by the compiler to test that we emit these correctly.
+static llvm::cl::opt<bool> ForceTypedErrors(
+    "sil-regionbasedisolation-force-use-of-typed-errors",
+    llvm::cl::desc("Force the usage of typed instead of named errors to make "
+                   "it easier to test typed errors"),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -152,6 +162,23 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
   }
 
   return foundExpr;
+}
+
+/// Attempt to infer a name for \p value. Returns none if we fail or if we are
+/// asked to force typed errors since we are testing.
+static std::optional<Identifier> inferNameHelper(SILValue value) {
+  if (ForceTypedErrors)
+    return {};
+  return VariableNameInferrer::inferName(value);
+}
+
+/// Attempt to infer a name and root for \p value. Returns none if we fail or if
+/// we are asked to force typed errors since we are testing.
+static std::optional<std::pair<Identifier, SILValue>>
+inferNameAndRootHelper(SILValue value) {
+  if (ForceTypedErrors)
+    return {};
+  return VariableNameInferrer::inferNameAndRoot(value);
 }
 
 //===----------------------------------------------------------------------===//
@@ -894,8 +921,7 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
     emittedDiagnostic = true;
 
     auto &state = transferringOpToStateMap.get(transferOp);
-    if (auto rootValueAndName =
-            VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+    if (auto rootValueAndName = inferNameAndRootHelper(transferOp->get())) {
       diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
           state.isolationInfo.getIsolationInfo(), std::get<2>(p));
@@ -1066,8 +1092,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
             .hasOption(SILParameterInfo::Sending)) {
 
       // First try to do the named diagnostic if we can find a name.
-      if (auto rootValueAndName =
-              VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+      if (auto rootValueAndName = inferNameAndRootHelper(transferOp->get())) {
         return diagnosticEmitter.emitNamedUseOfStronglyTransferredValue(
             baseLoc, rootValueAndName->first);
       }
@@ -1093,8 +1118,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
-    if (auto rootValueAndName =
-            VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+    if (auto rootValueAndName = inferNameAndRootHelper(transferOp->get())) {
       auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
           baseLoc, rootValueAndName->first,
@@ -1579,7 +1603,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
         // See if we can infer a name from the value.
         SmallString<64> resultingName;
-        if (auto varName = VariableNameInferrer::inferName(op->get())) {
+        if (auto varName = inferNameHelper(op->get())) {
           diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
               loc, *varName);
           return true;
@@ -1619,7 +1643,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
     // See if we can infer a name from the value.
     SmallString<64> resultingName;
-    if (auto name = VariableNameInferrer::inferName(op->get())) {
+    if (auto name = inferNameHelper(op->get())) {
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
     }
@@ -1667,7 +1691,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
              "All result info must be the same... if that changes... update "
              "this code!");
       SmallString<64> resultingName;
-      if (auto name = VariableNameInferrer::inferName(op->get())) {
+      if (auto name = inferNameHelper(op->get())) {
         diagnosticEmitter.emitNamedTransferringReturn(loc, *name);
         return true;
       }
@@ -1807,7 +1831,7 @@ public:
 void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto varName = VariableNameInferrer::inferName(info.inoutSendingParam);
+  auto varName = inferNameHelper(info.inoutSendingParam);
   if (!varName) {
     return emitUnknownPatternError();
   }
