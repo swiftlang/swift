@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
+
 // RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %t/a.out
-// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy not --crash %target-run %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -22,6 +23,22 @@
 // UNSUPPORTED: single_threaded_concurrency
 
 import Dispatch
+import StdlibUnittest
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#elseif os(WASI)
+import WASILibc
+#elseif os(Windows)
+import CRT
+import WinSDK
+#endif
 
 @available(SwiftStdlib 6.0, *)
 final class NaiveOnMainQueueExecutor: SerialExecutor {
@@ -67,12 +84,26 @@ actor ActorOnNaiveOnMainQueueExecutor {
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 6.0, *) {
-      let actor = ActorOnNaiveOnMainQueueExecutor()
-      await actor.checkPreconditionIsolated()
-      // CHECK: Before preconditionIsolated
-      // CHECK-NEXT: checkIsolated: pretend it is ok!
-      // CHECK-NEXT: After preconditionIsolated
+    let tests = TestSuite(#file)
+
+    let varName = "SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE"
+    guard let _mode = getenv(varName) else {
+      fatalError("Env variable required by test was not set: \(varName)")
     }
+    let mode = String(validatingCString: _mode)!
+
+    if #available(SwiftStdlib 6.0, *) {
+      tests.test("test preconditionIsolated in mode: \(mode)") {
+        if (mode == "legacy") {
+          expectCrashLater()
+        } // else, swift6 mode should not crash
+
+
+        let actor = ActorOnNaiveOnMainQueueExecutor()
+        await actor.checkPreconditionIsolated()
+      }
+    }
+
+    await runAllTestsAsync()
   }
 }
