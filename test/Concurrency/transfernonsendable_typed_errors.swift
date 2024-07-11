@@ -20,6 +20,7 @@ class NonSendableKlass {}
 actor MyActor {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
+func transferToSendingParam<T>(_ x: sending T) {}
 
 /////////////////
 // MARK: Tests //
@@ -42,10 +43,9 @@ func isolatedClosureTest() async {
 }
 
 func sendingError() async {
-  func test(_ x: sending NonSendableKlass) {}
   let x = NonSendableKlass()
-  test(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
-  // expected-note @-1 {{Passing value of non-Sendable type 'NonSendableKlass' as a 'sending' argument to local function 'test' risks causing races in between local and caller code}}
+  transferToSendingParam(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{Passing value of non-Sendable type 'NonSendableKlass' as a 'sending' argument to global function 'transferToSendingParam' risks causing races in between local and callee code}}
   print(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -70,4 +70,10 @@ extension MyActor {
       }
     }
   }
+}
+
+@MainActor
+func sendingTransferNonSendableError(_ x: NonSendableKlass) {
+  transferToSendingParam(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-1 {{Passing main actor-isolated value of non-Sendable type 'NonSendableKlass' as a 'sending' parameter to global function 'transferToSendingParam' risks causing races inbetween main actor-isolated uses and uses reachable from 'transferToSendingParam'}}
 }

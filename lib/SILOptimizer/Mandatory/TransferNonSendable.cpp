@@ -1346,18 +1346,28 @@ public:
         .highlight(loc.getSourceRange());
   }
 
-  void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
-                                                    Type type) {
+  void emitTypedSendingNeverSendableToSendingParam(SILLocation loc,
+                                                   Type inferredType) {
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
       getIsolationRegionInfo().printForDiagnostics(os);
     }
-    auto diag =
-        diag::regionbasedisolation_arg_passed_to_strongly_transferred_param;
-    diagnoseError(loc, diag, descriptiveKindStr, type)
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
-        .limitBehaviorIf(getBehaviorLimit());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_typed_tns_passed_to_sending_callee,
+          descriptiveKindStr, inferredType, calleeInfo->first,
+          calleeInfo->second);
+    } else {
+      diagnoseNote(loc, diag::regionbasedisolation_typed_tns_passed_to_sending,
+                   descriptiveKindStr, inferredType);
+    }
   }
 
   void emitNamedOnlyError(SILLocation loc, Identifier name) {
@@ -1415,8 +1425,8 @@ public:
     }
   }
 
-  void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,
-                                                         Identifier varName) {
+  void emitNamedSendingNeverSendableToSendingParam(SILLocation loc,
+                                                   Identifier varName) {
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
     {
@@ -1631,7 +1641,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
         // See if we can infer a name from the value.
         SmallString<64> resultingName;
         if (auto varName = inferNameHelper(op->get())) {
-          diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
+          diagnosticEmitter.emitNamedSendingNeverSendableToSendingParam(
               loc, *varName);
           return true;
         }
@@ -1641,8 +1651,8 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
                 inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
           type = inferredArgExpr->findOriginalType();
         }
-        diagnosticEmitter.emitFunctionArgumentApplyStronglyTransferred(loc,
-                                                                       type);
+        diagnosticEmitter.emitTypedSendingNeverSendableToSendingParam(loc,
+                                                                      type);
         return true;
       }
     }

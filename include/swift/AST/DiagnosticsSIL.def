@@ -951,9 +951,6 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 ERROR(regionbasedisolation_arg_transferred, none,
       "sending %0 value of type %1 with later accesses to %2 context risks causing data races",
       (StringRef, Type, ActorIsolation))
-ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
-      "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
-      (StringRef, Type))
 
 //===---
 // New Transfer Non Sendable Diagnostics
@@ -1029,6 +1026,12 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks causing races inbetween %0 uses and uses reachable from the callee",
+     (StringRef, Type))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %2 %3 risks causing races inbetween %0 uses and uses reachable from %2",
+     (StringRef, Type, DescriptiveDeclKind, DeclName))
 
 NOTE(regionbasedisolation_named_transfer_nt_asynclet_capture, none,
       "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
