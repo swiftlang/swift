@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1615,6 +1616,50 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
       LLVMUsed.push_back(casted);
     }
   }
+}
+
+void IRGenModule::addLinkLibraries() {
+  auto registerLinkLibrary = [this](const LinkLibrary &ll) {
+    this->addLinkLibrary(ll);
+  };
+
+  getSwiftModule()->collectLinkLibraries(
+    [registerLinkLibrary](LinkLibrary linkLib) {
+      registerLinkLibrary(linkLib);
+    });
+
+  if (ObjCInterop)
+    registerLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+
+  // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
+  // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
+  // (std) if available.
+  if (Context.LangOpts.EnableCXXInterop) {
+    bool hasStaticCxx = false;
+    bool hasStaticCxxStdlib = false;
+    if (const auto *M = Context.getModuleByName("Cxx"))
+      hasStaticCxx = M->isStaticLibrary();
+    if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
+      if (const auto *M = Context.getModuleByName("CxxStdlib"))
+        hasStaticCxxStdlib = M->isStaticLibrary();
+    dependencies::registerCxxInteropLibraries(Context.LangOpts.Target,
+                                              getSwiftModule()->getName().str(),
+                                              hasStaticCxx,
+                                              hasStaticCxxStdlib,
+                                              registerLinkLibrary);
+  }
+
+  // FIXME: It'd be better to have the driver invocation or build system that
+  // executes the linker introduce these compatibility libraries, since at
+  // that point we know whether we're building an executable, which is the only
+  // place where the compatibility libraries take effect. For the benefit of
+  // build systems that build Swift code, but don't use Swift to drive
+  // the linker, we can also use autolinking to pull in the compatibility
+  // libraries. This may however cause the library to get pulled in in
+  // situations where it isn't useful, such as for dylibs, though this is
+  // harmless aside from code size.
+  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded))
+    dependencies::registerBackDeployLibraries(IRGen.Opts, registerLinkLibrary);
 }
 
 static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
