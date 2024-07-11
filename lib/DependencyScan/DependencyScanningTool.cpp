@@ -35,11 +35,6 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
                                                     const char *main_executable_path) {
   llvm::sys::SmartScopedLock<true> Lock(TargetInfoMutex);
 
-  // We must reset option occurrences because we are handling an unrelated
-  // command-line to those possibly parsed before using the same tool.
-  // We must do so because LLVM options parsing is done using a managed
-  // static `GlobalParser`.
-  llvm::cl::ResetAllOptionOccurrences();
   // Parse arguments.
   std::string CommandString;
   for (const auto *c : Command) {
@@ -411,8 +406,7 @@ DependencyScanningTool::initCompilerInstanceForScan(
     StringRef WorkingDir,
     std::shared_ptr<DependencyScanDiagnosticCollector> scannerDiagnosticsCollector) {
   // The remainder of this method operates on shared state in the
-  // scanning service and global LLVM state with:
-  // llvm::cl::ResetAllOptionOccurrences
+  // scanning service
   llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   // FIXME: Instead, target-info and supported-features queries must use
   // `DependencyScanningToolStateLock`, but this currently requires further
@@ -438,11 +432,6 @@ DependencyScanningTool::initCompilerInstanceForScan(
   if (WorkingDirectory.empty())
     llvm::sys::fs::current_path(WorkingDirectory);
 
-  // We must reset option occurrences because we are handling an unrelated
-  // command-line to those possibly parsed before using the same tool.
-  // We must do so because LLVM options parsing is done using a managed
-  // static `GlobalParser`.
-  llvm::cl::ResetAllOptionOccurrences();
   // Parse/tokenize arguments.
   std::string CommandString;
   for (const auto *c : CommandArgs) {

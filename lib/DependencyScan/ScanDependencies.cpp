@@ -1142,11 +1142,6 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // those of the current scanner invocation.
       updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
     } else {
-      // We must reset option occurrences because we are handling an unrelated command-line
-      // to those parsed before. We must do so because LLVM options parsing is done
-      // using a managed static `GlobalParser`.
-      llvm::cl::ResetAllOptionOccurrences();
-
       // Create a new instance by the arguments and save it in the map.
       auto newService = std::make_unique<SwiftDependencyScanningService>();
       auto newInstance = std::make_unique<CompilerInstance>();
@@ -1222,15 +1217,15 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  SwiftDependencyScanningService service;
+  SwiftDependencyScanningService *service = Context.Allocate<SwiftDependencyScanningService>();
   if (opts.ReuseDependencyScannerCache)
-    deserializeDependencyCache(instance, service);
+    deserializeDependencyCache(instance, *service);
 
-  if (service.setupCachingDependencyScanningService(instance))
+  if (service->setupCachingDependencyScanningService(instance))
     return true;
 
   ModuleDependenciesCache cache(
-      service, instance.getMainModule()->getNameStr().str(),
+      *service, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
@@ -1241,7 +1236,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
   if (opts.SerializeDependencyScannerCache)
-    serializeDependencyCache(instance, service);
+    serializeDependencyCache(instance, *service);
 
   if (dependenciesOrErr.getError())
     return true;
@@ -1265,9 +1260,9 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  SwiftDependencyScanningService singleUseService;
+  SwiftDependencyScanningService *singleUseService = Context.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(
-      singleUseService, instance.getMainModule()->getNameStr().str(),
+      *singleUseService, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
