@@ -664,15 +664,15 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs,
   if (!fs.exists(interfacePath))
     return std::nullopt;
 
-  // If there is a package name, try to look for the package interface,
-  // which can only be loaded if -experimental-package-interface-load
-  // is passed to the client, so fall back to private/public interface
-  // if not.
+  // If both -package-name and -experimental-package-interface-load
+  // are passed to the client, try to look for the package interface
+  // to load; if either flag is missing, fall back to loading private
+  // or public interface.
   if (!ctx.LangOpts.PackageName.empty() &&
       ctx.LangOpts.EnablePackageInterfaceLoad) {
-    if (auto maybePackageInterface =
+    if (auto found =
             getPackageInterfacePathIfInSamePackage(fs, ctx))
-      return *maybePackageInterface;
+      return *found;
 
     // If package interface is not found, check if we can load the
     // public/private interface file by checking:
