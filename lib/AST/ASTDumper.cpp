@@ -3541,8 +3541,8 @@ public:
     printFoot();
   }
 
-  void visitLifetimeDependentReturnTypeRepr(LifetimeDependentReturnTypeRepr *T,
-                                            StringRef label) {
+  void visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T,
+                                      StringRef label) {
     printCommon("type_lifetime_dependent_return", label);
     for (auto &dep : T->getLifetimeDependencies()) {
       printFieldRaw(
@@ -4663,6 +4663,7 @@ void Requirement::dump(raw_ostream &out) const {
 }
 
 void SILParameterInfo::dump() const {
+  // TODO: Fix LifetimeDependenceInfo printing here.
   print(llvm::errs());
   llvm::errs() << '\n';
 }

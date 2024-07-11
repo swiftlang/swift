@@ -167,3 +167,4 @@ public func array_view_element(a: ContiguousArray<Int> , i: BufferViewIndex<Int>
 public func array_view_slice_element(a: ContiguousArray<Int> , sliceIdx: FakeRange<BufferViewIndex<Int>>, Idx: BufferViewIndex<Int>) -> Int {
   a.view[sliceIdx][Idx]
 }
+

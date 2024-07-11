@@ -495,7 +495,7 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                       /*ThrownType=*/TypeLoc(), emptyPL,
                       /*GenericParams=*/nullptr, structDecl,
-                      /*LifetimeDependentReturnTypeRepr*/ nullptr);
+                      /*LifetimeDependentTypeRepr*/ nullptr);
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -626,7 +626,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                       /*ThrownType=*/TypeLoc(), paramList,
                       /*GenericParams=*/nullptr, structDecl,
-                      /*LifetimeDependentReturnTypeRepr*/ nullptr);
+                      /*LifetimeDependentTypeRepr*/ nullptr);
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1274,7 +1274,7 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramPL,
                               /*GenericParams=*/nullptr, enumDecl,
-                              /*LifetimeDependentReturnTypeRepr*/ nullptr);
+                              /*LifetimeDependentTypeRepr*/ nullptr);
   ctorDecl->setImplicit();
   ctorDecl->setAccess(AccessLevel::Public);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);

@@ -2258,6 +2258,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
     nestedRepr = isolated->getBase();
 
+  if (auto *lifetime = dyn_cast<LifetimeDependentTypeRepr>(nestedRepr)) {
+    nestedRepr = lifetime->getBase();
+  }
+
   if (auto sending = dyn_cast<SendingTypeRepr>(nestedRepr)) {
     // If we do not have an Ownership Repr and do not have a no escape type,
     // return implicit copyable consuming.
@@ -2558,7 +2562,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
-    auto lifetimeDependenceInfo = AFD->getLifetimeDependenceInfo();
+    auto lifetimeDependenceInfo = AFD->getLifetimeDependencies();
 
     // (Args...) -> Result
     Type funcTy;
@@ -2581,7 +2585,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       if (lifetimeDependenceInfo.has_value()) {
         infoBuilder =
-            infoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
 
       auto info = infoBuilder.build();
@@ -2601,7 +2605,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
       if (lifetimeDependenceInfo.has_value()) {
         selfInfoBuilder =
-            selfInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
+            selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
@@ -3112,7 +3116,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   }
 }
 
-std::optional<LifetimeDependenceInfo>
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
                                         AbstractFunctionDecl *decl) const {
   return LifetimeDependenceInfo::get(decl);

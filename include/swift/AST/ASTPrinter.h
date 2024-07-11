@@ -364,6 +364,22 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
+  void printLifetimeDependence(
+      std::optional<LifetimeDependenceInfo> lifetimeDependence) {
+    if (!lifetimeDependence.has_value()) {
+      return;
+    }
+    *this << lifetimeDependence->getString();
+  }
+
+  void printLifetimeDependenceAt(
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
+    if (auto lifetimeDependence =
+            getLifetimeDependenceFor(lifetimeDependencies, index)) {
+      printLifetimeDependence(*lifetimeDependence);
+    }
+  }
+
 private:
   virtual void anchor();
 };

@@ -10292,8 +10292,8 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
-std::optional<LifetimeDependenceInfo>
-AbstractFunctionDecl::getLifetimeDependenceInfo() const {
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+AbstractFunctionDecl::getLifetimeDependencies() const {
   if (!isa<FuncDecl>(this) && !isa<ConstructorDecl>(this)) {
     return std::nullopt;
   }
@@ -10794,7 +10794,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 }
 
 bool ConstructorDecl::hasLifetimeDependentReturn() const {
-  return isa_and_nonnull<LifetimeDependentReturnTypeRepr>(getResultTypeRepr());
+  return isa_and_nonnull<LifetimeDependentTypeRepr>(getResultTypeRepr());
 }
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
