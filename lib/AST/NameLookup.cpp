@@ -2365,9 +2365,11 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
+  }
 
-    // Check that there is some import in the originating context that
-    // makes this decl visible.
+  // Check that there is some import in the originating context that makes this
+  // decl visible.
+  if (!(options & NL_IgnoreMissingImports)) {
     if (missingExplicitImportForMemberDecl(dc, decl))
       return false;
   }
@@ -3985,7 +3987,8 @@ bool IsCallAsFunctionNominalRequest::evaluate(Evaluator &evaluator,
   // that will be checked when we actually try to solve with a `callAsFunction`
   // member access.
   SmallVector<ValueDecl *, 4> results;
-  auto opts = NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreAccessControl;
+  auto opts = NL_QualifiedDefault | NL_ProtocolMembers |
+              NL_IgnoreAccessControl | NL_IgnoreMissingImports;
   dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction),
                       decl->getLoc(), opts, results);
 
@@ -4140,8 +4143,11 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NL_RemoveOverridden)
     FLAG(NL_IgnoreAccessControl)
     FLAG(NL_OnlyTypes)
-    FLAG(NL_OnlyMacros)
     FLAG(NL_IncludeAttributeImplements)
+    FLAG(NL_IncludeUsableFromInline)
+    FLAG(NL_ExcludeMacroExpansions)
+    FLAG(NL_OnlyMacros)
+    FLAG(NL_IgnoreMissingImports)
 #undef FLAG
   };
 
