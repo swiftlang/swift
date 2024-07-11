@@ -101,21 +101,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 ///   bb0(%dependent : NonEscapableThing):
 ///
 /// A lifetime dependence identifies its parent value, the kind of
-/// scope that the parent value represents, and a dependent value. A
-/// self-dependence has the same parent and dependent value:
-///
-///   %dependent = mark_dependence [nonescaping] %value on %value
-///
-/// Self-dependence is useful to ensure that derived values, including
-/// copies, do not escape the lifetime of the original
-/// value. Non-escapable function arguments are implicitly
-/// self-dependent, meaning that the argument's value does not escape
-/// the function body. Note that we do not insert a 'mark_dependence
-/// [nonescaping]' for function arguments because the caller must
-/// already represent the argument's dependence on some parent
-/// value. That parent value may not be the value directly passed to
-/// the argument. After inlining, an additional self-dependence on
-/// argument value would be overly strict.
+/// scope that the parent value represents, and a dependent value.
 struct LifetimeDependence : CustomStringConvertible {
   enum Scope : CustomStringConvertible {
     /// A guaranteed or inout argument whose scope is provided by the caller

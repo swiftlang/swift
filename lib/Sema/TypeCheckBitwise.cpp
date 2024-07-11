@@ -24,6 +24,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 
 using namespace swift;
@@ -141,7 +142,7 @@ bool BitwiseCopyableStorageVisitor::visitMemberDecl(ValueDecl *decl, Type ty) {
 }
 
 bool BitwiseCopyableStorageVisitor::visitMemberType(Type ty, SourceLoc loc) {
-  auto conformance = module->checkConformance(ty, protocol);
+  auto conformance = ModuleDecl::checkConformance(ty, protocol);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return visitNonconformingMemberType(ty, loc);
   }

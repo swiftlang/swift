@@ -41,6 +41,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
@@ -520,7 +521,6 @@ namespace {
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     ManagedValue tryEmitConvertedClosure(AbstractClosureExpr *e,
-                                         CanAnyFunctionType closureType,
                                          const Conversion &conv);
     ManagedValue emitClosureReference(AbstractClosureExpr *e,
                                       const FunctionTypeInfo &contextInfo);
@@ -1219,7 +1219,7 @@ void SILGenFunction::ForceTryEmission::finish() {
         subMap = SubstitutionMap::get(
             genericSig, [&](SubstitutableType *dependentType) {
               return error.getType().getObjectType().getASTType();
-            }, LookUpConformanceInModule(SGF.getModule().getSwiftModule()));
+            }, LookUpConformanceInModule());
 
         // Generic errors are passed indirectly.
         if (!error.getType().isAddress()) {
@@ -1509,10 +1509,8 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
   auto *fromDecl = fromCollection->getAnyNominal();
   auto *toDecl = toCollection->getAnyNominal();
 
-  auto fromSubMap = fromCollection->getContextSubstitutionMap(
-    SGM.SwiftModule, fromDecl);
-  auto toSubMap = toCollection->getContextSubstitutionMap(
-    SGM.SwiftModule, toDecl);
+  auto fromSubMap = fromCollection->getContextSubstitutionMap(fromDecl);
+  auto toSubMap = toCollection->getContextSubstitutionMap(toDecl);
 
   // Form type parameter substitutions.
   auto genericSig = fn->getGenericSignature();
@@ -1808,9 +1806,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
     (void) emitAnyClosureExpr(SGF, semanticExpr,
                               [&](AbstractClosureExpr *closure) {
       // Emit the closure body.
-      auto closureType =
-        cast<AnyFunctionType>(closure->getType()->getCanonicalType());
-      SGF.SGM.emitClosure(closure, SGF.getFunctionTypeInfo(closureType));
+      SGF.SGM.emitClosure(closure, SGF.getClosureTypeInfo(closure));
 
       loc = closure;
       return ManagedValue();
@@ -2959,10 +2955,10 @@ static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
 
 /// Try to emit the given closure under the given conversion.
 /// Returns an invalid ManagedValue if this fails.
-ManagedValue
-RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
-                                       CanAnyFunctionType closureType,
-                                       const Conversion &conv) {
+ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
+                                                    const Conversion &conv) {
+  auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+
   // Bail out if we don't have specialized type information from context.
   auto info = tryGetSpecializedClosureTypeFromContext(closureType, conv);
   if (!info) return ManagedValue();
@@ -3011,13 +3007,11 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   if (auto *placeholder = wrappedValueAutoclosurePlaceholder(e))
     return visitPropertyWrapperValuePlaceholderExpr(placeholder, C);
 
-  auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-
   // If we're emitting into a converting context, try to combine the
   // conversion into the emission of the closure function.
   if (auto *convertingInit = C.getAsConversion()) {
-    ManagedValue closure = tryEmitConvertedClosure(e, closureType,
-                                              convertingInit->getConversion());
+    ManagedValue closure =
+        tryEmitConvertedClosure(e, convertingInit->getConversion());
     if (closure.isValid()) {
       convertingInit->initWithConvertedValue(SGF, e, closure);
       convertingInit->finishInitialization(SGF);
@@ -3026,9 +3020,10 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   }
 
   // Otherwise, emit the expression using the simple type of the expression.
-  auto info = SGF.getFunctionTypeInfo(closureType);
+  auto info = SGF.getClosureTypeInfo(e);
   auto closure = emitClosureReference(e, info);
-  return RValue(SGF, e, closureType, closure);
+
+  return RValue(SGF, e, e->getType()->getCanonicalType(), closure);
 }
 
 ManagedValue
@@ -3984,7 +3979,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(genericSig.getPointer()));
+          LookUpConformanceInModule());
       }
 
       // Set up a substitution of Self => IndexType.
@@ -4257,7 +4252,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     } else {
       componentTy =
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getTypeOfMember(SwiftModule, var)
+          ->getTypeOfMember(var)
           ->getReferenceStorageReferent()
           ->mapTypeOutOfContext()
           ->getCanonicalType();
@@ -6147,15 +6142,15 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   if (SGF.getLoweredType(eltTy).isTrivial(SGF.F))
     return;
 
-  auto *SM = SGF.getModule().getSwiftModule();
-  if (auto *bitwiseCopyableDecl = SM->getASTContext().getProtocol(
+  auto &ctx = SGF.getASTContext();
+  if (auto *bitwiseCopyableDecl = ctx.getProtocol(
         KnownProtocolKind::BitwiseCopyable)) {
-    if (SM->checkConformance(eltTy, bitwiseCopyableDecl))
+    if (ModuleDecl::checkConformance(eltTy, bitwiseCopyableDecl))
       return;
   }
-  if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
+  if (auto *fixedWidthIntegerDecl = ctx.getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (SM->checkConformance(eltTy, fixedWidthIntegerDecl))
+    if (ModuleDecl::checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 
@@ -6298,8 +6293,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
     getASTContext().getConvertInOutToPointerArgument();
 
   auto pointerType = pointerInfo.PointerType;
-  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                       getPointerProtocol());
+  auto subMap = pointerType->getContextSubstitutionMap(getPointerProtocol());
   return emitApplyOfLibraryIntrinsic(
              loc, converter, subMap,
              ManagedValue::forObjectRValueWithoutOwnership(pointer),
@@ -6360,11 +6354,10 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   }
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto *M = SGM.M.getSwiftModule();
   auto firstSubMap =
-      accessInfo.ArrayType->getContextSubstitutionMap(M, ctx.getArrayDecl());
+      accessInfo.ArrayType->getContextSubstitutionMap();
   auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
-      M, getPointerProtocol());
+      getPointerProtocol());
 
   auto genericSig = converter->getGenericSignature();
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
@@ -6408,8 +6401,7 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
   FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument();
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                       getPointerProtocol());
+  auto subMap = pointerType->getContextSubstitutionMap(getPointerProtocol());
   SmallVector<ManagedValue, 2> results;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, stringValue, SGFContext())
     .getAll(results);

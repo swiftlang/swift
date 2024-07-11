@@ -31,6 +31,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
@@ -3022,6 +3023,93 @@ static bool diagnoseIsolatedAnyAvailability(
       ReferenceDC);
 }
 
+static bool diagnoseTypedThrowsAvailability(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+  return TypeChecker::checkAvailability(
+      ReferenceRange,
+      ReferenceDC->getASTContext().getTypedThrowsAvailability(),
+      diag::availability_typed_throws_only_version_newer,
+      ReferenceDC);
+}
+
+/// Make sure the generic arguments conform to all known invertible protocols.
+/// Runtimes prior to NoncopyableGenerics do not check if any of the
+/// generic arguments conform to Copyable/Escapable during dynamic casts.
+/// But a dynamic cast *needs* to check if the generic arguments conform,
+/// to determine if the cast should be permitted at all. For example:
+///
+///    struct X<T> {}
+///    extension X: P where T: Y {}
+///
+///     func f<Y: ~Copyable>(...) {
+///       let x: X<Y> = ...
+///       _ = x as? any P   // <- cast should fail
+///     }
+///
+/// The dynamic cast here must fail because Y does not conform to Copyable,
+/// thus X<Y> doesn't conform to P!
+///
+/// \param boundTy The generic type with its generic arguments.
+/// \returns the invertible protocol for which a conformance is missing in
+///          one of the generic arguments, or none if all are present for
+///          every generic argument.
+static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
+    BoundGenericType *boundTy) {
+  for (auto arg : boundTy->getGenericArgs()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      switch (ip) {
+      case InvertibleProtocolKind::Copyable:
+        if (arg->isNoncopyable())
+          return ip;
+        break;
+      case InvertibleProtocolKind::Escapable:
+        if (!arg->isEscapable())
+          return ip;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Older runtimes won't check for required invertible protocol conformances
+/// at runtime during a cast.
+///
+/// \param srcType the source or initial type of the cast
+/// \param refLoc source location of the cast
+/// \param refDC decl context in which the cast occurs
+/// \return true if diagnosed
+static bool checkInverseGenericsCastingAvailability(Type srcType,
+                                                    SourceRange refLoc,
+                                                    const DeclContext *refDC) {
+  if (!srcType) return false;
+
+  auto type = srcType->getCanonicalType();
+
+  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
+    if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
+      std::optional<Diag<StringRef, llvm::VersionTuple>> diag;
+      switch (*missing) {
+      case InvertibleProtocolKind::Copyable:
+        diag =
+            diag::availability_copyable_generics_casting_only_version_newer;
+        break;
+      case InvertibleProtocolKind::Escapable:
+        diag =
+            diag::availability_escapable_generics_casting_only_version_newer;
+        break;
+      }
+
+      // Enforce the availability restriction.
+      return TypeChecker::checkAvailability(
+          refLoc,
+          refDC->getASTContext().getNoncopyableGenericsAvailability(),
+          *diag,
+          refDC);
+    }
+  }
+  return false;
+}
+
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
                                                   SourceRange refLoc,
                                                   const DeclContext *refDC) {
@@ -3032,6 +3120,8 @@ static bool checkTypeMetadataAvailabilityInternal(CanType type,
       auto isolation = fnType->getIsolation();
       if (isolation.isErased())
         return diagnoseIsolatedAnyAvailability(refLoc, refDC);
+      if (fnType.getThrownError())
+        return diagnoseTypedThrowsAvailability(refLoc, refDC);
     }
     return false;
   });
@@ -3063,7 +3153,13 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
   // there.
   if (type.isAnyExistentialType()) return false;
 
-  return checkTypeMetadataAvailabilityInternal(type, refLoc, refDC);
+  if (checkTypeMetadataAvailabilityInternal(type, refLoc, refDC))
+    return true;
+
+  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
+    return true;
+
+  return false;
 }
 
 namespace {
@@ -3310,25 +3406,32 @@ bool swift::diagnoseExplicitUnavailability(
 
 namespace {
 class ExprAvailabilityWalker : public ASTWalker {
-  /// Describes how the next member reference will be treated as we traverse
-  /// the AST.
+  /// Models how member references will translate to accessor usage. This is
+  /// used to diagnose the availability of individual accessors that may be
+  /// called by the expression being checked.
   enum class MemberAccessContext : unsigned {
-    /// The member reference is in a context where an access will call
-    /// the getter.
-    Getter,
+    /// The starting access context for the root of any expression tree. In this
+    /// context, a member access will call the get accessor only.
+    Default,
 
-    /// The member reference is in a context where an access will call
-    /// the setter.
-    Setter,
+    /// The access context for expressions rooted in a LoadExpr. A LoadExpr
+    /// coerces l-values to r-values and thus member access inside of a LoadExpr
+    /// will only invoke get accessors.
+    Load,
 
-    /// The member reference is in a context where it will be turned into
-    /// an inout argument. (Once this happens, we have to conservatively assume
-    /// that both the getter and setter could be called.)
-    InOut
+    /// The access context for the outermost member accessed in the expression
+    /// tree on the left-hand side of an assignment. Only the set accessor will
+    /// be invoked on this member.
+    Assignment,
+
+    /// The access context for expressions in which member is being read and
+    /// then written back to. For example, a writeback will occur inside of an
+    /// InOutExpr. Both the get and set accessors may be called in this context.
+    Writeback
   };
 
   ASTContext &Context;
-  MemberAccessContext AccessContext = MemberAccessContext::Getter;
+  MemberAccessContext AccessContext = MemberAccessContext::Default;
   SmallVector<const Expr *, 16> ExprStack;
   const ExportContext &Where;
 
@@ -3343,6 +3446,13 @@ public:
   MacroWalking getMacroWalkingBehavior() const override {
     // Expanded source should be type checked and diagnosed separately.
     return MacroWalking::Arguments;
+  }
+
+  PreWalkAction walkToArgumentPre(const Argument &Arg) override {
+    // Arguments should be walked in their own member access context which
+    // starts out read-only by default.
+    walkInContext(Arg.getExpr(), MemberAccessContext::Default);
+    return Action::SkipChildren();
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -3450,6 +3560,9 @@ public:
     if (auto EE = dyn_cast<ErasureExpr>(E)) {
       checkTypeMetadataAvailability(EE->getSubExpr()->getType(),
                                     EE->getLoc(), Where.getDeclContext());
+      checkInverseGenericsCastingAvailability(EE->getSubExpr()->getType(),
+                                              EE->getLoc(),
+                                              Where.getDeclContext());
 
       for (ProtocolConformanceRef C : EE->getConformances()) {
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
@@ -3465,6 +3578,11 @@ public:
     if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
       diagnoseDeclRefAvailability(
           ME->getMacroRef(), ME->getMacroNameLoc().getSourceRange());
+    }
+
+    if (auto LE = dyn_cast<LoadExpr>(E)) {
+      walkLoadExpr(LE);
+      return Action::SkipChildren(E);
     }
 
     return Action::Continue(E);
@@ -3523,20 +3641,6 @@ private:
     return call;
   }
 
-  /// Walks up to the first enclosing LoadExpr and returns it.
-  const LoadExpr *getEnclosingLoadExpr() const {
-    assert(!ExprStack.empty() && "must be called while visiting an expression");
-    ArrayRef<const Expr *> stack = ExprStack;
-    stack = stack.drop_back();
-
-    for (auto expr : llvm::reverse(stack)) {
-      if (auto loadExpr = dyn_cast<LoadExpr>(expr))
-        return loadExpr;
-    }
-
-    return nullptr;
-  }
-
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) {
     // We take over recursive walking of assignment expressions in order to
@@ -3552,32 +3656,38 @@ private:
     // encountered walking (pre-order) is the Dest is the destination of the
     // write. For the moment this is fine -- but future syntax might violate
     // this assumption.
-    walkInContext(E, Dest, MemberAccessContext::Setter);
+    walkInContext(Dest, MemberAccessContext::Assignment);
 
     // Check RHS in getter context
     Expr *Source = E->getSrc();
     if (!Source) {
       return;
     }
-    walkInContext(E, Source, MemberAccessContext::Getter);
+    walkInContext(Source, MemberAccessContext::Default);
   }
-  
+
+  /// Walk a load expression, checking for availability.
+  void walkLoadExpr(LoadExpr *E) {
+    walkInContext(E->getSubExpr(), MemberAccessContext::Load);
+  }
+
   /// Walk a member reference expression, checking for availability.
   void walkMemberRef(MemberRefExpr *E) {
-    // Walk the base. If the access context is currently `Setter`, then we must
-    // be diagnosing the destination of an assignment. When recursing, diagnose
-    // any remaining member refs as if they were in an InOutExpr, since there is
-    // a writeback occurring through them as a result of the assignment.
+    // Walk the base. If the access context is currently `Assignment`, then we
+    // must be diagnosing the destination of an assignment. When recursing,
+    // diagnose any remaining member refs in a `Writeback` context, since
+    // there is a writeback occurring through them as a result of the
+    // assignment.
     //
     //   someVar.x.y = 1
-    //           │ ╰─ MemberAccessContext::Setter
-    //           ╰─── MemberAccessContext::InOut
+    //           │ ╰─ MemberAccessContext::Assignment
+    //           ╰─── MemberAccessContext::Writeback
     //
     MemberAccessContext accessContext =
-        (AccessContext == MemberAccessContext::Setter)
-            ? MemberAccessContext::InOut
+        (AccessContext == MemberAccessContext::Assignment)
+            ? MemberAccessContext::Writeback
             : AccessContext;
-    walkInContext(E, E->getBase(), accessContext);
+    walkInContext(E->getBase(), accessContext);
 
     ConcreteDeclRef DR = E->getMember();
     // Diagnose for the member declaration itself.
@@ -3630,12 +3740,13 @@ private:
 
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
-    // If there is a LoadExpr in the stack, then this InOutExpr is not actually
-    // indicative of any mutation so the access context should just be Getter.
-    auto accessContext = getEnclosingLoadExpr() ? MemberAccessContext::Getter
-                                                : MemberAccessContext::InOut;
-
-    walkInContext(E, E->getSubExpr(), accessContext);
+    // Typically an InOutExpr should begin a `Writeback` context. However,
+    // inside a LoadExpr this transition is suppressed since the entire
+    // expression is being coerced to an r-value.
+    auto accessContext = AccessContext != MemberAccessContext::Load
+                             ? MemberAccessContext::Writeback
+                             : AccessContext;
+    walkInContext(E->getSubExpr(), accessContext);
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
@@ -3656,10 +3767,8 @@ private:
     return;
   }
 
-
   /// Walk the given expression in the member access context.
-  void walkInContext(Expr *baseExpr, Expr *E,
-                     MemberAccessContext AccessContext) {
+  void walkInContext(Expr *E, MemberAccessContext AccessContext) {
     llvm::SaveAndRestore<MemberAccessContext>
       C(this->AccessContext, AccessContext);
     E->walk(*this);
@@ -3686,17 +3795,18 @@ private:
     // this probably needs to be refined to not assume that the accesses are
     // specifically using the getter/setter.
     switch (AccessContext) {
-    case MemberAccessContext::Getter:
+    case MemberAccessContext::Default:
+    case MemberAccessContext::Load:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
                                ReferenceRange, ReferenceDC, std::nullopt);
       break;
 
-    case MemberAccessContext::Setter:
+    case MemberAccessContext::Assignment:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
                                ReferenceRange, ReferenceDC, std::nullopt);
       break;
 
-    case MemberAccessContext::InOut:
+    case MemberAccessContext::Writeback:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
                                ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
@@ -3893,11 +4003,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
 /// Return true if the specified type looks like an integer of floating point
 /// type.
-static bool isIntegerOrFloatingPointType(Type ty, ModuleDecl *M) {
+static bool isIntegerOrFloatingPointType(Type ty) {
   return (TypeChecker::conformsToKnownProtocol(
-            ty, KnownProtocolKind::ExpressibleByIntegerLiteral, M) ||
+            ty, KnownProtocolKind::ExpressibleByIntegerLiteral) ||
           TypeChecker::conformsToKnownProtocol(
-            ty, KnownProtocolKind::ExpressibleByFloatLiteral, M));
+            ty, KnownProtocolKind::ExpressibleByFloatLiteral));
 }
 
 
@@ -3925,9 +4035,8 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
 
   // If the expression type is integer or floating point, then we can rewrite it
   // to "lvalue += 1".
-  auto *DC = Where.getDeclContext();
   std::string replacement;
-  if (isIntegerOrFloatingPointType(call->getType(), DC->getParentModule()))
+  if (isIntegerOrFloatingPointType(call->getType()))
     replacement = isInc ? " += 1" : " -= 1";
   else {
     // Otherwise, it must be an index type.  Rewrite to:
@@ -4213,8 +4322,7 @@ public:
     if (isa<ProtocolType>(ty))
       return Action::Continue;
 
-    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
-    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap();
     (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
@@ -4222,8 +4330,7 @@ public:
   Action visitBoundGenericType(BoundGenericType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
-    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap();
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),

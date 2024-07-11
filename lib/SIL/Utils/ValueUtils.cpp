@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ValueUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILFunction.h"
 
@@ -25,8 +26,7 @@ ValueOwnershipKind swift::getSILValueOwnership(ArrayRef<SILValue> values,
 
   auto mergedOwnership = ValueOwnershipKind::merge(range);
 
-  // If we have a move only type, and the merged ownership is none, we return
-  // Owned ownership kind.
+  // If we have a move only type, return owned ownership.
   if (ty && ty.isMoveOnly() && mergedOwnership == OwnershipKind::None) {
     return OwnershipKind::Owned;
   }

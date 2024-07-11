@@ -32,6 +32,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "clang/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -502,7 +503,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // Otherwise, assume we have an interface type for the "combined" captured
     // environment.
     return type.subst(MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
-                      LookUpConformanceInModule(Module.getSwiftModule()),
+                      LookUpConformanceInModule(),
                       SubstFlags::AllowLoweredTypes |
                       SubstFlags::PreservePackExpansionLevel);
   }
@@ -518,7 +519,7 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
     auto genericSig = GenericEnv->getGenericSignature().getCanonicalSignature();
     return type.subst(Module,
                       MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
-                      LookUpConformanceInModule(Module.getSwiftModule()),
+                      LookUpConformanceInModule(),
                       genericSig,
                       SubstFlags::PreservePackExpansionLevel);
   }
@@ -534,7 +535,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   auto genericSig = getGenericSignature().getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInModule(M.getSwiftModule()),
+                    LookUpConformanceInModule(),
                     genericSig,
                     SubstFlags::PreservePackExpansionLevel);
 }

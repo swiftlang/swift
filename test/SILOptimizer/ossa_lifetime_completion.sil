@@ -19,6 +19,7 @@ public enum FakeOptional<T> {
 
 sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+sil @getC : $@convention(thin) () -> (@owned C)
 
 protocol Error {}
 
@@ -31,13 +32,13 @@ typealias AnyObject = Builtin.AnyObject
 
 protocol P : AnyObject {}
 
-// CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
+// CHECK-LABEL: begin running test 1 of 1 on eagerConsumeOwnedArg: ossa_lifetime_completion with: @argument
 // CHECK-LABEL: OSSA lifetime completion on liveness boundary: %0 = argument of bb0 : $C
-// CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: sil [ossa] @eagerConsumeOwnedArg : $@convention(thin) (@owned C) -> () {
 // CHECK: bb0(%0 : @_eagerMove @owned $C):
 // CHECK-NEXT:   destroy_value %0 : $C
-// CHECK-LABEL: end running test 1 of 1 on eagerConsumneOwnedArg: ossa_lifetime_completion with: @argument
-sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: end running test 1 of 1 on eagerConsumeOwnedArg: ossa_lifetime_completion with: @argument
+sil [ossa] @eagerConsumeOwnedArg : $@convention(thin) (@owned C) -> () {
 entry(%0 : @_eagerMove @owned $C):
   specify_test "ossa_lifetime_completion @argument liveness"
   br exit
@@ -53,7 +54,7 @@ exit:
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   cond_br undef, bb1, bb2
 // CHECK: bb2:
-// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-NEXT:   destroy_value [dead_end] %0 : $C
 // CHECK-NEXT:   unreachable
 // CHECK: } // end sil function 'lexicalOwnedArg'
 // CHECK-LABEL: end running test 1 of 1 on lexicalOwnedArg: ossa_lifetime_completion with: @argument
@@ -245,7 +246,7 @@ bb0(%0 : @guaranteed $C):
 // CHECK:       [[TO_DIE_1]]:
 // CHECK:         br [[TO_DIE_11:bb[0-9]+]]
 // CHECK:       [[TO_DIE_11]]:
-// CHECK:         destroy_value [[VALUE]]
+// CHECK:         destroy_value [dead_end] [[VALUE]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[TO_DIE_2]]:
 // CHECK:         br [[DIE]]
@@ -302,7 +303,7 @@ exit:
 // CHECK:       [[BACKEDGE]]:
 // CHECK:         br [[HEADER]]
 // CHECK:       [[TO_DIE_1]]:
-// CHECK:         destroy_value [[LEXICAL]]
+// CHECK:         destroy_value [dead_end] [[LEXICAL]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[TO_DIE_2]]:
 // CHECK:         br [[DIE]]
@@ -361,7 +362,7 @@ exit:
 // CHECK:       [[TO_BODY]]:
 // CHECK:         br [[BODY:bb[0-9]+]]
 // CHECK:       [[PREHEADER]]:
-// CHECK:         destroy_value [[VALUE]]
+// CHECK:         destroy_value [dead_end] [[VALUE]]
 // CHECK:         br [[HEADER:bb[0-9]+]]
 // CHECK:       [[HEADER]]:
 // CHECK:         br [[BODY]]
@@ -449,7 +450,7 @@ indirect enum IndirectEnumNontrivialPayload {
 // CHECK:         cond_br undef, {{bb[0-9]+}}, [[RIGHT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         end_borrow [[C]]
-// CHECK:         dealloc_box [[BOX]]
+// CHECK:         dealloc_box [dead_end] [[BOX]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'project_box_owned'
 sil [ossa] @project_box_owned : $@convention(thin) (@owned IndirectEnumNontrivialPayload) -> () {
@@ -506,7 +507,7 @@ bb0:
 // CHECK-LABEL: begin running test {{.*}} on alloc_box: ossa_lifetime_completion
 // CHECK-LABEL: sil [ossa] @alloc_box : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box
-// CHECK:         dealloc_box [[BOX]]
+// CHECK:         dealloc_box [dead_end] [[BOX]]
 // CHECK-LABEL: } // end sil function 'alloc_box'
 // CHECK-LABEL: end running test {{.*}} on alloc_box: ossa_lifetime_completion
 sil [ossa] @alloc_box : $@convention(thin) (@owned C) -> () {
@@ -723,4 +724,42 @@ bb0(%existential : @owned $any P):
   specify_test "liveness_partial_boundary_outside_users %opened"
   %ref_existential = init_existential_ref %opened : $@opened("00000000-0000-0000-0000-000000000000", any P) Self : $@opened("00000000-0000-0000-0000-000000000000", any P) Self, $AnyObject
   return %ref_existential : $AnyObject
+}
+
+// CHECK-LABEL: begin running test {{.*}} on root_of_reborrow: ossa_lifetime_completion
+// Verify that no instructions were inserted after backedge2's terminator.  (In
+// fact, if they were, the test would crash.)
+// CHECK-LABEL: sil [ossa] @root_of_reborrow : {{.*}} {
+// CHECK:       bb1([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow @guaranteed $C):
+// CHECK-NEXT:    [[B0F:%[^,]+]] = borrowed [[B0]] : $C from ([[C0]] : $C)
+// CHECK-NEXT:    end_borrow [[B0F]]
+// CHECK-NEXT:    destroy_value [[C0]]
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'root_of_reborrow'
+// CHECK-LABEL: end running test {{.*}} on root_of_reborrow: ossa_lifetime_completion
+sil [ossa] @root_of_reborrow : $@convention(thin) () -> () {
+entry:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b = begin_borrow %c : $C
+  br header(%c : $C, %b : $C)
+header(%c0 : @owned $C, %b0 : @reborrow @guaranteed $C):
+  %b0f = borrowed %b0 : $C from (%c0 : $C)
+  end_borrow %b0f : $C
+  destroy_value %c0 : $C
+  br body
+body:
+  br latch
+latch:
+  cond_br undef, backedge, exit
+backedge:
+  %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b1 = begin_borrow %c1 : $C
+  br backedge2(%c1 : $C, %b1 : $C)
+backedge2(%c2 : @owned $C, %b2 : @reborrow @guaranteed $C):
+  %b2f = borrowed %b2 : $C from (%c2 : $C)
+  specify_test "ossa_lifetime_completion %c2 availability"
+  br header(%c2 : $C, %b2f : $C)
+exit:
+  unreachable
 }

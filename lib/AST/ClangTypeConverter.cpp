@@ -32,6 +32,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 
 #include "clang/AST/ASTContext.h"
@@ -178,7 +179,7 @@ ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
     if (pc.isNull())
       return nullptr;
     clang::FunctionProtoType::ExtParameterInfo extParamInfo;
-    if (p.isConsumed()) {
+    if (p.isConsumedInCallee()) {
       someParamIsConsumed = true;
       extParamInfo = extParamInfo.withIsConsumed(true);
     }
@@ -896,6 +897,19 @@ ClangTypeConverter::getClangTemplateArguments(
     }
 
     auto replacement = genericArgs[templateParam->getIndex()];
+
+    // Ban ObjCBool type from being substituted into C++ templates.
+    if (auto nominal = replacement->getAs<NominalType>()) {
+      if (auto nominalDecl = nominal->getDecl()) {
+        if (nominalDecl->getName().is("ObjCBool") &&
+            nominalDecl->getModuleContext()->getName() ==
+                nominalDecl->getASTContext().Id_ObjectiveC) {
+          failedTypes.push_back(replacement);
+          continue;
+        }
+      }
+    }
+
     auto qualType = convert(replacement);
     if (qualType.isNull()) {
       failedTypes.push_back(replacement);

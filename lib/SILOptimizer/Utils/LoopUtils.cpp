@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-utils"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -279,9 +280,9 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
 
   // We can't have a phi of two openexistential instructions of different UUID.
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
-      isa<OpenExistentialMetatypeInst>(I) ||
-      isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
-      isa<OpenExistentialBoxValueInst>(I)) {
+      isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I) ||
+      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
+      isa<OpenPackElementInst>(I)) {
     SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
     for (auto *UI : OI->getUses())
       if (!L->contains(UI->getUser()))

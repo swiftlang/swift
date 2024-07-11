@@ -34,6 +34,8 @@
 
 namespace swift {
 
+class DeadEndBlocks;
+
 enum class LifetimeCompletion { NoLifetime, AlreadyComplete, WasCompleted };
 
 class OSSALifetimeCompletion {
@@ -42,13 +44,17 @@ class OSSALifetimeCompletion {
   // create a new phi would result in an immediately redundant phi.
   const DominanceInfo *domInfo = nullptr;
 
+  DeadEndBlocks &deadEndBlocks;
+
   // Cache intructions already handled by the recursive algorithm to avoid
   // recomputing their lifetimes.
   ValueSet completedValues;
 
 public:
-  OSSALifetimeCompletion(SILFunction *function, const DominanceInfo *domInfo)
-    : domInfo(domInfo), completedValues(function) {}
+  OSSALifetimeCompletion(SILFunction *function, const DominanceInfo *domInfo,
+                         DeadEndBlocks &deadEndBlocks)
+      : domInfo(domInfo), deadEndBlocks(deadEndBlocks),
+        completedValues(function) {}
 
   // The kind of boundary at which to complete the lifetime.
   //
@@ -139,6 +145,7 @@ class UnreachableLifetimeCompletion {
   // If domInfo is nullptr, lifetime completion may attempt to recreate
   // redundant phis, which should be immediately discarded.
   const DominanceInfo *domInfo = nullptr;
+  DeadEndBlocks &deadEndBlocks;
 
   BasicBlockSetVector unreachableBlocks;
   InstructionSet unreachableInsts; // not including those in unreachableBlocks
@@ -146,9 +153,11 @@ class UnreachableLifetimeCompletion {
   bool updatingLifetimes = false;
 
 public:
-  UnreachableLifetimeCompletion(SILFunction *function, DominanceInfo *domInfo)
-    : function(function), unreachableBlocks(function),
-      unreachableInsts(function), incompleteValues(function) {}
+  UnreachableLifetimeCompletion(SILFunction *function, DominanceInfo *domInfo,
+                                DeadEndBlocks &deadEndBlocks)
+      : function(function), domInfo(domInfo), deadEndBlocks(deadEndBlocks),
+        unreachableBlocks(function), unreachableInsts(function),
+        incompleteValues(function) {}
 
   /// Record information about this unreachable instruction and return true if
   /// ends any simple OSSA lifetimes.

@@ -165,13 +165,15 @@ SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
   ClassDecl *classDecl = genClassTy->getDecl();
   SILVTable *origVtable = module.lookUpVTable(classDecl);
   if (!origVtable) {
-    llvm::errs() << "No vtable available for "
-                 << genClassTy->getDecl()->getName() << '\n';
-    llvm::report_fatal_error("no vtable");
+    // This cannot occur in regular builds - only if built without wmo, which
+    // can only happen in SourceKit.
+    // Not ideal, but better than a SourceKit crash.
+    module.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::cannot_specialize_class, classTy.getASTType());
+    return nullptr;
   }
 
-  SubstitutionMap subs = astType->getContextSubstitutionMap(
-      classDecl->getParentModule(), classDecl);
+  SubstitutionMap subs = astType->getContextSubstitutionMap();
 
   llvm::SmallVector<SILVTableEntry, 8> newEntries;
 
@@ -245,9 +247,7 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
   if (!genClassTy) return false;
 
-  ClassDecl *classDecl = genClassTy->getDecl();
-  SubstitutionMap subs = astType->getContextSubstitutionMap(
-      classDecl->getParentModule(), classDecl);
+  SubstitutionMap subs = astType->getContextSubstitutionMap();
 
   SILType funcTy = cm->getType();
   SILType substitutedType =

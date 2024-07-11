@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -89,19 +90,6 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
                                        osVersion.getSubminor().value_or(0));
   }
   return ctxTarget.isOSVersionLT(moduleTarget);
-}
-
-std::string ModuleFile::resolveModuleDefiningFilename(const ASTContext &ctx) {
-  if (!Core->ModuleInterfacePath.empty()) {
-    std::string interfacePath = Core->ModuleInterfacePath.str();
-    if (llvm::sys::path::is_relative(interfacePath)) {
-      SmallString<128> absoluteInterfacePath(ctx.SearchPathOpts.getSDKPath());
-      llvm::sys::path::append(absoluteInterfacePath, interfacePath);
-      return absoluteInterfacePath.str().str();
-    } else
-      return interfacePath;
-  } else
-    return getModuleLoadedFilename().str();
 }
 
 namespace swift {
@@ -271,7 +259,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
   ASTContext &ctx = getContext();
   // Resolve potentially-SDK-relative module-defining .swiftinterface path
-  ResolvedModuleDefiningFilename = resolveModuleDefiningFilename(ctx);
+  ResolvedModuleDefiningFilename =
+       Core->resolveModuleDefiningFilePath(ctx.SearchPathOpts.getSDKPath());
 
   llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
   if (!areCompatible(moduleTarget, ctx.LangOpts.Target)) {

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -clang-header-expose-decls=all-public -emit-clang-header-path %t/cdecl.h
 // RUN: %FileCheck %s < %t/cdecl.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // CHECK-LABEL: namespace CdeclFunctions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("CdeclFunctions") {
 

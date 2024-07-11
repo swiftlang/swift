@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -1649,10 +1650,9 @@ namespace {
     }
 
     Type
-    resolveTypeReferenceInExpression(TypeRepr *repr, TypeResolverContext resCtx,
+    resolveTypeReferenceInExpression(TypeRepr *repr,
+                                     TypeResolutionOptions options,
                                      const ConstraintLocatorBuilder &locator) {
-      TypeResolutionOptions options(resCtx);
-
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
@@ -1676,9 +1676,9 @@ namespace {
                                      TVO_CanBindToHole);
       }
       // Diagnose top-level usages of placeholder types.
-      if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
-        CS.getASTContext().Diags.diagnose(repr->getLoc(),
-                                          diag::placeholder_type_not_allowed);
+      if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
+        auto *loc = CS.getConstraintLocator(locator, {LocatorPathElt::PlaceholderType(ty)});
+        CS.recordFix(IgnoreInvalidPlaceholder::create(CS, loc));
       }
       return result;
     }
@@ -2175,15 +2175,13 @@ namespace {
         if (!contextualType)
           return false;
 
-        auto *M = CS.DC->getParentModule();
-
         auto type = contextualType->lookThroughAllOptionalTypes();
 
-        if (M->lookupConformance(type, arrayProto))
+        if (ModuleDecl::lookupConformance(type, arrayProto))
           return false;
 
         if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-          if (M->lookupConformance(type, proto))
+          if (ModuleDecl::lookupConformance(type, proto))
             return true;
 
         return false;
@@ -2541,9 +2539,11 @@ namespace {
             return declaredTy;
           }
 
+          auto options =
+              TypeResolutionOptions(TypeResolverContext::InExpression);
+          options.setContext(TypeResolverContext::ClosureExpr);
           const auto resolvedTy = resolveTypeReferenceInExpression(
-              closure->getExplicitResultTypeRepr(),
-              TypeResolverContext::InExpression, resultLocator);
+              closure->getExplicitResultTypeRepr(), options, resultLocator);
           if (resolvedTy)
             return resolvedTy;
         }
@@ -2587,6 +2587,10 @@ namespace {
         return FunctionTypeIsolation::forNonIsolated();
       }();
       extInfo = extInfo.withIsolation(isolation);
+      if (isolation.isGlobalActor() &&
+          CS.getASTContext().LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+        extInfo = extInfo.withSendable();
+      }
 
       auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
       return CS.replaceInferableTypesWithTypeVars(
@@ -4111,7 +4115,7 @@ namespace {
         return false;
 
       auto member = UDE->getName().getBaseName().userFacingName();
-      return member.equals("trigger_fallback_diagnostic");
+      return member == "trigger_fallback_diagnostic";
     }
 
     enum class TypeOperation { None,
@@ -4407,8 +4411,6 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
 
 bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
     VarDecl *wrappedVar, Type initializerType, Type propertyType) {
-  auto dc = wrappedVar->getInnermostDeclContext();
-
   Type wrappedValueType;
   Type wrapperType;
   auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();
@@ -4442,7 +4444,7 @@ bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
     setType(typeExpr, wrapperType);
 
     wrappedValueType = wrapperType->getTypeOfMember(
-        dc->getParentModule(), wrapperInfo.valueVar);
+        wrapperInfo.valueVar);
   }
 
   // The property type must be equal to the wrapped value type

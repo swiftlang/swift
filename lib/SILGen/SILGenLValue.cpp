@@ -31,6 +31,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -1231,6 +1232,11 @@ namespace {
         return base;
       }
       auto result = SGF.B.createLoadBorrow(loc, base.getValue());
+      // Mark the load_borrow as unchecked. We can't stop the source code from
+      // trying to mutate or consume the same lvalue during this borrow, so
+      // we don't want verifiers to trip before the move checker gets a chance
+      // to diagnose these situations.
+      result->setUnchecked(true);
       return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
          base.getValue(), result);
     }
@@ -2375,7 +2381,7 @@ namespace {
       }
 
       auto subs = SubstitutionMap::get(sig, replacementTypes,
-                  LookUpConformanceInModule{SGF.getModule().getSwiftModule()});
+                  LookUpConformanceInModule());
 
       base = makeBaseConsumableMaterializedRValue(SGF, loc, base);
 
@@ -2400,9 +2406,7 @@ namespace {
       }
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = keyPathTy->getContextSubstitutionMap(
-          keyPathTy->getDecl()->getParentModule(),
-          keyPathTy->getDecl());
+      auto subs = keyPathTy->getContextSubstitutionMap();
 
       auto origType = AbstractionPattern::getOpaque();
       auto loweredTy = SGF.getLoweredType(origType, value.getSubstRValueType());
@@ -2476,9 +2480,7 @@ namespace {
       auto projectFnType = projectFn->getLoweredFunctionType();
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = keyPathTy->getContextSubstitutionMap(
-          keyPathTy->getDecl()->getParentModule(),
-          keyPathTy->getDecl());
+      auto subs = keyPathTy->getContextSubstitutionMap();
 
       auto substFnType = projectFnType->substGenericArgs(
           SGF.SGM.M, subs, SGF.getTypeExpansionContext());
@@ -4582,8 +4584,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   LValue lv;
 
   auto baseType = base.getType().getASTType();
-  auto subMap = baseType->getContextSubstitutionMap(
-      SGM.M.getSwiftModule(), ivar->getDeclContext());
+  auto subMap = baseType->getContextSubstitutionMap(ivar->getDeclContext());
 
   AccessStrategy strategy =
     ivar->getAccessStrategy(semantics,

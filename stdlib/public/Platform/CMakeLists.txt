@@ -81,7 +81,8 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(SWIFT_ENABLE_REFLECTION OFF)
 
-  add_custom_target(embedded-darwin ALL)
+  add_custom_target(embedded-darwin)
+  add_dependencies(embedded-libraries embedded-darwin)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -472,6 +473,11 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
                                  COMPONENT sdk-overlay)
     endif()
   endforeach()
+
+  swift_install_in_component(FILES
+      posix_filesystem.apinotes
+    DESTINATION "share"
+    COMPONENT sdk-overlay)
 endif()
 add_custom_target(android_modulemap DEPENDS ${android_modulemap_target_list})
 set_property(TARGET android_modulemap PROPERTY FOLDER "Miscellaneous")

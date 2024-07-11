@@ -21,7 +21,7 @@ distributed actor DA {
 
   nonisolated var computedNonisolated: Int {
     // nonisolated computed properties are outside of the actor and as such cannot access local
-    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a non-isolated context}}
+    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a nonisolated context}}
 
     _ = self.id // ok, special handled and always available
     _ = self.actorSystem // ok, special handled and always available
@@ -34,7 +34,7 @@ distributed actor DA {
     _ = self.actorSystem // ok
     
     // self is a distributed actor self is NOT isolated
-    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a non-isolated context}}
+    _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a nonisolated context}}
     _ = try await self.dist() // ok, was made implicitly throwing and async
     _ = self.computedNonisolated // it's okay, only the body of computedNonisolated is wrong
   }
@@ -58,7 +58,7 @@ func invalidIsolatedCall<DA: DistributedActor> (
   Task {
     // expected-note@+1 {{let declared here}}
     for await closure in queue {
-      // expected-warning@+1 {{distributed actor-isolated let 'closure' can not be accessed from a non-isolated context; this is an error in the Swift 6 language mode}}
+      // expected-warning@+1 {{distributed actor-isolated let 'closure' can not be accessed from a nonisolated context; this is an error in the Swift 6 language mode}}
       await closure(actor)
     }
   }

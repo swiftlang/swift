@@ -355,10 +355,10 @@ inline bool isNumeric(llvm::StringRef S) {
   return false;
 }
 
-inline bool isNull(llvm::StringRef S) { return S.equals("null"); }
+inline bool isNull(llvm::StringRef S) { return S == "null"; }
 
 inline bool isBool(llvm::StringRef S) {
-  return S.equals("true") || S.equals("false");
+  return S == "true" || S == "false";
 }
 
 template<typename T>

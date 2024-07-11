@@ -26,7 +26,7 @@ func useValue<T>(_ t: T) {}
   let ns = NonSendableKlass()
 
   // Will be resolved once @MainActor is @Sendable
-  Task.fakeInit { @MainActor in // expected-error {{main actor-isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
+  Task.fakeInit { @MainActor in // expected-error {{main actor-isolated value of type '@MainActor @Sendable () async -> ()' passed as a strongly transferred parameter}}
     print(ns)
   }
 

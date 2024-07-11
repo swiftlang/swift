@@ -1,13 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/generic-struct-in-cxx.swift -D KNOWN_LAYOUT -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/generic-struct-in-cxx.swift -D KNOWN_LAYOUT -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
+// CHECK: namespace Generics SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Generics") {
 // CHECK: // Stub struct to be used to pass/return values to/from Swift functions.
 // CHECK-NEXT: struct swift_interop_passStub_Generics_[[PTRPTRENC:void_ptr_[0-9]_[0-9]_void_ptr_[0-9]_[0-9]+]] {
 // CHECK-NEXT:  void * _Nullable _1;

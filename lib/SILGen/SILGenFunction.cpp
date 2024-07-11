@@ -32,6 +32,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
@@ -285,7 +286,7 @@ static DeclContext *getInnermostFunctionContext(DeclContext *DC) {
 }
 
 /// Return location of the macro expansion and the macro name.
-static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
+static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
                               DeclContext *FunctionDC) {
   MacroInfo Result(Info.generatedSourceRange.getStart(),
                    Info.originalSourceRange.getStart());
@@ -373,7 +374,7 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
     TopLevelScope = It->second;
   else {
     // Recursively create one inlined function + scope per layer of generated
-    // sources.  Chains of Macro expansions are representad as flat
+    // sources.  Chains of Macro expansions are represented as flat
     // function-level scopes.
     SILGenFunctionBuilder B(SGM);
     auto &ASTContext = SGM.M.getASTContext();
@@ -1038,10 +1039,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-    auto resultIsolation = (hasErasedIsolation
-                              ? SILFunctionTypeIsolation::Erased
-                              : SILFunctionTypeIsolation::Unknown);
-
+    auto resultIsolation =
+        (hasErasedIsolation ? SILFunctionTypeIsolation::Erased
+                            : SILFunctionTypeIsolation::Unknown);
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
                            calleeConvention, resultIsolation);
@@ -1056,6 +1056,26 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                   typeContext.OrigType,
                                   typeContext.FormalType,
               SILType::getPrimitiveObjectType(typeContext.ExpectedLoweredType));
+
+    auto resultType = cast<SILFunctionType>(result.getType().getASTType());
+
+    // Check if we performed Sendable/sending type compensation in
+    // emitTransformedValue for a closure. If we did, insert some fixup code to
+    // convert from an @Sendable to a not-@Sendable value.
+    //
+    // DISCUSSION: We cannot do this internally to emitTransformedValue since it
+    // does not have access to our SILDeclRef.
+    if (auto *e = constant.getClosureExpr()) {
+      auto actualType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+      if (e->inheritsActorContext() &&
+          e->getActorIsolation().isActorIsolated() && actualType->isAsync() &&
+          !actualType->isSendable() && resultType->isSendable()) {
+        auto extInfo = resultType->getExtInfo().withSendable(false);
+        resultType = resultType->getWithExtInfo(extInfo);
+        result = B.createConvertFunction(
+            loc, result, SILType::getPrimitiveObjectType(resultType));
+      }
+    }
   }
 
   return result;

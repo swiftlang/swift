@@ -19,6 +19,8 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
@@ -1696,6 +1698,39 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setPlatformAvailabilityInheritanceMapPath(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
   }
 
+  for (auto &entry : SearchPathOpts.PluginSearchOpts) {
+    switch (entry.getKind()) {
+    case PluginSearchOption::Kind::LoadPluginLibrary: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginLibrary>();
+      GenericArgs.push_back("-load-plugin-library");
+      GenericArgs.push_back(ArgSaver.save(val.LibraryPath));
+      break;
+    }
+    case PluginSearchOption::Kind::LoadPluginExecutable: {
+      auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
+      for (auto &moduleName : val.ModuleNames) {
+        GenericArgs.push_back("-load-plugin-executable");
+        GenericArgs.push_back(
+            ArgSaver.save(val.ExecutablePath + "#" + moduleName));
+      }
+      break;
+    }
+    case PluginSearchOption::Kind::PluginPath: {
+      auto &val = entry.get<PluginSearchOption::PluginPath>();
+      GenericArgs.push_back("-plugin-path");
+      GenericArgs.push_back(ArgSaver.save(val.SearchPath));
+      break;
+    }
+    case PluginSearchOption::Kind::ExternalPluginPath: {
+      auto &val = entry.get<PluginSearchOption::ExternalPluginPath>();
+      GenericArgs.push_back("-external-plugin-path");
+      GenericArgs.push_back(
+          ArgSaver.save(val.SearchPath + "#" + val.ServerPath));
+      break;
+    }
+    }
+  }
+
   genericSubInvocation.getFrontendOptions().InputMode
       = FrontendOptions::ParseInputMode::SwiftModuleInterface;
   if (!SearchPathOpts.RuntimeResourcePath.empty()) {
@@ -2385,7 +2420,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(
-    ImportPath::Module path, ModuleVersionInfo *versionInfo,
+    ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
     bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
@@ -2411,7 +2446,7 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   auto moduleBuf = fs.getBufferForFile(it->second.modulePath);
   if (!moduleBuf) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+    Ctx.Diags.diagnose(loc, diag::error_opening_explicit_module_file,
                        it->second.modulePath);
     return false;
   }
@@ -2422,8 +2457,7 @@ bool ExplicitSwiftModuleLoader::canImportModule(
     if (auto forwardingModule = ForwardingModule::load(**moduleBuf)) {
       moduleBuf = fs.getBufferForFile(forwardingModule->underlyingModulePath);
       if (!moduleBuf) {
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::error_opening_explicit_module_file,
+        Ctx.Diags.diagnose(loc, diag::error_opening_explicit_module_file,
                            forwardingModule->underlyingModulePath);
         return false;
       }
@@ -2736,7 +2770,7 @@ std::error_code ExplicitCASModuleLoader::findModuleFilesInDirectory(
 }
 
 bool ExplicitCASModuleLoader::canImportModule(
-    ImportPath::Module path, ModuleVersionInfo *versionInfo,
+    ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
     bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
@@ -2765,12 +2799,11 @@ bool ExplicitCASModuleLoader::canImportModule(
                                 : it->second.modulePath;
   auto moduleBuf = Impl.loadFileBuffer(moduleCASID, it->second.modulePath);
   if (!moduleBuf) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
-                       toString(moduleBuf.takeError()));
+    Ctx.Diags.diagnose(loc, diag::error_cas, toString(moduleBuf.takeError()));
     return false;
   }
   if (!*moduleBuf) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+    Ctx.Diags.diagnose(loc, diag::error_opening_explicit_module_file,
                        it->second.modulePath);
     return false;
   }

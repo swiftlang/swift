@@ -33,6 +33,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -324,14 +325,13 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   
   // Create the constructor.
   DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
-  auto *ctor =
-    new (ctx) ConstructorDecl(name, Loc,
-                              /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
-                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                              /*ThrownType=*/TypeLoc(),
-                              paramList, /*GenericParams=*/nullptr, decl,
-							  /*LifetimeDependentReturnTypeRepr*/ nullptr);
+  auto *ctor = new (ctx) ConstructorDecl(
+      name, Loc,
+      /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl,
+      /*LifetimeDependentTypeRepr*/ nullptr);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -777,7 +777,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // satisfied by the derived class. In this case, we don't want to inherit
     // this initializer; there's no way to call it on the derived class.
     auto checkResult = checkRequirements(
-        classDecl->getParentModule(),
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(subMap);
@@ -819,18 +818,16 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
   auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
-  auto ctor =
-    new (ctx) ConstructorDecl(superclassCtor->getName(),
-                              classDecl->getBraces().Start,
-                              superclassCtor->isFailable(),
-                              /*FailabilityLoc=*/SourceLoc(),
-                              /*Async=*/superclassCtor->hasAsync(),
-                              /*AsyncLoc=*/SourceLoc(),
-                              /*Throws=*/superclassCtor->hasThrows(),
-                              /*ThrowsLoc=*/SourceLoc(),
-                              TypeLoc::withoutLoc(thrownType),
-                              bodyParams, genericParams, implCtx,
-							  /*LifetimeDependentReturnTypeRepr*/ nullptr);
+  auto ctor = new (ctx) ConstructorDecl(
+      superclassCtor->getName(), classDecl->getBraces().Start,
+      superclassCtor->isFailable(),
+      /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/superclassCtor->hasAsync(),
+      /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/superclassCtor->hasThrows(),
+      /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType), bodyParams,
+      genericParams, implCtx,
+      /*LifetimeDependentTypeRepr*/ nullptr);
 
   ctor->setImplicit();
 
@@ -1383,7 +1380,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = target->getParentModule()->lookupConformance(
+    auto ref = ModuleDecl::lookupConformance(
         targetType, protocol);
     if (ref.isInvalid()) {
       return false;

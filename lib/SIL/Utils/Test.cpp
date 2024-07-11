@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
@@ -114,6 +115,10 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
 
 DominanceInfo *FunctionTest::getDominanceInfo() {
   return dependencies->getDominanceInfo();
+}
+
+DeadEndBlocks *FunctionTest::getDeadEndBlocks() {
+  return dependencies->getDeadEndBlocks();
 }
 
 SILPassManager *FunctionTest::getPassManager() {

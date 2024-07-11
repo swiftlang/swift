@@ -27,6 +27,7 @@
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
@@ -727,6 +728,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ValueWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ValueWitnessTable =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                      SpecialPointerAuthDiscriminators::ValueWitnessTable);
   opts.ProtocolWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolAssociatedTypeAccessFunctions =
@@ -1439,7 +1443,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       }
       
       if (auto *synthSFU = File->getSynthesizedFile()) {
-        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
+        CurrentIGMPtr IGM = irgen.getGenModule(&synthSFU->getFileUnit());
         IGM->emitSynthesizedFileUnit(*synthSFU);
       }
     } else {

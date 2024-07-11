@@ -83,24 +83,12 @@ Enum Never has added a conformance to an existing protocol Encodable
 Enum Never has added a conformance to an existing protocol Identifiable
 
 // These functions haven't actually changed ABI, but are using @_silgen_name tricks to maintain the old ABI while moving to typed throws.
-Func AnyBidirectionalCollection.map(_:) has been renamed to Func __rethrows_map(_:)
-Func AnyBidirectionalCollection.map(_:) has mangled name changing from 'Swift.AnyBidirectionalCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyBidirectionalCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
-Func AnyBidirectionalCollection.map(_:) is now without @rethrows
-Func AnyCollection.map(_:) has been renamed to Func __rethrows_map(_:)
-Func AnyCollection.map(_:) has mangled name changing from 'Swift.AnyCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
-Func AnyCollection.map(_:) is now without @rethrows
-Func AnyRandomAccessCollection.map(_:) has been renamed to Func __rethrows_map(_:)
-Func AnyRandomAccessCollection.map(_:) has mangled name changing from 'Swift.AnyRandomAccessCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyRandomAccessCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
-Func AnyRandomAccessCollection.map(_:) is now without @rethrows
-Func AnySequence.map(_:) has been renamed to Func __rethrows_map(_:)
-Func AnySequence.map(_:) has mangled name changing from 'Swift.AnySequence.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnySequence.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
-Func AnySequence.map(_:) is now without @rethrows
-Func Sequence.map(_:) has been renamed to Func __rethrows_map(_:)
-Func Sequence.map(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Sequence.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
-Func Sequence.map(_:) is now without @rethrows
-Func Collection.map(_:) has been renamed to Func __rethrows_map(_:)
-Func Collection.map(_:) has mangled name changing from '(extension in Swift):Swift.Collection.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Collection.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
-Func Collection.map(_:) is now without @rethrows
+Func AnyBidirectionalCollection.map(_:) has been removed
+Func AnyCollection.map(_:) has been removed
+Func AnyRandomAccessCollection.map(_:) has been removed
+Func AnySequence.map(_:) has been removed
+Func Collection.map(_:) has been removed
+Func Sequence.map(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
@@ -699,17 +687,10 @@ Func _fixLifetime(_:) is now with @_preInverseGenerics
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func swap(_:_:) has mangled name changing from 'Swift.swap<A>(inout A, inout A) -> ()' to 'Swift.swap<A where A: ~Swift.Copyable>(inout A, inout A) -> ()'
 Func swap(_:_:) is now with @_preInverseGenerics
-Func withUnsafeBytes(of:_:) has been renamed to Func __abi_se0413_withUnsafeBytes(of:_:)
-Func withUnsafeBytes(of:_:) has mangled name changing from 'Swift.withUnsafeBytes<A, B>(of: A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeBytes<A, B>(of: A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B'
-Func withUnsafeBytes(of:_:) has mangled name changing from 'Swift.withUnsafeBytes<A, B>(of: inout A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeBytes<A, B>(of: inout A, _: (Swift.UnsafeRawBufferPointer) throws -> B) throws -> B'
-Func withUnsafeMutableBytes(of:_:) has been renamed to Func __abi_se0413_withUnsafeMutableBytes(of:_:)
-Func withUnsafeMutableBytes(of:_:) has mangled name changing from 'Swift.withUnsafeMutableBytes<A, B>(of: inout A, _: (Swift.UnsafeMutableRawBufferPointer) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutableBytes<A, B>(of: inout A, _: (Swift.UnsafeMutableRawBufferPointer) throws -> B) throws -> B'
-Func withUnsafeMutablePointer(to:_:) has been renamed to Func __abi_se0413_withUnsafeMutablePointer(to:_:)
-Func withUnsafeMutablePointer(to:_:) has mangled name changing from 'Swift.withUnsafeMutablePointer<A, B>(to: inout A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafeMutablePointer<A, B>(to: inout A, _: (Swift.UnsafeMutablePointer<A>) throws -> B) throws -> B'
-Func withUnsafePointer(to:_:) has been renamed to Func __abi_se0413_withUnsafePointer(to:_:)
-Func withUnsafePointer(to:_:) has been renamed to Func __abi_withUnsafePointer(to:_:)
-Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
-Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: inout A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_se0413_withUnsafePointer<A, B>(to: inout A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
+Func withUnsafeBytes(of:_:) has been removed
+Func withUnsafeMutableBytes(of:_:) has been removed
+Func withUnsafeMutablePointer(to:_:) has been removed
+Func withUnsafePointer(to:_:) has been removed
 Protocol _Pointer has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable> to <Self : Swift.BitwiseCopyable, Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable, Self.Pointee : ~Copyable>
 Struct ManagedBufferPointer has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Struct UnsafeBufferPointer has generic signature change from <Element> to <Element where Element : ~Copyable>

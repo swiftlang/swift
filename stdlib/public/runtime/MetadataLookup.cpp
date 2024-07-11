@@ -402,6 +402,38 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
   auto mangledName = extension->getMangledExtendedContext();
+  
+  // A extension of the form `extension Protocol where Self == ConcreteType`
+  // is formally a protocol extension, so the formal generic parameter list
+  // is `<Self>`, but because of the same type constraint, the extended context
+  // looks like a reference to that nominal type. We want to match the
+  // extension's formal generic environment rather than the nominal type's
+  // in this case, so we should skip out on this case.
+  //
+  // We can detect this by looking at whether the generic context of the
+  // extension has a first generic parameter, which would be the Self parameter,
+  // with a same type constraint matching the extended type.
+  for (auto &reqt : extension->getGenericRequirements()) {
+    if (reqt.getKind() != GenericRequirementKind::SameType) {
+      continue;
+    }
+    // 'x' is the mangling of the first generic parameter
+    if (!reqt.getParam().equals("x")) {
+      continue;
+    }
+    // Is the generic parameter same-type-constrained to the same type
+    // we're extending? Then this is a `Self == ExtendedType` constraint.
+    // This is impossible for normal generic nominal type extensions because
+    // that would mean that you had:
+    //   struct Foo<T> {...}
+    //   extension Foo where T == Foo<T> {...}
+    // which would mean that the extended type is the infinite expansion
+    // Foo<Foo<Foo<Foo<...>>>>, which we don't allow.
+    if (reqt.getMangledTypeName().data() == mangledName.data()) {
+      return nullptr;
+    }
+  }
+  
   node = demangler.demangleType(mangledName,
                                 ResolveAsSymbolicReference(demangler));
   if (!node)
@@ -808,18 +840,18 @@ descriptorFromStandardMangling(Demangle::NodePointer symbolicNode) {
   // Fast-path lookup for standard library type references with short manglings.
   if (symbolicNode->getNumChildren() >= 2
       && symbolicNode->getChild(0)->getKind() == Node::Kind::Module
-      && symbolicNode->getChild(0)->getText().equals("Swift")
+      && stringRefEqualsCString(symbolicNode->getChild(0)->getText(), "Swift")
       && symbolicNode->getChild(1)->getKind() == Node::Kind::Identifier) {
     auto name = symbolicNode->getChild(1)->getText();
 
-#define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
-    if (name.equals(#TYPENAME)) { \
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                                \
+    if (stringRefEqualsCString(name, #TYPENAME)) {                             \
       return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
     }
   // FIXME: When the _Concurrency library gets merged into the Standard Library,
   // we will be able to reference those symbols directly as well.
 #define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
-  if (concurrencyDescriptors && name.equals(#TYPENAME)) {                      \
+  if (concurrencyDescriptors && stringRefEqualsCString(name, #TYPENAME)) {     \
     return concurrencyDescriptors->TYPENAME;                                   \
   }
 #if !SWIFT_OBJC_INTEROP
@@ -1254,7 +1286,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
   (void)_gatherGenericParameterCounts(context,
                                       genericParamCounts, demangler);
   unsigned numTotalGenericParams =
-    genericParamCounts.empty() ? 0 : genericParamCounts.back();
+    genericParamCounts.empty() ? context->getNumGenericParams()
+                               : genericParamCounts.back();
   
   // Check whether we have the right number of generic arguments.
   if (genericArgs.size() == getLocalGenericParams(context).size()) {
@@ -1870,7 +1903,7 @@ public:
   TypeLookupErrorOr<BuiltType> createBuiltinType(StringRef builtinName,
                                                  StringRef mangledName) const {
 #define BUILTIN_TYPE(Symbol, _) \
-    if (mangledName.equals(#Symbol)) \
+    if (stringRefEqualsCString(mangledName, #Symbol)) \
       return BuiltType(&METADATA_SYM(Symbol).base);
 #if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)

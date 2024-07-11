@@ -49,6 +49,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
@@ -1788,6 +1789,8 @@ bool ExtensionDecl::hasValidParent() const {
   return getDeclContext()->canBeParentOfExtension();
 }
 
+/// Does the extension's generic signature impose additional generic requirements
+/// not stated on the extended nominal type itself?
 bool ExtensionDecl::isConstrainedExtension() const {
   auto nominal = getExtendedNominal();
   if (!nominal)
@@ -1806,12 +1809,26 @@ bool ExtensionDecl::isConstrainedExtension() const {
   return !typeSig->isEqual(extSig);
 }
 
+/// Is the extension written as an unconstrained extension? This is not the same
+/// as isConstrainedExtension() in the case where the extended nominal type has
+/// inverse requirements, because an extension of such a type introduces default
+/// conformance requirements unless they're suppressed on the extension.
+///
+/// enum Optional<Wrapped> where Wrapped: ~Copyable {}
+///
+/// extension Optional {}
+///   --> isConstrainedExtension(): true
+///   --> isWrittenWithConstraints(): false
+///
+/// extension Optional where Wrapped: ~Copyable {}
+///   --> isConstrainedExtension(): false
+///   --> isWrittenWithConstraints(): true
 bool ExtensionDecl::isWrittenWithConstraints() const {
   auto nominal = getExtendedNominal();
   if (!nominal)
     return false;
 
-  // If there's no generic signature, then it's written without constraints.
+  // If there's no generic signature, then it's unconstrained.
   CanGenericSignature extSig = getGenericSignature().getCanonicalSignature();
   if (!extSig)
     return false;
@@ -1828,30 +1845,18 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   SmallVector<InverseRequirement, 2> typeInverseReqs;
   typeSig->getRequirementsWithInverses(typeReqs, typeInverseReqs);
 
-  // If the (non-inverse) requirements are different between the extension and
-  // the original type, it's written with constraints. Note that
-  // the extension can only add requirements, so we need only check the size
-  // (not the specific requirements).
-  if (extReqs.size() > typeReqs.size()) {
+  // If the non-inverse requirements are different between the extension and
+  // the original type, it's written with constraints.
+  if (extReqs != typeReqs)
     return true;
-  }
 
-  assert(extReqs.size() == typeReqs.size());
+  // If the extension has inverse requirements, then it's written with
+  // constraints.
+  if (!extInverseReqs.empty())
+    return true;
 
-  // If the type has no inverse requirements, there are no extra constraints
-  // to write.
-  if (typeInverseReqs.empty()) {
-    return false;
-  }
-
-  // If the extension has no inverse requirements, then there are no constraints
-  // that need to be written down.
-  if (extInverseReqs.empty()) {
-    return false;
-  }
-
-  // We have inverses that need to be written out.
-  return true;
+  // Otherwise, the extension is written as an unconstrained extension.
+  return false;
 }
 
 bool ExtensionDecl::isInSameDefiningModule() const {
@@ -1905,6 +1910,30 @@ Type ExtensionDecl::getExtendedType() const {
           Type()))
     return type;
   return ErrorType::get(ctx);
+}
+
+bool ExtensionDecl::isAddingConformanceToInvertible() const {
+  const unsigned numEntries = getInherited().size();
+  for (unsigned i = 0; i < numEntries; ++i) {
+    InheritedTypeRequest request{this, i, TypeResolutionStage::Structural};
+    auto result = evaluateOrDefault(getASTContext().evaluator, request,
+                                    InheritedTypeResult::forDefault());
+    Type inheritedTy;
+    switch (result) {
+    case InheritedTypeResult::Inherited:
+      inheritedTy = result.getInheritedType();
+      break;
+    case InheritedTypeResult::Suppressed:
+    case InheritedTypeResult::Default:
+      continue;
+    }
+
+    if (inheritedTy)
+      if (auto kp = inheritedTy->getKnownProtocol())
+        if (getInvertibleProtocolKind(*kp))
+          return true;
+  }
+  return false;
 }
 
 bool Decl::isObjCImplementation() const {
@@ -3073,9 +3102,6 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
     return isResilient();
   case ResilienceExpansion::Maximal:
     if (M == getModuleContext())
-      return false;
-    // Access non-resiliently if package optimization is enabled
-    if (bypassResilienceInPackage(M))
       return false;
     return isResilient();
   }
@@ -4710,6 +4736,8 @@ bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
 
   if (scope.isPublic())
     return !otherScope.isPublic();
+  else if (scope.isPackage())
+    return !otherScope.isPublicOrPackage();
   else if (scope.isInternal())
     return !otherScope.isPublic() && !otherScope.isInternal();
   else
@@ -5130,7 +5158,7 @@ NominalTypeDecl::canConformTo(InvertibleProtocolKind ip) const {
   Type selfTy = getDeclaredInterfaceType();
   assert(selfTy);
 
-  auto conformance = getModuleContext()->lookupConformance(selfTy, proto,
+  auto conformance = ModuleDecl::lookupConformance(selfTy, proto,
       /*allowMissing=*/false);
 
   if (conformance.isInvalid())
@@ -6648,13 +6676,14 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.RequiresClass = false;
   Bits.ProtocolDecl.ExistentialConformsToSelfValid = false;
   Bits.ProtocolDecl.ExistentialConformsToSelf = false;
-  Bits.ProtocolDecl.InheritedProtocolsValid = 0;
+  Bits.ProtocolDecl.InheritedProtocolsValid = false;
+  Bits.ProtocolDecl.AllInheritedProtocolsValid = false;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  Bits.ProtocolDecl.HasAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasLazyAssociatedTypes = 0;
-  Bits.ProtocolDecl.HasRequirementSignature = 0;
-  Bits.ProtocolDecl.HasLazyRequirementSignature = 0;
+  Bits.ProtocolDecl.HasAssociatedTypes = false;
+  Bits.ProtocolDecl.HasLazyAssociatedTypes = false;
+  Bits.ProtocolDecl.HasRequirementSignature = false;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = false;
   Bits.ProtocolDecl.ProtocolRequirementsValid = false;
   setTrailingWhereClause(TrailingWhere);
 }
@@ -6688,6 +6717,11 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
+  // Avoid evaluator overhead because we call this from Symbol::compare()
+  // in the Requirement Machine.
+  if (Bits.ProtocolDecl.AllInheritedProtocolsValid)
+    return AllInheritedProtocols;
+
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            AllInheritedProtocolsRequest{mutThis},
@@ -7405,6 +7439,8 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
   Bits.VarDecl.IsLazyStorageProperty = false;
   Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   Bits.VarDecl.IsTopLevelGlobal = false;
+  Bits.VarDecl.NoAttachedPropertyWrappers = false;
+  Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables = false;
 }
 
 Type VarDecl::getTypeInContext() const {
@@ -10286,8 +10322,8 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
-std::optional<LifetimeDependenceInfo>
-AbstractFunctionDecl::getLifetimeDependenceInfo() const {
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+AbstractFunctionDecl::getLifetimeDependencies() const {
   if (!isa<FuncDecl>(this) && !isa<ConstructorDecl>(this)) {
     return std::nullopt;
   }
@@ -10367,8 +10403,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
-  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR) ||
-      llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
+  if (llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
     FD->setSendingResult();
   return FD;
 }
@@ -10789,7 +10824,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 }
 
 bool ConstructorDecl::hasLifetimeDependentReturn() const {
-  return isa_and_nonnull<LifetimeDependentReturnTypeRepr>(getResultTypeRepr());
+  return isa_and_nonnull<LifetimeDependentTypeRepr>(getResultTypeRepr());
 }
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
@@ -11642,9 +11677,7 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
     auto baseType =
         memberRef->getBase()->getType()->getMetatypeInstanceType();
     if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
-      auto *dc = declRef.getDecl()->getDeclContext();
-      auto *module = dc->getParentModule();
-      auto conformance = module->checkConformance(baseType, globalActor);
+      auto conformance = ModuleDecl::checkConformance(baseType, globalActor);
       if (conformance &&
           conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
         return ActorIsolation::forGlobalActor(baseType);

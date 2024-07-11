@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -340,7 +341,6 @@ public:
     // We skip out-of-place expr checking here since we've already performed it.
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ std::nullopt,
                                     /*isExprStmt=*/false,
-                                    /*disableAvailabilityChecking*/ false,
                                     /*disableOutOfPlaceExprChecking*/ true);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -382,15 +382,14 @@ public:
 } // end anonymous namespace
 
 void constraints::performSyntacticDiagnosticsForTarget(
-    const SyntacticElementTarget &target, bool isExprStmt,
-    bool disableExprAvailabilityChecking) {
+    const SyntacticElementTarget &target, bool isExprStmt) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SyntacticElementTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
-    performSyntacticExprDiagnostics(
-        target.getAsExpr(), dc, target.getExprContextualTypePurpose(),
-        isExprStmt, disableExprAvailabilityChecking);
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc,
+                                    target.getExprContextualTypePurpose(),
+                                    isExprStmt);
     return;
   }
 
@@ -399,8 +398,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
 
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(stmt->getTypeCheckedSequence(), dc,
-                                    CTP_ForEachSequence, isExprStmt,
-                                    disableExprAvailabilityChecking);
+                                    CTP_ForEachSequence, isExprStmt);
 
     if (auto *whereExpr = stmt->getWhere())
       performSyntacticExprDiagnostics(whereExpr, dc, CTP_Condition,
@@ -543,9 +541,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticDiagnosticsForTarget(
-        *resultTarget, isExprStmt,
-        options.contains(TypeCheckExprFlags::DisableExprAvailabilityChecking));
+    performSyntacticDiagnosticsForTarget(*resultTarget, isExprStmt);
   }
 
   return *resultTarget;
@@ -1772,7 +1768,6 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     return CheckedCastKind::BridgingCoercion;
   }
 
-  auto *module = dc->getParentModule();
   bool optionalToOptionalCast = false;
 
   // Local function to indicate failure.
@@ -1997,8 +1992,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       auto archetype = toType->castTo<ArchetypeType>();
       conformsToAllProtocols = llvm::all_of(archetype->getConformsTo(),
         [&](ProtocolDecl *proto) {
-          return module->checkConformance(fromType, proto,
-                                          /*allowMissing=*/false);
+          return ModuleDecl::checkConformance(fromType, proto,
+                                              /*allowMissing=*/false);
         });
     }
 
@@ -2143,7 +2138,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       constraint = existential->getConstraintType();
     if (auto *protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(constraint->getAnyNominal())) {
-      if (!couldDynamicallyConformToProtocol(toType, protocolDecl, module)) {
+      if (!couldDynamicallyConformToProtocol(toType, protocolDecl)) {
         return failed();
       }
     } else if (auto protocolComposition =
@@ -2153,7 +2148,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
                                  protocolType->getAnyNominal())) {
                            return !couldDynamicallyConformToProtocol(
-                               toType, protocolDecl, module);
+                               toType, protocolDecl);
                          }
                          return false;
                        })) {
@@ -2249,7 +2244,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (module->checkConformance(toType, errorTypeProto)) {
+      if (ModuleDecl::checkConformance(toType, errorTypeProto)) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -2259,7 +2254,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         }
       }
 
-      if (module->checkConformance(fromType, errorTypeProto)) {
+      if (ModuleDecl::checkConformance(fromType, errorTypeProto)) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||
              (nsErrorTy && toType->isEqual(nsErrorTy)))

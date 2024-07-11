@@ -24,6 +24,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -474,10 +475,31 @@ void CompilerInstance::setupOutputBackend() {
 
   // Mirror the output into CAS.
   if (supportCaching()) {
+    auto &InAndOuts = Invocation.getFrontendOptions().InputsAndOutputs;
     CASOutputBackend = createSwiftCachingOutputBackend(
-        *CAS, *ResultCache, *CompileJobBaseKey,
-        Invocation.getFrontendOptions().InputsAndOutputs,
+        *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
         Invocation.getFrontendOptions().RequestedAction);
+
+    if (Invocation.getIRGenOptions().UseCASBackend) {
+      auto OutputFiles = InAndOuts.copyOutputFilenames();
+      std::unordered_set<std::string> OutputFileSet(
+          std::make_move_iterator(OutputFiles.begin()),
+          std::make_move_iterator(OutputFiles.end()));
+      // Filter the object file output if MCCAS is enabled, we do not want to
+      // store the object file itself, but store the MCCAS CASID instead.
+      auto FilterBackend = llvm::vfs::makeFilteringOutputBackend(
+          CASOutputBackend,
+          [&, OutputFileSet](StringRef Path,
+                             std::optional<llvm::vfs::OutputConfig> Config) {
+            if (InAndOuts.getPrincipalOutputType() != file_types::ID::TY_Object)
+              return true;
+            return !(OutputFileSet.find(Path.str()) != OutputFileSet.end());
+          });
+      OutputBackend =
+          llvm::vfs::makeMirroringOutputBackend(OutputBackend, FilterBackend);
+      return;
+    }
+
     OutputBackend =
         llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
   }
@@ -1650,11 +1672,6 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
         action != ActionType::ScanDependencies) {
       opts |= ParsingFlags::DisablePoundIfEvaluation;
     }
-
-    // If we need to dump the parse tree, disable delayed bodies as we want to
-    // show everything.
-    if (action == ActionType::DumpParse)
-      opts |= ParsingFlags::DisableDelayedBodies;
   }
 
   const auto &typeOpts = getASTContext().TypeCheckerOpts;

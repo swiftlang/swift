@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -1032,7 +1033,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // Verify educational notes
       for (auto &foundName : FoundDiagnostic.EducationalNotes) {
         llvm::erase_if(expectedNotes->Names,
-                       [&](StringRef item) { return item.equals(foundName); });
+                       [&](StringRef item) { return item == foundName; });
       }
 
       if (!expectedNotes->Names.empty()) {

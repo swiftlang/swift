@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 
@@ -847,7 +848,7 @@ namespace {
                 SmallVector<Space, 4> constElemSpaces;
                 if (auto payloadTy = eed->getArgumentInterfaceType()) {
                   auto eedTy = tp->getCanonicalType()->getTypeOfMember(
-                      E->getModuleContext(), eed, payloadTy);
+                      eed, payloadTy);
                   if (auto *TTy = eedTy->getAs<TupleType>()) {
                     Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
                   } else if (auto *TTy =

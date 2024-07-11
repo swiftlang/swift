@@ -23,6 +23,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SmallString.h"
@@ -674,28 +675,28 @@ SourceLoc SILBoxTypeRepr::getLocImpl() const {
   return LBraceLoc;
 }
 
-LifetimeDependentReturnTypeRepr *LifetimeDependentReturnTypeRepr::create(
+LifetimeDependentTypeRepr *LifetimeDependentTypeRepr::create(
     ASTContext &C, TypeRepr *base,
     ArrayRef<LifetimeDependenceSpecifier> specifiers) {
   auto size = totalSizeToAlloc<LifetimeDependenceSpecifier>(specifiers.size());
   auto mem = C.Allocate(size, alignof(LifetimeDependenceSpecifier));
-  return new (mem) LifetimeDependentReturnTypeRepr(base, specifiers);
+  return new (mem) LifetimeDependentTypeRepr(base, specifiers);
 }
 
-SourceLoc LifetimeDependentReturnTypeRepr::getStartLocImpl() const {
+SourceLoc LifetimeDependentTypeRepr::getStartLocImpl() const {
   return getLifetimeDependencies().front().getLoc();
 }
 
-SourceLoc LifetimeDependentReturnTypeRepr::getEndLocImpl() const {
+SourceLoc LifetimeDependentTypeRepr::getEndLocImpl() const {
   return getLifetimeDependencies().back().getLoc();
 }
 
-SourceLoc LifetimeDependentReturnTypeRepr::getLocImpl() const {
+SourceLoc LifetimeDependentTypeRepr::getLocImpl() const {
   return getBase()->getLoc();
 }
 
-void LifetimeDependentReturnTypeRepr::printImpl(
-    ASTPrinter &Printer, const PrintOptions &Opts) const {
+void LifetimeDependentTypeRepr::printImpl(ASTPrinter &Printer,
+                                          const PrintOptions &Opts) const {
   Printer << " ";
   for (auto &dep : getLifetimeDependencies()) {
     Printer << dep.getLifetimeDependenceSpecifierString() << " ";
@@ -850,9 +851,6 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   }
   case TypeReprKind::Isolated:
     Printer.printKeyword("isolated", Opts, " ");
-    break;
-  case TypeReprKind::Transferring:
-    Printer.printKeyword("transferring", Opts, " ");
     break;
   case TypeReprKind::Sending:
     Printer.printKeyword("sending", Opts, " ");

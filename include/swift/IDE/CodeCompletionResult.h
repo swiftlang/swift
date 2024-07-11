@@ -197,6 +197,7 @@ enum class CompletionKind : uint8_t {
   PostfixExpr,
   KeyPathExprObjC,
   KeyPathExprSwift,
+  TypePossibleFunctionParamBeginning,
   TypeDeclResultBeginning,
   TypeBeginning,
   TypeSimpleOrComposition,
@@ -228,6 +229,7 @@ enum class CompletionKind : uint8_t {
   StmtLabel,
   ForEachPatternBeginning,
   TypeAttrBeginning,
+  TypeAttrInheritanceBeginning,
   OptionalBinding,
 
   /// Completion after `~` in an inheritance clause.
@@ -322,6 +324,7 @@ enum class CodeCompletionMacroRole : uint8_t {
   AttachedVar = 1 << 3,
   AttachedContext = 1 << 4,
   AttachedDecl = 1 << 5,
+  AttachedFunction = 1 << 6,
 };
 using CodeCompletionMacroRoles = OptionSet<CodeCompletionMacroRole>;
 
@@ -336,6 +339,7 @@ enum class CodeCompletionFilterFlag : uint16_t {
   AttachedVarMacro = 1 << 7,
   AttachedContextMacro = 1 << 8,
   AttachedDeclMacro = 1 << 9,
+  AttachedFunctionMacro = 1 << 10,
 };
 using CodeCompletionFilter = OptionSet<CodeCompletionFilterFlag>;
 

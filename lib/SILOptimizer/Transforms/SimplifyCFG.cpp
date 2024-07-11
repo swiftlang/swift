@@ -32,6 +32,7 @@
 
 #include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -231,6 +232,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                    (*ThreadedSuccessorBlock->args_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+        Cloner.registerBlockWithNewPhiArg(ThreadedSuccessorBlock);
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
         auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);

@@ -167,6 +167,11 @@ bb0:
   return %6 : $()
 }
 
+// Check that we don't crash on global init-once declarations.
+
+// CHECK-LABEL: sil [global_init_once_fn] [no_locks] @external_global_init_once : $@convention(c) () -> ()
+sil [global_init_once_fn] [no_locks] @external_global_init_once : $@convention(c) () -> ()
+
 sil @yield_int_value : $@convention(thin) @yield_once () -> (@yields Int32) {
 bb0:
   %0 = integer_literal $Builtin.Int32, 10

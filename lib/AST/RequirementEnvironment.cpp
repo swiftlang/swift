@@ -23,6 +23,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 
 #define DEBUG_TYPE "Protocol conformance checking"
@@ -124,8 +125,7 @@ RequirementEnvironment::RequirementEnvironment(
         ProtocolConformance *specialized = conformance;
         if (conformance && conformance->getGenericSignature()) {
           auto concreteSubs =
-            substConcreteType->getContextSubstitutionMap(
-              conformanceDC->getParentModule(), conformanceDC);
+            substConcreteType->getContextSubstitutionMap(conformanceDC);
           specialized =
             ctx.getSpecializedConformance(substConcreteType,
                                           cast<NormalProtocolConformance>(conformance),

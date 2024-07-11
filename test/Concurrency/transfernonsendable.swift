@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // This run validates that for specific test cases around closures, we properly
@@ -19,6 +18,7 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   // expected-typechecker-only-note @-1 3{{}}
   // expected-tns-note @-2 {{}}
   var field: NonSendableKlass? = nil
+  var boolean: Bool = false
 
   init() {}
   init(_ x: NonSendableKlass) {
@@ -41,6 +41,7 @@ actor MyActor {
   func useSendableFunction(_: @Sendable () -> Void) {}
   func useNonSendableFunction(_: () -> Void) {}
   func doSomething() {}
+  @MainActor func useKlassMainActor(_ x: NonSendableKlass) {}
 }
 
 final actor FinalActor {
@@ -232,7 +233,7 @@ func closureNonInOut(_ a: MyActor) async {
 func transferNonIsolatedNonAsyncClosureTwice() async {
   let a = MyActor()
 
-  // This is non-isolated and non-async... we can transfer it safely.
+  // This is nonisolated and non-async... we can transfer it safely.
   var actorCaptureClosure = { print(a) }
   await transferToMain(actorCaptureClosure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -386,11 +387,11 @@ extension MyActor {
   func simpleClosureCaptureSelfThroughTupleWithFieldAccess() async {
     // In this case, we erase that we accessed self so we hit a type checker
     // error. We could make this a SNS error, but since in the other cases where
-    // we have a non-isolated non-async we are probably going to change it to be
+    // we have a nonisolated non-async we are probably going to change it to be
     // async as well making these errors go away.
     let x = (self, 1)
     let closure: () -> () = {
-      print(x.0.klass) // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+      print(x.0.klass) // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
     }
     await transferToMain(closure)
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
@@ -444,7 +445,7 @@ func testSimpleLetClosureCaptureActor() async {
 
 func testSimpleLetClosureCaptureActorField() async {
   let a = MyActor()
-  let closure = { print(a.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+  let closure = { print(a.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
   await transferToMain(closure)
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -452,7 +453,7 @@ func testSimpleLetClosureCaptureActorField() async {
 
 func testSimpleLetClosureCaptureActorFieldThroughTuple() async {
   let a = (MyActor(), 0)
-  let closure = { print(a.0.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+  let closure = { print(a.0.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
   await transferToMain(closure)
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -460,7 +461,7 @@ func testSimpleLetClosureCaptureActorFieldThroughTuple() async {
 
 func testSimpleLetClosureCaptureActorFieldThroughOptional() async {
   let a: MyActor? = MyActor()
-  let closure = { print(a!.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+  let closure = { print(a!.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
   await transferToMain(closure)
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -481,7 +482,7 @@ func testSimpleVarClosureCaptureActor() async {
 func testSimpleVarClosureCaptureActorField() async {
   let a = MyActor()
   var closure = {}
-  closure = { print(a.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+  closure = { print(a.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
   await transferToMain(closure)
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -490,7 +491,7 @@ func testSimpleVarClosureCaptureActorField() async {
 func testSimpleVarClosureCaptureActorFieldThroughTuple() async {
   let a = (MyActor(), 0)
   var closure = {}
-  closure = { print(a.0.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+  closure = { print(a.0.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
   await transferToMain(closure)
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -499,7 +500,7 @@ func testSimpleVarClosureCaptureActorFieldThroughTuple() async {
 func testSimpleVarClosureCaptureActorFieldThroughOptional() async {
   let a: MyActor? = MyActor()
   var closure = {}
-  closure = { print(a!.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a non-isolated context}}
+  closure = { print(a!.klass) } // expected-typechecker-only-error {{actor-isolated property 'klass' can not be referenced from a nonisolated context}}
   await transferToMain(closure)
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
@@ -1331,9 +1332,9 @@ func varSendableNonTrivialLetTupleFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
-  let z = test.1 // expected-tns-note {{access can happen concurrently}}
+  let z = test.1
   useValue(z)
-  useValue(test)
+  useValue(test) // expected-tns-note {{access can happen concurrently}}
 }
 
 func varNonSendableNonTrivialLetTupleFieldTest() async {
@@ -1745,4 +1746,92 @@ func testIndirectParameterSameIsolationNoError() async {
   let x = NonSendableKlass()
   await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+}
+
+extension MyActor {
+  func testNonSendableCaptures(sc: NonSendableKlass) {
+    Task {
+      _ = self
+      _ = sc
+
+      Task { [sc,self] in
+        _ = self
+        _ = sc
+
+        Task { // expected-tns-warning {{value of non-Sendable type '@isolated(any) @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' accessed after being transferred}}
+          _ = sc
+        }
+
+        Task { // expected-tns-note {{access can happen concurrently}}
+          _ = sc
+        }
+      }
+    }
+  }
+}
+
+public struct TimeoutError: Error, CustomStringConvertible {
+  public var description: String { "Timed out" }
+}
+
+// We used to not merge the isolation below correctly causing us to emit a crash
+// due to undefined behavior. Make sure we do not crash or emit an unhandled
+// pattern error.
+public func doNotCrashOrEmitUnhandledPatternErrors<T: Sendable>(
+  _ duration: Duration,
+  _ body: @escaping @Sendable () async throws -> T
+) async throws -> T {
+  try await withThrowingTaskGroup(of: T.self) { taskGroup in
+    taskGroup.addTask {
+      try await Task.sleep(for: duration)
+      throw TimeoutError()
+    }
+    taskGroup.addTask {
+      return try await body()
+    }
+    for try await value in taskGroup {
+      taskGroup.cancelAll()
+      return value
+    }
+    throw CancellationError()
+  }
+}
+
+/// The following makes sure that when we have a function like test2 with an
+/// assigned isolation that returns a Sendable value... we treat the value as
+/// actually Sendable. This occurs in this example via the result of the default
+/// parameter function for string.
+///
+/// We shouldn't emit any diagnostic here.
+actor FunctionWithSendableResultAndIsolationActor {
+    func foo() -> String {
+        return string()
+    }
+    func string(someCondition: Bool = false) -> String {
+        return ""
+    }
+}
+
+@MainActor
+func testThatGlobalActorTakesPrecedenceOverActorIsolationOnMethods() async {
+  let a = MyActor()
+  let ns = NonSendableKlass()
+
+  // 'ns' should be main actor isolated since useKlassMainActor is @MainActor
+  // isolated. Previously we would let MyActor take precedence here...
+  a.useKlassMainActor(ns)
+
+  // Meaning we would get an error here.
+  Task { @MainActor in print(ns) }
+}
+
+// Shouldn't get any errors from x.
+//
+// We used to look through the access to x.boolean and think that the closure
+// was capturing x instead of y.
+func testBooleanCapture(_ x: inout NonSendableKlass) {
+  let y = x.boolean
+  Task.detached { @MainActor [z = y] in
+    print(z)
+  }
 }

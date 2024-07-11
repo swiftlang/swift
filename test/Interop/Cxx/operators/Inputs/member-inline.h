@@ -492,4 +492,47 @@ public:
    }
 };
 
+struct ClassWithOperatorStarAvailable {
+  int value;
+
+public:
+  int &operator*() { return value; }
+};
+
+struct DerivedClassWithOperatorStarAvailable : ClassWithOperatorStarAvailable {
+};
+
+struct ClassWithOperatorStarUnavailable {
+  int value;
+
+public:
+  int &operator*() __attribute__((availability(swift, unavailable))) {
+    return value;
+  }
+};
+
+struct DerivedClassWithOperatorStarUnavailable
+    : ClassWithOperatorStarUnavailable {};
+
+struct ClassWithSuccessorAvailable {
+  int value;
+
+public:
+  ClassWithSuccessorAvailable &operator++() {
+    value++;
+    return *this;
+  }
+};
+
+struct ClassWithSuccessorUnavailable {
+  int value;
+
+public:
+  ClassWithSuccessorUnavailable &operator++()
+      __attribute__((availability(swift, unavailable))) {
+    value++;
+    return *this;
+  }
+};
+
 #endif

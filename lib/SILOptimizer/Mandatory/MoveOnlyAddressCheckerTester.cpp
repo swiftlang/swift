@@ -15,6 +15,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -89,6 +90,7 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
+    auto *deba = getAnalysis<DeadEndBlocksAnalysis>();
 
     DiagnosticEmitter diagnosticEmitter(fn);
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
@@ -107,8 +109,8 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
       LLVM_DEBUG(llvm::dbgs() << "No move introducers found?!\n");
     } else {
       borrowtodestructure::IntervalMapAllocator allocator;
-      MoveOnlyAddressChecker checker{getFunction(), diagnosticEmitter,
-                                     allocator, domTree, poa};
+      MoveOnlyAddressChecker checker{
+          getFunction(), diagnosticEmitter, allocator, domTree, poa, deba};
       madeChange = checker.completeLifetimes();
       madeChange |= checker.check(moveIntroducersToProcess);
     }

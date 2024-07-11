@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/RequirementSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -216,7 +217,7 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   auto &ctx = cs.getASTContext();
 
   if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-      if (!cs.DC->getParentModule()->lookupConformance(unwrappedDict, proto))
+      if (!ModuleDecl::lookupConformance(unwrappedDict, proto))
         return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);
@@ -1845,6 +1846,23 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
   return name;
 }
 
+bool AllowSendingMismatch::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  SendingMismatchFailure failure(solution, getFromType(), getToType(),
+                                 getLocator(), fixBehavior);
+  return failure.diagnose(asNote);
+}
+
+AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
+                                                   Type srcType, Type dstType,
+                                                   ConstraintLocator *locator) {
+  auto fixBehavior = cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+                         ? FixBehavior::Error
+                         : FixBehavior::DowngradeToWarning;
+  return new (cs.getAllocator())
+      AllowSendingMismatch(cs, srcType, dstType, locator, fixBehavior);
+}
+
 bool SpecifyBaseTypeForContextualMember::diagnose(const Solution &solution,
                                                   bool asNote) const {
   MissingContextualBaseInMemberRefFailure failure(solution, MemberName,
@@ -2103,6 +2121,18 @@ SpecifyContextualTypeForNil *
 SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
+}
+
+bool IgnoreInvalidPlaceholder::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  InvalidPlaceholderFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreInvalidPlaceholder *
+IgnoreInvalidPlaceholder::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidPlaceholder(cs, locator);
 }
 
 bool SpecifyTypeForPlaceholder::diagnose(const Solution &solution,

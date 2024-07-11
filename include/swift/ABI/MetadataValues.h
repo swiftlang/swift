@@ -1197,7 +1197,7 @@ class TargetExtendedFunctionTypeFlags {
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
 
-    // Values if we have a transferring result.
+    // Values if we have a sending result.
     HasSendingResult  = 0x00000010U,
 
     /// A InvertibleProtocolSet in the high bits.
@@ -2698,7 +2698,8 @@ enum class TaskOptionRecordKind : uint8_t {
   /// Information about the result type of the task, used in embedded Swift.
   ResultTypeInfo = 4,
   /// Set the initial task executor preference of the task.
-  InitialTaskExecutor = 5,
+  InitialTaskExecutorUnowned = 5,
+  InitialTaskExecutorOwned = 6,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

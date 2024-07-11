@@ -18,6 +18,7 @@
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 
 using namespace swift;
@@ -972,7 +973,7 @@ public:
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+                                         LookUpConformanceInModule());
 
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,

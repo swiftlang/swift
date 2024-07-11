@@ -64,6 +64,7 @@ class TypeBase;
 class SwiftPassInvocation;
 class GenericSpecializationInformation;
 class LifetimeDependenceInfo;
+class IndexSubset;
 }
 
 bool swiftModulesInitialized();
@@ -136,6 +137,7 @@ enum class BridgedArgumentConvention {
   Indirect_In_Guaranteed,
   Indirect_Inout,
   Indirect_InoutAliasable,
+  Indirect_In_CXX,
   Indirect_Out,
   Direct_Owned,
   Direct_Unowned,
@@ -153,6 +155,7 @@ inline swift::ParameterConvention getParameterConvention(BridgedArgumentConventi
     case BridgedArgumentConvention::Indirect_In_Guaranteed:  return swift::ParameterConvention::Indirect_In_Guaranteed;
     case BridgedArgumentConvention::Indirect_Inout:          return swift::ParameterConvention::Indirect_Inout;
     case BridgedArgumentConvention::Indirect_InoutAliasable: return swift::ParameterConvention::Indirect_InoutAliasable;
+    case BridgedArgumentConvention::Indirect_In_CXX:         return swift::ParameterConvention::Indirect_In_CXX;
     case BridgedArgumentConvention::Indirect_Out:            break;
     case BridgedArgumentConvention::Direct_Owned:            return swift::ParameterConvention::Direct_Owned;
     case BridgedArgumentConvention::Direct_Unowned:          return swift::ParameterConvention::Direct_Unowned;
@@ -171,6 +174,7 @@ inline BridgedArgumentConvention getArgumentConvention(swift::ParameterConventio
     case swift::ParameterConvention::Indirect_In_Guaranteed:   return BridgedArgumentConvention::Indirect_In_Guaranteed;
     case swift::ParameterConvention::Indirect_Inout:           return BridgedArgumentConvention::Indirect_Inout;
     case swift::ParameterConvention::Indirect_InoutAliasable:  return BridgedArgumentConvention::Indirect_InoutAliasable;
+    case swift::ParameterConvention::Indirect_In_CXX:          return BridgedArgumentConvention::Indirect_In_CXX;
     case swift::ParameterConvention::Direct_Owned:             return BridgedArgumentConvention::Direct_Owned;
     case swift::ParameterConvention::Direct_Unowned:           return BridgedArgumentConvention::Direct_Unowned;
     case swift::ParameterConvention::Direct_Guaranteed:        return BridgedArgumentConvention::Direct_Guaranteed;
@@ -245,15 +249,45 @@ struct BridgedYieldInfoArray {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedParameterInfo at(SwiftInt resultIndex) const;
 };
-
 struct BridgedLifetimeDependenceInfo {
-  const swift::LifetimeDependenceInfo * _Nullable info = nullptr;
+  swift::IndexSubset *_Nullable inheritLifetimeParamIndices;
+  swift::IndexSubset *_Nullable scopeLifetimeParamIndices;
+  SwiftUInt targetIndex;
+  bool immortal;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
+      : inheritLifetimeParamIndices(info.getInheritIndices()),
+        scopeLifetimeParamIndices(info.getScopeIndices()),
+        targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
+#endif
 
   BRIDGED_INLINE bool empty() const;
   BRIDGED_INLINE bool checkInherit(SwiftInt index) const;
   BRIDGED_INLINE bool checkScope(SwiftInt index) const;
+  BRIDGED_INLINE SwiftInt getTargetIndex() const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+};
+
+struct BridgedLifetimeDependenceInfoArray {
+  BridgedArrayRef lifetimeDependenceInfoArray;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedLifetimeDependenceInfoArray(
+      llvm::ArrayRef<swift::LifetimeDependenceInfo> lifetimeDependenceInfo)
+      : lifetimeDependenceInfoArray(lifetimeDependenceInfo) {}
+
+  llvm::ArrayRef<swift::LifetimeDependenceInfo> unbridged() const {
+    return lifetimeDependenceInfoArray
+        .unbridged<swift::LifetimeDependenceInfo>();
+  }
+#endif
+
+  BRIDGED_INLINE SwiftInt count() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfo
+  at(SwiftInt index) const;
 };
 
 // Temporary access to the AST type within SIL until ASTBridging provides it.
@@ -302,7 +336,8 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedYieldInfoArray SILFunctionType_getYields() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfo SILFunctionType_getLifetimeDependenceInfo() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfoArray
+  SILFunctionType_getLifetimeDependencies() const;
 };
 
 struct BridgedType {
@@ -622,7 +657,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isGeneric() const;
   BRIDGED_INLINE bool hasSemanticsAttr(BridgedStringRef attrName) const;
   BRIDGED_INLINE bool hasUnsafeNonEscapableResult() const;
-  bool mayBindDynamicSelf() const;
+  BRIDGED_INLINE bool hasDynamicSelfMetadata() const;
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;

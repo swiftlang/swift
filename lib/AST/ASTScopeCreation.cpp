@@ -31,6 +31,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
@@ -289,7 +290,11 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
-    case MacroRole::CodeItem:
+    case MacroRole::CodeItem: {
+      parentLoc = SF->getMacroInsertionRange().Start;
+      break;
+    }
+
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
     case MacroRole::Conformance:

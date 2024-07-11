@@ -107,6 +107,29 @@ enum class PrintStructureKind {
   FunctionParameterType,
 };
 
+/// ---------------------------------
+/// MARK: inverse filtering functors
+
+/// An inverse filter is just a function-object. Use one of the functors below
+/// to create such a filter.
+using InverseFilter = std::function<bool(const InverseRequirement &)>;
+
+/// Include all of them!
+class AllInverses {
+public:
+  bool operator()(const InverseRequirement &) const { return true; }
+};
+
+/// Only prints inverses on generic parameters defined in the specified
+/// generic context.
+class InversesAtDepth {
+  std::optional<unsigned> includedDepth;
+public:
+  InversesAtDepth(GenericContext *level);
+  bool operator()(const InverseRequirement &) const;
+};
+/// ---------------------------------
+
 /// An abstract class used to print an AST.
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
@@ -339,6 +362,22 @@ public:
   /// first time.
   bool shouldPrintRedeclaredClangDecl(const clang::Decl *d) {
     return printedClangDecl.insert(d).second;
+  }
+
+  void printLifetimeDependence(
+      std::optional<LifetimeDependenceInfo> lifetimeDependence) {
+    if (!lifetimeDependence.has_value()) {
+      return;
+    }
+    *this << lifetimeDependence->getString();
+  }
+
+  void printLifetimeDependenceAt(
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
+    if (auto lifetimeDependence =
+            getLifetimeDependenceFor(lifetimeDependencies, index)) {
+      printLifetimeDependence(*lifetimeDependence);
+    }
   }
 
 private:

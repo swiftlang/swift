@@ -18,7 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Runtime/Concurrency.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
@@ -171,8 +171,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILType dtorTy;
 
     auto subMap
-      = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                superclass);
+      = superclassTy->getContextSubstitutionMap(superclass);
 
     // We completely drop the generic signature if all generic parameters were
     // concrete.
@@ -377,8 +376,7 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
     auto classDecl = classTy.getASTType()->getAnyNominal();
     ManagedValue dtorValue;
     SILType dtorTy;
-    auto subMap = classTy.getASTType()->getContextSubstitutionMap(
-        SGM.M.getSwiftModule(), classDecl);
+    auto subMap = classTy.getASTType()->getContextSubstitutionMap(classDecl);
     std::tie(dtorValue, dtorTy) =
         emitSiblingMethodRef(loc, selfValue, dtorConstant, subMap);
 
@@ -788,8 +786,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   assert(superSelf->getOwnershipKind() == OwnershipKind::Owned);
 
   auto subMap
-    = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                              superclass);
+    = superclassTy->getContextSubstitutionMap(superclass);
 
   B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 

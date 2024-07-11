@@ -27,6 +27,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -259,6 +260,7 @@ public:
   void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
+  void completeTypePossibleFunctionParamBeginning() override;
   void completeTypeDeclResultBeginning() override;
   void completeTypeBeginning() override;
   void completeTypeSimpleOrComposition() override;
@@ -301,6 +303,7 @@ public:
   void completeStmtLabel(StmtKind ParentKind) override;
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
   void completeTypeAttrBeginning() override;
+  void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
   void completeWithoutConstraintType() override;
 
@@ -427,6 +430,11 @@ void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
 
 void CodeCompletionCallbacksImpl::completePoundAvailablePlatform() {
   Kind = CompletionKind::PoundAvailablePlatform;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeTypePossibleFunctionParamBeginning() {
+  Kind = CompletionKind::TypePossibleFunctionParamBeginning;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -646,6 +654,11 @@ void CodeCompletionCallbacksImpl::completeWithoutConstraintType() {
 void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::TypeAttrBeginning;
+}
+
+void CodeCompletionCallbacksImpl::completeTypeAttrInheritanceBeginning() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::TypeAttrInheritanceBeginning;
 }
 
 bool swift::ide::isDynamicLookup(Type T) {
@@ -899,6 +912,8 @@ void swift::ide::addExprKeywords(CodeCompletionResultSink &Sink,
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try, "", flair);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try, "", flair);
   addKeyword(Sink, "await", CodeCompletionKeywordKind::None, "", flair);
+  addKeyword(Sink, "consume", CodeCompletionKeywordKind::None, "", flair);
+  addKeyword(Sink, "copy", CodeCompletionKeywordKind::None, "", flair);
 }
 
 void swift::ide::addSuperKeyword(CodeCompletionResultSink &Sink,
@@ -974,6 +989,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PrecedenceGroup:
   case CompletionKind::StmtLabel:
   case CompletionKind::TypeAttrBeginning:
+  case CompletionKind::TypeAttrInheritanceBeginning:
   case CompletionKind::OptionalBinding:
   case CompletionKind::WithoutConstraintType:
     break;
@@ -1058,10 +1074,20 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     }
     break;
 
-  case CompletionKind::TypeBeginning:
-    addKeyword(Sink, "repeat", CodeCompletionKeywordKind::None);
+  case CompletionKind::TypePossibleFunctionParamBeginning:
+    addKeyword(Sink, "inout", CodeCompletionKeywordKind::kw_inout);
+    addKeyword(Sink, "borrowing", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "consuming", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "isolated", CodeCompletionKeywordKind::None);
     LLVM_FALLTHROUGH;
   case CompletionKind::TypeDeclResultBeginning:
+    addKeyword(Sink, "sending", CodeCompletionKeywordKind::None);
+    LLVM_FALLTHROUGH;
+  case CompletionKind::TypeBeginning:
+    // Not technically allowed after '->', since you need to write in parens.
+    if (Kind != CompletionKind::TypeDeclResultBeginning)
+      addKeyword(Sink, "repeat", CodeCompletionKeywordKind::None);
+    LLVM_FALLTHROUGH;
   case CompletionKind::TypeSimpleOrComposition:
     addKeyword(Sink, "some", CodeCompletionKeywordKind::None);
     addKeyword(Sink, "any", CodeCompletionKeywordKind::None);
@@ -1262,6 +1288,7 @@ void swift::ide::postProcessCompletionResults(
     // names at non-type name position are "rare".
     if (result->getKind() == CodeCompletionResultKind::Declaration &&
         result->getAssociatedDeclKind() == CodeCompletionDeclKind::Protocol &&
+        Kind != CompletionKind::TypePossibleFunctionParamBeginning &&
         Kind != CompletionKind::TypeBeginning &&
         Kind != CompletionKind::TypeSimpleOrComposition &&
         Kind != CompletionKind::TypeSimpleBeginning &&
@@ -1755,6 +1782,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
+  case CompletionKind::TypePossibleFunctionParamBeginning:
   case CompletionKind::TypeDeclResultBeginning:
   case CompletionKind::TypeBeginning:
   case CompletionKind::TypeSimpleOrComposition:
@@ -1823,6 +1851,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       if (*AttTargetDK != DeclKind::Param) {
         ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
       }
+      if (AbstractFunctionDecl::isKind(*AttTargetDK))
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::FunctionMacro;
     } else {
       // If we don't know on which decl kind we are completing, suggest all
       // attribute kinds.
@@ -1832,6 +1862,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::FunctionMacro;
     }
 
     Lookup.setExpectedTypes(/*Types=*/{}, /*isImpliedResult=*/false,
@@ -1907,14 +1938,14 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     Lookup.getStmtLabelCompletions(Loc, ParentStmtKind == StmtKind::Continue);
     break;
   }
-  case CompletionKind::TypeAttrBeginning: {
-    Lookup.getTypeAttributeKeywordCompletions();
+  case CompletionKind::TypeAttrBeginning:
+  case CompletionKind::TypeAttrInheritanceBeginning: {
+    Lookup.getTypeAttributeKeywordCompletions(Kind);
 
     // Type names at attribute position after '@'.
     Lookup.getTypeCompletionsInDeclContext(
       P.Context.SourceMgr.getIDEInspectionTargetLoc());
     break;
-
   }
   case CompletionKind::OptionalBinding: {
     SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();

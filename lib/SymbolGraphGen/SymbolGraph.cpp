@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
@@ -322,8 +323,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
     OwningNominal = ThisNominal;
   } else if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
-      if (!ExtendedNominal->getModuleContext()->getNameStr()
-          .equals(M.getNameStr())) {
+      if (ExtendedNominal->getModuleContext()->getNameStr() != M.getNameStr()) {
         OwningNominal = ExtendedNominal;
       } else {
         return;

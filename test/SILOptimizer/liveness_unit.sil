@@ -382,7 +382,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // CHECK-LABEL: testSSAReborrowedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = begin_borrow
 // CHECK-NEXT: bb0: LiveWithin
-// CHECK-NEXT: regular user: br bb1
+// CHECK-NEXT: lifetime-ending user: br bb1
 // CHECK-NEXT: regular user: %{{.*}} = struct
 // CHECK-NEXT: last user: br bb1
 // CHECK-NEXT: end running

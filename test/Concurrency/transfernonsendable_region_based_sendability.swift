@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend  -strict-concurrency=complete -disable-availability-checking -parse-as-library -emit-sil -o /dev/null -verify -verify-additional-prefix complete- %s -disable-region-based-isolation-with-strict-concurrency -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend  -strict-concurrency=complete -disable-availability-checking -parse-as-library -emit-sil -o /dev/null -verify -verify-additional-prefix tns- %s -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
@@ -103,7 +102,10 @@ func test_closure_capture(a : A) async {
   print(ns3)
 
   // this should consume ns0
-  await a.run_closure(captures0) // expected-tns-warning {{sending value of non-Sendable type '() -> ()' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  await a.run_closure(captures0)
+  // expected-tns-warning @-1 {{sending 'captures0' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'captures0' to actor-isolated instance method 'run_closure' risks causing data races between actor-isolated and local nonisolated uses}}
+
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
@@ -113,7 +115,9 @@ func test_closure_capture(a : A) async {
   print(ns3)
 
   // this should consume ns1 and ns2
-  await a.run_closure(captures12) // expected-tns-warning {{sending value of non-Sendable type '() -> ()' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  await a.run_closure(captures12)
+  // expected-tns-warning @-1 {{sending 'captures12' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'captures12' to actor-isolated instance method 'run_closure' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
@@ -124,7 +128,9 @@ func test_closure_capture(a : A) async {
   print(ns3)
 
   // this should consume ns3
-  await a.run_closure(captures3indirect) // expected-tns-warning {{sending value of non-Sendable type '() -> ()' with later accesses from nonisolated context to actor-isolated context risks causing data races}}
+  await a.run_closure(captures3indirect)
+  // expected-tns-warning @-1 {{sending 'captures3indirect' risks causing data races}}
+  // expected-tns-note @-2 {{sending 'captures3indirect' to actor-isolated instance method 'run_closure' risks causing data races between actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 

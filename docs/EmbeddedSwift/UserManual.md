@@ -22,8 +22,8 @@ A typical setup and build + run cycle for an embedded development board involves
 - (1) Getting an SDK with the C compilers, headers and libraries for the target
 - (2) Building the C source code, and Swift source code into object files.
 - (3) Linking all the libraries, C object files, and Swift object files.
-- (4) Post-processing the linked firmware into a flashable format (UD2, BIN, or bespoke formats)
-- (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool or by copying it to a fake USB Mass Storage volume presented by the board.
+- (4) Post-processing the linked firmware into a flashable format (UF2, BIN, HEX, or bespoke formats)
+- (5) Uploading the flashable binary to the board over a USB cable using some vendor-provided JTAG/SWD tool, by copying it to a fake USB Mass Storage volume presented by the board or a custom platform bootloader.
 - (6) Restarting the board, observing physical effects of the firmware (LEDs light up) or UART output over USB, or presence on network, etc.
 
 Most of these steps are out of scope for this document, instead refer to the vendor provided documentation. This document only focuses on (2) from the list above, and it's important that you first get familiar with the details of firmware development for your board without Swift in the mix. Even if you want to build a completely pure Swift firmware, you are still going to need the vendor provided tooling for linking, post-processing, uploading, etc.
@@ -41,7 +41,7 @@ $ swiftc -target <target triple> -enable-experimental-feature Embedded -wmo \
 
 ### Building Swift firmware for an embedded target
 
-To build Swift firmware (for now ingnoring integration with SDKs, libraries and other pre-existing C code), we can use the `-target` argument to specify the CPU architecture. The target triple also decides whether the output object file will be an ELF file, or a Mach-O. For example:
+To build Swift firmware (for now ignoring integration with SDKs, libraries and other pre-existing C code), we can use the `-target` argument to specify the CPU architecture. The target triple also decides whether the output object file will be an ELF file, or a Mach-O. For example:
 
 ```bash
 # To build an ARMv7 Mach-O object file:
@@ -185,7 +185,7 @@ Features that are not available:
 - **Not available**: Runtime reflection (`Mirror` APIs).
 - **Not available**: Values of protocol types ("existentials"), e.g. `let a: Hashable = ...`, are not allowed. `Any` and `AnyObject` are also not allowed.
 - **Not available**: Metatypes, e.g. `let t = SomeClass.Type` or `type(of: value)` are not allowed.
-- **Not available**: Printing and stringifation of arbitrary types (archieved via reflection in desktop Swift).
+- **Not available**: Printing and stringification of arbitrary types (achieved via reflection in desktop Swift).
 - **Not available yet (under development)**: Swift Concurrency.
 
 For a more complete list of supported features in Embedded Swift, see [Embedded Swift -- Status](EmbeddedSwiftStatus.md).
@@ -252,11 +252,11 @@ For (2), external dependencies are also triggered by specific code needing them,
   - dependency: `void *__stack_chk_guard;`
   - dependency: `void __stack_chk_fail(void);`
   - stack protectors can be disabled with `-disable-stack-protector` swiftc flag
-- **atomics instrinsics**
+- **atomics intrinsics**
   - on CPU architectures that don't have direct load-acquire/store-release support in the ISA, LLVM calls helper functions for atomic operations
   - needed by refcounting in the Embedded Swift runtime (so any class usage will trigger this dependency)
   - also needed when using atomics from the Synchronization module
-- **multiplication/division/modulo instrinsics**
+- **multiplication/division/modulo intrinsics**
   - on CPU architectures that don't have direct support for the math operations in the ISA
   - dependency (on Mach-O): `__divti3`
   - dependency (on Mach-O): `__modti3`

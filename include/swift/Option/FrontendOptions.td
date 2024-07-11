@@ -415,6 +415,10 @@ def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
 def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
   HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
 
+def analyze_request_evaluator : Flag<["-"], "analyze-request-evaluator">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Print out request evaluator cache statistics at the end of the compilation job">;
+
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;
@@ -1257,6 +1261,12 @@ def enable_move_inout_stack_protector :
   Flag<["-"], "enable-move-inout-stack-protector">,
   HelpText<"Enable the stack protector by moving values to temporaries">;
 
+// This feature is enabled by default, the flag is a no-op.
+def enable_import_ptrauth_field_function_pointers :
+   Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
+   HelpText<"Enable import of custom ptrauth qualified field function pointers. "
+            "This is on by default.">;
+
 def disable_import_ptrauth_field_function_pointers :
   Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
   HelpText<"Disable import of custom ptrauth qualified field function pointers">;
@@ -1370,16 +1380,6 @@ def platform_c_calling_convention_EQ :
 def disable_experimental_parser_round_trip : Flag<["-"],
   "disable-experimental-parser-round-trip">,
   HelpText<"Disable round trip through the new swift parser">;
-
-def disable_strict_concurrency_region_based_isolation : Flag<["-"],
-  "disable-region-based-isolation-with-strict-concurrency">,
-  HelpText<"Disable region based isolation when running with strict concurrency enabled. Only enabled with asserts">,
-  Flags<[HelpHidden]>;
-
-def disable_transferring_args_and_results_with_region_isolation : Flag<["-"],
-  "disable-transferring-args-and-results-with-region-based-isolation">,
-  HelpText<"Disable transferring args and results when region based isolation is enabled. Only enabled with asserts">,
-  Flags<[HelpHidden]>;
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,

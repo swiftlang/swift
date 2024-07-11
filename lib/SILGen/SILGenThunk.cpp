@@ -33,6 +33,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -481,7 +482,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         LookUpConformanceInModule(SwiftModule));
+                                         LookUpConformanceInModule());
         SGF.emitApplyOfLibraryIntrinsic(loc, errorIntrinsic, subs,
                                         {continuation, nativeError},
                                         SGFContext());
@@ -579,7 +580,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         LookUpConformanceInModule(SwiftModule));
+                                         LookUpConformanceInModule());
         SGF.emitApplyOfLibraryIntrinsic(loc, resumeIntrinsic, subs,
                                         {continuation, resumeArg},
                                         SGFContext());

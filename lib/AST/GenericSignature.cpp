@@ -22,6 +22,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
@@ -339,18 +340,6 @@ ASTContext &GenericSignatureImpl::getASTContext() const {
   return GenericSignature::getASTContext(getGenericParams(), getRequirements());
 }
 
-ProtocolConformanceRef
-GenericSignatureImpl::lookupConformance(CanType type,
-                                        ProtocolDecl *proto) const {
-  // FIXME: Actually implement this properly.
-  auto *M = proto->getParentModule();
-
-  if (type->isTypeParameter())
-    return ProtocolConformanceRef(proto);
-
-  return M->lookupConformance(type, proto, /*allowMissing=*/true);
-}
-
 bool GenericSignatureImpl::requiresClass(Type type) const {
   assert(type->isTypeParameter() &&
          "Only type parameters can have superclass requirements");
@@ -429,7 +418,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
 
           return type;
         },
-        LookUpConformanceInSignature(this));
+        LookUpConformanceInModule());
   }
 
   SmallVector<Requirement, 2> subReqs;
@@ -1282,9 +1271,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
   // Filter out explicit conformances to invertible protocols.
   for (auto req : getRequirements()) {
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->is<GenericTypeParamType>() &&
-        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+    if (req.isInvertibleProtocolRequirement()) {
       continue;
     }
 

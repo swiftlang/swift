@@ -198,6 +198,10 @@ public:
   /// 'T : C' can be satisfied; however, if 'T' already has an unrelated
   /// superclass requirement, 'T : C' cannot be satisfied.
   bool canBeSatisfied() const;
+  
+  /// True if the requirement states a conformance to an invertible protocol
+  /// that is implied by default (such as `Copyable` or `Escapable`.
+  bool isInvertibleProtocolRequirement() const;
 
   /// Linear order on requirements in a generic signature.
   int compare(const Requirement &other) const;
@@ -237,8 +241,7 @@ checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
-CheckRequirementsResult checkRequirements(ModuleDecl *module,
-                                          ArrayRef<Requirement> requirements,
+CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements,
                                           TypeSubstitutionFn substitutions,
                                           SubstOptions options = std::nullopt);
 

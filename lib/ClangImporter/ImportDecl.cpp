@@ -38,6 +38,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
@@ -2522,6 +2523,15 @@ namespace {
           VarDecl *pointeeProperty =
               synthesizer.makeDereferencedPointeeProperty(
                   getterAndSetter.first, getterAndSetter.second);
+
+          // Import the attributes from clang decl of dereference operator to
+          // synthesized pointee property.
+          FuncDecl *getterOrSetterImpl = getterAndSetter.first
+                                             ? getterAndSetter.first
+                                             : getterAndSetter.second;
+          Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(
+              getterOrSetterImpl, pointeeProperty);
+
           result->addMember(pointeeProperty);
         }
       }
@@ -2815,6 +2825,8 @@ namespace {
           conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
           conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
           conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxFunctionIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
         }
       }
 
@@ -3319,6 +3331,10 @@ namespace {
           // This is a pre-increment operator. We synthesize a
           // non-mutating function called `successor() -> Self`.
           FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(func);
+
+          // Import the clang decl attributes to synthesized successor function.
+          Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(func, successorFunc);
+
           typeDecl->addMember(successorFunc);
 
           Impl.markUnavailable(func, "use .successor()");
@@ -3641,7 +3657,7 @@ namespace {
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
             /*ThrownType=*/TypeLoc(), bodyParams, genericParams, dc,
-            /*LifetimeDependentReturnTypeRepr*/ nullptr);
+            /*LifetimeDependentTypeRepr*/ nullptr);
       } else {
         auto resultTy = importedType.getType();
 
@@ -5291,8 +5307,8 @@ namespace {
 
       // Add inferred attributes.
 #define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)               \
-  if (name.str().equals(#ClassName) &&                                         \
-      result->getParentModule()->getName().str().equals(#ModuleName)) {        \
+  if (name.str() == #ClassName &&                                              \
+      result->getParentModule()->getName().str() == #ModuleName) {             \
     using namespace inferred_attributes;                                       \
     addInferredAttributes(result, AttributeSet);                               \
   }
@@ -6247,12 +6263,12 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   }
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
-      failable, /*FailabilityLoc=*/SourceLoc(),
+      decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(), failable,
+      /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       parameterList, /*GenericParams=*/nullptr, dc,
-      /*LifetimeDependentReturnTypeRepr*/ nullptr);
+      /*LifetimeDependentTypeRepr*/ nullptr);
   result->setImplicitlyUnwrappedOptional(isIUO);
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
                                                 std::move(initKind));
@@ -6767,7 +6783,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*Throws=*/importedName.getErrorInfo().has_value(),
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), bodyParams,
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc),
-      /*LifetimeDependentReturnTypeRepr*/ nullptr);
+      /*LifetimeDependentTypeRepr*/ nullptr);
 
   addObjCAttribute(result, selector);
   recordMemberInContext(dc, result);
@@ -7373,10 +7389,10 @@ std::optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
           TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
       }
     }
-    if (inherited.empty()) {
-      inherited.push_back(
-        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
-    }
+
+    inherited.push_back(
+      TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
+
     genericParamDecl->setInherited(Impl.SwiftContext.AllocateCopy(inherited));
 
     genericParams.push_back(genericParamDecl);
@@ -8069,10 +8085,10 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         auto *nominal = dyn_cast<NominalTypeDecl>(MappedDecl);
         if (!nominal)
           continue;
-        auto *module = nominal->getModuleContext();
+
         // Don't synthesize a conformance if one already exists.
         auto ty = nominal->getDeclaredInterfaceType();
-        if (module->lookupConformance(ty, protocol))
+        if (ModuleDecl::lookupConformance(ty, protocol))
           continue;
         auto conformance = SwiftContext.getNormalConformance(
             ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
@@ -8083,18 +8099,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
             ConformanceEntryKind::Synthesized, nullptr);
 
         nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
-      }
-
-      if (swiftAttr->getAttribute() == "transferring") {
-        // Swallow this if the feature is not enabled.
-        if (!SwiftContext.LangOpts.hasFeature(
-                Feature::TransferringArgsAndResults))
-          continue;
-        auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl);
-        if (!funcDecl)
-          continue;
-        funcDecl->setSendingResult();
-        continue;
       }
 
       if (swiftAttr->getAttribute() == "sending") {
@@ -8248,6 +8252,17 @@ static bool isUsingMacroName(clang::SourceManager &SM,
     return false;
   StringRef content(SM.getCharacterData(Sloc), MacroName.size());
   return content == MacroName;
+}
+
+void ClangImporter::Implementation::importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *sourceDecl, Decl* synthesizedDecl)
+{
+  // sourceDecl->getClangDecl() can be null because some lazily instantiated cases like C++ members that were instantiated from using-shadow-decls have no corresponding Clang decl.
+  // FIXME: Need to include the cases where correspondoing clang decl is not present.
+  if (auto clangDeclForSource =
+          dyn_cast_or_null<clang::NamedDecl>(
+              sourceDecl->getClangDecl())) {
+    importAttributes(clangDeclForSource, synthesizedDecl);
+  }
 }
 
 /// Import Clang attributes as Swift attributes.
@@ -8697,7 +8712,6 @@ static void finishTypeWitnesses(
     NormalProtocolConformance *conformance) {
   auto *dc = conformance->getDeclContext();
   auto nominal = dc->getSelfNominalTypeDecl();
-  auto *module = dc->getParentModule();
 
   auto *proto = conformance->getProtocol();
   auto selfType = conformance->getType();
@@ -8722,7 +8736,7 @@ static void finishTypeWitnesses(
 
       auto memberType = typeDecl->getDeclaredInterfaceType();
       auto subMap = selfType->getContextSubstitutionMap(
-          module, typeDecl->getDeclContext());
+          typeDecl->getDeclContext());
       memberType = memberType.subst(subMap);
       conformance->setTypeWitness(assocType, memberType, typeDecl);
       satisfied = true;

@@ -42,6 +42,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -906,7 +907,7 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
 
   SourceLoc startLoc = loc;
   unsigned startBufferID = bufferID;
-  while (std::optional<GeneratedSourceInfo> info =
+  while (const GeneratedSourceInfo *info =
              SM.getGeneratedSourceInfo(bufferID)) {
     switch (info->kind) {
 #define MACRO_ROLE(Name, Description)  \
@@ -1534,31 +1535,36 @@ void ModuleDecl::ImportCollector::collect(
 }
 
 static void
-collectExportedImports(const ModuleDecl *module,
+collectExportedImports(const ModuleDecl *topLevelModule,
                        ModuleDecl::ImportCollector &importCollector) {
-  for (const FileUnit *file : module->getFiles()) {
-    if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
-      if (source->hasImports()) {
-        for (const auto &import : source->getImports()) {
-          if (import.options.contains(ImportFlags::Exported) &&
-              import.docVisibility.value_or(AccessLevel::Public) >=
-                  importCollector.minimumDocVisibility) {
-            importCollector.collect(import.module);
-            collectExportedImports(import.module.importedModule,
-                                   importCollector);
+  SmallVector<const ModuleDecl *> stack;
+  stack.push_back(topLevelModule);
+  while (!stack.empty()) {
+    const ModuleDecl *module = stack.pop_back_val();
+
+    for (const FileUnit *file : module->getFiles()) {
+      if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
+        if (source->hasImports()) {
+          for (const auto &import : source->getImports()) {
+            if (import.options.contains(ImportFlags::Exported) &&
+                import.docVisibility.value_or(AccessLevel::Public) >=
+                importCollector.minimumDocVisibility) {
+              importCollector.collect(import.module);
+              stack.push_back(import.module.importedModule);
+            }
           }
         }
-      }
-    } else {
-      SmallVector<ImportedModule, 8> exportedImports;
-      file->getImportedModules(exportedImports,
-                               ModuleDecl::ImportFilterKind::Exported);
-      for (const auto &im : exportedImports) {
-        // Skip collecting the underlying clang module as we already have the relevant import.
-        if (module->isClangOverlayOf(im.importedModule))
-          continue;
-        importCollector.collect(im);
-        collectExportedImports(im.importedModule, importCollector);
+      } else {
+        SmallVector<ImportedModule, 8> exportedImports;
+        file->getImportedModules(exportedImports,
+                                 ModuleDecl::ImportFilterKind::Exported);
+        for (const auto &im : exportedImports) {
+          // Skip collecting the underlying clang module as we already have the relevant import.
+          if (module->isClangOverlayOf(im.importedModule))
+            continue;
+          importCollector.collect(im);
+          stack.push_back(im.importedModule);
+        }
       }
     }
   }
@@ -2668,9 +2674,11 @@ ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
   auto &ctx = sf->getASTContext();
   auto imports = sf->getImports();
 
+  auto mutModule = const_cast<ModuleDecl *>(module);
   // Look to see if the owning module was directly imported.
   for (const auto &import : imports) {
-    if (import.module.importedModule == module)
+    if (import.module.importedModule
+            ->isSameModuleLookingThroughOverlays(mutModule))
       return import;
   }
 
@@ -2679,7 +2687,8 @@ ImportDeclRequest::evaluate(Evaluator &evaluator, const SourceFile *sf,
   for (const auto &import : imports) {
     auto &importSet = importCache.getImportSet(import.module.importedModule);
     for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == module) {
+      if (transitive.importedModule
+              ->isSameModuleLookingThroughOverlays(mutModule)) {
         return import;
       }
     }
@@ -2716,6 +2725,26 @@ void SourceFile::registerAccessLevelUsingImport(
     ImportsUseAccessLevel[mod] = accessLevel;
   else
     ImportsUseAccessLevel[mod] = std::max(accessLevel, known->second);
+
+  // Also register modules triggering the import of cross-import overlays.
+  auto declaringMod = mod->getDeclaringModuleIfCrossImportOverlay();
+  if (!declaringMod)
+    return;
+
+  SmallVector<Identifier, 1> bystanders;
+  auto bystandersValid =
+    mod->getRequiredBystandersIfCrossImportOverlay(declaringMod, bystanders);
+  if (!bystandersValid)
+    return;
+
+  for (auto &otherImport : *Imports) {
+    auto otherImportMod = otherImport.module.importedModule;
+    auto otherImportModName = otherImportMod->getName();
+    if (otherImportMod == declaringMod ||
+        llvm::find(bystanders, otherImportModName) != bystanders.end()) {
+      registerAccessLevelUsingImport(otherImport, accessLevel);
+    }
+  }
 }
 
 bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,

@@ -37,6 +37,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 /// Set each bound variable in the pattern to have an error type.
@@ -1001,7 +1002,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       auto subs = result->getType()
           ->getWithoutSpecifierType()
           ->getContextSubstitutionMap(
-            accessor->getParentModule(),
             underlyingVar->getDeclContext());
 
       ConcreteDeclRef memberRef(underlyingVar, subs);
@@ -1067,10 +1067,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       // fails (because, for instance, a generic parameter of a generic nominal
       // type cannot be resolved).
       if (!selfTypeForAccess->is<ErrorType>()) {
-        subs =
-          selfTypeForAccess->getContextSubstitutionMap(
-            accessor->getParentModule(),
-            baseClass);
+        subs = selfTypeForAccess->getContextSubstitutionMap(baseClass);
       }
 
       storage = override;
@@ -1316,7 +1313,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = dc->getParentModule()->checkConformance(type, proto))
+    if (auto result = ModuleDecl::checkConformance(type, proto))
       return result;
   }
 

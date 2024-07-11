@@ -23,6 +23,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
@@ -75,7 +76,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
     auto fromParam = fromParameters[index];
     auto toParam = toParameters[index];
     // To convert guaranteed argument to be owned, create a copy.
-    if (fromParam.isConsumed() && !toParam.isConsumed()) {
+    if (fromParam.isConsumedInCaller() && !toParam.isConsumedInCallee()) {
       // If the argument has an object type, create a `copy_value`.
       if (arg->getType().isObject()) {
         auto argCopy = builder.emitCopyValueOperation(loc, arg);
@@ -91,7 +92,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
       continue;
     }
     // To convert owned argument to be guaranteed, borrow the argument.
-    if (fromParam.isGuaranteed() && !toParam.isGuaranteed()) {
+    if (fromParam.isGuaranteedInCaller() && !toParam.isGuaranteedInCaller()) {
       auto bbi = builder.emitBeginBorrowOperation(loc, arg);
       forwardedArgs.push_back(bbi);
       valuesToCleanup.push_back(bbi);
@@ -454,9 +455,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto zeroSILType = zeroSILParameter.getSILStorageInterfaceType();
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
-    auto *swiftMod = parentThunk->getModule().getSwiftModule();
     auto tangentSpace =
-        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
+        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule());
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector: {
@@ -465,14 +465,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
       builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
         arguments.push_back(buf);
-        if (zeroSILParameter.isGuaranteed()) {
+        if (zeroSILParameter.isGuaranteedInCaller()) {
           valuesToCleanup.push_back(buf);
         }
       } else {
         auto arg = builder.emitLoadValueOperation(loc, buf,
                                                   LoadOwnershipQualifier::Take);
         arguments.push_back(arg);
-        if (zeroSILParameter.isGuaranteed()) {
+        if (zeroSILParameter.isGuaranteedInCaller()) {
           valuesToCleanup.push_back(arg);
         }
       }
@@ -715,7 +715,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = fb.getModule();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();

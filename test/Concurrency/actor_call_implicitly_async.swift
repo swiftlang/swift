@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -233,7 +232,7 @@ func anotherAsyncFunc() async {
 
   _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a non-isolated context}}
+  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a nonisolated context}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
   _ = await b.owner == "cat"
@@ -291,35 +290,23 @@ func blender(_ peeler : () -> Void) {
 
 
   await wisk({})
-  // expected-complete-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
-  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   await wisk(1)
   await (peelBanana)()
   await (((((peelBanana)))))()
   await (((wisk)))((wisk)((wisk)(1)))
 
   blender((peelBanana))
-  // expected-warning@-1 {{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+  // expected-warning@-1 {{converting function value of type '@BananaActor @Sendable () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
 
   await wisk(peelBanana)
-  // expected-complete-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
-  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   await wisk(wisk)
-  // expected-complete-warning@-1{{passing argument of non-sendable type '(Any) -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
-  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   await (((wisk)))(((wisk)))
-  // expected-complete-warning@-1{{passing argument of non-sendable type '(Any) -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
-  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   await {wisk}()(1)
 
-  // FIXME: Poor diagnostic. The issue is that the invalid function conversion
-  // to remove '@BananaActor' on 'wisk' cannot influence which solution is chosen.
-  // So, the constraint system cannot determine whether the type of this expression
-  // is '(Any) -> Void' or '@BananaActor (Any) -> Void'.
-  await (true ? wisk : {n in return})(1)
-  // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+  (true ? wisk : {n in return})(1)
+  // expected-warning@-1 {{converting function value of type '@BananaActor @Sendable (Any) -> ()' to '(Any) -> ()' loses global actor 'BananaActor'; this is an error in the Swift 6 language mode}}
 }
 
 actor Chain {
@@ -467,7 +454,7 @@ func tryEffPropsFromSync() {
   _ = effPropA // expected-error{{'async' property access in a function that does not support concurrency}}
 
   // expected-error@+1 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
-  _ = effPropT // expected-error{{global actor 'BananaActor'-isolated var 'effPropT' can not be referenced from a non-isolated context}}
+  _ = effPropT // expected-error{{global actor 'BananaActor'-isolated var 'effPropT' can not be referenced from a nonisolated context}}
   // NOTE: that we don't complain about async access on `effPropT` because it's not declared async, and we're not in an async context!
 
   // expected-error@+1 {{property access can throw, but it is not marked with 'try' and the error is not handled}}

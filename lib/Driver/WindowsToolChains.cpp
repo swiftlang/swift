@@ -12,6 +12,7 @@
 
 #include "ToolChains.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -41,17 +42,6 @@ std::string toolchains::Windows::sanitizerRuntimeLibName(StringRef Sanitizer,
   return (Twine("clang_rt.") + Sanitizer + "-" +
           this->getTriple().getArchName() + ".lib")
       .str();
-}
-
-void
-toolchains::Windows::addPluginArguments(const ArgList &Args,
-                                        ArgStringList &Arguments) const {
-  SmallString<261> LibraryPath = StringRef(getDriver().getSwiftProgramPath());
-  llvm::sys::path::remove_filename(LibraryPath); // Remove `swift`
-
-  // Default plugin path.
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(LibraryPath));
 }
 
 ToolChain::InvocationInfo

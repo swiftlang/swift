@@ -33,6 +33,7 @@
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/Frontend.h"
@@ -317,7 +318,7 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
   if (!proto) return nullptr;
 
   // Find the conformance to _ObjectiveCBridgeable.
-  auto result = SwiftModule->lookupConformance(type, proto);
+  auto result = ModuleDecl::lookupConformance(type, proto);
   if (result.isInvalid())
     return nullptr;
 
@@ -362,7 +363,7 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
     return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
-  return SwiftModule->lookupConformance(type, proto);
+  return ModuleDecl::lookupConformance(type, proto);
 }
 
 static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
@@ -519,7 +520,7 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   }
 
   auto conformance =
-    SwiftModule->lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
+    ModuleDecl::lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
 
   if (conformance.isConcrete())
     NSErrorConformanceToError = conformance.getConcrete();
@@ -650,7 +651,28 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool shouldEmitFunctionBody(const AbstractFunctionDecl *AFD) {
-  return AFD->hasBody() && !AFD->isBodySkipped();
+  if (!AFD->hasBody())
+    return false;
+
+  if (AFD->isBodySkipped())
+    return false;
+
+  auto &ctx = AFD->getASTContext();
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    // Force the function body to be type-checked and then skip it if there
+    // have been any errors.
+    (void)AFD->getTypecheckedBody();
+
+    // FIXME: Only skip bodies that contain type checking errors.
+    // It would be ideal to only skip the function body if it is specifically
+    // the source of an error. However, that information isn't available today
+    // so instead we avoid emitting all function bodies as soon as any error is
+    // encountered.
+    if (ctx.hadError())
+      return false;
+  }
+
+  return true;
 }
 
 static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
@@ -793,20 +815,6 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
 
   if (D->isExposedToClients())
     return false;
-
-  if (isa<AbstractFunctionDecl>(D)) {
-    // If this function is nested within another function that is exposed to
-    // clients then it should be emitted.
-    auto dc = D->getDeclContext();
-    do {
-      if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
-        if (afd->isExposedToClients())
-          return false;
-    } while ((dc = dc->getParent()));
-
-    // We didn't find a parent function that is exposed.
-    return true;
-  }
 
   return true;
 }

@@ -105,6 +105,15 @@ enum class IfConfigElementsRole {
   Skipped
 };
 
+/// Describes the context in which the '#if' is being parsed.
+enum class IfConfigContext {
+  BraceItems,
+  DeclItems,
+  SwitchStmt,
+  PostfixExpr,
+  DeclAttrs
+};
+
 /// The main class used for parsing a source file (.swift or .sil).
 ///
 /// Rather than instantiating a Parser yourself, use one of the parsing APIs
@@ -993,8 +1002,9 @@ public:
   /// them however they wish. The parsing function will be provided with the
   /// location of the clause token (`#if`, `#else`, etc.), the condition,
   /// whether this is the active clause, and the role of the elements.
-  template<typename Result>
+  template <typename Result>
   Result parseIfConfigRaw(
+      IfConfigContext ifConfigContext,
       llvm::function_ref<void(SourceLoc clauseLoc, Expr *condition,
                               bool isActive, IfConfigElementsRole role)>
           parseElements,
@@ -1003,7 +1013,8 @@ public:
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
   ParserResult<IfConfigDecl> parseIfConfig(
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
+      IfConfigContext ifConfigContext,
+      llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
 
   /// Parse an #if ... #endif containing only attributes.
   ParserStatus parseIfConfigDeclAttributes(
@@ -1200,9 +1211,6 @@ public:
         Tok.isContextualKeyword("isolated") ||
         Tok.isContextualKeyword("_const"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
-        Tok.isContextualKeyword("transferring"))
-      return true;
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
@@ -1238,7 +1246,7 @@ public:
       if (next.isAny(tok::at_sign, tok::kw_inout, tok::l_paren,
                      tok::identifier, tok::l_square, tok::kw_Any,
                      tok::kw_Self, tok::kw__, tok::kw_var,
-                     tok::kw_let))
+                     tok::kw_let, tok::code_complete))
         return true;
 
       if (next.is(tok::oper_prefix) && next.getText() == "~")
@@ -1248,44 +1256,9 @@ public:
     return isLifetimeDependenceToken();
   }
 
-  struct ParsedTypeAttributeList {
-    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
-    SourceLoc SpecifierLoc;
-    SourceLoc IsolatedLoc;
-    SourceLoc ConstLoc;
-    SourceLoc TransferringLoc;
-    SourceLoc SendingLoc;
-    SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
-
-    /// Main entry point for parsing.
-    ///
-    /// Inline we just have the fast path of failing to match. We call slowParse
-    /// that contains the outline of more complex implementation. This is HOT
-    /// code!
-    ParserStatus parse(Parser &P) {
-      auto &Tok = P.Tok;
-      if (Tok.is(tok::at_sign) || P.isParameterSpecifier())
-        return slowParse(P);
-      return makeParserSuccess();
-    }
-
-    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
-
-  private:
-    /// An out of line implementation of the more complicated cases. This
-    /// ensures on the inlined fast path we handle the case of not matching.
-    ParserStatus slowParse(Parser &P);
-  };
-
   bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
-
-  ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
-                                  SourceLoc AtEndLoc,
-                                  PatternBindingInitializer *&initContext,
-                                  bool justChecking = false);
 
   ParserStatus parseLifetimeDependenceSpecifiers(
       SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
@@ -1425,6 +1398,8 @@ public:
 
     /// Whether the type is for a closure attribute.
     CustomAttribute,
+    /// A type in an inheritance clause.
+    InheritanceClause,
   };
 
   ParserResult<TypeRepr> parseTypeScalar(
@@ -1480,6 +1455,43 @@ public:
 
   /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
   ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
+
+  struct ParsedTypeAttributeList {
+    ParseTypeReason ParseReason;
+    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
+    SourceLoc SpecifierLoc;
+    SourceLoc IsolatedLoc;
+    SourceLoc ConstLoc;
+    SourceLoc SendingLoc;
+    SmallVector<TypeOrCustomAttr> Attributes;
+    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
+
+    ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
+
+    /// Main entry point for parsing.
+    ///
+    /// Inline we just have the fast path of failing to match. We call slowParse
+    /// that contains the outline of more complex implementation. This is HOT
+    /// code!
+    ParserStatus parse(Parser &P) {
+      auto &Tok = P.Tok;
+      if (Tok.is(tok::at_sign) || P.isParameterSpecifier())
+        return slowParse(P);
+      return makeParserSuccess();
+    }
+
+    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
+
+  private:
+    /// An out of line implementation of the more complicated cases. This
+    /// ensures on the inlined fast path we handle the case of not matching.
+    ParserStatus slowParse(Parser &P);
+  };
+
+  ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
+                                  SourceLoc AtEndLoc, ParseTypeReason reason,
+                                  PatternBindingInitializer *&initContext,
+                                  bool justChecking = false);
 
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
@@ -1566,9 +1578,6 @@ public:
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
 
-    /// The location of the 'transferring' keyword if present.
-    SourceLoc TransferringLoc;
-
     /// The location of the 'sending' keyword if present.
     SourceLoc SendingLoc;
 
@@ -1607,6 +1616,11 @@ public:
 
   /// Whether we are at the start of a parameter name when parsing a parameter.
   bool startsParameterName(bool isClosure);
+
+  /// Attempts to perform code completion for the possible start of a function
+  /// parameter type, returning the source location of the consumed completion
+  /// token, or a null location if there is no completion token.
+  SourceLoc tryCompleteFunctionParamTypeBeginning();
 
   /// Parse a parameter-clause.
   ///

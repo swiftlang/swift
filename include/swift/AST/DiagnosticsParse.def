@@ -51,6 +51,8 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
+ERROR(ifconfig_unexpectedtoken,none,
+      "unexpected tokens in '#if' body", ())
 ERROR(unexpected_if_following_else_compilation_directive,none,
       "unexpected 'if' keyword following '#else' conditional compilation "
       "directive; did you mean '#elseif'?",
@@ -2158,6 +2160,10 @@ ERROR(init_accessor_is_not_on_property,none,
       "init accessors could only be associated with properties",
       ())
 
+ERROR(init_accessor_is_not_in_the_primary_declaration,none,
+      "init accessors cannot be declared in an extension",
+      ())
+
 ERROR(missing_storage_restrictions_attr_label,none,
       "missing label in @storageRestrictions attribute", ())
 
@@ -2198,19 +2204,10 @@ ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
       "specifiers",
       ())
 
-ERROR(transferring_after_parameter_specifier,none,
-      "'transferring' must be placed before specifier '%0'", (StringRef))
-ERROR(transferring_repeated,none,
-      "parameter may have at most one 'transferring' specifier", ())
 ERROR(sending_before_parameter_specifier,none,
       "'sending' must be placed after specifier '%0'", (StringRef))
 ERROR(sending_repeated,none,
       "parameter may have at most one 'sending' specifier", ())
-ERROR(sending_and_transferring_used_together,none,
-      "'transferring' and 'sending' may not be used together", ())
-WARNING(transferring_is_now_sendable,none,
-        "'transferring' has been renamed to 'sending' and the 'transferring' spelling will be removed shortly",
-        ())
 ERROR(sending_cannot_be_used_with_borrowing,none,
       "'%0' cannot be used together with 'borrowing'", (StringRef))
 

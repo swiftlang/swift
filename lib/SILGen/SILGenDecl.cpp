@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1275,7 +1276,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         CanType substEltTy =
             value.getType()
                 .getASTType()
-                ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
+                ->getTypeOfMember(eltDecl,
                                   eltDecl->getArgumentInterfaceType())
                 ->getCanonicalType();
 

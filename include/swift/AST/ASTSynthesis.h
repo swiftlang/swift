@@ -78,8 +78,11 @@ inline Type synthesizeType(SynthesisContext &SC,
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
   case _taskExecutor:
-    return SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)
-      ->getDeclaredInterfaceType();
+    if (auto ty = SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)) {
+      return ty->getDeclaredInterfaceType();
+    } else {
+      return nullptr;
+    }
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();
@@ -173,6 +176,28 @@ template <class S>
 Type synthesizeType(SynthesisContext &SC,
                     const ExistentialTypeSynthesizer<S> &M) {
   return ExistentialType::get(synthesizeType(SC, M.Sub));
+}
+
+/// A synthesizer which generates an existential type from a requirement type.
+template <class S, class FallbackS>
+struct BincompatIfTypeAvailableTypeSynthesizer {
+  bool condition;
+  S Sub;
+  FallbackS FallbackSub;
+};
+template <class S, class FallbackS>
+constexpr BincompatIfTypeAvailableTypeSynthesizer<S, FallbackS> _bincompatType(
+    bool bincompatCondition, S sub, FallbackS fallbackSub) {
+  return {bincompatCondition, sub, {fallbackSub}};
+}
+template <class S, class FallbackS>
+Type synthesizeType(SynthesisContext &SC,
+                    const BincompatIfTypeAvailableTypeSynthesizer<S, FallbackS> &M) {
+  if (M.condition) {
+    return synthesizeType(SC, M.Sub);
+  } else {
+    return synthesizeType(SC, M.FallbackSub);
+  }
 }
 
 MetatypeRepresentation
@@ -332,6 +357,10 @@ constexpr SpecifiedParamSynthesizer<G> _owned(G sub) {
   return {ParamSpecifier::LegacyOwned, sub};
 }
 template <class G>
+constexpr SpecifiedParamSynthesizer<G> _consuming(G sub) {
+  return {ParamSpecifier::Consuming, sub};
+}
+template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
   return {ParamSpecifier::InOut, sub};
 }
@@ -343,6 +372,27 @@ ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
   param->setSpecifier(s.specifier);
   return param;
 }
+
+template <class S>
+struct SendingParamSynthesizer {
+  S sub;
+};
+
+template <class S>
+constexpr SendingParamSynthesizer<S> _sending(S sub) {
+  return {sub};
+}
+
+template <class S>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const SendingParamSynthesizer<S> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
+  if (SC.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults))
+    param->setSending();
+  return param;
+}
+
 template <class S>
 FunctionType::Param synthesizeParamType(SynthesisContext &SC,
                                         const SpecifiedParamSynthesizer<S> &s) {

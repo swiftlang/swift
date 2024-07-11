@@ -28,6 +28,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -779,6 +780,8 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
   if (StackAllocSize < 0)
     return nullptr;
   if (!FieldLayout.isFixedLayout())
+    return nullptr;
+  if (!FieldLayout.isFixedSize())
     return nullptr;
 
   // Calculate the total size needed.

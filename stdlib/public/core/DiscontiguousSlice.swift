@@ -45,7 +45,7 @@ extension DiscontiguousSlice: Equatable where Base.Element: Equatable {
 @available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(count) // delimeter; do not remove
+    hasher.combine(count) // delimiter; do not remove
     for element in self {
       hasher.combine(element)
     }

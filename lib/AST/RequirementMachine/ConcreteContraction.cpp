@@ -143,6 +143,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "NameLookup.h"
@@ -279,13 +280,12 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
     // type's conformance to the associated type's protocol.
     if (auto *assocType = memberType->getAssocType()) {
       auto *proto = assocType->getProtocol();
-      auto *module = proto->getParentModule();
 
       // The 'Sendable' protocol does not declare any associated types, so the
       // 'allowMissing' value here is actually irrelevant.
       auto conformance = ((*substBaseType)->isTypeParameter()
                           ? ProtocolConformanceRef(proto)
-                          : module->lookupConformance(
+                          : ModuleDecl::lookupConformance(
                               *substBaseType, proto,
                               /*allowMissing=*/false));
 
@@ -306,7 +306,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
       return assocType->getDeclaredInterfaceType()
                       ->castTo<DependentMemberType>()
-                      ->substBaseType(module, *substBaseType);
+                      ->substBaseType(*substBaseType);
     }
 
     // An unresolved DependentMemberType stores an identifier. Handle this
@@ -327,8 +327,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
     // Substitute the base type into the member type.
     auto *dc = typeDecl->getDeclContext();
-    auto subMap = (*substBaseType)->getContextSubstitutionMap(
-        dc->getParentModule(), dc);
+    auto subMap = (*substBaseType)->getContextSubstitutionMap(dc);
     return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 
@@ -345,7 +344,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 /// it is the subject of a conformance requirement.
 Type ConcreteContraction::substTypeParameter(
     Type type, Position position) const {
-  assert(type->isTypeParameter());
+  ASSERT(type->isTypeParameter());
 
   auto result = substTypeParameterRec(type, position);
   if (!result)
@@ -397,7 +396,6 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
         firstType, Position::ConformanceRequirement);
 
     auto *proto = req.getProtocolDecl();
-    auto *module = proto->getParentModule();
 
     // For conformance to 'Sendable', allow synthesis of a missing conformance
     // if the generic parameter is concrete, that is, if we're looking at a
@@ -413,8 +411,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
       allowMissing = true;
 
     if (!substFirstType->isTypeParameter()) {
-      auto conformance = module->lookupConformance(substFirstType, proto,
-                                                   allowMissing);
+      auto conformance = ModuleDecl::lookupConformance(substFirstType, proto,
+                                                       allowMissing);
 
       if (!allowMissing &&
           proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
@@ -551,13 +549,13 @@ bool ConcreteContraction::performConcreteContraction(
   // subject type is a generic parameter.
   for (auto req : requirements) {
     auto subjectType = req.req.getFirstType();
-    assert(subjectType->isTypeParameter() &&
-           "You forgot to call desugarRequirement()");
+    ASSERT(subjectType->isTypeParameter() &&
+           "Forgot to call desugarRequirement()");
 
     auto kind = req.req.getKind();
     switch (kind) {
     case RequirementKind::SameShape:
-      assert(req.req.getSecondType()->isTypeParameter());
+      ASSERT(req.req.getSecondType()->isTypeParameter());
       continue;
 
     case RequirementKind::SameType: {
@@ -583,8 +581,8 @@ bool ConcreteContraction::performConcreteContraction(
     }
     case RequirementKind::Superclass: {
       auto constraintType = req.req.getSecondType();
-      assert(!constraintType->isTypeParameter() &&
-             "You forgot to call desugarRequirement()");
+      ASSERT(!constraintType->isTypeParameter() &&
+             "Forgot to call desugarRequirement()");
 
       subjectType = stripBoundDependentMemberTypes(subjectType);
       if (typeOccursIn(subjectType,
@@ -625,8 +623,7 @@ bool ConcreteContraction::performConcreteContraction(
     auto superclassTy = *found->second.begin();
 
     for (auto *proto : pair.second) {
-      auto *module = proto->getParentModule();
-      if (module->lookupConformance(superclassTy, proto)) {
+      if (ModuleDecl::lookupConformance(superclassTy, proto)) {
         auto genericSig = proto->getGenericSignature();
         // FIXME: If we end up here while building the requirement
         // signature of `proto`, we will hit a request cycle.

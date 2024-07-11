@@ -36,6 +36,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -55,6 +56,23 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
+
+FunctionTypeInfo SILGenFunction::getClosureTypeInfo(AbstractClosureExpr *expr) {
+  auto fnType = cast<AnyFunctionType>(expr->getType()->getCanonicalType());
+
+  // If we have a closure expr that has inherits actor context, work around AST
+  // issues that causes us to be able to get non-Sendable actor isolated
+  // closures.
+  if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
+    if (ce->inheritsActorContext() && fnType->isAsync() &&
+        !fnType->isSendable() && expr->getActorIsolation().isActorIsolated()) {
+      auto newExtInfo = fnType->getExtInfo().withSendable();
+      fnType = fnType.withExtInfo(newExtInfo);
+    }
+  }
+
+  return getFunctionTypeInfo(fnType);
+}
 
 FunctionTypeInfo SILGenFunction::getFunctionTypeInfo(CanAnyFunctionType fnType) {
   return { AbstractionPattern(fnType), fnType,
@@ -258,7 +276,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
     }
   }
 
-  if (param.isConsumed() &&
+  if (param.isConsumedInCaller() &&
       value.getOwnershipKind() == OwnershipKind::Guaranteed) {
     return value.copyUnmanaged(SGF, loc);
   }
@@ -1291,8 +1309,7 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    SGF.SGM.emitClosure(e, SGF.getFunctionTypeInfo(closureType));
+    SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e));
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
@@ -1926,7 +1943,7 @@ static void emitRawApply(SILGenFunction &SGF,
     auto inputTy =
         substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
 
-    if (inputParams[i].isConsumed()) {
+    if (inputParams[i].isConsumedInCaller()) {
       argValue = args[i].forward(SGF);
       if (argValue->getType().isMoveOnlyWrapped() &&
           !inputTy.isMoveOnlyWrapped()) {
@@ -3539,7 +3556,7 @@ private:
     }
 
     // If we have a guaranteed +0 parameter...
-    if (param.isGuaranteed() || isShared) {
+    if (param.isGuaranteedInCaller() || isShared) {
       // And this is a yield, emit a borrowed r-value.
       if (IsYield) {
         if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
@@ -3561,7 +3578,7 @@ private:
         return;
     }
 
-    if (param.isConsumed() || isOwned) {
+    if (param.isConsumedInCaller() || isOwned) {
       if (tryEmitConsumedMoveOnly(std::move(arg), loweredSubstArgType,
                                   loweredSubstParamType, origParamType,
                                   paramSlice))
@@ -3762,7 +3779,7 @@ private:
                     ClaimedParamsRef claimedParams) {
     auto emissionKind = SGFAccessKind::BorrowedObjectRead;
     for (auto param : claimedParams) {
-      assert(!param.isConsumed());
+      assert(!param.isConsumedInCaller());
       if (param.isIndirectInGuaranteed() && SGF.silConv.useLoweredAddresses()) {
         emissionKind = SGFAccessKind::BorrowedAddressRead;
         break;
@@ -3886,7 +3903,7 @@ private:
       // happen outside of the formal-evaluation scope we pushed for the
       // expression evaluation, but any copies to be done inside of it.
       // Copies are only done if the parameter is consumed.
-      if (!param.isConsumed())
+      if (!param.isConsumedInCaller())
         S.pop();
 
       Args.push_back(convertOwnershipConvention(value));
@@ -4359,7 +4376,7 @@ private:
     bool requiresReabstraction = loweredArgType.getASTType()
       != param.getInterfaceType();
     // If the parameter is consumed, we have to emit at +1.
-    if (param.isConsumed()) {
+    if (param.isConsumedInCaller()) {
       return {SGFContext(), requiresReabstraction};
     }
 
@@ -5053,7 +5070,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
          MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
       }
       yields.push_back(ManagedValue::forLValue(value));
-    } else if (info.isConsumed()) {
+    } else if (info.isConsumedInCaller()) {
       if (value->getType().isMoveOnly()) {
         value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
          MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
@@ -5061,7 +5078,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
       !useLoweredAddresses && value->getType().isTrivial(getFunction())
           ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
           : yields.push_back(emitManagedRValueWithCleanup(value));
-    } else if (info.isGuaranteed()) {
+    } else if (info.isGuaranteedInCaller()) {
       if (value->getType().isMoveOnly()) {
         if (!value->getType().isAddress()) {
           // The move checker uses the lifetime of the "copy" for borrow checking.
@@ -5599,6 +5616,7 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Inout:
@@ -5918,7 +5936,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
         assert(outerErrorType == SILType::getExceptionType(getASTContext()));
 
         ProtocolConformanceRef conformances[1] = {
-          getModule().getSwiftModule()->checkConformance(
+          ModuleDecl::checkConformance(
             innerError->getType().getASTType(),
             getASTContext().getErrorDecl())
         };
@@ -5975,6 +5993,11 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SubstitutionMap subs,
                                           ArrayRef<SILValue> args,
                                           SmallVectorImpl<SILValue> &yields) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
@@ -6599,8 +6622,7 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   auto allocate = Ctx.getAllocateUninitializedArray();
 
   // Invoke the intrinsic, which returns a tuple.
-  auto subMap = ArrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = ArrayTy->getContextSubstitutionMap();
   auto result = emitApplyOfLibraryIntrinsic(
       Loc, allocate, subMap,
       ManagedValue::forObjectRValueWithoutOwnership(Length), SGFContext());
@@ -6625,8 +6647,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   CanType arrayTy = array->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap();
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanagedOwnedValue(array),
                               SGFContext());
@@ -6649,8 +6670,7 @@ ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
   CanType arrayTy = arrayVal->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap();
   RValue result = emitApplyOfLibraryIntrinsic(
       loc, finalize, subMap, ManagedValue::forUnmanagedOwnedValue(arrayVal),
       SGFContext());
@@ -6849,6 +6869,7 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_CXX:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
     // rdar://problem/19782170
@@ -6868,11 +6889,11 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
   if (shouldLoadBaseAddress()) {
-    if (selfParam.isConsumed() || base.getType().isAddressOnly(SGF.F)) {
+    if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
-      auto isGuaranteed = selfParam.isGuaranteed();
+      auto isGuaranteed = selfParam.isGuaranteedInCaller();
 
       auto context =
           isGuaranteed ? SGFContext::AllowImmediatePlusZero : SGFContext();
@@ -6921,7 +6942,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
   assert(!base.isLValue());
 
   // We need to produce the value at +1 if it's going to be consumed.
-  if (selfParam.isConsumed() && !base.hasCleanup()) {
+  if (selfParam.isConsumedInCaller() && !base.hasCleanup()) {
     base = base.copyUnmanaged(SGF, loc);
   }
   // If the parameter is indirect, we'll need to drop the value into

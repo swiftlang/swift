@@ -19,6 +19,7 @@
 #include "TypeCheckInvertible.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "TypeChecker.h"
 
 using namespace swift;
@@ -142,6 +143,16 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
     if (auto *normalConf = dyn_cast<NormalProtocolConformance>(concrete)) {
       conformanceLoc = normalConf->getLoc();
       assert(conformanceLoc);
+
+      // Conformance must be defined in the same source file as the nominal.
+      auto conformanceDC = concrete->getDeclContext();
+      if (auto *sourceFile = conformanceDC->getOutermostParentSourceFile()) {
+        if (sourceFile != nominalDecl->getOutermostParentSourceFile()) {
+          ctx.Diags.diagnose(conformanceLoc,
+                             diag::invertible_conformance_other_source_file,
+                             getInvertibleProtocolKindName(ip), nominalDecl);
+        }
+      }
 
       auto condReqs = normalConf->getConditionalRequirements();
       hasUnconditionalConformance = condReqs.empty();

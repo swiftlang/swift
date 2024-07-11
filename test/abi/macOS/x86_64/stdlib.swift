@@ -163,6 +163,7 @@ Added: _$ss8RangeSetV6RangesV10startIndexSivpMV
 Added: _$ss8RangeSetV6RangesV11descriptionSSvg
 Added: _$ss8RangeSetV6RangesV11descriptionSSvpMV
 Added: _$ss8RangeSetV6RangesV13_intersectionyADyx_GAFF
+Added: _$ss8RangeSetV6RangesV6_unionyADyx_GAFF
 Added: _$ss8RangeSetV6RangesV2eeoiySbADyx_G_AFtFZ
 Added: _$ss8RangeSetV6RangesV5_gaps9boundedByADyx_GSnyxG_tF
 Added: _$ss8RangeSetV6RangesV5countSivg
@@ -385,6 +386,8 @@ Added: _$ss6Int128Vs35_ExpressibleByBuiltinIntegerLiteralsWP
 Added: _$ss6Int128VyABBi128_cfC
 Added: _$ss6Int128VyABxcSBRzlufC
 Added: _$ss6Int128VyABxcSzRzlufC
+Added: _$ss6Int128V8_lowWordSuvg
+Added: _$ss6Int128V8_lowWordSuvpMV
 
 // UInt128
 Added: _$sSYsSeRzs7UInt128V8RawValueSYRtzrlE4fromxs7Decoder_p_tKcfC
@@ -547,6 +550,8 @@ Added: _$ss7UInt128Vs35_ExpressibleByBuiltinIntegerLiteralsWP
 Added: _$ss7UInt128VyABBi128_cfC
 Added: _$ss7UInt128VyABxcSBRzlufC
 Added: _$ss7UInt128VyABxcSzRzlufC
+Added: _$ss7UInt128V8_lowWordSuvg
+Added: _$ss7UInt128V8_lowWordSuvpMV
 
 // Fixed-width integer &* customization point
 Added: _$ss17FixedWidthIntegerP2amoiyxx_xtFZTj
@@ -570,3 +575,6 @@ Added: _swift_bincompat_useLegacyNonCrashingExecutorChecks
 
 // Add add SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE
 Added: _concurrencyIsCurrentExecutorLegacyModeOverride
+
+//String.init<Encoding: Unicode.Encoding>(_immortalCocoaString: AnyObject, count: Int, encoding: Encoding.Type)
+Added: _$sSS20_immortalCocoaString5count8encodingSSyXl_Sixmtcs16_UnicodeEncodingRzlufC

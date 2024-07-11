@@ -20,10 +20,10 @@
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
-public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
+public func withExtendedLifetime<T: ~Copyable, E: Error, Result: ~Copyable>(
   _ x: borrowing T,
-  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
-) rethrows -> Result {
+  _ body: () throws(E) -> Result
+) throws(E) -> Result {
   defer { _fixLifetime(x) }
   return try body()
 }
@@ -32,8 +32,7 @@ public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
 @_silgen_name("$ss20withExtendedLifetimeyq_x_q_yKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withExtendedLifetime<T, Result>(
-  _ x: T,
-  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
+  _ x: T, _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -49,9 +48,10 @@ internal func __abi_withExtendedLifetime<T, Result>(
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
-public func withExtendedLifetime<T, Result: ~Copyable>(
-  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
-) rethrows -> Result {
+public func withExtendedLifetime<T: ~Copyable, E: Error, Result: ~Copyable>(
+  _ x: borrowing T,
+  _ body: (borrowing T) throws(E) -> Result
+) throws(E) -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
 }
@@ -60,7 +60,7 @@ public func withExtendedLifetime<T, Result: ~Copyable>(
 @_silgen_name("$ss20withExtendedLifetimeyq_x_q_xKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withExtendedLifetime<T, Result>(
-  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
+  _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
@@ -106,14 +106,13 @@ public func withUnsafeMutablePointer<
   try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
-) rethrows -> Result {
+) throws -> Result {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
@@ -167,14 +166,13 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withUnsafePointer<T, Result>(
   to value: T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result
+) throws -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
@@ -213,14 +211,13 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result {
+) throws -> Result {
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 

@@ -38,6 +38,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -675,10 +676,8 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  // If we support TransferringArgsAndResults, set the -D flag to signal that it
+  // If we support SendingArgsAndResults, set the -D flag to signal that it
   // is supported.
-  if (LangOpts.hasFeature(Feature::TransferringArgsAndResults))
-    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_TRANSFERRING=1");
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
 
@@ -1148,6 +1147,10 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching)
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
+
+    // If clang target is ignored, using swift target.
+    if (ignoreClangTarget)
+      CI->getTargetOpts().Triple = ctx.LangOpts.Target.str();
 
     // Forward the index store path. That information is not passed to scanner
     // and it is cached invariant so we don't want to re-scan if that changed.
@@ -2147,6 +2150,7 @@ static llvm::VersionTuple getCurrentVersionFromTBD(llvm::vfs::FileSystem &FS,
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
+                                    SourceLoc loc,
                                     ModuleVersionInfo *versionInfo,
                                     bool isTestableDependencyLookup) {
   // Look up the top-level module to see if it exists.
@@ -4976,7 +4980,6 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 // using the types base and derived.
 static
 DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
-                                             ModuleDecl *swiftModule,
                                              const clang::Module *owningModule,
                                              Type base, Type derived) {
   if (base->isForeignReferenceType() && derived->isForeignReferenceType()) {
@@ -5001,7 +5004,7 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
   // this yet because it can't infer the "To" type.
   auto subst =
       SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
-                           LookUpConformanceInModule(swiftModule));
+                           LookUpConformanceInModule());
   auto functionTemplate = const_cast<clang::FunctionTemplateDecl *>(
       cast<clang::FunctionTemplateDecl>(staticCastFn->getClangDecl()));
   auto spec = ctx.getClangModuleLoader()->instantiateCXXFunctionTemplate(
@@ -5039,14 +5042,12 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
     return selfRef;
   }(funcDecl);
 
-  auto *module = funcDecl->getParentModule();
-
   auto createCallToBuiltin = [&](Identifier name, ArrayRef<Type> substTypes,
                                  Argument arg) {
     auto builtinFn = cast<FuncDecl>(getBuiltinValueDecl(ctx, name));
     auto substMap =
         SubstitutionMap::get(builtinFn->getGenericSignature(), substTypes,
-                             LookUpConformanceInModule(module));
+                             LookUpConformanceInModule());
     ConcreteDeclRef builtinFnRef(builtinFn, substMap);
     auto builtinFnRefExpr =
         new (ctx) DeclRefExpr(builtinFnRef, DeclNameLoc(), /*implicit*/ true);
@@ -5075,7 +5076,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
   selfPointer->setType(derivedPtrType);
 
   auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
-      ctx, module, baseStruct->getClangDecl()->getOwningModule(),
+      ctx, baseStruct->getClangDecl()->getOwningModule(),
       baseStruct->getSelfInterfaceType()->wrapInPointer(
           PTK_UnsafeMutablePointer),
       derivedStruct->getSelfInterfaceType()->wrapInPointer(
@@ -5090,7 +5091,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
   SubstitutionMap pointeeSubst = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
       {baseStruct->getSelfInterfaceType()},
-      LookUpConformanceInModule(module));
+      LookUpConformanceInModule());
   VarDecl *pointeePropertyDecl =
       ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
   auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(
@@ -5698,20 +5699,20 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 }
 
 // Clone attributes that have been imported from Clang.
-DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
-  auto attrs = DeclAttributes();
-  for (auto attr : decl->getAttrs()) {
+void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
+  ASTContext& context = fromDecl->getASTContext();
+  DeclAttributes& attrs = toDecl->getAttrs();
+  for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
     case DeclAttrKind::Available: {
       attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
       break;
     }
     case DeclAttrKind::Custom: {
-      if (CustomAttr *cAttr = cast<CustomAttr>(attr)) {
-        attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                                     cAttr->getInitContext(), cAttr->getArgs(),
-                                     true));
-      }
+      CustomAttr *cAttr = cast<CustomAttr>(attr);
+      attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
+                                   cAttr->getInitContext(), cAttr->getArgs(),
+                                   true));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
@@ -5738,8 +5739,6 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
       break;
     }
   }
-
-  return attrs;
 }
 
 static ValueDecl *
@@ -5769,8 +5768,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
         fn->getThrownInterfaceType(),
         fn->getGenericParams(), fn->getParameters(),
         fn->getResultInterfaceType(), newContext);
-    auto inheritedAttributes = cloneImportedAttributes(decl, context);
-    out->getAttrs().add(inheritedAttributes);
+    cloneImportedAttributes(decl, out);
     out->copyFormalAccessFrom(fn);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());

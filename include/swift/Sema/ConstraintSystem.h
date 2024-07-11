@@ -2826,6 +2826,10 @@ public:
   /// Associate an argument list with a call at a given locator.
   void associateArgumentList(ConstraintLocator *locator, ArgumentList *args);
 
+  /// If the given node is a function expression with a parent ApplyExpr,
+  /// returns the apply, otherwise returns the node itself.
+  ASTNode includingParentApply(ASTNode node);
+
   std::optional<SelectedOverload>
   findSelectedOverloadFor(ConstraintLocator *locator) const {
     auto result = ResolvedOverloads.find(locator);
@@ -6515,9 +6519,8 @@ bool hasResultExpr(ClosureExpr *closure);
 
 /// Emit diagnostics for syntactic restrictions within a given solution
 /// application target.
-void performSyntacticDiagnosticsForTarget(
-    const SyntacticElementTarget &target, bool isExprStmt,
-    bool disableExprAvailabilityChecking = false);
+void performSyntacticDiagnosticsForTarget(const SyntacticElementTarget &target,
+                                          bool isExprStmt);
 
 /// Given a member of a protocol, check whether `Self` type of that
 /// protocol is contextually bound to some concrete type via same-type

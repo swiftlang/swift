@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/ApplySite.h"
@@ -707,6 +708,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
       Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
+    }
+    auto *dbi = dyn_cast<DeallocBoxInst>(LastRelease);
+    if (dbi && dbi->isDeadEnd()) {
+      // Don't bother to create dealloc_stack instructions in dead-ends.
+      continue;
     }
     Builder.createDeallocStack(Loc, ASI);
   }

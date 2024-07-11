@@ -26,6 +26,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -872,12 +873,11 @@ DeclContext *ConformanceLookupTable::getConformingContext(
       // FIXME: This is a hack because the inherited conformances aren't
       // getting updated properly.
       Type classTy = nominal->getDeclaredInterfaceType();
-      ModuleDecl *module = nominal->getParentModule();
       do {
         Type superclassTy = classTy->getSuperclassForDecl(superclassDecl);
         if (superclassTy->is<ErrorType>())
           return nullptr;
-        auto inheritedConformance = module->lookupConformance(
+        auto inheritedConformance = ModuleDecl::lookupConformance(
             superclassTy, protocol, /*allowMissing=*/false);
         if (inheritedConformance.hasUnavailableConformance())
           inheritedConformance = ProtocolConformanceRef::forInvalid();
@@ -955,8 +955,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
       return nullptr;
 
     // Look up the inherited conformance.
-    ModuleDecl *module = entry->getDeclContext()->getParentModule();
-    auto inheritedConformance = module->lookupConformance(
+    auto inheritedConformance = ModuleDecl::lookupConformance(
         superclassTy, protocol, /*allowMissing=*/true);
 
     // Form the inherited conformance.

@@ -21,6 +21,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -111,8 +112,7 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
-    auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(
+    auto conformance = ModuleDecl::lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
@@ -203,6 +203,12 @@ bool Requirement::canBeSatisfied() const {
   }
 
   llvm_unreachable("Bad requirement kind");
+}
+
+bool Requirement::isInvertibleProtocolRequirement() const {
+  return getKind() == RequirementKind::Conformance
+      && getFirstType()->is<GenericTypeParamType>()
+      && getProtocolDecl()->getInvertibleProtocolKind();
 }
 
 /// Determine the canonical ordering of requirements.
@@ -320,12 +326,12 @@ swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
 }
 
 CheckRequirementsResult swift::checkRequirements(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> substReqs;
   for (auto req : requirements) {
     substReqs.push_back(req.subst(substitutions,
-                              LookUpConformanceInModule(module), options));
+                                  LookUpConformanceInModule(), options));
   }
 
   return checkRequirements(substReqs);

@@ -2292,6 +2292,19 @@ private:
   void emitSuggestionNotes() const;
 };
 
+class SendingMismatchFailure final : public ContextualFailure {
+public:
+  SendingMismatchFailure(const Solution &solution, Type srcType, Type dstType,
+                         ConstraintLocator *locator, FixBehavior fixBehavior)
+      : ContextualFailure(solution, srcType, dstType, locator, fixBehavior) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  bool diagnoseArgFailure();
+  bool diagnoseResultFailure();
+};
+
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
 public:
   AssignmentTypeMismatchFailure(const Solution &solution,
@@ -2603,6 +2616,20 @@ class MissingContextualTypeForNil final : public FailureDiagnostic {
 public:
   MissingContextualTypeForNil(const Solution &solution,
                               ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a placeholder type in an invalid place, e.g:
+///
+/// \code
+/// y as? _
+/// \endcode
+class InvalidPlaceholderFailure final : public FailureDiagnostic {
+public:
+  InvalidPlaceholderFailure(const Solution &solution,
+                            ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

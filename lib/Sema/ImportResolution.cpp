@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1392,12 +1393,6 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
   // first bind all exported imports in all files, then bind all other imports
   // in each file. This may become simpler if we bind all ImportDecls before we
   // start computing cross-imports, but I haven't figured that part out yet.
-  //
-  // Fixing this is tracked within Apple by rdar://problem/59527118. I haven't
-  // filed an SR because I plan to address it myself, but if this comment is
-  // still here in April 2020 without an SR number, please file a Swift bug and
-  // harass @brentdax to fill in the details.
-
   if (!SF.shouldCrossImport())
     return;
 

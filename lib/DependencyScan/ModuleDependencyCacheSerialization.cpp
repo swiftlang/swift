@@ -12,6 +12,7 @@
 
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Version.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
@@ -304,7 +305,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!moduleCacheKeyID)
         llvm::report_fatal_error("Bad moduleCacheKey");
 
-      // TODO: LinkLibraries
+      // TODO: LinkLibraries, MacroDependencies
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
           outputModulePath.value(), optionalSwiftInterfaceFile.value(),
@@ -513,12 +514,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!headerImport)
         llvm::report_fatal_error("Bad binary direct dependencies: no header import");
 
-      // TODO: LinkLibraries
+      // TODO: LinkLibraries, DefiningModulePath
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
            *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
            currentModuleImports, currentOptionalModuleImports, {},
-           *headerImport, isFramework, isStatic, *moduleCacheKey);
+           *headerImport, "", isFramework, isStatic, *moduleCacheKey);
 
       auto headerModuleDependencies = getStringArray(headerModuleDependenciesArrayID);
       if (!headerModuleDependencies)

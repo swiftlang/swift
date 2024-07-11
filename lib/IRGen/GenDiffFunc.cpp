@@ -19,6 +19,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -79,7 +80,7 @@ public:
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, kind, IGM.getSILTypes(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -206,7 +207,7 @@ public:
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, kind, IGM.getSILTypes(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(assocTy);
   }
 
@@ -254,7 +255,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       auto transposeTy = origFnTy->getAutoDiffTransposeFunctionType(
           parameterIndices, IGM.getSILTypes(),
-          LookUpConformanceInModule(IGM.getSwiftModule()));
+          LookUpConformanceInModule());
       return SILType::getPrimitiveObjectType(transposeTy);
     }
     llvm_unreachable("invalid component type");
@@ -376,7 +377,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       auto transposeTy = originalType->getAutoDiffTransposeFunctionType(
           parameterIndices, IGM.getSILTypes(),
-          LookUpConformanceInModule(IGM.getSwiftModule()));
+          LookUpConformanceInModule());
       return SILType::getPrimitiveObjectType(transposeTy);
     }
     llvm_unreachable("invalid component type");

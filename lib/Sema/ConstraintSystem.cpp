@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
@@ -291,6 +292,13 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name,
   // Lookup the member.
   result = TypeChecker::lookupMember(DC, base, name, loc,
                                      defaultMemberLookupOptions);
+
+  // If we are in an @_unsafeInheritExecutor context, swap out
+  // declarations for their _unsafeInheritExecutor_ counterparts if they
+  // exist.
+  if (enclosingUnsafeInheritsExecutor(DC)) {
+    introduceUnsafeInheritExecutorReplacements(DC, base, loc, *result);
+  }
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
@@ -1029,12 +1037,11 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
   if (extension && extension->isConstrainedExtension()) {
     auto contextSubMap = parentTy->getContextSubstitutionMap(
-        extension->getParentModule(), extension->getSelfNominalTypeDecl());
+        extension->getSelfNominalTypeDecl());
     if (!subMap) {
       // The substitution map wasn't set above, meaning we should grab the map
       // for the extension itself.
-      subMap = parentTy->getContextSubstitutionMap(extension->getParentModule(),
-                                                   extension);
+      subMap = parentTy->getContextSubstitutionMap(extension);
     }
 
     if (auto signature = decl->getGenericSignature()) {
@@ -1371,8 +1378,7 @@ getPropertyWrapperInformationFromOverload(
       VarDecl *memberDecl;
       std::tie(memberDecl, type) = *declInformation;
       if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type =
-            baseType->getTypeOfMember(DC->getParentModule(), memberDecl, type);
+        type = baseType->getTypeOfMember(memberDecl, type);
       }
       return std::make_pair(decl, type);
     }
@@ -1747,8 +1753,17 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
       });
 
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    DeclContext *DC = nullptr;
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
-      auto *DC = FD->getDeclContext();
+      DC = FD->getDeclContext();
+    } else if (auto EED = dyn_cast<EnumElementDecl>(decl)) {
+      if (EED->hasAssociatedValues() &&
+          !locator.endsWith<LocatorPathElt::PatternMatch>()) {
+        DC = EED->getDeclContext();
+      }
+    }
+
+    if (DC) {
       // All global functions should be @Sendable
       if (DC->isModuleScopeContext()) {
         if (!adjustedTy->getExtInfo().isSendable()) {
@@ -2715,8 +2730,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
-    auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
-                                                         typeDecl, baseObjTy);
+    auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
     // If the member type is a constraint, e.g. because the
     // reference is to a typealias with an underlying protocol
@@ -6658,6 +6672,16 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
 }
 #endif
 
+ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
+  if (auto *expr = getAsExpr(node)) {
+    if (auto apply = getAsExpr<ApplyExpr>(getParentExpr(expr))) {
+      if (apply->getFn() == expr)
+        return apply;
+    }
+  }
+  return node;
+}
+
 Type Solution::resolveInterfaceType(Type type) const {
   auto resolvedType = type.transform([&](Type type) -> Type {
     if (auto *tvt = type->getAs<TypeVariableType>()) {
@@ -7755,8 +7779,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
     return cachedConformance->second;
 
   auto conformance =
-      DC->getParentModule()->lookupConformance(type, protocol,
-                                               /*allowMissing=*/true);
+      ModuleDecl::lookupConformance(type, protocol, /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
 }

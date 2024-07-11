@@ -31,6 +31,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -198,7 +199,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
     return declaredType;
 
   auto *dc = aliasDecl->getDeclContext();
-  auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
+  auto subs = parent->getContextSubstitutionMap(dc);
 
   return declaredType.subst(subs);
 }
@@ -238,7 +239,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   // Build a SubstitutionMap.
   auto genericSig = nominalDecl->getGenericSignature();
   auto subs = createSubstitutionMapFromGenericArgs(
-      genericSig, args, LookUpConformanceInModule(decl->getParentModule()));
+      genericSig, args, LookUpConformanceInModule());
   if (!subs)
     return Type();
   auto origType = nominalDecl->getDeclaredInterfaceType();
@@ -277,7 +278,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
         opaqueDecl->getGenericSignature(), allArgs,
-        LookUpConformanceInModule(parentModule));
+        LookUpConformanceInModule());
     Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
     return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
   }
@@ -317,11 +318,9 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
       substTy;
   }
 
-  // FIXME: This is the wrong module
-  auto *moduleDecl = decl->getParentModule();
   auto subMap = SubstitutionMap::get(genericSig,
                                      QueryTypeSubstitutionMap{subs},
-                                     LookUpConformanceInModule(moduleDecl));
+                                     LookUpConformanceInModule());
   if (!subMap)
     return Type();
 
@@ -470,13 +469,14 @@ Type ASTBuilder::createFunctionType(
                                                  representation);
 
   // TODO: Handle LifetimeDependenceInfo here.
-  auto einfo = FunctionType::ExtInfoBuilder(
-                   representation, noescape, flags.isThrowing(), thrownError,
-                   resultDiffKind, clangFunctionType, isolation,
-                   LifetimeDependenceInfo(), extFlags.hasSendingResult())
-                   .withAsync(flags.isAsync())
-                   .withSendable(flags.isSendable())
-                   .build();
+  auto einfo =
+      FunctionType::ExtInfoBuilder(
+          representation, noescape, flags.isThrowing(), thrownError,
+          resultDiffKind, clangFunctionType, isolation,
+          /*LifetimeDependenceInfo*/ std::nullopt, extFlags.hasSendingResult())
+          .withAsync(flags.isAsync())
+          .withSendable(flags.isSendable())
+          .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -689,11 +689,12 @@ Type ASTBuilder::createImplFunctionType(
     clangFnType = getASTContext().getCanonicalClangFunctionType(
         funcParams, result, representation);
   }
-  auto einfo = SILFunctionType::ExtInfoBuilder(
-                   representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isSendable(), flags.isAsync(), unimplementable,
-                   isolation, diffKind, clangFnType, LifetimeDependenceInfo())
-                   .build();
+  auto einfo =
+      SILFunctionType::ExtInfoBuilder(
+          representation, flags.isPseudogeneric(), !flags.isEscaping(),
+          flags.isSendable(), flags.isAsync(), unimplementable, isolation,
+          diffKind, clangFnType, /*LifetimeDependenceInfo*/ std::nullopt)
+          .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
@@ -755,36 +756,53 @@ Type ASTBuilder::createExistentialMetatypeType(
 Type ASTBuilder::createConstrainedExistentialType(
     Type base, ArrayRef<BuiltRequirement> constraints,
     ArrayRef<BuiltInverseRequirement> inverseRequirements) {
-  // FIXME: Generalize to other kinds of bases.
-  if (!base->getAs<ProtocolType>())
-    return Type();
-  auto baseTy = base->castTo<ProtocolType>();
-  auto baseDecl = baseTy->getDecl();
-  llvm::SmallDenseMap<Identifier, Type> cmap;
-  for (const auto &req : constraints) {
-    switch (req.getKind()) {
-    case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::Layout:
-      continue;
+  Type constrainedBase;
 
-    case RequirementKind::SameType:
-      if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
-        cmap[DMT->getName()] = req.getSecondType();
+  if (auto baseTy = base->getAs<ProtocolType>()) {
+    auto baseDecl = baseTy->getDecl();
+    llvm::SmallDenseMap<Identifier, Type> cmap;
+    for (const auto &req : constraints) {
+      switch (req.getKind()) {
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::Layout:
+        continue;
+
+      case RequirementKind::SameType:
+        if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
+          cmap[DMT->getName()] = req.getSecondType();
+      }
     }
-  }
-  llvm::SmallVector<Type, 4> args;
-  for (auto *assocTy : baseDecl->getPrimaryAssociatedTypes()) {
-    auto argTy = cmap.find(assocTy->getName());
-    if (argTy == cmap.end()) {
-      return Type();
+    llvm::SmallVector<Type, 4> args;
+    for (auto *assocTy : baseDecl->getPrimaryAssociatedTypes()) {
+      auto argTy = cmap.find(assocTy->getName());
+      if (argTy == cmap.end()) {
+        return Type();
+      }
+      args.push_back(argTy->getSecond());
     }
-    args.push_back(argTy->getSecond());
+
+    // We may not have any arguments because the constrained existential is a
+    // plain protocol with an inverse requirement.
+    if (args.empty()) {
+      constrainedBase =
+          ProtocolType::get(baseDecl, baseTy, base->getASTContext());
+    } else {
+      constrainedBase =
+          ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+    }
+  } else if (base->isAny()) {
+    // The only other case should be that we got an empty PCT, which is equal to
+    // the Any type. The other constraints should have been encoded in the
+    // existential's generic signature (and arrive as BuiltInverseRequirement).
+    constrainedBase = base;
+  } else {
+    return Type();
   }
-  Type constrainedBase =
-      ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
+
+  assert(constrainedBase);
 
   // Handle inverse requirements.
   if (!inverseRequirements.empty()) {
@@ -937,7 +955,7 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   if (signature)
     substs = createSubstitutionMapFromGenericArgs(
         signature, replacements,
-        LookUpConformanceInSignature(signature.getPointer()));
+        LookUpConformanceInModule());
   return SILBoxType::get(Ctx, layout, substs);
 }
 
@@ -1036,7 +1054,7 @@ SubstitutionMap
 ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
                                   ArrayRef<BuiltType> replacements) {
   return SubstitutionMap::get(sig, replacements,
-                              LookUpConformanceInSignature(sig.getPointer()));
+                              LookUpConformanceInModule());
 }
 
 Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {

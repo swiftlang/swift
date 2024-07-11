@@ -635,7 +635,7 @@ protected:
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
 
-  NodePointer demangleLifetimeDependenceKind(bool isSelfDependence);
+  NodePointer demangleLifetimeDependence();
 
   void dump();
 

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Methods -clang-header-expose-decls=all-public -emit-clang-header-path %t/methods.h
 // RUN: %FileCheck %s < %t/methods.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/methods.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/methods.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public struct Struct {
   var field: Int16
