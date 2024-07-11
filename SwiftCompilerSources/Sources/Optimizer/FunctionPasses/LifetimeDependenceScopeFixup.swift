@@ -234,13 +234,18 @@ private struct LifetimeDependenceScopeFixupWalker : LifetimeDependenceDefUseWalk
     return .continueWalk
   }
 
+  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+    dependsOnCaller = true
+    return visitor(operand)
+  }
+
   mutating func returnedDependence(result operand: Operand) -> WalkResult {
     dependsOnCaller = true
     return visitor(operand)
   }
 
   mutating func returnedDependence(address: FunctionArgument,
-                                   using operand: Operand) -> WalkResult {
+                                   on operand: Operand) -> WalkResult {
     dependsOnCaller = true
     return visitor(operand)
   }

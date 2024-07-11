@@ -348,7 +348,7 @@ extension LifetimeDependence.Scope {
       case let .argument(arg):
         if arg.convention.isIndirectIn {
           self = .initialized(initialAddress: arg, initializingStore: nil)
-        } else if arg.convention.isIndirectOut {
+        } else if arg.convention.isIndirectOut || arg.convention.isInout {
           // TODO: verify that @out values are never reassigned.
           self = .caller(arg)
         } else {
@@ -772,8 +772,9 @@ extension LifetimeDependenceUseDefWalker {
 ///   leafUse(of: Operand) -> WalkResult
 ///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 ///   escapingDependence(on operand: Operand) -> WalkResult
+///   inoutDependence(argument: FunctionArgument, on: Operand) -> WalkResult
 ///   returnedDependence(result: Operand) -> WalkResult
-///   returnedDependence(address: FunctionArgument, using: Operand) -> WalkResult
+///   returnedDependence(address: FunctionArgument, on: Operand) -> WalkResult
 ///   yieldedDependence(result: Operand) -> WalkResult
 /// Start walking:
 ///   walkDown(root: Value)
@@ -791,9 +792,13 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult
 
+  // Assignment to an inout argument. This does not include the indirect out result, which is considered a return
+  // value.
+  mutating func inoutDependence(argument: FunctionArgument, on: Operand) -> WalkResult
+
   mutating func returnedDependence(result: Operand) -> WalkResult
 
-  mutating func returnedDependence(address: FunctionArgument, using: Operand) -> WalkResult
+  mutating func returnedDependence(address: FunctionArgument, on: Operand) -> WalkResult
 
   mutating func yieldedDependence(result: Operand) -> WalkResult
 }
@@ -1072,7 +1077,7 @@ extension LifetimeDependenceDefUseWalker {
       if arg.convention.isIndirectIn || arg.convention.isInout {
         allocation = arg
       } else if arg.convention.isIndirectOut, !arg.isEscapable {
-        return returnedDependence(address: arg, using: operand)
+        return returnedDependence(address: arg, on: operand)
       }
       break
     case .global, .class, .tail, .yield, .storeBorrow, .pointer, .unidentified:
@@ -1140,7 +1145,7 @@ extension LifetimeDependenceDefUseWalker {
     case .outgoingArgument:
       let arg = allocation as! FunctionArgument
       assert(arg.type.isAddress, "returned local must be allocated with an indirect argument")
-      return returnedDependence(address: arg, using: initialValue)
+      return inoutDependence(argument: arg, on: initialValue)
     case .incomingArgument:
       fatalError("Incoming arguments are never reachable")
     }
@@ -1253,13 +1258,18 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
     return .continueWalk
   }
 
+  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+    print("Out use: \(operand) in: \(argument)")
+    return .continueWalk
+  }
+
   mutating func returnedDependence(result: Operand) -> WalkResult {
     print("Returned use: \(result)")
     return .continueWalk
   }
 
   mutating func returnedDependence(address: FunctionArgument,
-                                   using operand: Operand) -> WalkResult {
+                                   on operand: Operand) -> WalkResult {
     print("Returned use: \(operand) in: \(address)")
     return .continueWalk
   }

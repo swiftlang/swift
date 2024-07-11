@@ -131,6 +131,22 @@ private struct DiagnoseDependence {
     reportEscaping(operand: operand)
   }
 
+  func checkInoutResult(argument inoutArg: FunctionArgument, result operand: Operand) -> WalkResult {
+    // Check that the parameter dependence for this inout argument is the same as the current dependence scope.
+    if let sourceArg = dependence.scope.parentValue as? FunctionArgument {
+      // If the inout result is also the inout source, then it's always ok.
+      if inoutArg == sourceArg {
+        return .continueWalk
+      }
+      if function.argumentConventions.getDependence(target: inoutArg.index, source: sourceArg.index) != nil {
+        // The inout result depends on a lifetime that is inherited or borrowed in the caller.
+        return .continueWalk
+      }
+    }
+    reportEscaping(operand: operand)
+    return .abortWalk
+  }
+
   func checkFunctionResult(operand: Operand) -> WalkResult {
 
     if function.hasUnsafeNonEscapableResult {
@@ -151,7 +167,7 @@ private struct DiagnoseDependence {
     if dependence.isUnsafeApplyResult, function.hasResultDependence {
       return .continueWalk
     }
-    // Check that the argument dependence for this result is the same
+    // Check that the parameter dependence for this result is the same
     // as the current dependence scope.
     if let arg = dependence.scope.parentValue as? FunctionArgument,
        function.argumentConventions[resultDependsOn: arg.index] != nil {
@@ -363,12 +379,16 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
     return .abortWalk
   }
 
+  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+    return diagnostics.checkInoutResult(argument: argument, result: operand)
+  }
+
   mutating func returnedDependence(result: Operand) -> WalkResult {
     return diagnostics.checkFunctionResult(operand: result)
   }
 
   mutating func returnedDependence(address: FunctionArgument,
-                                   using operand: Operand) -> WalkResult {
+                                   on operand: Operand) -> WalkResult {
     return diagnostics.checkFunctionResult(operand: operand)
   }
 
