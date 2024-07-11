@@ -106,14 +106,13 @@ public func withUnsafeMutablePointer<
   try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
-) rethrows -> Result {
+) throws -> Result {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
@@ -167,14 +166,13 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withUnsafePointer<T, Result>(
   to value: T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result
+) throws -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
@@ -213,14 +211,13 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result {
+) throws -> Result {
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 

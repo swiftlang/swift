@@ -68,7 +68,7 @@ class C {
   // CHECK:         store {{.*}} to [[A]] : $*Int
   // CHECK:         [[EI:%.*]] = end_init_let_ref %1
   // CHECK:       bb1:
-  // CHEKC:         ref_element_addr [[EI]] : $C, #C.b
+  // CHECK:         ref_element_addr [[EI]] : $C, #C.b
   // CHECK:         return [[EI]]
   // CHECK:       } // end sil function '$s4test1CC1cACSb_tcfc'
   init(c: Bool) {

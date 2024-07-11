@@ -3997,6 +3997,12 @@ ERROR(reasync_without_async_parameter,none,
 
 ERROR(inherits_executor_without_async,none,
       "non-async functions cannot inherit an executor", ())
+ERROR(isolation_in_inherits_executor,none,
+      "#isolation%select{| (introduced by a default argument)}0 cannot be used "
+      "within an '@_unsafeInheritExecutor' function", (bool))
+ERROR(unsafe_inherits_executor_deprecated,none,
+        "@_unsafeInheritExecutor attribute is deprecated; consider an "
+        "'isolated' parameter defaulted to '#isolation' instead", ())
 
 ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
       (DeclAttribute))
@@ -7820,6 +7826,9 @@ WARNING(suppress_already_suppressed_protocol,none,
 ERROR(extension_conforms_to_invertible_and_others, none,
       "conformance to '%0' must be declared in a separate extension",
       (StringRef))
+ERROR(invertible_conformance_other_source_file,none,
+      "conformance to '%0' must occur in the same source file as %kind1",
+      (StringRef, const ValueDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -7994,6 +8003,9 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        ())
 ERROR(lifetime_dependence_immortal_conflict_name, none,
       "conflict between the parameter name and immortal keyword", ())
+ERROR(lifetime_dependence_function_type, none,
+      "lifetime dependencies on function types are not supported",
+      ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending

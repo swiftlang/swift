@@ -1006,6 +1006,8 @@ static bool hasDependentTypeWitness(
   if (!DC->isGenericContext())
     return false;
 
+  auto genericSig = conformance->getGenericSignature();
+
   // Check whether any of the associated types are dependent.
   if (conformance->forEachTypeWitness(
         [&](AssociatedTypeDecl *requirement, Type type,
@@ -1015,7 +1017,7 @@ static bool hasDependentTypeWitness(
             return false;
 
           // RESILIENCE: this could be an opaque conformance
-          return type->getCanonicalType()->hasTypeParameter();
+          return type->getReducedType(genericSig)->hasTypeParameter();
        },
        /*useResolver=*/true)) {
     return true;
@@ -2989,7 +2991,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     GenericTypeRequirements requirements(IGF.IGM, nominal);
     auto &requirement = requirements.getRequirements()[reqtIndex];
 
-    auto subs = sourceKey.Type->getContextSubstitutionMap(nominal);
+    auto subs = type->getContextSubstitutionMap();
     auto sub = requirement.getTypeParameter().subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.

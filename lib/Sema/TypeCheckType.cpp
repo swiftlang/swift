@@ -3961,6 +3961,12 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
+          repr->getResultTypeRepr())) {
+    diagnoseInvalid(lifetimeRepr, lifetimeRepr->getLoc(),
+                    diag::lifetime_dependence_function_type);
+  }
+
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);

@@ -3778,8 +3778,6 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
   // The type eraser must be a concrete nominal type
   auto nominalTypeDecl = typeEraser->getAnyNominal();
-  if (auto typeAliasDecl = dyn_cast_or_null<TypeAliasDecl>(nominalTypeDecl))
-    nominalTypeDecl = typeAliasDecl->getUnderlyingType()->getAnyNominal();
 
   if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
     diags.diagnose(attr->getLoc(), diag::non_nominal_type_eraser);
@@ -3841,7 +3839,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     // substituting the protocol's Self type for the generic arg and check that
     // the requirements in the generic signature are satisfied.
     auto baseMap =
-        typeEraser->getContextSubstitutionMap(nominalTypeDecl);
+        typeEraser->getContextSubstitutionMap();
     QuerySubstitutionMap getSubstitution{baseMap};
 
     auto result = checkRequirements(
@@ -7005,15 +7003,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     if (var->hasStorage()) {
       {
         // 'nonisolated' can not be applied to mutable stored properties unless
-        // qualified as 'unsafe', or is of a Sendable type on a
-        // globally-isolated value type.
+        // qualified as 'unsafe', or is of a Sendable type on a Sendable
+        // value type.
         bool canBeNonisolated = false;
-        if (dc->isTypeContext()) {
-          if (auto nominal = dc->getSelfStructDecl()) {
-            if (!var->isStatic() && type->isSendableType() &&
-                getActorIsolation(nominal).isGlobalActor()) {
-              canBeNonisolated = true;
-            }
+        if (auto nominal = dc->getSelfStructDecl()) {
+          if (nominal->getDeclaredTypeInContext()->isSendableType() &&
+              !var->isStatic() && type->isSendableType()) {
+            canBeNonisolated = true;
           }
         }
 
@@ -7279,6 +7275,13 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  } else {
+    bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
+        .str().equals("_Concurrency");
+    auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
+    diag.warnUntilSwiftVersion(6);
+    diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
+    replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
 }
 
