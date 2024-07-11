@@ -650,7 +650,7 @@ void SignatureExpansion::expandResult(
   const TypeInfo *directResultTypeInfo;
   std::tie(ResultIRType, directResultTypeInfo) = expandDirectResult();
 
-  if (!fnConv.hasIndirectSILErrorResults()) {
+  if (!fnConv.hasIndirectSILResults() && !fnConv.hasIndirectSILErrorResults()) {
     llvm::Type *directErrorType;
     const TypeInfo *directErrorTypeInfo;
     std::tie(directErrorType, directErrorTypeInfo) = expandDirectErrorType();
@@ -1997,7 +1997,8 @@ void SignatureExpansion::expandParameters(
       auto &errorTI = IGM.getTypeInfo(errorType);
       auto &nativeError = errorTI.nativeReturnValueSchema(IGM);
 
-      if (getSILFuncConventions().hasIndirectSILErrorResults() ||
+      if (getSILFuncConventions().hasIndirectSILResults() ||
+          getSILFuncConventions().hasIndirectSILErrorResults() ||
           native.requiresIndirect() ||
           nativeError.shouldReturnTypedErrorIndirectly()) {
         ParamIRTypes.push_back(IGM.getStorageType(errorType)->getPointerTo());
@@ -2560,7 +2561,8 @@ public:
           auto &errorSchema =
               IGF.IGM.getTypeInfo(silErrorTy).nativeReturnValueSchema(IGF.IGM);
 
-          if (nativeSchema.requiresIndirect() ||
+          if (fnConv.hasIndirectSILResults() ||
+              nativeSchema.requiresIndirect() ||
               errorSchema.shouldReturnTypedErrorIndirectly()) {
             // Return the error indirectly.
             auto buf = IGF.getCalleeTypedErrorResultSlot(silErrorTy);
@@ -4329,8 +4331,9 @@ bool CallEmission::mayReturnTypedErrorDirectly() const {
   SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
                                 IGF.getSILModule());
   bool mayReturnErrorDirectly = false;
-  if (!convertDirectToIndirectReturn && !fnConv.hasIndirectSILErrorResults() &&
-      fnConv.funcTy->hasErrorResult() && fnConv.isTypedError()) {
+  if (!convertDirectToIndirectReturn && !fnConv.hasIndirectSILResults() &&
+      !fnConv.hasIndirectSILErrorResults() && fnConv.funcTy->hasErrorResult() &&
+      fnConv.isTypedError()) {
     auto errorType =
         fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
     auto &errorSchema =
