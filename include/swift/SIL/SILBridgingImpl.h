@@ -82,23 +82,59 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 //                       BridgedLifetimeDependenceInfo
 //===----------------------------------------------------------------------===//
 
+SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
+  return unbridged().size();
+}
+
+BridgedLifetimeDependenceInfo
+BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
+  return BridgedLifetimeDependenceInfo(unbridged()[index]);
+}
+
 bool BridgedLifetimeDependenceInfo::empty() const {
-  return info == nullptr || info->empty();
+  return !immortal && inheritLifetimeParamIndices == nullptr &&
+         scopeLifetimeParamIndices == nullptr;
 }
 
 bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
-  assert(info);
-  return info->checkInherit(index);
+  return inheritLifetimeParamIndices &&
+         inheritLifetimeParamIndices->contains(index);
 }
 
 bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
-  assert(info);
-  return info->checkScope(index);
+  return scopeLifetimeParamIndices &&
+         scopeLifetimeParamIndices->contains(index);
+}
+
+SwiftInt BridgedLifetimeDependenceInfo::getTargetIndex() const {
+  return targetIndex;
 }
 
 BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
-  assert(info);
-  return BridgedOwnedString(info->getString());
+  std::string lifetimeDependenceString;
+  auto getOnIndices = [](swift::IndexSubset *bitvector) {
+    std::string result;
+    bool isFirstSetBit = true;
+    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
+      if (bitvector->contains(i)) {
+        if (!isFirstSetBit) {
+          result += ", ";
+        }
+        result += std::to_string(i);
+        isFirstSetBit = false;
+      }
+    }
+    return result;
+  };
+  if (inheritLifetimeParamIndices && !inheritLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString =
+        "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ") ";
+  }
+  if (scopeLifetimeParamIndices && !scopeLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString +=
+        "_scope(" + getOnIndices(scopeLifetimeParamIndices) + ") ";
+  }
+  return lifetimeDependenceString;
 }
 
 //===----------------------------------------------------------------------===//
@@ -162,9 +198,10 @@ BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getYields();
 }
 
-BridgedLifetimeDependenceInfo BridgedASTType::SILFunctionType_getLifetimeDependenceInfo() const {
+BridgedLifetimeDependenceInfoArray
+BridgedASTType::SILFunctionType_getLifetimeDependencies() const {
   auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
-  return {fnTy->getLifetimeDependenceInfoOrNull()};
+  return fnTy->getLifetimeDependencies();
 }
 
 //===----------------------------------------------------------------------===//

@@ -2156,8 +2156,9 @@ namespace {
     NeverNullType
     resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                     TypeResolutionOptions options);
-    NeverNullType resolveLifetimeDependentReturnTypeRepr(
-        LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
+    NeverNullType
+    resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2762,9 +2763,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
 
-  case TypeReprKind::LifetimeDependentReturn:
-    return resolveLifetimeDependentReturnTypeRepr(
-        cast<LifetimeDependentReturnTypeRepr>(repr), options);
+  case TypeReprKind::LifetimeDependent:
+    return resolveLifetimeDependentTypeRepr(
+        cast<LifetimeDependentTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -3961,7 +3962,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
+  if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
           repr->getResultTypeRepr())) {
     diagnoseInvalid(lifetimeRepr, lifetimeRepr->getLoc(),
                     diag::lifetime_dependence_function_type);
@@ -4016,7 +4017,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      LifetimeDependenceInfo(), hasSendingResult);
+      /*LifetimeDependenceInfo*/ std::nullopt, hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4225,7 +4226,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType, LifetimeDependenceInfo());
+      isolation, diffKind, clangFnType,
+      /*LifetimeDependenceInfo*/ std::nullopt);
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -4395,16 +4397,11 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
   }
 
-  std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
-  if (auto *lifetimeDependentTypeRepr =
-          dyn_cast<LifetimeDependentReturnTypeRepr>(
-              repr->getResultTypeRepr())) {
-    lifetimeDependenceInfo = LifetimeDependenceInfo::fromTypeRepr(
-        lifetimeDependentTypeRepr, params, getDeclContext());
-    if (lifetimeDependenceInfo.has_value()) {
-      extInfoBuilder =
-          extInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
-    }
+  auto lifetimeDependencies =
+      LifetimeDependenceInfo::get(repr, params, results, getDeclContext());
+  if (lifetimeDependencies.has_value()) {
+    extInfoBuilder =
+        extInfoBuilder.withLifetimeDependencies(*lifetimeDependencies);
   }
 
   return SILFunctionType::get(genericSig.getCanonicalSignature(),
@@ -4521,11 +4518,11 @@ bool TypeResolver::resolveSingleSILResult(
 
   options.setContext(TypeResolverContext::FunctionResult);
 
-  // Look through LifetimeDependentReturnTypeRepr.
-  // LifetimeDependentReturnTypeRepr will be processed separately when building
+  // Look through LifetimeDependentTypeRepr.
+  // LifetimeDependentTypeRepr will be processed separately when building
   // SILFunctionType.
   if (auto *lifetimeDependentTypeRepr =
-          dyn_cast<LifetimeDependentReturnTypeRepr>(repr)) {
+          dyn_cast<LifetimeDependentTypeRepr>(repr)) {
     repr = lifetimeDependentTypeRepr->getBase();
   }
 
@@ -5003,14 +5000,16 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   return ArraySliceType::get(baseTy);
 }
 
-NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
-    LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
+                                               TypeResolutionOptions options) {
   if (options.is(TypeResolverContext::TupleElement)) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
                     diag::lifetime_dependence_cannot_be_applied_to_tuple_elt);
     return ErrorType::get(getASTContext());
   }
-  if (!options.is(TypeResolverContext::FunctionResult)) {
+  if (!options.is(TypeResolverContext::FunctionResult) &&
+      !options.is(TypeResolverContext::FunctionInput)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(),
         diag::lifetime_dependence_only_on_function_method_init_result);
@@ -5996,7 +5995,7 @@ private:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
-    case TypeReprKind::LifetimeDependentReturn:
+    case TypeReprKind::LifetimeDependent:
       return false;
     }
   }

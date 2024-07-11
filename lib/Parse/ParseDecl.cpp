@@ -9941,7 +9941,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   if (auto *lifetimeTyR =
-          dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(FuncRetTy)) {
+          dyn_cast_or_null<LifetimeDependentTypeRepr>(FuncRetTy)) {
     auto *base = lifetimeTyR->getBase();
 
     auto isOptionalSimpleUnqualifiedIdentifier = [](TypeRepr *typeRepr,

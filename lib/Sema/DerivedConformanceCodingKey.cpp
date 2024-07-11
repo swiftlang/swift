@@ -127,14 +127,13 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
 
   // init(rawValue:) decl
   auto *initDecl =
-    new (C) ConstructorDecl(name, SourceLoc(),
-                            /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
-                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            /*ThrownType=*/TypeLoc(),
-                            paramList,
-                            /*GenericParams=*/nullptr, parentDC,
-                            /*LifetimeDependentReturnTypeRepr*/ nullptr);
+      new (C) ConstructorDecl(name, SourceLoc(),
+                              /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                              /*ThrownType=*/TypeLoc(), paramList,
+                              /*GenericParams=*/nullptr, parentDC,
+                              /*LifetimeDependentTypeRepr*/ nullptr);
 
   initDecl->setImplicit();
 

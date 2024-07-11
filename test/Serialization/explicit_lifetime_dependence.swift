@@ -48,9 +48,8 @@ func testFakeOptional() {
   _ = FakeOptional<Int>(())
 }
 
-// CHECK: sil @$s32def_explicit_lifetime_dependence6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(0) @owned BufferView
-// CHECK: sil @$s32def_explicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView
-// CHECK: sil @$s32def_explicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(0) @owned BufferView
-// CHECK: sil @$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVADYls_ADYlstF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(0, 1) @owned BufferView
-
-// CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence6deriveyAA10BufferViewVYlsS_ADF : $@convention(thin) (@guaranteed BufferView) -> _scope(0)  @owned BufferView
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVYliS_ADnF : $@convention(thin) (@owned BufferView) -> _inherit(0)  @owned BufferView
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVYlsS_ADF : $@convention(thin) (@guaranteed BufferView) -> _scope(0)  @owned BufferView
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVYlsSS_AD_ADtF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(0, 1)  @owned BufferView
+// CHECK-LABEL: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACYlsUSU_SW_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1)  @owned BufferView

@@ -1072,7 +1072,7 @@ public:
 
   // Reads lifetime dependence info from type if present.
   std::optional<LifetimeDependenceInfo>
-  maybeReadLifetimeDependenceInfo(unsigned numParams);
+  maybeReadLifetimeDependence(unsigned numParams);
 
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeDependenceSpecifier(

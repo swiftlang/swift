@@ -2518,7 +2518,7 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // LifetimeDependenceInfoRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<std::optional<LifetimeDependenceInfo>>
+std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
 LifetimeDependenceInfoRequest::getCachedResult() const {
   auto *func = std::get<0>(getStorage());
 
@@ -2529,7 +2529,7 @@ LifetimeDependenceInfoRequest::getCachedResult() const {
 }
 
 void LifetimeDependenceInfoRequest::cacheResult(
-    std::optional<LifetimeDependenceInfo> result) const {
+    std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> result) const {
   auto *func = std::get<0>(getStorage());
   
   if (!result) {
