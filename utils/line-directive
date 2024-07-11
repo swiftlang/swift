@@ -340,7 +340,7 @@ def run():
     ... // Licensed under Apache License v2.0 with Runtime Library Exception
     ... //
     ... // See https://swift.org/LICENSE.txt for license information
-    ... // See https://swift.org/CONTRIBUTORS.txt for the list of Swift projec
+    ... // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project
     ... //
     ... //===-----------------------------------------------------------------
     ...
@@ -408,7 +408,7 @@ def run():
     ...     return _base.underestimatedCount
     ...   }
     ...
-    ...   /// Creates an instance with elements `transform(x)` for each elemen
+    ...   /// Creates an instance with elements `transform(x)` for each element
     ...   /// `x` of base.
     ...   @_inlineable
     ...   @_versioned
@@ -433,7 +433,7 @@ def run():
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
     ...
     ... /// A `Collection` whose elements consist of those in a `Base`
-    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// `Collection` passed through a transform function returning `Element`
     ... /// These elements are computed lazily, each time they're read, by
     ... /// calling the transform function on a base element.
     ... @_fixed_layout
@@ -471,7 +471,7 @@ def run():
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
     ...
     ... /// A `Collection` whose elements consist of those in a `Base`
-    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// `Collection` passed through a transform function returning `Element`
     ... /// These elements are computed lazily, each time they're read, by
     ... /// calling the transform function on a base element.
     ... @_fixed_layout
@@ -509,7 +509,7 @@ def run():
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
     ...
     ... /// A `Collection` whose elements consist of those in a `Base`
-    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// `Collection` passed through a transform function returning `Element`
     ... /// These elements are computed lazily, each time they're read, by
     ... /// calling the transform function on a base element.
     ... @_fixed_layout

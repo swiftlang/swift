@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
       desc("Dump the imported module after checking it imports just fine"),
       cat(Visible));
 
-  opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
+  opt<bool> Verbose("verbose", desc("Dump information on the loaded module"),
                     cat(Visible));
 
   opt<std::string> Filter("filter", desc("triple for filtering modules"),
