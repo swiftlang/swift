@@ -462,6 +462,9 @@ namespace swift {
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
 
+    /// Diagnose use of declarations that are soft-deprecated.
+    bool WarnSoftDeprecated = false;
+
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
 
