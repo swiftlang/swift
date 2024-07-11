@@ -177,11 +177,11 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
 
 static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
                                         const ValueDecl *VD) {
-  if (BaseTy->isExistentialType() && VD->isStatic() &&
-      !isExtensionWithSelfBound(
+  if (BaseTy->isExistentialType() && VD->isStatic()) {
+    return isExtensionWithSelfBound(
           dyn_cast<ExtensionDecl>(VD->getDeclContext()),
-          dyn_cast_or_null<ProtocolDecl>(BaseTy->getAnyNominal())))
-    return false;
+          dyn_cast_or_null<ProtocolDecl>(BaseTy->getAnyNominal()));
+  }
 
   // We can't leak type variables into another constraint system.
   // We can't do anything if the base type has unbound generic parameters.

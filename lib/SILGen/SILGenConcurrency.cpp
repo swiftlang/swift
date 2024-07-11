@@ -257,7 +257,7 @@ SILGenFunction::emitLoadOfGlobalActorShared(SILLocation loc, CanType actorType) 
   VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
   assert(sharedInstanceDecl && "no shared actor field in global actor");
   SubstitutionMap subs =
-    actorType->getContextSubstitutionMap(nominal);
+    actorType->getContextSubstitutionMap();
   Type instanceType =
     actorType->getTypeOfMember(sharedInstanceDecl);
 
