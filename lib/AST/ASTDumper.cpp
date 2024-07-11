@@ -3816,16 +3816,13 @@ public:
 
     auto genericParams = genericSig.getGenericParams();
     auto replacementTypes =
-    static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
+    static_cast<const SubstitutionMap &>(map).getReplacementTypes();
     for (unsigned i : indices(genericParams)) {
       if (style == SubstitutionMap::DumpStyle::Minimal) {
         printFieldRaw([&](raw_ostream &out) {
           genericParams[i]->print(out);
           out << " -> ";
-          if (replacementTypes[i])
-            out << replacementTypes[i];
-          else
-            out << "<unresolved concrete type>";
+          out << replacementTypes[i];
         }, "");
       } else {
         printRecArbitrary([&](StringRef label) {
@@ -3834,8 +3831,7 @@ public:
             genericParams[i]->print(out);
             out << " -> ";
           }, "");
-          if (replacementTypes[i])
-            printRec(replacementTypes[i]);
+          printRec(replacementTypes[i]);
           printFoot();
         });
       }

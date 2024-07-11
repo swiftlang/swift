@@ -325,9 +325,8 @@ bool ArrayAllocation::replaceAppendContentOf() {
       continue;
 
     SILType ArrayType = ArrayValue->getType();
-    auto *NTD = ArrayType.getASTType()->getAnyNominal();
     SubstitutionMap ArraySubMap = ArrayType.getASTType()
-      ->getContextSubstitutionMap(NTD);
+      ->getContextSubstitutionMap();
 
     AppendContentsOf.replaceByAppendingValues(AppendFn, ReserveFn,
                                               ElementValueVector,

@@ -1976,10 +1976,9 @@ void ASTMangler::appendRetroactiveConformances(Type type, GenericSignature sig) 
     if (type->hasUnboundGenericType())
       return;
 
-    auto nominal = type->getAnyNominal();
-    if (!nominal) return;
+    if (!type->getAnyNominal()) return;
 
-    subMap = type->getContextSubstitutionMap(nominal);
+    subMap = type->getContextSubstitutionMap();
   }
 
   appendRetroactiveConformances(subMap, sig);

@@ -4322,7 +4322,7 @@ public:
     if (isa<ProtocolType>(ty))
       return Action::Continue;
 
-    auto subs = ty->getContextSubstitutionMap(ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap();
     (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
@@ -4330,7 +4330,7 @@ public:
   Action visitBoundGenericType(BoundGenericType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    auto subs = ty->getContextSubstitutionMap(ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap();
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),
