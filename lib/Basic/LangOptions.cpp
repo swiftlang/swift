@@ -726,22 +726,23 @@ namespace {
         "-working-directory=",
         "-working-directory"};
 
-constexpr std::array<std::string_view, 15> knownClangDependencyIgnorablePrefiexes =
-     {"-I",
-      "-F",
-      "-fmodule-map-file=",
-      "-iquote",
-      "-idirafter",
-      "-iframeworkwithsysroot",
-      "-iframework",
-      "-iprefix",
-      "-iwithprefixbefore",
-      "-iwithprefix",
-      "-isystemafter",
-      "-isystem",
-      "-isysroot",
-      "-working-directory=",
-      "-working-directory"};
+  constexpr std::array<std::string_view, 16>
+      knownClangDependencyIgnorablePrefiexes = {"-I",
+                                                "-F",
+                                                "-fmodule-map-file=",
+                                                "-iquote",
+                                                "-idirafter",
+                                                "-iframeworkwithsysroot",
+                                                "-iframework",
+                                                "-iprefix",
+                                                "-iwithprefixbefore",
+                                                "-iwithprefix",
+                                                "-isystemafter",
+                                                "-isystem",
+                                                "-isysroot",
+                                                "-working-directory=",
+                                                "-working-directory",
+                                                "-D"};
 }
 
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
