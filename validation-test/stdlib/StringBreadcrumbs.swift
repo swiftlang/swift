@@ -88,7 +88,7 @@ StringBreadcrumbsTests.test("largeString") {
 // aligning
 StringBreadcrumbsTests.test("surrogates-heavy") {
 
-  // Mis-align the hieroglyphics by 1,2,3 UTF-8 and UTF-16 code units
+  // Misalign the hieroglyphics by 1,2,3 UTF-8 and UTF-16 code units
   validateBreadcrumbs(nonBMP)
   validateBreadcrumbs("a" + nonBMP)
   validateBreadcrumbs("ab" + nonBMP)

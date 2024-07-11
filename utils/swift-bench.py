@@ -56,7 +56,7 @@ BENCH_RE = re.compile(
     r"\s*\(\s*\)"       # argument list
     r"\s*->\s*Int\s*"   # return type
     r"({)?"             # opening brace of the function body
-    r"\s*$"             # whitespace ot the end of the line
+    r"\s*$"             # whitespace at the end of the line
 )
 
 

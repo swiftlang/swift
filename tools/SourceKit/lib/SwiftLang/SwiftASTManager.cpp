@@ -315,7 +315,7 @@ class ASTBuildOperation
   const std::vector<FileContent> FileContents;
 
   /// Guards \c DependencyStamps. This prevents reading from \c DependencyStamps
-  /// while it is being modified. It does not provide any ordering gurantees
+  /// while it is being modified. It does not provide any ordering guarantees
   /// that \c DependencyStamps have been computed in \c buildASTUnit before they
   /// are accessed in \c matchesSourceState but that's fine (see comment on
   /// \c DependencyStamps).
