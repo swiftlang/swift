@@ -5701,20 +5701,20 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 }
 
 // Clone attributes that have been imported from Clang.
-DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
-  auto attrs = DeclAttributes();
-  for (auto attr : decl->getAttrs()) {
+void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
+  ASTContext& context = fromDecl->getASTContext();
+  DeclAttributes& attrs = toDecl->getAttrs();
+  for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
     case DeclAttrKind::Available: {
       attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
       break;
     }
     case DeclAttrKind::Custom: {
-      if (CustomAttr *cAttr = cast<CustomAttr>(attr)) {
-        attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                                     cAttr->getInitContext(), cAttr->getArgs(),
-                                     true));
-      }
+      CustomAttr *cAttr = cast<CustomAttr>(attr);
+      attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
+                                   cAttr->getInitContext(), cAttr->getArgs(),
+                                   true));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
@@ -5741,8 +5741,6 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
       break;
     }
   }
-
-  return attrs;
 }
 
 static ValueDecl *
@@ -5772,8 +5770,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
         fn->getThrownInterfaceType(),
         fn->getGenericParams(), fn->getParameters(),
         fn->getResultInterfaceType(), newContext);
-    auto inheritedAttributes = cloneImportedAttributes(decl, context);
-    out->getAttrs().add(inheritedAttributes);
+    cloneImportedAttributes(decl, out);
     out->copyFormalAccessFrom(fn);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());

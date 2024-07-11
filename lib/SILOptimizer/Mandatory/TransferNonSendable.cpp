@@ -111,7 +111,7 @@ getTransferringApplyCalleeInfo(SILInstruction *inst) {
     return {};
 
   auto *decl = declRef->getDecl();
-  if (!decl->hasName())
+  if (!decl || !decl->hasName())
     return {};
 
   return {{decl->getDescriptiveKind(), decl->getName()}};
@@ -157,6 +157,23 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
 //===----------------------------------------------------------------------===//
 //                             MARK: Diagnostics
 //===----------------------------------------------------------------------===//
+
+/// Emit the "unknown pattern error" at the SILLocation of \p inst.
+static void diagnoseUnknownPatternError(SILInstruction *inst) {
+  if (shouldAbortOnUnknownPatternMatchError()) {
+    llvm::report_fatal_error(
+        "RegionIsolation: Aborting on unknown pattern match error");
+  }
+
+  auto &ctx = inst->getFunction()->getASTContext();
+  auto loc = inst->getLoc().getSourceLoc();
+
+  ctx.Diags.diagnose(loc, diag::regionbasedisolation_unknown_pattern);
+}
+
+static void diagnoseUnknownPatternError(Operand *op) {
+  diagnoseUnknownPatternError(op->getUser());
+}
 
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnoseError(ASTContext &context, SourceLoc loc,
@@ -732,14 +749,7 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(transferOp->getUser(),
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseUnknownPatternError(transferOp->getUser());
   }
 
 private:
@@ -1160,12 +1170,7 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // tells the user to file a bug. This importantly ensures that we can
     // guarantee that we always find the require if we successfully compile.
     if (!didEmitRequireNote) {
-      if (shouldAbortOnUnknownPatternMatchError()) {
-        llvm::report_fatal_error(
-            "RegionIsolation: Aborting on unknown pattern match error");
-      }
-
-      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
+      diagnoseUnknownPatternError(transferOp);
       continue;
     }
 
@@ -1217,20 +1222,17 @@ public:
     return getTransferringApplyCalleeInfo(info.transferredOperand->getUser());
   }
 
+  SILLocation getLoc() const {
+    return info.transferredOperand->getUser()->getLoc();
+  }
+
   /// Return the isolation region info for \p getNonTransferrableValue().
   SILDynamicMergedIsolationInfo getIsolationRegionInfo() const {
     return info.isolationRegionInfo;
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(getOperand()->getUser(),
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseUnknownPatternError(getOperand()->getUser());
   }
 
   void emitUnknownUse(SILLocation loc) {
@@ -1289,6 +1291,24 @@ public:
     diagnoseError(loc, diag::regionbasedisolation_named_transfer_yields_race,
                   name)
         .highlight(getOperand()->getUser()->getLoc().getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+  }
+
+  void emitNamedAsyncLetCapture(SILLocation loc, Identifier name,
+                                SILIsolationInfo transferredValueIsolation) {
+    assert(!getIsolationRegionInfo().isDisconnected() &&
+           "Should never be disconnected?!");
+    emitNamedOnlyError(loc, name);
+
+    SmallString<64> descriptiveKindStr;
+    {
+      llvm::raw_svector_ostream os(descriptiveKindStr);
+      getIsolationRegionInfo().printForDiagnostics(os);
+    }
+
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_transfer_nt_asynclet_capture,
+                 name, descriptiveKindStr)
         .limitBehaviorIf(getBehaviorLimit());
   }
 
@@ -1402,6 +1422,8 @@ private:
 };
 
 class TransferNonTransferrableDiagnosticInferrer {
+  struct AutoClosureWalker;
+
   TransferNonTransferrableDiagnosticEmitter diagnosticEmitter;
 
 public:
@@ -1453,6 +1475,74 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
 
   return false;
 }
+
+/// This walker visits an AutoClosureExpr and looks for uses of a specific
+/// captured value. We want to error on the uses in the autoclosure.
+struct TransferNonTransferrableDiagnosticInferrer::AutoClosureWalker
+    : ASTWalker {
+  TransferNonTransferrableDiagnosticEmitter &foundTypeInfo;
+  ValueDecl *targetDecl;
+  SILIsolationInfo targetDeclIsolationInfo;
+  SmallPtrSet<Expr *, 8> visitedCallExprDeclRefExprs;
+  SILLocation captureLoc;
+  bool isAsyncLet;
+
+  AutoClosureWalker(TransferNonTransferrableDiagnosticEmitter &foundTypeInfo,
+                    ValueDecl *targetDecl,
+                    SILIsolationInfo targetDeclIsolationInfo,
+                    SILLocation captureLoc, bool isAsyncLet)
+      : foundTypeInfo(foundTypeInfo), targetDecl(targetDecl),
+        targetDeclIsolationInfo(targetDeclIsolationInfo),
+        captureLoc(captureLoc), isAsyncLet(isAsyncLet) {}
+
+  Expr *lookThroughArgExpr(Expr *expr) {
+    while (true) {
+      if (auto *memberRefExpr = dyn_cast<MemberRefExpr>(expr)) {
+        expr = memberRefExpr->getBase();
+        continue;
+      }
+
+      if (auto *cvt = dyn_cast<ImplicitConversionExpr>(expr)) {
+        expr = cvt->getSubExpr();
+        continue;
+      }
+
+      if (auto *e = dyn_cast<ForceValueExpr>(expr)) {
+        expr = e->getSubExpr();
+        continue;
+      }
+
+      if (auto *t = dyn_cast<TupleElementExpr>(expr)) {
+        expr = t->getBase();
+        continue;
+      }
+
+      return expr;
+    }
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+      // If this decl ref expr was not visited as part of a callExpr and is our
+      // target decl... emit a simple async let error.
+      //
+      // This occurs if we do:
+      //
+      // ```
+      // let x = ...
+      // async let y = x
+      // ```
+      if (declRef->getDecl() == targetDecl) {
+        foundTypeInfo.emitNamedAsyncLetCapture(captureLoc,
+                                               targetDecl->getBaseIdentifier(),
+                                               targetDeclIsolationInfo);
+        return Action::Continue(expr);
+      }
+    }
+
+    return Action::Continue(expr);
+  }
+};
 
 bool TransferNonTransferrableDiagnosticInferrer::run() {
   // We need to find the isolation info.
@@ -1570,6 +1660,26 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     }
   }
 
+  // If we are failing due to an autoclosure... see if we can find the captured
+  // value that is causing the issue.
+  if (auto *autoClosureExpr = loc.getAsASTNode<AutoClosureExpr>()) {
+    // To split up this work, we only do this for async let for now.
+    if (autoClosureExpr->getThunkKind() == AutoClosureExpr::Kind::AsyncLet) {
+      auto *i = op->getUser();
+      auto pai = ApplySite::isa(i);
+      unsigned captureIndex = pai.getAppliedArgIndex(*op);
+      auto captureInfo =
+          autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
+      auto loc = RegularLocation(captureInfo.getLoc(), false /*implicit*/);
+      AutoClosureWalker walker(
+          diagnosticEmitter, captureInfo.getDecl(),
+          diagnosticEmitter.getIsolationRegionInfo().getIsolationInfo(), loc,
+          autoClosureExpr->getThunkKind() == AutoClosureExpr::Kind::AsyncLet);
+      autoClosureExpr->walk(walker);
+      return true;
+    }
+  }
+
   diagnosticEmitter.emitUnknownUse(loc);
   return true;
 }
@@ -1615,14 +1725,7 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(info.functionExitingInst,
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    diagnoseUnknownPatternError(info.functionExitingInst);
   }
 
   void emit();
@@ -1882,13 +1985,7 @@ struct DiagnosticEvaluator final
   }
 
   void handleUnknownCodePattern(const PartitionOp &op) const {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(op.getSourceInst(),
-                  diag::regionbasedisolation_unknown_pattern);
+    diagnoseUnknownPatternError(op.getSourceInst());
   }
 
   bool isActorDerived(Element element) const {

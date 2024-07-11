@@ -402,6 +402,38 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
   auto mangledName = extension->getMangledExtendedContext();
+  
+  // A extension of the form `extension Protocol where Self == ConcreteType`
+  // is formally a protocol extension, so the formal generic parameter list
+  // is `<Self>`, but because of the same type constraint, the extended context
+  // looks like a reference to that nominal type. We want to match the
+  // extension's formal generic environment rather than the nominal type's
+  // in this case, so we should skip out on this case.
+  //
+  // We can detect this by looking at whether the generic context of the
+  // extension has a first generic parameter, which would be the Self parameter,
+  // with a same type constraint matching the extended type.
+  for (auto &reqt : extension->getGenericRequirements()) {
+    if (reqt.getKind() != GenericRequirementKind::SameType) {
+      continue;
+    }
+    // 'x' is the mangling of the first generic parameter
+    if (!reqt.getParam().equals("x")) {
+      continue;
+    }
+    // Is the generic parameter same-type-constrained to the same type
+    // we're extending? Then this is a `Self == ExtendedType` constraint.
+    // This is impossible for normal generic nominal type extensions because
+    // that would mean that you had:
+    //   struct Foo<T> {...}
+    //   extension Foo where T == Foo<T> {...}
+    // which would mean that the extended type is the infinite expansion
+    // Foo<Foo<Foo<Foo<...>>>>, which we don't allow.
+    if (reqt.getMangledTypeName().data() == mangledName.data()) {
+      return nullptr;
+    }
+  }
+  
   node = demangler.demangleType(mangledName,
                                 ResolveAsSymbolicReference(demangler));
   if (!node)
@@ -1254,7 +1286,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
   (void)_gatherGenericParameterCounts(context,
                                       genericParamCounts, demangler);
   unsigned numTotalGenericParams =
-    genericParamCounts.empty() ? 0 : genericParamCounts.back();
+    genericParamCounts.empty() ? context->getNumGenericParams()
+                               : genericParamCounts.back();
   
   // Check whether we have the right number of generic arguments.
   if (genericArgs.size() == getLocalGenericParams(context).size()) {

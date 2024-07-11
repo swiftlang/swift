@@ -4929,7 +4929,7 @@ namespace {
     }
 
     SubstitutionMap genericSubstitutions() {
-      return type->getContextSubstitutionMap(type->getAnyNominal());
+      return type->getContextSubstitutionMap();
     }
 
     MetadataTrailingFlags getTrailingFlags() {

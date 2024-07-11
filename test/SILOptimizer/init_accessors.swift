@@ -185,7 +185,7 @@ struct TestNoInitAndInit {
 
   var pointX: Int {
     @storageRestrictions(accesses: x)
-    init(initalValue) {
+    init(initialValue) {
     }
 
     get { x }

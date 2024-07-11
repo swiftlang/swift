@@ -677,6 +677,96 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   return ErrorType::get(this);
 }
 
+SubstitutionMap TypeBase::getContextSubstitutionMap() {
+  // Fast path.
+  auto *nominalTy = castTo<NominalOrBoundGenericNominalType>();
+  if (nominalTy->ContextSubMap)
+    return nominalTy->ContextSubMap;
+
+  auto nominal = nominalTy->getDecl();
+  auto genericSig = nominal->getGenericSignature();
+  if (!genericSig)
+    return SubstitutionMap();
+
+  Type baseTy(this);
+
+  assert(!baseTy->hasLValueType() &&
+         !baseTy->is<AnyMetatypeType>() &&
+         !baseTy->is<ErrorType>());
+
+  // The resulting set of substitutions. Always use this to ensure we
+  // don't miss out on NRVO anywhere.
+  SmallVector<Type, 4> replacementTypes;
+
+  // Gather all of the substitutions for all levels of generic arguments.
+  auto params = genericSig.getGenericParams();
+  bool first = true;
+
+  while (baseTy) {
+    // For a bound generic type, gather the generic parameter -> generic
+    // argument substitutions.
+    if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
+      auto args = boundGeneric->getGenericArgs();
+      for (auto arg : llvm::reverse(args)) {
+        replacementTypes.push_back(arg);
+      }
+
+      // Continue looking into the parent.
+      baseTy = boundGeneric->getParent();
+      first = false;
+      continue;
+    }
+
+    // For an unbound generic type, fill in error types.
+    if (auto unboundGeneric = baseTy->getAs<UnboundGenericType>()) {
+      auto &ctx = getASTContext();
+      auto decl = unboundGeneric->getDecl();
+      for (auto *paramDecl : decl->getGenericParams()->getParams()) {
+        replacementTypes.push_back(ErrorType::get(ctx));
+        (void) paramDecl;
+      }
+      baseTy = unboundGeneric->getParent();
+      first = false;
+      continue;
+    }
+
+    // This case indicates we have invalid nesting of types.
+    if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
+      if (!first)
+        break;
+
+      replacementTypes.push_back(getASTContext().TheErrorType);
+      break;
+    }
+
+    // Continue looking into the parent.
+    if (auto nominalTy = baseTy->getAs<NominalType>()) {
+      baseTy = nominalTy->getParent();
+      first = false;
+      continue;
+    }
+
+    abort();
+  }
+
+  ASSERT(replacementTypes.size() <= params.size());
+
+  // Add any outer generic parameters from the local context.
+  while (replacementTypes.size() < params.size()) {
+    replacementTypes.push_back(getASTContext().TheErrorType);
+  }
+
+  std::reverse(replacementTypes.begin(), replacementTypes.end());
+
+  auto subMap = SubstitutionMap::get(
+    genericSig,
+    QueryReplacementTypeArray{genericSig, replacementTypes},
+    LookUpConformanceInModule());
+
+  nominalTy->ContextSubMap = subMap;
+  return subMap;
+}
+
 TypeSubstitutionMap
 TypeBase::getContextSubstitutions(const DeclContext *dc,
                                   GenericEnvironment *genericEnv) {
@@ -808,6 +898,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     const DeclContext *dc,
     GenericEnvironment *genericEnv) {
+  if (dc == getAnyNominal() && genericEnv == nullptr)
+    return getContextSubstitutionMap();
+
   auto genericSig = dc->getGenericSignatureOfContext();
   if (genericSig.isNull())
     return SubstitutionMap();

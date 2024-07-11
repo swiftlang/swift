@@ -155,8 +155,9 @@ if ($PinnedBuild -eq "") {
       $PinnedVersion = "5.10.1"
     }
     "ARM64" {
-      # TODO(hjyamauchi) once we have an arm64 release, fill in PinnedBuild and PinnedSHA256.
-      throw "Missing pinned toolchain for ARM64"
+      $PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
+      $PinnedSHA256 = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
+      $PinnedVersion = "0.0.0"
     }
     default { throw "Unsupported processor architecture" }
   }
@@ -1669,7 +1670,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation `
+      -Src $SourceCache\swift-corelibs-foundation-windows `
       -Bin $FoundationBinaryCache `
       -InstallTo $InstallPath `
       -Arch $Arch `

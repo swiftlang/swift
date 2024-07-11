@@ -249,7 +249,7 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
                                       unsigned depth) {
   startExpandingType(type);
 
-  auto subMap = type->getContextSubstitutionMap(S);
+  auto subMap = type->getContextSubstitutionMap();
 
   for (auto field: S->getStoredProperties()) {
     auto fieldType =field->getValueInterfaceType().subst(subMap);
@@ -272,7 +272,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
 
   startExpandingType(type);
 
-  auto subMap = type->getContextSubstitutionMap(E);
+  auto subMap = type->getContextSubstitutionMap();
 
   for (auto elt: E->getAllElements()) {
     // Indirect elements are representational leaves.

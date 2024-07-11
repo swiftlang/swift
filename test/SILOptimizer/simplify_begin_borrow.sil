@@ -341,10 +341,10 @@ bb0(%0 : @owned $C):
   return %0 : $C
 }
 
-// CHECK-LABEL: sil [ossa] @dont_replace_copy_in_differnt_bb :
+// CHECK-LABEL: sil [ossa] @dont_replace_copy_in_different_bb :
 // CHECK:         begin_borrow
-// CHECK:       } // end sil function 'dont_replace_copy_in_differnt_bb'
-sil [ossa] @dont_replace_copy_in_differnt_bb : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       } // end sil function 'dont_replace_copy_in_different_bb'
+sil [ossa] @dont_replace_copy_in_different_bb : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : @owned $C):
   %1 = begin_borrow %0 : $C
   cond_br undef, bb1, bb2

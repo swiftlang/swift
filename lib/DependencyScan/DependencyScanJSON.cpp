@@ -243,6 +243,49 @@ void writeLinkLibraries(llvm::raw_ostream &out,
   out << "\n";
 }
 
+static void
+writeMacroDependencies(llvm::raw_ostream &out,
+                       const swiftscan_macro_dependency_set_t *macro_deps,
+                       unsigned indentLevel, bool trailingComma) {
+  if (macro_deps->count == 0)
+    return;
+
+  out.indent(indentLevel * 2);
+  out << "\"macroDependencies\": ";
+  out << "[\n";
+  for (size_t i = 0; i < macro_deps->count; ++i) {
+    const auto &macroInfo = *macro_deps->macro_dependencies[i];
+    out.indent((indentLevel + 1) * 2);
+    out << "{\n";
+    auto entryIndentLevel = ((indentLevel + 2) * 2);
+    out.indent(entryIndentLevel);
+    out << "\"moduleName\": ";
+    writeJSONValue(out, macroInfo.moduleName, indentLevel);
+    out << ",\n";
+    out.indent(entryIndentLevel);
+    out << "\"libraryPath\": ";
+    writeJSONValue(out, macroInfo.libraryPath, entryIndentLevel);
+    out << ",\n";
+    out.indent(entryIndentLevel);
+    out << "\"executablePath\": ";
+    writeJSONValue(out, macroInfo.executablePath, entryIndentLevel);
+    out << "\n";
+    out.indent((indentLevel + 1) * 2);
+    out << "}";
+    if (i != macro_deps->count - 1) {
+      out << ",";
+    }
+    out << "\n";
+  }
+
+  out.indent(indentLevel * 2);
+  out << "]";
+
+  if (trailingComma)
+    out << ",";
+  out << "\n";
+}
+
 static const swiftscan_swift_textual_details_t *
 getAsTextualDependencyModule(swiftscan_module_details_t details) {
   if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL)
@@ -413,6 +456,8 @@ void writeJSON(llvm::raw_ostream &out,
                              swiftTextualDeps->module_cache_key, 5,
                              /*trailingComma=*/true);
       }
+      writeMacroDependencies(out, swiftTextualDeps->macro_dependencies, 5,
+                             /*trailingComma=*/true);
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
                            5, commaAfterFramework);
       if (swiftTextualDeps->extra_pcm_args->count != 0) {

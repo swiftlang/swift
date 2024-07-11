@@ -30,7 +30,8 @@
 // CHECK-NEXT:   mutating func swiftRenamed(input i: Int32) -> Int32
 // CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
 // CHECK-NEXT:   mutating func renamed(_ i: Int32) -> Int32
-// CHECK-NEXT:   @_effects(readonly) func pure()
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   @_effects(readonly) func pure() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func sameMethodNameSameSignature() -> Int32
 // CHECK-NEXT:   @discardableResult
@@ -65,7 +66,8 @@
 // CHECK-NEXT:   mutating func swiftRenamed(input i: Int32) -> Int32
 // CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
 // CHECK-NEXT:   mutating func renamed(_ i: Int32) -> Int32
-// CHECK-NEXT:   @_effects(readonly) func pure()
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   @_effects(readonly) func pure() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func sameMethodDifferentSignature() -> Int32
 // CHECK-NEXT:   @discardableResult
@@ -96,7 +98,8 @@
 // CHECK-NEXT:   mutating func swiftRenamed(input i: Int32) -> Int32
 // CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
 // CHECK-NEXT:   mutating func renamed(_ i: Int32) -> Int32
-// CHECK-NEXT:   @_effects(readonly) func pure()
+// CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   @_effects(readonly) func pure() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func sameMethodDifferentSignature() -> Int32
 // CHECK-NEXT:   @discardableResult

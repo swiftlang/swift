@@ -34,7 +34,7 @@ func test3<MyGeneric: MyProto>() {
       #^GENERICEXPR^#
 // GENERICEXPR: Decl[GenericTypeParam]/Local:       MyGeneric[#MyGeneric#]; name=MyGeneric
 // GENERICEXPR: Decl[Constructor]/Local:            MyGeneric({#value: String#})[#MyProto#]; name=MyGeneric(value:)
-// GENERICEXPR: Decl[Constructor]/Local:            MyGeneric({#arg: String#})[#MyStruct#]; name=MyGeneric(arg:)
+// GENERICEXPR: Decl[Constructor]/Local:            MyGeneric({#arg: String#})[#MyProto#]; name=MyGeneric(arg:)
     }
   }
 }

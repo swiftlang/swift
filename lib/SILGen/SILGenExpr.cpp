@@ -6355,7 +6355,7 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   auto firstSubMap =
-      accessInfo.ArrayType->getContextSubstitutionMap(ctx.getArrayDecl());
+      accessInfo.ArrayType->getContextSubstitutionMap();
   auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
       getPointerProtocol());
 

@@ -9,7 +9,9 @@ public class NonSendableKlass {}
 // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
 // CHECK-NEXT: public func transferArgTest(_ x: sending test.NonSendableKlass)
 // CHECK-NEXT: #else
-// CHECK-NEXT: public func transferArgTest(_ x: test.NonSendableKlass)
+// When we suppress, we preserve +1 by marking the parameter as __owned. Otherwise, we
+// be breaking ABI.
+// CHECK-NEXT: public func transferArgTest(_ x: __owned test.NonSendableKlass)
 // CHECK-NEXT: #endif
 public func transferArgTest(_ x: sending NonSendableKlass) {}
 
@@ -23,14 +25,14 @@ public func transferResultTest() -> sending NonSendableKlass { fatalError() }
 // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
 // CHECK-NEXT: public func transferArgAndResultTest(_ x: test.NonSendableKlass, _ y: sending test.NonSendableKlass, _ z: test.NonSendableKlass) -> sending test.NonSendableKlass
 // CHECK-NEXT: #else
-// CHECK-NEXT: public func transferArgAndResultTest(_ x: test.NonSendableKlass, _ y: test.NonSendableKlass, _ z: test.NonSendableKlass) -> test.NonSendableKlass
+// CHECK-NEXT: public func transferArgAndResultTest(_ x: test.NonSendableKlass, _ y: __owned test.NonSendableKlass, _ z: test.NonSendableKlass) -> test.NonSendableKlass
 // CHECK-NEXT: #endif
 public func transferArgAndResultTest(_ x: NonSendableKlass, _ y: sending NonSendableKlass, _ z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
 
 // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
 // CHECK-NEXT: public func argEmbeddedInType(_ fn: (sending test.NonSendableKlass) -> ())
 // CHECK-NEXT: #else
-// CHECK-NEXT: public func argEmbeddedInType(_ fn: (test.NonSendableKlass) -> ())
+// CHECK-NEXT: public func argEmbeddedInType(_ fn: (__owned test.NonSendableKlass) -> ())
 // CHECK-NEXT: #endif
 public func argEmbeddedInType(_ fn: (sending NonSendableKlass) -> ()) {}
 
@@ -44,7 +46,7 @@ public func resultEmbeddedInType(_ fn: () -> sending NonSendableKlass) {}
 // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
 // CHECK-NEXT: public func argAndResultEmbeddedInType(_ fn: (test.NonSendableKlass, sending test.NonSendableKlass, test.NonSendableKlass) -> sending test.NonSendableKlass)
 // CHECK-NEXT: #else
-// CHECK-NEXT: public func argAndResultEmbeddedInType(_ fn: (test.NonSendableKlass, test.NonSendableKlass, test.NonSendableKlass) -> test.NonSendableKlass)
+// CHECK-NEXT: public func argAndResultEmbeddedInType(_ fn: (test.NonSendableKlass, __owned test.NonSendableKlass, test.NonSendableKlass) -> test.NonSendableKlass)
 // CHECK-NEXT: #endif
 public func argAndResultEmbeddedInType(_ fn: (NonSendableKlass, sending NonSendableKlass, NonSendableKlass) -> sending NonSendableKlass) {}
 
@@ -52,7 +54,7 @@ public class TestInKlass {
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public func testKlassArg(_ x: sending test.NonSendableKlass)
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public func testKlassArg(_ x: test.NonSendableKlass)
+  // CHECK-NEXT: public func testKlassArg(_ x: __owned test.NonSendableKlass)
   // CHECK-NEXT: #endif
   public func testKlassArg(_ x: sending NonSendableKlass) { fatalError() }
 
@@ -66,7 +68,7 @@ public class TestInKlass {
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: sending test.NonSendableKlass, z: test.NonSendableKlass) -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
+  // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: __owned test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   public func testKlassArgAndResult(_ x: NonSendableKlass, _ y: sending NonSendableKlass, z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
 }
@@ -75,7 +77,7 @@ public struct TestInStruct {
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public func testKlassArg(_ x: sending test.NonSendableKlass)
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public func testKlassArg(_ x: test.NonSendableKlass)
+  // CHECK-NEXT: public func testKlassArg(_ x: __owned test.NonSendableKlass)
   // CHECK-NEXT: #endif
   public func testKlassArg(_ x: sending NonSendableKlass) { fatalError() }
 
@@ -89,7 +91,7 @@ public struct TestInStruct {
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: sending test.NonSendableKlass, z: test.NonSendableKlass) -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
+  // CHECK-NEXT: public func testKlassArgAndResult(_ x: test.NonSendableKlass, _ y: __owned test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   public func testKlassArgAndResult(_ x: NonSendableKlass, _ y: sending NonSendableKlass, z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
 
@@ -112,7 +114,7 @@ public struct TestInStruct {
   // CHECK-NEXT: internal func testUsableFromInlineKlassArg(_ x: sending test.NonSendableKlass)
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal func testUsableFromInlineKlassArg(_ x: test.NonSendableKlass)
+  // CHECK-NEXT: internal func testUsableFromInlineKlassArg(_ x: __owned test.NonSendableKlass)
   // CHECK-NEXT: #endif
   @usableFromInline func testUsableFromInlineKlassArg(_ x: sending NonSendableKlass) { fatalError() }
 
@@ -131,7 +133,7 @@ public struct TestInStruct {
   // CHECK-NEXT: internal func testUsableFromInlineKlassArgAndResult(_ x: test.NonSendableKlass, _ y: sending test.NonSendableKlass, z: test.NonSendableKlass) -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal func testUsableFromInlineKlassArgAndResult(_ x: test.NonSendableKlass, _ y: test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
+  // CHECK-NEXT: internal func testUsableFromInlineKlassArgAndResult(_ x: test.NonSendableKlass, _ y: __owned test.NonSendableKlass, z: test.NonSendableKlass) -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   @usableFromInline
   func testUsableFromInlineKlassArgAndResult(_ x: NonSendableKlass, _ y: sending NonSendableKlass, z: NonSendableKlass) -> sending NonSendableKlass { fatalError() }
@@ -159,7 +161,7 @@ public struct TestInStruct {
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public var publicVarFieldFunctionArg: (sending test.NonSendableKlass) -> ()
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public var publicVarFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: public var publicVarFieldFunctionArg: (__owned test.NonSendableKlass) -> ()
   // CHECK-NEXT: #endif
   public var publicVarFieldFunctionArg: (sending NonSendableKlass) -> ()
 
@@ -168,7 +170,7 @@ public struct TestInStruct {
   // CHECK-NEXT: internal var internalVarFieldFunctionArg: (sending test.NonSendableKlass) -> ()
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal var internalVarFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: internal var internalVarFieldFunctionArg: (__owned test.NonSendableKlass) -> ()
   // CHECK-NEXT: #endif
   @usableFromInline
   var internalVarFieldFunctionArg: (sending NonSendableKlass) -> ()
@@ -176,7 +178,7 @@ public struct TestInStruct {
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public let publicLetFieldFunctionArg: (sending test.NonSendableKlass) -> ()
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public let publicLetFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: public let publicLetFieldFunctionArg: (__owned test.NonSendableKlass) -> ()
   // CHECK-NEXT: #endif
   public let publicLetFieldFunctionArg: (sending NonSendableKlass) -> ()
 
@@ -185,7 +187,7 @@ public struct TestInStruct {
   // CHECK-NEXT: internal let internalLetFieldFunctionArg: (sending test.NonSendableKlass) -> ()
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal let internalLetFieldFunctionArg: (test.NonSendableKlass) -> ()
+  // CHECK-NEXT: internal let internalLetFieldFunctionArg: (__owned test.NonSendableKlass) -> ()
   // CHECK-NEXT: #endif
   @usableFromInline
   let internalLetFieldFunctionArg: (sending NonSendableKlass) -> ()
@@ -204,8 +206,7 @@ public struct TestInStruct {
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
 // to make sure we do not fail if we fail to parse sending in the if block.
 
-// CHECK-LABEL: #if compiler(>=5.3) && $OptionalIsolatedParameters && $ExpressionMacroDefaultArguments // Suppression Count: 24
-// CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
+// CHECK: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 24
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> sending T {
 // CHECK-NEXT:   fatalError()
 // CHECK-NEXT: }
@@ -213,7 +214,6 @@ public struct TestInStruct {
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> T {
 // CHECK-NEXT:   fatalError()
 // CHECK-NEXT: }
-// CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 @inlinable public func withCheckedContinuation<T>(
   isolation: isolated (any _Concurrency.Actor)? = #isolation,
@@ -223,19 +223,19 @@ public struct TestInStruct {
   fatalError()
 }
 
-// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 26
+// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
 // CHECK-NEXT: public var publicGlobal: (sending test.NonSendableKlass) -> ()
 // CHECK-NEXT: #else
-// CHECK-NEXT: public var publicGlobal: (test.NonSendableKlass) -> ()
+// CHECK-NEXT: public var publicGlobal: (__owned test.NonSendableKlass) -> ()
 // CHECK-NEXT: #endif
 public var publicGlobal: (sending NonSendableKlass) -> () = { x in fatalError() }
 
-// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 27
+// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 26
 // CHECK-NEXT: @usableFromInline
 // CHECK-NEXT: internal var usableFromInlineGlobal: (sending test.NonSendableKlass) -> ()
 // CHECK-NEXT: #else
 // CHECK-NEXT: @usableFromInline
-// CHECK-NEXT: internal var usableFromInlineGlobal: (test.NonSendableKlass) -> ()
+// CHECK-NEXT: internal var usableFromInlineGlobal: (__owned test.NonSendableKlass) -> ()
 // CHECK-NEXT: #endif
 @usableFromInline
 internal var usableFromInlineGlobal: (sending NonSendableKlass) -> () = { x in fatalError() }

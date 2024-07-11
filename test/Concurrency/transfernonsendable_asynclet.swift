@@ -18,7 +18,11 @@ class NonSendableKlass {
 
 class SendableKlass : @unchecked Sendable {}
 
-actor Actor {
+struct NonSendableStruct { // expected-note {{}}
+  var ns = NonSendableKlass()
+}
+
+actor MyActor {
   var klass = NonSendableKlass()
   final var finalKlass = NonSendableKlass()
 
@@ -28,7 +32,7 @@ actor Actor {
   func useNonSendableFunction(_: () -> Void) {}
 }
 
-final actor FinalActor {
+final actor FinalMyActor {
   var klass = NonSendableKlass()
   func useKlass(_ x: NonSendableKlass) {}
 }
@@ -44,6 +48,13 @@ func useInOut<T>(_ x: inout T) {}
 @discardableResult
 func useValue<T>(_ x: T) -> T { x }
 func useValueWrapInOptional<T>(_ x: T) -> T? { x }
+
+func useValueNoReturnWithInstance<T, V : Actor>(_ x: T, _ y: V) -> () { fatalError() }
+func useValueAsyncNoReturnWithInstance<T, V : Actor>(_ x: T, _ y: V) async -> () { fatalError() }
+@MainActor
+func useMainActorValueAsyncNoReturn<T>(_ x: T) async -> () { fatalError() }
+@MainActor
+func useMainActorValueNoReturn<T>(_ x: T) -> () { fatalError() }
 
 @MainActor func returnValueFromMain<T>() async -> T { fatalError() }
 @MainActor func transferToMain<T>(_ t: T) async {}
@@ -720,11 +731,50 @@ func asyncLetWithoutCapture() async {
 }
 
 func asyncLet_Let_ActorIsolated_Method() async {
-  let a = Actor()
+  let a = MyActor()
   let x = NonSendableKlass()
   async let y = a.useKlass(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
 
   useValue(x) // expected-note {{access can happen concurrently}}
   let _ = await y
+}
+
+extension NonSendableStruct {
+  func asyncLetInferAsNonIsolated<T : Actor>(
+    isolation actor: isolated T
+  ) async throws {
+    async let subTask: Void = {
+      await useValueAsyncNoReturnWithInstance(self, actor)
+      // expected-warning @-1:47 {{sending 'self' risks causing data races}}
+      // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
+    }()
+    await subTask
+
+    async let subTask2: () = await useValueAsyncNoReturnWithInstance(self, actor)
+    // expected-warning @-1 {{sending 'self' risks causing data races}}
+    // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
+    await subTask2
+
+    async let subTask3: () = useValueNoReturnWithInstance(self, actor)
+    // expected-warning @-1 {{sending 'self' risks causing data races}}
+    // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
+    await subTask3
+
+    async let subTask4: () = await useMainActorValueAsyncNoReturn(self)
+    // expected-warning @-1 {{sending 'self' risks causing data races}}
+    // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
+    await subTask4
+
+    async let subTask5: () = useMainActorValueNoReturn(self)
+    // expected-warning @-1 {{sending 'self' risks causing data races}}
+    // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
+    await subTask5
+
+    async let subTask6: NonSendableStruct = self
+    // expected-warning @-1 {{sending 'self' risks causing data races}}
+    // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
+    // expected-warning @-3 {{non-sendable type 'NonSendableStruct' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
+    _ = await subTask6
+  }
 }

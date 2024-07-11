@@ -392,7 +392,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : 
 // CHECK: %[[CONVERTED:[0-9]+]] = thin_to_thick_function %[[FR]] : $@convention(thin) () -> () to $@callee_owned () -> ()
 // CHECK-NOT: partial_apply
 // CHECK: apply %[[CALLEE]](%[[CONVERTED]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-// CHECL-NOT: partial_apply
+// CHECK-NOT: partial_apply
 // CHECK: return
 sil @test_generic_capture_propagation2_caller : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 0

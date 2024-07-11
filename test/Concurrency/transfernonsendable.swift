@@ -18,6 +18,7 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   // expected-typechecker-only-note @-1 3{{}}
   // expected-tns-note @-2 {{}}
   var field: NonSendableKlass? = nil
+  var boolean: Bool = false
 
   init() {}
   init(_ x: NonSendableKlass) {
@@ -1331,9 +1332,9 @@ func varSendableNonTrivialLetTupleFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(Int, SendableKlass, NonSendableKlass)' into main actor-isolated context may introduce data races}}
-  let z = test.1 // expected-tns-note {{access can happen concurrently}}
+  let z = test.1
   useValue(z)
-  useValue(test)
+  useValue(test) // expected-tns-note {{access can happen concurrently}}
 }
 
 func varNonSendableNonTrivialLetTupleFieldTest() async {
@@ -1822,4 +1823,15 @@ func testThatGlobalActorTakesPrecedenceOverActorIsolationOnMethods() async {
 
   // Meaning we would get an error here.
   Task { @MainActor in print(ns) }
+}
+
+// Shouldn't get any errors from x.
+//
+// We used to look through the access to x.boolean and think that the closure
+// was capturing x instead of y.
+func testBooleanCapture(_ x: inout NonSendableKlass) {
+  let y = x.boolean
+  Task.detached { @MainActor [z = y] in
+    print(z)
+  }
 }

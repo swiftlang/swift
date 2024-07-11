@@ -1102,9 +1102,5 @@ func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
 @_alwaysEmitIntoClient
 public
 func _allocateVector<Element>(elementType: Element.Type, capacity: Int) -> UnsafeMutablePointer<Element> {
-#if $BuiltinAllocVector
   return UnsafeMutablePointer(Builtin.allocVector(elementType, capacity._builtinWordValue))
-#else
-  fatalError("unsupported compiler")
-#endif
 }

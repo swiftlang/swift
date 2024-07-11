@@ -201,7 +201,6 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
         // TODO: When we have isolation history, isolation history will be able
         // to tell us what is going on.
         group.addTask { [submitted,i] in // expected-error {{escaping closure captures non-escaping parameter 'transform'}}
-          // expected-tns-warning @-1 {{task-isolated value of type '() async throws -> SendableTuple2<Int, T>' passed as a strongly transferred parameter}}
           let _ = try await transform(self[i]) // expected-note {{captured here}}
           let value: T? = nil
           return SendableTuple2(submitted, value!)
