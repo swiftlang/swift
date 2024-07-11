@@ -3306,6 +3306,37 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                opaque1->getInterfaceType()->getCanonicalType()->matches(
                    opaque2->getInterfaceType()->getCanonicalType(), matchMode);
 
+  if (matchMode.contains(TypeMatchFlags::IgnoreSendability)) {
+    // Support `any Sendable` -> `Any` matching inside generic types
+    // e.g. collections and optionals (i.e. `[String: (any Sendable)?]`).
+    if (auto *generic1 = t1->getAs<BoundGenericType>()) {
+      if (auto *generic2 = t2->getAs<BoundGenericType>()) {
+        if (generic1->getDecl() == generic2->getDecl()) {
+          auto genericArgs1 = generic1->getGenericArgs();
+          auto genericArgs2 = generic2->getGenericArgs();
+
+          if (genericArgs1.size() == genericArgs2.size() &&
+              llvm::all_of(llvm::zip_equal(genericArgs1, genericArgs2),
+                           [&](const auto &elt) -> bool {
+                             return matches(
+                                 std::get<0>(elt)->getCanonicalType(),
+                                 std::get<1>(elt)->getCanonicalType(),
+                                 matchMode, ParameterPosition::NotParameter,
+                                 OptionalUnwrapping::None);
+                           }))
+            return true;
+        }
+      }
+    }
+
+    // Attempting to match `any Sendable` by `Any` is allowed in this mode.
+    if (t1->isAny()) {
+      auto *PD = dyn_cast_or_null<ProtocolDecl>(t2->getAnyNominal());
+      if (PD && PD->isSpecificProtocol(KnownProtocolKind::Sendable))
+        return true;
+    }
+  }
+
   return false;
 }
 
