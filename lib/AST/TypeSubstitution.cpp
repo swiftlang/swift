@@ -188,9 +188,6 @@ static Type getMemberForBaseType(InFlightSubstitution &IFS,
 ProtocolConformanceRef LookUpConformanceInModule::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol);
-
   return ModuleDecl::lookupConformance(conformingReplacementType,
                                        conformedProtocol,
                                        /*allowMissing=*/true);

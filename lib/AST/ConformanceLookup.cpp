@@ -440,19 +440,15 @@ static ProtocolConformanceRef getPackTypeConformance(
       auto patternType = packExpansion->getPatternType();
 
       auto patternConformance =
-          (patternType->isTypeParameter()
-           ? ProtocolConformanceRef(protocol)
-           : ModuleDecl::lookupConformance(patternType, protocol,
-                                           /*allowMissing=*/true));
+          ModuleDecl::lookupConformance(patternType, protocol,
+                                        /*allowMissing=*/true);
       patternConformances.push_back(patternConformance);
       continue;
     }
 
     auto patternConformance =
-        (packElement->isTypeParameter()
-         ? ProtocolConformanceRef(protocol)
-         : ModuleDecl::lookupConformance(packElement, protocol,
-                                         /*allowMissing=*/true));
+        ModuleDecl::lookupConformance(packElement, protocol,
+                                      /*allowMissing=*/true);
     patternConformances.push_back(patternConformance);
   }
 
@@ -467,23 +463,51 @@ LookupConformanceInModuleRequest::evaluate(
   auto *protocol = desc.PD;
   ASTContext &ctx = protocol->getASTContext();
 
-  // Remove SIL reference ownership wrapper, if present.
-  type = type->getReferenceStorageReferent();
+again:
+  switch (type->getKind()) {
+#define SUGARED_TYPE(id, parent)                                               \
+  case TypeKind::id:                                                         \
+    type = type->getDesugaredType();                                         \
+    goto again;
 
-  // A dynamic Self type conforms to whatever its underlying type
-  // conforms to.
-  if (auto selfType = type->getAs<DynamicSelfType>())
-    type = selfType->getSelfType();
+#define BUILTIN_TYPE(id, parent)                                               \
+  case TypeKind::id:                                                         \
+    return getBuiltinBuiltinTypeConformance(type,                            \
+                                       cast<BuiltinType>(type.getPointer()), \
+                                            protocol);
 
-  // A pack element type conforms to whatever its underlying pack type
-  // conforms to.
-  if (auto packElement = type->getAs<PackElementType>())
-    type = packElement->getPackType();
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
 
-  // An archetype conforms to a protocol if the protocol is listed in the
-  // archetype's list of conformances, or if the archetype has a superclass
-  // constraint and the superclass conforms to the protocol.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
+  case TypeKind::WeakStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
+    // Remove SIL reference ownership wrapper, if present.
+    type = type->getReferenceStorageReferent();
+    goto again;
+
+  case TypeKind::DynamicSelf:
+    // A dynamic Self type conforms to whatever its underlying type
+    // conforms to.
+    type = cast<DynamicSelfType>(type.getPointer())->getSelfType();
+    goto again;
+
+  case TypeKind::PackElement:
+    // A pack element type conforms to whatever its underlying pack type
+    // conforms to.
+    type = cast<PackElementType>(type.getPointer())->getPackType();
+    goto again;
+
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::ElementArchetype: {
+    // An archetype conforms to a protocol if the protocol is listed in the
+    // archetype's list of conformances, or if the archetype has a superclass
+    // constraint and the superclass conforms to the protocol.
+    auto *archetype = cast<ArchetypeType>(type.getPointer());
+
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be
@@ -509,76 +533,65 @@ LookupConformanceInModuleRequest::evaluate(
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
   }
 
-  // An existential conforms to a protocol if the protocol is listed in the
-  // existential's list of conformances and the existential conforms to
-  // itself.
-  if (type->isExistentialType()) {
+  case TypeKind::Existential:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::ParameterizedProtocol: {
+    // An existential conforms to a protocol if the protocol is listed in the
+    // existential's list of conformances and the existential conforms to
+    // itself.
     auto result = ModuleDecl::lookupExistentialConformance(type, protocol);
     if (result.isInvalid())
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     return result;
   }
 
-  // Type variables have trivial conformances.
-  if (type->isTypeVariableOrMember())
+  case TypeKind::TypeVariable:
+  case TypeKind::DependentMember:
+  case TypeKind::GenericTypeParam:
+    // Type variables and type parameters have trivial conformances.
     return ProtocolConformanceRef(protocol);
 
-  // UnresolvedType is a placeholder for an unknown type used when generating
-  // diagnostics.  We consider it to conform to all protocols, since the
-  // intended type might have. Same goes for PlaceholderType.
-  if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
+  case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
+    // UnresolvedType is a placeholder for an unknown type used when generating
+    // diagnostics.  We consider it to conform to all protocols, since the
+    // intended type might have. Same goes for PlaceholderType.
     return ProtocolConformanceRef(protocol);
 
-  // Pack types can conform to protocols.
-  if (auto packType = type->getAs<PackType>()) {
-    return getPackTypeConformance(packType, protocol);
-  }
+  case TypeKind::Pack:
+    return getPackTypeConformance(cast<PackType>(type.getPointer()), protocol);
 
-  // Tuple types can conform to protocols.
-  if (auto tupleType = type->getAs<TupleType>()) {
-    return getBuiltinTupleTypeConformance(type, tupleType, protocol);
-  }
+  case TypeKind::Tuple:
+    return getBuiltinTupleTypeConformance(type, cast<TupleType>(type.getPointer()),
+                                          protocol);
 
-  // Function types can conform to protocols.
-  if (auto functionType = type->getAs<FunctionType>()) {
-    return getBuiltinFunctionTypeConformance(type, functionType, protocol);
-  }
+  case TypeKind::Function:
+    return getBuiltinFunctionTypeConformance(type, cast<FunctionType>(type.getPointer()),
+                                             protocol);
 
-  // SIL function types in the AST can conform to protocols
-  if (auto silFn = type->getAs<SILFunctionType>()) {
-    return getBuiltinFunctionTypeConformance(type, silFn, protocol);
-  }
+  case TypeKind::SILFunction:
+    return getBuiltinFunctionTypeConformance(type, cast<SILFunctionType>(type.getPointer()),
+                                             protocol);
 
-  // Metatypes can conform to protocols.
-  if (auto metatypeType = type->getAs<AnyMetatypeType>()) {
-    return getBuiltinMetaTypeTypeConformance(type, metatypeType, protocol);
-  }
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    return getBuiltinMetaTypeTypeConformance(type, cast<AnyMetatypeType>(type.getPointer()),
+                                             protocol);
 
-  // Builtin types can conform to protocols.
-  if (auto builtinType = type->getAs<BuiltinType>()) {
-    return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
-  }
+  case TypeKind::Struct:
+  case TypeKind::Enum:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::BoundGenericEnum:
+  case TypeKind::BoundGenericClass:
+    break;
 
-#ifndef NDEBUG
-  // Ensure we haven't missed queries for the specialty SIL types
-  // in the AST in conformance to one of the invertible protocols.
-  if (auto kp = protocol->getKnownProtocolKind()) {
-    if (getInvertibleProtocolKind(*kp)) {
-      assert(!(type->is<SILFunctionType,
-                        SILBoxType,
-                        SILMoveOnlyWrappedType,
-                        SILPackType,
-                        SILTokenType>()));
-      assert(!type->is<ReferenceStorageType>());
-    }
+  default:
+    return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
   }
-#endif
 
   auto nominal = type->getAnyNominal();
-
-  // If we don't have a nominal type, there are no conformances.
-  if (!nominal || isa<ProtocolDecl>(nominal))
-    return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 
   // Expand conformances added by extension macros.
   //

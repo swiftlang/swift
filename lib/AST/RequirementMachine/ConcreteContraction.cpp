@@ -283,11 +283,9 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
       // The 'Sendable' protocol does not declare any associated types, so the
       // 'allowMissing' value here is actually irrelevant.
-      auto conformance = ((*substBaseType)->isTypeParameter()
-                          ? ProtocolConformanceRef(proto)
-                          : ModuleDecl::lookupConformance(
+      auto conformance = ModuleDecl::lookupConformance(
                               *substBaseType, proto,
-                              /*allowMissing=*/false));
+                              /*allowMissing=*/false);
 
       if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
           conformance.hasUnavailableConformance()) {
