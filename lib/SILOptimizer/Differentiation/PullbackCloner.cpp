@@ -765,14 +765,15 @@ private:
                                         SILValue wrappedAdjoint,
                                         SILType optionalTy);
 
-  /// Accumulate optional buffer from `wrappedAdjoint`.
+  /// Accumulate adjoint of `wrappedAdjoint` into optionalBuffer.
   void accumulateAdjointForOptionalBuffer(SILBasicBlock *bb,
                                           SILValue optionalBuffer,
                                           SILValue wrappedAdjoint);
 
-  /// Set optional value from `wrappedAdjoint`.
-  void setAdjointValueForOptional(SILBasicBlock *bb, SILValue optionalValue,
-                                  SILValue wrappedAdjoint);
+  /// Accumulate adjoint of `wrappedAdjoint` into optionalValue.
+  void accumulateAdjointValueForOptional(SILBasicBlock *bb,
+                                         SILValue optionalValue,
+                                         SILValue wrappedAdjoint);
 
   //--------------------------------------------------------------------------//
   // Array literal initialization differentiation
@@ -2732,8 +2733,8 @@ void PullbackCloner::Implementation::accumulateAdjointForOptionalBuffer(
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 }
 
-// Set the adjoint value for the incoming `Optional` value.
-void PullbackCloner::Implementation::setAdjointValueForOptional(
+// Accumulate adjoint for the incoming `Optional` value.
+void PullbackCloner::Implementation::accumulateAdjointValueForOptional(
     SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
   assert(getTangentValueCategory(optionalValue) == SILValueCategory::Object);
   auto pbLoc = getPullback().getLocation();
@@ -2745,10 +2746,11 @@ void PullbackCloner::Implementation::setAdjointValueForOptional(
 
   auto optTanAdjVal = builder.emitLoadValueOperation(
       pbLoc, optTanAdjBuf, LoadOwnershipQualifier::Take);
+
   recordTemporary(optTanAdjVal);
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 
-  setAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal));
+  addAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal), pbLoc);
 }
 
 SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
@@ -2959,12 +2961,12 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           // Handle `switch_enum` on `Optional`.
           auto termInst = bbArg->getSingleTerminator();
           if (isSwitchEnumInstOnOptional(termInst)) {
-            setAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
+            accumulateAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
           } else {
             blockTemporaries[getPullbackBlock(predBB)].insert(
               concreteBBArgAdjCopy);
-            setAdjointValue(predBB, incomingValue,
-                            makeConcreteAdjointValue(concreteBBArgAdjCopy));
+            addAdjointValue(predBB, incomingValue,
+                            makeConcreteAdjointValue(concreteBBArgAdjCopy), pbLoc);
           }
         }
         break;
