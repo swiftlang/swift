@@ -842,6 +842,11 @@ def warn_implicit_overrides :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about implicit overrides of protocol members">;
 
+def warn_soft_deprecated :
+  Flag<["-"], "warn-soft-deprecated">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  HelpText<"Warn when soft-deprecated declarations are referenced">;
+
 def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<n>">,

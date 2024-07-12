@@ -1164,6 +1164,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
+  Opts.WarnSoftDeprecated = Args.hasArg(OPT_warn_soft_deprecated);
+
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
