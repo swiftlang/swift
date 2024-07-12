@@ -163,6 +163,7 @@ Added: _$ss8RangeSetV6RangesV10startIndexSivpMV
 Added: _$ss8RangeSetV6RangesV11descriptionSSvg
 Added: _$ss8RangeSetV6RangesV11descriptionSSvpMV
 Added: _$ss8RangeSetV6RangesV13_intersectionyADyx_GAFF
+Added: _$ss8RangeSetV6RangesV6_unionyADyx_GAFF
 Added: _$ss8RangeSetV6RangesV2eeoiySbADyx_G_AFtFZ
 Added: _$ss8RangeSetV6RangesV5_gaps9boundedByADyx_GSnyxG_tF
 Added: _$ss8RangeSetV6RangesV5countSivg
