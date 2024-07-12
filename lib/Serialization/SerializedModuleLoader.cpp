@@ -618,9 +618,6 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
 std::optional<std::string>
 SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(
     llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
-  if (!ctx.LangOpts.EnablePackageInterfaceLoad)
-    return std::nullopt;
-
   std::string packagePath{
       getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
 
@@ -667,11 +664,15 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs,
   if (!fs.exists(interfacePath))
     return std::nullopt;
 
-  // If there is a package name, try look for the package interface.
-  if (!ctx.LangOpts.PackageName.empty()) {
-    if (auto maybePackageInterface =
+  // If both -package-name and -experimental-package-interface-load
+  // are passed to the client, try to look for the package interface
+  // to load; if either flag is missing, fall back to loading private
+  // or public interface.
+  if (!ctx.LangOpts.PackageName.empty() &&
+      ctx.LangOpts.EnablePackageInterfaceLoad) {
+    if (auto found =
             getPackageInterfacePathIfInSamePackage(fs, ctx))
-      return *maybePackageInterface;
+      return *found;
 
     // If package interface is not found, check if we can load the
     // public/private interface file by checking:
