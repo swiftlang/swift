@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 static inline __swift_uint32_t _swift_stdlib_gettid() {
-  static __thread tid = 0;
+  static __thread auto tid = 0;
 
   if (tid == 0) {
     tid = syscall(SYS_gettid);
