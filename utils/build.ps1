@@ -385,6 +385,7 @@ enum TargetComponent {
   LLVM
   Runtime
   Dispatch
+  SwiftSyntax
   Foundation
   XCTest
 }
@@ -1646,6 +1647,27 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 }
 
+function Build-Syntax([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  $SyntaxBinaryDir = Get-TargetProjectBinaryCache $Arch SwiftSyntax
+  $Targets = @("default", "install")
+  $InstallPath = "$($Arch.SDKInstallRoot)\usr"
+
+  Isolate-EnvVars {
+    Build-CMakeProject `
+      -Src $SourceCache\swift-syntax `
+      -Bin $SyntaxBinaryDir `
+      -InstallTo $InstallPath `
+      -Arch $Arch `
+      -Platform $Platform `
+      -UseBuiltCompilers Swift `
+      -BuildTargets $Targets `
+      -Defines (@{
+        CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+        BUILD_SHARED_LIBS = "YES";
+      })
+  }
+}
+
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
   $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
@@ -2358,6 +2380,7 @@ if (-not $SkipBuild) {
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Windows $Arch
     Invoke-BuildStep Build-Dispatch Windows $Arch
+    Invoke-BuildStep Build-Syntax Windows $Arch
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
   }
@@ -2372,6 +2395,7 @@ if (-not $SkipBuild) {
      # Build platform: SDK, Redist and XCTest
      Invoke-BuildStep Build-Runtime Android $Arch
      Invoke-BuildStep Build-Dispatch Android $Arch
+     Invoke-BuildStep Build-Syntax Android $Arch
      Invoke-BuildStep Build-Foundation Android $Arch
      Invoke-BuildStep Build-XCTest Android $Arch
    }
