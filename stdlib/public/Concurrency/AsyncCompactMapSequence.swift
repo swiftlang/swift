@@ -146,7 +146,8 @@ extension AsyncCompactMapSequence: AsyncSequence {
           return nil
         }
 
-        if let transformed = await transform(element) {
+        nonisolated(unsafe) let t = transform
+        if let transformed = await t(element) {
           return transformed
         }
       }

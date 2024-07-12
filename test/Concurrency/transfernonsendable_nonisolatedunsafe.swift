@@ -816,4 +816,43 @@ actor ActorContainingSendableStruct {
   }
 }
 
+struct CallFunctionFieldWithMismatchingArgAndResultIsolation {
+  let transform: (NonSendableKlass) async -> NonSendableKlass
 
+  init(_ t: @escaping (NonSendableKlass) async -> NonSendableKlass) {
+    self.transform = t
+  }
+
+  func test(_ x: NonSendableKlass, isolation: isolated (any Actor)? = #isolation) async -> NonSendableKlass {
+    nonisolated(unsafe) let nonisolatedTransform = transform
+    nonisolated(unsafe) let arg = x
+    return await nonisolatedTransform(arg)
+  }
+}
+
+struct CallMethodWithMismatchingArgAndResultIsolation {
+  let k = NonSendableKlass()
+
+  mutating func mutatingNext(_ x: NonSendableKlass) async -> NonSendableKlass {
+    fatalError()
+  }
+
+  mutating func mutatingNext(_ x: NonSendableKlass, isolation: isolated (any Actor)?) async -> NonSendableKlass {
+    nonisolated(unsafe) var this = self
+    nonisolated(unsafe) let arg = x
+    let result = await this.mutatingNext(arg)
+    self = this
+    return result
+  }
+
+  func next(_ x: NonSendableKlass) async -> NonSendableKlass {
+    fatalError()
+  }
+
+  func next(_ x: NonSendableKlass, isolation: isolated (any Actor)?) async -> NonSendableKlass {
+    nonisolated(unsafe) let this = self
+    nonisolated(unsafe) let arg = x
+    let result = await this.next(arg)
+    return result
+  }
+}
