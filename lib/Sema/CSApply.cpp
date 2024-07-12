@@ -313,18 +313,28 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       continue;
 
     case KeyPathExpr::Component::Kind::Member: {
-      // Property references must be to @objc properties.
-      // TODO: If we added special properties matching KVC operators like '@sum',
-      // '@count', etc. those could be mapped too.
-      auto property = cast<VarDecl>(component.getDeclRef().getDecl());
-      if (!property->isObjC())
+      if (auto subscript =
+              isa<SubscriptDecl>(component.getDeclRef().getDecl())) {
+        // Subscripts and tuples aren't generally represented in KVC.
+        // TODO: There are some subscript forms we could map to KVC, such as
+        // when indexing a Dictionary or NSDictionary by string, or when
+        // applying a mapping subscript operation to Array/Set or NSArray/NSSet.
         return false;
-      if (!buf.empty()) {
-        buf.push_back('.');
+      } else {
+        // Property references must be to @objc properties.
+        // TODO: If we added special properties matching KVC operators like
+        // '@sum',
+        // '@count', etc. those could be mapped too.
+        auto property = cast<VarDecl>(component.getDeclRef().getDecl());
+        if (!property->isObjC())
+          return false;
+        if (!buf.empty()) {
+          buf.push_back('.');
+        }
+        auto objcName = property->getObjCPropertyName().str();
+        buf.append(objcName.begin(), objcName.end());
+        continue;
       }
-      auto objcName = property->getObjCPropertyName().str();
-      buf.append(objcName.begin(), objcName.end());
-      continue;
     }
     case KeyPathExpr::Component::Kind::TupleElement:
     case KeyPathExpr::Component::Kind::Subscript:
@@ -5369,8 +5379,9 @@ namespace {
       auto resolvedTy = simplifyType(overload.adjustedOpenedType);
       if (auto *member = overload.choice.getDeclOrNull()) {
         // Key paths don't work with mutating-get properties.
-        auto varDecl = cast<VarDecl>(member);
-        assert(!varDecl->isGetterMutating());
+        if (auto varDecl = dyn_cast<VarDecl>(member)) {
+          assert(!varDecl->isGetterMutating());
+        }
 
         // Compute the concrete reference to the member.
         auto ref = resolveConcreteDeclRef(member, locator);

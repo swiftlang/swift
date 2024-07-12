@@ -636,19 +636,24 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
 
     using ComponentKind = KeyPathExpr::Component::Kind;
     switch (component.getKind()) {
-    case ComponentKind::UnresolvedApply:
-    case ComponentKind::Apply:
-    case ComponentKind::Subscript:
-      // For a subscript the callee is given by 'component -> subscript member'.
-      return getConstraintLocator(
-                                  anchor, {*componentElt, ConstraintLocator::SubscriptMember});
     case ComponentKind::UnresolvedMember:
     case ComponentKind::Member:
-      // For a member, the choice is just given by the component.
-      return getConstraintLocator(anchor, *componentElt);
+      if (!component.hasUnresolvedDeclName()) {
+        // For a subscript the callee is given by 'component -> subscript
+        // member'.
+        return getConstraintLocator(
+            anchor, {*componentElt, ConstraintLocator::SubscriptMember});
+      } else {
+        // For a member, the choice is just given by the component.
+        return getConstraintLocator(anchor, *componentElt);
+      }
+
     case ComponentKind::TupleElement:
       llvm_unreachable("Not implemented by CSGen");
       break;
+    case ComponentKind::UnresolvedApply:
+    case ComponentKind::Apply:
+    case ComponentKind::Subscript:
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -7842,7 +7847,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
           }
         }
       }
-      LLVM_FALLTHROUGH;
+      break;
     }
     case KeyPathExpr::Component::Kind::Member:
     case KeyPathExpr::Component::Kind::UnresolvedMember: {
