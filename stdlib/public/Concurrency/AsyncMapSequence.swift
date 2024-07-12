@@ -94,7 +94,6 @@ extension AsyncMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    nonisolated(unsafe)
     let transform: (Base.Element) async -> Transformed
 
     @usableFromInline
@@ -131,8 +130,9 @@ extension AsyncMapSequence: AsyncSequence {
       guard let element = try await baseIterator.next(isolation: actor) else {
         return nil
       }
-      nonisolated(unsafe) let t = transform
-      return await t(element)
+      nonisolated(unsafe) let unsafeTransform = transform
+      nonisolated(unsafe) let unsafeElement = element
+      return await unsafeTransform(unsafeElement)
     }
   }
 

@@ -169,7 +169,9 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
           return nil
         }
         do {
-          if let transformed = try await transform(element) {
+          nonisolated(unsafe) let t = transform
+          nonisolated(unsafe) let e = element
+          if let transformed = try await t(e) {
             return transformed
           }
         } catch {

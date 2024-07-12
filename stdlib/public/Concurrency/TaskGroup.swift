@@ -586,7 +586,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
-    return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
+    nonisolated(unsafe) let unsafeGroup = _group
+    return try! await _taskGroupWaitNext(group: unsafeGroup) // !-safe cannot throw, we're a non-throwing TaskGroup
   }
 
   @available(SwiftStdlib 5.1, *)
@@ -1020,7 +1021,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
-    return try await _taskGroupWaitNext(group: _group)
+    nonisolated(unsafe) let unsafeGroup = _group
+    return try await _taskGroupWaitNext(group: unsafeGroup)
   }
 
   @available(SwiftStdlib 5.1, *)
@@ -1079,7 +1081,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - SeeAlso: `next()`
   @_alwaysEmitIntoClient
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
-    return try! await nextResultForABI()
+    nonisolated(unsafe) var this = self
+    defer { self = this }
+    return try! await this.nextResultForABI()
   }
 
   /// A Boolean value that indicates whether the group has any remaining tasks.

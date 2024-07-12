@@ -202,7 +202,9 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
           }
           let segment: SegmentOfResult
           do {
-            segment = try await transform(item)
+            nonisolated(unsafe) let t = transform
+            nonisolated(unsafe) let i = item
+            segment = try await t(i)
             var iterator = segment.makeAsyncIterator()
             guard let element = try await iterator.next(isolation: actor) else {
               currentIterator = nil

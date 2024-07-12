@@ -128,7 +128,8 @@ extension AsyncFilterSequence: AsyncSequence {
         guard let element = try await baseIterator.next(isolation: actor) else {
           return nil
         }
-        if await isIncluded(element) {
+        nonisolated(unsafe) let unsafeElement = element
+        if await isIncluded(unsafeElement) {
           return element
         }
       }

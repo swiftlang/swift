@@ -301,8 +301,9 @@ extension AsyncFlatMapSequence: AsyncSequence {
             return nil
           }
           do {
-            nonisolated(unsafe) let nonisolatedUnsafeTransform = transform
-            let segment = await nonisolatedUnsafeTransform(item)
+            nonisolated(unsafe) let unsafeTransform = transform
+            nonisolated(unsafe) let unsafeItem = item
+            let segment = await unsafeTransform(unsafeItem)
             var iterator = segment.makeAsyncIterator()
             let optElement = try await iterator.next(isolation: actor)  
             guard let element = optElement else {

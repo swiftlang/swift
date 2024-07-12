@@ -143,7 +143,9 @@ extension AsyncDropWhileSequence: AsyncSequence {
         guard let element = try await baseIterator.next(isolation: actor) else {
           return nil
         }
-        if await predicate(element) == false {
+
+        nonisolated(unsafe) let e = element
+        if await predicate(e) == false {
           self.predicate = nil
           return element
         }
