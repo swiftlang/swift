@@ -170,6 +170,15 @@ macro(swift_common_standalone_build_config_llvm product)
   string(REGEX REPLACE "[0-9]+\\.([0-9]+)(\\.[0-9]+)?" "\\1" PACKAGE_VERSION_MINOR
     ${PACKAGE_VERSION})
 
+  # If -gsplit-dwarf has been specified, filter out from COMPILE_OPTIONS as it is
+  # not supported by the swift compiler.
+  if (LLVM_USE_SPLIT_DWARF)
+    get_property(compile_options DIRECTORY PROPERTY COMPILE_OPTIONS)
+    string(REGEX REPLACE "-gsplit-dwarf" "" compile_options ${compile_options})
+    set_property(DIRECTORY PROPERTY COMPILE_OPTIONS ${compile_options})
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-gsplit-dwarf>)
+  endif()
+
   set(SWIFT_LIBCLANG_LIBRARY_VERSION
     "${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}" CACHE STRING
     "Version number that will be placed into the libclang library , in the form XX.YY")
