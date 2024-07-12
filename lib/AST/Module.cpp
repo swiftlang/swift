@@ -3102,35 +3102,6 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
-bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
-  for (auto &import : *Imports) {
-    if (!import.options.contains(ImportFlags::WeakLinked))
-      continue;
-
-    const ModuleDecl *importedModule = import.module.importedModule;
-    if (module == importedModule)
-      return true;
-
-    // Also check whether the target module is actually the underlyingClang
-    // module for this @_weakLinked import.
-    const ModuleDecl *clangModule =
-        importedModule->getUnderlyingModuleIfOverlay();
-    if (module == clangModule)
-      return true;
-
-    // Traverse the exported modules of this weakly-linked module to ensure
-    // that we weak-link declarations from its exported peers.
-    SmallVector<ImportedModule, 8> reexportedModules;
-    importedModule->getImportedModules(reexportedModules,
-                                       ModuleDecl::ImportFilterKind::Exported);
-    for (const ImportedModule &reexportedModule : reexportedModules) {
-      if (module == reexportedModule.importedModule)
-        return true;
-    }
-  }
-  return false;
-}
-
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto declSPIGroups = attr->getSPIGroups();
@@ -3162,11 +3133,7 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
 }
 
 bool ModuleDecl::isImportedAsWeakLinked(const ModuleDecl *module) const {
-  for (auto file : getFiles()) {
-    if (file->importsModuleAsWeakLinked(module))
-      return true;
-  }
-  return false;
+  return getASTContext().getImportCache().isWeakImportedBy(module, this);
 }
 
 bool Decl::isSPI() const {
