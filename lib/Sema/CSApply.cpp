@@ -315,7 +315,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     case KeyPathExpr::Component::Kind::Member: {
       if (auto subscript =
               isa<SubscriptDecl>(component.getDeclRef().getDecl())) {
-        // Subscripts and tuples aren't generally represented in KVC.
+        // Subscripts aren't generally represented in KVC.
         // TODO: There are some subscript forms we could map to KVC, such as
         // when indexing a Dictionary or NSDictionary by string, or when
         // applying a mapping subscript operation to Array/Set or NSArray/NSSet.
@@ -339,10 +339,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     case KeyPathExpr::Component::Kind::TupleElement:
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::Apply:
-      // Subscripts and tuples aren't generally represented in KVC.
-      // TODO: There are some subscript forms we could map to KVC, such as
-      // when indexing a Dictionary or NSDictionary by string, or when applying
-      // a mapping subscript operation to Array/Set or NSArray/NSSet.
+      // Tuples aren't generally represented in KVC.
       return false;
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedMember:
