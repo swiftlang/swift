@@ -68,9 +68,18 @@ void ConformanceLookupTable::ConformanceEntry::markSupersededBy(
   SupersededBy = entry;
 
   if (diagnose) {
+    // If an unavailable Sendable conformance is superseded by a
+    // retroactive one in the client, we need to record this error
+    // at the client decl context.
+    auto *dc = getDeclContext();
+    if (getProtocol()->isMarkerProtocol() && isFixed() &&
+        !entry->isFixed()) {
+      dc = entry->getDeclContext();
+    }
+
     // Record the problem in the conformance table. We'll
     // diagnose these in semantic analysis.
-    table.AllSupersededDiagnostics[getDeclContext()].push_back(this);
+    table.AllSupersededDiagnostics[dc].push_back(this);
   }
 }
 
@@ -596,21 +605,22 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     }
   }
 
-  // Unavailable Sendable conformances cannot be replaced by available ones.
-  if (!lhs->getProtocol()->isMarkerProtocol()) {
-    // If only one of the conformances is unconditionally available on the
-    // current deployment target, pick that one.
-    //
-    // FIXME: Conformance lookup should really depend on source location for
-    // this to be 100% correct.
-    // FIXME: When a class and an extension with the same availability declare the
-    // same conformance, this silently takes the class and drops the extension.
-    if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
-        rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
-      return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
-              ? Ordering::Before
-              : Ordering::After);
-    }
+  // If only one of the conformances is unconditionally available on the
+  // current deployment target, pick that one.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  // FIXME: When a class and an extension with the same availability declare the
+  // same conformance, this silently takes the class and drops the extension.
+  if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
+      rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
+    // Diagnose conflicting marker protocol conformances that differ in
+    // un-availability.
+    diagnoseSuperseded = lhs->getProtocol()->isMarkerProtocol();
+
+    return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
+            ? Ordering::Before
+            : Ordering::After);
   }
 
   // If one entry is fixed and the other is not, we have our answer.
@@ -1128,8 +1138,16 @@ void ConformanceLookupTable::lookupConformances(
   if (diagnostics) {
     auto knownDiags = AllSupersededDiagnostics.find(dc);
     if (knownDiags != AllSupersededDiagnostics.end()) {
-      for (const auto *entry : knownDiags->second) {
+      for (auto *entry : knownDiags->second) {
         ConformanceEntry *supersededBy = entry->getSupersededBy();
+
+        // Diagnose the client conformance as superseded.
+        auto *definingModule = nominal->getParentModule();
+        if (entry->getDeclContext()->getParentModule() == definingModule &&
+            supersededBy->getDeclContext()->getParentModule() != definingModule) {
+          supersededBy = entry;
+          entry = entry->getSupersededBy();
+        }
 
         diagnostics->push_back({entry->getProtocol(), 
                                 entry->getDeclaredLoc(),
