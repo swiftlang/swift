@@ -569,10 +569,10 @@ extension _ArrayBuffer {
 
   @inlinable
   static var associationKey: UnsafeRawPointer {
-    withUnsafePointer(to: &_emptyArrayStorage) {
+    withUnsafePointer(to: _emptyArrayStorage) {
       //emptyArrayStorage is immortal so this doesn't dangle
       //also we never dereference it
-      $0
+      UnsafeRawPointer($0)
     }
   }
   
@@ -590,7 +590,7 @@ extension _ArrayBuffer {
     }
     if let associatedBuffer = _swift_stdlib_objc_getAssociatedObject(
       owner,
-      associationKey
+      _ArrayBuffer.associationKey
     ) {
       let contigBuffer = unsafeBitCast(
         associatedBuffer,
@@ -603,7 +603,7 @@ extension _ArrayBuffer {
       let contig = ContiguousArray(self)
       _swift_stdlib_objc_setAssociatedObject(
         owner,
-        associationKey,
+        _ArrayBuffer.associationKey,
         contig._buffer,
         0o1401 //OBJC_ASSOCIATION_RETAIN
       )

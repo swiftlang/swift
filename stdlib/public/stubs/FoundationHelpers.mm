@@ -112,5 +112,16 @@ _swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
           && SWIFT_RUNTIME_WEAK_USE(_dyld_is_objc_constant(dyld_objc_string_kind, addr))) ? 1 : 0;
 }
 
+id _Nonnull
+_swift_stdlib_objc_getAssociatedObject(id _Nonnull obj, const void * _Nonnull key) {
+  return objc_getAssociatedObject(obj, key);
+}
+
+void
+_swift_stdlib_objc_setAssociatedObject(id _Nonnull obj, const void * _Nonnull key, id _Nullable value, _swift_shims_objc_associationPolicy policy) {
+  objc_setAssociatedObject(obj, key, value, (objc_AssociationPolicy)policy);
+}
+
+
 #endif
 

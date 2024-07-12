@@ -30,9 +30,11 @@ extern "C" {
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
 typedef signed long long _swift_shims_CFIndex;
+typedef unsigned long long _swift_shims_objc_associationPolicy;
 #else
 typedef unsigned long _swift_shims_CFHashCode;
 typedef signed long _swift_shims_CFIndex;
+typedef unsigned long _swift_shims_objc_associationPolicy;
 #endif
 
 // Consider creating SwiftMacTypes.h for these
@@ -81,7 +83,7 @@ _swift_stdlib_objc_getAssociatedObject(id _Nonnull obj, const void * _Nonnull ke
   
 SWIFT_RUNTIME_STDLIB_API
 void
-_swift_stdlib_objc_setAssociatedObject(id _Nonnull obj, const void * _Nonnull key, id value, uintptr_t policy);
+_swift_stdlib_objc_setAssociatedObject(id _Nonnull obj, const void * _Nonnull key, id _Nullable value, _swift_shims_objc_associationPolicy policy);
 
 #endif // __OBJC2__
 
