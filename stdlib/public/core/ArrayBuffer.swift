@@ -189,6 +189,10 @@ extension _ArrayBuffer {
   internal __consuming func _consumeAndCreateNew(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) -> _ArrayBuffer {
+    if !_isNative && capacity >= minimumCapacity,
+       let associatedBuffer = getAssociatedBuffer() {
+      return _ArrayBuffer(_buffer: associatedBuffer, shiftedToStartIndex: 0) 
+    }
     let newCapacity = _growArrayCapacity(oldCapacity: capacity,
                                          minimumCapacity: minimumCapacity,
                                          growForAppend: growForAppend)
@@ -576,6 +580,31 @@ extension _ArrayBuffer {
     }
   }
   
+  @usableFromInline
+  internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
+    if let associatedBuffer = _swift_stdlib_objc_getAssociatedObject(
+      owner,
+      _ArrayBuffer.associationKey
+    ) {
+      let contigBuffer = unsafeBitCast(
+        associatedBuffer,
+        to: _ContiguousArrayBuffer<Element>.self
+      )
+      return contigBuffer
+    }
+    return nil
+  }
+  
+  @usableFromInline
+  internal func setAssociatedBuffer(_ contig: ContiguousArray<Element>) {
+    _swift_stdlib_objc_setAssociatedObject(
+      owner,
+      _ArrayBuffer.associationKey,
+      contig._buffer,
+      0o1401 //OBJC_ASSOCIATION_RETAIN
+    )
+  }
+  
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
@@ -588,25 +617,13 @@ extension _ArrayBuffer {
       return try body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    if let associatedBuffer = _swift_stdlib_objc_getAssociatedObject(
-      owner,
-      _ArrayBuffer.associationKey
-    ) {
-      let contigBuffer = unsafeBitCast(
-        associatedBuffer,
-        to: _ContiguousArrayBuffer<Element>.self
-      )
+    if let associatedBuffer = getAssociatedBuffer() {
       return try ContiguousArray(
-        _buffer: contigBuffer
+        _buffer: associatedBuffer
       ).withUnsafeBufferPointer(body)
     } else {
       let contig = ContiguousArray(self)
-      _swift_stdlib_objc_setAssociatedObject(
-        owner,
-        _ArrayBuffer.associationKey,
-        contig._buffer,
-        0o1401 //OBJC_ASSOCIATION_RETAIN
-      )
+      setAssociatedBuffer(contig)
       return try contig.withUnsafeBufferPointer(body)
     }
   }
