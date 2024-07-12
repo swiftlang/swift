@@ -1164,6 +1164,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
+  Opts.WarnSoftDeprecated = Args.hasArg(OPT_warn_soft_deprecated);
+
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
@@ -2109,6 +2111,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.setVCToolsRoot(A->getValue());
   if (const Arg *A = Args.getLastArg(OPT_visualc_tools_version))
     Opts.setVCToolsVersion(A->getValue());
+
+  if (const Arg *A = Args.getLastArg(OPT_sysroot))
+    Opts.setSysRoot(A->getValue());
 
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();

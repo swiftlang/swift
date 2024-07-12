@@ -42,6 +42,47 @@ if #available(SwiftStdlib 6.0, *) {
     }
     return set
   }
+  
+  RangeSetTests.test("initialization") {
+    // Test coalescing and elimination of empty ranges
+    do {
+      let empty = RangeSet(Array(repeating: 0..<0, count: 100))
+      expectTrue(empty.isEmpty)
+
+      let repeated = RangeSet(Array(repeating: 0..<3, count: 100))
+      expectEqual(repeated, [0..<3])
+      
+      let singleAfterEmpty = RangeSet(Array(repeating: 0..<0, count: 100) + [0..<3])
+      expectEqual(singleAfterEmpty, [0..<3])
+
+      let contiguousRanges = (0..<100).map { $0 ..< ($0 + 1) }
+      expectEqual(RangeSet(contiguousRanges), [0..<100])
+      expectEqual(RangeSet(contiguousRanges.shuffled()), [0..<100])
+    }
+    
+    // The `buildRandomRangeSet()` function builds a range set via additions
+    // and removals. This function creates an array of potentially empty or
+    // overlapping ranges that can be used to initialize a range set.
+    func randomRanges() -> [Range<Int>] {
+      (0..<100).map { _ in
+        let low = Int.random(in: 0...100)
+        let count = Int.random(in: 0...20)
+        return low ..< (low + count)
+      }
+    }
+    
+    for _ in 0..<1000 {
+      let ranges = randomRanges()
+      let set = RangeSet(ranges)
+      
+      // Manually construct a range set for comparison
+      var comparison = RangeSet<Int>()
+      for r in ranges {
+        comparison.insert(contentsOf: r)
+      }
+      expectEqual(set, comparison)
+    }
+  }
 
   RangeSetTests.test("contains") {
     expectFalse(source.contains(0))

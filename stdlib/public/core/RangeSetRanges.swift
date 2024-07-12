@@ -37,25 +37,57 @@ extension RangeSet {
       _storage.sort {
         $0.lowerBound < $1.lowerBound
       }
-      var i = 0
-      while i < _storage.count {
-        let current = _storage[i]
-        if i > 0 {
-          let previous = _storage[i - 1]
-          if previous.upperBound >= current.lowerBound {
-            let newUpper = Swift.max(previous.upperBound, current.upperBound)
-            _storage[i - 1] = previous.lowerBound ..< newUpper
-            _storage.remove(at: i)
-            continue
-          } 
-        }
-
-        if current.isEmpty {
-          _storage.remove(at: i)
+      
+      // Find the index of the first non-empty range. If all ranges are empty,
+      // the result is empty.
+      guard let firstNonEmpty = _storage.firstIndex(where: { $0.isEmpty == false }) else {
+        _storage = []
+        return
+      }
+      
+      // Swap that non-empty range to be first. (This and the swap in the loop
+      // might be no-ops, if no empty or overlapping ranges have been found.)
+      _storage.swapAt(0, firstNonEmpty)
+      
+      // That single range is now a valid range set, so we set up three sections 
+      // of the storage array:
+      //
+      //    1: a processed, valid range set (0...lastValid)
+      //    2: ranges to discard (lastValid + 1 ..< current)
+      //    3: unprocessed ranges (current ..< _storage.count)
+      //
+      // Section 2 is made up of ranges that are either empty or that overlap
+      // with the ranges in section 1. By waiting to remove these ranges until
+      // we've processed the entire array, we avoid needing to constantly
+      // reshuffle the elements during processing.
+      var lastValid = 0
+      var current = firstNonEmpty + 1
+      
+      while current < _storage.count {
+        defer { current += 1 }
+        
+        // Skip over empty ranges.
+        if _storage[current].isEmpty { continue }
+        
+        // If the last valid range overlaps with the current range, extend the
+        // last valid range to cover the current.
+        if _storage[lastValid].upperBound >= _storage[current].lowerBound {
+          let newUpper = Swift.max(
+            _storage[lastValid].upperBound,
+            _storage[current].upperBound)
+          _storage[lastValid] = Range(
+            uncheckedBounds: (_storage[lastValid].lowerBound, newUpper))
         } else {
-          i += 1
+          // Otherwise, this is a valid new range to add to the range set: 
+          // swap it into place at the end of the valid section.
+          lastValid += 1
+          _storage.swapAt(current, lastValid)
         }
       }
+      
+      // Now that we've processed the whole array, remove anything left after
+      // the valid section.
+      _storage.removeSubrange((lastValid + 1) ..< _storage.count)
     }
   }
 }

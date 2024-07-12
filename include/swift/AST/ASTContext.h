@@ -1499,10 +1499,6 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
-  /// The declaration for the `_diagnoseUnavailableCodeReached()` declaration
-  /// that ought to be used for the configured deployment target.
-  FuncDecl *getDiagnoseUnavailableCodeReachedDecl();
-
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
   /// Set the plugin loader.

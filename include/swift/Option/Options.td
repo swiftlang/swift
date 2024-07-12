@@ -255,6 +255,13 @@ def visualc_tools_version : Separate<["-"], "visualc-tools-version">,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"VisualC++ ToolSet Version">, MetaVarName<"<version>">;
 
+// Android Options
+
+def sysroot : Separate<["-"], "sysroot">,
+  Flags<[ArgumentIsPath, FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
+  HelpText<"Native Platform sysroot">, MetaVarName<"<sysroot>">;
+
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>;
@@ -841,6 +848,11 @@ def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about implicit overrides of protocol members">;
+
+def warn_soft_deprecated :
+  Flag<["-"], "warn-soft-deprecated">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  HelpText<"Warn when soft-deprecated declarations are referenced">;
 
 def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
   Flags<[FrontendOption, HelpHidden]>,
