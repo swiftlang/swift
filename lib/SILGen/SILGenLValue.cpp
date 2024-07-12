@@ -4572,7 +4572,7 @@ LValue SILGenLValue::visitABISafeConversionExpr(ABISafeConversionExpr *e,
   if (lval.getTypeOfRValue().getASTType() != loweredSubExprType.getASTType()) {
     // Logical components always re-abstract back to the substituted
     // type.
-    assert(lval.isLastComponentPhysical());
+    ASSERT(lval.isLastComponentPhysical());
     lval.addOrigToSubstComponent(loweredSubExprType);
   }
 
