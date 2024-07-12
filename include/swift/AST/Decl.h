@@ -780,10 +780,10 @@ protected:
     /// Whether this module has been built with C++ interoperability enabled.
     HasCxxInteroperability : 1,
 
-    /// Whether this module has been built with -experimental-allow-non-resilient-access.
+    /// Whether this module has been built with -allow-non-resilient-access.
     AllowNonResilientAccess : 1,
 
-    /// Whether this module has been built with -experimental-package-cmo.
+    /// Whether this module has been built with -package-cmo.
     SerializePackageEnabled : 1
   );
 
@@ -7482,7 +7482,8 @@ public:
 
   /// Add the given derivative function configuration.
   void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
-  std::optional<LifetimeDependenceInfo> getLifetimeDependenceInfo() const;
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  getLifetimeDependencies() const;
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or

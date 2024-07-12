@@ -347,6 +347,8 @@ enum class TypeMatchFlags {
   AllowCompatibleOpaqueTypeArchetypes = 1 << 5,
   /// Ignore the @Sendable attributes on functions when matching types.
   IgnoreFunctionSendability = 1 << 6,
+  /// Ignore `any Sendable` and compositions with Sendable protocol.
+  IgnoreSendability = 1 << 7,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -417,7 +419,7 @@ protected:
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasThrownError : 1,
-    HasLifetimeDependenceInfo : 1,
+    HasLifetimeDependencies : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -449,8 +451,7 @@ protected:
     HasErrorResult : 1,
     CoroutineKind : 2,
     HasInvocationSubs : 1,
-    HasPatternSubs : 1,
-    HasLifetimeDependenceInfo : 1
+    HasPatternSubs : 1
   );
 
   SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
@@ -3366,8 +3367,8 @@ protected:
       Bits.AnyFunctionType.HasThrownError =
           !Info.value().getThrownError().isNull();
       assert(!Bits.AnyFunctionType.HasThrownError || Info->isThrowing());
-      Bits.AnyFunctionType.HasLifetimeDependenceInfo =
-          !Info.value().getLifetimeDependenceInfo().empty();
+      Bits.AnyFunctionType.HasLifetimeDependencies =
+          !Info.value().getLifetimeDependencies().empty();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3379,7 +3380,7 @@ protected:
       Bits.AnyFunctionType.HasClangTypeInfo = false;
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasThrownError = false;
-      Bits.AnyFunctionType.HasLifetimeDependenceInfo = false;
+      Bits.AnyFunctionType.HasLifetimeDependencies = false;
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -3426,8 +3427,8 @@ public:
     return Bits.AnyFunctionType.HasThrownError;
   }
 
-  bool hasLifetimeDependenceInfo() const {
-    return Bits.AnyFunctionType.HasLifetimeDependenceInfo;
+  bool hasLifetimeDependencies() const {
+    return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
 
   ClangTypeInfo getClangTypeInfo() const;
@@ -3436,14 +3437,13 @@ public:
   Type getGlobalActor() const;
   Type getThrownError() const;
 
-  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const;
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
-  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
-    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
-      return *depInfo;
-    }
-    return LifetimeDependenceInfo();
-  }
+  std::optional<LifetimeDependenceInfo>
+  getLifetimeDependenceFor(unsigned targetIndex) const;
+
+  std::optional<LifetimeDependenceInfo>
+  getLifetimeDependenceForResult(const ValueDecl *decl) const;
 
   FunctionTypeIsolation getIsolation() const {
     if (hasExtInfo())
@@ -3489,7 +3489,7 @@ public:
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
                    getGlobalActor(), getThrownError(),
-                   getLifetimeDependenceInfo());
+                   getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -3718,11 +3718,10 @@ bool hasIsolatedParameter(ArrayRef<AnyFunctionType::Param> params);
 class FunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
-      private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
-                                    ClangTypeInfo, Type,
-                                    LifetimeDependenceInfo> {
+      private llvm::TrailingObjects<
+          FunctionType, AnyFunctionType::Param, ClangTypeInfo, Type,
+          size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo> {
   friend TrailingObjects;
-
 
   size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
     return getNumParams();
@@ -3736,8 +3735,12 @@ class FunctionType final
     return hasGlobalActor() + hasThrownError();
   }
 
+  size_t numTrailingObjects(OverloadToken<size_t>) const {
+    return hasLifetimeDependencies() ? 1 : 0;
+  }
+
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
-    return hasLifetimeDependenceInfo() ? 1 : 0;
+    return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
   }
 
 public:
@@ -3771,22 +3774,27 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
 
-  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
-    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
-      return *depInfo;
-    }
-    return LifetimeDependenceInfo();
+  inline size_t getNumLifetimeDependencies() const {
+    if (!hasLifetimeDependencies())
+      return 0;
+    return getTrailingObjects<size_t>()[0];
   }
 
-  /// Returns nullptr for an empty dependence list.
-  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const {
-    if (!hasLifetimeDependenceInfo()) {
-      return nullptr;
-    }
-    auto *info = getTrailingObjects<LifetimeDependenceInfo>();
-    assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
-                             "shouldn't have stored it.");
-    return info;
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
+    if (!hasLifetimeDependencies())
+      return std::nullopt;
+    return {getTrailingObjects<LifetimeDependenceInfo>(),
+            getNumLifetimeDependencies()};
+  }
+
+  std::optional<LifetimeDependenceInfo>
+  getLifetimeDependenceFor(unsigned targetIndex) const {
+    return swift::getLifetimeDependenceFor(getLifetimeDependencies(),
+                                           targetIndex);
+  }
+
+  std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
+    return getLifetimeDependenceFor(getNumParams());
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -3814,9 +3822,9 @@ static CanFunctionType get(CanParamArrayRef params, CanType result,
   return cast<FunctionType>(fnType->getCanonicalType());
 }
 
-  CanFunctionType withExtInfo(ExtInfo info) const {
-    return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
-  }
+CanFunctionType withExtInfo(ExtInfo info) const {
+  return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
+}
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 
 /// Provides information about the parameter list of a given declaration, including whether each parameter
@@ -3887,7 +3895,8 @@ class GenericFunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param,
-                                    Type, LifetimeDependenceInfo> {
+                                    Type, size_t /*NumLifetimeDependencies*/,
+                                    LifetimeDependenceInfo> {
   friend TrailingObjects;
       
   GenericSignature Signature;
@@ -3900,8 +3909,12 @@ class GenericFunctionType final
     return hasGlobalActor() + hasThrownError();
   }
 
+  size_t numTrailingObjects(OverloadToken<size_t>) const {
+    return hasLifetimeDependencies() ? 1 : 0;
+  }
+
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
-    return hasLifetimeDependenceInfo() ? 1 : 0;
+    return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
   }
 
   /// Construct a new generic function type.
@@ -3932,22 +3945,28 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
 
-  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
-    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
-      return *depInfo;
-    }
-    return LifetimeDependenceInfo();
+  inline size_t getNumLifetimeDependencies() const {
+    if (!hasLifetimeDependencies())
+      return 0;
+    return getTrailingObjects<size_t>()[0];
   }
 
-  /// Returns nullptr for an empty dependence list.
-  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const {
-    if (!hasLifetimeDependenceInfo()) {
-      return nullptr;
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
+    if (!hasLifetimeDependencies())
+      return std::nullopt;
+    return {getTrailingObjects<LifetimeDependenceInfo>(),
+            getNumLifetimeDependencies()};
+  }
+
+  std::optional<LifetimeDependenceInfo>
+  getLifetimeDependenceFor(unsigned targetIndex) const {
+    auto dependencies = getLifetimeDependencies();
+    for (auto dependence : dependencies) {
+      if (dependence.getTargetIndex() == targetIndex) {
+        return dependence;
+      }
     }
-    auto *info = getTrailingObjects<LifetimeDependenceInfo>();
-    assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
-                             "shouldn't have stored it.");
-    return info;
+    return std::nullopt;
   }
 
   /// Retrieve the generic signature of this function type.
@@ -4451,8 +4470,12 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out,
-             const PrintOptions &options = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+             const PrintOptions &options = PrintOptions(),
+             std::optional<LifetimeDependenceInfo> lifetimeDependence =
+                 std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options,
+             std::optional<LifetimeDependenceInfo> lifetimeDependence =
+                 std::nullopt) const;
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                                        SILParameterInfo type) {
     type.print(out);
@@ -4824,7 +4847,7 @@ class SILFunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
-    return Bits.SILFunctionType.HasLifetimeDependenceInfo ? 1 : 0;
+    return NumLifetimeDependencies;
   }
 
 public:
@@ -4844,6 +4867,7 @@ private:
   unsigned NumAnyYieldResults = 0;  // Not including the ErrorResult.
   unsigned NumAnyIndirectFormalYieldResults = 0; // Subset of NumAnyYieldResults.
   unsigned NumPackYieldResults = 0; // Subset of NumAnyIndirectFormalYieldResults.
+  unsigned NumLifetimeDependencies = 0;
 
   // [NOTE: SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
@@ -4889,6 +4913,11 @@ private:
     assert(hasInvocationSubstitutions());
     return *(getTrailingObjects<SubstitutionMap>()
                + unsigned(hasPatternSubstitutions()));
+  }
+
+  MutableArrayRef<LifetimeDependenceInfo> getMutableLifetimeDependenceInfo() {
+    return {getTrailingObjects<LifetimeDependenceInfo>(),
+            NumLifetimeDependencies};
   }
 
   /// Do we have slots for caches of the normal-result tuple type?
@@ -5332,14 +5361,25 @@ public:
 
   ClangTypeInfo getClangTypeInfo() const;
 
-  /// Returns nullptr for an empty dependence list.
-  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const;
+  bool hasLifetimeDependencies() const {
+    return NumLifetimeDependencies != 0;
+  }
 
-  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
-    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
-      return *depInfo;
-    }
-    return LifetimeDependenceInfo();
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
+    if (!hasLifetimeDependencies())
+      return std::nullopt;
+    return {getTrailingObjects<LifetimeDependenceInfo>(),
+            NumLifetimeDependencies};
+  }
+
+  std::optional<LifetimeDependenceInfo>
+  getLifetimeDependenceFor(unsigned targetIndex) const {
+    return swift::getLifetimeDependenceFor(getLifetimeDependencies(),
+                                           targetIndex);
+  }
+
+  std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
+    return getLifetimeDependenceFor(getNumParameters());
   }
 
   /// Returns true if the function type stores a Clang type that cannot
@@ -5506,7 +5546,7 @@ public:
 
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.SILFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getLifetimeDependenceInfo());
+                   getLifetimeDependencies());
   }
 
   /// Returns the language-level calling convention of the function.

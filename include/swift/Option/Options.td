@@ -519,11 +519,15 @@ def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimizat
 
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to bypass resilience within a package">;
+  HelpText<"Deprecated; has no effect">;
 
 def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-non-resilient-access">,
   Flags<[FrontendOption]>,
-  HelpText<"Allow non-resilient access by generating all contents besides exportable decls">;
+  HelpText<"Deprecated; use -allow-non-resilient-access instead">;
+
+def allow_non_resilient_access : Flag<["-"], "allow-non-resilient-access">,
+  Flags<[FrontendOption]>,
+  HelpText<"Ensures all contents are generated besides exportable decls in the binary module, so non-resilient access can be allowed">;
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
@@ -998,7 +1002,11 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform default CMO within a package boundary">;
+  HelpText<"Deprecated; use -package-cmo instead">;
+
+def PackageCMO : Flag<["-"], "package-cmo">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
 
 def EnbaleDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,

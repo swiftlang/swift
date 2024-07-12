@@ -1027,7 +1027,7 @@ function Build-CMakeProject {
 
       if ($Platform -eq "Windows") {
         $SwiftArgs += @("-Xlinker", "/INCREMENTAL:NO")
-        # Swift Requries COMDAT folding and de-duplication
+        # Swift requires COMDAT folding and de-duplication
         $SwiftArgs += @("-Xlinker", "/OPT:REF")
         $SwiftArgs += @("-Xlinker", "/OPT:ICF")
       }
@@ -1194,7 +1194,7 @@ function Build-WiXProject() {
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
     # but Packages still require a purely numerical version number, 
-    # so trim any semantic versionning suffixes
+    # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
 
@@ -1669,8 +1669,15 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
+    if ($env:CI) {
+      # Use the windows-specific checkout on CI that provides
+      # a checkout that does not yet use swift-foundation.
+      $RepoName = "swift-corelibs-foundation-windows";
+    } else {
+      $RepoName = "swift-corelibs-foundation";
+    }
     Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation-windows `
+      -Src $SourceCache\$RepoName `
       -Bin $FoundationBinaryCache `
       -InstallTo $InstallPath `
       -Arch $Arch `

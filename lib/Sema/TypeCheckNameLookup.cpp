@@ -221,6 +221,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::IncludeUsableFromInline;
   if (options.contains(NameLookupFlags::ExcludeMacroExpansions))
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+    newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
 
   return newOptions;
 }
@@ -324,6 +326,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   NLOptions subOptions = (NL_QualifiedDefault | NL_ProtocolMembers);
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
+  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+    subOptions |= NL_IgnoreMissingImports;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -420,6 +424,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
+  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+    subOptions |= NL_IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     subOptions |= NL_IncludeUsableFromInline;
 

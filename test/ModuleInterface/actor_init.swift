@@ -12,8 +12,7 @@
 // CHECK-LABEL: public actor TestActor {
 @available(SwiftStdlib 5.5, *)
 public actor TestActor {
-  // FIXME: The convenience keyword should be omitted (rdar://130926278)
-  // CHECK: public convenience init(convenience: Swift.Int)
+  // CHECK: public init(convenience: Swift.Int)
   public init(convenience: Int) {
     self.init()
   }

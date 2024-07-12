@@ -691,15 +691,21 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
 }
 
 void CompilerInstance::setUpLLVMArguments() {
-  // Honor -Xllvm.
-  if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
-    llvm::SmallVector<const char *, 4> Args;
-    Args.push_back("swift (LLVM option parsing)");
-    for (unsigned i = 0, e = Invocation.getFrontendOptions().LLVMArgs.size();
-         i != e; ++i)
-      Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
-    Args.push_back(nullptr);
-    llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
+  // Dependency scanning has no need for LLVM options, and
+  // must not use `llvm::cl::` utilities operating on global state
+  // since dependency scanning is multi-threaded.
+  if (Invocation.getFrontendOptions().RequestedAction !=
+      FrontendOptions::ActionType::ScanDependencies) {
+    // Honor -Xllvm.
+    if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
+      llvm::SmallVector<const char *, 4> Args;
+      Args.push_back("swift (LLVM option parsing)");
+      for (unsigned i = 0, e = Invocation.getFrontendOptions().LLVMArgs.size();
+           i != e; ++i)
+        Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
+      Args.push_back(nullptr);
+      llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
+    }
   }
 }
 

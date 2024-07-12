@@ -703,7 +703,7 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << " against SDK " << SDKVersion
      << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.AllowNonResilientAccess)
-    os << ", built with -experimental-allow-non-resilient-access";
+    os << ", built with -allow-non-resilient-access";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)

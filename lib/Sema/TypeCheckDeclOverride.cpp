@@ -1204,6 +1204,30 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   Type declTy = getDeclComparisonType();
   Type owningTy = dc->getDeclaredInterfaceType();
   auto isClassContext = classDecl != nullptr;
+  bool allowsSendabilityMismatches =
+      attempt == OverrideCheckingAttempt::MismatchedSendability ||
+      (attempt == OverrideCheckingAttempt::PerfectMatch &&
+       baseDecl->preconcurrency());
+  bool mismatchedOnSendability = false;
+
+  auto diagnoseSendabilityMismatch = [&]() {
+    SendableCheckContext fromContext(decl->getDeclContext(),
+                                     SendableCheck::Explicit);
+    auto baseDeclClass = baseDecl->getDeclContext()->getSelfClassDecl();
+
+    diagnoseSendabilityErrorBasedOn(
+        baseDeclClass, fromContext, [&](DiagnosticBehavior limit) {
+          diags
+              .diagnose(decl, diag::override_sendability_mismatch,
+                        decl->getName())
+              .limitBehaviorUntilSwiftVersion(limit, 6)
+              .limitBehaviorIf(
+                  fromContext.preconcurrencyBehavior(baseDeclClass));
+          diags.diagnose(baseDecl, diag::overridden_here);
+          return false;
+        });
+  };
+
   if (declIUOAttr == matchDeclIUOAttr && declTy->isEqual(baseTy)) {
     // Nothing to do.
 
@@ -1264,30 +1288,47 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     CanType parentPropertyCanTy =
       parentPropertyTy->getReducedType(
         decl->getInnermostDeclContext()->getGenericSignatureOfContext());
-    if (!propertyTy->matches(parentPropertyCanTy,
-                             TypeMatchFlags::AllowOverride)) {
-      diags.diagnose(property, diag::override_property_type_mismatch,
-                     property->getName(), propertyTy, parentPropertyTy);
-      noteFixableMismatchedTypes(decl, baseDecl);
-      diags.diagnose(baseDecl, diag::property_override_here);
-      return true;
+
+    TypeMatchOptions options;
+    options |= TypeMatchFlags::AllowOverride;
+    if (!propertyTy->matches(parentPropertyCanTy, options)) {
+      if (allowsSendabilityMismatches) {
+        options |= TypeMatchFlags::IgnoreSendability;
+        options |= TypeMatchFlags::IgnoreFunctionSendability;
+
+        mismatchedOnSendability =
+            propertyTy->matches(parentPropertyCanTy, options);
+      }
+
+      if (!mismatchedOnSendability) {
+        diags.diagnose(property, diag::override_property_type_mismatch,
+                       property->getName(), propertyTy, parentPropertyTy);
+        noteFixableMismatchedTypes(decl, baseDecl);
+        diags.diagnose(baseDecl, diag::property_override_here);
+        return true;
+      }
     }
 
     // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
-    bool IsSilentDifference = false;
+    bool optionalVsIUO = false;
     if (auto propertyTyNoOptional = propertyTy->getOptionalObjectType())
       if (auto parentPropertyTyNoOptional =
               parentPropertyTy->getOptionalObjectType())
         if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
-          IsSilentDifference = true;
+          optionalVsIUO = true;
 
     // The overridden property must not be mutable.
     if (cast<AbstractStorageDecl>(baseDecl)->supportsMutation() &&
-        !IsSilentDifference) {
+        !(optionalVsIUO || mismatchedOnSendability)) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
       diags.diagnose(baseDecl, diag::property_override_here);
       return true;
+    }
+
+    if (mismatchedOnSendability && !emittedMatchError) {
+      diagnoseSendabilityMismatch();
+      return checkSingleOverride(decl, baseDecl);
     }
   }
 
@@ -1295,19 +1336,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     return true;
 
   if (attempt == OverrideCheckingAttempt::MismatchedSendability) {
-    SendableCheckContext fromContext(decl->getDeclContext(),
-                                     SendableCheck::Explicit);
-    auto baseDeclClass = baseDecl->getDeclContext()->getSelfClassDecl();
-
-    diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
-                                    [&](DiagnosticBehavior limit) {
-      diags.diagnose(decl, diag::override_sendability_mismatch,
-                     decl->getName())
-        .limitBehaviorUntilSwiftVersion(limit, 6)
-        .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
-      diags.diagnose(baseDecl, diag::overridden_here);
-      return false;
-    });
+    diagnoseSendabilityMismatch();
   }
   // Catch-all to make sure we don't silently accept something we shouldn't.
   else if (attempt != OverrideCheckingAttempt::PerfectMatch) {

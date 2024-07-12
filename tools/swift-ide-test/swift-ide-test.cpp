@@ -508,7 +508,7 @@ static llvm::cl::opt<bool> CodeCompletionAddCallWithNoDefaultArgs(
 
 static llvm::cl::list<std::string>
 ConformingMethodListExpectedTypes("conforming-methods-expected-types",
-    llvm::cl::desc("Set expected types for comforming method list"),
+    llvm::cl::desc("Set expected types for conforming method list"),
     llvm::cl::cat(Category));
 
 // '-syntax-coloring' options.
@@ -3049,7 +3049,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Context.getModule(unloadedImport.module.getModulePath());
@@ -3116,7 +3116,7 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Context.getModule(unloadedImport.module.getModulePath());
