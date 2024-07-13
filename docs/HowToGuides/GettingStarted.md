@@ -311,23 +311,19 @@ You will need to slightly tweak the paths for other build configurations.
   In many situations, there are several errors, so scrolling further back
   and looking at the first error may be more helpful than simply looking
   at the last error.
-- Check if others have encountered the same issue on the [Swift Forums](https://forums.swift.org/c/development/compiler) or on [Swift repository 'Issues' tab][Swift Issues]. Here is a list of threads that describe common issues:
-  * [Problems with `build-script` building compiler with `–xcode`](https://forums.swift.org/t/problems-with-build-script-building-compiler-with-xcode/53477)
-  * [Error building the compiler (even with ninja)](https://forums.swift.org/t/error-building-the-compiler-even-with-ninja/54834)
-  * [Build failure on Apple MacBook Pro with Apple M1 Chip](https://forums.swift.org/t/build-failure-on-apple-silicon-m1-mac-mini/45011)
-  * [CMake cannot compile a test program](https://forums.swift.org/t/build-failure-locally/55695)
-  * [Building Swift compiler from source fails when not using Ninja](https://forums.swift.org/t/building-swift-compiler-from-source-fails-when-not-using-ninja/54656)
-  * [ALL_BUILD Target failing at validation](https://forums.swift.org/t/help-building-swift-in-xcode-error/49728)
-  * [“gtest/gtest.h” not found while compiling the compiler](https://forums.swift.org/t/gtest-gtest-h-not-found-in-typeref-cpp-while-compiling-the-compiler/44399)
-- If you still could not find a solution to your issue, feel free to create a new Swift Forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category: 
-  - Include information about your configuration and the errors you are seeing.
+- Check if others have encountered the same issue on the
+  [Swift forums][build-script-issues-forums] or in
+  [our issues][build-script-issues-github].
+- If you still could not find a solution to your issue, feel free to create a new Swift forums thread in the [Development/Compiler](https://forums.swift.org/c/development/compiler) category:
+  - Include the command, information about your environment, and the errors
+    you are seeing.
   - You can [create a gist](https://gist.github.com) with the entire build
     output and link it, while highlighting the most important part of the
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
-[Swift Issues]: https://github.com/swiftlang/swift/issues
-[Swift Forums]: https://forums.swift.org
+[build-script-issues-forums]: https://forums.swift.org/search?q=tags%3Abuild-script%2Bhelp-needed
+[build-script-issues-github]: https://github.com/swiftlang/swift/issues?q=is%3Aissue+label%3Abuild-script+label%3Abug
 
 ## Editing code
 
@@ -706,3 +702,5 @@ If you see mistakes in the documentation (including typos, not just major
 errors) or identify gaps that you could potentially improve the contributing
 experience, please start a discussion on the forums, submit a pull request
 or file a bug report on [Swift repository 'Issues' tab][Swift Issues]. Thanks!
+
+[Swift Issues]: https://github.com/swiftlang/swift/issues
