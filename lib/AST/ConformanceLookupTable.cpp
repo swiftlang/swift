@@ -69,9 +69,18 @@ void ConformanceLookupTable::ConformanceEntry::markSupersededBy(
   SupersededBy = entry;
 
   if (diagnose) {
+    // If an unavailable Sendable conformance is superseded by a
+    // retroactive one in the client, we need to record this error
+    // at the client decl context.
+    auto *dc = getDeclContext();
+    if (getProtocol()->isMarkerProtocol() && isFixed() &&
+        !entry->isFixed()) {
+      dc = entry->getDeclContext();
+    }
+
     // Record the problem in the conformance table. We'll
     // diagnose these in semantic analysis.
-    table.AllSupersededDiagnostics[getDeclContext()].push_back(this);
+    table.AllSupersededDiagnostics[dc].push_back(this);
   }
 }
 
@@ -258,14 +267,6 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
   llvm::SmallPtrSet<ProtocolDecl *, 4> protocols;
   auto addInheritedConformance = [&](ConformanceEntry *entry) {
     auto protocol = entry->getProtocol();
-
-    // Don't add unavailable conformances.
-    if (auto dc = entry->Source.getDeclContext()) {
-      if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-        if (AvailableAttr::isUnavailable(ext))
-          return;
-      }
-    }
 
     // Don't add redundant conformances here. This is merely an
     // optimization; resolveConformances() would zap the duplicates
@@ -614,6 +615,10 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   // same conformance, this silently takes the class and drops the extension.
   if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
       rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
+    // Diagnose conflicting marker protocol conformances that differ in
+    // un-availability.
+    diagnoseSuperseded = lhs->getProtocol()->isMarkerProtocol();
+
     return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
             ? Ordering::Before
             : Ordering::After);
@@ -621,23 +626,12 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
 
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
-    auto isReplaceableOrMarker = [](ConformanceEntry *entry) -> bool {
-      ConformanceEntryKind kind = entry->getRankingKind();
-      if (isReplaceable(kind))
-        return true;
-
-      // Allow replacement of an explicit conformance to a marker protocol.
-      // (This permits redundant explicit declarations of `Sendable`.)
-      return (kind == ConformanceEntryKind::Explicit
-              && entry->getProtocol()->isMarkerProtocol());
-    };
-
     // If the non-fixed conformance is not replaceable, we have a failure to
     // diagnose.
     // FIXME: We should probably diagnose if they have different constraints.
-    diagnoseSuperseded = (lhs->isFixed() && !isReplaceableOrMarker(rhs)) ||
-                         (rhs->isFixed() && !isReplaceableOrMarker(lhs));
-      
+    diagnoseSuperseded = (lhs->isFixed() && !isReplaceable(rhs->getRankingKind())) ||
+                         (rhs->isFixed() && !isReplaceable(lhs->getRankingKind()));
+
     return lhs->isFixed() ? Ordering::Before : Ordering::After;
   }
 
@@ -879,8 +873,6 @@ DeclContext *ConformanceLookupTable::getConformingContext(
           return nullptr;
         auto inheritedConformance = ModuleDecl::lookupConformance(
             superclassTy, protocol, /*allowMissing=*/false);
-        if (inheritedConformance.hasUnavailableConformance())
-          inheritedConformance = ProtocolConformanceRef::forInvalid();
         if (inheritedConformance)
           return superclassDecl;
       } while ((superclassDecl = superclassDecl->getSuperclassDecl()));
@@ -1145,8 +1137,16 @@ void ConformanceLookupTable::lookupConformances(
   if (diagnostics) {
     auto knownDiags = AllSupersededDiagnostics.find(dc);
     if (knownDiags != AllSupersededDiagnostics.end()) {
-      for (const auto *entry : knownDiags->second) {
+      for (auto *entry : knownDiags->second) {
         ConformanceEntry *supersededBy = entry->getSupersededBy();
+
+        // Diagnose the client conformance as superseded.
+        auto *definingModule = nominal->getParentModule();
+        if (entry->getDeclContext()->getParentModule() == definingModule &&
+            supersededBy->getDeclContext()->getParentModule() != definingModule) {
+          supersededBy = entry;
+          entry = entry->getSupersededBy();
+        }
 
         diagnostics->push_back({entry->getProtocol(), 
                                 entry->getDeclaredLoc(),
