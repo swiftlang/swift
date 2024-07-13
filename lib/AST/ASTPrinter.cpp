@@ -7182,7 +7182,7 @@ public:
       }
 
       // Print based on the type.
-      Printer << "some ";
+      Printer.printKeyword("some", Options, /*Suffix=*/" ");
       auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
           decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
       auto constraintType = archetypeType->getExistentialType();
