@@ -6256,20 +6256,56 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     // protocol, just warn; we'll pick up the original conformance.
     auto existingModule = diag.ExistingDC->getParentModule();
     auto extendedNominal = diag.ExistingDC->getSelfNominalTypeDecl();
-    if (existingModule != dc->getParentModule() &&
-        (existingModule->getName() ==
-           extendedNominal->getParentModule()->getName() ||
+    auto definingModule = extendedNominal->getParentModule()->getName();
+    bool conformanceInOrigModule =
+        (existingModule->getName() == definingModule ||
          existingModule == diag.Protocol->getParentModule() ||
-         existingModule->getName().is("CoreGraphics"))) {
+         existingModule->getName().is("CoreGraphics"));
+
+    // Redundant Sendable conformances are always warnings.
+    auto knownProtocol = diag.Protocol->getKnownProtocolKind();
+    bool isSendable = knownProtocol == KnownProtocolKind::Sendable;
+    // Try to find an inherited Sendable conformance if there is one.
+    if (isSendable && !SendableConformance) {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      nominal->lookupConformance(diag.Protocol, conformances);
+      for (auto conformance : conformances) {
+        if (isa<InheritedProtocolConformance>(conformance))
+          SendableConformance = conformance;
+      }
+    }
+
+    if ((existingModule != dc->getParentModule() && conformanceInOrigModule) ||
+        isSendable) {
       // Warn about the conformance.
-      auto diagID = differentlyConditional
-                        ? diag::redundant_conformance_adhoc_conditional
-                        : diag::redundant_conformance_adhoc;
-      Context.Diags.diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
-                             diag.Protocol->getName(),
-                             existingModule->getName() ==
-                                 extendedNominal->getParentModule()->getName(),
-                             existingModule->getName());
+      if (isSendable && SendableConformance &&
+          isa<InheritedProtocolConformance>(SendableConformance)) {
+        // Allow re-stated unchecked conformances to Sendable in subclasses
+        // as long as the inherited conformance isn't unavailable.
+        auto *conformance = SendableConformance->getRootConformance();
+        auto *decl = conformance->getDeclContext()->getAsDecl();
+        if (!AvailableAttr::isUnavailable(decl)) {
+          continue;
+        }
+
+        Context.Diags.diagnose(diag.Loc, diag::unavailable_conformance,
+                               nominal->getDeclaredInterfaceType(),
+                               diag.Protocol->getName());
+      } else if (existingModule == dc->getParentModule()) {
+        Context.Diags.diagnose(diag.Loc, diag::redundant_conformance,
+                               nominal->getDeclaredInterfaceType(),
+                               diag.Protocol->getName())
+          .limitBehavior(DiagnosticBehavior::Warning);
+      } else {
+        auto diagID = differentlyConditional
+                          ? diag::redundant_conformance_adhoc_conditional
+                          : diag::redundant_conformance_adhoc;
+        Context.Diags.diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
+                               diag.Protocol->getName(),
+                               existingModule->getName() ==
+                                   extendedNominal->getParentModule()->getName(),
+                               existingModule->getName());
+      }
 
       // Complain about any declarations in this extension whose names match
       // a requirement in that protocol.
