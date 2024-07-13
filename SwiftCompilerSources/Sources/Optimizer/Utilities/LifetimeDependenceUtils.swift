@@ -215,7 +215,7 @@ extension LifetimeDependence {
     if (value.definingInstructionOrTerminator as! FullApplySite).hasResultDependence {
       return nil
     }
-    assert(value.ownership == .owned, "apply result must be owned")
+    assert(value.ownership == .owned, "unsafe apply result must be owned")
     self.scope = Scope(base: value, context)!
     self.dependentValue = value
   }

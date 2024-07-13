@@ -168,3 +168,25 @@ func tupleLifetimeDependence(_ x: borrowing BufferView) -> (BufferView, BufferVi
   return (BufferView(x.ptr, x.c), BufferView(x.ptr, x.c))
 }
 
+public struct OuterNE: ~Escapable {
+  // A public property generates an implicit setter with an infered dependence on 'newValue'.
+  //
+  // CHECK-LABEL: sil [transparent] @$s28implicit_lifetime_dependence7OuterNEV5innerAC05InnerE0Vvs : $@convention(method) (@owned OuterNE.InnerNE, _inherit(0) @inout OuterNE) -> () {
+  public var inner1: InnerNE
+
+  // Explicit setter with an infered dependence on 'newValue'.
+  public var inner2: InnerNE {
+    get { inner1 }
+    set { inner1 = newValue }
+  }
+
+  public struct InnerNE: ~Escapable {
+    init<Owner: ~Escapable & ~Copyable>(
+      owner: borrowing Owner
+    ) -> dependsOn(owner) Self {}
+  }
+
+  init<Owner: ~Copyable & ~Escapable>(owner: borrowing Owner) -> dependsOn(owner) Self {
+    self.inner1 = InnerNE(owner: owner)
+  }
+}

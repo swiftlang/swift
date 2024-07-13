@@ -159,6 +159,10 @@ class LifetimeDependenceInfo {
   /// Infer LifetimeDependenceInfo on result
   static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd);
 
+  /// Infer LifetimeDependenceInfo on setter
+  static std::optional<LifetimeDependenceInfo>
+  inferSetter(AbstractFunctionDecl *afd);
+
   /// Builds LifetimeDependenceInfo from SIL function type
   static std::optional<LifetimeDependenceInfo>
   fromTypeRepr(LifetimeDependentTypeRepr *lifetimeDependentRepr,

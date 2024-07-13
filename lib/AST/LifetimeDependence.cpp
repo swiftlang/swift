@@ -80,6 +80,8 @@ getLifetimeDependenceKindFromType(Type sourceType) {
   return LifetimeDependenceKind::Inherit;
 }
 
+// Warning: this is incorrect for Setter 'newValue' parameters. It should only
+// be called for a Setter's 'self'.
 static ValueOwnership getLoweredOwnership(AbstractFunctionDecl *afd) {
   if (isa<ConstructorDecl>(afd)) {
     return ValueOwnership::Owned;
@@ -437,6 +439,13 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     return std::nullopt;
   }
 
+  // Setters infer 'self' dependence on 'newValue'.
+  if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
+    if (accessor->getAccessorKind() == AccessorKind::Set) {
+      return inferSetter(accessor);
+    }
+  }
+
   if (hasEscapableResultOrYield(afd)) {
     return std::nullopt;
   }
@@ -540,6 +549,53 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
 
   return LifetimeDependenceInfo::getForIndex(
       afd, resultIndex, *candidateParamIndex, *candidateLifetimeKind);
+}
+
+/// Infer LifetimeDependenceInfo on a setter where 'self' is nonescapable.
+std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferSetter(
+  AbstractFunctionDecl *afd) {
+
+  auto *param = afd->getParameters()->get(0);
+  Type paramTypeInContext =
+    afd->mapTypeIntoContext(param->getInterfaceType());
+  if (paramTypeInContext->hasError()) {
+    return std::nullopt;
+  }
+  if (paramTypeInContext->isEscapable()) {
+    return std::nullopt;
+  }
+  auto kind = getLifetimeDependenceKindFromType(paramTypeInContext);
+  return LifetimeDependenceInfo::getForIndex(
+    afd, /*selfIndex */ afd->getParameters()->size(), 0, kind);
+}
+
+/// Infer LifetimeDependenceInfo on a mutating method where 'self' is
+/// nonescapable and the result is 'void'. For now, we'll assume that 'self'
+/// depends on a single nonescapable argument.
+std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferMutatingSelf(
+  AbstractFunctionDecl *afd) {
+  std::optional<LifetimeDependenceInfo> dep;
+  for (unsigned paramIndex : range(afd->getParameters()->size())) {
+    auto *param = afd->getParameters()->get(paramIndex);
+    Type paramTypeInContext =
+      afd->mapTypeIntoContext(param->getInterfaceType());
+    if (paramTypeInContext->hasError()) {
+      continue;
+    }
+    if (paramTypeInContext->isEscapable()) {
+      continue;
+    }
+    if (dep) {
+      // Don't infer dependence on multiple nonescapable parameters. We may want
+      // to do this in the future if dependsOn(self: arg1, arg2) syntax is too
+      // cumbersome.
+      return std::nullopt;
+    }
+    int selfIndex = afd->getParameters()->size();
+    dep = LifetimeDependenceInfo::getForIndex(
+      afd, selfIndex, paramIndex, LifetimeDependenceKind::Inherit);
+  }
+  return dep;
 }
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
