@@ -9124,7 +9124,7 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
                        ReferenceOwnership::Weak, varType);
 
   auto typeRange = var->getTypeSourceRangeForDiagnostics();
-  if (varType->hasSimpleTypeRepr()) {
+  if (varType->lookThroughSingleOptionalType()->hasSimpleTypeRepr()) {
     diagnostic.fixItInsertAfter(typeRange.End, "?");
   } else {
     diagnostic.fixItInsert(typeRange.Start, "(")
