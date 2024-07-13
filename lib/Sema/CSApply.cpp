@@ -5124,8 +5124,7 @@ namespace {
 
         bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.
-        if (kind == KeyPathExpr::Component::Kind::UnresolvedMember ||
-            kind == KeyPathExpr::Component::Kind::UnresolvedApply) {
+        if (kind == KeyPathExpr::Component::Kind::UnresolvedMember) {
           auto foundDecl = solution.getOverloadChoiceIfAvailable(calleeLoc);
           if (!foundDecl) {
             // If we couldn't resolve the component, leave it alone.
@@ -5151,12 +5150,21 @@ namespace {
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedApply: {
-          buildKeyPathSubscriptComponent(
-              solution.getOverloadChoice(calleeLoc), origComponent.getLoc(),
-              origComponent.getArgs(), componentLocator, resolvedComponents);
-          //          buildKeyPathApplyComponent(solution.getOverloadChoice(calleeLoc),
-          //          origComponent.getArgs(), componentLocator,
-          //          resolvedComponents);
+          //          buildKeyPathSubscriptComponent(
+          //              solution.getOverloadChoice(calleeLoc),
+          //              origComponent.getLoc(), origComponent.getArgs(),
+          //              componentLocator, resolvedComponents);
+
+          // Get the calleeLoc of the property that requires application
+          // resolution of its arguments.
+          auto propertyComponentLocator = cs.getConstraintLocator(
+              E, LocatorPathElt::KeyPathComponent(i - 1));
+          auto propertyCalleeLoc =
+              cs.getCalleeLocator(propertyComponentLocator);
+          buildKeyPathApplyComponent(
+              solution.getOverloadChoice(propertyCalleeLoc),
+              origComponent.getArgs(), componentLocator,
+              propertyComponentLocator, resolvedComponents);
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
@@ -5378,6 +5386,8 @@ namespace {
         // Key paths don't work with mutating-get properties.
         if (auto varDecl = dyn_cast<VarDecl>(member)) {
           assert(!varDecl->isGetterMutating());
+        } else if (auto subscriptDecl = dyn_cast<SubscriptDecl>(member)) {
+          assert(!subscriptDecl->isGetterMutating());
         }
 
         // Compute the concrete reference to the member.
@@ -5398,23 +5408,22 @@ namespace {
 
     void buildKeyPathApplyComponent(
         const SelectedOverload &overload, ArgumentList *args,
-        ConstraintLocator *locator,
+        ConstraintLocator *applyLocator, ConstraintLocator *propertyLocator,
         SmallVectorImpl<KeyPathExpr::Component> &components) {
       auto &ctx = cs.getASTContext();
-      //      auto memberLoc = components.back().getLoc();
-      auto memberRef = components.back().getDeclRef();
-      auto memberLoc = cs.getCalleeLocator(locator);
 
-      // Compute substitutions to refer to the member.
-      //      auto ref = resolveConcreteDeclRef(member, memberLoc);
-
-      auto memberType =
+      // Compute the type and substitutions to refer to the property that
+      // requires resolution of its arguments.
+      auto propertyTy =
           simplifyType(overload.adjustedOpenedType)->castTo<AnyFunctionType>();
+      auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
+      auto propertyRef = resolveConcreteDeclRef(subscript, propertyLocator);
 
-      // Coerce the indices to the type the subscript expects.
+      // Coerce the indices to the type the member expects.
       args = coerceCallArguments(
-          args, memberType, memberRef, /*applyExpr*/ nullptr,
-          cs.getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
+          args, propertyTy, propertyRef, /*applyExpr*/ nullptr,
+          cs.getConstraintLocator(applyLocator,
+                                  ConstraintLocator::ApplyArgument),
           /*appliedPropertyWrappers*/ {});
 
       // We need to be able to hash the captured index values in order for
@@ -5443,11 +5452,6 @@ namespace {
       auto comp = KeyPathExpr::Component::forApply(
           args, ctx.AllocateCopy(conformances));
       components.push_back(comp);
-
-      auto unwrapCount =
-          getIUOForceUnwrapCount(memberLoc, IUOReferenceKind::ReturnValue);
-      for (unsigned i = 0; i < unwrapCount; ++i)
-        buildKeyPathOptionalForceComponent(components);
     }
 
     void buildKeyPathSubscriptComponent(
