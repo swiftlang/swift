@@ -1421,6 +1421,11 @@ bool swift::checkOverrides(ValueDecl *decl) {
     return false;
   }
 
+  // Don't bother checking any further for invalid decls since they won't match
+  // anything.
+  if (decl->isInvalid())
+    return true;
+
   // Set up matching, but bail out if there's nothing to match.
   OverrideMatcher matcher(decl);
   if (!matcher) return false;
