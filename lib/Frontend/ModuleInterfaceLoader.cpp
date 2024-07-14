@@ -1715,6 +1715,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       }
       break;
     }
+    case PluginSearchOption::Kind::LoadPlugin: {
+      auto &val = entry.get<PluginSearchOption::LoadPlugin>();
+      for (auto &moduleName : val.ModuleNames) {
+        GenericArgs.push_back("-load-plugin");
+        GenericArgs.push_back(
+            ArgSaver.save(val.LibraryPath + ":" + val.ServerPath + "#" + moduleName));
+      }
+      break;
+    }
     case PluginSearchOption::Kind::PluginPath: {
       auto &val = entry.get<PluginSearchOption::PluginPath>();
       GenericArgs.push_back("-plugin-path");
