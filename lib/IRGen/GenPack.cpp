@@ -352,12 +352,10 @@ static void bindElementSignatureRequirementsAtIndex(
                       patternPackArchetype)
                   ->getCanonicalType();
           llvm::Value *_metadata = nullptr;
-          auto packConformance =
-              context.signature->lookupConformance(ty, proto);
+          auto packConformance = ProtocolConformanceRef(proto);
           auto *wtablePack = emitWitnessTableRef(IGF, patternPackArchetype,
                                                  &_metadata, packConformance);
-          auto elementConformance =
-              context.signature->lookupConformance(ty, proto);
+          auto elementConformance = ProtocolConformanceRef(proto);
           auto *wtable = bindWitnessTableAtIndex(
               IGF, elementArchetype, elementConformance, wtablePack, index);
           assert(wtable);
@@ -574,7 +572,7 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
   auto instantiatedPatternTy =
       context.environment->mapContextualPackTypeIntoElementContext(patternTy);
   auto instantiatedConformance =
-      context.environment->getGenericSignature()->lookupConformance(
+      ModuleDecl::lookupConformance(
           instantiatedPatternTy, conformance.getRequirement());
 
   // Emit the element witness table.

@@ -6,6 +6,7 @@
 import P
 import FooBar
 
+
 // CHECK:      {{.*}}{{/|\\}}error_source_locations.swift:7:8: error: Unable to find module dependency: 'FooBar'
 // CHECK-NEXT: 5 |
 // CHECK-NEXT: 6 | import P

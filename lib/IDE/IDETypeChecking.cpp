@@ -66,7 +66,7 @@ void swift::getTopLevelDeclsForDisplay(
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void)M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void)ModuleDecl::lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
@@ -358,7 +358,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         assert(!Req.getFirstType()->hasArchetype());
         assert(!Req.getSecondType()->hasArchetype());
 
-        auto *M = DC->getParentModule();
         auto SubstReq = Req.subst(
           [&](Type type) -> Type {
             if (type->isTypeParameter())
@@ -366,7 +365,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
             return type;
           },
-          LookUpConformanceInModule(M));
+          LookUpConformanceInModule());
 
         SmallVector<Requirement, 2> subReqs;
         switch (SubstReq.checkRequirement(subReqs)) {
@@ -396,7 +395,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return false;
     };
 
-    auto *M = DC->getParentModule();
     if (Ext->isConstrainedExtension()) {
       // Get the substitutions from the generic signature of
       // the extension to the interface types of the base type's
@@ -404,7 +402,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       SubstitutionMap subMap;
       if (!BaseType->isExistentialType()) {
         if (auto *NTD = Ext->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(M, NTD);
+          subMap = BaseType->getContextSubstitutionMap(NTD);
       }
 
       assert(Ext->getGenericSignature() && "No generic signature.");
@@ -417,7 +415,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       SubstitutionMap subMap;
       if (!BaseType->isExistentialType()) {
         if (auto *NTD = EnablingExt->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(M, NTD);
+          subMap = BaseType->getContextSubstitutionMap(NTD);
       }
       if (handleRequirements(subMap,
                              EnablingExt,

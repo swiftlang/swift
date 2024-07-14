@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTVisitor.h"
@@ -524,10 +525,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
       auto accessLevel =
           first->getFormalAccessScope().accessLevelForDiagnostics();
-      if (accessLevel == AccessLevel::Public &&
-          diagnoseMissingImportForMember(first, DC, Loc))
-        return errorResult();
-
       Context.Diags.diagnose(Loc, diag::candidate_inaccessible, first,
                              accessLevel);
 
@@ -537,6 +534,19 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         auto *VD = lookupResult.getValueDecl();
         VD->diagnose(diag::decl_declared_here, VD);
       }
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if the type of the inaccessible decl is also inaccessible.
+      return errorResult();
+    }
+
+    // Try ignoring missing imports.
+    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    auto nonImportedResults =
+        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
+    if (nonImportedResults) {
+      const ValueDecl *first = nonImportedResults.front().getValueDecl();
+      diagnoseMissingImportForMember(first, DC, Loc);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if the type of the inaccessible decl is also inaccessible.
@@ -736,6 +746,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           isa<TypeDecl>(ResultValues.front())) {
         return buildTypeExpr(cast<TypeDecl>(ResultValues.front()));
       }
+    }
+
+    // If we are in an @_unsafeInheritExecutor context, swap out
+    // declarations for their _unsafeInheritExecutor_ counterparts if they
+    // exist.
+    if (enclosingUnsafeInheritsExecutor(DC)) {
+      introduceUnsafeInheritExecutorReplacements(
+          DC, UDRE->getNameLoc().getBaseNameLoc(), ResultValues);
     }
 
     return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
@@ -2436,7 +2454,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  return DC->getParentModule()->lookupConformance(castTy, protocol)
+  return ModuleDecl::lookupConformance(castTy, protocol)
              ? CoerceExpr::forLiteralInit(getASTContext(), literal,
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())

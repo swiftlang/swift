@@ -48,11 +48,19 @@ using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
 
-static llvm::cl::opt<bool> AbortOnUnknownPatternMatchError(
+#ifndef NDEBUG
+
+bool swift::regionanalysisimpl::AbortOnUnknownPatternMatchError = false;
+
+static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
     "sil-region-isolation-assert-on-unknown-pattern",
     llvm::cl::desc("Abort if SIL region isolation detects an unknown pattern. "
                    "Intended only to be used when debugging the compiler!"),
-    llvm::cl::init(false), llvm::cl::Hidden);
+    llvm::cl::Hidden,
+    llvm::cl::location(
+        swift::regionanalysisimpl::AbortOnUnknownPatternMatchError));
+
+#endif
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -370,6 +378,11 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 }
 
 static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
+  // Before a check if the value we are attempting to access is Sendable. In
+  // such a case, just return early.
+  if (!SILIsolationInfo::isNonSendableType(value))
+    return UnderlyingTrackedValueInfo(value);
+
   // Look through a project_box, so that we process it like its operand object.
   if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
     value = pbi->getOperand();
@@ -378,6 +391,7 @@ static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
     SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
 
+    // If we do not have a load inst, just return the value.
     if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
       return UnderlyingTrackedValueInfo(underlyingValue);
     }
@@ -1197,8 +1211,16 @@ struct PartitionOpBuilder {
         PartitionOp::Require(lookupValueID(value), currentInst));
   }
 
+  void addRequireInOutSendingAtFunctionExit(SILValue value) {
+    assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
+           "required value should already have been encountered");
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::RequireInOutSendingAtFunctionExit(lookupValueID(value),
+                                                       currentInst));
+  }
+
   void addUnknownPatternError(SILValue value) {
-    if (AbortOnUnknownPatternMatchError) {
+    if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
@@ -1596,9 +1618,9 @@ public:
     // compiler exits successfully, actor merge errors could not have happened.
     std::optional<SILDynamicMergedIsolationInfo> mergedInfo;
     if (resultIsolationInfoOverride) {
-      mergedInfo = resultIsolationInfoOverride;
+      mergedInfo = SILDynamicMergedIsolationInfo(resultIsolationInfoOverride);
     } else {
-      mergedInfo = SILIsolationInfo::getDisconnected(false);
+      mergedInfo = SILDynamicMergedIsolationInfo::getDisconnected(false);
     }
 
     for (SILValue src : sourceValues) {
@@ -1619,8 +1641,9 @@ public:
               if (originalMergedInfo)
                   originalMergedInfo->printForDiagnostics(llvm::dbgs());
               else llvm::dbgs() << "nil";
-              llvm::dbgs() << "\nValue: "
+              llvm::dbgs() << "\nValue Rep: "
                            << value->getRepresentative().getValue();
+              llvm::dbgs() << "Original Src: " << src;
               llvm::dbgs() << "Value Info: ";
               value->getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
               llvm::dbgs() << "\n");
@@ -2313,6 +2336,22 @@ public:
 #define INST(INST, PARENT) TranslationSemantics visit##INST(INST *inst);
 #include "swift/SIL/SILNodes.def"
 
+  /// Adds requires for all sending inout parameters to make sure that they are
+  /// properly updated before the end of the function.
+  void addRequiresForInOutParameters(TermInst *inst) {
+    assert(inst->isFunctionExiting() && "Must be function exiting term inst?!");
+    for (auto *arg : inst->getFunction()->getArguments()) {
+      auto *fArg = cast<SILFunctionArgument>(arg);
+      if (fArg->getArgumentConvention().isInoutConvention() &&
+          fArg->getKnownParameterInfo().hasOption(SILParameterInfo::Sending)) {
+        if (auto ns = tryToTrackValue(arg)) {
+          auto rep = ns->getRepresentative().getValue();
+          builder.addRequireInOutSendingAtFunctionExit(rep);
+        }
+      }
+    }
+  }
+
   /// Top level switch that translates SIL instructions.
   void translateSILInstruction(SILInstruction *inst) {
     builder.reset(inst);
@@ -2702,12 +2741,8 @@ CONSTANT_TRANSLATION(CondFailInst, Ignored)
 // function_ref/class_method which are considered sendable.
 CONSTANT_TRANSLATION(SwitchValueInst, Ignored)
 CONSTANT_TRANSLATION(UnreachableInst, Ignored)
-CONSTANT_TRANSLATION(UnwindInst, Ignored)
-// Doesn't take a parameter.
-CONSTANT_TRANSLATION(ThrowAddrInst, Ignored)
 
 // Terminators that only need require.
-CONSTANT_TRANSLATION(ThrowInst, Require)
 CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
 CONSTANT_TRANSLATION(YieldInst, Require)
 
@@ -2716,6 +2751,33 @@ CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+
+// Function exiting terminators.
+//
+// We handle these especially since we want to make sure that inout parameters
+// that are transferred are forced to be reinitialized.
+//
+// There is an assert in TermInst::isFunctionExiting that makes sure we do this
+// correctly.
+//
+// NOTE: We purposely do not require reinitialization along paths that end in
+// unreachable.
+#ifdef FUNCTION_EXITING_TERMINATOR_TRANSLATION
+#error "FUNCTION_EXITING_TERMINATOR_TRANSLATION already defined?!"
+#endif
+
+#define FUNCTION_EXITING_TERMINATOR_CONSTANT(INST, Kind)                       \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    assert(inst->isFunctionExiting() && "Must be function exiting?!");         \
+    addRequiresForInOutParameters(inst);                                       \
+    return TranslationSemantics::Kind;                                         \
+  }
+
+FUNCTION_EXITING_TERMINATOR_CONSTANT(UnwindInst, Ignored)
+FUNCTION_EXITING_TERMINATOR_CONSTANT(ThrowAddrInst, Ignored)
+FUNCTION_EXITING_TERMINATOR_CONSTANT(ThrowInst, Require)
+
+#undef FUNCTION_EXITING_TERMINATOR_CONSTANT
 
 // Today, await_async_continuation just takes Sendable values
 // (UnsafeContinuation and UnsafeThrowingContinuation).
@@ -2953,6 +3015,7 @@ PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
+  addRequiresForInOutParameters(ri);
   if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
     return TranslationSemantics::TransferringNoResult;
   }

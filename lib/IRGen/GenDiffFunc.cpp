@@ -80,7 +80,7 @@ public:
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, kind, IGM.getSILTypes(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -207,7 +207,7 @@ public:
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, kind, IGM.getSILTypes(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(assocTy);
   }
 
@@ -255,7 +255,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       auto transposeTy = origFnTy->getAutoDiffTransposeFunctionType(
           parameterIndices, IGM.getSILTypes(),
-          LookUpConformanceInModule(IGM.getSwiftModule()));
+          LookUpConformanceInModule());
       return SILType::getPrimitiveObjectType(transposeTy);
     }
     llvm_unreachable("invalid component type");
@@ -377,7 +377,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       auto transposeTy = originalType->getAutoDiffTransposeFunctionType(
           parameterIndices, IGM.getSILTypes(),
-          LookUpConformanceInModule(IGM.getSwiftModule()));
+          LookUpConformanceInModule());
       return SILType::getPrimitiveObjectType(transposeTy);
     }
     llvm_unreachable("invalid component type");

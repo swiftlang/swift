@@ -709,6 +709,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
       // instruction we found that isn't an explicit dealloc_box.
       Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
     }
+    auto *dbi = dyn_cast<DeallocBoxInst>(LastRelease);
+    if (dbi && dbi->isDeadEnd()) {
+      // Don't bother to create dealloc_stack instructions in dead-ends.
+      continue;
+    }
     Builder.createDeallocStack(Loc, ASI);
   }
 

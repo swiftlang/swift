@@ -163,6 +163,7 @@ Added: _$ss8RangeSetV6RangesV10startIndexSivpMV
 Added: _$ss8RangeSetV6RangesV11descriptionSSvg
 Added: _$ss8RangeSetV6RangesV11descriptionSSvpMV
 Added: _$ss8RangeSetV6RangesV13_intersectionyADyx_GAFF
+Added: _$ss8RangeSetV6RangesV6_unionyADyx_GAFF
 Added: _$ss8RangeSetV6RangesV2eeoiySbADyx_G_AFtFZ
 Added: _$ss8RangeSetV6RangesV5_gaps9boundedByADyx_GSnyxG_tF
 Added: _$ss8RangeSetV6RangesV5countSivg
@@ -574,3 +575,6 @@ Added: _swift_bincompat_useLegacyNonCrashingExecutorChecks
 
 // Add add SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE
 Added: _concurrencyIsCurrentExecutorLegacyModeOverride
+
+//String.init<Encoding: Unicode.Encoding>(_immortalCocoaString: AnyObject, count: Int, encoding: Encoding.Type)
+Added: _$sSS20_immortalCocoaString5count8encodingSSyXl_Sixmtcs16_UnicodeEncodingRzlufC

@@ -728,6 +728,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ValueWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.ValueWitnessTable =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                      SpecialPointerAuthDiscriminators::ValueWitnessTable);
   opts.ProtocolWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolAssociatedTypeAccessFunctions =
@@ -1189,12 +1192,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
         if (auto *synthSFU = file->getSynthesizedFile()) {
           IGM.emitSynthesizedFileUnit(*synthSFU);
         }
-      } else {
-        file->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
-          IGM.addLinkLibrary(LinkLib);
-        });
       }
     }
+
+    IGM.addLinkLibraries();
 
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
@@ -1410,7 +1411,6 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     IRGenModule *IGM = new IRGenModule(
         irgen, std::move(targetMachine), nextSF, desc.ModuleName, *OutputIter++,
         nextSF->getFilename(), nextSF->getPrivateDiscriminator().str());
-    IGMcreated = true;
 
     initLLVMModule(*IGM, *SILMod);
     if (!DidRunSILCodeGenPreparePasses) {
@@ -1421,6 +1421,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     }
 
     (void)layoutStringsEnabled(*IGM, /*diagnose*/ true);
+
+    // Only need to do this once.
+    if (!IGMcreated)
+      IGM->addLinkLibraries();
+    IGMcreated = true;
   }
   
   if (!IGMcreated) {
@@ -1443,10 +1448,6 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         CurrentIGMPtr IGM = irgen.getGenModule(&synthSFU->getFileUnit());
         IGM->emitSynthesizedFileUnit(*synthSFU);
       }
-    } else {
-      File->collectLinkLibraries([&](LinkLibrary LinkLib) {
-        irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
-      });
     }
   }
   

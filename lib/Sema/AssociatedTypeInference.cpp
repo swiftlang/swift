@@ -149,7 +149,6 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     return CheckTypeWitnessResult::forSuccess();
 
   const auto proto = Conf->getProtocol();
-  const auto dc = Conf->getDeclContext();
   const auto sig = proto->getGenericSignature();
 
   // FIXME: The RequirementMachine will assert on re-entrant construction.
@@ -190,11 +189,9 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
       return CheckTypeWitnessResult::forSuperclass(superclass);
   }
 
-  auto *module = dc->getParentModule();
-
   // Check protocol conformances. We don't check conditional requirements here.
   for (const auto reqProto : sig->getRequiredProtocols(depTy)) {
-    if (module->lookupConformance(
+    if (ModuleDecl::lookupConformance(
             type, reqProto,
             /*allowMissing=*/reqProto->isSpecificProtocol(
                 KnownProtocolKind::Sendable))
@@ -363,9 +360,9 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 
     // Find the conformance for this overridden protocol.
     auto overriddenConformance =
-      dc->getParentModule()->lookupConformance(dc->getSelfInterfaceType(),
-                                               overridden->getProtocol(),
-                                               /*allowMissing=*/true);
+      ModuleDecl::lookupConformance(dc->getSelfInterfaceType(),
+                                    overridden->getProtocol(),
+                                    /*allowMissing=*/true);
     if (overriddenConformance.isInvalid() ||
         !overriddenConformance.isConcrete())
       continue;
@@ -517,7 +514,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     }
 
     auto memberType = TypeChecker::substMemberTypeWithBase(
-        dc->getParentModule(), typeDecl, dc->getSelfInterfaceType());
+        typeDecl, dc->getSelfInterfaceType());
 
     // Type witnesses that resolve to constraint types are always
     // existential types. This can only happen when the type witness
@@ -1385,10 +1382,9 @@ static bool isExtensionUsableForInference(const ExtensionDecl *extension,
   // in the first place. Only check conformances on the `Self` type,
   // because those have to be explicitly declared on the type somewhere
   // so won't be affected by whatever answer inference comes up with.
-  auto *module = conformanceDC->getParentModule();
   auto checkConformance = [&](ProtocolDecl *proto) {
     auto typeInContext = conformanceDC->mapTypeIntoContext(conformance->getType());
-    auto otherConf = module->checkConformance(typeInContext, proto);
+    auto otherConf = ModuleDecl::checkConformance(typeInContext, proto);
     return !otherConf.isInvalid();
   };
 
@@ -1931,11 +1927,9 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
                              genericFn->getExtInfo());
   }
 
-  ModuleDecl *module = conformance->getDeclContext()->getParentModule();
-
   if (!witness->getDeclContext()->getExtendedProtocolDecl()) {
     return type.subst(QueryTypeSubstitutionMap{substitutions},
-                      LookUpConformanceInModule(module));
+                      LookUpConformanceInModule());
   }
 
   auto proto = conformance->getProtocol();
@@ -1977,7 +1971,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 
     // Replace Self with the concrete conforming type.
     substType = substType.subst(QueryTypeSubstitutionMap{substitutions},
-                                LookUpConformanceInModule(module));
+                                LookUpConformanceInModule());
 
     // If we don't have enough type witnesses, leave it abstract.
     if (substType->hasError())
@@ -2667,8 +2661,6 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
         proto->getSelfInterfaceType()->getCanonicalType());
     substitutions[selfTy] = dc->mapTypeIntoContext(conformance->getType());
 
-    auto *module = dc->getParentModule();
-
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       if (conformance->hasTypeWitness(assocType))
         continue;
@@ -2700,7 +2692,7 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
 
           // Replace Self with the concrete conforming type.
           auto substType = Type(type).subst(QueryTypeSubstitutionMap{substitutions},
-                                            LookUpConformanceInModule(module),
+                                            LookUpConformanceInModule(),
                                             options);
 
           // If we don't have enough type witnesses to substitute fully,
@@ -2849,7 +2841,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                sanitizedRequirements);
 
   switch (checkRequirements(
-      dc->getParentModule(), sanitizedRequirements,
+      sanitizedRequirements,
       QuerySubstitutionMap{substitutions}, options)) {
   case CheckRequirementsResult::RequirementFailure:
     ++NumSolutionStatesFailedCheck;
@@ -2897,7 +2889,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (checkRequirements(
-      dc->getParentModule(), ext->getGenericSignature().getRequirements(),
+      ext->getGenericSignature().getRequirements(),
       QueryTypeSubstitutionMap{subs}, options)) {
   case CheckRequirementsResult::Success:
   case CheckRequirementsResult::SubstitutionFailure:
@@ -4476,8 +4468,6 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
                                        NormalProtocolConformance *conformance,
                                        CanType origTy, ProtocolDecl *reqProto,
                                        unsigned index) const {
-  auto *module = conformance->getDeclContext()->getParentModule();
-
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
       conformance->getProtocol(),
       conformance->getType(),
@@ -4503,7 +4493,7 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
   if (substTy->hasTypeParameter())
     substTy = conformance->getDeclContext()->mapTypeIntoContext(substTy);
 
-  return module->lookupConformance(substTy, reqProto, /*allowMissing=*/true)
+  return ModuleDecl::lookupConformance(substTy, reqProto, /*allowMissing=*/true)
       .mapConformanceOutOfContext();
 }
 

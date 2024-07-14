@@ -82,7 +82,7 @@ toolchain as a one-off, there are a couple of differences:
      If you plan on contributing regularly, cloning over SSH provides a better
      experience. After you've [uploaded your SSH keys to GitHub][]:
      ```sh
-     git clone git@github.com:apple/swift.git swift
+     git clone git@github.com:swiftlang/swift.git swift
      cd swift
      utils/update-checkout --clone-with-ssh
      ```
@@ -91,7 +91,7 @@ toolchain as a one-off, there are a couple of differences:
      or are not familiar with setting up SSH,
      you can use HTTPS instead:
      ```sh
-     git clone https://github.com/apple/swift.git swift
+     git clone https://github.com/swiftlang/swift.git swift
      cd swift
      utils/update-checkout --clone
      ```
@@ -99,7 +99,7 @@ toolchain as a one-off, there are a couple of differences:
    > If you've already forked the project on GitHub at this stage, **do not
    > clone your fork** to start off. We describe [how to setup your fork](#setting-up-your-fork)
    > in a subsection below.
-   <!-- Recommending against cloning the fork due to https://github.com/apple/swift/issues/55918 and https://github.com/apple/swift/issues/55947. -->
+   <!-- Recommending against cloning the fork due to https://github.com/swiftlang/swift/issues/55918 and https://github.com/swiftlang/swift/issues/55947. -->
 3. Double-check that `swift`'s sibling directories are present.
    ```sh
    ls ..
@@ -165,11 +165,11 @@ toolchain as a one-off, there are a couple of differences:
 ### Linux
 
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
-   * [Ubuntu 18.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/18.04/Dockerfile)
-   * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
-   * [Ubuntu 22.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/22.04/Dockerfile)
-   * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
-   * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
+   * [Ubuntu 18.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/ubuntu/18.04/Dockerfile)
+   * [Ubuntu 20.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
+   * [Ubuntu 22.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/ubuntu/22.04/Dockerfile)
+   * [CentOS 7](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
+   * [Amazon Linux 2](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
    Note that [a prebuilt Swift release toolchain](https://www.swift.org/download/)
    is installed and added to the `PATH` in all these Docker containers: it is
@@ -265,7 +265,7 @@ Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
 - macOS:
   ```sh
   utils/build-script --skip-build-benchmarks \
-    --skip-ios --skip-watchos --skip-tvos --skip-xros --swift-darwin-supported-archs "$(uname -m)" \
+    --swift-darwin-supported-archs "$(uname -m)" \
     --sccache --release-debuginfo --swift-disable-dead-stripping \
     --bootstrapping=hosttools
   ```
@@ -301,7 +301,7 @@ You will need to slightly tweak the paths for other build configurations.
   [meet the minimum required versions](#spot-check-dependencies).
 - Check if there are spaces in the paths being used by `build-script` in
   the log. While `build-script` should work with paths containing spaces,
-  sometimes bugs do slip through, such as [#55883](https://github.com/apple/swift/issues/55883).
+  sometimes bugs do slip through, such as [#55883](https://github.com/swiftlang/swift/issues/55883).
   If this is the case, please [file a bug report][Swift Issues] and change the path
   to work around it.
 - Check that your `build-script` invocation doesn't have typos. You can compare
@@ -326,7 +326,7 @@ You will need to slightly tweak the paths for other build configurations.
     build log in the post.
   - Include the output of `utils/update-checkout --dump-hashes`.
 
-[Swift Issues]: https://github.com/apple/swift/issues
+[Swift Issues]: https://github.com/swiftlang/swift/issues
 [Swift Forums]: https://forums.swift.org
 
 ## Editing code
@@ -336,7 +336,7 @@ You will need to slightly tweak the paths for other build configurations.
 If you are building the toolchain for development and submitting patches,
 you will need to setup a GitHub fork.
 
-First fork the `apple/swift` [repository](https://github.com/apple/swift.git),
+First fork the `swiftlang/swift` [repository](https://github.com/swiftlang/swift.git),
 using the "Fork" button in the web UI, near the top-right. This will create a
 repository `username/swift` for your GitHub username. Next, add it as a remote:
 ```sh
@@ -507,7 +507,7 @@ This should print your updated version string.
 
 ## Reproducing an issue
 
-[Good first issues](https://github.com/apple/swift/contribute) typically have
+[Good first issues](https://github.com/swiftlang/swift/contribute) typically have
 small code examples that fit within a single file. You can reproduce such an
 issue in various ways, such as compiling it from the command line using
 `/path/to/swiftc MyFile.swift`, pasting the code into [Compiler Explorer](https://godbolt.org)

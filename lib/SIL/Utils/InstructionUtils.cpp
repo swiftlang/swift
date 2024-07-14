@@ -250,6 +250,16 @@ SILValue swift::stripValueProjections(SILValue V) {
   }
 }
 
+SILValue swift::lookThroughAddressAndValueProjections(SILValue V) {
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+    if (!Projection::isObjectProjection(V) &&
+        !Projection::isAddressProjection(V))
+      return V;
+    V = cast<SingleValueInstruction>(V)->getOperand(0);
+  }
+}
+
 SILValue swift::stripIndexingInsts(SILValue V) {
   while (true) {
     if (!isa<IndexingInst>(V))

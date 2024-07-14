@@ -79,7 +79,7 @@ deliverResults(SourceKit::ConformingMethodListConsumer &SKConsumer,
 
       auto funcTy = cast<FuncDecl>(member)->getMethodInterfaceType();
       funcTy = Result->Result->ExprType->getTypeOfMember(
-          Result->Result->DC->getParentModule(), member, funcTy);
+          member, funcTy);
       auto resultTy = funcTy->castTo<FunctionType>()->getResult();
 
       // Name.

@@ -52,7 +52,6 @@ namespace swift {
   void performSyntacticExprDiagnostics(
       const Expr *E, const DeclContext *DC,
       std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-      bool disableExprAvailabilityChecking = false,
       bool disableOutOfPlaceExprChecking = false);
 
   /// Emit diagnostics for a given statement.

@@ -220,7 +220,7 @@ sil @die : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @o
 // CHECK:         [[PA:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[GETTER]]([[MB]])
 // CHECK:         [[DIE:%[^,]+]] = function_ref @die
 // CHECK:         apply [[DIE]]([[PA]])
-// CHECK:         destroy_value [[PA]]
+// CHECK:         destroy_value [dead_end] [[PA]]
 // CHECK:         end_borrow [[MB]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'partial_apply_of_borrow_of_deinitless_empty_struct'

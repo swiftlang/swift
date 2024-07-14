@@ -13,6 +13,15 @@
 // RUN: %FileCheck %s --check-prefixes=CHECK < %t/Lib.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-MAIN < %t/Main.sil
 
+// RUN: rm -rf %t/Lib.swiftmodule
+// RUN: %target-build-swift %t/Lib.swift \
+// RUN: -module-name=Lib -package-name Pkg \
+// RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
+// RUN: -Xfrontend -package-cmo -Xfrontend -allow-non-resilient-access \
+// RUN: -O -wmo -enable-library-evolution
+// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib2.sil
+// RUN: %FileCheck %s --check-prefixes=CHECK < %t/Lib2.sil
+
 
 //--- main.swift
 

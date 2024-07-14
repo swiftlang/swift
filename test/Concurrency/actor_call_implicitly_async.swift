@@ -232,7 +232,7 @@ func anotherAsyncFunc() async {
 
   _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a non-isolated context}}
+  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a nonisolated context}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
   _ = await b.owner == "cat"
@@ -454,7 +454,7 @@ func tryEffPropsFromSync() {
   _ = effPropA // expected-error{{'async' property access in a function that does not support concurrency}}
 
   // expected-error@+1 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
-  _ = effPropT // expected-error{{global actor 'BananaActor'-isolated var 'effPropT' can not be referenced from a non-isolated context}}
+  _ = effPropT // expected-error{{global actor 'BananaActor'-isolated var 'effPropT' can not be referenced from a nonisolated context}}
   // NOTE: that we don't complain about async access on `effPropT` because it's not declared async, and we're not in an async context!
 
   // expected-error@+1 {{property access can throw, but it is not marked with 'try' and the error is not handled}}

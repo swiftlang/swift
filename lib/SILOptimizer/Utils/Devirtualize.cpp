@@ -420,7 +420,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
     if (auto metatypeType = derivedClass->getAs<MetatypeType>())
       derivedClass = metatypeType->getInstanceType();
     baseSubMap = derivedClass->getContextSubstitutionMap(
-        module.getSwiftModule(), baseClassDecl);
+        baseClassDecl);
   }
 
   SubstitutionMap origSubMap = applySite.getSubstitutionMap();

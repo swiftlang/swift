@@ -322,7 +322,7 @@ void verifyKeyPathComponent(SILModule &M,
               "property");
     }
 
-    auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
+    auto fieldTy = baseTy->getTypeOfMember(property)
                          ->getReferenceStorageReferent()
                          ->getCanonicalType();
     require(getTypeInExpansionContext(fieldTy) ==
@@ -2147,6 +2147,8 @@ public:
   }
 
   void checkMarkDependencInst(MarkDependenceInst *MDI) {
+    require(isa<SILUndef>(MDI->getValue()) || MDI->getValue() != MDI->getBase(),
+            "mark_dependence operands must be distinct");
     if (MDI->isNonEscaping()) {
       require(F.hasOwnership(), "mark_dependence [nonescaping] requires OSSA");
       require(MDI->getOwnershipKind() == OwnershipKind::Owned,
@@ -3405,6 +3407,10 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
+    if (I->isDeadEnd()) {
+      require(getDeadEndBlocks().isDeadEnd(I->getParentBlock()),
+              "a dead_end destroy_value must be in a dead-end block");
+    }
   }
 
   void checkReleaseValueInst(ReleaseValueInst *I) {
@@ -3805,6 +3811,10 @@ public:
     require(boxTy, "operand must be a @box type");
     require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
+    if (DI->isDeadEnd()) {
+      require(getDeadEndBlocks().isDeadEnd(DI->getParentBlock()),
+              "a dead_end dealloc_box must be in a dead-end block");
+    }
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
@@ -5897,7 +5907,7 @@ public:
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(M));
+          LookUpConformanceInModule());
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
                       SILType::getPrimitiveObjectType(expectedJVPType),
                       "JVP type does not match expected JVP type");
@@ -5909,7 +5919,7 @@ public:
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(M));
+          LookUpConformanceInModule());
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
                       SILType::getPrimitiveObjectType(expectedVJPType),
                       "VJP type does not match expected VJP type");
@@ -5936,7 +5946,7 @@ public:
       require(!transposeType->isDifferentiable(),
               "The transpose function must not be differentiable");
       auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
-          lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
+          lfi->getParameterIndices(), TC, LookUpConformanceInModule());
       // TODO: Consider tightening verification. This requires changes to
       // `SILFunctionType::getAutoDiffTransposeFunctionType`.
       requireSameType(
@@ -6273,8 +6283,7 @@ public:
                                    Type conformingType,
                                    ProtocolDecl *protocol) -> ProtocolConformanceRef {
         // FIXME: This violates the spirit of this verifier check.
-        return protocol->getParentModule()
-            ->lookupConformance(conformingType, protocol);
+        return ModuleDecl::lookupConformance(conformingType, protocol);
       };
 
       // If the pack components and expected element types are SIL types,
@@ -6686,8 +6695,8 @@ public:
              FTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "only thick function types can have erased isolation");
 
-    // If our function hasTransferringResult, then /all/ results must be
-    // transferring.
+    // If our function hasSendingResult, then /all/ results must be
+    // sending.
     require(FTy->hasSendingResult() ==
                 (FTy->getResults().size() &&
                  llvm::all_of(FTy->getResults(),
@@ -6695,7 +6704,7 @@ public:
                                 return result.hasOption(
                                     SILResultInfo::IsSending);
                               })),
-            "transferring result means all results are transferring");
+            "sending result means all results are sending");
 
     require(1 >= std::count_if(FTy->getParameters().begin(), FTy->getParameters().end(),
                                [](const SILParameterInfo &parameterInfo) {

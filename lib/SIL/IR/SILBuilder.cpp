@@ -635,7 +635,7 @@ void SILBuilder::emitDestructureValueOperation(
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
-                                             bool poisonRefs,
+                                             PoisonRefs_t poisonRefs,
                                              UsesMoveableValueDebugInfo_t moved,
                                              bool trace) {
   if (shouldDropVariable(Var, Loc))

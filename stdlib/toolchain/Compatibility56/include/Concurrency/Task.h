@@ -313,7 +313,7 @@ public:
   void flagAsRunning_slow();
 
   /// Flag that this task is now suspended.  This can update the
-  /// priority stored in the job flags if the priority hsa been
+  /// priority stored in the job flags if the priority has been
   /// escalated.  Generally this should be done immediately after
   /// clearing ActiveTask and immediately before enqueuing the task
   /// somewhere.  TODO: record where the task is enqueued if

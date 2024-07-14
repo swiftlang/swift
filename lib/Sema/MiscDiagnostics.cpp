@@ -3410,10 +3410,9 @@ public:
           bool conforms = llvm::all_of(
               OpaqueDecl->getOpaqueInterfaceGenericSignature()
                   .getRequirements(),
-              [&exprType, this](auto requirement) {
+              [&exprType](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = Implementation->getModuleContext()
-                      ->checkConformance(
+                  auto conformance = ModuleDecl::checkConformance(
                       exprType->getRValueType(),
                       requirement.getProtocolDecl(),
                       /*allowMissing=*/false);
@@ -5975,11 +5974,10 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
   class ComparisonWithNaNFinder : public ASTWalker {
     const ASTContext &C;
-    const DeclContext *DC;
 
   public:
     ComparisonWithNaNFinder(const DeclContext *dc)
-        : C(dc->getASTContext()), DC(dc) {}
+        : C(dc->getASTContext()) {}
 
     void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
       ValueDecl *comparisonDecl = nullptr;
@@ -6019,11 +6017,9 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
       // Both arguments must conform to FloatingPoint protocol.
       if (!TypeChecker::conformsToKnownProtocol(firstArg->getType(),
-                                                KnownProtocolKind::FloatingPoint,
-                                                DC->getParentModule()) ||
+                                                KnownProtocolKind::FloatingPoint) ||
           !TypeChecker::conformsToKnownProtocol(secondArg->getType(),
-                                                KnownProtocolKind::FloatingPoint,
-                                                DC->getParentModule())) {
+                                                KnownProtocolKind::FloatingPoint)) {
         return;
       }
 
@@ -6373,7 +6369,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 void swift::performSyntacticExprDiagnostics(
     const Expr *E, const DeclContext *DC,
     std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-    bool disableExprAvailabilityChecking, bool disableOutOfPlaceExprChecking) {
+    bool disableOutOfPlaceExprChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6385,7 +6381,7 @@ void swift::performSyntacticExprDiagnostics(
   diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
-  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabilityChecking)
+  if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);

@@ -518,8 +518,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   // call returns a two-element tuple, where the first element is the newly
   // created array and the second element is a pointer to the internal storage
   // of the array.
-  SubstitutionMap subMap = arrayType->getContextSubstitutionMap(
-      module.getSwiftModule(), astContext.getArrayDecl());
+  SubstitutionMap subMap = arrayType->getContextSubstitutionMap();
   FunctionRefInst *arrayAllocateRef =
       builder.createFunctionRef(loc, arrayAllocateFun);
   ApplyInst *applyInst = builder.createApply(
@@ -683,8 +682,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
            "aggregate symbolic value's type and expected type do not match");
 
     VarDecl *propertyDecl = structDecl->getStoredProperties().front();
-    Type propertyType = expectedType->getTypeOfMember(
-        propertyDecl->getModuleContext(), propertyDecl);
+    Type propertyType = expectedType->getTypeOfMember(propertyDecl);
     SymbolicValue propertyVal = symVal.lookThroughSingleElementAggregates();
     SILValue newPropertySIL = emitCodeForSymbolicValue(
         propertyVal, propertyType, builder, loc, stringInfo);

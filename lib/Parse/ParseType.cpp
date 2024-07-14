@@ -54,17 +54,13 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
   }
 
-  if (TransferringLoc.isValid()) {
-    ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
-  }
-
   if (SendingLoc.isValid()) {
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
   if (!lifetimeDependenceSpecifiers.empty()) {
-    ty = LifetimeDependentReturnTypeRepr::create(p.Context, ty,
-                                                 lifetimeDependenceSpecifiers);
+    ty = LifetimeDependentTypeRepr::create(p.Context, ty,
+                                           lifetimeDependenceSpecifiers);
   }
   return ty;
 }
@@ -400,8 +396,14 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   ParserStatus status;
 
   // Parse attributes.
-  ParsedTypeAttributeList parsedAttributeList;
+  ParsedTypeAttributeList parsedAttributeList(reason);
   status |= parsedAttributeList.parse(*this);
+
+  // If we have a completion, create an ErrorType.
+  if (status.hasCodeCompletion()) {
+    auto *ET = ErrorTypeRepr::create(Context, PreviousLoc);
+    return makeParserCodeCompletionResult<TypeRepr>(ET);
+  }
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;

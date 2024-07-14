@@ -620,7 +620,20 @@ void ExprPattern::updateMatchExpr(Expr *e) const {
 
   MatchExprAndOperandOwnership = {e, walker.Ownership};
 }
-  
+
+EnumElementPattern *
+EnumElementPattern::createImplicit(Type parentTy, SourceLoc dotLoc,
+                                   DeclNameLoc nameLoc, EnumElementDecl *decl,
+                                   Pattern *subPattern, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  auto *parentExpr = TypeExpr::createImplicit(parentTy, ctx);
+  auto *P = new (ctx) EnumElementPattern(
+      parentExpr, dotLoc, nameLoc, decl->createNameRef(), decl, subPattern, DC);
+  P->setImplicit();
+  P->setType(parentTy);
+  return P;
+}
+
 SourceLoc EnumElementPattern::getStartLoc() const {
   return (ParentType && !ParentType->isImplicit())
              ? ParentType->getSourceRange().Start

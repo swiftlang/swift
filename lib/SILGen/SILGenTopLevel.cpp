@@ -303,7 +303,7 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
       SubstitutionMap subMap = SubstitutionMap::get(
           genericSig, [&](SubstitutableType *dependentType) {
             return errorType.getASTType();
-          }, LookUpConformanceInModule(getModule().getSwiftModule()));
+          }, LookUpConformanceInModule());
 
       // Generic errors are passed indirectly.
       if (!error->getType().isAddress()) {

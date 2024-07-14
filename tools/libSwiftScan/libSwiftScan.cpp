@@ -29,6 +29,16 @@ using namespace swift::dependencies;
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 
 //=== Private Cleanup Functions -------------------------------------------===//
+void swiftscan_macro_dependency_dispose(
+    swiftscan_macro_dependency_set_t *macro) {
+  for (unsigned i = 0; i < macro->count; ++i) {
+    swiftscan_string_dispose(macro->macro_dependencies[i]->moduleName);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->libraryPath);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->executablePath);
+    delete macro->macro_dependencies[i];
+  }
+  delete macro;
+}
 
 void swiftscan_dependency_info_details_dispose(
     swiftscan_module_details_t details) {
@@ -58,6 +68,8 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_textual_details.bridging_header_include_tree);
     swiftscan_string_dispose(
         details_impl->swift_textual_details.module_cache_key);
+    swiftscan_macro_dependency_dispose(
+        details_impl->swift_textual_details.macro_dependencies);
     break;
   case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY:
     swiftscan_string_dispose(
@@ -114,11 +126,13 @@ void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info) {
 }
 
 void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
-  for (size_t i = 0; i < set->count; ++i) {
-    swiftscan_dependency_info_dispose(set->modules[i]);
+  if (set) {
+    for (size_t i = 0; i < set->count; ++i) {
+      swiftscan_dependency_info_dispose(set->modules[i]);
+    }
+    delete[] set->modules;
+    delete set;
   }
-  delete[] set->modules;
-  delete set;
 }
 
 //=== Scanner Cache Operations --------------------------------------------===//
@@ -741,11 +755,13 @@ void swiftscan_diagnostic_dispose(swiftscan_diagnostic_info_t diagnostic) {
 
 void
 swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics){
-  for (size_t i = 0; i < diagnostics->count; ++i) {
-    swiftscan_diagnostic_dispose(diagnostics->diagnostics[i]);
+  if (diagnostics) {
+    for (size_t i = 0; i < diagnostics->count; ++i) {
+      swiftscan_diagnostic_dispose(diagnostics->diagnostics[i]);
+    }
+    delete[] diagnostics->diagnostics;
+    delete diagnostics;
   }
-  delete[] diagnostics->diagnostics;
-  delete diagnostics;
 }
 
 //=== Source Location -----------------------------------------------------===//

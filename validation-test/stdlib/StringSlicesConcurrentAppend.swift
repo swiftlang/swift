@@ -23,7 +23,7 @@ extension String {
   }
 }
 
-// Swift.String used to hsve an optimization that allowed us to append to a
+// Swift.String used to have an optimization that allowed us to append to a
 // shared string buffer.  However, as lock-free programming invariably does, it
 // introduced a race condition [rdar://25398370 Data Race in StringBuffer.append
 // (found by TSan)].

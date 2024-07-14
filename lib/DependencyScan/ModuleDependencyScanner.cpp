@@ -207,6 +207,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           ScanASTContext.getModuleInterfaceChecker()),
       &DependencyTracker,
       ScanCompilerInvocation.getSearchPathOptions().ModuleLoadMode);
+
+  llvm::cl::ResetAllOptionOccurrences();
 }
 
 ModuleDependencyVector
@@ -381,7 +383,8 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   std::vector<std::string> buildArgs;
   if (ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
     buildArgs.push_back("-direct-clang-cc1-module-build");
-    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
+    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args(
+             /*isInterface=*/false)) {
       buildArgs.push_back("-Xcc");
       buildArgs.push_back(arg);
     }

@@ -452,8 +452,6 @@ auto GenericEnvironment::getOrCreateNestedTypeStorage() -> NestedTypeStorage & {
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto genericSig = getGenericSignature();
-  LookUpConformanceInSignature conformanceLookupFn(genericSig.getPointer());
-
   auto requirements = genericSig->getLocalRequirements(depType);
 
   /// Substitute a type for the purpose of requirements.
@@ -462,7 +460,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     case Kind::Primary:
     case Kind::OpenedExistential:
       if (type->hasTypeParameter()) {
-        return mapTypeIntoContext(type, conformanceLookupFn);
+        return mapTypeIntoContext(type, LookUpConformanceInModule());
       } else {
         return type;
       }
@@ -643,8 +641,7 @@ Type GenericEnvironment::mapTypeIntoContext(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(Type type) const {
-  auto sig = getGenericSignature();
-  return mapTypeIntoContext(type, LookUpConformanceInSignature(sig.getPointer()));
+  return mapTypeIntoContext(type, LookUpConformanceInModule());
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
@@ -769,7 +766,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
         }
         return mapIntoContext(genericParam);
       },
-      LookUpConformanceInSignature(sig.getPointer()),
+      LookUpConformanceInModule(),
       SubstFlags::PreservePackExpansionLevel);
 }
 
@@ -825,7 +822,7 @@ GenericEnvironment::mapConformanceRefIntoContext(
                                      ProtocolConformanceRef conformance) const {
   auto contextConformance = conformance.subst(conformingInterfaceType,
     QueryInterfaceTypeSubstitutions(this),
-    LookUpConformanceInSignature(getGenericSignature().getPointer()));
+    LookUpConformanceInModule());
   
   auto contextType = mapTypeIntoContext(conformingInterfaceType);
   return {contextType, contextConformance};

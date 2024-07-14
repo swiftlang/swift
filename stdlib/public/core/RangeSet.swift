@@ -251,10 +251,11 @@ extension RangeSet {
   /// Adds the contents of the given range set to this range set.
   ///
   /// - Parameter other: A range set to merge with this one.
+  ///
+  /// - Complexity: O(*m* + *n*), where *m* and *n* are the number of ranges in
+  ///   this and the other range set.
   public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
-    for range in other._ranges {
-      insert(contentsOf: range)
-    }
+    self = self.union(other)
   }
   
   /// Removes the contents of this range set that aren't also in the given
@@ -293,9 +294,7 @@ extension RangeSet {
   public __consuming func union(
     _ other: __owned RangeSet<Bound>
   ) -> RangeSet<Bound> {
-    var result = self
-    result.formUnion(other)
-    return result
+    return RangeSet(_ranges: _ranges._union(other._ranges))
   }
   
   /// Returns a new range set containing the contents of both this set and the

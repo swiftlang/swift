@@ -87,7 +87,7 @@ if #available(SwiftStdlib 5.9, *) {
 //
 // We were accidentally hanging when rounding word indices for some concoctions of
 // strings. In particular, where we had a pair of scalars create a constraint
-// for the preceeding pair, but the preceeding extend rules were not taking the
+// for the preceding pair, but the preceding extend rules were not taking the
 // constraint into consideration.
 if #available(SwiftStdlib 5.10, *) {
   StringWordBreaking.test("word breaking backward extend constraints") {

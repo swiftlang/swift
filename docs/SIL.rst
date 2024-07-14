@@ -3747,7 +3747,7 @@ of ``scalar_pack_index``, ``pack_pack_index``, or ``dynamic_pack_index``),
 and it must index into a pack type with the same shape as the indexed
 pack type.
 
-Third, additional restrictions must be satisifed depending on which
+Third, additional restrictions must be satisfied depending on which
 pack indexing instruction the pack index is:
 
 - For ``scalar_pack_index``, the projected element type must be the
@@ -4179,7 +4179,7 @@ dealloc_box
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_box' sil-operand
+  sil-instruction ::= 'dealloc_box' '[dead_end]'? sil-operand
 
   dealloc_box %0 : $@box T
 
@@ -4191,6 +4191,9 @@ undefined behavior results.
 This does not destroy the boxed value. The contents of the
 value must have been fully uninitialized or destroyed before
 ``dealloc_box`` is applied.
+
+The optional ``dead_end`` attribute specifies that this instruction was created
+during lifetime completion and is eligible for deletion during OSSA lowering.
 
 project_box
 ```````````
@@ -6664,7 +6667,7 @@ destroy_value
 
 ::
 
-  sil-instruction ::= 'destroy_value' '[poison]'? sil-operand
+  sil-instruction ::= 'destroy_value' '[dead_end]'? '[poison]'? sil-operand
 
   destroy_value %0 : $A
 
@@ -6681,6 +6684,9 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+The optional ``dead_end`` attribute specifies that this instruction was created
+during lifetime completion and is eligible for deletion during OSSA lowering.
 
 autorelease_value
 `````````````````

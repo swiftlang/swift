@@ -29,13 +29,13 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
   }
   // TODO: Once Optional is ~Escapable, the error will go away
-  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Float>) -> dependsOn(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<Float>) -> dependsOn(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable types}}
     if (Int.random(in: 1..<100) == 0) {
       return nil
     }
     self.ptr = ptr
   }
-  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<String>) -> dependsOn(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+  init?(_ ptr: UnsafeRawBufferPointer, _ arr: borrowing Array<String>) -> dependsOn(arr) Self? { // expected-error{{lifetime dependence can only be specified on ~Escapable types}}
     if (Int.random(in: 1..<100) == 0) {
       return nil
     }
@@ -81,7 +81,7 @@ struct WrapperStruct {
   let k: Klass
 }
 
-func invalidLifetimeDependenceOnEscapableResult(_ w: borrowing WrapperStruct) -> dependsOn(w) Klass { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
+func invalidLifetimeDependenceOnEscapableResult(_ w: borrowing WrapperStruct) -> dependsOn(w) Klass { // expected-error{{lifetime dependence can only be specified on ~Escapable types}}
   return w.k
 }
 
@@ -129,7 +129,7 @@ func inoutParamLifetimeDependence2(_ x: inout BufferView) -> dependsOn(scoped x)
   return BufferView(x.ptr)
 }
 
-func invalidSpecifierPosition1(_ x: borrowing dependsOn(x) BufferView) -> BufferView { // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
+func invalidSpecifierPosition1(_ x: borrowing dependsOn(x) BufferView) -> BufferView {
   return BufferView(x.ptr)
 }
 
@@ -140,6 +140,13 @@ func invalidSpecifierPosition2(_ x: borrowing BufferView) -> BufferView {
 
 func invalidTupleLifetimeDependence(_ x: inout BufferView) -> (dependsOn(x) BufferView, BufferView) { // expected-error{{lifetime dependence specifiers cannot be applied to tuple elements}}
   return (BufferView(x.ptr), BufferView(x.ptr))
+}
+
+// TODO: Is this legal ? If not, diagnose in Sema.
+func incorrectLifetimeDependenceInParamPosition1(bv: dependsOn(bv) inout BufferView, to: ContiguousArray<Int>) {
+}
+
+func incorrectLifetimeDependenceInParamPosition1(bv: dependsOn(to) inout ContiguousArray<Int>, to: ContiguousArray<Int>) { // expected-error{{lifetime dependence can only be specified on ~Escapable types}}
 }
 
 struct Wrapper : ~Escapable {

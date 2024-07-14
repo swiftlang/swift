@@ -208,7 +208,7 @@ namespace {
 /// A simple FileSystemProvider that creates an InMemoryFileSystem for a given
 /// dictionary of file contents and overlays that on top of the real filesystem.
 class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
-  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
+  /// Provides the real filesystem, overlaid with an InMemoryFileSystem that
   /// contains specified files at specified locations.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
   getFileSystem(OptionsDictionary &options, std::string &error) override {
@@ -922,8 +922,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
   OS << VD->getBaseName().userFacingName();
 
   // Parameters.
-  auto *M = VD->getModuleContext();
-  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
+  auto substMap = baseTy->getMemberSubstitutionMap(VD);
   auto printSingleParam = [&](ParamDecl *param) {
     auto paramTy = param->getInterfaceType();
 

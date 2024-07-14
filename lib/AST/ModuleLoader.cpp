@@ -223,7 +223,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(
     }
     case swift::ModuleDependencyKind::SwiftBinary: {
       auto *swiftBinaryDep = getAsSwiftBinaryModule();
-      modulePath = swiftBinaryDep->compiledModulePath;
+      modulePath = swiftBinaryDep->getDefiningModulePath();
       assert(modulePath.has_value());
       StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
       if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {

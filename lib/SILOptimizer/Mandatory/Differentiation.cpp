@@ -204,7 +204,6 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
   if (requirements.empty())
     return false;
   // Iterate through all requirements and check whether they are satisfied.
-  auto *swiftModule = context.getModule().getSwiftModule();
   SmallVector<Requirement, 2> unsatisfiedRequirements;
   for (auto req : requirements) {
     auto firstType = req.getFirstType();
@@ -213,14 +212,14 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
     // looking up conformances in the current module, if possible.
     if (auto substFirstType =
             firstType.subst(QuerySubstitutionMap{substMap},
-                            LookUpConformanceInModule(swiftModule))) {
+                            LookUpConformanceInModule())) {
       firstType = substFirstType;
     }
     if (req.getKind() != RequirementKind::Layout) {
       secondType = req.getSecondType();
       if (auto substSecondType =
               secondType.subst(QuerySubstitutionMap{substMap},
-                               LookUpConformanceInModule(swiftModule))) {
+                               LookUpConformanceInModule())) {
         secondType = substSecondType;
       }
     }
@@ -267,7 +266,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       assert(protocol && "Expected protocol in generic signature requirement");
       // If the first type does not conform to the second type in the current
       // module, then record the unsatisfied requirement.
-      if (!swiftModule->lookupConformance(firstType, protocol))
+      if (!ModuleDecl::lookupConformance(firstType, protocol))
         unsatisfiedRequirements.push_back(req);
       continue;
     }
@@ -444,7 +443,7 @@ static SILValue reapplyFunctionConversion(
       } else {
         substMap = SubstitutionMap::get(
             newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
-            LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+            LookUpConformanceInModule());
       }
     }
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
@@ -604,7 +603,7 @@ emitDerivativeFunctionReference(
               originalFn->getLoweredFunctionType(),
               desiredParameterIndices, desiredResultIndices,
               contextualDerivativeGenSig,
-              LookUpConformanceInModule(context.getModule().getSwiftModule()));
+              LookUpConformanceInModule());
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
           context.getModule(), SILLinkage::Private, originalFn,
           DifferentiabilityKind::Reverse, desiredParameterIndices,
@@ -703,7 +702,7 @@ emitDerivativeFunctionReference(
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalConfig->parameterIndices, minimalConfig->resultIndices, kind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
         context.getASTContext());
@@ -748,7 +747,7 @@ emitDerivativeFunctionReference(
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalConfig->parameterIndices, minimalConfig->resultIndices, kind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
         context.getASTContext());
@@ -798,7 +797,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::VJP,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      module.Types, LookUpConformanceInModule(),
       vjpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
@@ -842,7 +841,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::JVP,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      module.Types, LookUpConformanceInModule(),
       jvpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
@@ -1192,7 +1191,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     auto expectedDerivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, derivativeFnKind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(context.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     // If `derivativeFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.
     if (expectedDerivativeFnTy->getRepresentation() ==
@@ -1251,7 +1250,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   auto originalType = origFnOperand->getType().castTo<SILFunctionType>();
   auto transposeFnType = originalType->getAutoDiffTransposeFunctionType(
       parameterIndices, context.getTypeConverter(),
-      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+      LookUpConformanceInModule());
   auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
   auto transposeFn = SILUndef::get(builder.getFunction(), transposeType);
   auto *newLinearFn = context.createLinearFunction(

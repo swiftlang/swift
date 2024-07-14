@@ -374,6 +374,8 @@ ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
 ERROR(non_final_generic_class_function,none,
       "classes cannot have non-final generic fuctions in embedded Swift", ())
+ERROR(cannot_specialize_class,none,
+      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
 ERROR(embedded_swift_existential_type,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_existential,none,
@@ -396,6 +398,8 @@ ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
+ERROR(embedded_capture_of_generic_value_with_deinit,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
@@ -691,14 +695,14 @@ WARNING(warning_int_to_fp_inexact, none,
 
 // Flow-isolation diagnostics
 ERROR(isolated_after_nonisolated, none,
-      "cannot access %1 %2 here in %select{non-isolated initializer|deinitializer}0",
+      "cannot access %1 %2 here in %select{nonisolated initializer|deinitializer}0",
       (bool, DescriptiveDeclKind, DeclName))
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
-     "only non-isolated properties of 'self' can be accessed from "
+     "only nonisolated properties of 'self' can be accessed from "
      "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
 ERROR(isolated_property_mutation_in_nonisolated_context,none,
       "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
-      "from a non-isolated context",
+      "from a nonisolated context",
       (const ValueDecl *, bool))
 
 // Yield usage errors
@@ -943,6 +947,9 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 
 NOTE(regionbasedisolation_maybe_race, none,
      "access can happen concurrently", ())
+NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
+     "'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value",
+     ())
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
@@ -972,6 +979,9 @@ ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
      "value is %0 since it is in the same region as %1",
      (StringRef, DeclBaseName))
+NOTE(regionbasedisolation_isolated_since_in_same_region_string, none,
+     "%0 is %1since it is in the same region as %2",
+     (Identifier, StringRef, Identifier))
 
 //===---
 // New Transfer Non Sendable Diagnostics
@@ -980,6 +990,13 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
       "sending %0 risks causing data races",
       (Identifier))
+
+ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
+      "'inout sending' parameter %0 cannot be %1at end of function",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
+      "%1%0 risks causing races in between %1uses and caller uses since caller assumes value is not actor isolated",
+      (Identifier, StringRef))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
@@ -994,6 +1011,10 @@ NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
 NOTE(regionbasedisolation_named_transfer_non_transferrable_callee, none,
       "sending %1%0 to %2 %3 %4 risks causing data races between %2 and %5 uses",
       (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, StringRef))
+NOTE(regionbasedisolation_named_nonisolated_asynclet_name, none,
+      "sending %0 into async let risks causing data races between async let uses and local uses",
+      (Identifier))
+
 NOTE(regionbasedisolation_named_transfer_into_sending_param, none,
      "%0%1 is passed as a 'sending' parameter; Uses in callee may race with later %0uses",
      (StringRef, Identifier))
@@ -1006,6 +1027,10 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
+
+NOTE(regionbasedisolation_named_transfer_nt_asynclet_capture, none,
+      "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
+      (Identifier, StringRef))
 
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,

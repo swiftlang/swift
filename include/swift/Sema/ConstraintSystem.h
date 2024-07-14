@@ -1975,6 +1975,10 @@ struct MemberLookupResult {
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
 
+    /// The member is not visible because it comes from a module that was not
+    /// imported.
+    UR_MissingImport,
+
     /// This is a `WritableKeyPath` being used to look up read-only member,
     /// used in situations involving dynamic member lookup via keypath,
     /// because it's not known upfront what access capability would the
@@ -6519,9 +6523,8 @@ bool hasResultExpr(ClosureExpr *closure);
 
 /// Emit diagnostics for syntactic restrictions within a given solution
 /// application target.
-void performSyntacticDiagnosticsForTarget(
-    const SyntacticElementTarget &target, bool isExprStmt,
-    bool disableExprAvailabilityChecking = false);
+void performSyntacticDiagnosticsForTarget(const SyntacticElementTarget &target,
+                                          bool isExprStmt);
 
 /// Given a member of a protocol, check whether `Self` type of that
 /// protocol is contextually bound to some concrete type via same-type

@@ -205,6 +205,10 @@ public:
   BasicBlockCloner(SILBasicBlock *origBB, SILPassManager *pm, DeadEndBlocks *deBlocks = nullptr)
       : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks), pm(pm) {}
 
+  void registerBlockWithNewPhiArg(SILBasicBlock *b) {
+    blocksWithNewPhiArgs.push_back(b);
+  }
+
   bool canCloneBlock() {
     for (auto &inst : *origBB) {
       if (!canCloneInstruction(&inst))

@@ -30,6 +30,7 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/TreeEntry.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Support/Debug.h"
@@ -135,7 +136,7 @@ lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
 bool replayCachedCompilerOutputs(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     DiagnosticEngine &Diag, const FrontendInputsAndOutputs &InputsAndOutputs,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks) {
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
   bool CanReplayAllOutput = true;
   struct OutputEntry {
     std::string Path;
@@ -144,6 +145,7 @@ bool replayCachedCompilerOutputs(
   };
   SmallVector<OutputEntry> OutputProxies;
   std::optional<OutputEntry> DiagnosticsOutput;
+  std::string ObjFile;
 
   auto replayOutputsForInputFile = [&](const std::string &InputPath,
                                        unsigned InputIndex,
@@ -177,7 +179,6 @@ bool replayCachedCompilerOutputs(
     CachedResultLoader Loader(CAS, **OutputRef);
     LLVM_DEBUG(llvm::dbgs() << "DEBUG: lookup cache key \'" << OutID.toString()
                             << "\' for input \'" << InputPath << "\n";);
-
     if (auto Err = Loader.replay([&](file_types::ID Kind,
                                      ObjectRef Ref) -> Error {
           auto OutputPath = Outputs.find(Kind);
@@ -188,6 +189,9 @@ bool replayCachedCompilerOutputs(
           auto Proxy = CAS.getProxy(Ref);
           if (!Proxy)
             return Proxy.takeError();
+
+          if (Kind == file_types::ID::TY_Object && UseCASBackend)
+            ObjFile = OutputPath->second;
 
           if (Kind == file_types::ID::TY_CachedDiagnostics) {
             assert(!DiagnosticsOutput && "more than 1 diagnotics found");
@@ -282,7 +286,14 @@ bool replayCachedCompilerOutputs(
                     toString(File.takeError()));
       continue;
     }
-    *File << Output.Proxy.getData();
+
+    if (UseCASBackend && Output.Path == ObjFile) {
+      auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
+      if (auto E = Schema->serializeObjectFile(Output.Proxy, *File))
+        Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
+    } else
+      *File << Output.Proxy.getData();
+
     if (auto E = File->keep()) {
       Diag.diagnose(SourceLoc(), diag::error_closing_output, Output.Path,
                     toString(std::move(E)));

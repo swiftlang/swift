@@ -181,23 +181,17 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
-    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
-                                                      lhsPayloadVars);
-    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat = new (C)
-        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
-                           elt, lhsSubpattern, /*DC*/ eqDecl);
-    lhsElemPat->setImplicit();
+    auto *lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(
+        elt, 'l', eqDecl, lhsPayloadVars);
+    auto *lhsElemPat = EnumElementPattern::createImplicit(
+        enumType, elt, lhsSubpattern, /*DC*/ eqDecl);
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
-    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
-                                                      rhsPayloadVars);
-    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat = new (C)
-        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
-                           elt, rhsSubpattern, /*DC*/ eqDecl);
-    rhsElemPat->setImplicit();
+    auto *rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(
+        elt, 'r', eqDecl, rhsPayloadVars);
+    auto *rhsElemPat = EnumElementPattern::createImplicit(
+        enumType, elt, rhsSubpattern, /*DC*/ eqDecl);
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
     std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
@@ -709,11 +703,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
     auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C)
-        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(elt->getBaseIdentifier()),
-                           elt, payloadPattern, /*DC*/ hashIntoDecl);
-    pat->setImplicit();
+    auto *pat = EnumElementPattern::createImplicit(
+        enumType, elt, payloadPattern, /*DC*/ hashIntoDecl);
 
     auto labelItem = CaseLabelItem(pat);
 
@@ -843,7 +834,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
         return Type(dependentType);
       },
-      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+      LookUpConformanceInModule());
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
 
   Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
@@ -878,15 +869,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
   if (!TypeChecker::conformsToKnownProtocol(
-          intType, KnownProtocolKind::Hashable,
-          derived.getParentModule())) {
+          intType, KnownProtocolKind::Hashable)) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   if (!TypeChecker::conformsToKnownProtocol(
-          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
-          derived.getParentModule())) {
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -930,7 +919,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
-  hashValuePat->setType(intType);
 
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,

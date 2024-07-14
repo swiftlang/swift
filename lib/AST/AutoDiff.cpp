@@ -595,9 +595,8 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
          "Expected a stored property or a property-wrapped property");
   auto *parentDC = originalField->getDeclContext();
   assert(parentDC->isTypeContext());
-  auto *moduleDecl = originalField->getModuleContext();
   auto parentTan =
-      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl));
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule());
   // Error if parent nominal type does not conform to `Differentiable`.
   if (!parentTan) {
     return TangentPropertyInfo(
@@ -609,17 +608,16 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
         TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty);
   }
   // Error if original property's type does not conform to `Differentiable`.
-  auto originalFieldType = baseType->getTypeOfMember(
-      originalField->getModuleContext(), originalField);
+  auto originalFieldType = baseType->getTypeOfMember(originalField);
   auto originalFieldTan = originalFieldType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(moduleDecl));
+      LookUpConformanceInModule());
   if (!originalFieldTan) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable);
   }
   // Get the parent `TangentVector` type.
   auto parentTanType =
-      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl))
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule())
           ->getType();
   auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
   // Error if parent `TangentVector` is not a struct.
@@ -651,7 +649,7 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   // `TangentVector` type.
   auto originalFieldTanType = originalFieldTan->getType();
   auto tanFieldType =
-      parentTanType->getTypeOfMember(tanField->getModuleContext(), tanField);
+      parentTanType->getTypeOfMember(tanField);
   if (!originalFieldTanType->isEqual(tanFieldType)) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::TangentPropertyWrongType,

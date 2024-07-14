@@ -323,7 +323,7 @@ macro(configure_sdk_unix name architectures)
   endif()
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
-  # Static linking is suported on Linux and WASI
+  # Static linking is supported on Linux and WASI
   if("${prefix}" STREQUAL "LINUX"
       OR "${prefix}" STREQUAL "LINUX_STATIC"
       OR "${prefix}" STREQUAL "WASI")

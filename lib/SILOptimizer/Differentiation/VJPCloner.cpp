@@ -1095,7 +1095,6 @@ const DifferentiableActivityInfo &VJPCloner::getActivityInfo() const {
 }
 
 SILFunction *VJPCloner::Implementation::createEmptyPullback() {
-  auto &module = context.getModule();
   auto origTy = original->getLoweredFunctionType();
   // Get witness generic signature for remapping types.
   // Witness generic signature may have more requirements than VJP generic
@@ -1103,7 +1102,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // binding all generic parameters to concrete types, VJP function type uses
   // all the concrete types and VJP generic signature is null.
   auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
@@ -1306,6 +1305,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       IsNotTransparent, vjp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
+  auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
 

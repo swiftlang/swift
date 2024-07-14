@@ -355,6 +355,9 @@ private extension Value {
 private extension Function {
   /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
   func getInitializedGlobal() -> GlobalVariable? {
+    if !isDefinition {
+      return nil
+    }
     for inst in self.entryBlock.instructions {
       switch inst {
       case let agi as AllocGlobalInst:

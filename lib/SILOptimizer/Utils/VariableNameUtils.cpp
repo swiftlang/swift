@@ -627,7 +627,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperValueInst>(searchValue) ||
-        isa<EndInitLetRefInst>(searchValue)) {
+        isa<EndInitLetRefInst>(searchValue) ||
+        isa<ConvertEscapeToNoEscapeInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }

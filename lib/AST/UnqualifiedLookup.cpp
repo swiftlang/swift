@@ -596,6 +596,8 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     baseNLOptions |= NL_OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
     baseNLOptions |= NL_IgnoreAccessControl;
+  if (options.contains(Flags::IgnoreMissingImports))
+    baseNLOptions |= NL_IgnoreMissingImports;
   return baseNLOptions;
 }
 
