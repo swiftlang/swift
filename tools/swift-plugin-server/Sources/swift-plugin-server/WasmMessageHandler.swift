@@ -30,7 +30,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
       guard libraryPath.hasSuffix(".wasm") else { break }
       let libraryFilePath = FilePath(libraryPath)
       do {
-        loadedWasmPlugins[moduleName] = try defaultWasmPlugin.init(path: libraryFilePath)
+        loadedWasmPlugins[moduleName] = try DefaultWasmPlugin(path: libraryFilePath)
       } catch {
         return .loadPluginLibraryResult(
           loaded: false,
@@ -110,5 +110,3 @@ protocol WasmPlugin {
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8]
 }
-
-private var defaultWasmPlugin: (some WasmPlugin).Type { DefaultWasmPlugin.self }
