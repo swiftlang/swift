@@ -95,7 +95,7 @@ toolchain as a one-off, there are a couple of differences:
      cd swift
      utils/update-checkout --clone
      ```
-   > **Note**  
+   > **Important**\
    > If you've already forked the project on GitHub at this stage, **do not
    > clone your fork** to start off. We describe [how to setup your fork](#setting-up-your-fork)
    > in a subsection below.
@@ -121,7 +121,7 @@ toolchain as a one-off, there are a couple of differences:
    Detailed branching information, including names for release branches, can
    be found in [Branches.md](/docs/Branches.md).
 
-> **Note**  
+> [!NOTE]
 > The commands used in the rest of this guide assumes that the absolute path
 > to your working directory is something like `/path/to/swift-project/swift`.
 > Double-check that running `pwd` prints a path ending with `swift`.
@@ -193,7 +193,7 @@ toolchain as a one-off, there are a couple of differences:
      sudo chmod +x /usr/local/bin/sccache
      ```
 
-> **Note**  
+> [!NOTE]
 > LLDB currently requires at least `swig-1.3.40` but will successfully build
 > with version 2 shipped with Ubuntu.
 
@@ -209,7 +209,7 @@ toolchain as a one-off, there are a couple of differences:
 * If you installed and want to use Sccache: Run `sccache --version`; check
   that this succeeds.
 
-> **Note**  
+> [!NOTE]
 > If you are running on Apple Silicon hardware (M1, M2, etc), ensure you have
 > the native arm64 build of these dependencies installed and configured in your PATH.
 >
@@ -250,8 +250,9 @@ to understand what the different tools do:
    is a high-level automation script that handles configuration (via CMake),
    building (via Ninja), caching (via Sccache), running tests and more.
 
-> **Pro Tip**: Most tools support `--help` flags describing the options they
-> support. Additionally, both Clang and the Swift compiler have hidden flags
+> [!TIP]
+> Most tools support `--help` flags describing the options they support.
+> Additionally, both Clang and the Swift compiler have hidden flags
 > (`clang --help-hidden`/`swiftc --help-hidden`) and frontend flags
 > (`clang -cc1 --help`/`swiftc -frontend --help`) and the Swift compiler
 > even has hidden frontend flags (`swiftc -frontend --help-hidden`). Sneaky!
@@ -363,7 +364,7 @@ whenever the heading is modified.
 This workflow enables you to edit, build, run, and debug in Xcode. The
 following steps assume that you have already [built the toolchain with Ninja](#the-actual-build).
 
-> **Note**  
+> [!NOTE]
 > A seamless LLDB debugging experience requires that your `build-script`
   invocation for Ninja is tuned to generate build rules for the
   [debug variant](#debugging-issues) of the component you intend to debug.
