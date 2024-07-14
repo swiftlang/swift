@@ -365,7 +365,7 @@ following steps assume that you have already [built the toolchain with Ninja](#t
 
 > **Note**  
 > A seamless LLDB debugging experience requires that your `build-script`
-  invocation for Ninja is tuned to produce build rules for the
+  invocation for Ninja is tuned to generate build rules for the
   [debug variant](#debugging-issues) of the component you intend to debug.
 
 * <p id="generate-xcode">
@@ -378,21 +378,26 @@ following steps assume that you have already [built the toolchain with Ninja](#t
   This can take a few minutes due to metaprogrammed sources that depend on LLVM
   tools that are built from source.
   </p>
-* Create an empty Xcode workspace.
-* Add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj` to the workspace. If Xcode
-  prompts to autocreate schemes, select *Manually Manage Schemes* and don't
-  create any schemes just yet.
+* Create an empty Xcode workspace and open it.
+* Add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj` to the workspace by
+  selecting the Project navigator and choosing
+  *File > Add Files to "\<workspace name>"*.
 
-  This project includes the sources for almost everything in the repository,
-  including the compiler, standard library and runtime. If you intend to work on
-  a compiler subcomponent that is written in Swift and has a `Package.swift`
-  file (e.g. `lib/ASTGen`), first choose *Product > Scheme > Manage Schemes...*
-  and select the *Autocreate schemes* checkbox, then add the package directory
-  to the workspace by choosing *File > Add Files to "\<workspace name>"*. Xcode
-  will automatically create schemes for package manifest.
+  > **Important**\
+  > If upon addition Xcode prompts to autocreate schemes, select *Manually
+    Manage Schemes*.
+
+  This Xcode project includes the sources for almost everything in the
+  repository, including the compiler, standard library and runtime.
+  If you intend to work on a compiler subcomponent that is written in Swift and
+  has a `Package.swift` file, e.g. `lib/ASTGen`, first choose
+  *Product > Scheme > Manage Schemes* and select the *Autocreate schemes*
+  checkbox, then add the package directory to the workspace the same way you
+  added the Xcode project.
+  Xcode will automatically create schemes for the package manifest.
 * Create an Xcode project using the _External Build System_ template, and add
   it to the workspace.
-* Create a target in the new project, using the _External Build System_
+* Create a target in the new Xcode project, using the _External Build System_
   template.
 * In the _Info_ pane of the target settings, set
   * _Build Tool_ to the absolute path of the `ninja` executable (the output of
