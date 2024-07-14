@@ -1347,6 +1347,14 @@ namespace {
       printStorageImpl(VD);
       printFlag(VD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
+      if (auto *nonisolatedAttr =
+              VD->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolatedAttr->isUnsafe()) {
+          printFlag(true, "nonisolated(unsafe)", DeclModifierColor);
+        } else {
+          printFlag(true, "nonisolated", DeclModifierColor);
+        }
+      }
 
       printAccessors(VD);
       
