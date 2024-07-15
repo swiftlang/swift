@@ -247,7 +247,7 @@ static void
 writeMacroDependencies(llvm::raw_ostream &out,
                        const swiftscan_macro_dependency_set_t *macro_deps,
                        unsigned indentLevel, bool trailingComma) {
-  if (macro_deps->count == 0)
+  if (!macro_deps)
     return;
 
   out.indent(indentLevel * 2);
