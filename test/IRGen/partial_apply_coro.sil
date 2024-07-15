@@ -332,39 +332,135 @@ bb0(%0 : $Float):
   return %r : $()
 }
 
-// FIXME: Support coroutine indirect results
-// sil @yieldgen2 : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T) {
-// bb0(%outt : $*T, %t : $*T):
-//   yield (%t : $*T), resume bb1, unwind bb2
-// 
-// bb1:
-//   copy_addr %t to %outt : $*T
-//   %r = tuple ()
-//   return %r : $()
-// 
-// bb2:
-//   unwind
-// }
+// Coroutine with a generic yield and a generic indirect result
+//
+// CHECK: define {{.*}} { ptr, ptr } @yieldgen2(ptr noalias dereferenceable(32) %[[CTX:.*]], ptr %[[INDIRECT_RET:.*]], ptr noalias %[[ARG:.*]], ptr %[[TYPE:.*]])
+// CHECK-NEXT: entry:
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %yieldgen2.Frame, ptr %[[CTX]], i32 0, i32 2
+// CHECK:   store ptr %[[TYPE]], ptr %[[SPILL2]], align 8
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %yieldgen2.Frame, ptr %[[CTX]], i32 0, i32 1
+// CHECK:   store ptr %[[ARG]], ptr %[[SPILL1]], align 8
+// CHECK:   %[[SPILL0:.*]] = getelementptr inbounds %yieldgen2.Frame, ptr %[[CTX]], i32 0, i32 0
+// CHECK:   store ptr %[[INDIRECT_RET]], ptr %[[SPILL0]], align 8
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @yieldgen2.resume.0, 0
+// CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[ARG]], 1
+// CHECK:   ret { ptr, ptr } %[[RET1]]
+//
+// CHECK: define {{.*}} void @yieldgen2.resume.0(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %yieldgen2.Frame, ptr %[[CTX]], i32 0, i32 2
+// CHECK:   %[[TYPE:.*]] = load ptr, ptr %[[SPILL2]], align 8
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %yieldgen2.Frame, ptr %[[CTX]], i32 0, i32 1
+// CHECK:   %[[ARG:.*]] = load ptr, ptr %[[SPILL1]], align 8
+// CHECK:   %[[SPILL0:.*]] = getelementptr inbounds %yieldgen2.Frame, ptr %[[CTX]], i32 0, i32 0
+// CHECK:   %[[INDIRECT_RET:.*]] = load ptr, ptr %[[SPILL0]], align 8
+// CHECK:   %[[VW_PTR:.*]] = getelementptr inbounds ptr, ptr %[[TYPE]], i64 -1
+// CHECK:   %[[VW:.*]] = load ptr, ptr %[[VW_PTR]], align 8
+// CHECK:   %[[ASSIGN_PTR:.*]] = getelementptr inbounds ptr, ptr %[[VW]], i32 3
+// CHECK:   %[[ASSIGN:.*]] = load ptr, ptr %[[ASSIGN_PTR]], align 8
+// CHECK:   call ptr %[[ASSIGN]](ptr %[[INDIRECT_RET]], ptr %[[ARG]], ptr %[[TYPE]])
+//
+sil @yieldgen2 : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T) {
+bb0(%outt : $*T, %t : $*T):
+  yield (%t : $*T), resume bb1, unwind bb2
 
-// sil [ossa] @applygen2 : $(Float) -> () {
-// bb0(%0 : $Float):
-//   %coro = function_ref @yieldgen2 : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T)
-//   %temp = alloc_stack $Float
-//   store %0 to [trivial] %temp : $*Float  
-//   %pa = partial_apply [callee_guaranteed] %coro<Float>(%temp) : $@yield_once @convention(thin) <T where T : Copyable, T : Escapable> (@in T) -> (@yields @in T, @out T)
-// 
-//   %out = alloc_stack $Float
-//   (%f1, %token) = begin_apply %pa(%out) : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T, @out T) for <Float>
-// 
-//   %f2 = end_apply %token as $()
-//   destroy_value %pa : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T, @out T) for <Float>
-// 
-//   dealloc_stack %out : $*Float
-//   dealloc_stack %temp : $*Float
-// 
-//   %r = tuple ()
-//   return %r : $()
-// }
+bb1:
+  copy_addr %t to %outt : $*T
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  unwind
+}
+
+// CHECK: define {{.*}} void @applygen2(float %[[ARG:.*]])
+// CHECK-NEXT: entry:
+// CHECK:   %[[ARG_COPY:.*]] = alloca %TSf, align 4
+// CHECK:   %[[INDIRECT_RET:.*]] = alloca %TSf, align 4
+// CHECK:   %[[CTX:.*]] = alloca [32 x i8], align 8
+// CHECK:   call void @llvm.lifetime.start.p0(i64 4, ptr %[[ARG_COPY]])
+// CHECK:   %[[ARG_COPY_PTR:.*]] = getelementptr inbounds %TSf, ptr %[[ARG_COPY]], i32 0, i32 0
+// CHECK:   store float %[[ARG]], ptr %[[ARG_COPY_PTR]], align 4
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject
+// CHECK:   %[[PA_CTX_ARG:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSf }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %[[PA_CTX_ARG]], ptr align 4 %[[ARG_COPY]], i64 4, i1 false)
+// CHECK:   call void @llvm.lifetime.start.p0(i64 4, ptr %[[INDIRECT_RET]])
+// CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[CTX]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s9yieldgen2TA"(ptr noalias dereferenceable(32) %[[CTXPTR]], ptr %[[INDIRECT_RET]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable(32) %[[CTXPTR]], i1 false)
+// CHECK:   call void @llvm.lifetime.end.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   call void @swift_release(ptr %[[PA_CTX_BOX]])
+// CHECK:   call void @llvm.lifetime.end.p0(i64 4, ptr %[[INDIRECT_RET]])
+// CHECK:   call void @llvm.lifetime.end.p0(i64 4, ptr %[[ARG_COPY]])
+// CHECK:   ret void
+// CHECK: }
+
+// CHECK: define internal swiftcc { ptr, ptr } @"$s9yieldgen2TA"(ptr noalias dereferenceable(32) %[[CTX:.*]], ptr %[[INDIRECT_RET:.*]], ptr swiftself %[[PA_BOX_CTX:.*]])
+// CHECK: entry:
+// CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 48)
+// CHECK:   store ptr %[[SPILL]], ptr %[[CTX]], align 8
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[SPILL]], i32 0, i32 2
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[ARG:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSf }>, ptr %[[PA_BOX_CTX:.*]], i32 0, i32 1
+// CHECK:   call void @llvm.lifetime.start.p0(i64 4, ptr %[[SPILL2:.*]])
+// CHECK:   call void @llvm.memcpy.p0.p0.i64(ptr align 4 %[[SPILL2:.*]], ptr align 8 %[[ARG]], i64 4, i1 false)
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @yieldgen2(ptr noalias dereferenceable(32) %[[FRAMEPTR]], ptr %[[INDIRECT_RET]], ptr noalias %[[SPILL2]], ptr @"$sSfN")
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   store ptr %[[RESUME]], ptr %[[SPILL1]], align 8
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s9yieldgen2TA.resume.0", 0
+// CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[YIELD]], 1
+// CHECK:   ret { ptr, ptr } %[[RET1]]
+// CHECK: }
+
+// CHECK: define {{.*}} void @"$s9yieldgen2TA.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
+// CHECK: entryresume.0:
+// CHECK:   %[[FRAME:.*]] = load ptr, ptr %[[CTX]], align 8
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[FRAME]], i32 0, i32 2
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   br i1 %[[UNWIND]], label %unwind, label %resume
+//
+// CHECK: unwind:
+// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME0:.*]] = load ptr, ptr %[[RESUME_ADDR0:.*]], align 8
+// CHECK:   %[[CTX:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
+// CHECK:   call swiftcc void %[[RESUME0]](ptr noalias dereferenceable(32) %[[CTX]], i1 true)
+// CHECK:   call void @free(ptr %[[FRAME]])
+// CHECK:   unreachable
+//
+// CHECK: resume:
+// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s9yieldgen2TA.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME1:.*]] = load ptr, ptr %[[RESUME_ADDR1]], align 8
+// CHECK:   %[[CTX:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
+// CHECK:   call swiftcc void %[[RESUME1]](ptr noalias dereferenceable(32) %[[CTX]], i1 false)
+// CHECK:   call void @free(ptr %[[FRAME]])
+// CHECK:   ret void
+// CHECK: }
+//
+sil [ossa] @applygen2 : $(Float) -> () {
+bb0(%0 : $Float):
+  %coro = function_ref @yieldgen2 : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T)
+  %temp = alloc_stack $Float
+  store %0 to [trivial] %temp : $*Float
+  %pa = partial_apply [callee_guaranteed] %coro<Float>(%temp) : $@yield_once @convention(thin) <T where T : Copyable, T : Escapable> (@in T) -> (@yields @in T, @out T)
+
+  %out = alloc_stack $Float
+  (%f1, %token) = begin_apply %pa(%out) : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T, @out T) for <Float>
+
+  %f2 = end_apply %token as $()
+  destroy_value %pa : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T, @out T) for <Float>
+
+  dealloc_stack %out : $*Float
+  dealloc_stack %temp : $*Float
+
+  %r = tuple ()
+  return %r : $()
+}
 
 // Tests below are ported from partial_apply.sil and adapted to use coroutines.
 
@@ -454,36 +550,36 @@ sil @use_closure_two : $@convention(thin) (@noescape @yield_once @callee_guarant
 
 // CHECK: define {{.*}} void @partial_apply_class_on_stack(ptr %[[ARG:.*]])
 // CHECK: entry:
-// CHECK:   call swiftcc void @use_closure(ptr @"$s28partially_applyable_to_classTA.7", ptr %[[ARG]])
+// CHECK:   call swiftcc void @use_closure(ptr @"$s28partially_applyable_to_classTA.{{[0-9]+}}", ptr %[[ARG]])
 // CHECK:   call void @swift_release(ptr %[[ARG]])
 // CHECK:   ret void
 // CHECK: }
 //
-// CHECK: define {{.*}} { ptr, ptr } @"$s28partially_applyable_to_classTA.7"(ptr noalias dereferenceable(32) %[[CTX:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: define {{.*}} { ptr, ptr } @"$s28partially_applyable_to_classTA.{{[0-9]+}}"(ptr noalias dereferenceable(32) %[[CTX:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
 // CHECK: entry:
 // CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
 // CHECK:   store ptr %[[SPILL]], ptr %[[CTX]], align 8
-// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.7.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 0
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @partially_applyable_to_class(ptr noalias dereferenceable(32) %[[FRAMEPTR]], ptr %[[PA_CTX_BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
-// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.7.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]], align 8
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
-// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s28partially_applyable_to_classTA.7.resume.0", 0
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s28partially_applyable_to_classTA.{{[0-9]+}}.resume.0", 0
 // CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[YIELD]], 1
 // CHECK:   ret { ptr, ptr } %[[RET1]]
 // CHECK: }
 //
-// CHECK: define {{.*}} void @"$s28partially_applyable_to_classTA.7.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
+// CHECK: define {{.*}} void @"$s28partially_applyable_to_classTA.{{[0-9]+}}.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
 // CHECK: entryresume.0:
 // CHECK:   %[[FRAME:.*]] = load ptr, ptr %[[CTX]], align 8
-// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.7.Frame", ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   br i1 %[[UNWIND]], label %unwind, label %resume
 //
 // CHECK: unwind:
-// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.7.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME0:.*]] = load ptr, ptr %[[RESUME_ADDR0]], align 8
 // CHECK:   %[[CTX0:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   call swiftcc void %[[RESUME0]](ptr noalias dereferenceable(32) %[[CTX0]], i1 true)
@@ -491,7 +587,7 @@ sil @use_closure_two : $@convention(thin) (@noescape @yield_once @callee_guarant
 // CHECK:   unreachable
 //
 // CHECK: resume:
-// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.7.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s28partially_applyable_to_classTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME1:.*]] = load ptr, ptr %[[RESUME_ADDR1]], align 8
 // CHECK:   %[[CTX1:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   call swiftcc void %[[RESUME1]](ptr noalias dereferenceable(32) %[[CTX1]], i1 false)
@@ -1262,24 +1358,82 @@ bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
   return %p : $@yield_once @callee_guaranteed () -> ()
 }
 
-// FIXME: Support coroutine indirect results
-// sil public @captured_dependent_out_param : $@yield_once @convention(thin) <A> (@in A) -> (@out A, @yields A) {
-// entry(%o : $*A, %i : $*A):
-//   %0 = builtin "int_trap"() : $Never
-//   unreachable
-// }
+// CHECK: @partial_apply_with_out_param
+// CHECK-SAME: (ptr noalias %[[ARG:.*]], ptr %[[ARGTY:.*]])
+// CHECK: entry:
+// CHECK:   %[[ARGTY_VW_PTR:.*]] = getelementptr inbounds ptr, ptr %[[ARGTY]], i64 -1
+// CHECK:   %[[ARGTY_VW:.*]] = load ptr, ptr %[[ARGTY_VW_PTR]]
+// CHECK:   %[[ARGTY_FLAGS_PTR:.*]] = getelementptr inbounds %swift.vwtable, ptr %[[ARGTY_VW]], i32 0, i32 10
+// CHECK:   %[[ARGTY_FLAGS_I32:.*]] = load i32, ptr %[[ARGTY_FLAGS_PTR]]
+// CHECK:   %[[ARGTY_FLAGS:.*]] = zext i32 %[[ARGTY_FLAGS_I32]] to i64
+// CHECK:   %[[ARGTY_ALIGN1:.*]] = and i64 %[[ARGTY_FLAGS]], 255
+// CHECK:   %[[ARGTY_ALIGN2:.*]] = xor i64 %[[ARGTY_ALIGN1]], -1
+// CHECK:   %[[ARGTY_ALIGN3:.*]] = add i64 24, %[[ARGTY_ALIGN1]]
+// CHECK:   %[[ARGTY_ALIGN4:.*]] = and i64 %[[ARGTY_ALIGN3]], %[[ARGTY_ALIGN2]]
+// CHECK:   %[[ARGTY_SIZE_PTR:.*]] = getelementptr inbounds %swift.vwtable, ptr %[[ARGTY_VW]], i32 0, i32 8
+// CHECK:   %[[ARGTY_SIZE1:.*]] = load i64, ptr %[[ARGTY_SIZE_PTR]]
+// CHECK:   %[[ARGTY_SIZE2:.*]] = add i64 %[[ARGTY_ALIGN4]], %[[ARGTY_SIZE1]]
+// CHECK:   %[[ARGTY_ALIGN5:.*]] = or i64 7, %[[ARGTY_ALIGN1]]
+// CHECK:   %[[PA_BOX_ALLOC:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @{{.*}}, i32 0, i32 2), i64 %[[ARGTY_SIZE2]], i64 %[[ARGTY_ALIGN5]])
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, [8 x i8] }>, ptr %[[PA_BOX_ALLOC]], i32 0, i32 1
+// CHECK:   store ptr %[[ARGTY]], ptr %[[PA_CTX]]
+// CHECK:   %[[PA_CTX_ARG:.*]] = getelementptr inbounds i8, ptr %[[PA_BOX_ALLOC]], i64 %[[ARGTY_ALIGN4]]
+// CHECK:   %[[INIT_PTR:.*]] = getelementptr inbounds ptr, ptr %[[ARGTY_VW]], i32 4
+// CHECK:   %[[INIT:.*]] = load ptr, ptr %[[INIT_PTR]], align 8, !invariant.load !7
+// CHECK:   call ptr %[[INIT]](ptr noalias %[[PA_CTX_ARG]], ptr noalias %[[ARG]], ptr %[[ARGTY]])
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s28captured_dependent_out_paramTA", ptr undef }, ptr %[[PA_BOX_ALLOC]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+//
+// CHECK: define {{.*}} @"$s28captured_dependent_out_paramTA"
+// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], ptr %[[INDIRECT_RET:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: entry:
+// CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
+// CHECK:   store ptr %[[SPILL]], ptr %[[CTX]]
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s28captured_dependent_out_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, [8 x i8] }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[TY:.*]] = load ptr, ptr %[[PA_CTX]]
+// CHECK:   %[[TYMD:.*]] = getelementptr inbounds ptr, ptr %[[TY]], i64 -1
+// CHECK:   %[[VWTABLE:.*]] = load ptr, ptr %[[TYMD]]
+// CHECK:   %[[WITNESS:.*]] = getelementptr inbounds %swift.vwtable, ptr %[[VWTABLE]], i32 0, i32 10
+// CHECK:   %[[FLAGS:.*]] = load i32, ptr %[[WITNESS]]
+// do not check computation of align; may be target dependent
+// CHECK:   %[[WITNESS_SIZE:.*]] = getelementptr inbounds %swift.vwtable, ptr %[[VWTABLE]], i32 0, i32 8
+// CHECK:   %[[SIZE:.*]] = load i64, ptr %[[WITNESS_SIZE]]
+// CHECK:   %[[PA_CTX2:.*]] = getelementptr inbounds i8, ptr %[[PA_CTX_BOX]], i64 %{{.*}}
+// CHECK:   %[[ARG_COPY:.*]] = call ptr @malloc(i64 %[[SIZE]])
+// CHECK:   call void @llvm.lifetime.start.p0(i64 -1, ptr %[[ARG_COPY]])
+// CHECK:   %[[INIT_PTR:.*]] = getelementptr inbounds ptr, ptr %[[VWTABLE]], i32 2
+// CHECK:   %[[INIT:.*]] = load ptr, ptr %[[INIT_PTR]]
+// CHECK:   call ptr %[[INIT]](ptr noalias %[[ARG_COPY]], ptr noalias %[[PA_CTX2]], ptr %[[TY]])
+// CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @captured_dependent_out_param(ptr noalias dereferenceable(32) %[[CTXPTR]], ptr %[[INDIRECT_RET]], ptr noalias %[[ARG_COPY]], ptr %[[TY]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s28captured_dependent_out_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   store ptr %[[RESUME]], ptr %[[SPILL1]], align 8
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s28captured_dependent_out_paramTA.resume.0", 0
+// CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[YIELD]], 1
+// CHECK:   ret { ptr, ptr } %[[RET1:.*]]
 
-// sil @partial_apply_with_out_param : $@convention(thin) <T> (@in T) -> @yield_once @callee_guaranteed () -> (@out T, @yields T) {
-// bb0(%x : $*T):
-//   %f = function_ref @captured_dependent_out_param : $@yield_once @convention(thin) <B> (@in B) -> (@out B, @yields B)
-//   %p = partial_apply [callee_guaranteed] %f<T>(%x) : $@yield_once @convention(thin) <C> (@in C) -> (@out C, @yields C)
-//   return %p : $@yield_once @callee_guaranteed () -> (@out T, @yields T)
-// }
+sil public @captured_dependent_out_param : $@yield_once @convention(thin) <A> (@in A) -> (@out A, @yields @in A) {
+entry(%o : $*A, %i : $*A):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
-// sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @yield_once @callee_guaranteed (Int32) -> (@out T, @yields T)) -> @yield_once @callee_guaranteed () -> (@out T, @yields T) {
-// bb0(%x : $Int32, %f : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields T)):
-//   %p = partial_apply [callee_guaranteed] %f(%x) : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields T)
-//   return %p : $@yield_once @callee_guaranteed () -> (@out T, @yields T)
+sil @partial_apply_with_out_param : $@convention(thin) <T> (@in T) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> (@out T, @yields @in T) for <T> {
+bb0(%x : $*T):
+  %f = function_ref @captured_dependent_out_param : $@yield_once @convention(thin) <B> (@in B) -> (@out B, @yields @in B)
+  %p = partial_apply [callee_guaranteed] %f<T>(%x) : $@yield_once @convention(thin) <C> (@in C) -> (@out C, @yields @in C)
+  return %p : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> (@out T, @yields @in T) for <T>
+}
+
+// FIXME: Cannot mangle free-standing archetypes
+// sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)) -> @yield_once @callee_guaranteed () -> (@out T, @yields @in T) {
+// bb0(%x : $Int32, %f : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)):
+//   %p = partial_apply [callee_guaranteed] %f(%x) : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)
+//   return %p : $@yield_once @callee_guaranteed () -> (@out T, @yields @in T)
 // }
 
 class Base {
@@ -1333,7 +1487,7 @@ bb2:
 // CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[CTX0PTR]])
 // CHECK:   %[[MDRESP:.*]] = call swiftcc %swift.metadata_response @"$s18partial_apply_coro3SubCMa"(i64 0)
 // CHECK:   %[[MD:.*]] = extractvalue %swift.metadata_response %[[MDRESP]], 0
-// CHECK:   %[[RESUME0:.*]] = call swiftcc ptr @receive_closure(ptr noalias dereferenceable(32) %[[CTX0PTR]], ptr @"$s26parametric_casting_closureTA.26", ptr %[[ARG0]], ptr %[[MD]])
+// CHECK:   %[[RESUME0:.*]] = call swiftcc ptr @receive_closure(ptr noalias dereferenceable(32) %[[CTX0PTR]], ptr @"$s26parametric_casting_closureTA.{{[0-9]+}}", ptr %[[ARG0]], ptr %[[MD]])
 // CHECK:   call swiftcc void %[[RESUME0]](ptr noalias dereferenceable(32) %[[CTX0PTR]], i1 false)
 // CHECK:   call void @llvm.lifetime.end.p0(i64 32, ptr %[[CTX0PTR]])
 // CHECK:   %[[CTX1PTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[CTX1]], i32 0, i32 0
@@ -1386,33 +1540,33 @@ bb2:
 // CHECK:   ret ptr %[[RET]]
 // CHECK: }
 //
-// CHECK: define {{.*}} { ptr, ptr } @"$s26parametric_casting_closureTA.26"(ptr noalias dereferenceable(32) %[[CTX:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: define {{.*}} { ptr, ptr } @"$s26parametric_casting_closureTA.{{[0-9]+}}"(ptr noalias dereferenceable(32) %[[CTX:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
 // CHECK: entry:
 // CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
 // CHECK:   store ptr %[[SPILL]], ptr %[[CTX]], align 8
-// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.26.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 0
 // CHECK:   %[[MDRESP:.*]] = call swiftcc %swift.metadata_response @"$s18partial_apply_coro3SubCMa"(i64 0)
 // CHECK:   %[[MD:.*]] = extractvalue %swift.metadata_response %[[MDRESP]], 0
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @parametric_casting_closure(ptr noalias dereferenceable(32) %[[FRAMEPTR]], ptr %[[PA_CTX_BOX]], ptr %[[MD]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
-// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.26.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]], align 8
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
-// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s26parametric_casting_closureTA.26.resume.0", 0
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s26parametric_casting_closureTA.{{[0-9]+}}.resume.0", 0
 // CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[YIELD]], 1
 // CHECK:   ret { ptr, ptr } %[[RET1]]
 // CHECK: }
 //
-// CHECK: define {{.*}} ptr @"$s26parametric_casting_closureTA.26.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
+// CHECK: define {{.*}} ptr @"$s26parametric_casting_closureTA.{{[0-9]+}}.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
 // CHECK: entryresume.0:
 // CHECK:   %[[FRAME:.*]] = load ptr, ptr %[[CTX]], align 8
-// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.26.Frame", ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   br i1 %[[UNWIND]], label %unwind, label %resume
 //
 // CHECK: unwind:
-// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.26.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME0:.*]] = load ptr, ptr %[[RESUME_ADDR0]], align 8
 // CHECK:   %[[CTX0:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   %{{.*}} = call swiftcc ptr %[[RESUME0]](ptr noalias dereferenceable(32) %[[CTX0]], i1 true)
@@ -1420,7 +1574,7 @@ bb2:
 // CHECK:   unreachable
 //
 // CHECK: resume:
-// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.26.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s26parametric_casting_closureTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME1:.*]] = load ptr, ptr %[[RESUME_ADDR1]], align 8
 // CHECK:   %[[CTX1:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   %[[RET:.*]] = call swiftcc ptr %[[RESUME1]](ptr noalias dereferenceable(32) %[[CTX1]], i1 false)
@@ -1447,39 +1601,185 @@ bb0(%0 : $Base):
  return %7 : $()
 }
 
+protocol P0 {}
+protocol P1 { associatedtype X : P0 }
+protocol P2 { associatedtype Y : P1 }
+
+// CHECK: define {{.*}} void @partial_apply_complex_generic_function
+// CHECK-SAME: (i64 %[[ARG:.*]], ptr %[[TY1:.*]], ptr %[[TY2:.*]], ptr %[[TY3:.*]])
+// CHECK: entry:
+// CHECK:   %[[CTX:.*]] = alloca [32 x i8]
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, {{.*}}
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   store ptr %[[TY1]], ptr %[[PA_CTX]]
+// CHECK:   %[[PA_CTX1:.*]] = getelementptr inbounds ptr, ptr %[[PA_CTX]], i32 1
+// CHECK:   store ptr %[[TY2]], ptr %[[PA_CTX1]]
+// CHECK:   %[[PA_CTX2:.*]] = getelementptr inbounds ptr, ptr %[[PA_CTX]], i32 2
+// CHECK:   store ptr %[[TY3]], ptr %[[PA_CTX2]]
+// CHECK:   %[[PA_ARG:.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 2
+// CHECK:   %[[PA_ARG_PTR:.*]] = getelementptr inbounds %TSi, ptr %[[PA_ARG]], i32 0, i32 0
+// CHECK:   store i64 %[[ARG]], ptr %[[PA_ARG_PTR]]
+// CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[CTX]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s24complex_generic_functionTA"(ptr noalias {{.*}} %[[CTXPTR]], ptr swiftself %[[PA_CTX_BOX]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   call swiftcc void %[[RESUME]](ptr noalias {{.*}} %[[CTXPTR]], i1 false)
+// CHECK:   call void @llvm.lifetime.end.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   ret void
+// CHECK: }
+
+// CHECK: define {{.*}} { ptr, ptr } @"$s24complex_generic_functionTA"
+// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: entry:
+// CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
+// CHECK:   store ptr %[[SPILL]], ptr %[[CTX]], align 8
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s24complex_generic_functionTA.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[TY1:.*]] = load ptr, ptr %[[PA_CTX]]
+// CHECK:   %[[TY2_PTR:.*]] = getelementptr inbounds ptr, ptr %[[PA_CTX]], i32 1
+// CHECK:   %[[TY2:.*]] = load ptr, ptr %[[TY2_PTR]]
+// CHECK:   %[[TY3_PTR:.*]] = getelementptr inbounds ptr, ptr %[[PA_CTX]], i32 2
+// CHECK:   %[[TY3:.*]] = load ptr, ptr %[[TY3_PTR]]
+// CHECK:   %[[PA_ARG_PTR:.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 2
+// CHECK:   %[[PA_ARG:.*]] = getelementptr inbounds %TSi, ptr %[[PA_ARG_PTR]], i32 0, i32 0
+// CHECK:   %[[ARG:.*]] = load i64, ptr %[[PA_ARG]]
+// CHECK:   call void @swift_release(ptr %[[PA_CTX_BOX]])
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @complex_generic_function(ptr noalias {{.*}} %[[FRAMEPTR]], i64 %[[ARG]], ptr %[[TY1]], ptr %[[TY2]], ptr %[[TY3]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s24complex_generic_functionTA.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   store ptr %[[RESUME]], ptr %[[SPILL1]]
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s24complex_generic_functionTA.resume.0", 0
+// CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[YIELD]], 1
+// CHECK:   ret { ptr, ptr } %[[RET1]]
+// CHECK: }
+
+sil hidden_external @complex_generic_function : $@yield_once @convention(thin) <T where T : P2, T.Y : P2> (Int) -> (@yields @in T)
+sil @partial_apply_complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
+bb0(%0 : $Int):
+  %fn = function_ref @complex_generic_function : $@yield_once @convention(thin) <T where T : P2, T.Y : P2> (Int) -> (@yields @in T)
+  %pa = partial_apply %fn <T>(%0) : $@yield_once @convention(thin) <T where T : P2, T.Y : P1, T.Y : P2> (Int) -> (@yields @in T)
+  (%yield, %token) = begin_apply %pa() : $@yield_once @callee_owned @substituted <T where T : P2, T.Y : P1, T.Y : P2> () -> (@yields @in T) for <T>
+  end_apply %token as $()
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK: define {{.*}} void @partial_apply_with_generic_type
+// CHECK-SAME: (ptr %[[TY1:.*]], ptr %[[TY2:.*]])
+// CHECK: entry:
+// CHECK:   %[[CTX:.*]] = alloca [32 x i8]
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, {{.*}})
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, [8 x i8] }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[MD_RES:.*]] = call swiftcc %swift.metadata_response @"$s18partial_apply_coro18ComplexBoundedTypeVMa"(i64 0, ptr %[[TY1]], ptr %[[TY2]])
+// CHECK:   %[[MD:.*]] = extractvalue %swift.metadata_response %[[MD_RES]], 0
+// CHECK:   store ptr %[[MD]], ptr %[[PA_CTX]]
+// CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[CTX]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s16generic_functionTA"(ptr noalias {{.*}} %[[CTXPTR]], ptr swiftself %[[PA_CTX_BOX]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   call swiftcc void %[[RESUME]](ptr noalias {{.*}} %[[CTXPTR]], i1 false)
+// CHECK:   call void @llvm.lifetime.end.p0(i64 32, ptr %[[CTXPTR]])
+// CHECK:   ret void
+// CHECK: }
+
+// CHECK: define {{.*}} { ptr, ptr } @"$s16generic_functionTA"
+// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: entry:
+// CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
+// CHECK:   store ptr %[[SPILL]], ptr %[[CTX]]
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s16generic_functionTA.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, [8 x i8] }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[MD:.*]] = load ptr, ptr %[[PA_CTX]]
+// CHECK:   call void @swift_release(ptr %[[PA_CTX_BOX]]) #3
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @generic_function(ptr noalias {{.*}} %[[FRAMEPTR]], ptr %[[MD]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s16generic_functionTA.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   store ptr %[[RESUME]], ptr %[[SPILL1]]
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } poison, ptr @"$s16generic_functionTA.resume.0", 0
+// CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET]], ptr %[[YIELD]], 1
+// CHECK:   ret { ptr, ptr } %[[RET1]]
+// CHECK: }
+
+struct ComplexBoundedType<T: P2> {}
+sil hidden_external @generic_function : $@yield_once @convention(thin) <T> () -> (@yields @in T)
+sil @partial_apply_with_generic_type : $@convention(thin) <U: P2> () -> () {
+bb0:
+  %fn = function_ref @generic_function : $@yield_once @convention(thin) <T> () -> (@yields @in T)
+  %pa = partial_apply %fn <ComplexBoundedType<U>>() : $@yield_once @convention(thin) <T> () -> (@yields @in T)
+  (%yield, %token) = begin_apply %pa() : $@yield_once @callee_owned @substituted <T where T: Copyable, T: Escapable> () -> (@yields @in T) for <ComplexBoundedType<U>>
+  end_apply %token as $()
+  %result = tuple ()
+  return %result : $()
+}
+
+
 // Crash on partial apply of a generic enum.
 enum GenericEnum<T> {
   case X(String)
   case Y(T, T, T, T, T)
 }
 
-// FIXME: Support coroutine indirect results
+sil public @generic_indirect_return : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T> {
+entry(%i : $Int):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
-// sil public @generic_indirect_return : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T> {
-// entry(%i : $Int):
-//   %0 = builtin "int_trap"() : $Never
-//   unreachable
-// }
+// CHECK: define {{.*}} { ptr, ptr } @partial_apply_generic_indirect_return
+// CHECK-SAME: (i64 %[[ARG:.*]])
+// CHECK: entry:
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, {{.*}})
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[PA_ARG_PTR:.*]] = getelementptr inbounds %TSi, ptr %[[PA_CTX]], i32 0, i32 0
+// CHECK:   store i64 %[[ARG]], ptr %[[PA_ARG_PTR]]
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s23generic_indirect_returnTA", ptr undef }, ptr %[[PA_CTX_BOX]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
 
-// sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @yield_once @callee_guaranteed () -> @owned GenericEnum<Int> {
-//   bb0(%0 : $Int):
-//   %fn = function_ref @generic_indirect_return :$@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T>
-//   %pa = partial_apply [callee_guaranteed] %fn<Int> (%0) : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T>
-//   return %pa : $@yield_once @callee_guaranteed () -> @owned GenericEnum<Int>
-// }
+sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum<T> for <Int> {
+  bb0(%0 : $Int):
+  %fn = function_ref @generic_indirect_return :$@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T>
+  %pa = partial_apply [callee_guaranteed] %fn<Int> (%0) : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T>
+  return %pa : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum<T> for <Int>
+}
 
-// sil public @generic_indirect_return2 : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum2<T> {
-// entry(%i : $Int):
-//   %0 = builtin "int_trap"() : $Never
-//   unreachable
-// }
+enum GenericEnum2<T> {
+  case X(String)
+  case Y(T)
+}
 
-// sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T> () -> @owned GenericEnum2<T> for <Int> {
-//   bb0(%0 : $Int):
-//   %fn = function_ref @generic_indirect_return2 :$@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum2<T>
-//   %pa = partial_apply [callee_guaranteed] %fn<Int> (%0) : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum2<T>
-//   return %pa : $@yield_once @callee_guaranteed @substituted <T> () -> @owned GenericEnum2<T> for <Int>
-// }
+sil public @generic_indirect_return2 : $@yield_once @convention(thin) <T where T: Copyable> (Int) -> @owned GenericEnum2<T> {
+entry(%i : $Int):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+
+// CHECK: define {{.*}} { ptr, ptr } @partial_apply_generic_indirect_return2
+// CHECK-SAME: (i64 %[[ARG:.*]])
+// CHECK: entry:
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, {{.*}})
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[PA_ARG_PTR:.*]] = getelementptr inbounds %TSi, ptr %[[PA_CTX]], i32 0, i32 0
+// CHECK:   store i64 %[[ARG]], ptr %[[PA_ARG_PTR]]
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s24generic_indirect_return2TA", ptr undef }, ptr %[[PA_CTX_BOX]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
+
+sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum2<T> for <Int> {
+  bb0(%0 : $Int):
+  %fn = function_ref @generic_indirect_return2 :$@yield_once @convention(thin) <T where T: Copyable, T: Escapable> (Int) -> @owned GenericEnum2<T>
+  %pa = partial_apply [callee_guaranteed] %fn<Int> (%0) : $@yield_once @convention(thin) <T where T: Copyable, T: Escapable> (Int) -> @owned GenericEnum2<T>
+  return %pa : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum2<T> for <Int>
+}
 
 struct SwiftStruct {}
 
@@ -1634,36 +1934,36 @@ bb0(%0 : $*A2<A3>):
 // CHECK:   %[[BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.{{.*}}, i32 0, i32 2), i64 32, i64 7)
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   call void @llvm.memcpy.p0.p0.i64(ptr align 8 %[[BOXPTR]], ptr align 8 %[[ARG]], i64 16, i1 false)
-// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.30", ptr undef }, ptr %[[BOX]], 1
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}", ptr undef }, ptr %[[BOX]], 1
 // CHECK:   ret { ptr, ptr } %[[RET]]
 // CHECK: }
 //
-// CHECK: define {{.*}} { ptr, i64 } @"$s45indirect_guaranteed_captured_class_pair_paramTA.30"(ptr noalias dereferenceable(32) %[[CTX:.*]], i64 %[[ARG0:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: define {{.*}} { ptr, i64 } @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}"(ptr noalias dereferenceable(32) %[[CTX:.*]], i64 %[[ARG0:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
 // CHECK: entry:
 // CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
 // CHECK:   store ptr %[[SPILL]], ptr %[[CTX]], align 8
-// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.30.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 0
 // CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
 // CHECK:   %[[PA_ARG:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[PA_ARG]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, i64 } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable(32) %[[PA_ARG]], i64 %[[ARG0]], ptr noalias nocapture dereferenceable(16) %[[PA_CTX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, i64 } %[[YIELD_PAIR]], 0
-// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.30.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]], align 8
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, i64 } %[[YIELD_PAIR]], 1
-// CHECK:   %[[RET0:.*]] = insertvalue { ptr, i64 } poison, ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.30.resume.0", 0
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, i64 } poison, ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.resume.0", 0
 // CHECK:   %[[RET1:.*]] = insertvalue { ptr, i64 } %[[RET0]], i64 %[[YIELD]], 1
 // CHECK:   ret { ptr, i64 } %[[RET1]]
 // CHECK: }
 //
-// CHECK: define {{.*}} void @"$s45indirect_guaranteed_captured_class_pair_paramTA.30.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
+// CHECK: define {{.*}} void @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
 // CHECK: entryresume.0:
 // CHECK:   %[[FRAME:.*]] = load ptr, ptr %[[CTX]], align 8
-// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.30.Frame", ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   br i1 %[[UNWIND]], label %unwind, label %resume
 //
 // CHECK: unwind:
-// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.30.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME0:.*]] = load ptr, ptr %[[RESUME_ADDR0]], align 8
 // CHECK:   %[[CTX0:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   call swiftcc void %[[RESUME0]](ptr noalias dereferenceable(32) %[[CTX0]], i1 true)
@@ -1671,7 +1971,7 @@ bb0(%0 : $*A2<A3>):
 // CHECK:   unreachable
 //
 // CHECK: resume:
-// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.30.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME1:.*]] = load ptr, ptr %[[RESUME_ADDR1]], align 8
 // CHECK:   %[[CTX1:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   call swiftcc void %[[RESUME1]](ptr noalias dereferenceable(32) %[[CTX1]], i1 false)
@@ -1696,7 +1996,7 @@ sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @y
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]], align 8
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[CTX]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[CTXPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, i64 } @use_closure2(ptr noalias dereferenceable(32) %[[CTXPTR]], ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.31", ptr %[[BOX]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, i64 } @use_closure2(ptr noalias dereferenceable(32) %[[CTXPTR]], ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}", ptr %[[BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, i64 } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, i64 } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable(32) %[[CTXPTR]], i1 false)
@@ -1704,33 +2004,33 @@ sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @y
 // CHECK:   ret void
 // CHECK: }
 //
-// CHECK: define {{.*}} { ptr, i64 } @"$s45indirect_guaranteed_captured_class_pair_paramTA.31"(ptr noalias dereferenceable(32) %[[CTX:.*]], i64 %[[ARG0:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: define {{.*}} { ptr, i64 } @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}"(ptr noalias dereferenceable(32) %[[CTX:.*]], i64 %[[ARG0:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
 // CHECK: entry:
 // CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
 // CHECK:   store ptr %[[SPILL]], ptr %[[CTX]], align 8
-// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.31.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 0
 // CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
 // CHECK:   %[[PA_ARG:.*]] = load ptr, ptr %[[PA_CTX]], align 8
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, i64 } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable(32) %[[FRAMEPTR]], i64 %[[ARG0]], ptr noalias nocapture dereferenceable(16) %[[PA_ARG]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, i64 } %[[YIELD_PAIR]], 0
-// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.31.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]], align 8
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, i64 } %[[YIELD_PAIR]], 1
-// CHECK:   %[[RET0:.*]] = insertvalue { ptr, i64 } poison, ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.31.resume.0", 0
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, i64 } poison, ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.resume.0", 0
 // CHECK:   %[[RET1:.*]] = insertvalue { ptr, i64 } %[[RET0]], i64 %[[YIELD]], 1
 // CHECK:   ret { ptr, i64 } %[[RET1]]
 // CHECK: }
 //
-// CHECK: define {{.*}} void @"$s45indirect_guaranteed_captured_class_pair_paramTA.31.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
+// CHECK: define {{.*}} void @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.resume.0"(ptr noalias noundef nonnull align 8 dereferenceable(32) %[[CTX:.*]], i1 %[[UNWIND:.*]])
 // CHECK: entryresume.0:
 // CHECK:   %[[FRAME:.*]] = load ptr, ptr %[[CTX]], align 8
-// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.31.Frame", ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   br i1 %[[UNWIND]], label %unwind, label %resume
 //
 // CHECK: unwind:
-// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.31.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR0:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME0:.*]] = load ptr, ptr %[[RESUME_ADDR0]], align 8
 // CHECK:   %[[CTX0:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   call swiftcc void %[[RESUME0]](ptr noalias dereferenceable(32) %[[CTX0]], i1 true)
@@ -1738,7 +2038,7 @@ sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @y
 // CHECK:   unreachable
 //
 // CHECK: resume:
-// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.31.Frame", ptr %[[FRAME]], i32 0, i32 1
+// CHECK:   %[[RESUME_ADDR1:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[FRAME]], i32 0, i32 1
 // CHECK:   %[[RESUME1:.*]] = load ptr, ptr %[[RESUME_ADDR1]], align 8
 // CHECK:   %[[CTX1:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAMEPTR]], i32 0, i32 0
 // CHECK:   call swiftcc void %[[RESUME1]](ptr noalias dereferenceable(32) %[[CTX1]], i1 false)
@@ -1923,8 +2223,8 @@ bb0(%thick : $@callee_guaranteed @yield_once @convention(thick) (Int64, Int32) -
   return %pa_f : $@yield_once @callee_guaranteed (Int64) -> Int64
 }
 
+// FIXME: Assertion `LastArgWritten >= adjusted.size()' failed.
 // sil @external_closure : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
-
 // sil @dont_crash : $@convention(thin) (Int) -> @owned @yield_once @callee_guaranteed (Int) -> (Int, @error Error) {
 // bb0(%0 : $Int):
 //   %2 = function_ref @external_closure : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
@@ -1932,12 +2232,17 @@ bb0(%thick : $@callee_guaranteed @yield_once @convention(thick) (Int64, Int32) -
 //   return %3 : $@yield_once @callee_guaranteed (Int) -> (Int, @error Error)
 // }
 
-sil @method_with_out_return : $@convention(method) @yield_once (SwiftClass) -> @out Int
+// CHECK: define {{.*}} { ptr, ptr } @partially_apply_method_with_out_return
+// CHECK-SAME: (ptr %[[ARG:.*]])
+// CHECK: entry:
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s22method_with_out_returnTA", ptr undef }, ptr %[[ARG]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
 
-// FIXME: Support coroutine indirect results
-// sil @partially_apply_method_with_out_return : $@convention(thin) (SwiftClass) -> @yield_once @callee_guaranteed () -> @out Int {
-// bb(%class : $SwiftClass):
-//   %method_with_out_param = function_ref @method_with_out_return : $@convention(method) @yield_once (SwiftClass) -> @out Int
-//   %result = partial_apply [callee_guaranteed] %method_with_out_param(%class) : $@convention(method) @yield_once (SwiftClass) -> @out Int
-//   return %result : $@callee_guaranteed @yield_once () -> @out Int
-// }
+sil @method_with_out_return : $@convention(method) @yield_once (SwiftClass) -> @out Int
+sil @partially_apply_method_with_out_return : $@convention(thin) (SwiftClass) -> @yield_once @callee_guaranteed () -> @out Int {
+bb(%class : $SwiftClass):
+  %method_with_out_param = function_ref @method_with_out_return : $@convention(method) @yield_once (SwiftClass) -> @out Int
+  %result = partial_apply [callee_guaranteed] %method_with_out_param(%class) : $@convention(method) @yield_once (SwiftClass) -> @out Int
+  return %result : $@callee_guaranteed @yield_once () -> @out Int
+}
