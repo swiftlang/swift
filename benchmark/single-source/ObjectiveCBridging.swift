@@ -823,9 +823,10 @@ public func run_BridgedNSArrayObjectAtIndex(_ n: Int) {
 @inline(never)
 public func run_BridgedNSArrayBufferAccess(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< n * 50 {
-    for i in 0..<100 {
+  for _ in 0 ..< n {
+    for i in 0..<1000 {
       let tmp = nsArray as! [NSObject]
+      blackHole(tmp)
       blackHole(tmp.withContiguousStorageIfAvailable {
         $0[0]
       })
@@ -837,9 +838,10 @@ public func run_BridgedNSArrayBufferAccess(_ n: Int) {
 @inline(never)
 public func run_BridgedNSArrayRepeatedBufferAccess(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< n * 50 {
+  for _ in 0 ..< n {
     let tmp = nsArray as! [NSObject]
-    for i in 0..<100 {
+    blackHole(tmp)
+    for i in 0..<1000 {
       blackHole(tmp.withContiguousStorageIfAvailable {
         $0[0]
       })
