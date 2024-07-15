@@ -310,6 +310,7 @@ extension DoubleWidth : FixedWidthInteger {
   public func multipliedReportingOverflow(
     by rhs: DoubleWidth
   ) -> (partialValue: DoubleWidth, overflow: Bool) {
+    let (carry, product) = multipliedFullWidth(by: rhs)
     let partialValue = DoubleWidth(truncatingIfNeeded: product)
     // Overflow has occured if carry is not just the sign-extension of
     // partialValue (which is zero when Base is unsigned).
