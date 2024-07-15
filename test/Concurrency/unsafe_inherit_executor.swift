@@ -172,3 +172,7 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
     throw MyError.fail
   }
 }
+
+@_unsafeInheritExecutor
+func _unsafeInheritExecutor_hacky() async { }
+// expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
