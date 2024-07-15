@@ -270,9 +270,11 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @_unsafeInheritExecutor // internal for backwards compatibility; though may be able to be removed safely?
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 5.9)
-  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
-                                 operation: () async throws -> R,
-                                 file: String = #fileID, line: UInt = #line) async rethrows -> R {
+  internal func _unsafeInheritExecutor_withValueImpl<R>(
+    _ valueDuringOperation: __owned Value,
+    operation: () async throws -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
 
