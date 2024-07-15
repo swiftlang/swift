@@ -6505,6 +6505,13 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::EnumPatternImplicitCastMatch: {
+      emitDiagnostic(diag::pattern_does_not_conform_to_match, getFromType(),
+                     getToType())
+          .highlight(getSourceRange());
+      return true;
+    }
+
     default:
       break;
     }
@@ -9124,7 +9131,7 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
                        ReferenceOwnership::Weak, varType);
 
   auto typeRange = var->getTypeSourceRangeForDiagnostics();
-  if (varType->hasSimpleTypeRepr()) {
+  if (varType->lookThroughSingleOptionalType()->hasSimpleTypeRepr()) {
     diagnostic.fixItInsertAfter(typeRange.End, "?");
   } else {
     diagnostic.fixItInsert(typeRange.Start, "(")
