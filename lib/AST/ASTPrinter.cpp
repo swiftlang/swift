@@ -353,11 +353,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
-      if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-        if (accessor->isInitAccessor() && !options.PrintForSIL)
-          return false;
-      }
-
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
