@@ -253,5 +253,9 @@ private struct LifetimeDependenceScopeFixupWalker : LifetimeDependenceDefUseWalk
   mutating func yieldedDependence(result: Operand) -> WalkResult {
     return .continueWalk
   }
+
+  mutating func storeToYieldDependence(address: Value, of operand: Operand) -> WalkResult {
+    return .continueWalk
+  }
 }
 

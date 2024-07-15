@@ -40,6 +40,7 @@ struct LocalVariableAccess: CustomStringConvertible {
   enum Kind {
     case incomingArgument // @in, @inout, @inout_aliasable
     case outgoingArgument // @inout, @inout_aliasable
+    case inoutYield       // indirect yield from this accessor
     case beginAccess // Reading or reassinging a 'var'
     case load        // Reading a 'let'. Returning 'var' from an initializer.
     case store       // 'var' initialization and destruction
@@ -77,7 +78,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       }
     case .load:
       return false
-    case .incomingArgument, .outgoingArgument, .store:
+    case .incomingArgument, .outgoingArgument, .store, .inoutYield:
       return true
     case .apply:
       let apply = instruction as! FullApplySite
@@ -108,6 +109,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "incomingArgument"
     case .outgoingArgument:
       str += "outgoingArgument"
+    case .inoutYield:
+      str += "inoutYield"
     case .beginAccess:
       str += "beginAccess"
     case .load:
@@ -133,7 +136,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   private var _isFullyAssigned: Bool?
 
   /// Cache whether the allocation has escaped prior to this access.
-  /// For alloc_box, this returns `nil` until reachability is computed.
+  /// This returns `nil` until reachability is computed.
   var hasEscaped: Bool?
 
   init(localAccess: LocalVariableAccess) {
@@ -150,7 +153,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       self._isFullyAssigned = false
     case .store:
       if let store = localAccess.instruction as? StoringInstruction {
-        self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.source)
+        self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination)
       } else {
         self._isFullyAssigned = true
       }
@@ -164,6 +167,8 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .escape:
       self._isFullyAssigned = false
       self.hasEscaped = true
+    case .inoutYield:
+      self._isFullyAssigned = false
     case .incomingArgument, .outgoingArgument:
       fatalError("Function arguments are never mapped to LocalVariableAccessInfo")
     }
@@ -430,6 +435,11 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
 
   mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite) -> WalkResult {
     visit(LocalVariableAccess(.apply, operand))
+    return .continueWalk
+  }
+
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    visit(LocalVariableAccess(.inoutYield, operand))
     return .continueWalk
   }
 

@@ -44,6 +44,12 @@ public struct OuterNE: ~Escapable {
 
   // Explicit setter with an infered dependence on 'newValue'.
   public var inner2: InnerNE {
+    get { inner1 }
+    set { inner1 = newValue }
+  }
+
+  // Modify yields inout self.
+  public var inner3: InnerNE {
     _read { yield inner1 }
     _modify { yield &inner1 }
   }
