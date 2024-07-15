@@ -191,6 +191,12 @@ weak var weak16 : Class!
 
 @weak var weak17 : Class? // expected-error {{'weak' is a declaration modifier, not an attribute}} {{1-2=}}
 
+class SomeClass {}
+protocol SomeProtocol {}
+_ = {
+  // Make sure the fix-it here includes the parens
+  weak var x: SomeClass & SomeProtocol // expected-error {{'weak' variable should have optional type '(any SomeClass & SomeProtocol)?'}} {{15-15=(}} {{39-39=)?}}
+}
 
 @_exported var exportVar: Int // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
 @_exported func exportFunc() {} // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
