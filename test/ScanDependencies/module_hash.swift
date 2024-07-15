@@ -50,6 +50,25 @@
 // RUN: not diff %t/lib-4.cmd %t/lib-5.cmd
 // RUN: not diff %t/lib-4.cmd %t/lib-6.cmd
 
+/// interface doesn't build due to failed type-check.
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:SwiftShims > %t/shim1.cmd
+// RUN: %swift_frontend_plain @%t/shim1.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:A > %t/a1.cmd
+// RUN: %swift_frontend_plain @%t/a1.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-1.json Library > %t/lib1.cmd
+// RUN: not %swift_frontend_plain @%t/lib1.cmd
+
+/// interface builds if clang module has the correct preprocessor defines.
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-2.json clang:SwiftShims > %t/shim2.cmd
+// RUN: %swift_frontend_plain @%t/shim2.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-2.json clang:A > %t/a2.cmd
+// RUN: %swift_frontend_plain @%t/a2.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-2.json Library > %t/lib2.cmd
+// RUN: %swift_frontend_plain @%t/lib2.cmd
+
+/// This should fail no matter if the swiftmodule is already compiled or not.
+// RUN: not %swift_frontend_plain @%t/lib1.cmd
+
 //--- main.swift
 import Library
 
@@ -58,7 +77,10 @@ import Library
 // swift-module-flags: -module-name Library -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -user-module-version 1.0
 import Swift
 @_exported import A
-public func test() {}
+@inlinable
+public func test() {
+    foo()
+}
 
 //--- include/a.h
 #ifdef HAS_FOO
