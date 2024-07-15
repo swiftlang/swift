@@ -44,7 +44,7 @@ set(LLVM_BUILTIN_TARGETS ${DEFAULT_BUILTIN_TARGETS} CACHE STRING "")
 set(LLVM_RUNTIME_TARGETS
       x86_64-unknown-windows-msvc
       aarch64-unknown-windows-msvc
-  CACHE STRING "")
+    CACHE STRING "")
 
 foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_LLVM_ENABLE_RUNTIMES
