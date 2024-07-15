@@ -6505,6 +6505,13 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::EnumPatternImplicitCastMatch: {
+      emitDiagnostic(diag::pattern_does_not_conform_to_match, getFromType(),
+                     getToType())
+          .highlight(getSourceRange());
+      return true;
+    }
+
     default:
       break;
     }

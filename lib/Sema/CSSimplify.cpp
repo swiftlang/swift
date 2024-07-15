@@ -6667,6 +6667,11 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
+    // If we're converting to an existential, we'll diagnose failures in
+    // the conformance constraint.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+      return false;
+
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
