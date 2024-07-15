@@ -1443,7 +1443,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       }
       
       if (auto *synthSFU = File->getSynthesizedFile()) {
-        CurrentIGMPtr IGM = irgen.getGenModule(&synthSFU->getFileUnit());
+        CurrentIGMPtr IGM = irgen.getGenModule(synthSFU);
         IGM->emitSynthesizedFileUnit(*synthSFU);
       }
     } else {
