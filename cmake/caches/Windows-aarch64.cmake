@@ -27,12 +27,12 @@ set(LLVM_APPEND_VC_REV NO CACHE BOOL "")
 set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")
 
-#set(DEFAULT_BUILTIN_TARGETS
-#      x86_64-unknown-windows-msvc
-#      aarch64-unknown-windows-msvc)
+set(DEFAULT_BUILTIN_TARGETS
+      x86_64-unknown-windows-msvc
+      aarch64-unknown-windows-msvc)
 # Build the android builtins if NDK path is provided.
 if(NOT "$ENV{NDKPATH}" STREQUAL "")
-  set(DEFAULT_BUILTIN_TARGETS
+  list(APPEND DEFAULT_BUILTIN_TARGETS
        aarch64-unknown-linux-android
        x86_64-unknown-linux-android)
 endif()
