@@ -90,11 +90,16 @@ public func withDiscardingTaskGroup<GroupResult>(
   return result
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.9, *)
-@usableFromInline
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss23withDiscardingTaskGroup9returning4bodyxxm_xs0bcD0VzYaXEtYalF")
-internal func __abi_withDiscardingTaskGroup<GroupResult>(
+public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
@@ -637,10 +642,9 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 }
 
 @available(SwiftStdlib 5.9, *)
-@usableFromInline
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss31withThrowingDiscardingTaskGroup9returning4bodyxxm_xs0bcdE0Vys5Error_pGzYaKXEtYaKlF")
-internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
+public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
