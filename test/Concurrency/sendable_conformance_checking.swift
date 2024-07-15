@@ -180,7 +180,7 @@ extension SendableExtSub: @unchecked Sendable {}
 
 // Still want to know about same-class redundancy
 class MultiConformance: @unchecked Sendable {} // expected-note {{'MultiConformance' declares conformance to protocol 'Sendable' here}}
-extension MultiConformance: @unchecked Sendable {} // expected-error {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
+extension MultiConformance: @unchecked Sendable {} // expected-warning {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
 
 @available(SwiftStdlib 5.1, *)
 actor MyActor {

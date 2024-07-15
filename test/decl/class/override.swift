@@ -414,3 +414,13 @@ open class OpenDerivedFinal : OpenBase {
 open class OpenDerivedStatic : OpenBase {
   override public static func classMethod() {}
 }
+
+// When override matching an invalid decl, avoid emitting
+// another error saying it doesn't override anything.
+class OverrideTypoBaseClass {
+  func foo(_ x: Int) {}
+}
+class OverrideTypoSubclass: OverrideTypoBaseClass {
+  override func foo(_ x: Itn) {} // expected-error {{cannot find type 'Itn' in scope}}
+}
+

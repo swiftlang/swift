@@ -265,7 +265,7 @@ Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
 - macOS:
   ```sh
   utils/build-script --skip-build-benchmarks \
-    --skip-ios --skip-watchos --skip-tvos --skip-xros --swift-darwin-supported-archs "$(uname -m)" \
+    --swift-darwin-supported-archs "$(uname -m)" \
     --sccache --release-debuginfo --swift-disable-dead-stripping \
     --bootstrapping=hosttools
   ```
