@@ -1091,7 +1091,7 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Support operators.
-      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit()))
+      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit() && !isa<AccessorDecl>(AFD)))
         return;
 
       auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
