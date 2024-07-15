@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: CODEGENERATOR=WebAssembly
 
 // RUN: %empty-directory(%t)
 
