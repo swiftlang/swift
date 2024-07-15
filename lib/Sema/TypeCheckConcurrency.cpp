@@ -2793,6 +2793,25 @@ namespace {
         if (capture.isOpaqueValue())
           continue;
 
+        auto *closure = localFunc.getAbstractClosureExpr();
+
+        // Diagnose a `self` capture inside an escaping `sending`
+        // `@Sendable` closure in a deinit, which almost certainly
+        // means `self` would escape deinit at runtime.
+        auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
+        auto *dc = getDeclContext();
+        if (explicitClosure && isa<DestructorDecl>(dc) &&
+            !explicitClosure->getType()->isNoEscape() &&
+            (explicitClosure->isPassedToSendingParameter() ||
+             explicitClosure->isSendable())) {
+          auto var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+          if (var && var->isSelfParameter()) {
+            ctx.Diags.diagnose(explicitClosure->getLoc(),
+                               diag::self_capture_deinit_task)
+                .warnUntilSwiftVersion(6);
+          }
+        }
+
         // If the closure won't execute concurrently with the context in
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
@@ -2817,7 +2836,6 @@ namespace {
         if (type->hasError())
           continue;
 
-        auto *closure = localFunc.getAbstractClosureExpr();
         if (closure && closure->isImplicit()) {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
