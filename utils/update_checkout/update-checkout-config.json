@@ -42,8 +42,6 @@
             "remote": { "id": "apple/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
             "remote": { "id": "apple/swift-corelibs-foundation" } },  
-        "swift-corelibs-foundation-windows": {
-            "remote": { "id": "apple/swift-corelibs-foundation" } },  
         "swift-foundation-icu": {
             "remote": { "id": "apple/swift-foundation-icu" } },  
         "swift-foundation": {
@@ -140,7 +138,6 @@
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
-                "swift-corelibs-foundation-windows": "windows/main",
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
@@ -192,7 +189,6 @@
                 "swift-stress-tester": "release/6.0",
                 "swift-corelibs-xctest": "release/6.0",
                 "swift-corelibs-foundation": "release/6.0",
-                "swift-corelibs-foundation-windows": "windows/release/6.0",
                 "swift-corelibs-libdispatch": "release/6.0",
                 "swift-integration-tests": "release/6.0",
                 "swift-xcode-playground-support": "release/6.0",
