@@ -67,7 +67,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
       return AccessLevel::Private;
     case AccessorKind::Init:
       // These are only called from within the same module.
-      return std::min(storage->getFormalAccess(), AccessLevel::Internal);
+      return AccessLevel::Internal;
     }
   }
 
