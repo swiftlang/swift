@@ -25,7 +25,7 @@ private func log(_ message: @autoclosure () -> String) {
 ///
 /// TODO: Integrate this with SIL verification to ensure completeness.
 ///
-/// TODO: Convert AddressDefUseWalker to conform to AddressUtils after
+/// TODO: Convert AddressDefUseWalker to use AddressUseVisitor after
 /// checking that the additional instructions are handled correctly by
 /// escape analysis.
 ///
