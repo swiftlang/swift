@@ -43,13 +43,77 @@ namespace swift {
 struct SymbolInfo {
 private:
 #if defined(_WIN32) && !defined(__CYGWIN__)
-  SYMBOL_INFO_PACKAGE _package;
+  const void *_symbolAddress;
+  const char *_symbolName;
+  const char *_moduleFileName;
+  const void *_moduleBaseAddress;
 #elif SWIFT_STDLIB_HAS_DLADDR
   Dl_info _info;
 #endif
 
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  SymbolInfo(const void *symbolAddress,
+             const char *symbolName,
+             const char *moduleFileName,
+             const void *moduleBaseAddress)
+    : _symbolAddress(symbolAddress),
+      _symbolName(symbolName),
+      _moduleFileName(moduleFileName),
+      _moduleBaseAddress(moduleBaseAddress)
+  {}
+
+  void initializeFrom(const SymbolInfo &other) {
+    _symbolAddress = other._symbolAddress;
+    _symbolName = ::strdup(other._symbolName);
+    _moduleFileName = ::strdup(other._moduleFileName);
+    _moduleBaseAddress = other._moduleBaseAddress;
+  }
+
+  void deinitialize() {
+    ::free((void *)_moduleFileName);
+    ::free((void *)_symbolName);
+    _moduleFileName = nullptr;
+    _symbolName = nullptr;
+  }
+#endif
+
 public:
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  SymbolInfo() : _symbolName(nullptr), _moduleFileName(nullptr) {}
+
+  SymbolInfo(const SymbolInfo &other) {
+    initializeFrom(other);
+  }
+  SymbolInfo(SymbolInfo &&other) {
+    *this = std::move(other);
+  }
+  ~SymbolInfo() {
+    deinitialize();
+  }
+
+  SymbolInfo &operator=(const SymbolInfo &other) {
+    if (this != &other) {
+      deinitialize();
+      initializeFrom(other);
+    }
+
+    return *this;
+  }
+  SymbolInfo &operator=(SymbolInfo &&other) {
+    if (this != &other) {
+      _symbolAddress = other._symbolAddress;
+      _symbolName = other._symbolName;
+      other._symbolName = nullptr;
+      _moduleFileName = other._moduleFileName;
+      other._moduleFileName = nullptr;
+      _moduleBaseAddress = other._moduleBaseAddress;
+    }
+
+    return *this;
+  }
+#else
   SymbolInfo() {}
+#endif
 
   /// Get the file name of the image where the symbol was found.
   ///
