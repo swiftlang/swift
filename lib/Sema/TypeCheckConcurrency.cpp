@@ -2105,7 +2105,8 @@ void swift::introduceUnsafeInheritExecutorReplacements(
 
   auto isReplaceable = [&](ValueDecl *decl) {
     return isa<FuncDecl>(decl) && inConcurrencyModule(decl->getDeclContext()) &&
-        decl->getDeclContext()->isModuleScopeContext();
+        decl->getDeclContext()->isModuleScopeContext() &&
+        cast<FuncDecl>(decl)->hasAsync();
   };
 
   // Make sure at least some of the entries are functions in the _Concurrency
@@ -2160,7 +2161,8 @@ void swift::introduceUnsafeInheritExecutorReplacements(
     return;
 
   auto isReplaceable = [&](ValueDecl *decl) {
-    return isa<FuncDecl>(decl) && inConcurrencyModule(decl->getDeclContext());
+    return isa<FuncDecl>(decl) && inConcurrencyModule(decl->getDeclContext()) &&
+      cast<FuncDecl>(decl)->hasAsync();
   };
 
   // Make sure at least some of the entries are functions in the _Concurrency

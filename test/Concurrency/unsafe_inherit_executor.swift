@@ -117,7 +117,12 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
   } onCancel: {
   }
 
-  await TL.$string.withValue("hello") {
+  TL.$string.withValue("hello") {
+    print(TL.string)
+  }
+
+  try await TL.$string.withValue("hello") {
+    try await Task.sleep(nanoseconds: 500)
     print(TL.string)
   }
 
