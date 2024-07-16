@@ -591,12 +591,10 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
 
 static swiftscan_macro_dependency_set_t *createMacroDependencySet(
     const std::map<std::string, MacroPluginDependency> &macroDeps) {
+  if (macroDeps.empty())
+    return nullptr;
+
   swiftscan_macro_dependency_set_t *set = new swiftscan_macro_dependency_set_t;
-  if (macroDeps.empty()) {
-    set->count = 0;
-    set->macro_dependencies = nullptr;
-    return set;
-  }
   set->count = macroDeps.size();
   set->macro_dependencies = new swiftscan_macro_dependency_t[set->count];
   unsigned SI = 0;
