@@ -1294,12 +1294,12 @@ func testNestedTwoPayload() {
     let ptr = UnsafeMutablePointer<TwoPayloadOuter>.allocate(capacity: 1)
 
     do {
-        let x = TwoPayloadOuter.y(TwoPayloadInner.x(SimpleClass(x: 23)))
+        let x = TwoPayloadOuter.y(TwoPayloadInner.y(SimpleClass(x: 23)))
         testInit(ptr, to: x)
     }
 
     do {
-        let y = TwoPayloadOuter.y(TwoPayloadInner.x(SimpleClass(x: 1)))
+        let y = TwoPayloadOuter.y(TwoPayloadInner.y(SimpleClass(x: 1)))
 
         // CHECK: Before deinit
         print("Before deinit")
