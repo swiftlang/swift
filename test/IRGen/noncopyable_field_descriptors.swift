@@ -41,9 +41,9 @@ public struct NonCopyable: ~Copyable { }
 // 'MF' constant as a separator that precedes each field descriptor.
 
 // NEW: @"$s4test8CC_TestsCMF" =
-// NEW-SAME: @"symbolic _____yxG 4test21ConditionallyCopyableOAARi_zrlE"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyxG.3"
 // NEW-SAME: @"symbolic _____yq_G 4test21ConditionallyCopyableOAARi_zrlE"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyAA03NonC0VG.3"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyAA03NonC0VG.4"
 // NEW-SAME: @"symbolic _____ySSG 4test21ConditionallyCopyableOAARi_zrlE"
 
 // OLD: @"$s4test8CC_TestsCMF" =
@@ -64,10 +64,10 @@ public class CC_Tests<NCG: ~Copyable, T> {
 /// fields until a future runtime says they're safe to reflect.
 
 // NEW: @"$s4test8NC_TestsCMF" =
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.4"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyq_G.5"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyAA03NonC0VG.6"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOySSG.7"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.5"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyq_G.6"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyAA03NonC0VG.7"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOySSG.8"
 
 // OLD: @"$s4test8NC_TestsCMF" =
 // OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.7"
@@ -85,7 +85,7 @@ public class NC_Tests<NCG: ~Copyable, T> {
 // NEW: @"$s4test17StdlibTypes_TestsCMF" =
 // NEW-SAME: @"symbolic xSg"
 // NEW-SAME: @"symbolic q_Sg"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableVSg.8"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableVSg.9"
 // NEW-SAME: @"symbolic SSSg"
 // NEW-SAME: @"symbolic SPyxG"
 // NEW-SAME: @"symbolic SPyq_G"
@@ -111,4 +111,30 @@ public class StdlibTypes_Tests<NCG: ~Copyable, T> {
   var upT: UnsafePointer<T> = .init(bitPattern: 32)!
   var upNC: UnsafePointer<NonCopyable> = .init(bitPattern: 64)!
   var upC: UnsafePointer<String> = .init(bitPattern: 128)!
+}
+
+
+// NEW: @"$s4test19PlainlyStored_TestsCMF" =
+// NEW-SAME: @"symbolic x"
+// NEW-SAME: @"symbolic q_"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableV.10"
+// NEW-SAME: @"symbolic SS"
+
+// OLD: @"$s4test19PlainlyStored_TestsCMF" =
+// OLD-SAME: @"symbolic x"
+// OLD-SAME: @"symbolic q_"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableV.12"
+// OLD-SAME: @"symbolic SS"
+public class PlainlyStored_Tests<NCG: ~Copyable, T> {
+  var ncg: NCG
+  var t: T
+  var concreteNC: NonCopyable
+  var str: String
+
+  public init(_ ncg: consuming NCG, _ t: T) {
+    self.ncg = ncg
+    self.t = t
+    self.concreteNC = NonCopyable()
+    self.str = ""
+  }
 }
