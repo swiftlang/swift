@@ -88,8 +88,12 @@ enum TL {
   static var string: String = "<undefined>"
 }
 
+enum MyError: Error {
+case fail
+}
+
 @_unsafeInheritExecutor
-func unsafeCallerAvoidsNewLoop() async throws {
+func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
   // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   _ = await withUnsafeContinuation { (continuation: UnsafeContinuation<Int, Never>) in
@@ -113,10 +117,62 @@ func unsafeCallerAvoidsNewLoop() async throws {
   } onCancel: {
   }
 
-  await TL.$string.withValue("hello") {
+  TL.$string.withValue("hello") {
+    print(TL.string)
+  }
+
+  try await TL.$string.withValue("hello") {
+    try await Task.sleep(nanoseconds: 500)
     print(TL.string)
   }
 
   func operation() async throws -> Int { 7 }
   try await TL.$string.withValue("hello", operation: operation)
+
+  // FIXME: Clock.measure does not currently support this hack.
+  // expected-error@+1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}
+  _ = try! await clock.measure {
+    print("so very slow")
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = await withDiscardingTaskGroup(returning: Int.self) { group in
+    group.addTask {
+      print("hello")
+    }
+
+    return 5
+  }
+
+  _ = try await withThrowingDiscardingTaskGroup(returning: Int.self) { group in
+    group.addTask {
+      print("hello")
+    }
+
+    return 5
+  }
+
+  _ = await withTaskExecutorPreference(nil) {
+    print("hello")
+  }
+
+  _ = await withTaskGroup(of: Int.self, returning: Int.self) { group in
+    group.addTask {
+      return 5
+    }
+
+    return 5
+  }
+
+  _ = try await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
+    group.addTask {
+      throw MyError.fail
+    }
+
+    throw MyError.fail
+  }
 }
+
+@_unsafeInheritExecutor
+func _unsafeInheritExecutor_hacky() async { }
+// expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}

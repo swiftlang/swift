@@ -90,11 +90,17 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
 @_unsafeInheritExecutor // for ABI compatibility
 @inlinable
-public func withTaskGroup<ChildTaskResult, GroupResult>(
+public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
@@ -228,11 +234,16 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
 @_unsafeInheritExecutor // for ABI compatibility
-@usableFromInline
-internal func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
