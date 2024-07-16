@@ -581,7 +581,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor)
       /*flags=*/ExecutorCheckFlags());
 }
 
-#define ISOLATION_WARNING_FORMAT "Unexpected actor isolation, expected %p%s%s but was %sisolated%s %p%s, in %s at %s:%lu:%lu! %.*s\n"
+#define ISOLATION_WARNING_FORMAT "Unexpected actor isolation, expected %p%s but was %sisolated%s %p%s, in %s at %s:%lu:%lu! %.*s\n"
 
 static void logIsolationWarning(
     SerialExecutorRef currentExecutor, SerialExecutorRef expectedExecutor,
@@ -616,13 +616,14 @@ static void logIsolationWarning(
                ISOLATION_WARNING_FORMAT,
                // expected isolation
                expectedExecutor.getIdentity(),
-               expectedActorName ? expectedActorName : "",
-               expectedActorName ? "" : expectedExecutor.getIdentityDebugName(),
+               expectedActorName ? expectedActorName
+                                 : expectedExecutor.getIdentityDebugName(),
                // current isolation
                currentExecutor.getIdentity() == 0 ? "non" : "",
                currentExecutor.getIdentity() ? " to" : "",
                currentExecutor.getIdentity(),
-               currentActorName ? currentActorName : currentExecutor.getIdentityDebugName(),
+               currentActorName ? currentActorName
+                                : currentExecutor.getIdentityDebugName(),
                // message and location details
                function, file, line, column,
                messageLen, message);
@@ -630,13 +631,14 @@ static void logIsolationWarning(
   fprintf(stderr, ISOLATION_WARNING_FORMAT,
           // expected isolation
           expectedExecutor.getIdentity(),
-          expectedActorName ? expectedActorName : "",
-          expectedActorName ? "" : expectedExecutor.getIdentityDebugName(),
+          expectedActorName ? expectedActorName
+                            : expectedExecutor.getIdentityDebugName(),
           // current isolation
           currentExecutor.getIdentity() == 0 ? "non" : "",
           currentExecutor.getIdentity() ? " to" : "",
           currentExecutor.getIdentity(),
-          currentActorName ? currentActorName : currentExecutor.getIdentityDebugName(),
+          currentActorName ? currentActorName
+                           : currentExecutor.getIdentityDebugName(),
           // message and location details
           function, file, line, column,
           messageLen, message);
@@ -669,18 +671,9 @@ static void swift_task_checkOnExpectedExecutorImpl(
     return;
   }
 
-//  // Executors are not equal, but perhaps the executor is a dispatch queue?
-//  // Attempt checking using specialize dispatch API which would warn, without
-//  // giving us information back if we were on the "right" queue or not:
-//#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
-//  auto dispatchMayHaveWarned = swift_dispatch_checkOnExpectedExecutor(
-//      expectedExecutor, message, messageLen, function, functionLen, file,
-//      fileLen, line, flags);
-//
-//  if (dispatchMayHaveWarned) {
-//    return;
-//  }
-//#endif
+  // TODO(dispatch): when able to, invoke dispatch SPI which can check "is this the right queue?"
+  //    and if it isn't, would log a warning. We should prevent "our" logging logic if we invoked dispatch
+  //    as it may have logged -- the condition here is if the executor specifically was a dispatch queue.
 
   auto trackingInfo = ExecutorTrackingInfo::current();
   auto currentExecutor =

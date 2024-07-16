@@ -32,23 +32,35 @@ namespace swift {
 /// to configure how we should "check" an executor..
 class ExecutorCheckOptionRecord {
 public:
-  const ExecutorCheckOptionRecordKind Kind;
+  ExecutorCheckOptionRecordFlags Flags;
   ExecutorCheckOptionRecord* _Nullable Parent;
 
-  ExecutorCheckOptionRecord(ExecutorCheckOptionRecordKind kind,
-                            ExecutorCheckOptionRecord * _Nullable parent = nullptr)
-      : Kind(kind), Parent(parent) { }
+  ExecutorCheckOptionRecord(
+      ExecutorCheckOptionRecordKind kind, ExecutorCheckOptionRecordFlags flags,
+      ExecutorCheckOptionRecord *_Nullable parent = nullptr)
+      : Parent(parent) {
+    flags.setKind(kind);
+    Flags = flags;
+  }
 
   ExecutorCheckOptionRecord(const ExecutorCheckOptionRecord &) = delete;
   ExecutorCheckOptionRecord &operator=(const ExecutorCheckOptionRecord &) = delete;
 
   ExecutorCheckOptionRecordKind getKind() const {
-    return Kind;
+    return Flags.getKind();
+  }
+
+  bool isTaskLocalAllocated() const {
+    return Flags.isTaskLocalAllocated();
   }
 
   ExecutorCheckOptionRecord* _Nullable getParent() const {
     return Parent;
   }
+
+  /// Appropriately destroys the record using a task-local deallocation or free(),
+  /// depending on how it was created.
+  void destroy();
 };
 
 
@@ -65,13 +77,12 @@ public:
   const uintptr_t Line;
   const uintptr_t Column;
 
-  SourceLocationExecutorCheckOptionRecord(const char * _Nonnull functionName,
-                                          const char * _Nonnull file,
-                                          uintptr_t line,
-                                          uintptr_t column,
-                                          ExecutorCheckOptionRecord* _Nullable Parent)
+  SourceLocationExecutorCheckOptionRecord(
+      ExecutorCheckOptionRecordFlags flags, const char *_Nonnull functionName,
+      const char *_Nonnull file, uintptr_t line, uintptr_t column,
+      ExecutorCheckOptionRecord *_Nullable Parent)
       : ExecutorCheckOptionRecord(
-            ExecutorCheckOptionRecordKind::SourceLocation, Parent),
+            ExecutorCheckOptionRecordKind::SourceLocation, flags, Parent),
         FunctionName(functionName), File(file), Line(line), Column(column) {}
 
   static bool classof(const ExecutorCheckOptionRecord * _Nonnull record) {

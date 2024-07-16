@@ -455,7 +455,7 @@ internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
 @_unavailableInEmbedded
 @_spi(ConcurrencyDiagnostics)
 @available(SwiftStdlib 6.0, *)
-public func _checkOnExpectedExecutor(
+public func _warnOnUnexpectedExecutor(
   expected actor: any Actor,
   message: @autoclosure () -> String,
   file: StaticString = #fileID, line: Int = #line, column: Int = #column,
@@ -465,7 +465,7 @@ public func _checkOnExpectedExecutor(
   var _file = file
   var _function = function
 
-  let flags = 0 // See: ExecutorCheckFlags
+  let flags = createExecutorCheckFlags(dontCrash: true)
 
   _message.withCString { messageBuf -> Void in
     _file.withUTF8Buffer { fileBuf -> Void in
@@ -477,7 +477,6 @@ public func _checkOnExpectedExecutor(
           parent: nil)
         defer { _destroyExecutorCheckOptions(options) }
 
-
         _checkOnExpectedExecutor(
           expectedSerialExecutor: actor.unownedExecutor,
           message: messageBuf, messageLength: CInt(messageCount),
@@ -486,6 +485,16 @@ public func _checkOnExpectedExecutor(
       }
     }
   }
+}
+
+@available(SwiftStdlib 6.0, *)
+@_alwaysEmitIntoClient
+func createExecutorCheckFlags(dontCrash: Bool) -> Int {
+  var bits = 0
+  if dontCrash {
+    bits |= 1
+  }
+  return bits
 }
 
 @available(SwiftStdlib 5.9, *)

@@ -206,15 +206,17 @@ ExecutorCheckOptionRecord*
 swift::swift_task_makeExecutorCheckOption_sourceLocation(
         const char * _Nonnull functionName, const char * _Nonnull file,
         uintptr_t line, uintptr_t column, ExecutorCheckOptionRecord *parent) {
-  // TODO: can we task local allocate it? then store a bit if we were able to do so
-  //  auto task = swift_task_getCurrent();
-  //  _swift_task_alloc_specific(task, sizeof class SourceLocationExecutorCheckOptionRecord);
+  parent = nullptr; // FIXME:
 
-  parent = nullptr;
-  auto allocation = malloc(sizeof(class SourceLocationExecutorCheckOptionRecord));
+  ExecutorCheckOptionRecordFlags flags;
+  auto requiredSize = sizeof(class SourceLocationExecutorCheckOptionRecord);
+  auto task = swift_task_getCurrent();
+  flags.setIsTaskLocalAllocated(task != nullptr);
+  void *allocation = task ? _swift_task_alloc_specific(task, requiredSize)
+                          : malloc(requiredSize);
 
   auto option = new(allocation) SourceLocationExecutorCheckOptionRecord(
-      functionName, file, line, column, /*parent=*/parent);
+      flags, functionName, file, line, column, /*parent=*/parent);
   return option;
 }
 
@@ -224,8 +226,19 @@ void swift::swift_task_destroyExecutorCheckOptions(
   auto option = options;
   while (option) {
     auto parent = option->getParent();
-    free(option);
+    option->destroy();
     option = parent;
+  }
+}
+
+void ExecutorCheckOptionRecord::destroy() {
+  if (isTaskLocalAllocated()) {
+    auto task = swift_task_getCurrent();
+    assert(task && "expected task to deallocate executor check record!");
+    _swift_task_dealloc_specific(task, this);
+    return;
+  } else {
+    free(this);
   }
 }
 

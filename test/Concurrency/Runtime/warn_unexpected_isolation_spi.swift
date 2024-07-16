@@ -35,11 +35,11 @@ final class NaiveQueueExecutor: SerialExecutor {
 
 actor SomeDefaultActor {
   nonisolated func checkNonisolatedFunc(line: Int) async {
-    _checkOnExpectedExecutor(expected: self, message: "Whoops, nonisolated but expected self", line: line)
+    _warnOnUnexpectedExecutor(expected: self, message: "Whoops, nonisolated but expected self", line: line)
   }
 
   func checkIsolatedFunc(line: Int) async {
-    _checkOnExpectedExecutor(expected: self, message: "Whoops!", line: line)
+    _warnOnUnexpectedExecutor(expected: self, message: "Whoops!", line: line)
   }
 }
 
@@ -55,21 +55,21 @@ actor ActorOnNaiveQueueExecutor {
   }
 
   nonisolated func checkNonisolatedFuncOnQueueActor(line: Int) async {
-    _checkOnExpectedExecutor(expected: self, message: "Whoops, nonisolated but expected self", line: line)
+    _warnOnUnexpectedExecutor(expected: self, message: "Whoops, nonisolated but expected self", line: line)
   }
 
   func checkIsolatedFunc(line: Int) async {
-    _checkOnExpectedExecutor(expected: self, message: "Whoops!", line: line)
+    _warnOnUnexpectedExecutor(expected: self, message: "Whoops!", line: line)
   }
 }
 
 @MainActor
 func checkMainActorFunc(expected: any Actor, line: Int) async {
-  _checkOnExpectedExecutor(expected: expected, message: "Whoops, MainActor but expected actor", line: line)
+  _warnOnUnexpectedExecutor(expected: expected, message: "Whoops, MainActor but expected actor", line: line)
 }
 
 func checkOtherActorFuncExpectedMainActor(other: isolated (any Actor), line: Int) async {
-  _checkOnExpectedExecutor(expected: MainActor.shared, message: "Whoops, MainActor but expected actor", line: line)
+  _warnOnUnexpectedExecutor(expected: MainActor.shared, message: "Whoops, MainActor but expected actor", line: line)
 }
 
 @main struct Main {

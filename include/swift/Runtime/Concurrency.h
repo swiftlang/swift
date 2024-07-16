@@ -759,18 +759,6 @@ uint64_t swift_task_getJobTaskId(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 
-///// Invoke Dispatch's "warn about executing on wrong queue isolation"
-/////
-///// Returns true if the dispatch api was able to be invoked on this executor,
-///// and therefore we may have already logged a warning.
-//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-//bool swift_dispatch_checkOnExpectedExecutor(
-//    SerialExecutorRef expectedExecutor,
-//    const unsigned char *message, int messageLen,
-//    const unsigned char *function, int functionLen,
-//    const unsigned char *file, int fileLen,
-//    int line, size_t flags);
-
 #endif
 
 /// A hook to take over global enqueuing.
