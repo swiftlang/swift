@@ -35,7 +35,7 @@ func identity<T>(_ x: T) -> T { return x }
 \end{Verbatim}
 While this function declaration is trivial, it illustrates some important concepts and allows us to introduce terminology. We'll see a full description of the compilation pipeline in the next chapter, but for now, let's consider a simplified view where we begin with parsing, then type checking, and finally code generation.
 
-\begin{figure}\captionabove{The abstract syntax tree for \texttt{identity(\_:)}}\label{identity ast}
+\begin{figure}\captionabove{The abstract syntax tree for \texttt{identity(\char`_:)}}\label{identity ast}
 \begin{center}
 \begin{tikzpicture}[%
   grow via three points={one child at (0.5,-0.7) and
@@ -45,7 +45,7 @@ While this function declaration is trivial, it illustrates some important concep
     child { node [class] {\vphantom{p}generic parameter list: \texttt{<T>}}
       child { node  [class] {\vphantom{p}generic parameter declaration: \texttt{T}}}}
     child [missing] {}
-    child { node [class] {\vphantom{p}parameter declaration: \texttt{\_ x:\ T}}
+    child { node [class] {\vphantom{p}parameter declaration: \texttt{\char`_\ x:\ T}}
       child { node  [class] {\vphantom{p}type representation: \texttt{T}}}}
     child [missing] {}
     child { node [class] {\vphantom{p}type representation: \texttt{T}}}
@@ -462,7 +462,7 @@ This protocol states two associated requirements:
 \item The \index{associated conformance requirement}conformance requirement $\ConfReq{Self.Iterator}{IteratorProtocol}$, stated using the sugared form, as a constraint type in the inheritance clause of the \texttt{Iterator} associated type.
 \item The \index{associated same-type requirement}same-type requirement $\SameReq{Self.Element}{Self.Iterator.Element}$, which we state in a trailing \texttt{where} clause attached to the associated type.
 \end{itemize}
-Associated requirements are like the requirements in a generic signature, except they are rooted in the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type. Once again, there are multiple equivalent syntactic forms for stating them. For example, we could write out the conformance requirement explicitly, and the above \texttt{where} clause could be attached to the protocol itself for the same semantic effect.
+Associated requirements are like the requirements in a generic signature, except they are rooted in the \IndexSelf protocol \tSelf\ type. Once again, there are multiple equivalent syntactic forms for stating them. For example, we could write out the conformance requirement explicitly, and the above \texttt{where} clause could be attached to the protocol itself for the same semantic effect.
 
 The associated requirements of a protocol are recorded by the protocol's \index{requirement signature}\emph{requirement signature}. The \texttt{Sequence} protocol has the following requirement signature:
 \begin{quote}
@@ -505,7 +505,7 @@ A normal conformance stores the \index{associated conformance}\emph{associated c
 \item A \index{witness table}\emph{witness table access function} to witness the associated conformance requirement \ConfReq{Self.Iterator}{IteratorProtocol}.
 \item A function pointer to witness the \texttt{makeIterator()} protocol method.
 \end{enumerate}
-Protocol inheritance is the special case of an associated conformance requirement with a subject type of \texttt{Self}. The standard library \texttt{Collection} protocol inherits from \texttt{Sequence}, so the associated conformance requirement $\ConfReq{Self}{Sequence}$ appears in the requirement signature of \texttt{Collection}. Starting from a conformance $\ConfReq{Array<Int>}{Collection}$, we can get at the conformance to \texttt{Sequence} via \emph{associated conformance projection}:
+Protocol inheritance is the special case of an associated conformance requirement with a subject type of \tSelf. The standard library \texttt{Collection} protocol inherits from \texttt{Sequence}, so the associated conformance requirement $\ConfReq{Self}{Sequence}$ appears in the requirement signature of \texttt{Collection}. Starting from a conformance $\ConfReq{Array<Int>}{Collection}$, we can get at the conformance to \texttt{Sequence} via \emph{associated conformance projection}:
 \[\AssocConf{Self}{Sequence}\otimes\ConfReq{Array<Int>}{Collection}=\ConfReq{Array<Int>}{Sequence}\]
 Similarly, at runtime, starting from a witness table for a conformance to \texttt{Collection}, we can recover a witness table for a conformance to \texttt{Sequence}, and thus all of the metadata described above. We will take a closer look at the other associated requirements of the \texttt{Collection} protocol in due time. This will lead us into the topic of \emph{recursive} associated conformance requirements, which as we show, enable the type substitution algebra to encode any computable function.
 
