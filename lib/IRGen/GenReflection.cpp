@@ -225,6 +225,25 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       // involving them.
     }
 
+    /// Any nominal type that has an inverse requirement in its generic
+    /// signature uses NoncopyableGenerics. Since inverses are mangled into
+    /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
+    ///
+    /// We make an exception for types in the stdlib, like Optional, since the
+    /// runtime should still be able to demangle them, based on the availability
+    /// of the type.
+    if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
+      auto *nom = nominalTy->getDecl();
+      if (auto sig = nom->getGenericSignature()) {
+        SmallVector<InverseRequirement, 2> inverses;
+        SmallVector<Requirement, 2> reqs;
+        sig->getRequirementsWithInverses(reqs, inverses);
+        if (!inverses.empty() && !nom->getModuleContext()->isStdlibModule()) {
+          return addRequirement(Swift_6_0);
+        }
+      }
+    }
+
     return false;
   });
 
