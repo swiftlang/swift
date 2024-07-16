@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-build-swift -D CRASH %s -o %t/crash
+// RUN: %target-codesign %t/crash
+
 // RUN: %target-build-swift %s -o %t/exe
+// RUN: %target-codesign %t/exe
 
 // RUN: %target-run %t/exe | %FileCheck %s
 // RUN: %target-run not --crash %t/crash
