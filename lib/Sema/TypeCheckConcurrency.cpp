@@ -4891,6 +4891,8 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
 /// are directly specified on the type.
 static std::optional<ActorIsolation>
 getIsolationFromConformances(NominalTypeDecl *nominal) {
+  auto &ctx = nominal->getASTContext();
+
   if (isa<ProtocolDecl>(nominal))
     return std::nullopt;
 
@@ -4904,8 +4906,13 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     // If the superclass has opted out of global actor inference, such as
     // by conforming to the protocol in an extension, then the subclass should
     // not infer isolation from the protocol.
-    if (conformance->getKind() == ProtocolConformanceKind::Inherited)
+    //
+    // Gate this change behind an upcoming feature flag; isolation inference
+    // changes can break source in language modes < 6.
+    if (conformance->getKind() == ProtocolConformanceKind::Inherited &&
+        ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
       continue;
+    }
 
     auto *proto = conformance->getProtocol();
     switch (auto protoIsolation = getActorIsolation(proto)) {
