@@ -31,12 +31,16 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 //=== Private Cleanup Functions -------------------------------------------===//
 void swiftscan_macro_dependency_dispose(
     swiftscan_macro_dependency_set_t *macro) {
+  if (!macro)
+    return;
+
   for (unsigned i = 0; i < macro->count; ++i) {
     swiftscan_string_dispose(macro->macro_dependencies[i]->moduleName);
     swiftscan_string_dispose(macro->macro_dependencies[i]->libraryPath);
     swiftscan_string_dispose(macro->macro_dependencies[i]->executablePath);
     delete macro->macro_dependencies[i];
   }
+  delete[] macro->macro_dependencies;
   delete macro;
 }
 

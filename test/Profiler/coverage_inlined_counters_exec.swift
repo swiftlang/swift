@@ -21,6 +21,9 @@
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
 
+// FIXME: Currently fails on non-Darwin (https://github.com/swiftlang/swift/issues/75240)
+// REQUIRES: OS=macosx
+
 //--- a.swift
 @_transparent
 public func foo() {}
