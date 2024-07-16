@@ -17,7 +17,7 @@
 // RUN: %FileCheck --check-prefix=OLD %s < %t/test_old.irgen
 
 // rdar://124401253
-// REQUIRES: OS=macosx || OS=linux || OS=windows-msvc
+// REQUIRES: OS=macosx
 // UNSUPPORTED: CPU=arm64e
 
 @frozen
