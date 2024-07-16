@@ -389,6 +389,10 @@ struct ASTContext::Implementation {
   ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
 
+  /// func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word, Builtin.Word,Builtin.Word, Builtin.word)
+  ///    -> Builtin.Int1
+  FuncDecl *IsVariantOSVersionAtLeastDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -1838,6 +1842,40 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
     return nullptr;
 
   getImpl().IsOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
+  if (getImpl().IsVariantOSVersionAtLeastDecl)
+    return getImpl().IsVariantOSVersionAtLeastDecl;
+
+  // Look for the function.
+  auto decl =
+      findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeastOrVariantVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  auto *fnType = getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false);
+  if (!fnType)
+    return nullptr;
+
+  // Input must be (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word)
+  auto intrinsicsParams = fnType->getParams();
+  if (intrinsicsParams.size() != 6)
+    return nullptr;
+
+  if (llvm::any_of(intrinsicsParams, [](AnyFunctionType::Param param) {
+    return (param.isVariadic() || param.isInOut() ||
+            !isBuiltinWordType(param.getPlainType()));
+  })) {
+    return nullptr;
+  }
+
+  // Output must be Builtin.Int1
+  if (!isBuiltinInt1Type(fnType->getResult()))
+    return nullptr;
+
+  getImpl().IsVariantOSVersionAtLeastDecl = decl;
   return decl;
 }
 

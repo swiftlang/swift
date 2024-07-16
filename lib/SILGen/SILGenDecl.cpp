@@ -1725,7 +1725,8 @@ emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
 /// the specified version range and 0 otherwise. The returned SILValue
 /// (which has type Builtin.Int1) represents the result of this check.
 SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
-                                                 const VersionRange &range) {
+                                                 const VersionRange &range,
+                                                 const VersionRange &variantRange) {
   // Emit constants for the checked version range.
   SILValue majorValue;
   SILValue minorValue;
@@ -1733,16 +1734,31 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
   std::tie(majorValue, minorValue, subminorValue) =
       emitVersionLiterals(loc, B, getASTContext(), range.getLowerEndpoint());
 
-  // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
-  FuncDecl *versionQueryDecl =
-      getASTContext().getIsOSVersionAtLeastDecl();
+  std::vector<SILValue> args{majorValue, minorValue, subminorValue};
+
+  FuncDecl *versionQueryDecl = nullptr;
+  if (!variantRange.isEmpty()) {
+    SILValue variantMajorValue;
+    SILValue variantMinorValue;
+    SILValue variantSubminorValue;
+    std::tie(variantMajorValue, variantMinorValue, variantSubminorValue) =
+      emitVersionLiterals(loc, B, getASTContext(), variantRange.getLowerEndpoint());
+
+    args.push_back(variantMajorValue);
+    args.push_back(variantMinorValue);
+    args.push_back(variantSubminorValue);
+    versionQueryDecl = getASTContext().getIsVariantOSVersionAtLeastDecl();
+  } else {
+    // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
+    versionQueryDecl =
+        getASTContext().getIsOSVersionAtLeastDecl();
+  }
   assert(versionQueryDecl);
 
   auto silDeclRef = SILDeclRef(versionQueryDecl);
   SILValue availabilityGTEFn = emitGlobalFunctionRef(
       loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
 
-  SILValue args[] = {majorValue, minorValue, subminorValue};
   return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
 }
 
@@ -1795,6 +1811,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // specified by elt.
       PoundAvailableInfo *availability = elt.getAvailability();
       VersionRange OSVersion = availability->getAvailableRange();
+      VersionRange VariantOSVersion = availability->getVariantAvailableRange();
       
       // The OS version might be left empty if availability checking was
       // disabled. Treat it as always-true in that case.
@@ -1808,7 +1825,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         bool value = !availability->isUnavailability();
         booleanTestValue = B.createIntegerLiteral(loc, i1, value);
       } else {
-        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
+        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion, VariantOSVersion);
         if (availability->isUnavailability()) {
           // If this is an unavailability check, invert the result
           // by emitting a call to Builtin.xor_Int1(lhs, -1).

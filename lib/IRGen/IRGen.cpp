@@ -1029,6 +1029,10 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
     else
       assert(Module->getSDKVersion() == *IGM.Context.LangOpts.SDKVersion);
   }
+  if (IGM.Context.LangOpts.TargetVariant)
+    Module->setDarwinTargetVariantTriple(IGM.Context.LangOpts.TargetVariant->getTriple());
+  if (IGM.Context.LangOpts.VariantSDKVersion)
+    Module->setDarwinTargetVariantSDKVersion(*IGM.Context.LangOpts.VariantSDKVersion);
 
   // Set the module's string representation.
   Module->setDataLayout(IGM.DataLayout.getStringRepresentation());

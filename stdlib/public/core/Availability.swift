@@ -58,7 +58,11 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ variantMinor: Builtin.Word,
   _ variantPatch: Builtin.Word
   ) -> Builtin.Int1 {
-  return _stdlib_isOSVersionAtLeast(major, minor, patch)
+  var isAtLeast = _stdlib_isOSVersionAtLeast(major, minor, patch)
+  if !Bool(isAtLeast) {
+    isAtLeast = _stdlib_isOSVersionAtLeast(variantMajor, variantMinor, variantPatch)
+  }
+  return isAtLeast
 }
 #endif
 

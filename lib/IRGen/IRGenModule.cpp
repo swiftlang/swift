@@ -2308,6 +2308,10 @@ bool swift::writeEmptyOutputFilesFor(
       Context.getClangModuleLoader());
     llvmModule->setTargetTriple(
       clangImporter->getTargetInfo().getTargetOpts().Triple);
+    if (const auto *TVT = clangImporter->getTargetInfo().getDarwinTargetVariantTriple())
+      llvmModule->setDarwinTargetVariantTriple(TVT->getTriple());
+    if (auto TVSDKVersion = clangImporter->getTargetInfo().getDarwinTargetVariantSDKVersion())
+      llvmModule->setDarwinTargetVariantSDKVersion(*TVSDKVersion);
 
     // Add LLVM module flags.
     auto &clangASTContext = clangImporter->getClangASTContext();

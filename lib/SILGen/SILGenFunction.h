@@ -1591,7 +1591,7 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
+  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range, const VersionRange &variantRange);
   void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());

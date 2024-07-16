@@ -76,7 +76,7 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
     SILType i1 = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
     booleanTestValue = SGF.B.createIntegerLiteral(loc, i1, 1);
   } else {
-    booleanTestValue = SGF.emitOSVersionRangeCheck(loc, OSVersion);
+    booleanTestValue = SGF.emitOSVersionRangeCheck(loc, OSVersion, VersionRange::empty());
   }
 
   SGF.B.createCondBranch(loc, booleanTestValue, availableBB, unavailableBB);
