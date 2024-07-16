@@ -493,4 +493,22 @@ public:
 
 } // namespace swift
 
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::SILIsolationInfo &isolationInfo) {
+  isolationInfo.printForOneLineLogging(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::SILDynamicMergedIsolationInfo &isolationInfo) {
+  isolationInfo.printForOneLineLogging(os);
+  return os;
+}
+
+} // namespace llvm
+
 #endif
