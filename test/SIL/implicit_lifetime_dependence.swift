@@ -172,7 +172,7 @@ public struct OuterNE: ~Escapable {
   // A public property generates an implicit setter with an infered dependence on 'newValue'.
   //
   // CHECK-LABEL: sil [transparent] @$s28implicit_lifetime_dependence7OuterNEV5innerAC05InnerE0Vvs : $@convention(method) (@owned OuterNE.InnerNE, _inherit(0) @inout OuterNE) -> () {
-  public var inner1: InnerNE
+  var inner1: InnerNE
 
   // Explicit setter with an infered dependence on 'newValue'.
   public var inner2: InnerNE {
@@ -188,5 +188,12 @@ public struct OuterNE: ~Escapable {
 
   init<Owner: ~Copyable & ~Escapable>(owner: borrowing Owner) -> dependsOn(owner) Self {
     self.inner1 = InnerNE(owner: owner)
+  }
+
+  // Infer a dependence from 'self' on 'value'. We might revoke this rule once we have dependsOn(self:) syntax.
+  //
+  // CHECK-LABEL: sil hidden [ossa] @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, _inherit(0) @inout OuterNE) -> () {
+  mutating func setInner(value: InnerNE) {
+    self.inner1 = value
   }
 }

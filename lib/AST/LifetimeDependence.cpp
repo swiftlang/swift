@@ -20,6 +20,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Range.h"
 
 namespace swift {
 
@@ -444,6 +445,16 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     if (accessor->getAccessorKind() == AccessorKind::Set) {
       return inferSetter(accessor);
     }
+  } else if (auto *fd = dyn_cast<FuncDecl>(afd)) {
+    // Infer self dependence for a mutating function with no result.
+    //
+    // FIXME: temporary hack until we have dependsOn(self: param) syntax.
+    // Do not apply this to accessors (_modify). _modify is handled below like a
+    // mutating method.
+    if (fd->isMutating() && fd->getResultInterfaceType()->isVoid()
+        && !dc->getSelfTypeInContext()->isEscapable()) {
+      return inferMutatingSelf(afd);
+    }
   }
 
   if (hasEscapableResultOrYield(afd)) {
@@ -487,6 +498,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
       return std::nullopt;
     }
 
+    // Infer method dependence: result depends on self.
+    //
+    // This includes _modify. A _modify's yielded value depends on self. The
+    // caller of the _modify ensures that the 'self' depends on any value stored
+    // to the yielded address.
     return LifetimeDependenceInfo::getForIndex(
         afd, resultIndex, /*selfIndex */ afd->getParameters()->size(), kind);
   }
@@ -551,7 +567,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
       afd, resultIndex, *candidateParamIndex, *candidateLifetimeKind);
 }
 
-/// Infer LifetimeDependenceInfo on a setter where 'self' is nonescapable.
+/// Infer LifetimeDependence on a setter where 'self' is nonescapable.
 std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferSetter(
   AbstractFunctionDecl *afd) {
 
