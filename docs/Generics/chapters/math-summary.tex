@@ -23,7 +23,7 @@ A handful of Greek letters are used for variable names and other notation: lower
 \IndexDefinition{natural numbers}
 \IndexDefinition{integers}
 \IndexDefinition{empty set}
-A \emph{set} is a collection of elements without regard to order or duplicates. Sets can be finite or infinite. A finite set can be specified by listing its elements in any order, for example $\{a,\,b,\,c\}$. The empty set \index{$\varnothing$}\index{$\varnothing$!z@\igobble|seealso{empty set}}$\varnothing$ is the unique set with no elements. The set of \emph{natural numbers} \index{$\mathbb{N}$}\index{$\mathbb{N}$!z@\igobble|seealso{natural numbers}}$\mathbb{N}:=\{0,\,1,\,2,\,\ldots\}$ is the infinite set containing zero and all of its \index{successor}successors. The set of \emph{integers} \index{$\mathbb{Z}$}\index{$\mathbb{Z}$!z@\igobble|seealso{integers}}$\mathbb{Z}:=\{\ldots,\,-2,\,-1,\,0,\,1,\,2,\,\ldots\}$ also contains the negative whole numbers.
+A \emph{set} is a collection of elements without regard to order or duplicates. Sets can be finite or infinite. A finite set can be specified by listing its elements in any order, for example $\{a,\,b,\,c\}$. The empty set \index{$\varnothing$}\index{$\varnothing$!z@\igobble|seealso{empty set}}$\varnothing$ is the unique set with no elements. The set of \emph{natural numbers} \index{$\NN$}\index{$\NN$!z@\igobble|seealso{natural numbers}}$\NN:=\{0,\,1,\,2,\,\ldots\}$ is the infinite set containing zero and all of its \index{successor}successors. The set of \emph{integers} \index{$\mathbb{Z}$}\index{$\mathbb{Z}$!z@\igobble|seealso{integers}}$\mathbb{Z}:=\{\ldots,\,-2,\,-1,\,0,\,1,\,2,\,\ldots\}$ also contains the negative whole numbers.
 
 The notation \index{$\in$}\index{$\in$!z@\igobble|seealso{set}}$x\in S$ means ``$x$ is an element of a set $S$,'' and \index{$\notin$}$x\notin S$ is its negation. Properties of sets can be defined using \emph{existential} quantification (``there exists (at least one) $x\in S$ such that $x$ has this property\ldots'') or \emph{universal} quantification (``for all $x\in S$, the following property is true of $x$\ldots'').
 
@@ -46,16 +46,16 @@ The \emph{Cartesian product} of two sets $X$ and $Y$, denoted \index{$\times$}\i
 \IndexDefinition{function}
 A \emph{function} (or \emph{mapping}) $f\colon X\rightarrow Y$ assigns to each $x\in X$ a unique element $f(x)\in Y$. If the sets $X$ and $Y$ are equipped with some kind of additional structure (which will be explicitly defined), then $f$ is a \emph{homomorphism} if it preserves this structure.
 
-A function $f\colon X\times Y\rightarrow Z$ defined on the Cartesian product can be thought of as taking a pair of values $x\in X$, $y\in Y$ to an element $f(x,y)\in Z$. A \emph{binary operation} is a function named by a symbol like $\otimes$, $\star$ or $\cdot$ defined on the Cartesian product of two sets. The application of a binary operation is denoted by writing the symbol in between the two elements, like $x\otimes y$.
+A function $f\colon X\times Y\rightarrow Z$ defined on the Cartesian product can be thought of as taking a pair of values $x\in X$, $y\in Y$ to an element $f(x,y)\in Z$. A \emph{binary operation} is a function named by a symbol like $\otimes$, $\WL$ or $\cdot$ defined on the Cartesian product of two sets. The application of a binary operation is denoted by writing the symbol in between the two elements, like $x\otimes y$.
 
-The \emph{cardinality} of a finite set $S$, denoted $|S|$, is the number of elements in $S$. The notation $|x|$ sometimes denotes certain other functions taking values in $\mathbb{N}$, such as the length of a sequence; this will always be explicitly defined when needed.
+The \emph{cardinality} of a finite set $S$, denoted $|S|$, is the number of elements in $S$. The notation $|x|$ sometimes denotes certain other functions taking values in $\NN$, such as the length of a sequence; this will always be explicitly defined when needed.
 
 \section*{More}
 
 \begin{itemize}
 \item Formal systems (\SecRef{derived req}).
 \item Equivalence relations (\SecRef{type params}, \SecRef{rewrite graph}).
-\item Partial and linear orders (\SecRef{reduced types}, \SecRef{rewritesystemintro}, \SecRef{reduction order}).
+\item Partial and linear orders (\SecRef{reduced types}, \SecRef{rewritesystemintro}, \SecRef{building terms}).
 \item Category theory (\SecRef{submapcomposition}).
 \item Directed graphs (\SecRef{type parameter graph}, \SecRef{finding conformance paths}, \SecRef{recursive conformances}, \SecRef{protocol component}).
 \item Proof by induction (\SecRef{generic signature validity}).

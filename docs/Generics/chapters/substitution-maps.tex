@@ -509,7 +509,7 @@ A better representation for the specializations of nominal types would replace t
 \index{runtime type metadata}
 Luckily, this ``flat'' representation is already implemented in the Swift runtime. The runtime type metadata for a nominal type includes all the generic parameters from the nominal type declaration's generic signature, not just the generic parameters of the nominal type declaration itself. So while lifting this restriction would require some engineering effort on the compiler side, it would be a backward-deployable and \index{ABI}ABI-compatible change.
 
-\paragraph{Types in protocol contexts.} Allowing struct, enum and class declarations to appear inside protocols and protocol extensions would come down to deciding if the \Index{protocol Self type@protocol \texttt{Self} type}protocol \texttt{Self} type should be ``captured'' by the nested type.
+\paragraph{Types in protocol contexts.} Allowing struct, enum and class declarations to appear inside protocols and protocol extensions would come down to deciding if the \IndexSelf protocol \tSelf\ type should be ``captured'' by the nested type.
 
 \begin{listing}\captionabove{A nominal type declaration nested in a protocol context}\label{nominal type in protocol context}
 \begin{Verbatim}
@@ -535,9 +535,9 @@ struct S1: P {}
 struct S2: P {}  // are S1.Nested and S2.Nested distinct?
 \end{Verbatim}
 \end{listing}
-If the nested type captures \texttt{Self}, the code shown in \ListingRef{nominal type in generic local context} would become valid. With this model, the \texttt{Nested} struct depends on \texttt{Self}, so it would not make sense to reference it as a member of the protocol itself, like \texttt{P.Nested}. Instead, \texttt{Nested} would behave as if it was a member of every \index{conforming type}conforming type, like \texttt{S.Nested} above (or even \texttt{T.Nested}, if \texttt{T} is a generic parameter conforming to \texttt{P}). At the implementation level, the generic signature of a nominal type nested inside of a protocol context would include the protocol \texttt{Self} type, and the \emph{entire} parent type, for example \texttt{S} in \texttt{S.Nested}, would become the replacement type for \texttt{Self} in the context substitution map.
+If the nested type captures \tSelf, the code shown in \ListingRef{nominal type in generic local context} would become valid. With this model, the \texttt{Nested} struct depends on \tSelf, so it would not make sense to reference it as a member of the protocol itself, like \texttt{P.Nested}. Instead, \texttt{Nested} would behave as if it was a member of every \index{conforming type}conforming type, like \texttt{S.Nested} above (or even \texttt{T.Nested}, if \texttt{T} is a generic parameter conforming to \texttt{P}). At the implementation level, the generic signature of a nominal type nested inside of a protocol context would include the protocol \tSelf\ type, and the \emph{entire} parent type, for example \texttt{S} in \texttt{S.Nested}, would become the replacement type for \tSelf\ in the context substitution map.
 
-The alternative is to prohibit the nested type from referencing the protocol \texttt{Self} type. The nested type's generic signature would \emph{not} include the protocol \texttt{Self} type, and \texttt{P.Nested} would be a valid member type reference. The protocol would effectively act as a namespace for the nominal types it contains, with the nested type not depending on the conformance to the protocol in any way.
+The alternative is to prohibit the nested type from referencing the protocol \tSelf\ type. The nested type's generic signature would \emph{not} include the protocol \tSelf\ type, and \texttt{P.Nested} would be a valid member type reference. The protocol would effectively act as a namespace for the nominal types it contains, with the nested type not depending on the conformance to the protocol in any way.
 
 \begin{listing}\captionabove{Protocol declaration nested inside other declaration contexts}\label{protocol nested inside type}
 \begin{Verbatim}
@@ -555,15 +555,12 @@ func generic<T>(_: T) {
 \end{Verbatim}
 \end{listing}
 
-\Index{protocol Self type@protocol \texttt{Self} type}
-\index{Haskell}
-\index{multi-parameter type class}
 \paragraph{Protocols in other declaration contexts.} The final possibility is the nesting of protocols inside other declaration contexts, such as functions or nominal types. This breaks down into two cases, illustrated in \ListingRef{protocol nested inside type}:
 \begin{enumerate}
 \item Protocols inside non-generic declaration contexts.
 \item Protocols inside generic declaration contexts.
 \end{enumerate}
-The first case was originally prohibited, but is now permitted as of \IndexSwift{5.a@5.10}Swift~5.10 \cite{se0404}; the non-generic declaration context acts as a namespace to which the protocol declaration is scoped, but apart from the interaction with name lookup this has no other semantic consequences. The second case is more subtle. If we were to allow a ``generic protocol'' to be parameterized by its outer generic parameters in addition to just the protocol \texttt{Self} type, we would get what \index{Haskell}Haskell calls a ``multi-parameter type class.'' Multi-parameter type classes introduce some complications, for example undecidable type inference~\cite{mptc}.
+The first case was originally prohibited, but is now permitted as of \IndexSwift{5.a@5.10}Swift~5.10 \cite{se0404}; the non-generic declaration context acts as a namespace to which the protocol declaration is scoped, but apart from the interaction with name lookup this has no other semantic consequences. The second case is more subtle. If we were to allow a ``generic protocol'' to be parameterized by its outer generic parameters in addition to just the protocol \IndexSelf\tSelf\ type, we would get what \index{Haskell}Haskell calls a \index{multi-parameter type class}``multi-parameter type class.'' Multi-parameter type classes introduce some complications, for example undecidable type inference~\cite{mptc}.
 
 \section{Source Code Reference}\label{substmapsourcecoderef}
 
@@ -613,7 +610,7 @@ if (subMap1.getCanonical() == subMap2.getCanonical())
 
 \index{primary archetype}
 \index{opened archetype}
-\Index{dynamic Self type@dynamic \texttt{Self} type}
+\Index{dynamic Self type@dynamic \tSelf\ type}
 \IndexSource{canonical substitution map}
 Accessor methods:
 \begin{itemize}

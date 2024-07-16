@@ -609,20 +609,20 @@ Generic function types have a special behavior when their canonical type is comp
 A \IndexDefinition{reference storage type}reference storage type is the type of a variable declaration adorned with the \IndexDefinition{weak reference type}\texttt{weak}, \IndexDefinition{unowned reference type}\texttt{unowned} or \texttt{unowned(unsafe)} attribute. The wrapped type must be a class type, a class-constrained archetype, or class-constrained existential type. Reference storage types arise as the interface types of variable declarations, and as the types of SIL instructions. The types of \index{expression}expressions never contain reference storage types.
 
 \paragraph{Placeholder types.}
-A \IndexDefinition{placeholder type}placeholder type represents a generic argument to be inferred by the type checker. The written representation is the underscore ``\texttt{\_}''. They can only appear in a handful of restricted contexts, and do not appear in the types of expressions or the interface types of declarations after type checking. The constraint solver replaces placeholder types with type variables when solving the constraint system. For example, here the interface type of the \texttt{myPets} local variable is inferred as \texttt{Array<String>}:
+A \IndexDefinition{placeholder type}placeholder type represents a generic argument to be inferred by the type checker. The written representation is the underscore ``\verb|_|''. They can only appear in a handful of restricted contexts, and do not appear in the types of expressions or the interface types of declarations after type checking. The constraint solver replaces placeholder types with type variables when solving the constraint system. For example, here the interface type of the \texttt{myPets} local variable is inferred as \texttt{Array<String>}:
 \begin{Verbatim}
 let myPets: Array<_> = ["Zelda", "Giblet"]
 \end{Verbatim}
 Placeholder types were introduced in \IndexSwift{5.6}Swift 5.6~\cite{se0315}.
 
 \paragraph{Unbound generic types.}
-\IndexDefinition{unbound generic type}Unbound generic types predate placeholder types, and can be seen as a special case. An unbound generic type is written as a named reference to a generic type declaration, without generic arguments applied. An unbound generic type behaves like a generic nominal type where all generic arguments are placeholder types. In previous example, we wrote the generic nominal type \texttt{Array<\_>} with a placeholder type. The unbound generic type \texttt{Array} could have been used instead:
+\IndexDefinition{unbound generic type}Unbound generic types predate placeholder types, and can be seen as a special case. An unbound generic type is written as a named reference to a generic type declaration, without generic arguments applied. An unbound generic type behaves like a generic nominal type where all generic arguments are placeholder types. In previous example, we wrote the generic nominal type \verb|Array<_>| with a placeholder type. The unbound generic type \texttt{Array} could have been used instead:
 \begin{Verbatim}
 let myPets: Array = ["Zelda", "Giblet"]
 \end{Verbatim}
 Unbound generic types are also occasionally useful in \index{diagnostic!printing unbound generic type}diagnostics, to print the name of a type declaration only (like \texttt{Outer.Inner}) without the generic parameters of its declared interface type (\texttt{Outer<T>.Inner<U>}, for example). Unbound generic types are discussed in the context of type resolution in \SecRef{unbound generic types}.
 
-\begin{listing}\captionabove{Dynamic \texttt{Self} type example}\label{dynamic self example}
+\begin{listing}\captionabove{Dynamic \tSelf\ type example}\label{dynamic self example}
 \begin{Verbatim}
 class Base {
   required init() {}
@@ -652,9 +652,9 @@ let z = Derived().clone()  // z has type `Derived'
 \end{listing}
 
 \paragraph{Dynamic Self types.}
-The \IndexDefinition{dynamic Self type@dynamic \texttt{Self} type}dynamic \texttt{Self} type appears when a class method declares a return type of \texttt{Self}. In this case, the object is known to have the same dynamic type as the base of the method call, which might be a subclass of the method's class. The dynamic \texttt{Self} type has one structural component, a class type, which is the static upper bound for the type. This concept comes from \index{Objective-C}Objective-C, where it is called \texttt{instancetype}. The dynamic \texttt{Self} type in many ways behaves like a generic parameter, but it is not represented as one; the type checker and \index{SILGen}SILGen implement support for it directly. Note that the identifier ``\texttt{Self}'' only has this interpretation inside a class. In a protocol declaration, \texttt{Self} is the implicit generic parameter (\SecRef{protocols}). In a struct or enum declaration, \texttt{Self} is the declared interface type (\SecRef{identtyperepr}).
+The \IndexDefinition{dynamic Self type@dynamic \tSelf\ type}dynamic \tSelf\ type appears when a class method declares a return type of \tSelf. In this case, the object is known to have the same dynamic type as the base of the method call, which might be a subclass of the method's class. The dynamic \tSelf\ type has one structural component, a class type, which is the static upper bound for the type. This concept comes from \index{Objective-C}Objective-C, where it is called \texttt{instancetype}. The dynamic \tSelf\ type in many ways behaves like a generic parameter, but it is not represented as one; the type checker and \index{SILGen}SILGen implement support for it directly. Note that the identifier ``\tSelf'' only has this interpretation inside a class. In a protocol declaration, \tSelf\ is the implicit generic parameter (\SecRef{protocols}). In a struct or enum declaration, \tSelf\ is the declared interface type (\SecRef{identtyperepr}).
 
-\ListingRef{dynamic self example} demonstrates some of the behaviors of the dynamic \texttt{Self} type. Two invalid cases are shown; \texttt{invalid1()} is rejected because the type checker cannot prove that the return type is always an instance of the dynamic type of \texttt{self}, and \texttt{invalid2()} is rejected because \texttt{Self} appears in contravariant position.
+\ListingRef{dynamic self example} demonstrates some of the behaviors of the dynamic \tSelf\ type. Two invalid cases are shown; \texttt{invalid1()} is rejected because the type checker cannot prove that the return type is always an instance of the dynamic type of \texttt{self}, and \texttt{invalid2()} is rejected because \tSelf\ appears in contravariant position.
 
 \paragraph{Type variable types.}
 A \IndexDefinition{type variable type}type variable represents the future inferred type of an \index{expression}expression in the expression type checker's constraint system. The expression type checker builds the constraint system by walking an expression recursively, assigning new type variables to the types of sub-expressions and recording constraints between these type variables. Solving the constraint system can have three possible outcomes:
@@ -688,7 +688,7 @@ Error types are also returned by \index{type resolution}type resolution if the \
 \IndexDefinition{built-in type}
 What users think of as fundamental types, such as \texttt{Int} and \texttt{Bool}, are defined as structs in the standard library. These structs wrap the various \emph{built-in types} which are understood directly by the compiler. Built-in types are not nominal types, so they cannot contain members, cannot have new members added via extensions, and cannot conform to protocols. Values of built-in types are manipulated using special \emph{compiler intrinsics}. The standard library wraps built-in types in nominal types, and defines methods and operators on those nominal types which call the intrinsic functions, thereby presenting the actual interface expected by users.
 
-For example, the \texttt{Int} struct defines a single stored property named \texttt{\_value} with type \texttt{Builtin.Int}. The \texttt{+} operator on \texttt{Int} is implemented by extracting the \texttt{\_value} stored property from a pair of \texttt{Int} values, calling the \texttt{Builtin.sadd\_with\_overflow\_Int64} compiler intrinsic to add them together, and finally, wrapping the resulting \texttt{Builtin.Int} in a new instance of \texttt{Int}.
+For example, the \texttt{Int} struct defines a single stored property named \verb|_value| with type \texttt{Builtin.Int}. The \texttt{+} operator on \texttt{Int} is implemented by extracting the \verb|_value| stored property from a pair of \texttt{Int} values, calling the \verb|Builtin.sadd_with_overflow_Int64| compiler intrinsic to add them together, and finally, wrapping the resulting \texttt{Builtin.Int} in a new instance of \texttt{Int}.
 
 \IndexDefinition{built-in module}
 \IndexFlag{parse-stdlib}
