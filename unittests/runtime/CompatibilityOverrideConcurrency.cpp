@@ -355,10 +355,6 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
   swift_task_startOnMainActor(nullptr);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
-  swift_task_startOnMainActor(nullptr);
-}
-
 #if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_checkOnExpectedExecutorImpl) {
   swift_task_checkOnExpectedExecutor(SerialExecutorRef::generic(),

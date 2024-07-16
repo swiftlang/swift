@@ -270,3 +270,7 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
 SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride() {
   return runtime::environment::SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE();
 }
+
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyLogIsolationWarningModeOverride() {
+  return runtime::environment::SWIFT_LOG_ISOLATION_WARNING_MODE_OVERRIDE();
+}

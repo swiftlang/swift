@@ -366,6 +366,17 @@ const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
 #endif
 }
 
+// Shimming call to Swift runtime because Swift Embedded does not have
+// these symbols defined.
+const char *__swift_runtime_env_logIsolationWarningMode() {
+#if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  return swift::runtime::environment::
+      concurrencyLogIsolationWarningModeOverride();
+#else
+  return nullptr;
+#endif
+}
+
 // Done this way because of the interaction with the initial value of
 // 'unexpectedExecutorLogLevel'
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
@@ -405,6 +416,19 @@ static void initIsolationWarningOsLog(void *context) {
   IsolationWarningLog = os_log_create(SWIFT_LOG_APPLE_RUNTIME_ISSUES_SUBSYSTEM,
                                       SWIFT_LOG_ACTOR_CATEGORY);
 #endif
+}
+
+/// Forces stderr logging of isolation warnings,
+/// in addition to the os_log warning issued on apple platforms.
+bool LogIsolationWarningStderr = false;
+static void initLogIsolationWarningStderr(void *context) {
+  // Potentially, override the platform detected mode, primarily used in tests.
+  if (const char *modeStr =
+          __swift_runtime_env_logIsolationWarningMode()) {
+    if (strcmp(modeStr, "stderr") == 0) {
+      LogIsolationWarningStderr = true;
+    }
+  } // no override, use the default
 }
 
 // Implemented in Swift to avoid some annoying hard-coding about
@@ -594,6 +618,9 @@ static void logIsolationWarning(
   static swift::once_t initializeOsLogToken;
   swift::once(initializeOsLogToken, initIsolationWarningOsLog, nullptr);
 
+  static swift::once_t initializeLogIsolationWarningStderrToken;
+  swift::once(initializeLogIsolationWarningStderrToken, initLogIsolationWarningStderr, nullptr);
+
   auto getActorTypeName = [](SerialExecutorRef ref) {
     char *nameBuf = nullptr;
     if (ref.isDefaultActor()) {
@@ -611,7 +638,7 @@ static void logIsolationWarning(
   char *expectedActorName = getActorTypeName(expectedExecutor);
   SWIFT_DEFER { free(expectedActorName); };
 
-//#if defined(__APPLE__)
+#if defined(__APPLE__)
   os_log_fault(IsolationWarningLog,
                ISOLATION_WARNING_FORMAT,
                // expected isolation
@@ -627,23 +654,23 @@ static void logIsolationWarning(
                // message and location details
                function, file, line, column,
                messageLen, message);
-//#else
-  fprintf(stderr, ISOLATION_WARNING_FORMAT,
-          // expected isolation
-          expectedExecutor.getIdentity(),
-          expectedActorName ? expectedActorName
-                            : expectedExecutor.getIdentityDebugName(),
-          // current isolation
-          currentExecutor.getIdentity() == 0 ? "non" : "",
-          currentExecutor.getIdentity() ? " to" : "",
-          currentExecutor.getIdentity(),
-          currentActorName ? currentActorName
-                           : currentExecutor.getIdentityDebugName(),
-          // message and location details
-          function, file, line, column,
-          messageLen, message);
-  fflush(stderr);
-//#endif
+#endif
+  if (LogIsolationWarningStderr) {
+    fprintf(stderr, ISOLATION_WARNING_FORMAT,
+            // expected isolation
+            expectedExecutor.getIdentity(),
+            expectedActorName ? expectedActorName
+                              : expectedExecutor.getIdentityDebugName(),
+            // current isolation
+            currentExecutor.getIdentity() == 0 ? "non" : "",
+            currentExecutor.getIdentity() ? " to" : "",
+            currentExecutor.getIdentity(),
+            currentActorName ? currentActorName
+                             : currentExecutor.getIdentityDebugName(),
+            // message and location details
+            function, file, line, column, messageLen, message);
+    fflush(stderr);
+  }
 }
 
 /// SPI(ConcurrencyDiagnostics)

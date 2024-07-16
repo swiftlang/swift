@@ -121,4 +121,9 @@ VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          " 'legacy' (Legacy behavior), "
          " 'swift6' (Swift 6.0+ behavior)")
 
+VARIABLE(SWIFT_LOG_ISOLATION_WARNING_MODE_OVERRIDE, string, "",
+         "Allows configuring additional isolation warning modes. "
+         "Legal values are: "
+         " 'stderr' (Enables stderr logging)")
+
 #undef VARIABLE

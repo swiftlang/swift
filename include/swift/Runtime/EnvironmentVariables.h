@@ -53,6 +53,10 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride();
 
+// Wrapper around SWIFT_LOG_ISOLATION_WARNING_MODE_OVERRIDE that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyLogIsolationWarningModeOverride();
+
 } // end namespace environment
 } // end namespace runtime
 } // end namespace swift

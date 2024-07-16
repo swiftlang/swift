@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library -plugin-path %swift-plugin-dir %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out 2>&1 | %FileCheck %s --dump-input=always
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_LOG_ISOLATION_WARNING_MODE_OVERRIDE=stderr %target-run %t/a.out 2>&1 | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
