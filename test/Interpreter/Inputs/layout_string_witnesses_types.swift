@@ -620,8 +620,8 @@ public enum MultiPayloadError {
 }
 
 public enum TwoPayloadInner {
-    case x(AnyObject)
-    case y(Int)
+    case x(Int)
+    case y(AnyObject)
 }
 
 public enum TwoPayloadOuter {
