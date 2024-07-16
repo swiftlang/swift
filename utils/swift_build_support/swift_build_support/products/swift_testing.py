@@ -1,4 +1,4 @@
-# swift_build_support/products/xctest.py -------------------------*- python -*-
+# swift_build_support/products/swift_testing.py -----------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
