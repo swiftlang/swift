@@ -117,11 +117,7 @@ public:
 };
 
 class ModuleWriter {
-  enum class EmissionState {
-    NotYetDefined = 0,
-    DefinitionRequested,
-    Defined
-  };
+  enum class EmissionState { NotYetDefined = 0, DefinitionRequested, Defined };
 
   raw_ostream &os;
   SmallPtrSetImpl<ImportModuleTy> &imports;
@@ -309,7 +305,7 @@ public:
 
   void forwardDeclareType(const TypeDecl *TD) {
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
+      if (isa<StructDecl>(TD) || isa<EnumDecl>(TD) || isa<ClassDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
         if (!addImport(NTD))
           forwardDeclareCxxValueTypeIfNeeded(NTD);
@@ -474,7 +470,12 @@ public:
       return false;
 
     (void)forwardDeclareMemberTypes(CD->getMembers(), CD);
-    seenTypes[CD] = { EmissionState::Defined, true };
+    auto [it, inserted] =
+        seenTypes.try_emplace(CD, EmissionState::NotYetDefined, false);
+    if (outputLangMode == OutputLanguageMode::Cxx &&
+        (inserted || !it->second.second))
+      ClangValueTypePrinter::forwardDeclType(os, CD, printer);
+    it->second = {EmissionState::Defined, true};
     os << '\n';
     printer.print(CD);
     return true;
