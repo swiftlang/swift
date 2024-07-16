@@ -615,10 +615,6 @@ NOTE(autodiff_member_subset_indices_not_differentiable,none,
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
-NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
-     "cannot differentiate through multiple results", ())
-NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
-     "cannot differentiate through 'inout' arguments", ())
 NOTE(autodiff_cannot_differentiate_through_direct_yield,none,
      "cannot differentiate through a '_read' accessor", ())
 NOTE(autodiff_enums_unsupported,none,
@@ -796,14 +792,6 @@ NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
 
-// move operator used on generic or evalue
-ERROR(move_operator_used_on_generic_or_existential_value, none,
-      "move() used on a generic or existential value", ())
-
-// copy operator used on generic or evalue
-ERROR(copy_operator_used_on_generic_or_existential_value, none,
-      "copy() used on a generic or existential value", ())
-
 // noimplicitcopy on generic or existential binding
 ERROR(noimplicitcopy_used_on_generic_or_existential, none,
       "@_noImplicitCopy can not be used on a generic or existential typed "
@@ -976,12 +964,6 @@ ERROR(regionbasedisolation_arg_transferred, none,
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
       "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
       (StringRef, Type))
-NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
-     "value is %0 since it is in the same region as %1",
-     (StringRef, DeclBaseName))
-NOTE(regionbasedisolation_isolated_since_in_same_region_string, none,
-     "%0 is %1since it is in the same region as %2",
-     (Identifier, StringRef, Identifier))
 
 //===---
 // New Transfer Non Sendable Diagnostics

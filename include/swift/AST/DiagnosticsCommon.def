@@ -232,8 +232,6 @@ NOTE(in_macro_expansion,none,
 ERROR(macro_experimental,none,
       "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
       (StringRef, StringRef))
-ERROR(ambiguous_macro_reference,none,
-      "ambiguous reference to macro %0", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics
