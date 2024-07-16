@@ -591,10 +591,11 @@ extension _ArrayBuffer {
     return nil
   }
   
-  @inlinable
+  @inlinable @inline(never)
   internal func withUnsafeBufferPointer_nonNative<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    objc_sync_enter(_storage.objCInstance)
     var associatedBuffer = getAssociatedBuffer()
     if associatedBuffer == nil {
       let contig = ContiguousArray(self)
@@ -606,11 +607,13 @@ extension _ArrayBuffer {
         0o1401 //OBJC_ASSOCIATION_RETAIN
       )
     }
-    defer { _fixLifetime(associatedBuffer) }
+    let unwrapped = associatedBuffer.unsafelyUnwrapped
+    defer { _fixLifetime(unwrapped) }
+    objc_sync_exit(_storage.objCInstance)
     return try body(
       UnsafeBufferPointer(
-        start: associatedBuffer.unsafelyUnwrapped.firstElementAddress,
-        count: count
+        start: unwrapped.firstElementAddress,
+        count: unwrapped.count
       )
     )
   }

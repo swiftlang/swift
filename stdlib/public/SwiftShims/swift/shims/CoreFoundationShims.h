@@ -45,7 +45,8 @@ objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key,
 //return type is actually `id`, but we need it to not import as `Any`
 extern const void * _Nullable
 objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
-
+int objc_sync_enter(id _Nonnull object);
+int objc_sync_exit(id _Nonnull object);
 #endif
 
 // Consider creating SwiftMacTypes.h for these
