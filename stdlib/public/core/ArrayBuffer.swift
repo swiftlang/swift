@@ -573,35 +573,45 @@ extension _ArrayBuffer {
 
   @inlinable
   static var associationKey: UnsafeRawPointer {
-    withUnsafePointer(to: _emptyArrayStorage) {
-      //emptyArrayStorage is immortal so this doesn't dangle
-      //also we never dereference it
-      UnsafeRawPointer($0)
-    }
+    //Doesn't need to be a valid pointer
+    UnsafeRawPointer(OpaquePointer(bitPattern: 0x1).unsafelyUnwrapped)
   }
   
-  @usableFromInline
+  @inlinable
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
-    if let associatedBuffer = _swift_stdlib_objc_getAssociatedObject(
-      owner,
+    if let associatedBufferPtr = objc_getAssociatedObject(
+      _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
-      let contigBuffer = unsafeBitCast(
-        associatedBuffer,
-        to: _ContiguousArrayBuffer<Element>.self
+      let contigStorage = associatedBufferPtr.load(
+        as: _ContiguousArrayStorage<Element>.self
       )
-      return contigBuffer
+      return _ContiguousArrayBuffer(contigStorage)
     }
     return nil
   }
   
-  @usableFromInline
-  internal func setAssociatedBuffer(_ contig: ContiguousArray<Element>) {
-    _swift_stdlib_objc_setAssociatedObject(
-      owner,
-      _ArrayBuffer.associationKey,
-      contig._buffer,
-      0o1401 //OBJC_ASSOCIATION_RETAIN
+  @inlinable
+  internal func withUnsafeBufferPointer_nonNative<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    var associatedBuffer = getAssociatedBuffer()
+    if associatedBuffer == nil {
+      let contig = ContiguousArray(self)
+      associatedBuffer = contig._buffer
+      objc_setAssociatedObject(
+        _storage.objCInstance,
+        _ArrayBuffer.associationKey,
+        unsafeBitCast(associatedBuffer, to: UnsafeRawPointer.self),
+        0o1401 //OBJC_ASSOCIATION_RETAIN
+      )
+    }
+    defer { _fixLifetime(associatedBuffer) }
+    return try body(
+      UnsafeBufferPointer(
+        start: associatedBuffer.unsafelyUnwrapped.firstElementAddress,
+        count: count
+      )
     )
   }
   
@@ -617,15 +627,7 @@ extension _ArrayBuffer {
       return try body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    if let associatedBuffer = getAssociatedBuffer() {
-      return try ContiguousArray(
-        _buffer: associatedBuffer
-      ).withUnsafeBufferPointer(body)
-    } else {
-      let contig = ContiguousArray(self)
-      setAssociatedBuffer(contig)
-      return try contig.withUnsafeBufferPointer(body)
-    }
+    return try withUnsafeBufferPointer_nonNative(body)
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`

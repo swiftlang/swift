@@ -37,6 +37,17 @@ typedef signed long _swift_shims_CFIndex;
 typedef unsigned long _swift_shims_objc_associationPolicy;
 #endif
 
+#if !FOUNDATION_HELPER_FILE
+//`value` is actually `id`, but we need it to not import as `Any`
+extern void
+objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key,
+                         const void * _Nullable value, _swift_shims_objc_associationPolicy policy);
+//return type is actually `id`, but we need it to not import as `Any`
+extern const void * _Nullable
+objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
+
+#endif
+
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint8_t _swift_shims_UInt8;
@@ -76,14 +87,6 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void * _Nonnull addr);
-
-SWIFT_RUNTIME_STDLIB_API
-id
-_swift_stdlib_objc_getAssociatedObject(id _Nonnull obj, const void * _Nonnull key);
-  
-SWIFT_RUNTIME_STDLIB_API
-void
-_swift_stdlib_objc_setAssociatedObject(id _Nonnull obj, const void * _Nonnull key, id _Nullable value, _swift_shims_objc_associationPolicy policy);
 
 #endif // __OBJC2__
 
