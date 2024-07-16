@@ -146,7 +146,6 @@ NOTE(macro_not_imported_unsupported_named_operator, none, "operator '%0' not sup
 NOTE(macro_not_imported_invalid_string_literal, none, "invalid string literal", ())
 NOTE(macro_not_imported_invalid_numeric_literal, none, "invalid numeric literal", ())
 NOTE(macro_not_imported_unsupported_literal, none, "only numeric and string macro literals supported", ())
-NOTE(macro_not_imported_nested_cast, none, "non-null nested casts not supported", ())
 
 NOTE(macro_not_imported_function_like, none, "macro '%0' unavailable: function like macros not supported", (StringRef))
 NOTE(macro_not_imported_unsupported_structure, none, "macro '%0' unavailable: structure not supported", (StringRef))
