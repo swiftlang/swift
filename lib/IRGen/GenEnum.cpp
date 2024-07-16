@@ -1696,7 +1696,7 @@ namespace {
           // In CVW we have to mask the extra bits, which requires us to make
           // this cast here, otherwise LLVM would optimize away the bit mask.
           if (projectedBits.getElementType()->getIntegerBitWidth() < 8) {
-            projectedBits = IGF.Builder.CreateElementBitCast(addr, IGM.Int8Ty);
+            projectedBits = IGF.Builder.CreateElementBitCast(projectedBits, IGM.Int8Ty);
           }
           extraTag = IGF.Builder.CreateLoad(projectedBits);
           auto maskBits = llvm::PowerOf2Ceil(NumExtraTagValues) - 1;
