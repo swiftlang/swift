@@ -14,7 +14,7 @@ The requirements in a generic signature must be \index{reduced requirement}reduc
 
 Outside of the generics implementation, the \IndexDefinition{generic signature constructor}primitive constructor is used in a handful of cases when it is already known the requirements satisfy the necessary conditions. When deserializing a generic signature from a \index{serialized module}serialized module for example, we know it satisfied the invariants when it was serialized.
 
-We also use the primitive constructor to build the \index{protocol generic signature}protocol generic signature \verb|<Self where Self: P>| for a protocol \texttt{P}, because we know it satisfies the invariants by definition. Anywhere else we need to build a generic signature ``from scratch,'' we use the \textbf{abstract generic signature request} instead.
+We also use the primitive constructor to build the \index{protocol generic signature}protocol generic signature \verb|<Self where Self: P>| for a protocol \tP, because we know it satisfies the invariants by definition. Anywhere else we need to build a generic signature ``from scratch,'' we use the \textbf{abstract generic signature request} instead.
 
 \item The \textbf{requirement signature request} lazily builds a requirement signature for a protocol written in source. The flow resembles the inferred generic signature request; we start by resolving user-written requirements, then perform minimization. There's no ``abstract'' equivalent of the requirement signature request; a requirement signature is always attached to a specific named protocol declaration.
 \end{itemize}
@@ -25,7 +25,7 @@ Now we look at each involved request in detail.
 \index{request evaluator}%
 \index{protocol declaration}%
 \index{protocol extension}%
-\Index{protocol Self type@protocol \texttt{Self} type}%
+\IndexSelf%
 Two easy cases are handled first:
 \begin{enumerate}
 \item If the declaration is a protocol or an unconstrained protocol extension, we build the \index{protocol generic signature}protocol generic signature \verb|<Self where Self: P>| using the primitive constructor.
@@ -171,7 +171,7 @@ A general fact is that the protocol inheritance relation is \index{transitive re
 \begin{Verbatim}
 protocol Most: Good {}
 \end{Verbatim}
-We can understand this behavior by writing down a derivation for the requirement $\ConfReq{\rT}{Base}$ in the \index{protocol generic signature}protocol generic signature $G_\texttt{Most}$. We start with $\ConfReq{\rT}{Most}$ and apply the associated conformance requirements $\ConfReq{Self}{Good}_{\texttt{Most}}$ and $\ConfReq{Self}{Base}_{\texttt{Good}}$:
+We can understand this behavior by writing down a derivation for the requirement $\ConfReq{\rT}{Base}$ in the \index{protocol generic signature}protocol generic signature $G_\texttt{Most}$. We start with $\ConfReq{\rT}{Most}$ and apply the associated conformance requirements $\AssocConfReq{Self}{Good}{Most}$ and $\AssocConfReq{Self}{Base}{Good}$:
 \begin{gather*}
 \ConfStep{\rT}{Most}{1}\\
 \AssocConfStep{1}{\rT}{Good}{2}\\
@@ -184,7 +184,7 @@ protocol Bad {
   typealias Income = Salary  // error
 }
 \end{Verbatim}
-We diagnose an error, because we are unable to resolve \texttt{Salary} as a member of \texttt{Bad}. To understand why, notice that the derivation $G_\texttt{Bad} \vdash \ConfReq{\rT}{Base}$ involves the \index{associated same-type requirement}associated same-type requirement $\SameReq{Self}{Self.Tricky.Other}_\texttt{Bad}$, so it is not a consequence of the protocol's syntactic \index{inheritance clause}inheritance clause:
+We diagnose an error, because we are unable to resolve \texttt{Salary} as a member of \texttt{Bad}. To understand why, notice that the derivation $G_\texttt{Bad} \vdash \ConfReq{\rT}{Base}$ involves the \index{associated same-type requirement}associated same-type requirement $\AssocSameReq{Self}{Self.Tricky.Other}{Bad}$, so it is not a consequence of the protocol's syntactic \index{inheritance clause}inheritance clause:
 \begin{gather*}
 \ConfStep{\rT}{Bad}{1}\\
 \AssocConfStep{1}{\rT.Tricky}{Base}{2}\\
@@ -192,7 +192,7 @@ We diagnose an error, because we are unable to resolve \texttt{Salary} as a memb
 \AssocSameStep{1}{\rT}{\rT.Tricky.Other}{4}\\
 \SameConfStep{3}{4}{\rT}{Base}{5}
 \end{gather*}
-A special code path detects this problem and \index{diagnostic!protocol inheritance clause}diagnoses a \index{warning}warning to explain what is going on. After building a protocol's requirement signature, the \Request{type-check source file request} verifies that any conformance requirements known to be satisfied by \texttt{Self} actually appear in the protocol's inheritance clause, or \texttt{where} clause entries with a subject type of \texttt{Self}.
+A special code path detects this problem and \index{diagnostic!protocol inheritance clause}diagnoses a \index{warning}warning to explain what is going on. After building a protocol's requirement signature, the \Request{type-check source file request} verifies that any conformance requirements known to be satisfied by \tSelf\ actually appear in the protocol's inheritance clause, or \texttt{where} clause entries with a subject type of \tSelf.
 
 In our example, we discover the unexpected derived requirement $\ConfReq{\ttgp{0}{0}}{Base}$ of $G_\texttt{Bad}$, but at this point it is too late to attempt the failed name lookup of \texttt{Salary} again. The compiler instead suggests that the user should explicitly state the inheritance from \texttt{Base} in the inheritance clause of \texttt{Bad}:
 \begin{Verbatim}
@@ -207,7 +207,7 @@ protocol Bad {
          ^
 \end{Verbatim}
 
-A mistake of this sort is baked into the standard library's \texttt{SIMDScalar} protocol. The \texttt{Self} type of \texttt{SIMDScalar} must conform to all of \texttt{Equatable}, \texttt{Hashable}, \texttt{Encodable} and \texttt{Decodable}, via an associated same-type requirement:
+A mistake of this sort is baked into the standard library's \texttt{SIMDScalar} protocol. The \tSelf\ type of \texttt{SIMDScalar} must conform to all of \texttt{Equatable}, \texttt{Hashable}, \texttt{Encodable} and \texttt{Decodable}, via an associated same-type requirement:
 \begin{Verbatim}
 public protocol SIMDScalar {
   ...
@@ -386,18 +386,18 @@ We now present requirement decomposition in the form of an algorithm. Mostly thi
 \index{protocol substitution map}
 \index{primary associated type}
 \index{same-type requirement}
-\begin{algorithm}[Decomposition of conformance requirements]\label{expand conformance req algorithm} Takes a list of conformance requirements as input. Outputs a new list of equivalent requirements where all conformance requirements have a protocol type on the right hand side.
+\begin{algorithm}[Decompose conformance requirement]\label{expand conformance req algorithm} Takes a list of conformance requirements as input. Outputs a new list of equivalent requirements where all conformance requirements have a protocol type on the right hand side.
 \begin{enumerate}
 \item Initialize an empty list to collect the output requirements.
 \item Add all input requirements to the worklist.
 \item (Check) If the worklist is empty, return the output list.
 \item (Loop) Remove a conformance requirement $\ConfReq{T}{X}$ from the worklist, where \texttt{X} is a ``protocol-like'' type, with one of the three kinds below.
 \item (Base case) If \texttt{X} is a protocol type, output the conformance requirement $\ConfReq{T}{X}$.
-\item (Composition) If \texttt{X} is a protocol composition type \texttt{$\texttt{M}_1$ \& ...~\& $\texttt{M}_n$}, visit each member $\texttt{M}_i\in\texttt{X}$. If $\texttt{M}_i$ is a class type, output the superclass requirement $\ConfReq{T}{$\texttt{M}_i$}$. If $\texttt{M}_i$ is \texttt{AnyObject}, output the layout requirement $\ConfReq{T}{AnyObject}$. Otherwise, $\texttt{M}_i$ is either a protocol type, or it can be decomposed further. Add the conformance requirement $\ConfReq{T}{$\texttt{M}_i$}$ to the worklist.
-\item (Parameterized) If \texttt{X} is a parameterized protocol type \texttt{P<$\texttt{B}_1$, ..., $\texttt{B}_n$>} with base protocol type \texttt{P} and generic arguments $\texttt{B}_i$, decompose the requirement as follows:
+\item (Composition) If \texttt{X} is a protocol composition type \texttt{$\texttt{M}_1$ \& ...~\& $\texttt{M}_n$}, visit each member $\texttt{M}_i\in\texttt{X}$. If $\texttt{M}_i$ is a class type, output the superclass requirement $\ConfReq{T}{$\texttt{M}_i$}$. If $\texttt{M}_i$ is \texttt{AnyObject}, output the layout requirement $\TAnyObject$. Otherwise, $\texttt{M}_i$ is either a protocol type, or it can be decomposed further. Add the conformance requirement $\ConfReq{T}{$\texttt{M}_i$}$ to the worklist.
+\item (Parameterized) If \texttt{X} is a parameterized protocol type \texttt{P<$\texttt{B}_1$, ..., $\texttt{B}_n$>} with base protocol type \tP\ and generic arguments $\texttt{B}_i$, decompose the requirement as follows:
 \begin{enumerate}
-\item Output the conformance requirement $\ConfReq{T}{P}$.
-\item For each primary associated type $\texttt{A}_i$ of \texttt{P}, apply the protocol substitution map for \texttt{T} to the declared interface type of $\texttt{A}_i$:
+\item Output the conformance requirement $\TP$.
+\item For each primary associated type $\nA_i$ of \tP, apply the protocol substitution map for \tT\ to the declared interface type of $\nA_i$:
 \[\texttt{Self.[P]A}_i \otimes \SubstMapLongC{\SubstType{Self}{T}}{\SubstConf{Self}{T}{P}} = \texttt{T.[P]A}_i\]
 Output the same-type requirement $\SameReq{$\texttt{T.[P]A}_i$}{$\texttt{G}_i$}$.
 \end{enumerate}
@@ -405,7 +405,7 @@ Output the same-type requirement $\SameReq{$\texttt{T.[P]A}_i$}{$\texttt{G}_i$}$
 \item (Next) Go back to Step~4.
 \end{enumerate}
 \end{algorithm}
-Usually \texttt{T} will be a type parameter in Step~7, and the substituted type becomes the dependent member type $\texttt{T.[P]A}_i$. Our algorithm relies on type substitution to also cope with \texttt{T} being a concrete type. When \texttt{T} is a concrete type, the subject type of each introduced same-type requirement has to be the \index{type witness}type witness for $\texttt{A}_i$ in the concrete conformance $\ConfReq{T}{P}$. For example, given $\ConfReq{Array<\rT>}{Sequence<Int>}$, we output $\ConfReq{Array<\rT>}{Sequence}$ and $\SameReq{\rT}{Int}$. Admittedly, this is a rather a silly edge case. One might think that requirement inference would exercise this scenario:
+Usually \tT\ will be a type parameter in Step~7, and the substituted type becomes the dependent member type $\texttt{T.[P]A}_i$. Our algorithm relies on type substitution to also cope with \tT\ being a concrete type. When \tT\ is a concrete type, the subject type of each introduced same-type requirement has to be the \index{type witness}type witness for $\nA_i$ in the concrete conformance $\TP$. For example, given $\ConfReq{Array<\rT>}{Sequence<Int>}$, we output $\ConfReq{Array<\rT>}{Sequence}$ and $\SameReq{\rT}{Int}$. Admittedly, this is a rather a silly edge case. One might think that requirement inference would exercise this scenario:
 \begin{Verbatim}
 typealias G<T: Sequence<Int>> = T
 func f<E>(_: G<Array<E>>) {}
@@ -461,23 +461,23 @@ For two concrete types to be equivalent under all substitutions, they can only d
 If the two types in a same-type requirement do not match, we have a conflict, so we \index{diagnostic!invalid same-type requirement}diagnose an error and give up. Otherwise, the types have an equal number of children; we walk the children in parallel and construct a simpler set of same-type requirements equivalent to the original. This is a recursive process; some of these requirements might need further desugaring, or lead to conflicts, and so on.
 
 \index{same-type requirement}
-\begin{algorithm}[Same-type requirement desugaring]\label{desugar same type algo} Takes an arbitrary same-type requirement as input. Outputs a list of desugared requirements and a list of conflicting requirements.
+\begin{algorithm}[Desugar same-type requirement]\label{desugar same type algo} Takes an arbitrary same-type requirement as input. Outputs a list of desugared requirements and a list of conflicting requirements.
 \begin{enumerate}
 \item Initialize empty output and conflict lists.
 \item Add the input requirement to the worklist.
-\item (Next) Take the next requirement $\SameReq{T}{U}$ from the worklist.
-\item (Abstract) If \texttt{T} and \texttt{U} are both type parameters, add $\SameReq{T}{U}$ to the output list.
-\item (Concrete) If \texttt{T} is a type parameter and \texttt{U} is concrete, output $\SameReq{T}{U}$.
-\item (Flipped) If \texttt{T} is concrete and \texttt{U} is a type parameter, output $\SameReq{U}{T}$.
-\item (Redundant) If \texttt{T} and \texttt{U} are canonically equal, nothing non-trivial will be generated below, so we immediately go to Step~10.
-\item (Recurse) If \texttt{T} and \texttt{U} match, let $\texttt{T}_1\ldots\texttt{T}_n$ and $\texttt{U}_1\ldots\texttt{U}_n$ be the children of \texttt{T} and~\texttt{U}. For each $1\le i\le n$, add $\SameReq{$\texttt{T}_i$}{$\texttt{U}_i$}$ to the worklist.
-\item (Conflict) If \texttt{T} and \texttt{U} do not match, add $\SameReq{T}{U}$ to the conflict list and diagnose.
+\item (Next) Take the next requirement $\TU$ from the worklist.
+\item (Abstract) If \tT\ and \tU\ are both type parameters, add $\TU$ to the output list.
+\item (Concrete) If \tT\ is a type parameter and \tU\ is concrete, output $\TU$.
+\item (Flipped) If \tT\ is concrete and \tU\ is a type parameter, output $\SameReq{U}{T}$.
+\item (Redundant) If \tT\ and \tU\ are canonically equal, nothing non-trivial will be generated below, so we immediately go to Step~10.
+\item (Recurse) If \tT\ and \tU\ match, let $\tT_1\ldots\tT_n$ and $\tU_1\ldots\tU_n$ be the children of \tT\ and~\tU. For each $1\le i\le n$, add $\SameReq{$\tT_i$}{$\tU_i$}$ to the worklist.
+\item (Conflict) If \tT\ and \tU\ do not match, add $\TU$ to the conflict list and diagnose.
 \item (Loop) If the worklist is empty, return. Otherwise, go back to Step~3.
 \end{enumerate}
 \end{algorithm}
 Next we have the algorithm for desugaring an arbitrary requirement. This runs after \AlgRef{expand conformance req algorithm}, so we assume conformance requirements have been decomposed. Notice how this algorithm generalizes the \index{satisfied requirement}``requirement is satisfied'' check of \AlgRef{reqissatisfied}: if we desugar a requirement that does not contain any type parameters, the conflict list will be empty if and only if the requirement is satisfied.
 
-\begin{algorithm}[Requirement desugaring]\label{requirement desugaring algorithm}
+\begin{algorithm}[Desugar requirement]\label{requirement desugaring algorithm}
 Takes an arbitrary requirement as input. Outputs a list of desugared requirements and a list of conflicting requirements.
 \begin{enumerate}
 \item Initialize empty output and conflict lists.
@@ -485,24 +485,24 @@ Takes an arbitrary requirement as input. Outputs a list of desugared requirement
 \item (Next) Take the next requirement from the worklist. If the requirement's subject type is a type parameter, add it to the output list and go to Step~5.
 \item (Desugar) Otherwise, the subject type is a concrete type. Handle each \index{requirement kind}requirement kind as follows:
 \begin{enumerate}
-\item For a \index{conformance requirement}\textbf{conformance requirement} $\ConfReq{T}{P}$, perform the \index{global conformance lookup}global conformance lookup $\protosym{P}\otimes\texttt{T}$:
+\item For a \index{conformance requirement}\textbf{conformance requirement} $\TP$, perform the \index{global conformance lookup}global conformance lookup $\protosym{P}\otimes\tT$:
 \begin{enumerate}
 \item If we get a \index{concrete conformance}concrete conformance, add the \index{conditional requirement}conditional requirements, if any, to the worklist.
-\item If we get an invalid conformance, add $\ConfReq{T}{P}$ to the conflict list.
+\item If we get an invalid conformance, add $\TP$ to the conflict list.
 \end{enumerate}
-\item For a \index{superclass requirement}\textbf{superclass requirement} $\ConfReq{T}{C}$:
+\item For a \index{superclass requirement}\textbf{superclass requirement} $\TC$:
 \begin{enumerate}
-\item If \texttt{T} and \texttt{C} are two specializations of the same \index{class declaration}class declaration, add the same-type requirement $\SameReq{T}{C}$ to the worklist.
-\item If \texttt{T} does not have a \index{superclass type}superclass type (\ChapRef{classinheritance}), then \texttt{T} cannot be a subclass of~\texttt{C}; add $\ConfReq{T}{C}$ to the conflict list.
-\item Otherwise, let $\texttt{T}^\prime$ be the superclass type of \texttt{T}. Add the superclass requirement $\ConfReq{$\texttt{T}^\prime$}{C}$ to the worklist.
+\item If \tT\ and \texttt{C} are two specializations of the same \index{class declaration}class declaration, add the same-type requirement $\SameReq{T}{C}$ to the worklist.
+\item If \tT\ does not have a \index{superclass type}superclass type (\ChapRef{classinheritance}), then \tT\ cannot be a subclass of~\texttt{C}; add $\TC$ to the conflict list.
+\item Otherwise, let $\tT^\prime$ be the superclass type of \tT. Add the superclass requirement $\ConfReq{$\tT^\prime$}{C}$ to the worklist.
 \end{enumerate}
-\item For a \index{layout requirement}\textbf{layout requirement} $\ConfReq{T}{AnyObject}$, any type parameters contained in the concrete type \texttt{T} have no bearing on the outcome. It suffices to apply \AlgRef{reqissatisfied}. If unsatisfied, add $\ConfReq{T}{AnyObject}$ to the conflict list.
-\item For a \index{same-type requirement}\textbf{same-type requirement} $\SameReq{T}{U}$, apply \AlgRef{desugar same type algo} and add the results to the output and conflict lists.
+\item For a \index{layout requirement}\textbf{layout requirement} $\TAnyObject$, any type parameters contained in the concrete type \tT\ have no bearing on the outcome. It suffices to apply \AlgRef{reqissatisfied}. If unsatisfied, add $\TAnyObject$ to the conflict list.
+\item For a \index{same-type requirement}\textbf{same-type requirement} $\TU$, apply \AlgRef{desugar same type algo} and add the results to the output and conflict lists.
 \end{enumerate}
 \item (Loop) If the worklist is empty, return. Otherwise, go back to Step~3.
 \end{enumerate}
 \end{algorithm}
-Requirements on the conflict list are diagnosed as errors. Requirements on the output list have the correct desugared form for minimization. To restate:
+Requirements on the conflict list are diagnosed as errors. Requirements on the output list have the correct desugared form for minimization. To re-state:
 \begin{definition}\label{desugaredrequirementdef}
 A \IndexDefinition{desugared requirement}\emph{desugared requirement} is a requirement where:
 \begin{enumerate}
@@ -524,24 +524,24 @@ struct Concat<C: Collection> where C.Element: Collection {
 
 A \index{type parameter}type parameter is a \index{prefix}\emph{prefix} of another type parameter if it is equal to the other's base type, or the base type of the base type, at any level of nesting. So \texttt{\rT.Element} and $\rT$ are the two prefixes of \texttt{\rT.Element.Element}. From the user's point of view, if ``\texttt{C.Element.Element}'' is a meaningful utterance to write down in the program, ``\texttt{C.Element}'' certainly should be as well! This suggests a reasonable property that any ``good'' generic signature ought to have: \textsl{every prefix of a valid type parameter is itself a valid type parameter}. This is not our final condition though, so we generalize further.
 
-When we say that a type parameter \texttt{T} is valid in a generic signature $G$, we mean that we have a derivation~$G\vdash\texttt{T}$. Only a handful of derivation steps have a type parameter as a conclusion (see \AppendixRef{derived summary}), and by inspecting these steps, we can see another way to characterize the validity of a type parameter~\texttt{T}:
+When we say that a type parameter \tT\ is valid in a generic signature $G$, we mean that we have a derivation~$G\vdash\tT$. Only a handful of derivation steps have a type parameter as a conclusion (see \AppendixRef{derived summary}), and by inspecting these steps, we can see another way to characterize the validity of a type parameter~\tT:
 \begin{itemize}
-\item If \texttt{T} is a \index{generic parameter type}generic parameter, then \texttt{T} is valid if and only if it appears in $G$.
-\item If \texttt{T} is an \index{unbound dependent member type}unbound \index{dependent member type}dependent member type \texttt{U.A}, then \texttt{T} is valid if and only if some protocol \texttt{P} declares an associated type named \texttt{A}, and $G\vdash\ConfReq{U}{P}$.
-\item If \texttt{T} is a \index{bound dependent member type}bound dependent member type \texttt{U.[P]A}, then \texttt{T} is valid if and only if $G\vdash\ConfReq{U}{P}$, where \texttt{P} is the parent protocol of the associated type declaration denoted by \texttt{[P]A}.
+\item If \tT\ is a \index{generic parameter type}generic parameter, then \tT\ is valid if and only if it appears in $G$.
+\item If \tT\ is an \index{unbound dependent member type}unbound \index{dependent member type}dependent member type \texttt{U.A}, then \tT\ is valid if and only if some protocol \tP\ declares an associated type named \nA, and $G\vdash\ConfReq{U}{P}$.
+\item If \tT\ is a \index{bound dependent member type}bound dependent member type \texttt{U.[P]A}, then \tT\ is valid if and only if $G\vdash\ConfReq{U}{P}$, where \tP\ is the parent protocol of the associated type declaration denoted by \texttt{[P]A}.
 \end{itemize}
 
-If we have one of those generic signatures where every prefix of \texttt{T} is also valid, then in the case where \texttt{T} is a dependent member type above, the subject type \texttt{U} of $\ConfReq{U}{P}$ is a prefix of~\texttt{T}, so \texttt{U} must be valid. We say that $\ConfReq{U}{P}$ is a \emph{well-formed} requirement if its subject type \texttt{U} is valid. This idea of well-formedness allows us to subsume ``prefix validity'' with a more general idea: \textsl{every derived conformance requirement must be well-formed}. In other words, we want $G\vdash\ConfReq{U}{P}$ to imply $G\vdash\texttt{U}$ for all \texttt{U} and \texttt{P}.
+If we have one of those generic signatures where every prefix of \tT\ is also valid, then in the case where \tT\ is a dependent member type above, the subject type \tU\ of $\ConfReq{U}{P}$ is a prefix of~\tT, so \tU\ must be valid. We say that $\ConfReq{U}{P}$ is a \emph{well-formed} requirement if its subject type \tU\ is valid. This idea of well-formedness allows us to subsume ``prefix validity'' with a more general idea: \textsl{every derived conformance requirement must be well-formed}. In other words, we want $G\vdash\ConfReq{U}{P}$ to imply $G\vdash\tU$ for all \tU\ and \tP.
 
 We can also find motivation in \index{type substitution}type substitution. Let $G$ be a generic signature where some derived requirement of $G$, not necessarily a conformance requirement, contains an invalid type parameter. By \AlgRef{reqissatisfied}, no substitution map $\Sigma$ can \index{satisfied requirement}satisfy this requirement, because after we apply $\Sigma$, the invalid type parameter becomes an error type. Recalling our earlier notion of a \index{well-formed substitution map}well-formed \emph{substitution map} from \DefRef{valid subst map}, we conclude that~$G$ cannot have any well-formed substitution maps at all! To rule this out, we generalize our condition to cover all requirements, not just conformance requirements.
 
 \begin{definition}\label{valid requirement}
 A requirement is \IndexDefinition{well-formed requirement}\emph{well-formed} with respect to a generic signature~$G$ if all type parameters contained in the requirement are valid type parameters of~$G$:
 \begin{itemize}
-\item A \textbf{conformance requirement} $\ConfReq{T}{P}$ is well-formed if $G\vdash\texttt{T}$.
-\item A \textbf{superclass requirement} $\ConfReq{T}{C}$, with $\{\texttt{C}_1,\ldots,\texttt{C}_n\}$ denoting the set of type parameters contained in~\texttt{C}, is well-formed if $G\vdash\texttt{T}$ and $G\vdash\texttt{C}_i$ for all $1\le i\le n$.
-\item A \textbf{layout requirement} $\ConfReq{T}{AnyObject}$ is well-formed if $G\vdash\texttt{T}$.
-\item A \textbf{same-type requirement} $\SameReq{T}{U}$, with $\{\texttt{U}_1,\ldots,\texttt{U}_n\}$ denoting the set of type parameters contained in~\texttt{U}, is well-formed if $G\vdash\texttt{T}$ and $G\vdash\texttt{U}_i$ for all $1\le i\le n$. (If the right-hand side \texttt{U} is a type parameter, the set of type parameters here is trivially $\{\texttt{U}\}$.)
+\item A \textbf{conformance requirement} $\TP$ is well-formed if $G\vdash\tT$.
+\item A \textbf{superclass requirement} $\TC$, with $\{\texttt{C}_1,\ldots,\texttt{C}_n\}$ denoting the set of type parameters contained in~\texttt{C}, is well-formed if $G\vdash\tT$ and $G\vdash\texttt{C}_i$ for all $1\le i\le n$.
+\item A \textbf{layout requirement} $\TAnyObject$ is well-formed if $G\vdash\tT$.
+\item A \textbf{same-type requirement} $\TU$, with $\{\tU_1,\ldots,\tU_n\}$ denoting the set of type parameters contained in~\tU, is well-formed if $G\vdash\tT$ and $G\vdash\tU_i$ for all $1\le i\le n$. (If the right-hand side \tU\ is a type parameter, the set of type parameters here is trivially $\{\tU\}$.)
 \end{itemize}
 \end{definition}
 
@@ -556,11 +556,11 @@ A \index{generic signature}generic signature $G$ is \IndexDefinition{well-formed
 \end{definition}
 This definition doesn't immediately give us an algorithm for checking well-formedness. The derived requirements of a generic signature are an infinite set in general, so we cannot enumerate them all. We will resolve this dilemma shortly.
 
-Notice how if $G\vdash\ConfReq{T}{P}$ for some protocol \texttt{P}, the well-formedness of~$G$ implicitly depends on the well-formedness of the associated requirements of~\texttt{P}; we interpret~$G$ with respect to its \index{protocol dependency set}\emph{protocol dependency set}, containing those protocols that can appear on the right-hand side of a derived conformance requirement. We will return to this topic in \SecRef{protocol component}; for now, we can take this set to contain \emph{all} protocols as a conservative approximation.
+Notice how if $G\vdash\TP$ for some protocol \tP, the well-formedness of~$G$ implicitly depends on the well-formedness of the associated requirements of~\tP; we interpret~$G$ with respect to its \index{protocol dependency set}\emph{protocol dependency set}, containing those protocols that can appear on the right-hand side of a derived conformance requirement. We will return to this topic in \SecRef{protocol component}; for now, we can take this set to contain \emph{all} protocols as a conservative approximation.
 
 One more thing. The result we proved while motivating \DefRef{valid generic signature def} will be useful later, so let's re-state it for posterity:
 \begin{proposition}\label{prefix prop}
-Let $G$ be a well-formed generic signature, and let \texttt{T} be a \index{valid type parameter}valid type parameter of~$G$. Then every prefix of \texttt{T} is also a valid type parameter of~$G$.
+Let $G$ be a well-formed generic signature, and let \tT\ be a \index{valid type parameter}valid type parameter of~$G$. Then every prefix of \tT\ is also a valid type parameter of~$G$.
 \end{proposition}
 
 \paragraph{Diagnostics.} We now give an example of a generic signature that is not well-formed. We return to our \texttt{Concat} type, except here we ``forgot'' to state that \texttt{C} must conform to \texttt{Collection}:
@@ -585,7 +585,7 @@ struct Bad<C> where C.Element: Sequence {}
 
 Next, we define what it means for an associated requirement to be well-formed:
 \begin{definition}
-An associated requirement of a protocol \texttt{P} is \emph{well-formed} if it is a well-formed requirement for the protocol generic signature $\GP$; that is, all type parameters it contains are valid type parameters in $\GP$.
+An associated requirement of a protocol \tP\ is \emph{well-formed} if it is a well-formed requirement for the protocol generic signature $\GP$; that is, all type parameters it contains are valid type parameters in $\GP$.
 \end{definition}
 
 A generic signature may depend on protocols written in source, or protocols from serialized modules. For protocols written in source, type resolution checks that their associated requirements are well-formed by visiting them again in the interface resolution stage, once the protocol's \index{requirement signature}requirement signature has been built. Protocols from \index{serialized module}serialized modules already have well-formed associated requirements, because they were checked before serialization. Thus, if type resolution does not diagnose any errors, all user-written requirements are well-formed. The next theorem says this is a sufficient condition for all generic signatures in the \index{main module}main module to be well-formed.
@@ -594,13 +594,13 @@ A generic signature may depend on protocols written in source, or protocols from
 Suppose that a generic signature~$G$ satisfies these conditions:
 \begin{itemize}
 \item Every explicit requirement of $G$ is well-formed.
-\item For every protocol \texttt{P} such that $G\vdash\ConfReq{T}{P}$ for some \texttt{T}, every associated requirement of \texttt{P} is well-formed (in the protocol generic signature $\GP$).
+\item For every protocol \tP\ such that $G\vdash\TP$ for some \tT, every associated requirement of \tP\ is well-formed (in the protocol generic signature $\GP$).
 \end{itemize}
 Then every derived requirement of $G$ is well-formed; in other words, $G$ is well-formed.
 \end{theorem}
-To prove this theorem, we must expand our repertoire for reasoning about derivations. First, we recall the \index{protocol generic signature}protocol generic signature from \SecRef{requirement sig}. If~\texttt{P} is any protocol, then its generic signature, which we denote by~$\GP$, has the single requirement $\ConfReq{Self}{P}$. As always, the protocol \texttt{Self} type is sugar for $\rT$.
+To prove this theorem, we must expand our repertoire for reasoning about derivations. First, we recall the \index{protocol generic signature}protocol generic signature from \SecRef{requirement sig}. If~\tP\ is any protocol, then its generic signature, which we denote by~$\GP$, has the single requirement $\ConfReq{Self}{P}$. As always, the protocol \tSelf\ type is sugar for $\rT$.
 
-The protocol generic signature describes the structure generated by the protocol's requirement signature. These are the \index{valid type parameter}valid type parameters and derived requirements inside the declaration of the protocol and its unconstrained extensions. These type parameters are all rooted in the protocol \texttt{Self} type, and the derived requirements talk about these \texttt{Self}-rooted type parameters. Informally, anything we can say about the protocol \texttt{Self} type in $\GP$, should also be true of an arbitrary type parameter \texttt{T} in some other generic signature~$G$ where $G\vdash\ConfReq{T}{P}$. We will now make this precise.
+The protocol generic signature describes the structure generated by the protocol's requirement signature. These are the \index{valid type parameter}valid type parameters and derived requirements inside the declaration of the protocol and its unconstrained extensions. These type parameters are all rooted in the protocol \tSelf\ type, and the derived requirements talk about these \tSelf-rooted type parameters. Informally, anything we can say about the protocol \tSelf\ type in $\GP$, should also be true of an arbitrary type parameter \tT\ in some other generic signature~$G$ where $G\vdash\TP$. We will now make this precise.
 
 For example, we might first define an algorithm in a protocol extension of \texttt{Collection}, and then call our algorithm from another generic function:
 \begin{Verbatim}
@@ -626,12 +626,12 @@ Suppose that \texttt{myComplicatedAlgorithm()} makes use of \texttt{Self.SubSequ
 \AssocNameStep{2}{Self.SubSequence.Index}{3}\\
 \AssocConfStep{2}{Self.SubSequence.Index}{Comparable}{4}
 \end{gather*}
-We apply our substitution map to (3) and (4). Of course, we have yet to explain how to apply a substitution map to a dependent member type! We will get to that in the next chapter, but for now, let's make the simplifying assumption that we're performing a syntactic replacement of ``\texttt{Self}'' with ``\texttt{\rT.Element}''. This gives us:
+We apply our substitution map to (3) and (4). Of course, we have yet to explain how to apply a substitution map to a dependent member type! We will get to that in the next chapter, but for now, let's make the simplifying assumption that we're performing a syntactic replacement of ``\tSelf'' with ``\texttt{\rT.Element}''. This gives us:
 \begin{gather*}
 \texttt{\rT.Element.SubSequence.Index}\\
 \ConfReq{\rT.Element.Self.SubSequence.Index}{Comparable}
 \end{gather*}
-We can show that the first is a valid type parameter of $G$, and the second a derived requirement of~$G$, by taking our original derivation in $G_\texttt{Collection}$, and replacing \texttt{Self} with \texttt{\rT.Element} throughout:
+We can show that the first is a valid type parameter of $G$, and the second a derived requirement of~$G$, by taking our original derivation in $G_\texttt{Collection}$, and replacing \tSelf\ with \texttt{\rT.Element} throughout:
 \begin{gather*}
 \ConfStep{\rT.Element}{Collection}{1}\\
 \AssocConfStep{1}{\rT.Element.SubSequence}{Collection}{2}\\
@@ -642,19 +642,19 @@ This works because $\ConfReq{\rT.Element}{Collection}$ was an \emph{explicit} re
 \ConfStep{\rT}{Collection}{1}\\
 \AssocConfStep{1}{\rT.Indices}{Collection}{2}
 \end{gather*}
-To build a derivation for $G\vdash\ConfReq{\rT.Indices.SubSequence.Index}{Comparable}$, we first replace the elementary step $\ConfReq{Self}{Collection}$ with the entire \emph{derivation} of $G\vdash\ConfReq{\rT.Indices}{Collection}$; then we substitute \texttt{Self} with \texttt{\rT.Indices} in all remaining steps:
+To build a derivation for $G\vdash\ConfReq{\rT.Indices.SubSequence.Index}{Comparable}$, we first replace the elementary step $\ConfReq{Self}{Collection}$ with the entire \emph{derivation} of $G\vdash\ConfReq{\rT.Indices}{Collection}$; then we substitute \tSelf\ with \texttt{\rT.Indices} in all remaining steps:
 \begin{gather*}
 \ConfStep{\rT}{Collection}{1}\\
 \AssocConfStep{1}{\rT.Indices}{Collection}{2}\\
 \AssocConfStep{2}{\rT.Indices.SubSequence}{Collection}{3}\\
 \AssocConfStep{3}{\rT.Indices.SubSequence.Index}{Comparable}{4}
 \end{gather*}
-A protocol generic signature has two elementary derivation steps, so we might instead have a derivation that starts with the \textsc{Generic} elementary step for $\texttt{Self}$. For example, we can derive the requirement $\SameReq{Self}{Self}$ in $G_\texttt{Collection}$:
+A protocol generic signature has two elementary derivation steps, so we might instead have a derivation that starts with the \textsc{Generic} elementary step for $\tSelf$. For example, we can derive the requirement $\SameReq{Self}{Self}$ in $G_\texttt{Collection}$:
 \begin{gather*}
 \GenericStep{Self}{1}\\
 \ReflexStep{1}{Self}{2}
 \end{gather*}
-To get a derivation $G \vdash \SameReq{\rT.Indices}{\rT.Indices}$, we make use of the fact that \texttt{\rT.Indices} is a valid type parameter of~$G$. We replace the elementary derivation step for \texttt{Self} with the entire derivation of $G \vdash \texttt{\rT.Indices}$:
+To get a derivation $G \vdash \SameReq{\rT.Indices}{\rT.Indices}$, we make use of the fact that \texttt{\rT.Indices} is a valid type parameter of~$G$. We replace the elementary derivation step for \tSelf\ with the entire derivation of $G \vdash \texttt{\rT.Indices}$:
 \begin{gather*}
 \ConfStep{\rT}{Collection}{1}\\
 \AssocNameStep{1}{\rT.Indices}{2}\\
@@ -664,40 +664,40 @@ To get a derivation $G \vdash \SameReq{\rT.Indices}{\rT.Indices}$, we make use o
 We now state the general result. We need this for the proof of \ThmRef{valid theorem}, and also later in \SecRef{conformance paths exist}, when we show that every derived conformance requirement has a derivation of a certrain form.
 
 \begin{lemma}[Formal substitution]\label{subst lemma}
-Let $G$ be an arbitrary generic signature. Suppose that $G\vdash\texttt{T}$ and $G\vdash\ConfReq{T}{P}$ for some type parameter \texttt{T} and protocol \texttt{P}. Then if we take a valid type parameter or derived requirement of~$\GP$ and replace \texttt{Self} with \texttt{T} throughout, we get a valid type parameter or derived requirement of~$G$, just rooted in \texttt{T}. That is:
+Let $G$ be an arbitrary generic signature. Suppose that $G\vdash\tT$ and $G\vdash\TP$ for some type parameter \tT\ and protocol \tP. Then if we take a valid type parameter or derived requirement of~$\GP$ and replace \tSelf\ with \tT\ throughout, we get a valid type parameter or derived requirement of~$G$, just rooted in \tT. That is:
 \begin{itemize}
 \item If $\GP\vdash\texttt{Self.U}$, then $G\vdash\texttt{T.U}$.
-\item If $\GP\vdash R$, then $G\vdash R^\prime$, where $R^\prime$ is the substituted requirement obtained by replacing \texttt{Self} with \texttt{T} in $R$.
+\item If $\GP\vdash R$, then $G\vdash R^\prime$, where $R^\prime$ is the substituted requirement obtained by replacing \tSelf\ with \tT\ in $R$.
 \end{itemize}
 \end{lemma}
 
 \begin{proof}
-Suppose we wanted to write down an \emph{algorithm} for the above. As input, we're given a generic signature~$G$, a pair of derivations $G\vdash\texttt{T}$ and $G\vdash\ConfReq{T}{P}$, and some derivation in $\GP$. We rewrite the derivation in $\GP$ into a derivation in $G$ by visiting each consecutive step. First, consider the elementary derivation steps of $\GP$:
+Suppose we wanted to write down an \emph{algorithm} for the above. As input, we're given a generic signature~$G$, a pair of derivations $G\vdash\tT$ and $G\vdash\TP$, and some derivation in $\GP$. We rewrite the derivation in $\GP$ into a derivation in $G$ by visiting each consecutive step. First, consider the elementary derivation steps of $\GP$:
 \begin{gather*}
-\texttt{Self}\tag{\textsc{Generic}}\\
+\tSelf\tag{\textsc{Generic}}\\
 \ConfReq{Self}{P}\tag{\textsc{Conf}}
 \end{gather*}
-Each one is replaced with the \emph{entire derivation} of \texttt{T} or $\ConfReq{T}{P}$, respectively:
+Each one is replaced with the \emph{entire derivation} of \tT\ or $\TP$, respectively:
 \begin{gather*}
-\texttt{T}\tag{$\ldots$}\\
-\ConfReq{T}{P}\tag{$\ldots$}
+\tT\tag{$\ldots$}\\
+\TP\tag{$\ldots$}
 \end{gather*}
-For all other derivation steps, we substitute \texttt{T} in place of \texttt{Self} anywhere it appears in the derivation step's statement. This gives us the desired derivation in~$G$.
+For all other derivation steps, we substitute \tT\ in place of \tSelf\ anywhere it appears in the derivation step's statement. This gives us the desired derivation in~$G$.
 \end{proof}
-A few words about the above proof. To be completely rigorous, we should go through each \index{inference rule}inference rule and argue that the substitution outputs a meaningful derivation step in each case. We're not going to do that, because we will demonstrate this form of exhaustive case analysis in the proof of \ThmRef{valid theorem} instead. Finally, note that our lemma makes the assumption that $\ConfReq{T}{P}$ is well-formed, because we need $G\vdash\texttt{T}$. However, we are specifically not assuming that $G$~is well-formed. In fact, we will use this lemma in the proof of \ThmRef{valid theorem}, so such an assumption would be circular.
+A few words about the above proof. To be completely rigorous, we should go through each \index{inference rule}inference rule and argue that the substitution outputs a meaningful derivation step in each case. We're not going to do that, because we will demonstrate this form of exhaustive case analysis in the proof of \ThmRef{valid theorem} instead. Finally, note that our lemma makes the assumption that $\TP$ is well-formed, because we need $G\vdash\tT$. However, we are specifically not assuming that $G$~is well-formed. In fact, we will use this lemma in the proof of \ThmRef{valid theorem}, so such an assumption would be circular.
 
-\paragraph{Structural induction.} Suppose that $P(n)$ is some property of the \index{natural numbers}natural numbers, and we wish to show that it is always true of all $n\in\mathbb{N}$. We can argue by \IndexDefinition{induction}\emph{induction}, writing down a proof in two parts:
+\paragraph{Structural induction.} Suppose that $P(n)$ is some property of the \index{natural numbers}natural numbers, and we wish to show that it is always true of all $n\in\NN$. We can argue by \IndexDefinition{induction}\emph{induction}, writing down a proof in two parts:
 \begin{itemize}
 \item The \IndexDefinition{base case}\emph{base case}, that $P(0)$ is true.
 \item The \IndexDefinition{inductive step}\emph{inductive step}, where we \emph{assume} that $P(n)$ is true for a fixed but arbitrary~$n$, and then prove that $P(n+1)$ is true as a consequence.
 \end{itemize}
-For example, let's say $P(n)$ is the statement that $0+1+2+\cdots+n=n(n+1)/2$ for some given~$n\in\mathbb{N}$. We can show this statement is always true it by induction:
+For example, let's say $P(n)$ is the statement that $0+1+2+\cdots+n=n(n+1)/2$ for some given~$n\in\NN$. We can show this statement is always true it by induction:
 \begin{itemize}
 \item To show that $P(0)$, we substitute $n=0$ into our formula. The left-hand side is zero, and the right-hand side is $n(n+1)/2=0(0+1)/2=0$.
 \item To show the inductive step, we assume $P(n)$, so, $0+1+2+\cdots+n=n(n+1)/2$. We add $n+1$ to both sides. The right-hand side simplifies as follows, establishing $P(n+1)$:
 \[\frac{n(n+1)}{2}+(n+1)=\frac{n^2+n+2n+2}{2}=\frac{n^2+3n+2}{2}=\frac{(n+1)(n+2)}{2}\]
 \end{itemize}
-A proof by induction is sort of like a ``recipe'' that tells us how to derive a proof for some specific~$n\in\mathbb{N}$. For example, suppose we wish to show $P(2)$. We start by writing down the base case $P(0)$. Then, the inductive step with $n=0$ shows that $P(0)$ implies $P(1)$, but we know $P(0)$ is true, thus $P(1)$ is true. Next, we apply the inductive step with $n=1$, and conclude that $P(2)$ is true. We can use our ``recipe'' to construct a proof for any~$n$ this way.
+A proof by induction is sort of like a ``recipe'' that tells us how to derive a proof for some specific~$n\in\NN$. For example, suppose we wish to show $P(2)$. We start by writing down the base case $P(0)$. Then, the inductive step with $n=0$ shows that $P(0)$ implies $P(1)$, but we know $P(0)$ is true, thus $P(1)$ is true. Next, we apply the inductive step with $n=1$, and conclude that $P(2)$ is true. We can use our ``recipe'' to construct a proof for any~$n$ this way.
 
 Proof by induction is an axiom of \index{Peano arithmetic}\emph{Peano arithmetic}, a \index{formal system}formal system for the natural numbers. One way to think of it, is that induction says we can reach any natural number by repeated application of the \index{successor}\emph{successor function} ``$1+{}$'' to ``0''. Notice how this encoding of the natural numbers resembles a Swift \index{enum type}enum:
 \begin{Verbatim}
@@ -733,19 +733,19 @@ We're given a requirement~$R$ such that $G\vdash R$, and a type parameter contai
 \SuperStepDef\\
 \LayoutStepDef
 \end{gather*}
-The first assumption in our theorem was that all explicit requirements of~$G$ are well-formed. In other words, every type parameter in~$R$ is a valid type parameter of~$G$, so we're done. The other base case is that we have a requirement obtained by the \IndexStep{Reflex}\textsc{Reflex} inference rule, from some valid type parameter~\texttt{T}:
+The first assumption in our theorem was that all explicit requirements of~$G$ are well-formed. In other words, every type parameter in~$R$ is a valid type parameter of~$G$, so we're done. The other base case is that we have a requirement obtained by the \IndexStep{Reflex}\textsc{Reflex} inference rule, from some valid type parameter~\tT:
 \begin{gather*}
 \ReflexStepDef
 \end{gather*}
-We must have $G\vdash\texttt{T}$, so the requirement $\SameReq{T}{T}$ is then well-formed by definition.
+We must have $G\vdash\tT$, so the requirement $\SameReq{T}{T}$ is then well-formed by definition.
 
-\InductiveStep We must handle each kind of inference rule in turn. Consider an \IndexStep{AssocBind}\textsc{AssocBind} step, for some type parameter~\texttt{T}, protocol~\texttt{P} and associated type~\texttt{A}:
+\InductiveStep We must handle each kind of inference rule in turn. Consider an \IndexStep{AssocBind}\textsc{AssocBind} step, for some type parameter~\tT, protocol~\tP\ and associated type~\nA:
 \begin{gather*}
 \AssocBindStepDef
 \end{gather*}
-The conclusion is a derived same-type requirement that contains two type parameters, \texttt{T.[P]A} and \texttt{T.A}. We can derive both from the conformance requirement $\ConfReq{T}{P}$ using \IndexStep{AssocDecl}\textsc{AssocDecl} and \IndexStep{AssocName}\textsc{AssocName}:
+The conclusion is a derived same-type requirement that contains two type parameters, \texttt{T.[P]A} and \texttt{T.A}. We can derive both from the conformance requirement $\TP$ using \IndexStep{AssocDecl}\textsc{AssocDecl} and \IndexStep{AssocName}\textsc{AssocName}:
 \begin{gather*}
-\AnyStep{\ConfReq{T}{P}}{1}\\
+\AnyStep{\TP}{1}\\
 \AssocDeclStep{1}{T.[P]A}{2}\\
 \AssocNameStep{2}{T.A}{3}
 \end{gather*}
@@ -754,28 +754,28 @@ Next, consider the \IndexStep{SameName}\textsc{SameName} and \IndexStep{SameDecl
 \SameNameStepDef\\
 \SameDeclStepDef
 \end{gather*}
-We have four type parameters to derive: \texttt{T.A}, \texttt{T.[P]A}, \texttt{U.A} and \texttt{U.[P]A}. We first derive $\ConfReq{T}{P}$ from $\ConfReq{U}{P}$, and then apply \textsc{AssocDecl} and \textsc{AssocName} to $\ConfReq{T}{P}$ and $\ConfReq{U}{P}$:
+We have four type parameters to derive: \texttt{T.A}, \texttt{T.[P]A}, \texttt{U.A} and \texttt{U.[P]A}. We first derive $\TP$ from $\ConfReq{U}{P}$, and then apply \textsc{AssocDecl} and \textsc{AssocName} to $\TP$ and $\ConfReq{U}{P}$:
 \begin{gather*}
 \AnyStep{\ConfReq{U}{P}}{1}\\
-\AnyStep{\SameReq{T}{U}}{2}\\
+\AnyStep{\TU}{2}\\
 \SameConfStep{1}{2}{T}{P}{3}\\
 \AssocNameStep{3}{T.A}{4}\\
 \AssocDeclStep{3}{T.[P]A}{5}\\
 \AssocNameStep{1}{U.A}{6}\\
 \AssocDeclStep{1}{U.[P]A}{7}
 \end{gather*}
-To handle the derivation steps generated by the \index{associated requirement}associated requirements of a protocol~\texttt{P}, we must make use of the second assumption of our theorem, together with \LemmaRef{subst lemma}. The simplest case is an \IndexStep{AssocConf}\textsc{AssocConf} or \IndexStep{AssocLayout}\textsc{AssocLayout} step:
+To handle the derivation steps generated by the \index{associated requirement}associated requirements of a protocol~\tP, we must make use of the second assumption of our theorem, together with \LemmaRef{subst lemma}. The simplest case is an \IndexStep{AssocConf}\textsc{AssocConf} or \IndexStep{AssocLayout}\textsc{AssocLayout} step:
 \begin{gather*}
 \AssocConfStepDef\\
 \AssocLayoutStepDef
 \end{gather*}
-By the induction hypothesis, $G\vdash\texttt{T}$. We must show that $G\vdash\texttt{T.U}$. The requirement on the right-hand side is obtained by replacing \texttt{Self} with \texttt{T} in some associated conformance requirement $\ConfReq{Self.U}{Q}_\texttt{P}$. By assumption, this associated requirement is well-formed with respect to $\GP$, so we have a derivation $\GP\vdash\texttt{Self.U}$. All the conditions of \LemmaRef{subst lemma} are satisfied, thus we can construct a derivation $G\vdash\texttt{T.U}$.
+By the induction hypothesis, $G\vdash\tT$. We must show that $G\vdash\texttt{T.U}$. The requirement on the right-hand side is obtained by replacing \tSelf\ with \tT\ in some associated conformance requirement $\ConfReq{Self.U}{Q}_\tP$. By assumption, this associated requirement is well-formed with respect to $\GP$, so we have a derivation $\GP\vdash\texttt{Self.U}$. All the conditions of \LemmaRef{subst lemma} are satisfied, thus we can construct a derivation $G\vdash\texttt{T.U}$.
 
-For an \IndexStep{AssocSame}associated same-type requirement $\SameReq{Self.U}{Self.V}_\texttt{P}$ we repeat the same construction to derive $G\vdash\texttt{T.U}$ and $G\vdash\texttt{T.V}$:
+For an \IndexStep{AssocSame}associated same-type requirement $\AssocSameReq{Self.U}{Self.V}{P}$ we repeat the same construction to derive $G\vdash\texttt{T.U}$ and $G\vdash\texttt{T.V}$:
 \begin{gather*}
 \AssocSameStepDef
 \end{gather*}
-If we are looking at a \IndexStep{AssocSuper}concrete same-type requirement $\SameReq{Self.U}{X}_\texttt{P}$, or a superclass requirement $\ConfReq{Self.U}{C}_\texttt{P}$, we again use \LemmaRef{subst lemma} to derive each type parameter that appears in $\Xprime$ and $\Cprime$, which we use to denote the types obtained from \texttt{X} and \texttt{C}, respectively, by structural replacement of \texttt{Self} with \texttt{T}:
+If we are looking at a \IndexStep{AssocSuper}concrete same-type requirement $\AssocSameReq{Self.U}{X}{P}$, or a superclass requirement $\AssocConfReq{Self.U}{C}{P}$, we again use \LemmaRef{subst lemma} to derive each type parameter that appears in $\Xprime$ and $\Cprime$, which we use to denote the types obtained from \texttt{X} and \texttt{C}, respectively, by structural replacement of \tSelf\ with \tT:
 \begin{gather*}
 \AssocConcreteStepDef\\
 \AssocSuperStepDef
@@ -791,59 +791,59 @@ Finally, all other derivation steps have the property that the type parameters a
 \end{gather*}
 This completes the induction.
 \end{proof}
-Formally, structural induction depends on a \index{well-founded order}well-founded order (\SecRef{reduced types}), so we would use the ``containment'' order on derivations. However, the ``recursive algorithm'' viewpoint is good enough for us. Induction over the natural numbers is covered in introductory books such as \cite{grimaldi}; for structural induction in formal logic, see something like~\cite{bradley2007calculus}. We will use structural induction over derivations again to study conformance paths in \SecRef{conformance paths exist}, encode finitely-presented monoids as protocols in \SecRef{monoidsasprotocols}, and finally present a correctness proof for the Requirement Machine in \SecRef{rqm correctness}.
+Formally, structural induction depends on a \index{well-founded order}well-founded order (\SecRef{reduced types}), so we would use the ``containment'' order on derivations. However, the ``recursive algorithm'' viewpoint is good enough for us. Induction over the natural numbers is covered in introductory books such as \cite{grimaldi}; for structural induction in formal logic, see something like~\cite{bradley2007calculus}. We will use structural induction over derivations again to study conformance paths in \SecRef{conformance paths exist}, encode finitely-presented monoids as protocols in \SecRef{monoidsasprotocols}, and finally present a correctness proof for the Requirement Machine in \ChapRef{symbols terms rules}.
 
 \medskip
 
 Before we end this section, we revisit \index{bound type parameter}bound and \index{unbound type parameter}unbound type parameters from \SecRef{type params}, and prove one final result. We previously claimed that every equivalence class of type parameters contains both a bound and unbound type parameter representative. This actually requires the assumption that our generic signature is well-formed.
 \begin{theorem}\label{bound and unbound equiv}
-Let $G$ be a well-formed \index{generic signature}generic signature, and suppose \texttt{T} is a \index{valid type parameter}valid type parameter of~$G$. Then, the \index{equivalence class}equivalence class of \texttt{T} also contains two type parameters (not necessarily unique), which we denote by $\texttt{T}^*$ and $\texttt{T}_*$, such that:
+Let $G$ be a well-formed \index{generic signature}generic signature, and suppose \tT\ is a \index{valid type parameter}valid type parameter of~$G$. Then, the \index{equivalence class}equivalence class of \tT\ also contains two type parameters (not necessarily unique), which we denote by $\tT^*$ and $\tT_*$, such that:
 \begin{enumerate}
-\item $\texttt{T}^*$ is a bound type parameter,
-\item $\texttt{T}_*$ is an unbound type parameter,
-\item $\texttt{T}^*$~and~$\texttt{T}_*$ have the same \index{type parameter length}length as~\texttt{T},
-\item $\texttt{T}^*\le\texttt{T}\le\texttt{T}_*$ under the type parameter order.
+\item $\tT^*$ is a bound type parameter,
+\item $\tT_*$ is an unbound type parameter,
+\item $\tT^*$~and~$\tT_*$ have the same \index{type parameter length}length as~\tT,
+\item $\tT^*\le\tT\le\tT_*$ under the type parameter order.
 \end{enumerate}
-Furthermore, if \texttt{T} is a \index{reduced type parameter}reduced type parameter, then $\texttt{T}^*$ is canonically equal to $\texttt{T}$, and thus every reduced type parameter of~$G$ is a bound type parameter.
+Furthermore, if \tT\ is a \index{reduced type parameter}reduced type parameter, then $\tT^*$ is canonically equal to $\tT$, and thus every reduced type parameter of~$G$ is a bound type parameter.
 \end{theorem}
 \begin{proof}
-We proceed by \index{induction}induction on the length of the type parameter~\texttt{T}. In the base case, we prove that the property holds for all generic parameters; in the inductive step, we prove it holds for any dependent member type whose base type again has the property.
+We proceed by \index{induction}induction on the length of the type parameter~\tT. In the base case, we prove that the property holds for all generic parameters; in the inductive step, we prove it holds for any dependent member type whose base type again has the property.
 
-\BaseCase If \texttt{T} is a generic parameter type \ttgp{d}{i}, we can set both $\texttt{T}^*$ and $\texttt{T}_*$ to~\texttt{T}, so $\texttt{T}^*\le\texttt{T}\le\texttt{T}_*$ holds. Then, we derive a trivial same-type requirement twice:
+\BaseCase If \tT\ is a generic parameter type \ttgp{d}{i}, we can set both $\tT^*$ and $\tT_*$ to~\tT, so $\tT^*\le\tT\le\tT_*$ holds. Then, we derive a trivial same-type requirement twice:
 \begin{gather*}
 \GenericStep{\ttgp{d}{i}}{1}\\
 \ReflexStep{1}{\ttgp{d}{i}}{2}\\
 \ReflexStep{1}{\ttgp{d}{i}}{3}
 \end{gather*}
 
-\InductiveStep Assume that \texttt{T} is a dependent member type, either \texttt{U.[P]A} (bound) or \texttt{U.A} (unbound), for some \texttt{U} and \texttt{A} of~\texttt{P}. We have $G\vdash\ConfReq{U}{P}$ because \texttt{T} is valid, and $G\vdash\texttt{U}$ because $\ConfReq{U}{P}$ is well-formed. The length of \texttt{U} is one less than the length of \texttt{T}, so the induction hypothesis then gives us a pair of same-type requirements $\SameReq{U}{$\texttt{U}^*$}$ and $\SameReq{U}{$\texttt{U}_*$}$, such that $\texttt{U}^*\le\texttt{U}\le\texttt{U}_*$. We set $\texttt{T}^*:=\texttt{U}^*\texttt{.[P]A}$ and $\texttt{T}_*:=\texttt{U}_*\texttt{.A}$, and derive three new same-type requirements via \IndexStep{SameDecl}\textsc{SameDecl}, \IndexStep{AssocBind}\textsc{AssocBind} and \IndexStep{SameName}\textsc{SameName}:
+\InductiveStep Assume that \tT\ is a dependent member type, either \texttt{U.[P]A} (bound) or \texttt{U.A} (unbound), for some \tU\ and \nA\ of~\tP. We have $G\vdash\ConfReq{U}{P}$ because \tT\ is valid, and $G\vdash\tU$ because $\ConfReq{U}{P}$ is well-formed. The length of \tU\ is one less than the length of \tT, so the induction hypothesis then gives us a pair of same-type requirements $\SameReq{U}{$\tU^*$}$ and $\SameReq{U}{$\tU_*$}$, such that $\tU^*\le\tU\le\tU_*$. We set $\tT^*:=\tU^*\texttt{.[P]A}$ and $\tT_*:=\tU_*\texttt{.A}$, and derive three new same-type requirements via \IndexStep{SameDecl}\textsc{SameDecl}, \IndexStep{AssocBind}\textsc{AssocBind} and \IndexStep{SameName}\textsc{SameName}:
 \begin{gather*}
-\SameDeclStep{$\SameReq{U}{$\texttt{U}^*$}$}{$\ConfReq{U}{P}$}{U.[P]A}{$\texttt{T}^*$}{1}\\
+\SameDeclStep{$\SameReq{U}{$\tU^*$}$}{$\ConfReq{U}{P}$}{U.[P]A}{$\tT^*$}{1}\\
 \AssocBindStep{$\ConfReq{U}{P}$}{U.[P]A}{U.A}{2}\\
-\SameNameStep{$\SameReq{U}{$\texttt{U}_*$}$}{$\ConfReq{U}{P}$}{U.A}{$\texttt{T}_*$}{3}
+\SameNameStep{$\SameReq{U}{$\tU_*$}$}{$\ConfReq{U}{P}$}{U.A}{$\tT_*$}{3}
 \end{gather*}
 From the definition of the type parameter order in \SecRef{reduced types}, we also see that:
-\[\texttt{T}^*\le\texttt{U.[P]A}<\texttt{U.A}\le\texttt{T}_*\]
+\[\tT^*\le\texttt{U.[P]A}<\texttt{U.A}\le\tT_*\]
 
-If $\texttt{T}$ is the bound dependent member type $\texttt{U.[P]A}$, we already have $\SameReq{T}{$\texttt{T}^*$}$ as~(1), but we must \IndexStep{Trans}derive $\SameReq{T}{$\texttt{T}_*$}$:
+If $\tT$ is the bound dependent member type $\texttt{U.[P]A}$, we already have $\SameReq{T}{$\tT^*$}$ as~(1), but we must \IndexStep{Trans}derive $\SameReq{T}{$\tT_*$}$:
 \[
-\TransStep{2}{3}{T}{$\texttt{T}_*$}{4}
+\TransStep{2}{3}{T}{$\tT_*$}{4}
 \]
 
-If $\texttt{T}$ is the unbound dependent member type $\texttt{U.A}$, we find ourselves in the opposite situation. We already have $\SameReq{T}{$\texttt{T}_*$}$ as~(3), but we derive $\SameReq{T}{$\texttt{T}^*$}$ with \IndexStep{Sym}\textsc{Sym} and \IndexStep{Trans}\textsc{Trans}:
+If $\tT$ is the unbound dependent member type $\texttt{U.A}$, we find ourselves in the opposite situation. We already have $\SameReq{T}{$\tT_*$}$ as~(3), but we derive $\SameReq{T}{$\tT^*$}$ with \IndexStep{Sym}\textsc{Sym} and \IndexStep{Trans}\textsc{Trans}:
 \begin{gather*}
 \SymStep{2}{U.[P]A}{T}{5}\\
-\TransStep{5}{1}{T}{$\texttt{T}^*$}{6}
+\TransStep{5}{1}{T}{$\tT^*$}{6}
 \end{gather*}
 
-This completes the induction. To prove the second part of the theorem, we further assume that \texttt{T} is reduced. By the preceding argument, we get a bound type parameter~$\texttt{T}^*$ such that $\texttt{T}^*\le\texttt{T}$. On the other hand, a reduced type parameter is the smallest element in its equivalence class, so $\texttt{T}\le\texttt{T}^*$. We conclude that $\texttt{T}^*$ is canonically equal to $\texttt{T}$ if~\texttt{T} is reduced.
+This completes the induction. To prove the second part of the theorem, we further assume that \tT\ is reduced. By the preceding argument, we get a bound type parameter~$\tT^*$ such that $\tT^*\le\tT$. On the other hand, a reduced type parameter is the smallest element in its equivalence class, so $\tT\le\tT^*$. We conclude that $\tT^*$ is canonically equal to $\tT$ if~\tT\ is reduced.
 \end{proof}
 
 \section{Requirement Minimization}\label{minimal requirements}
 
 The last step shown in \FigRef{inferred generic signature request figure}~and~\ref{abstract generic signature request figure} is called \IndexDefinition{requirement minimization}\emph{requirement minimization}. To finish building our generic signature, we must transform the list of desugared requirements into a list of \emph{minimal} requirements. These minimal requirements are then given to the \index{generic signature constructor}primitive constructor, together with the list of generic parameter types collected at the start of the process, and we have our generic signature!
 
-Because of the central role that generic signatures play in the Swift \index{ABI}ABI, it is worth describing the requirement minimization problem in the abstract, which is our goal in the present section. The implementation itself will be revealed in \PartRef{part rqm}, when we build a rewrite system from desugared requirements (\SecRef{building rules}) and then perform rewrite system minimization (\ChapRef{rqm minimization}). The material in this section was based on~\cite{gensig}, an earlier write-up about the \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder}.
+Because of the central role that generic signatures play in the Swift \index{ABI}ABI, it is worth describing the requirement minimization problem in the abstract, which is our goal in the present section. The implementation itself will be revealed in \PartRef{part rqm}, when we build a convergent rewriting system from desugared requirements (\SecRef{building rules}) and then perform rewrite rule minimization (\ChapRef{rqm minimization}). The material in this section was based on~\cite{gensig}, an earlier write-up about the \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder}.
 
 We can summarize the key behaviors of requirement minimization:
 \begin{enumerate}
@@ -879,7 +879,7 @@ Suppose we are given a derivation~$G_1\vdash D$, where $D$ is either a valid typ
 This is a derivation in $G_2$, and so the theory of $G_1$ is a subset of the theory of $G_2$. To get the other inclusion, we make the same argument but with $G_1$ and $G_2$ swapped, and use the third assumption in step~2 instead.
 \end{proof}
 
-Note that we do not attempt to delete ``redundant'' generic parameters. For example, \verb|<T, U where T: Sequence, U == T.Element>| and \verb|<T where T: Sequence>| are also ``equivalent'' in some broader sense, because any derivation in the former theory can be transformed into one for the latter by replacing \verb|U| with \verb|T.Element|. The latter is also more ``minimal'' because the calling convention for a function with this signature only needs to pass type metadata for \texttt{T}, rather than both \texttt{T} and \texttt{U}. Since we do not pursue this direction, our notion of equivalence bakes in the idea that both the original and minimal generic signatures have the same identical list of generic parameter types.
+Note that we do not attempt to delete ``redundant'' generic parameters. For example, \verb|<T, U where T: Sequence, U == T.Element>| and \verb|<T where T: Sequence>| are also ``equivalent'' in some broader sense, because any derivation in the former theory can be transformed into one for the latter by replacing \verb|U| with \verb|T.Element|. The latter is also more ``minimal'' because the calling convention for a function with this signature only needs to pass type metadata for \tT, rather than both \tT\ and \tU. Since we do not pursue this direction, our notion of equivalence bakes in the idea that both the original and minimal generic signatures have the same identical list of generic parameter types.
 
 We want requirement minimization to output a minimal generic signature that is equivalent, but there are two important exceptions to keep in mind:
 \begin{enumerate}
@@ -897,7 +897,7 @@ func uniqueElements1<T: Sequence>(_: T) -> Int
 \end{Verbatim}
 When building the generic signature of \texttt{uniqueElements1()}, we get two user-written requirements from type resolution in the \index{structural resolution stage}structural resolution stage:
 \[\{\ConfReq{T}{Sequence},\,\ConfReq{T.Element}{Hashable}\}\]
-The subject type of the second requirement is an \index{unbound dependent member type}unbound dependent member type formed from the \index{generic parameter type}generic parameter type \texttt{T} and identifier \texttt{Element}. We can replace the second requirement with $\ConfReq{T.[Sequence]Element}{Hashable}$; the latter's subject type is a bound dependent member type, formed from \texttt{T} and the associated type declaration \texttt{Element} of \texttt{Sequence}. To justify this, we can derive $\ConfReq{T.[Sequence]Element}{Hashable}$ from $\ConfReq{T.Element}{Hashable}$:
+The subject type of the second requirement is an \index{unbound dependent member type}unbound dependent member type formed from the \index{generic parameter type}generic parameter type \tT\ and identifier \texttt{Element}. We can replace the second requirement with $\ConfReq{T.[Sequence]Element}{Hashable}$; the latter's subject type is a bound dependent member type, formed from \tT\ and the associated type declaration \texttt{Element} of \texttt{Sequence}. To justify this, we can derive $\ConfReq{T.[Sequence]Element}{Hashable}$ from $\ConfReq{T.Element}{Hashable}$:
 \begin{gather*}
 \ConfStep{T.Element}{Hashable}{1}\\
 \ConfStep{T}{Sequence}{2}\\
@@ -937,21 +937,21 @@ This is a list of \emph{reduced} requirements, because the subject type of each 
 \begin{definition}\label{reduced requirement}
 Let $G$ be a generic signature, and let $R$ be an explicit requirement of~$G$. We say $R$ is a \IndexDefinition{reduced requirement}\emph{reduced requirement} if the following holds:
 \begin{itemize}
-\item For a \index{conformance requirement}\textbf{conformance requirement} $\ConfReq{T}{P}$: \texttt{T} is a reduced type parameter.
-\item For a \index{layout requirement}\textbf{layout requirement} $\ConfReq{T}{AnyObject}$: \texttt{T} is a reduced type parameter.
-\item For a \index{superclass requirement}\textbf{superclass requirement} $\ConfReq{T}{C}$: both \texttt{T} and \texttt{C} are reduced types.
-\item For a \index{same-type requirement}\textbf{same-type requirement} $\SameReq{T}{X}$ where \texttt{X} is a \textbf{concrete type}: \texttt{T} is a reduced type parameter and \texttt{X} is a reduced type.
-\item For a \textbf{same-type requirement} $\SameReq{T}{U}$ where \texttt{U} is a \textbf{type parameter}:
+\item For a \index{conformance requirement}\textbf{conformance requirement} $\TP$: \tT\ is a reduced type parameter.
+\item For a \index{layout requirement}\textbf{layout requirement} $\TAnyObject$: \tT\ is a reduced type parameter.
+\item For a \index{superclass requirement}\textbf{superclass requirement} $\TC$: both \tT\ and \texttt{C} are reduced types.
+\item For a \index{same-type requirement}\textbf{same-type requirement} $\TX$ where \texttt{X} is a \textbf{concrete type}: \tT\ is a reduced type parameter and \texttt{X} is a reduced type.
+\item For a \textbf{same-type requirement} $\TU$ where \tU\ is a \textbf{type parameter}:
 \begin{enumerate}
-\item $\texttt{T} < \texttt{U}$ under the \index{type parameter order}type parameter order.
-\item \texttt{T} is either a reduced type parameter, or identical to the right-hand side of some other (explicit) same-type requirement in~$G$.
-\item \texttt{T} is not identical to the left-hand side of any same-type requirement of~$G$.
-\item \texttt{U} has the property that the only derivations $G\vdash\SameReq{$\texttt{U}^\prime$}{U}$ where $\texttt{U}^\prime<\texttt{U}$ must involve the explicit requirement $\SameReq{T}{U}$ itself; that is, \texttt{U} cannot be further reduced by any other requirement of~$G$.
+\item $\tT\ < \tU$ under the \index{type parameter order}type parameter order.
+\item \tT\ is either a reduced type parameter, or identical to the right-hand side of some other (explicit) same-type requirement in~$G$.
+\item \tT\ is not identical to the left-hand side of any same-type requirement of~$G$.
+\item \tU\ has the property that the only derivations $G\vdash\SameReq{$\tU^\prime$}{U}$ where $\tU^\prime<\tU$ must involve the explicit requirement $\TU$ itself; that is, \tU\ cannot be further reduced by any other requirement of~$G$.
 \end{enumerate}
 \end{itemize}
 \end{definition}
 
-For a same-type requirement between type parameters, we cannot simply say that both sides are reduced type parameters, because the only way this can happen is if we have a trivial same-type requirement $\SameReq{T}{T}$ for some reduced type parameter~\texttt{T}. An example will clarify the situation. Recall this funny protocol from \SecRef{type params}:
+For a same-type requirement between type parameters, we cannot simply say that both sides are reduced type parameters, because the only way this can happen is if we have a trivial same-type requirement $\SameReq{T}{T}$ for some reduced type parameter~\tT. An example will clarify the situation. Recall this funny protocol from \SecRef{type params}:
 \begin{Verbatim}
 protocol N {
   associatedtype A: N
@@ -981,11 +981,12 @@ To better understand this generic signature, note that we can derive $\ConfReq{T
 \SameStep{T}{T.[N]A}{5}\\
 \SameConfStep{4}{5}{T}{N}{6}
 \end{gather*}
-Both \texttt{T} and \texttt{U} conform to $\protosym{N}$, so each has a member type named \texttt{A}, but because of our same-type requirements, these member types are equivalent to~\texttt{T}. We get this \index{type parameter graph}type parameter graph:
+Both \tT\ and \tU\ conform to $\protosym{N}$, so each has a member type named \nA, but because of our same-type requirements, these member types are equivalent to~\tT. We get this \index{type parameter graph}type parameter graph:
+\begin{ceqn}
 \[
 \begin{tikzpicture}
-\node (T) [interior] {\texttt{T}};
-\node (U) [interior, right=of T] {\texttt{U}};
+\node (T) [interior] {\tT};
+\node (U) [interior, right=of T] {\tU};
 
 \begin{scope}[on background layer]
 \path (U) edge [arrow] node [yshift=5pt] {\tiny{\texttt{.A}}} (T);
@@ -993,9 +994,10 @@ Both \texttt{T} and \texttt{U} conform to $\protosym{N}$, so each has a member t
 \end{scope}
 \end{tikzpicture}
 \]
+\end{ceqn}
 Next, we look at \texttt{Hook2}, which only differs in how the second same-type requirement is specified. We write the requirements of \texttt{Hook2} with bound dependent member types:
 \[\{\ConfReq{U}{N},\,\SameReq{T}{T.[N]A},\,\SameReq{U.[N]A}{T}\}\]
-The last requirement is not reduced, because $\texttt{U.[N]A}>\texttt{T}$. However, we can derive $\SameReq{T.[N]A}{U.[N]A}$, which is reduced, from $\SameReq{U.[N]A}{T}$:
+The last requirement is not reduced, because $\texttt{U.[N]A}>\tT$. However, we can derive $\SameReq{T.[N]A}{U.[N]A}$, which is reduced, from $\SameReq{U.[N]A}{T}$:
 \begin{gather*}
 \SameStep{U.[N]A}{T}{1}\\
 \SameStep{T}{T.[N]A}{2}\\
@@ -1011,7 +1013,7 @@ And vice versa:
 \end{gather*}
 This shows that \texttt{Hook1} and \texttt{Hook2} actually have the same minimal generic signature, which \texttt{-debug-generic-signatures} will confirm.
 
-There's a bit of history behind this test case. Our derivation of $\ConfReq{T}{N}$ involved the same-type requirement $\SameReq{T}{T.A}$, which contains a member type of \texttt{T}. This was too difficult for the \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder} to reason about, so we only accepted \texttt{Hook2} but not \texttt{Hook1}, despite \texttt{Hook1} being the one whose requirements are written in reduced form according to the rules of the Swift~\index{ABI}ABI. This bug was fixed with the Requirement Machine.
+There's a bit of history behind this test case. Our derivation of $\ConfReq{T}{N}$ involved the same-type requirement $\SameReq{T}{T.A}$, which contains a member type of \tT. This was too difficult for the \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder} to reason about, so we only accepted \texttt{Hook2} but not \texttt{Hook1}, despite \texttt{Hook1} being the one whose requirements are written in reduced form according to the rules of the Swift~\index{ABI}ABI. This bug was fixed with the Requirement Machine.
 
 \paragraph{Minimal requirements.} Here is another variant of a function we saw earlier:
 \begin{Verbatim}
@@ -1060,11 +1062,12 @@ Notice that we have an explicit requirement $\ConfReq{T}{N}$, and we can also de
 \SameStep{U}{T.[N]A}{3}\\
 \SameConfStep{2}{3}{U}{N}{4}
 \end{gather*}
-We will now show the type parameter graph for \texttt{Knot1}. The requirements look similar to \texttt{Hook1} because we have two equivalence classes that have a member type named~\texttt{A}, but the same-type requirements act in a different way. Each member type~\texttt{A} now takes us to \emph{opposite} equivalence class:
+We will now show the type parameter graph for \texttt{Knot1}. The requirements look similar to \texttt{Hook1} because we have two equivalence classes that have a member type named~\nA, but the same-type requirements act in a different way. Each member type~\nA\ now takes us to \emph{opposite} equivalence class:
+\begin{ceqn}
 \[
 \begin{tikzpicture}
-\node (T) [interior] {\texttt{T}};
-\node (U) [interior, right=of T] {\texttt{U}};
+\node (T) [interior] {\tT};
+\node (U) [interior, right=of T] {\tU};
 
 \begin{scope}[on background layer]
 \path (T) edge [arrow, bend left] node [yshift=5pt] {\tiny{\texttt{.A}}} (U);
@@ -1072,6 +1075,7 @@ We will now show the type parameter graph for \texttt{Knot1}. The requirements l
 \end{scope}
 \end{tikzpicture}
 \]
+\end{ceqn}
 Now, consider \texttt{Knot2}. Here is our list of reduced requirements:
 \[\{\SameReq{T}{U.[N]A},\,\ConfReq{U}{N},\,\SameReq{U}{T.[N]A}\}\]
 This list is again minimal, so we get the following generic signature for \texttt{Knot2}:
@@ -1118,24 +1122,24 @@ The important invariant that we do maintain, to make \index{textual interface}te
 
 \paragraph{Conflicting requirements.} In the previous section, we related the idea of the \index{well-formed substitution map}well-formed substitution map (\DefRef{valid subst map}) and the well-formed generic signature (\DefRef{valid generic signature def}); a necessary condition for a generic signature to have any well-formed substitution maps at all, is for it to be a well-formed generic signature.
 
-If we limit ourselves to the subset of the language with only \index{conformance requirement}conformance requirements and \index{same-type requirement}same-type requirements between type parameters, this condition is also sufficient, meaning we can mechanically construct a well-formed substitution map for a well-formed generic signature. We first declare a single concrete nominal type, call it struct~\texttt{S}, and conform \texttt{S} to each protocol $\texttt{P}_i$ that our generic signature~$G$ depends on:
+If we limit ourselves to the subset of the language with only \index{conformance requirement}conformance requirements and \index{same-type requirement}same-type requirements between type parameters, this condition is also sufficient, meaning we can mechanically construct a well-formed substitution map for a well-formed generic signature. We first declare a single concrete nominal type, call it struct~\texttt{S}, and conform \texttt{S} to each protocol $\tP_i$ that our generic signature~$G$ depends on:
 \begin{itemize}
-\item Any \index{function declaration}method, \index{variable declaration}variable and \index{subscript declaration}subscript requirements of $\texttt{P}_i$ can be witnessed by stub implementations that call \texttt{fatalError()}.
-\item Any \index{associated type declaration}associated types of $\texttt{P}_i$ can be witnessed by type alias members of~\texttt{S} declared to have underlying type \texttt{S}.
+\item Any \index{function declaration}method, \index{variable declaration}variable and \index{subscript declaration}subscript requirements of $\tP_i$ can be witnessed by stub implementations that call \texttt{fatalError()}.
+\item Any \index{associated type declaration}associated types of $\tP_i$ can be witnessed by type alias members of~\texttt{S} declared to have underlying type \texttt{S}.
 \end{itemize}
-We then build a substitution map for $G$ by replacing each generic parameter type with \texttt{S} and each conformance requirement with the corresponding \index{normal conformance}normal conformance $\ConfReq{S}{$\texttt{P}_i$}$. Every derived requirement of~$G$ has the form $\ConfReq{T}{$\texttt{P}_i$}$ for some type parameter \texttt{T} and protocol $\texttt{T}_i$, or $\SameReq{T}{U}$ for a pair of type parameters \texttt{T} and \texttt{U}. Applying our substitution map, we always get either $\ConfReq{S}{$\texttt{P}_i$}$ or $\SameReq{S}{S}$. Both requirements are satisfied no matter what, so our substitution map is well-formed.
+We then build a substitution map for $G$ by replacing each generic parameter type with \texttt{S} and each conformance requirement with the corresponding \index{normal conformance}normal conformance $\ConfReq{S}{$\tP_i$}$. Every derived requirement of~$G$ has the form $\ConfReq{T}{$\tP_i$}$ for some type parameter \tT\ and protocol $\tT_i$, or $\TU$ for a pair of type parameters \tT\ and \tU. Applying our substitution map, we always get either $\ConfReq{S}{$\tP_i$}$ or $\SameReq{S}{S}$. Both requirements are satisfied no matter what, so our substitution map is well-formed.
 
 With \index{superclass requirement}superclass, \index{layout requirement}layout, and concrete \index{same-type requirement}same-type requirements, the picture is more complicated. When type parameters are required to have specific concrete types, we cannot ``collapse'' the entire generic signature down to a single point. Indeed, as we said, \index{conflicting requirement}\emph{conflicting requirements} might prevent our generic signature from being \index{satisfied requirement}satisfied by \emph{any} substitution map. There is another complication. While we can write derivations involving these ``exotic'' \index{requirement kind}requirement kinds, \index{limitation!derived requirements}certain \index{inference rule}inference rules are missing. The \index{type substitution}type substitution algebra will fill in some of these gaps.
 
-Suppose that $\Sigma$ is a substitution map where all replacement types are \index{fully-concrete type}fully concrete, so we can apply $\Sigma$ to a requirement and then apply \AlgRef{reqissatisfied} to check if its satisfied. Further, let's say that we can derive two concrete \index{same-type requirement}same-type requirements, where both have the same subject type parameter~\texttt{T} of $G$:
+Suppose that $\Sigma$ is a substitution map where all replacement types are \index{fully-concrete type}fully concrete, so we can apply $\Sigma$ to a requirement and then apply \AlgRef{reqissatisfied} to check if its satisfied. Further, let's say that we can derive two concrete \index{same-type requirement}same-type requirements, where both have the same subject type parameter~\tT\ of $G$:
 \begin{gather*}
 \AnyStep{\SameReq{T}{$\texttt{X}_1$}}{1}\\
 \AnyStep{\SameReq{T}{$\texttt{X}_2$}}{2}
 \end{gather*}
-(Note that with our existing inference rules, each requirement is either explicit, or an associated requirement of a protocol after substitution of \texttt{Self}; there are no other ways to ``compose'' concrete same-type requirements right now.) We can apply $\Sigma$ to both requirements to get a pair of substituted requirements:
-\[ \SameReq{$\texttt{T}\otimes\Sigma$}{$\texttt{X}_1\otimes\Sigma$}\qquad\text{and}\qquad
-   \SameReq{$\texttt{T}\otimes\Sigma$}{$\texttt{X}_2\otimes\Sigma$}. \]
-If $\Sigma$ is a \index{well-formed substitution map}well-formed substitution map, it must satisfy both substituted requirements; that is, $\texttt{T}\otimes\Sigma$ must be \index{canonical type equality}canonically equal to $\texttt{X}_1\otimes\Sigma$, and also $\texttt{T}\otimes\Sigma$ must be canonically equal to $\texttt{X}_2\otimes\Sigma$. But canonical type equality is \index{transitive relation}transitive, so it follows that $\texttt{X}_1\otimes\Sigma$ must be canonically equal to $\texttt{X}_2\otimes\Sigma$.
+(Note that with our existing inference rules, each requirement is either explicit, or an associated requirement of a protocol after substitution of \tSelf; there are no other ways to ``compose'' concrete same-type requirements right now.) We can apply $\Sigma$ to both requirements to get a pair of substituted requirements:
+\[ \SameReq{$\tT\otimes\Sigma$}{$\texttt{X}_1\otimes\Sigma$}\qquad\text{and}\qquad
+   \SameReq{$\tT\otimes\Sigma$}{$\texttt{X}_2\otimes\Sigma$}. \]
+If $\Sigma$ is a \index{well-formed substitution map}well-formed substitution map, it must satisfy both substituted requirements; that is, $\tT\otimes\Sigma$ must be \index{canonical type equality}canonically equal to $\texttt{X}_1\otimes\Sigma$, and also $\tT\otimes\Sigma$ must be canonically equal to $\texttt{X}_2\otimes\Sigma$. But canonical type equality is \index{transitive relation}transitive, so it follows that $\texttt{X}_1\otimes\Sigma$ must be canonically equal to $\texttt{X}_2\otimes\Sigma$.
 
 In other words, a necessary condition for $\Sigma$ to be well-formed is that it must satisfy the requirement $\SameReq{$\texttt{X}_1$}{$\texttt{X}_2$}\otimes\Sigma$. Now, $\SameReq{$\texttt{X}_1$}{$\texttt{X}_2$}$ is not a derived requirement of~$G$, because it has a concrete type on both sides. However, we know what to do if the user writes such a requirement directly; we apply \AlgRef{desugar same type algo}. If we do the same here, each of the possible outcomes gives us further information about~$G$:
 \begin{itemize}
@@ -1143,7 +1147,7 @@ In other words, a necessary condition for $\Sigma$ to be well-formed is that it 
 
 \item Otherwise, we always obtain a simpler list of requirements $\{R_1,\ldots,R_n\}$ with the property that $\Sigma$ satisfies $\SameReq{$\texttt{X}_1$}{$\texttt{X}_2$}$ if and only if it satisfies $R_i$ for all $1\le i\le n$. If one of the original derived requirements was actually an explicit requirement of~$G$, we can replace it with $\{R_1,\ldots,R_n\}$ without changing the ``intended meaning'' of the generic signature. (This might change the theory though, but only because our theory is missing some \index{inference rule}inference rules, as we already said.)
 \end{itemize}
-Let's revisit \ExRef{concrete type query example}. We declare a protocol \texttt{Foo} with two associated types, together with an associated same-type requirement $\SameReq{Self.A}{Array<Self.B>}_\texttt{Foo}$:
+Let's revisit \ExRef{concrete type query example}. We declare a protocol \texttt{Foo} with two associated types, together with an associated same-type requirement $\AssocSameReq{Self.A}{Array<Self.B>}{Foo}$:
 \begin{Verbatim}
 protocol Foo {
   associatedtype A where A == Array<B>
@@ -1154,7 +1158,7 @@ Now, consider this function:
 \begin{Verbatim}
 func f1<T: Foo>(_: T) where T.A == Array<Int> {}
 \end{Verbatim}
-We can derive two concrete same-type requirements involving \texttt{T}; the first one is explicit, the second is a consequence of the associated same-type requirement in~\texttt{Foo}:
+We can derive two concrete same-type requirements involving \tT; the first one is explicit, the second is a consequence of the associated same-type requirement in~\texttt{Foo}:
 \begin{gather*}
 \ConcreteStep{T.A}{Array<Int>}{1}\\
 \ConfStep{T}{Foo}{2}\\
@@ -1204,17 +1208,17 @@ We now state the general definition.
 Let $G$ be a well-formed \index{generic signature}generic signature. If $G$ has a pair of \index{derived requirement}derived requirements $R_1$~and~$R_2$ where $R_1\otimes\Sigma$ and $R_2\otimes\Sigma$ cannot both be \index{satisfied requirement}satisfied by the same substitution map~$\Sigma$, then $R_1$~and~$R_2$ define a pair of \IndexDefinition{conflicting requirement}\emph{confliciting requirements}. A generic signature $G$ is \emph{conflict-free} if it does not have any pairs of conflicting requirements. The pairs of derived requirements that can lead to conflicts are enumerated below:
 \begin{enumerate}
 \item For two concrete \index{same-type requirement}same-type requirements $\SameReq{T}{$\texttt{X}_1$}$ and $\SameReq{T}{$\texttt{X}_2$}$, we desugar the ``combined'' requirement $\SameReq{$\texttt{X}_1$}{$\texttt{X}_2$}$, as we already saw. Here and every remaining case below, desugaring will either detect a conflict, or produce a simpler list of requirements that can replace one of the two original requirements.
-\item For a concrete same-type requirement $\SameReq{T}{X}$ and superclass requirement $\ConfReq{T}{C}$, we desugar $\ConfReq{X}{C}$, which can be satisfied only if~\texttt{X} is a class type that is also a subclass of~\texttt{C}.
-\item For a same-type requirement $\SameReq{T}{X}$ and a \index{layout requirement}layout requirement $\ConfReq{T}{AnyObject}$, we desugar $\ConfReq{X}{AnyObject}$, which can be satisfied only if \texttt{X} is a class type.
-\item For a same-type requirement $\SameReq{T}{X}$ and a \index{conformance requirement}conformance requirement $\ConfReq{T}{P}$, we desugar $\ConfReq{X}{P}$, which can be satisfied only if \texttt{X} conforms to \texttt{P}.
+\item For a concrete same-type requirement $\TX$ and superclass requirement $\TC$, we desugar $\ConfReq{X}{C}$, which can be satisfied only if~\texttt{X} is a class type that is also a subclass of~\texttt{C}.
+\item For a same-type requirement $\TX$ and a \index{layout requirement}layout requirement $\TAnyObject$, we desugar $\ConfReq{X}{AnyObject}$, which can be satisfied only if \texttt{X} is a class type.
+\item For a same-type requirement $\TX$ and a \index{conformance requirement}conformance requirement $\TP$, we desugar $\ConfReq{X}{P}$, which can be satisfied only if \texttt{X} conforms to \tP.
 \item For two \index{superclass requirement}superclass requirements $\ConfReq{T}{$\texttt{C}_1$}$ and $\ConfReq{T}{$\texttt{C}_2$}$, we must consider the \index{superclass type}superclass relationship between the declarations of $\texttt{C}_1$~and~$\texttt{C}_2$:
 \begin{enumerate}
 \item If the \index{class declaration}class declaration of $\texttt{C}_1$ is a subclass of the declaration of $\texttt{C}_2$, we desugar $\ConfReq{$\texttt{C}_1$}{$\texttt{C}_2$}$, and $\ConfReq{T}{$\texttt{C}_2$}$ becomes redundant.
 \item If the class declaration of $\texttt{C}_2$ is a subclass of the declaration of $\texttt{C}_1$, we desugar $\ConfReq{$\texttt{C}_2$}{$\texttt{C}_1$}$, and $\ConfReq{T}{$\texttt{C}_1$}$ becomes redundant.
 \item If the two declarations are unrelated, the requirements conflict.
 \end{enumerate}
-\item For a superclass requirement $\ConfReq{T}{C}$ and a layout requirement $\ConfReq{T}{AnyObject}$, we desugar $\ConfReq{C}{AnyObject}$, which is always satisfied and cannot conflict.
-\item For a superclass requirement $\ConfReq{T}{C}$ and a conformance requirement $\ConfReq{T}{P}$, we desugar $\ConfReq{C}{P}$. If \texttt{C} conforms to \texttt{P}, the conformance requirement $\ConfReq{T}{P}$ becomes redundant. However, if \texttt{C} does not conform to \texttt{P}, there is no conflict; the generic signature just requires a subclass of \texttt{C} that \emph{also} conforms to \texttt{P}.
+\item For a superclass requirement $\TC$ and a layout requirement $\TAnyObject$, we desugar $\ConfReq{C}{AnyObject}$, which is always satisfied and cannot conflict.
+\item For a superclass requirement $\TC$ and a conformance requirement $\TP$, we desugar $\ConfReq{C}{P}$. If \texttt{C} conforms to \tP, the conformance requirement $\TP$ becomes redundant. However, if \texttt{C} does not conform to \tP, there is no conflict; the generic signature just requires a subclass of \texttt{C} that \emph{also} conforms to \tP.
 \end{enumerate}
 \end{definition}
 
@@ -1237,7 +1241,7 @@ We will explain how the implementation deals with superclass, layout and concret
 \end{center}
 \end{wrapfigure}
 
-Our next example involves superclass requirements. While a description of generic classes awaits us in \ChapRef{classinheritance}, we only need non-generic classes to demonstrate the key ideas in requirement minimization. Since it is such a clich\'e at this point, we're going to follow the trend and go with the classic object oriented ``shape hierarchy'', shown on the right. We also introduce a \texttt{Canvas} protocol, which subjects it associated type to an \index{associated superclass requirement}associated superclass requirement $\ConfReq{Self.Boundary}{Polygon}_\texttt{Canvas}$:
+Our next example involves superclass requirements. While a description of generic classes awaits us in \ChapRef{classinheritance}, we only need non-generic classes to demonstrate the key ideas in requirement minimization. Since it is such a clich\'e at this point, we're going to follow the trend and go with the classic object oriented ``shape hierarchy'', shown on the right. We also introduce a \texttt{Canvas} protocol, which subjects it associated type to an \index{associated superclass requirement}associated superclass requirement $\AssocConfReq{Self.Boundary}{Polygon}{Canvas}$:
 
 \begin{Verbatim}
 class Shape {}
@@ -1303,7 +1307,7 @@ Otherwise, both requirements have the same subject type and the same kind.
 \end{enumerate}
 \end{algorithm}
 
-\paragraph{Requirement signatures.} The \index{associated requirement}associated requirements in a protocol's \index{requirement signature}requirement signature are minimized just like the explicit requirements of a generic signature. The proof of \PropRef{equiv generic signatures} can be tweaked slightly to instead use a \index{equivalence relation}equivalence relation on requirement signatures. (The key idea is that for every associated requirement of a protocol~\texttt{P}, we can derive the corresponding requirement in the \index{protocol generic signature}protocol generic signature~$\GP$.) Minimal and reduced associated requirements are defined in the same way, and the \index{requirement signature request}\Request{requirement signature request} always outputs a \IndexDefinition{minimal requirement signature}minimal requirement signature. We can describe the \index{conflicting requirement}conflicts among the associated requirements using \DefRef{conflicting req def}, and finally, sort the minimal associated requirements in a requirement signature using \AlgRef{requirement order}.
+\paragraph{Requirement signatures.} The \index{associated requirement}associated requirements in a protocol's \index{requirement signature}requirement signature are minimized just like the explicit requirements of a generic signature. The proof of \PropRef{equiv generic signatures} can be tweaked slightly to instead use a \index{equivalence relation}equivalence relation on requirement signatures. (The key idea is that for every associated requirement of a protocol~\tP, we can derive the corresponding requirement in the \index{protocol generic signature}protocol generic signature~$\GP$.) Minimal and reduced associated requirements are defined in the same way, and the \index{requirement signature request}\Request{requirement signature request} always outputs a \IndexDefinition{minimal requirement signature}minimal requirement signature. We can describe the \index{conflicting requirement}conflicts among the associated requirements using \DefRef{conflicting req def}, and finally, sort the minimal associated requirements in a requirement signature using \AlgRef{requirement order}.
 
 The major difference is that we must minimize all requirement signatures of a set of mutually-dependent protocols, or a \index{protocol component}\emph{protocol component}, simultaneously. We will discuss this again in \SecRef{protocol component} and see an example in \SecRef{homotopy reduction}.
 
@@ -1350,7 +1354,7 @@ A reference to a \texttt{where} clause attached to a declaration, This is a wrap
 \item A \texttt{GenericContext} representing a generic declaration.
 \item An \texttt{AssociatedTypeDecl}, which can also have a \texttt{where} clause despite not being a \texttt{GenericContext}.
 \item A \texttt{GenericParamList}, which only has a \texttt{where} clause in textual SIL.
-\item A \texttt{SpecializeAttr} representing a \texttt{@\_specialize} attribute.
+\item A \texttt{SpecializeAttr} representing a \verb|@_specialize| attribute.
 \item An instance of a \texttt{TrailingWhereClause}, which is the primitive form for several of the above.
 \end{itemize}
 A pair of methods are defined for working with the requirements in the \texttt{where} clause:
@@ -1379,7 +1383,7 @@ Error flags returned by \texttt{AbstractGenericSignatureRequest}. We will see th
 \begin{itemize}
 \item \texttt{HasInvalidRequirements}: the original requirements were not \IndexSource{well-formed requirement}well-formed, or were in \IndexSource{conflicting requirement}conflict with each other. Any errors in the requirements handed to this request usually mean there was another error diagnosed elsewhere, like an invalid conformance, so this flag being set is not really actionable to the rest of the compiler. Without source location information, this error cannot be diagnosed in a friendly manner.
 \item \texttt{HasConcreteConformances}: the generic signature had non-redundant concrete conformance requirements, which is an internal flag used to prevent the requirement machine from being installed. It does not indicate an error condition to the caller. See \SecRef{concrete contraction} for discussion.
-\item \texttt{CompletionFailed}: the \index{completion}completion procedure could not construct a \index{confluence}convergent \index{rewrite system}rewrite system within the maximum number of steps (see the discussion of termination that immediately follows \AlgRef{knuthbendix}). This is actually fatal, so the \texttt{buildGenericSignature()} wrapper function aborts the compiler in this case.
+\item \texttt{CompletionFailed}: the \index{completion}completion procedure could not construct a \index{convergent rewriting system}convergent rewriting system within the maximum number of steps (see the discussion of termination that immediately follows \AlgRef{knuthbendix}). This is actually fatal, so the \texttt{buildGenericSignature()} wrapper function aborts the compiler in this case.
 \end{itemize}
 
 \IndexSource{requirement signature constructor}
