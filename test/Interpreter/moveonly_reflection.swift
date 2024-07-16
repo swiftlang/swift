@@ -11,6 +11,11 @@
 
 // REQUIRES: executable_test
 
+// Simulators and devices don't appear to have the 'not' binary in their PATH
+// to handle tests that intentionally crash such as this.
+// UNSUPPORTED: DARWIN_SIMULATOR={{.*}}
+// UNSUPPORTED: remote_run || device_run
+
 enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)
   case none
