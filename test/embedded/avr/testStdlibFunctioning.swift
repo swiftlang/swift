@@ -1,5 +1,5 @@
 // RUN: %swift-frontend -emit-ir %s -target avr-none-none-elf \
-//   -wmo -enable-experimental-feature Embedded
+// RUN:   -wmo -enable-experimental-feature Embedded
 // REQUIRES: embedded_stdlib_cross_compiling
 
 import Swift
