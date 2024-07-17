@@ -59,7 +59,6 @@ namespace irgen {
   class IRGenModule;
   class LinkEntity;
   class LocalTypeDataCache;
-  class MetadataDependencyCollector;
   class MetadataResponse;
   class Scope;
   class TypeInfo;
@@ -393,12 +392,6 @@ public:
   FunctionPointer emitValueWitnessFunctionRef(SILType type,
                                               llvm::Value *&metadataSlot,
                                               ValueWitness index);
-
-  void emitInitializeFieldOffsetVector(SILType T,
-                                       llvm::Value *metadata,
-                                       bool isVWTMutable,
-                                       MetadataDependencyCollector *collector);
-
 
   llvm::Value *optionallyLoadFromConditionalProtocolWitnessTable(
     llvm::Value *wtable);

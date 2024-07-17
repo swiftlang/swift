@@ -256,7 +256,7 @@ struct ObjCInterfaceAndImplementation final {
   ObjCInterfaceAndImplementation()
       : interfaceDecls(), implementationDecl(nullptr) {}
 
-  bool empty() const {
+  operator bool() const {
     return interfaceDecls.empty();
   }
 

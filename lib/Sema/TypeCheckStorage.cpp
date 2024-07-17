@@ -3510,7 +3510,8 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
 
       // @_objcImplementation extensions on a non-category can declare stored
       // properties; StoredPropertiesRequest knows to look for them there.
-      if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty())
+      if (ext->isObjCImplementation() &&
+          ext->getCategoryNameForObjCImplementation() == Identifier())
         return;
 
       storage->diagnose(diag::extension_stored_property);
