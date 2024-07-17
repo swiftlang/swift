@@ -221,12 +221,25 @@ public:
       return sei->getCase(i);
     return value.get<SelectEnumAddrInst *>()->getCase(i);
   }
+
+  std::pair<EnumElementDecl *, Operand *> getCaseOperand(unsigned i) const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseOperand(i);
+    return value.get<SelectEnumAddrInst *>()->getCaseOperand(i);
+  }
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCaseResult(D);
     return value.get<SelectEnumAddrInst *>()->getCaseResult(D);
+  }
+
+  Operand *getCaseResultOperand(EnumElementDecl *D) {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseResultOperand(D);
+    return value.get<SelectEnumAddrInst *>()->getCaseResultOperand(D);
   }
 
   /// If the default refers to exactly one case decl, return it.
@@ -242,6 +255,12 @@ public:
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getDefaultResult();
     return value.get<SelectEnumAddrInst *>()->getDefaultResult();
+  }
+
+  Operand *getDefaultResultOperand() const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getDefaultResultOperand();
+    return value.get<SelectEnumAddrInst *>()->getDefaultResultOperand();
   }
 };
 

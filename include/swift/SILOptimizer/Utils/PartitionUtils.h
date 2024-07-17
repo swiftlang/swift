@@ -510,15 +510,23 @@ private:
            "Transfer needs a sourceInst");
   }
 
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
+              Operand *sourceOp = nullptr)
+      : opKind(opKind), opArgs({arg1, arg2}), source(sourceOp) {
+    assert((opKind == PartitionOpKind::Assign ||
+            opKind == PartitionOpKind::Merge) &&
+           "Only supported for assign and merge");
+  }
+
   PartitionOp(PartitionOpKind opKind, SILInstruction *sourceInst)
       : opKind(opKind), opArgs(), source(sourceInst) {}
 
   friend class Partition;
 
 public:
-  static PartitionOp Assign(Element tgt, Element src,
-                            SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Assign, tgt, src, sourceInst);
+  static PartitionOp Assign(Element destElt, Element srcElt,
+                            Operand *srcOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::Assign, destElt, srcElt, srcOperand);
   }
 
   static PartitionOp AssignFresh(Element tgt,
@@ -535,9 +543,10 @@ public:
     return PartitionOp(PartitionOpKind::UndoTransfer, tgt, untransferringInst);
   }
 
-  static PartitionOp Merge(Element tgt1, Element tgt2,
-                           SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Merge, tgt1, tgt2, sourceInst);
+  static PartitionOp Merge(Element destElement, Element srcElement,
+                           Operand *sourceOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::Merge, destElement, srcElement,
+                       sourceOperand);
   }
 
   static PartitionOp Require(Element tgt,
