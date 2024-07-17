@@ -805,6 +805,10 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance/embedded diagnostics if not in WMO mode. Building in
+    // non-WMO mode currently results in false positives.
+    if (!module->isWholeModule()) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @_section, @_silgen_name is only on constant globals
