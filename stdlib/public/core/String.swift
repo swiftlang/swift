@@ -810,7 +810,7 @@ extension String {
   ///   - scalars: A sequence of Unicode scalar values.
   ///
   @inlinable
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public init(
     _ scalars: consuming Unicode.NormalizedScalars<some Sequence>.NFC
   ) {
@@ -829,7 +829,7 @@ extension String {
   ///   - scalars: A sequence of Unicode scalar values.
   ///
   @inlinable
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public init(
     _ scalars: consuming Unicode.NormalizedScalars<some Sequence>.NFKC
   ) {

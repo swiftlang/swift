@@ -30,7 +30,7 @@ extension Sequence<Unicode.Scalar> {
   /// aString.unicodeScalars.isNormalized(.nfc) // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable
   public consuming func isNormalized(
     _ form: Unicode.CanonicalNormalizationForm
@@ -53,7 +53,7 @@ extension Sequence<Unicode.Scalar> {
   /// aString.unicodeScalars.isNormalized(.nfc)  // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable
   public consuming func isNormalized(
     _ form: Unicode.CompatibilityNormalizationForm
@@ -79,7 +79,7 @@ extension Collection<Unicode.Scalar> {
   /// aString.unicodeScalars.isNormalized(.nfc) // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable
   public func isNormalized(
     _ form: Unicode.CanonicalNormalizationForm
@@ -102,7 +102,7 @@ extension Collection<Unicode.Scalar> {
   /// aString.unicodeScalars.isNormalized(.nfc)  // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable
   public func isNormalized(
     _ form: Unicode.CompatibilityNormalizationForm
@@ -128,7 +128,7 @@ extension StringProtocol {
   /// aString.isNormalized(.nfc) // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
   public func isNormalized(
@@ -149,7 +149,7 @@ extension StringProtocol {
   /// aString.isNormalized(.nfc)  // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
   public func isNormalized(
@@ -173,7 +173,7 @@ extension Character {
   /// char.isNormalized(.nfc) // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func isNormalized(
     _ form: Unicode.CanonicalNormalizationForm
   ) -> Bool {
@@ -192,7 +192,7 @@ extension Character {
   /// char.isNormalized(.nfc)  // true
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func isNormalized(
     _ form: Unicode.CompatibilityNormalizationForm
   ) -> Bool {
@@ -210,14 +210,14 @@ extension Unicode.Scalar {
 
   // ABI barrier for data required by the NFD Quick Check algorithm.
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal typealias _NFDQuickCheckData = (
     CCC: Unicode.CanonicalCombiningClass,
     isNFDQC: Bool
   )
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal func _getNFDQuickCheckData() -> _NFDQuickCheckData {
     let normdata = Unicode._CanonicalNormData(self)
@@ -227,7 +227,7 @@ extension Unicode.Scalar {
 
 extension Sequence<Unicode.Scalar> {
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable
   internal consuming func _isNFD() -> Bool {
 
@@ -262,14 +262,14 @@ extension Unicode.Scalar {
 
   // ABI barrier for data required by the NFKD Quick Check algorithm.
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal typealias _NFKDQuickCheckData = (
     CCC: Unicode.CanonicalCombiningClass,
     isNFKDQC: Bool
   )
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal func _getNFKDQuickCheckData() -> _NFKDQuickCheckData {
     let normdata = Unicode._CompatibilityNormData(self)
@@ -279,7 +279,7 @@ extension Unicode.Scalar {
 
 extension Sequence<Unicode.Scalar> {
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable
   internal consuming func _isNFKD() -> Bool {
 
@@ -314,14 +314,14 @@ extension Unicode.Scalar {
 
   // ABI barrier for data required by the NFC Quick Check algorithm.
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal typealias _NFCQuickCheckData = (
     CCC: Unicode.CanonicalCombiningClass,
     isNFCQC: Unicode.NFCQCResult
   )
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal func _getNFCQuickCheckData() -> _NFCQuickCheckData {
     let normdata = Unicode._CanonicalNormData(onlyCCCAndNFCQC: self)
@@ -331,7 +331,7 @@ extension Unicode.Scalar {
 
 extension Collection<Unicode.Scalar> {
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable @inline(never)
   internal func _isNFC() -> Bool {
 
@@ -389,7 +389,7 @@ extension Collection<Unicode.Scalar> {
 
 extension Sequence<Unicode.Scalar> {
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable @inline(never)
   internal consuming func _isNFC() -> Bool {
 
@@ -451,7 +451,7 @@ extension Sequence<Unicode.Scalar> {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+// @available(SwiftStdlib 9999, *)
 @inlinable
 internal func _isNFC_sequence_slow(
   segment: some Collection<Unicode.Scalar>,
@@ -480,14 +480,14 @@ extension Unicode.Scalar {
 
   // ABI barrier for data required by the NFKC Quick Check algorithm.
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal typealias _NFKCQuickCheckData = (
     CCC: Unicode.CanonicalCombiningClass,
     isNFKCQC: Unicode.NFCQCResult
   )
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @usableFromInline
   internal func _getNFKCQuickCheckData() -> _NFKCQuickCheckData {
     let normdata = Unicode._CompatibilityNormData(self)
@@ -497,7 +497,7 @@ extension Unicode.Scalar {
 
 extension Collection<Unicode.Scalar> {
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable @inline(never)
   internal func _isNFKC() -> Bool {
 
@@ -555,7 +555,7 @@ extension Collection<Unicode.Scalar> {
 
 extension Sequence<Unicode.Scalar> {
 
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @inlinable @inline(never)
   internal consuming func _isNFKC() -> Bool {
 
@@ -617,7 +617,7 @@ extension Sequence<Unicode.Scalar> {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+// @available(SwiftStdlib 9999, *)
 @inlinable
 internal func _isNFKC_sequence_slow(
   segment: some Collection<Unicode.Scalar>,

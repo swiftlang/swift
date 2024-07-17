@@ -545,7 +545,7 @@ extension Unicode.Scalar {
   /// Scalars which are unassigned in this version of Unicode
   /// may be meaningful to applications using a later version of the standard.
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public var isUnassigned: Bool {
 
     // Accurate for Unicode 14.0 and later.

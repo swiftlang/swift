@@ -31,7 +31,7 @@ extension Unicode {
   /// allow one to choose whether the result contains the composed (NFC)
   /// or decomposed (NFD) representations of these characters.
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @frozen
   public enum CanonicalNormalizationForm {
 
@@ -74,7 +74,7 @@ extension Unicode {
   /// allow one to choose whether the result contains the composed (NFKC)
   /// or decomposed (NFKD) representations of these characters.
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   @frozen
   public enum CompatibilityNormalizationForm {
 
@@ -132,7 +132,7 @@ extension StringProtocol {
   ///
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func normalized(
     _ form: Unicode.CanonicalNormalizationForm
   ) -> String {
@@ -230,7 +230,7 @@ extension StringProtocol {
   ///
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func stableNormalization(
     _ form: Unicode.CanonicalNormalizationForm
   ) -> String? {
@@ -291,7 +291,7 @@ extension StringProtocol {
   ///
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func normalized(
     _ form: Unicode.CompatibilityNormalizationForm
   ) -> String {
@@ -362,7 +362,7 @@ extension StringProtocol {
   ///
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func stableNormalization(
     _ form: Unicode.CompatibilityNormalizationForm
   ) -> String? {

@@ -270,10 +270,102 @@ extension Character {
   /// assert(nfc == nfd)
   /// ```
   ///
-  @available(SwiftStdlib 9999, *)
+  // @available(SwiftStdlib 9999, *)
   public func normalized(
     _ form: Unicode.CanonicalNormalizationForm
   ) -> Character {
     Character(unchecked: _str.normalized(form))
+  }
+}
+
+// FIXME: Improve these and move them somewhere logical.
+
+extension String.UTF8View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension Substring.UTF8View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension String.UTF16View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension Substring.UTF16View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension String.UnicodeScalarView: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension Substring.UnicodeScalarView: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
   }
 }
