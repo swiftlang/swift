@@ -1241,7 +1241,6 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
   rewriteCopies();
 
   clear();
-  consumes.clear();
 }
 
 /// Canonicalize a single extended owned lifetime.

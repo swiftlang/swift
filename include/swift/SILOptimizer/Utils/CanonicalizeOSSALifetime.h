@@ -342,11 +342,7 @@ public:
   void initializeLiveness(SILValue def,
                           ArrayRef<SILInstruction *> lexicalLifetimeEnds) {
     assert(consumingBlocks.empty() && debugValues.empty());
-    // Clear the cached analysis pointer just in case the client invalidates the
-    // analysis, freeing its memory.
-    accessBlocks = nullptr;
-    consumes.clear();
-    destroys.clear();
+    clear();
 
     currentDef = def;
     currentLexicalLifetimeEnds = lexicalLifetimeEnds;
@@ -358,9 +354,18 @@ public:
   }
 
   void clear() {
+    // Clear the access blocks analysis pointer in case the client invalidates
+    // the analysis.  If the client did, the analysis will be recomputed in
+    // extendLivenessThroughOverlappingAccess; if it didn't, the analysis
+    // pointer will just be set back to its old value when the analysis' cache
+    // is consulted in extendLivenessThroughOverlappingAccess.
+    accessBlocks = nullptr;
+
     consumingBlocks.clear();
     debugValues.clear();
     discoveredBlocks.clear();
+    consumes.clear();
+    destroys.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
