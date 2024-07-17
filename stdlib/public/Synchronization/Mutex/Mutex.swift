@@ -85,7 +85,7 @@ extension Mutex where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLock<Result: ~Copyable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> sending Result
+    _ body: (inout sending Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
     handle._lock()
 
@@ -132,7 +132,7 @@ extension Mutex where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> sending Result
+    _ body: (inout sending Value) throws(E) -> sending Result
   ) throws(E) -> sending Result? {
     guard handle._tryLock() else {
       return nil
