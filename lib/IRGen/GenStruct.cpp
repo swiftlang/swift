@@ -1390,7 +1390,7 @@ private:
 
   void collectStructFields(const clang::RecordDecl *decl) {
     auto cfi = decl->field_begin(), cfe = decl->field_end();
-    const auto& layout = ClangContext.getASTRecordLayout(decl);
+    const auto &layout = ClangContext.getASTRecordLayout(decl);
     auto swiftProperties = SwiftDecl->getStoredProperties();
     auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
     // When collecting fields from the base subobjects, we do not have corresponding swift
