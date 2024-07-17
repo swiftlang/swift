@@ -579,16 +579,53 @@ extension _ArrayBuffer {
   
   @inlinable
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
-    if let associatedBufferPtr = objc_getAssociatedObject(
+    let getter = objc_getAssociatedObject as @convention(c)(
+      Any,
+      UnsafeRawPointer
+    ) -> Any?
+    let typedGetter = unsafeBitCast(
+      getter,
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer
+      ) -> AnyObject?).self
+    )
+    if let assoc = typedGetter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
-      let contigStorage = associatedBufferPtr.load(
-        as: _ContiguousArrayStorage<Element>.self
+      let buffer = unsafeBitCast(
+        assoc,
+        to: _ContiguousArrayStorage<Element>.self
       )
-      return _ContiguousArrayBuffer(contigStorage)
+      return _ContiguousArrayBuffer(buffer)
     }
     return nil
+  }
+  
+  @inlinable
+  internal func setAssociatedBuffer(_ buffer: _ContiguousArrayBuffer<Element>) {
+    let setter = objc_setAssociatedObject as @convention(c)(
+      Any,
+      UnsafeRawPointer,
+      Any?,
+      UInt
+    ) -> Void
+    let typedSetter = unsafeBitCast(
+      setter,
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer,
+        AnyObject?,
+        UInt
+      ) -> Void).self
+    )
+    typedSetter(
+      _storage.objCInstance,
+      _ArrayBuffer.associationKey,
+      buffer._storage,
+      0o1401 //OBJC_ASSOCIATION_RETAIN
+    )
   }
   
   @inlinable @inline(never)
@@ -597,17 +634,14 @@ extension _ArrayBuffer {
   ) rethrows -> R {
     objc_sync_enter(_storage.objCInstance)
     var associatedBuffer = getAssociatedBuffer()
-    if associatedBuffer == nil {
-      let contig = ContiguousArray(self)
-      associatedBuffer = contig._buffer
-      objc_setAssociatedObject(
-        _storage.objCInstance,
-        _ArrayBuffer.associationKey,
-        unsafeBitCast(associatedBuffer, to: UnsafeRawPointer.self),
-        0o1401 //OBJC_ASSOCIATION_RETAIN
-      )
+    let unwrapped: _ContiguousArrayBuffer<Element>
+    if let associatedBuffer {
+      unwrapped = associatedBuffer
+    } else {
+      associatedBuffer = ContiguousArray(self)._buffer
+      unwrapped = associatedBuffer.unsafelyUnwrapped
+      setAssociatedBuffer(unwrapped)
     }
-    let unwrapped = associatedBuffer.unsafelyUnwrapped
     defer { _fixLifetime(unwrapped) }
     objc_sync_exit(_storage.objCInstance)
     return try body(
