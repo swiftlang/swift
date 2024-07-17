@@ -56,12 +56,12 @@ sil [ossa] @retract_value_lifetime_into_access_scope_when_access_scopes_not_resp
 bb0(%addr : $*C):
   %instance = apply undef() : $@convention(thin) () -> @owned C
   debug_value [trace] %instance : $C
-                                                         // respect access scopes
-                                                         // VVVV
+                                                   // respect access scopes
+                                                   // VVVV
   specify_test "canonicalize-ossa-lifetime true false true @trace"
   specify_test "canonicalize-ossa-lifetime true false false @trace"
-                                                         // ^^^^^
-                                                         // respect access scopes
+                                                   // ^^^^^
+                                                   // respect access scopes
   %copy = copy_value %instance : $C
   %access = begin_access [modify] [static] %addr : $*C
   store %copy to [init] %access : $*C
