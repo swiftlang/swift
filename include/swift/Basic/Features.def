@@ -430,6 +430,8 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 // When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
+EXPERIMENTAL_FEATURE(AddressableParameters, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
