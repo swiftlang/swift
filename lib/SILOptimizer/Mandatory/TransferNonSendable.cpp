@@ -2030,6 +2030,10 @@ struct DiagnosticEvaluator final
         .maybeGetValue();
   }
 
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return info->getValueMap().getRepresentativeValue(element);
+  }
+
   bool isClosureCaptured(Element element, Operand *op) const {
     auto value = info->getValueMap().maybeGetRepresentative(element);
     if (!value)

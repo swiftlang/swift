@@ -100,6 +100,53 @@ namespace swift {
 class Partition;
 class TransferringOperandToStateMap;
 
+/// The representative value of the equivalence class that makes up a tracked
+/// value.
+///
+/// We use a wrapper struct here so that we can inject "fake" actor isolated
+/// values into the regions of values that become merged into an actor by
+/// calling a function without a non-sendable result.
+class RepresentativeValue {
+  friend llvm::DenseMapInfo<RepresentativeValue>;
+
+  using InnerType = PointerUnion<SILValue, SILInstruction *>;
+
+  /// If this is set to a SILValue then it is the actual represented value. If
+  /// it is set to a SILInstruction, then this is a "fake" representative value
+  /// used to inject actor isolatedness. The instruction stored is the
+  /// instruction that introduced the actor isolated-ness.
+  InnerType value;
+
+public:
+  RepresentativeValue() : value() {}
+  RepresentativeValue(SILValue value) : value(value) {}
+  RepresentativeValue(SILInstruction *actorRegionInst)
+      : value(actorRegionInst) {}
+
+  operator bool() const { return bool(value); }
+
+  void print(llvm::raw_ostream &os) const {
+    if (auto *inst = value.dyn_cast<SILInstruction *>()) {
+      os << "ActorRegionIntroducingInst: " << *inst;
+      return;
+    }
+
+    os << *value.get<SILValue>();
+  }
+
+  SILValue getValue() const { return value.get<SILValue>(); }
+  SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
+  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
+  SILInstruction *getActorRegionIntroducingInst() const {
+    return value.get<SILInstruction *>();
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+private:
+  RepresentativeValue(InnerType value) : value(value) {}
+};
+
 /// A persistent data structure that is used to "rewind" partition history so
 /// that we can discover when values become part of the same region.
 ///
@@ -1029,6 +1076,10 @@ public:
     return asImpl().getRepresentative(value);
   }
 
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return asImpl().getRepresentativeValue(element);
+  }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
     if (shouldEmitVerboseLogging()) {
@@ -1416,6 +1467,10 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// have one.
   SILValue getRepresentative(SILValue value) const { return SILValue(); }
 
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return RepresentativeValue();
+  }
+
   /// Check if the representative value of \p elt is closure captured at \p
   /// op.
   ///
@@ -1447,5 +1502,37 @@ struct PartitionOpEvaluatorBasic final
 };
 
 } // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::RepresentativeValue &value) {
+  value.print(os);
+  return os;
+}
+
+template <>
+struct DenseMapInfo<swift::RepresentativeValue> {
+  using RepresentativeValue = swift::RepresentativeValue;
+  using InnerType = RepresentativeValue::InnerType;
+  using InnerDenseMapInfo = DenseMapInfo<InnerType>;
+
+  static RepresentativeValue getEmptyKey() {
+    return RepresentativeValue(InnerDenseMapInfo::getEmptyKey());
+  }
+  static RepresentativeValue getTombstoneKey() {
+    return RepresentativeValue(InnerDenseMapInfo::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(RepresentativeValue value) {
+    return InnerDenseMapInfo::getHashValue(value.value);
+  }
+
+  static bool isEqual(RepresentativeValue LHS, RepresentativeValue RHS) {
+    return InnerDenseMapInfo::isEqual(LHS.value, RHS.value);
+  }
+};
+
+} // namespace llvm
 
 #endif // SWIFT_PARTITIONUTILS_H
