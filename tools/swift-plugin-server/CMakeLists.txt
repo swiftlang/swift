@@ -7,4 +7,10 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
       SwiftCompilerPluginMessageHandling
       SwiftLibraryPluginProvider
   )
+
+  # FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(
+  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+    target_compile_options(swift-plugin-server PRIVATE
+      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
+  endif()
 endif()
