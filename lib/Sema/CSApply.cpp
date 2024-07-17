@@ -5409,8 +5409,8 @@ namespace {
         auto indexType = getTypeOfDynamicMemberIndex(overload);
         Expr *argExpr = nullptr;
         if (overload.choice.isKeyPathDynamicMemberLookup()) {
-          argExpr = buildKeyPathDynamicMemberArgExpr(
-              indexType->castTo<BoundGenericType>(), componentLoc, memberLoc);
+          argExpr = buildKeyPathDynamicMemberArgExpr(indexType, componentLoc,
+                                                     memberLoc);
         } else {
           auto fieldName = overload.choice.getName().getBaseIdentifier().str();
           argExpr = buildDynamicMemberLookupArgExpr(fieldName, componentLoc,
