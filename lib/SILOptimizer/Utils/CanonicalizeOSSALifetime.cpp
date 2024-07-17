@@ -1174,9 +1174,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   }
 
   // Remove the leftover copy_value and destroy_value instructions.
-  for (auto iter = instsToDelete.begin(), end = instsToDelete.end();
-       iter != end; ++iter) {
-    deleter.forceDelete(*iter);
+  for (auto *inst : instsToDelete) {
+    deleter.forceDelete(inst);
   }
 }
 
