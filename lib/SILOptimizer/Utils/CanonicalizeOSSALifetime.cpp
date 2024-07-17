@@ -252,9 +252,9 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   return true;
 }
 
-void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
-  // OSSALifetimeCompletion: With complete lifetimes, creating completeLiveness
-  // and using it to visit unreachable lifetime ends should be deleted.
+void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
+  // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+  //                               this method.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks(this->discoveredBlocks);
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
 
@@ -274,7 +274,9 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
           return true;
         });
       });
+}
 
+void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   SmallVector<SILInstruction *, 8> ends;
   if (currentLexicalLifetimeEnds.size() > 0) {
     visitExtendedUnconsumedBoundary(
@@ -1204,6 +1206,7 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     return false;
   }
   if (respectsDeinitBarriers()) {
+    extendLivenessToDeadEnds();
     extendLivenessToDeinitBarriers();
   }
   if (accessBlockAnalysis) {
