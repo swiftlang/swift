@@ -970,6 +970,39 @@ public:
   bool isCached() const { return true; }
 };
 
+using ObjCCategoryNameMap =
+  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>;
+
+/// Generate a map of all known extensions of the given class that have an
+/// explicit category name. This request does not force clang categories that
+/// haven't been imported already, but it will generate a new map if new
+/// categories have been imported since the cached value was generated.
+///
+/// \seeAlso ClassDecl::getObjCCategoryNameMap()
+class ObjCCategoryNameMapRequest
+    : public SimpleRequest<ObjCCategoryNameMapRequest,
+                           ObjCCategoryNameMap(ClassDecl *, ExtensionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Convenience to automatically extract `lastExtension`.
+  ObjCCategoryNameMapRequest(ClassDecl *classDecl)
+    : ObjCCategoryNameMapRequest(classDecl, classDecl->getLastExtension())
+  {}
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ObjCCategoryNameMap evaluate(Evaluator &evaluator,
+                               ClassDecl *classDecl,
+                               ExtensionDecl *lastExtension) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

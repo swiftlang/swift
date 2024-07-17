@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -import-objc-header %S/Inputs/objc_implementation.h -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -import-objc-header %S/Inputs/objc_implementation.h -swift-version 5 %s -target %target-stable-abi-triple | %FileCheck %s
 
 // REQUIRES: objc_interop
 

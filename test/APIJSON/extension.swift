@@ -45,6 +45,12 @@ extension B {
   public func fun() {}
 }
 
+// This creates a category with a custom name.
+@objc(CustomCategoryName)
+extension B {
+  public func doIt() {}
+}
+
 // CHECK:      "interfaces": [
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "name": "_TtC8MyModule1B",
@@ -65,6 +71,23 @@ extension B {
 // CHECK-NEXT:    }
 // CHECK-NEXT:  ],
 // CHECK-NEXT:  "categories": [
+// CHECK-NEXT:    {
+// CHECK-NEXT:      "name": "CustomCategoryName",
+// CHECK-NEXT:      "access": "public",
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift",
+// CHECK-NEXT:      "linkage": "exported",
+// CHECK-NEXT:      "interface": "_TtC8MyModule1B",
+// CHECK-NEXT:      "instanceMethods": [
+// CHECK-NEXT:        {
+// CHECK-NEXT:          "name": "doIt",
+// CHECK-NEXT:          "access": "public",
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift"
+// CHECK-NEXT:        }
+// CHECK-NEXT:      ],
+// CHECK-NEXT:      "classMethods": []
+// CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "name": "MyModule",
 // CHECK-NEXT:      "access": "public",

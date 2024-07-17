@@ -762,6 +762,7 @@ UNINTERESTING_FEATURE(IsolatedAny2)
 
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(CImplementation)
+UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
 
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 

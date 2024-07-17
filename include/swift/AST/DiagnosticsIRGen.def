@@ -69,5 +69,16 @@ NOTE(layout_strings_blocked,none,
      "Layout string value witnesses have been disabled for module '%0' "
      "through block list entry", (StringRef))
 
+ERROR(attr_objc_implementation_resilient_property_not_supported, none,
+      "'@implementation' does not support stored properties whose size can "
+      "change due to library evolution; store this value in an object or 'any' "
+      "type",
+      ())
+ERROR(attr_objc_implementation_resilient_property_deployment_target, none,
+      "'@implementation' on %0 %1 does not support stored properties whose "
+      "size can change due to library evolution; raise the minimum deployment "
+      "target to %0 %2 or store this value in an object or 'any' type",
+      (StringRef, const llvm::VersionTuple, const llvm::VersionTuple))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

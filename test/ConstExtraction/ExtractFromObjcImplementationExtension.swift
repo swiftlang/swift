@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "[MyProto]" > %t/protocols.json
 
-// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractFromObjcImplementationExtension.swiftconstvalues -const-gather-protocols-file %t/protocols.json %s -import-objc-header %S/Inputs/objc_implementation.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractFromObjcImplementationExtension.swiftconstvalues -const-gather-protocols-file %t/protocols.json %s -import-objc-header %S/Inputs/objc_implementation.h -disable-objc-attr-requires-foundation-module -target %target-stable-abi-triple
 // RUN: cat %t/ExtractFromObjcImplementationExtension.swiftconstvalues 2>&1 | %FileCheck %s
 
 protocol MyProto { }
