@@ -682,8 +682,6 @@ static void swift_task_checkOnExpectedExecutorImpl(
     const char *message, int messageLen,
     ExecutorCheckOptionRecord *options,
     ExecutorCheckFlags flags) {
-  // assert(flags.getDontCrash() && "check... API expects non crashing option"); // FIXME
-
   // Regardless of the runtime check mode, we will never invoke `checkIsolated`
   // (and thus potentially crash) when calling from here, because we need to
   // issue a warning after all.

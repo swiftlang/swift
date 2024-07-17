@@ -791,23 +791,10 @@ SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
     swift_task_enqueueGlobalWithDeadline_original original);
 
 typedef SWIFT_CC(swift) void (*swift_task_checkIsolated_original)(
-    SerialExecutorRef executor);
+    SerialExecutorRef expectedExecutor);
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_checkIsolated_hook)(
     SerialExecutorRef executor, swift_task_checkIsolated_original original);
-
-typedef SWIFT_CC(swift) void (*swift_task_checkOnExpectedExecutor_original)(
-    SerialExecutorRef expectedExecutor,
-    const char *message, int messageLen,
-    ExecutorCheckOptionRecord* options,
-    ExecutorCheckFlags flags);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_checkOnExpectedExecutor_hook)(
-    SerialExecutorRef expectedExecutor,
-    const char *message, int messageLen,
-    ExecutorCheckOptionRecord* options,
-    ExecutorCheckFlags flags,
-    swift_task_checkIsolated_original original);
 
 typedef SWIFT_CC(swift) bool (*swift_task_isOnExecutor_original)(
     HeapObject *executor,

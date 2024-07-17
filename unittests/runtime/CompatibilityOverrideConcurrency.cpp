@@ -87,16 +87,7 @@ swift_task_enqueueGlobal_override(Job *job,
 SWIFT_CC(swift)
 static void
 swift_task_checkIsolated_override(SerialExecutorRef executor,
-                                      swift_task_checkIsolated_original original) {
-  Ran = true;
-}
-
-SWIFT_CC(swift)
-static void swift_task_checkOnExpectedExecutor_override(
-    SerialExecutorRef expectedExecutor, const unsigned char *message,
-    int messageLen, ExecutorCheckOptionRecord *options,
-    ExecutorCheckFlags flags,
-    swift_task_checkOnExpectedExecutor_original original) {
+                                  swift_task_checkIsolated_original original) {
   Ran = true;
 }
 
@@ -116,19 +107,6 @@ static void swift_task_enqueueMainExecutor_override(
 // FIXME: not used!? Missing hook?
 SWIFT_CC(swift)
 static void swift_task_startOnMainActor_override(AsyncTask* task) {
-  Ran = true;
-}
-
-SWIFT_CC(swift)
-static void swift_task_makeExecutorCheckOption_sourceLocation_override(
-    const char * _Nonnull functionName, const char * _Nonnull file,
-    uintptr_t line, uintptr_t column, ExecutorCheckOptionRecord *parent) {
-  Ran = true;
-}
-
-SWIFT_CC(swift)
-static void swift_task_destroyExecutorCheckOptions_override(
-    ExecutorCheckOptionRecord *options) {
   Ran = true;
 }
 
@@ -162,8 +140,6 @@ protected:
         swift_task_enqueueMainExecutor_override;
     swift_task_checkIsolated_hook =
         swift_task_checkIsolated_override;
-    swift_task_checkOnExpectedExecutor_hook =
-        swift_task_checkOnExpectedExecutor_override;
 #ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
     swift_task_asyncMainDrainQueue_hook =
         swift_task_asyncMainDrainQueue_override_fn;
@@ -351,16 +327,19 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
   swift_task_escalate(nullptr, {});
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
-  swift_task_startOnMainActor(nullptr);
-}
 
-#if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_checkOnExpectedExecutorImpl) {
   swift_task_checkOnExpectedExecutor(SerialExecutorRef::generic(),
                                      /*message=*/nullptr, 0,
                                      nullptr, ExecutorCheckFlags());
 }
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
+  swift_task_startOnMainActor(nullptr);
+}
+
+#if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_asyncMainDrainQueue) {
 
   auto runner = [](void *) -> void * {
     swift_task_asyncMainDrainQueue();
