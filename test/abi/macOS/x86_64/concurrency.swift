@@ -338,7 +338,7 @@ Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXES
 
 // Add new executor checking entry point that could issue warnings
 // +Swift._checkOnExpectedExecutor(expected: Swift.Actor, message: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.Int, column: Swift.Int, function: Swift.StaticString) -> ()
-Added: _$ss24_checkOnExpectedExecutor8expected7message4file4line6column8functionyScA_p_SSyXKs12StaticStringVS2iAItF
+Added: _$ss25_warnOnUnexpectedExecutor8expected7message4file4line6column8functionyScA_p_SSyXKs12StaticStringVS2iAItF
 Added: _swift_task_makeExecutorCheckOption_sourceLocation
 Added: _swift_task_checkOnExpectedExecutor
 Added: _swift_task_destroyExecutorCheckOptions

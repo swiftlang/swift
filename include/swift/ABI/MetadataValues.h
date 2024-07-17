@@ -2621,10 +2621,11 @@ public:
     // Set when the record was able to be task local allocated
     // (as opposed to malloc-allocated).
     //
-    // While we could bet on the record being destroyed in the same context as
+    // While we could "bet" on the record being destroyed in the same context as
     // it was created, synchronously, betting on the same task being there when
-    // we destroy... this flag helps diagnose in case something would be
-    // misused with records, and codifies this assumption.
+    // we destroy... this would be more error-prone, and this explicit flag
+    // helps diagnose in case something would be misused with records, and
+    // codifies this assumption.
     ExecutorCheckOptionRecord_TaskLocalAllocated     = 8,
   };
 

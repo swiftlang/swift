@@ -456,7 +456,7 @@ static bool swift_task_isCurrentExecutorCommon(
   auto current = ExecutorTrackingInfo::current();
 
   if (flags.getDontCrash()) {
-    SWIFT_TASK_DEBUG_LOG("Override executor check mode with flag: don't crash; flags: %d", flags);
+    SWIFT_TASK_DEBUG_LOG("Override executor check mode with flag: don't crash; flags: %p", flags);
     checkMode = Legacy_NoCheckIsolated_NonCrashing;
   }
 
@@ -658,7 +658,7 @@ static void logIsolationWarning(
                function, file, line, column,
                messageLen, message);
 #endif
-  
+
   if (LogIsolationWarningStderr) {
     fprintf(stderr, ISOLATION_WARNING_FORMAT,
             // expected isolation

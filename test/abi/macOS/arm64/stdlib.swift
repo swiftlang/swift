@@ -579,5 +579,5 @@ Added: _concurrencyIsCurrentExecutorLegacyModeOverride
 //String.init<Encoding: Unicode.Encoding>(_immortalCocoaString: AnyObject, count: Int, encoding: Encoding.Type)
 Added: _$sSS20_immortalCocoaString5count8encodingSSyXl_Sixmtcs16_UnicodeEncodingRzlufC
 
-// Add add SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE
+// Add add SWIFT_LOG_ISOLATION_WARNING_MODE_OVERRIDE
 Added: _concurrencyLogIsolationWarningModeOverride
