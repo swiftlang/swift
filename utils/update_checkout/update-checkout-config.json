@@ -7,7 +7,7 @@
         "cmark": {
             "remote": { "id": "swiftlang/swift-cmark" } },
         "llbuild": {
-            "remote": { "id": "apple/swift-llbuild" } },
+            "remote": { "id": "swiftlang/swift-llbuild" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
         "swift-async-algorithms": {
@@ -72,27 +72,27 @@
         "swift-installer-scripts": {
             "remote": { "id": "swiftlang/swift-installer-scripts" } },
         "swift-docc": {
-            "remote": { "id": "apple/swift-docc" } },
+            "remote": { "id": "swiftlang/swift-docc" } },
         "swift-lmdb": {
-            "remote": { "id": "apple/swift-lmdb" } },
+            "remote": { "id": "swiftlang/swift-lmdb" } },
         "swift-docc-render-artifact": {
-            "remote": { "id": "apple/swift-docc-render-artifact" } },
+            "remote": { "id": "swiftlang/swift-docc-render-artifact" } },
         "swift-docc-symbolkit": {
-            "remote": { "id": "apple/swift-docc-symbolkit" } },
+            "remote": { "id": "swiftlang/swift-docc-symbolkit" } },
         "swift-markdown": {
-            "remote": { "id": "apple/swift-markdown" } },
+            "remote": { "id": "swiftlang/swift-markdown" } },
         "swift-nio": {
             "remote": { "id": "apple/swift-nio" } },
         "swift-nio-ssl": {
             "remote": { "id": "apple/swift-nio-ssl" } },
         "swift-experimental-string-processing": {
-            "remote": { "id": "apple/swift-experimental-string-processing" } },
+            "remote": { "id": "swiftlang/swift-experimental-string-processing" } },
         "swift-sdk-generator": {
             "remote": { "id": "swiftlang/swift-sdk-generator" } },
         "swift-llvm-bindings": {
-            "remote": { "id": "apple/swift-llvm-bindings" } },
+            "remote": { "id": "swiftlang/swift-llvm-bindings" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } },
+            "remote": { "id": "swiftlang/llvm-project" } },
         "wasi-libc": {
             "remote": { "id": "WebAssembly/wasi-libc" } },
         "wasmkit": {
