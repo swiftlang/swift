@@ -548,7 +548,7 @@ extension ActorAddress {
     return bytes
   }
   func fromBytes(_ bytes: [UInt8]) throws -> ActorAddress {
-    let address = String(cString: bytes)
+    let address = String(decoding: bytes, as: UTF8.self)
     return Self.init(parse: address)
   }
 }

@@ -21,6 +21,7 @@
 #include "TypeCheckType.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
@@ -6879,6 +6880,27 @@ VarDecl *swift::getReferencedParamOrCapture(
   // corresponds to the isolation of the given code.
   if (isa<CurrentContextIsolationExpr>(expr))
     return getCurrentIsolatedVar();
+
+  // Distributed:
+  // If we're referring to a member, it may be the special 'self.asLocalActor'
+  // of an actor that is the result of #isolation of distributed actors.
+  // the result of the value should be considered equal to the "self" isolation
+  // as it only transforms the DistributedActor self to an "any Actor" self
+  // used for isolation purposes.
+  if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+    if (auto refDecl = expr->getReferencedDecl(/*stopAtParenExpr=*/true)) {
+      if (auto decl = refDecl.getDecl()) {
+        auto module = decl->getDeclContext()->getParentModule();
+        auto AsLocalActorDecl =
+            getDistributedActorAsLocalActorComputedProperty(module);
+
+        if (decl == AsLocalActorDecl) {
+          return getCurrentIsolatedVar();
+        }
+      }
+    }
+  }
+
 
   return nullptr;
 }
