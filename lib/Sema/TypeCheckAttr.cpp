@@ -2318,7 +2318,10 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope,
              attr->getAttrName());
-  else if (D->getDeclContext()->isGenericContext())
+  else if (D->getDeclContext()->isGenericContext() &&
+           !D->getDeclContext()
+                ->getGenericSignatureOfContext()
+                ->areAllParamsConcrete())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
@@ -2345,7 +2348,10 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     return; // already diagnosed
 
-  if (D->getDeclContext()->isGenericContext())
+  if (D->getDeclContext()->isGenericContext() &&
+      !D->getDeclContext()
+           ->getGenericSignatureOfContext()
+           ->areAllParamsConcrete())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
