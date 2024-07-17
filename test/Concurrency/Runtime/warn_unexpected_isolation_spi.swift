@@ -74,63 +74,60 @@ func checkOtherActorFuncExpectedMainActor(other: isolated (any Actor), line: Int
 
 @main struct Main {
   static func main() async {
-    do {
-      let defaultActor = SomeDefaultActor()
-      await defaultActor.checkNonisolatedFunc(line: #line)
-      // CHECK: Unexpected actor isolation, expected [[NONISOLATED_EXECUTOR:0x.*]] (GenericExecutor)
-      // CHECK-SAME: in checkNonisolatedFunc(line:)
-      // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-3]]:[[COLUMN:.*]]!
-      // CHECK-SAME: Whoops, nonisolated but expected self
+    let defaultActor = SomeDefaultActor()
+    let queueWrappedActor = ActorOnNaiveQueueExecutor()
 
-      await checkMainActorFunc(expected: defaultActor, line: #line)
-      // CHECK: Unexpected actor isolation, expected [[DEFAULT_ACTOR:0x.*]] (default actor a.SomeDefaultActor)
-      // CHECK-SAME: but was isolated to [[MAIN_ACTOR:0x.*]] (MainActorExecutor),
-      // CHECK-SAME: in checkMainActorFunc(expected:line:)
-      // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
-      // CHECK-SAME: Whoops, MainActor but expected actor
+    // NOTE: Watch out for matching nil/0x0, as it seems 0x0 gets formatted as nil on Linux, so match both.
 
-      await defaultActor.checkIsolatedFunc(line: #line)
-      // OK
-    }
+    await defaultActor.checkNonisolatedFunc(line: #line)
+    // CHECK: Unexpected actor isolation, expected [[DEFAULT_ACTOR:0x.*]] (default actor a.SomeDefaultActor)
+    // CHECK-SAME: but was nonisolated [[NONISOLATED:(0x.*)|.nil.]] (GenericExecutor),
+    // CHECK-SAME: in checkNonisolatedFunc(line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
+    // CHECK-SAME: Whoops, nonisolated but expected self
 
-    do {
-      let queueWrappedActor = ActorOnNaiveQueueExecutor()
-      await queueWrappedActor.checkNonisolatedFuncOnQueueActor(line: #line)
-      // CHECK: Unexpected actor isolation, expected [[QUEUE_ACTOR:0x.*]] (custom SerialExecutor)
-      // CHECK-SAME: but was nonisolated 0x0 (GenericExecutor)
-      // CHECK-SAME: in checkNonisolatedFuncOnQueueActor(line:)
-      // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
-      // CHECK-SAME: Whoops, nonisolated but expected self
 
-      await checkMainActorFunc(expected: queueWrappedActor, line: #line)
-      // CHECK: Unexpected actor isolation, expected [[QUEUE_ACTOR]] (custom SerialExecutor)
-      // CHECK-SAME: but was isolated to [[MAIN_ACTOR]] (MainActorExecutor),
-      // CHECK-SAME: in checkMainActorFunc(expected:line:)
-      // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
-      // CHECK-SAME: Whoops, MainActor but expected actor
+    await checkMainActorFunc(expected: defaultActor, line: #line)
+    // CHECK: Unexpected actor isolation, expected [[DEFAULT_ACTOR:0x.*]] (default actor a.SomeDefaultActor)
+    // CHECK-SAME: but was isolated to [[MAIN_ACTOR:0x.*]] (MainActorExecutor),
+    // CHECK-SAME: in checkMainActorFunc(expected:line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
+    // CHECK-SAME: Whoops, MainActor but expected actor
 
-      await queueWrappedActor.checkIsolatedFunc(line: #line)
-      // OK
-    }
+    await defaultActor.checkIsolatedFunc(line: #line)
+    // OK
+
+    await queueWrappedActor.checkNonisolatedFuncOnQueueActor(line: #line)
+    // CHECK: Unexpected actor isolation, expected [[QUEUE_ACTOR:0x.*]] (custom SerialExecutor)
+    // CHECK-SAME: but was nonisolated [[GENERIC_EXEC:.nil.|0x0]] (GenericExecutor)
+    // CHECK-SAME: in checkNonisolatedFuncOnQueueActor(line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
+    // CHECK-SAME: Whoops, nonisolated but expected self
+
+    await checkMainActorFunc(expected: queueWrappedActor, line: #line)
+    // CHECK: Unexpected actor isolation, expected [[QUEUE_ACTOR]] (custom SerialExecutor)
+    // CHECK-SAME: but was isolated to [[MAIN_ACTOR]] (MainActorExecutor),
+    // CHECK-SAME: in checkMainActorFunc(expected:line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
+    // CHECK-SAME: Whoops, MainActor but expected actor
+
+    await queueWrappedActor.checkIsolatedFunc(line: #line)
+    // OK
 
     // Expecting main actor, but running on something else
-    do {
-      let defaultActor = SomeDefaultActor()
-      await checkOtherActorFuncExpectedMainActor(other: defaultActor, line: #line)
-      // CHECK: Unexpected actor isolation, expected [[MAIN_ACTOR]] (MainActorExecutor)
-      // CHECK-SAME: but was isolated to [[DEFAULT_ACTOR:0x.*]] (default actor a.SomeDefaultActor),
-      // CHECK-SAME: in checkOtherActorFuncExpectedMainActor(other:line:)
-      // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
-      // CHECK-SAME: Whoops, MainActor but expected actor
+    await checkOtherActorFuncExpectedMainActor(other: defaultActor, line: #line)
+    // CHECK: Unexpected actor isolation, expected [[MAIN_ACTOR]] (MainActorExecutor)
+    // CHECK-SAME: but was isolated to [[DEFAULT_ACTOR:0x.*]] (default actor a.SomeDefaultActor),
+    // CHECK-SAME: in checkOtherActorFuncExpectedMainActor(other:line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
+    // CHECK-SAME: Whoops, MainActor but expected actor
 
-      let queueWrappedActor = ActorOnNaiveQueueExecutor()
-      await checkOtherActorFuncExpectedMainActor(other: queueWrappedActor, line: #line)
-      // CHECK: Unexpected actor isolation, expected [[MAIN_ACTOR]] (MainActorExecutor)
-      // CHECK-SAME: but was isolated to [[QUEUE_ACTOR:0x.*]] (custom SerialExecutor),
-      // CHECK-SAME: in checkOtherActorFuncExpectedMainActor(other:line:)
-      // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
-      // CHECK-SAME: Whoops, MainActor but expected actor
-    }
+    await checkOtherActorFuncExpectedMainActor(other: queueWrappedActor, line: #line)
+    // CHECK: Unexpected actor isolation, expected [[MAIN_ACTOR]] (MainActorExecutor)
+    // CHECK-SAME: but was isolated to [[QUEUE_ACTOR:0x.*]] (custom SerialExecutor),
+    // CHECK-SAME: in checkOtherActorFuncExpectedMainActor(other:line:)
+    // CHECK-SAME: at a/warn_unexpected_isolation_spi.swift:[[@LINE-4]]:[[COLUMN:.*]]!
+    // CHECK-SAME: Whoops, MainActor but expected actor
 
     print("Done")
     // CHECK: Done
