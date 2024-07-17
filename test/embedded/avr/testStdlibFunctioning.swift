@@ -1,4 +1,4 @@
-// RUN: %swift-frontend -emit-ir %s -target avr-none-none-elf \
+// RUN: %swift-frontend -typecheck %s -target avr-none-none-elf \
 // RUN:   -wmo -enable-experimental-feature Embedded
 // REQUIRES: embedded_stdlib_cross_compiling
 
