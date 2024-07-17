@@ -7,7 +7,7 @@
         "cmark": {
             "remote": { "id": "swiftlang/swift-cmark" } },
         "llbuild": {
-            "remote": { "id": "apple/swift-llbuild" } },
+            "remote": { "id": "swiftlang/swift-llbuild" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
         "swift-atomics": {
@@ -82,7 +82,7 @@
         "swift-nio-ssl": {
             "remote": { "id": "apple/swift-nio-ssl" } },
         "swift-experimental-string-processing": {
-            "remote": { "id": "apple/swift-experimental-string-processing" } },
+            "remote": { "id": "swiftlang/swift-experimental-string-processing" } },
         "swift-llvm-bindings": {
             "remote": { "id": "swiftlang/swift-llvm-bindings" } },
         "llvm-project": {
