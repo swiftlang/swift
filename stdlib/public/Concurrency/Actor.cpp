@@ -76,8 +76,11 @@
 #include <io.h>
 #endif
 
-#if defined(__APPLE__)
+#if __has_include(<os/log.h>)
+#define SWIFT_HAS_OS_LOG 1
 #include <os/log.h>
+#else
+#define SWIFT_HAS_OS_LOG 0
 #endif
 
 
@@ -405,14 +408,14 @@ static void checkIsCurrentExecutorMode(void *context) {
                                         : Swift6_UseCheckIsolated_AllowCrash;
 }
 
-#if defined(__APPLE__)
+#if SWIFT_HAS_OS_LOG
 #define SWIFT_LOG_APPLE_RUNTIME_ISSUES_SUBSYSTEM "com.apple.runtime-issues"
 #define SWIFT_LOG_ACTOR_CATEGORY "Actor"
 os_log_t IsolationWarningLog;
 #endif
 
 static void initIsolationWarningOsLog(void *context) {
-#if defined(__APPLE__)
+#if SWIFT_HAS_OS_LOG
   IsolationWarningLog = os_log_create(SWIFT_LOG_APPLE_RUNTIME_ISSUES_SUBSYSTEM,
                                       SWIFT_LOG_ACTOR_CATEGORY);
 #endif
@@ -638,7 +641,7 @@ static void logIsolationWarning(
   char *expectedActorName = getActorTypeName(expectedExecutor);
   SWIFT_DEFER { free(expectedActorName); };
 
-#if defined(__APPLE__)
+#if SWIFT_HAS_OS_LOG
   os_log_fault(IsolationWarningLog,
                ISOLATION_WARNING_FORMAT,
                // expected isolation
@@ -655,6 +658,7 @@ static void logIsolationWarning(
                function, file, line, column,
                messageLen, message);
 #endif
+  
   if (LogIsolationWarningStderr) {
     fprintf(stderr, ISOLATION_WARNING_FORMAT,
             // expected isolation
