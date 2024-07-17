@@ -3264,6 +3264,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
           .maybeGetValue();
     }
 
+    RepresentativeValue getRepresentativeValue(Element element) const {
+      return translator.getValueMap().getRepresentativeValue(element);
+    }
+
     bool isClosureCaptured(Element elt, Operand *op) const {
       auto iter = translator.getValueForId(elt);
       if (!iter)
@@ -3500,6 +3504,11 @@ RegionAnalysisValueMap::getRepresentative(Element trackableValueID) const {
 SILValue
 RegionAnalysisValueMap::maybeGetRepresentative(Element trackableValueID) const {
   return getValueForId(trackableValueID)->getRepresentative().maybeGetValue();
+}
+
+RepresentativeValue
+RegionAnalysisValueMap::getRepresentativeValue(Element trackableValueID) const {
+  return getValueForId(trackableValueID)->getRepresentative();
 }
 
 SILIsolationInfo
