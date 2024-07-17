@@ -996,6 +996,16 @@ public:
                                                    isolationRegionInfo);
   }
 
+  /// Just call our CRTP subclass.
+  void handleAssignTransferNonTransferrableIntoSendingResult(
+      const PartitionOp &op, Element destElement,
+      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {
+    return asImpl().handleAssignTransferNonTransferrableIntoSendingResult(
+        op, destElement, destValue, srcElement, srcValue,
+        srcIsolationRegionInfo);
+  }
+
   /// Call our CRTP subclass.
   void handleInOutSendingNotInitializedAtExitError(
       const PartitionOp &op, Element elt, Operand *transferringOp) const {
@@ -1112,13 +1122,41 @@ public:
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
-    case PartitionOpKind::Assign:
+    case PartitionOpKind::Assign: {
       assert(op.getOpArgs().size() == 2 &&
              "Assign PartitionOp should be passed 2 arguments");
       assert(p.isTrackingElement(op.getOpArgs()[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
+
+      // See if we are assigning an a non-disconnected value into a 'out
+      // sending' parameter. In such a case, we emit a diagnostic.
+      if (op.getSourceInst()
+              ->getFunction()
+              ->getLoweredFunctionType()
+              ->hasSendingResult()) {
+        if (auto instance = getRepresentativeValue(op.getOpArgs()[0])) {
+          if (auto value = instance.maybeGetValue()) {
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
+              if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                Region srcRegion = p.getRegion(op.getOpArgs()[1]);
+                auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+                // We can unconditionally getValue here since we can never
+                // assign an actor introducing inst.
+                auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
+                if (!dynamicRegionIsolation.isDisconnected()) {
+                  handleAssignTransferNonTransferrableIntoSendingResult(
+                      op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
+                      dynamicRegionIsolation);
+                }
+              }
+            }
+          }
+        }
+      }
+
       p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
+    }
     case PartitionOpKind::AssignFresh:
       assert(op.getOpArgs().size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
@@ -1199,15 +1237,42 @@ public:
       p.undoTransfer(op.getOpArgs()[0]);
       return;
     }
-    case PartitionOpKind::Merge:
+    case PartitionOpKind::Merge: {
       assert(op.getOpArgs().size() == 2 &&
              "Merge PartitionOp should be passed 2 arguments");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              p.isTrackingElement(op.getOpArgs()[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
 
+      // See if we are assigning an a non-disconnected value into a 'out
+      // sending' parameter. In such a case, we emit a diagnostic.
+      if (op.getSourceInst()
+              ->getFunction()
+              ->getLoweredFunctionType()
+              ->hasSendingResult()) {
+        if (auto instance = getRepresentativeValue(op.getOpArgs()[0])) {
+          if (auto value = instance.maybeGetValue()) {
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
+              if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                Region srcRegion = p.getRegion(op.getOpArgs()[1]);
+                auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+                // We can unconditionally getValue here since we can never
+                // assign an actor introducing inst.
+                auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
+                if (!dynamicRegionIsolation.isDisconnected()) {
+                  handleAssignTransferNonTransferrableIntoSendingResult(
+                      op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
+                      dynamicRegionIsolation);
+                }
+              }
+            }
+          }
+        }
+      }
+
       p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
+    }
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
@@ -1424,9 +1489,18 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo regionInfo) const {}
 
+  /// Please see documentation on the CRTP version of this call for information
+  /// about this entrypoint.
   void handleTransferNonTransferrable(
       const PartitionOp &op, Element elt, Element otherElement,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {}
+
+  /// Please see documentation on the CRTP version of this call for information
+  /// about this entrypoint.
+  void handleAssignTransferNonTransferrableIntoSendingResult(
+      const PartitionOp &partitionOp, Element destElement,
+      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {}
 
   /// Used to signify an "unknown code pattern" has occured while performing
   /// dataflow.

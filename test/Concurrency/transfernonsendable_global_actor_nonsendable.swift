@@ -108,18 +108,18 @@ extension NonSendableGlobalActorIsolatedStruct {
     self.p
   }
 
-  // TODO: Should error here.
   mutating func test5() -> sending (any GlobalActorIsolatedProtocol)? {
-    self.p
+    self.p // expected-error {{returning main actor-isolated 'self.p' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p' risks causing data races since the caller assumes that 'self.p' can be safely sent to other isolation domains}}
   }
 
   mutating func test6() -> (any OtherProtocol)? {
     self.p2
   }
 
-  // TODO: Should error here.
   mutating func test7() -> sending (any OtherProtocol)? {
-    self.p2
+    self.p2 // expected-error {{returning main actor-isolated 'self.p2' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p2' risks causing data races since the caller assumes that 'self.p2' can be safely sent to other isolation domains}}
   }
 }
 
@@ -153,12 +153,20 @@ extension NonSendableGlobalActorIsolatedEnum {
     return x
   }
 
-  // TODO: This should error.
   mutating func test3() -> sending (any GlobalActorIsolatedProtocol)? {
     guard case let .fourth(x) = self else {
       return nil
     }
-    return x
+    return x // expected-error {{returning main actor-isolated 'x' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'x' risks causing data races since the caller assumes that 'x' can be safely sent to other isolation domains}}
+  }
+
+  mutating func test3a() -> sending (any GlobalActorIsolatedProtocol)? {
+    if case let .fourth(x) = self {
+      return x // expected-error {{returning main actor-isolated 'x' as a 'sending' result risks causing data races}}
+      // expected-note @-1 {{returning main actor-isolated 'x' risks causing data races since the caller assumes that 'x' can be safely sent to other isolation domains}}
+    }
+    return nil
   }
 
   mutating func test3() -> sending NonSendableKlass? {
@@ -166,6 +174,14 @@ extension NonSendableGlobalActorIsolatedEnum {
       return nil
     }
     return x
+  } // expected-error {{sending 'x.some' risks causing data races}}
+  // expected-note @-1 {{main actor-isolated 'x.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+
+  mutating func test3a() -> sending NonSendableKlass? {
+    if case let .second(x) = self {
+      return x
+    }
+    return nil
   } // expected-error {{sending 'x.some' risks causing data races}}
   // expected-note @-1 {{main actor-isolated 'x.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 }
@@ -188,18 +204,18 @@ extension NonSendableGlobalActorIsolatedKlass {
     self.p
   }
 
-  // TODO: Should error here.
   func test5() -> sending (any GlobalActorIsolatedProtocol)? {
-    self.p
+    self.p // expected-error {{returning main actor-isolated 'self.p' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p' risks causing data races since the caller assumes that 'self.p' can be safely sent to other isolation domains}}
   }
 
   func test6() -> (any OtherProtocol)? {
     self.p2
   }
 
-  // TODO: Should error here.
   func test7() -> sending (any OtherProtocol)? {
-    self.p2
+    self.p2 // expected-error {{returning main actor-isolated 'self.p2' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p2' risks causing data races since the caller assumes that 'self.p2' can be safely sent to other isolation domains}}
   }
 }
 
@@ -221,18 +237,18 @@ extension FinalNonSendableGlobalActorIsolatedKlass {
     self.p
   }
 
-  // TODO: Should error here.
   func test5() -> sending (any GlobalActorIsolatedProtocol)? {
-    self.p
+    self.p // expected-error {{returning main actor-isolated 'self.p' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p' risks causing data races since the caller assumes that 'self.p' can be safely sent to other isolation domains}}
   }
 
   func test6() -> (any OtherProtocol)? {
     self.p2
   }
 
-  // TODO: Should error here.
   func test7() -> sending (any OtherProtocol)? {
-    self.p2
+    self.p2 // expected-error {{returning main actor-isolated 'self.p2' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p2' risks causing data races since the caller assumes that 'self.p2' can be safely sent to other isolation domains}}
   }
 }
 
@@ -254,17 +270,17 @@ extension GlobalActorIsolatedProtocol {
     self.p
   }
 
-  // TODO: Should error here.
   mutating func test5() -> sending (any GlobalActorIsolatedProtocol)? {
-    self.p
+    self.p // expected-error {{returning main actor-isolated 'self.p' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p' risks causing data races since the caller assumes that 'self.p' can be safely sent to other isolation domains}}
   }
 
   mutating func test6() -> (any OtherProtocol)? {
     self.p2
   }
 
-  // TODO: Should error here.
   mutating func test7() -> sending (any OtherProtocol)? {
-    self.p2
+    self.p2 // expected-error {{returning main actor-isolated 'self.p2' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning main actor-isolated 'self.p2' risks causing data races since the caller assumes that 'self.p2' can be safely sent to other isolation domains}}
   }
 }
