@@ -227,7 +227,8 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
                                           false,
                                           c_string_utils::create_null(),
                                           c_string_utils::create_null(),
-                                          c_string_utils::create_null()};
+                                          c_string_utils::create_null(),
+                                          nullptr};
   hollowMainModuleInfo->details = hollowDetails;
 
   // Populate the diagnostic info

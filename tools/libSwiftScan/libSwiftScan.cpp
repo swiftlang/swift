@@ -29,6 +29,20 @@ using namespace swift::dependencies;
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 
 //=== Private Cleanup Functions -------------------------------------------===//
+void swiftscan_macro_dependency_dispose(
+    swiftscan_macro_dependency_set_t *macro) {
+  if (!macro)
+    return;
+
+  for (unsigned i = 0; i < macro->count; ++i) {
+    swiftscan_string_dispose(macro->macro_dependencies[i]->moduleName);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->libraryPath);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->executablePath);
+    delete macro->macro_dependencies[i];
+  }
+  delete[] macro->macro_dependencies;
+  delete macro;
+}
 
 void swiftscan_dependency_info_details_dispose(
     swiftscan_module_details_t details) {
@@ -58,6 +72,8 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_textual_details.bridging_header_include_tree);
     swiftscan_string_dispose(
         details_impl->swift_textual_details.module_cache_key);
+    swiftscan_macro_dependency_dispose(
+        details_impl->swift_textual_details.macro_dependencies);
     break;
   case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY:
     swiftscan_string_dispose(
