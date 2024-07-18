@@ -124,7 +124,7 @@ public:
     return Identity;
   }
 
-  const char* getIdentityDebugName() const {
+  std::string getIdentityDebugName() const {
     return isMainExecutor() ? " (MainActorExecutor)"
            : isGeneric()    ? " (GenericExecutor)"
                             : "";

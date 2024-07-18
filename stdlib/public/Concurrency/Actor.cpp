@@ -18,6 +18,8 @@
 #include "swift/Runtime/Concurrency.h"
 #include <atomic>
 #include <new>
+#include <string>
+#include <sstream>
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
@@ -625,35 +627,34 @@ static void logIsolationWarning(
   swift::once(initializeLogIsolationWarningStderrToken, initLogIsolationWarningStderr, nullptr);
 
   auto getActorTypeName = [](SerialExecutorRef ref) {
-    char *nameBuf = nullptr;
+    std::stringstream ss;
     if (ref.isDefaultActor()) {
       auto tyName = swift_getTypeName(swift_getObjectType(ref.getDefaultActor()), true);
-      asprintf(&nameBuf, " (default actor %.*s)", (int)tyName.length, tyName.data);
+      ss << " (default actor " << tyName.data << ")";
+      return ss.str();
     } else if (!ref.isGeneric() && !ref.isMainExecutor()) {
       // we have the executor reference; consider printing type name (if possible)
-      asprintf(&nameBuf, " (custom SerialExecutor)");
+      ss << " (custom SerialExecutor)";
+      return ss.str();
+    } else {
+      return ref.getIdentityDebugName();
     }
-    return nameBuf;
   };
 
-  char *currentActorName = getActorTypeName(currentExecutor);
-  SWIFT_DEFER { free(currentActorName); };
-  char *expectedActorName = getActorTypeName(expectedExecutor);
-  SWIFT_DEFER { free(expectedActorName); };
+  std::string currentActorName = getActorTypeName(currentExecutor);
+  std::string expectedActorName = getActorTypeName(expectedExecutor);
 
 #if SWIFT_HAS_OS_LOG
   os_log_fault(IsolationWarningLog,
                ISOLATION_WARNING_FORMAT,
                // expected isolation
                expectedExecutor.getIdentity(),
-               expectedActorName ? expectedActorName
-                                 : expectedExecutor.getIdentityDebugName(),
+               expectedActorName.c_str(),
                // current isolation
                currentExecutor.getIdentity() == 0 ? "non" : "",
                currentExecutor.getIdentity() ? " to" : "",
                currentExecutor.getIdentity(),
-               currentActorName ? currentActorName
-                                : currentExecutor.getIdentityDebugName(),
+               currentActorName.c_str(),
                // message and location details
                function, file, line, column,
                messageLen, message);
@@ -663,14 +664,12 @@ static void logIsolationWarning(
     fprintf(stderr, ISOLATION_WARNING_FORMAT,
             // expected isolation
             expectedExecutor.getIdentity(),
-            expectedActorName ? expectedActorName
-                              : expectedExecutor.getIdentityDebugName(),
+            expectedActorName.c_str(),
             // current isolation
             currentExecutor.getIdentity() == 0 ? "non" : "",
             currentExecutor.getIdentity() ? " to" : "",
             currentExecutor.getIdentity(),
-            currentActorName ? currentActorName
-                             : currentExecutor.getIdentityDebugName(),
+            currentActorName.c_str(),
             // message and location details
             function, file, line, column, messageLen, message);
     fflush(stderr);
