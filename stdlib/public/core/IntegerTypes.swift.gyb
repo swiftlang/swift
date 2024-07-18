@@ -1659,7 +1659,9 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public // @testable
   init(_ _v: Builtin.Word) {
-% if BuiltinName == 'Int32':
+% if BuiltinName == 'Int16':
+    self._value = Builtin.truncOrBitCast_Word_Int16(_v)
+% elif BuiltinName == 'Int32':
     self._value = Builtin.truncOrBitCast_Word_Int32(_v)
 % elif BuiltinName == 'Int64':
     self._value = Builtin.${z}extOrBitCast_Word_Int64(_v)
@@ -1669,7 +1671,9 @@ ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public // @testable
   var _builtinWordValue: Builtin.Word {
-% if BuiltinName == 'Int32':
+% if BuiltinName == 'Int16':
+    return Builtin.${z}extOrBitCast_Int16_Word(_value)
+% elif BuiltinName == 'Int32':
     return Builtin.${z}extOrBitCast_Int32_Word(_value)
 % elif BuiltinName == 'Int64':
     return Builtin.truncOrBitCast_Int64_Word(_value)
