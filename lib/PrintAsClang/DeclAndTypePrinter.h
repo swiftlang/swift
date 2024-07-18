@@ -15,6 +15,7 @@
 
 #include "OutputLanguageMode.h"
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
 #include "swift/ClangImporter/ClangImporter.h"
