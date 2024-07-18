@@ -1077,7 +1077,8 @@ void swift::copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
 /// Revisit the def-use chain of currentDef. Mark unneeded original
 /// copies and destroys for deletion. Insert new copies for interior uses that
 /// require ownership of the used operand.
-void CanonicalizeOSSALifetime::rewriteCopies() {
+void CanonicalizeOSSALifetime::rewriteCopies(
+    SmallVectorImpl<DestroyValueInst *> const &newDestroys) {
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
   InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
@@ -1163,11 +1164,17 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   assert(!consumes.hasUnclaimedConsumes());
 
   if (pruneDebugMode) {
+    for (auto *destroy : newDestroys) {
+      liveness->updateForUse(destroy, /*lifetimeEnding=*/true);
+    }
     for (auto *dvi : debugValues) {
-      if (!liveness->isWithinBoundary(dvi)) {
-        LLVM_DEBUG(llvm::dbgs() << "  Removing debug_value: " << *dvi);
-        deleter.forceDelete(dvi);
+      if (liveness->areUsesWithinBoundary(
+              {&dvi->getOperandRef()},
+              deadEndBlocksAnalysis->get(getCurrentDef()->getFunction()))) {
+        continue;
       }
+      LLVM_DEBUG(llvm::dbgs() << "  Removing debug_value: " << *dvi);
+      deleter.forceDelete(dvi);
     }
   }
 
@@ -1243,7 +1250,7 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
   // Step 5: insert destroys and record consumes
   insertDestroysOnBoundary(extendedBoundary, newDestroys);
   // Step 6: rewrite copies and delete extra destroys
-  rewriteCopies();
+  rewriteCopies(newDestroys);
 
   clear();
 }

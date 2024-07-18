@@ -491,7 +491,7 @@ private:
   void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary,
                                 SmallVectorImpl<DestroyValueInst *> &destroys);
 
-  void rewriteCopies();
+  void rewriteCopies(SmallVectorImpl<DestroyValueInst *> const &destroys);
 };
 
 } // end namespace swift
