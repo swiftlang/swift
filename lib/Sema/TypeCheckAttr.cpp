@@ -2309,8 +2309,36 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
   }
 }
 
+static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
+  if (ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers))
+    return true;
+
+  auto *sourceFile = D->getDeclContext()->getParentModule()
+      ->getSourceFileContainingLocation(D->getStartLoc());
+  if (!sourceFile)
+    return false;
+
+  auto expansion = sourceFile->getMacroExpansion();
+  auto *macroAttr = sourceFile->getAttachedMacroAttribute();
+  if (!expansion || !macroAttr)
+    return false;
+
+  auto *decl = expansion.dyn_cast<Decl *>();
+  if (!decl)
+    return false;
+
+  auto *macroDecl = decl->getResolvedMacro(macroAttr);
+  if (!macroDecl)
+    return false;
+
+  if (macroDecl->getParentModule()->isStdlibModule() &&
+      macroDecl->getName().getBaseIdentifier()
+          .str().equals("_DebugDescriptionProperty"))
+    return true;
+}
+
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+  if (!allowSymbolLinkageMarkers(Ctx, D)) {
     diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
     return;
   }
@@ -2336,7 +2364,7 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+  if (!allowSymbolLinkageMarkers(Ctx, D)) {
     diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
     return;
   }
