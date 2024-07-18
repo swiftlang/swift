@@ -1320,41 +1320,6 @@ function Build-CURL([Platform]$Platform, $Arch) {
     })
 }
 
-function Build-ICU([Platform]$Platform, $Arch) {
-  $ArchName = $Arch.LLVMName
-
-  if (-not $ToBatch) {
-    if (-not (Test-Path -Path "$SourceCache\icu\icu4c\CMakeLists.txt")) {
-      Copy-Item $SourceCache\swift-installer-scripts\shared\ICU\CMakeLists.txt $SourceCache\icu\icu4c\
-      Copy-Item $SourceCache\swift-installer-scripts\shared\ICU\icupkg.inc.cmake $SourceCache\icu\icu4c\
-    }
-  }
-
-  if ($Platform -eq "Windows" -and (($Arch.CMakeName -eq $BuildArch.CMakeName) -or ($Arch.CMakeName -ne "ARM64"))) {
-    $BuildToolsDefines = @{BUILD_TOOLS = "YES"}
-  } else {
-    $BuildToolsDefines = @{
-      BUILD_TOOLS = "NO";
-      ICU_TOOLS_DIR = "$($BuildArch.BinaryCache)\windows\icu-69.1"
-    }
-  }
-
-  Build-CMakeProject `
-    -Src $SourceCache\icu\icu4c `
-    -Bin "$($Arch.BinaryCache)\$Platform\icu-69.1" `
-    -InstallTo "$LibraryRoot\icu-69.1\usr" `
-    -Arch $Arch `
-    -Platform $Platform `
-    -UseMSVCCompilers C,CXX `
-    -BuildTargets default `
-    -Defines ($BuildToolsDefines + @{
-      BUILD_SHARED_LIBS = "NO";
-      CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
-      CMAKE_INSTALL_BINDIR = "bin/$Platform/$ArchName";
-      CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
-    })
-}
-
 function Build-Runtime([Platform]$Platform, $Arch) {
   Isolate-EnvVars {
     $env:Path = "$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
@@ -1443,15 +1408,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -UseBuiltCompilers ASM,C,CXX,Swift `
       -BuildTargets $Targets `
       -Defines (@{
-        # Turn off safeseh for lld as it has safeseh enabled by default
-        # and fails with an ICU data object file icudt69l_dat.obj. This
-        # matters to X86 only.
-        CMAKE_Swift_FLAGS = if ($Arch -eq $ArchX86) { @("-Xlinker", "/SAFESEH:NO") } else { "" };
         CURL_DIR = "$LibraryRoot\curl-8.4.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
-        ICU_DATA_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicudt69.lib";
-        ICU_I18N_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicuin69.lib";
-        ICU_ROOT = "$LibraryRoot\icu-69.1\usr";
-        ICU_UC_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicuuc69.lib";
         LIBXML2_LIBRARY = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
         LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
         LIBXML2_DEFINITIONS = "/DLIBXML_STATIC";
@@ -2159,7 +2116,6 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-ZLib Windows $Arch
     Invoke-BuildStep Build-XML2 Windows $Arch
     Invoke-BuildStep Build-CURL Windows $Arch
-    Invoke-BuildStep Build-ICU Windows $Arch
     Invoke-BuildStep Build-LLVM Windows $Arch
 
     # Build platform: SDK, Redist and XCTest

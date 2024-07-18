@@ -97,9 +97,6 @@
         "curl": {
           "remote": { "id": "curl/curl" }
         },
-        "icu": {
-          "remote": { "id": "unicode-org/icu" }
-        },
         "libxml2": {
           "remote": { "id": "gnome/libxml2" }
         },
@@ -156,7 +153,6 @@
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
                 "curl": "curl-8_4_0",
-                "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3"
             }
@@ -208,7 +204,6 @@
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
                 "curl": "curl-8_4_0",
-                "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3"
             }
