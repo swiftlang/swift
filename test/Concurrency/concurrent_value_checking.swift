@@ -361,7 +361,7 @@ class C5: @unchecked Sendable {
   var x: Int = 0 // okay
 }
 
-// expected-warning@+1 {{class 'C6' must restate inherited '@unchecked Sendable' conformance}}
+// expected-warning@+1 {{class 'C6' must restate inherited '@unchecked Sendable' conformance}}{{13-13=, @unchecked Sendable}}
 class C6: C5 {
   var y: Int = 0 // still okay, it's unsafe
 }

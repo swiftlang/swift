@@ -6244,8 +6244,9 @@ bool swift::checkSendableConformance(
         return false;
     }
 
-    nominal->diagnose(diag::restate_unchecked_sendable,
-                      nominal->getName());
+    auto diag =
+        nominal->diagnose(diag::restate_unchecked_sendable, nominal->getName());
+    addSendableFixIt(nominal, diag, /*unchecked=*/true);
     return false;
   }
 
