@@ -941,10 +941,12 @@ void CanonicalizeOSSALifetime::findExtendedBoundary(
 
 /// Create a new destroy_value instruction before the specified instruction and
 /// record it as a final consume.
-static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
-                                           SILValue currentDef,
-                                           CanonicalOSSAConsumeInfo &consumes,
-                                           InstModCallbacks &callbacks) {
+static void
+insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
+                               SILValue currentDef,
+                               CanonicalOSSAConsumeInfo &consumes,
+                               SmallVectorImpl<DestroyValueInst *> &destroys,
+                               InstModCallbacks &callbacks) {
   // OSSALifetimeCompletion: This conditional clause can be deleted with
   // complete lifetimes.
   if (consumes.isUnreachableLifetimeEnd(nextInstruction)) {
@@ -976,6 +978,7 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
   callbacks.createdNewInst(dvi);
   consumes.recordFinalConsume(dvi);
   ++NumDestroysGenerated;
+  destroys.push_back(dvi);
 }
 
 /// Inserts destroys along the boundary where needed and records all final
@@ -987,7 +990,8 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
 /// - The postdominating consumes cannot be within nested loops.
 /// - Any blocks in nested loops are now marked LiveOut.
 void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
-    PrunedLivenessBoundary const &boundary) {
+    PrunedLivenessBoundary const &boundary,
+    SmallVectorImpl<DestroyValueInst *> &newDestroys) {
   BasicBlockSet seenMergePoints(getCurrentDef()->getFunction());
   for (auto *instruction : boundary.lastUsers) {
     if (destroys.contains(instruction)) {
@@ -1009,7 +1013,7 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
           }
           auto *insertionPoint = &*successor->begin();
           insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(),
-                                         consumes, getCallbacks());
+                                         consumes, newDestroys, getCallbacks());
           LLVM_DEBUG(llvm::dbgs() << "  Destroy after terminator "
                                   << *instruction << " at beginning of ";
                      successor->printID(llvm::dbgs(), false);
@@ -1019,7 +1023,7 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
       }
       auto *insertionPoint = instruction->getNextInstruction();
       insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
-                                     getCallbacks());
+                                     newDestroys, getCallbacks());
       LLVM_DEBUG(llvm::dbgs()
                  << "  Destroy at last use " << insertionPoint << "\n");
       continue;
@@ -1028,14 +1032,14 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
   for (auto *edgeDestination : boundary.boundaryEdges) {
     auto *insertionPoint = &*edgeDestination->begin();
     insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
-                                   getCallbacks());
+                                   newDestroys, getCallbacks());
     LLVM_DEBUG(llvm::dbgs() << "  Destroy on edge " << edgeDestination << "\n");
   }
   for (auto *def : boundary.deadDefs) {
     if (auto *arg = dyn_cast<SILArgument>(def)) {
       auto *insertionPoint = &*arg->getParent()->begin();
       insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
-                                     getCallbacks());
+                                     newDestroys, getCallbacks());
       LLVM_DEBUG(llvm::dbgs()
                  << "  Destroy after dead def arg " << arg << "\n");
     } else {
@@ -1043,7 +1047,7 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
       auto *insertionPoint = instruction->getNextInstruction();
       assert(insertionPoint && "def instruction was a terminator?!");
       insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
-                                     getCallbacks());
+                                     newDestroys, getCallbacks());
       LLVM_DEBUG(llvm::dbgs()
                  << "  Destroy after dead def inst " << instruction << "\n");
     }
@@ -1235,8 +1239,9 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
     findExtendedBoundary(originalBoundary, extendedBoundary);
   }
 
+  SmallVector<DestroyValueInst *> newDestroys;
   // Step 5: insert destroys and record consumes
-  insertDestroysOnBoundary(extendedBoundary);
+  insertDestroysOnBoundary(extendedBoundary, newDestroys);
   // Step 6: rewrite copies and delete extra destroys
   rewriteCopies();
 

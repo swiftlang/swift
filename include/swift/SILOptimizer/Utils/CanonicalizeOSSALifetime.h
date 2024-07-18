@@ -488,7 +488,8 @@ private:
       llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
           visitor);
 
-  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
+  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary,
+                                SmallVectorImpl<DestroyValueInst *> &destroys);
 
   void rewriteCopies();
 };
