@@ -100,6 +100,7 @@
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -247,6 +248,8 @@ private:
   // extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
+
   DominanceInfo *domTree = nullptr;
 
   BasicCalleeAnalysis *calleeAnalysis;
@@ -326,15 +329,14 @@ public:
     }
   };
 
-  CanonicalizeOSSALifetime(PruneDebugInsts_t pruneDebugMode,
-                           MaximizeLifetime_t maximizeLifetime,
-                           SILFunction *function,
-                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceInfo *domTree,
-                           BasicCalleeAnalysis *calleeAnalysis,
-                           InstructionDeleter &deleter)
+  CanonicalizeOSSALifetime(
+      PruneDebugInsts_t pruneDebugMode, MaximizeLifetime_t maximizeLifetime,
+      SILFunction *function, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+      DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
+      BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
+        accessBlockAnalysis(accessBlockAnalysis),
+        deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
   SILValue getCurrentDef() const { return currentDef; }

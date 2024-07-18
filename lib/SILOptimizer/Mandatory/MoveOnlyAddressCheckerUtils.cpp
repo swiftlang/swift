@@ -1490,7 +1490,7 @@ struct MoveOnlyAddressCheckerPImpl {
       DominanceInfo *domTree, PostOrderAnalysis *poa,
       DeadEndBlocksAnalysis *deba,
       borrowtodestructure::IntervalMapAllocator &allocator)
-      : fn(fn), deleter(), canonicalizer(fn, domTree, deleter),
+      : fn(fn), deleter(), canonicalizer(fn, domTree, deba, deleter),
         addressUseState(domTree), diagnosticEmitter(diagnosticEmitter),
         deba(deba), poa(poa), allocator(allocator) {
     deleter.setCallbacks(std::move(

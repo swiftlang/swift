@@ -1282,6 +1282,8 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
     [](auto &function, auto &arguments, auto &test) {
       auto *accessBlockAnalysis =
           test.template getAnalysis<NonLocalAccessBlockAnalysis>();
+      auto *deadEndBlocksAnalysis =
+          test.template getAnalysis<DeadEndBlocksAnalysis>();
       auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
       DominanceInfo *domTree = dominanceAnalysis->get(&function);
       auto *calleeAnalysis = test.template getAnalysis<BasicCalleeAnalysis>();
@@ -1291,8 +1293,8 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
       InstructionDeleter deleter;
       CanonicalizeOSSALifetime canonicalizer(
           pruneDebug, maximizeLifetimes, &function,
-          respectAccessScopes ? accessBlockAnalysis : nullptr, domTree,
-          calleeAnalysis, deleter);
+          respectAccessScopes ? accessBlockAnalysis : nullptr,
+          deadEndBlocksAnalysis, domTree, calleeAnalysis, deleter);
       auto value = arguments.takeValue();
       SmallVector<SILInstruction *, 4> lexicalLifetimeEnds;
       while (arguments.hasUntaken()) {

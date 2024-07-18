@@ -47,11 +47,12 @@ struct OSSACanonicalizer {
   CanonicalizeOSSALifetime canonicalizer;
 
   OSSACanonicalizer(SILFunction *fn, DominanceInfo *domTree,
+                    DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
                     InstructionDeleter &deleter)
       : canonicalizer(DontPruneDebugInsts,
                       MaximizeLifetime_t(!fn->shouldOptimize()), fn,
-                      nullptr /*accessBlockAnalysis*/, domTree,
-                      nullptr /*calleeAnalysis*/, deleter) {}
+                      nullptr /*accessBlockAnalysis*/, deadEndBlocksAnalysis,
+                      domTree, nullptr /*calleeAnalysis*/, deleter) {}
 
   void clear() {
     consumingUsesNeedingCopy.clear();
@@ -176,6 +177,7 @@ bool searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
 struct MoveOnlyObjectChecker {
   DiagnosticEmitter &diagnosticEmitter;
   DominanceInfo *domTree;
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
   PostOrderAnalysis *poa;
   borrowtodestructure::IntervalMapAllocator &allocator;
 
