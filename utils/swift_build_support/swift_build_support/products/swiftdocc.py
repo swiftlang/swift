@@ -18,6 +18,7 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
+from . import libicu
 from . import llbuild
 from . import llvm
 from . import product
@@ -105,6 +106,7 @@ class SwiftDocC(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
+                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 foundation.Foundation,

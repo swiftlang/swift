@@ -135,6 +135,9 @@ toolchain as a one-off, there are a couple of differences:
 - Before running `update-checkout`, double-check that `swift` is the only
   repository inside the `swift-project` directory. Otherwise,
   `update-checkout` may not clone the necessary dependencies.
+- Running `update-checkout` may fail if the `git-lfs` dependency is not
+  installed. This may report as an error related to `icu`. A workaround is
+  passing `--skip-repository icu` to `update-checkout`.
 
 ## Installing dependencies
 

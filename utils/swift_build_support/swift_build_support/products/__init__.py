@@ -18,6 +18,7 @@ from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
 from .libdispatch import LibDispatch
+from .libicu import LibICU
 from .libxml2 import LibXML2
 from .llbuild import LLBuild
 from .lldb import LLDB
@@ -49,6 +50,7 @@ __all__ = [
     'Foundation',
     'LibCXX',
     'LibDispatch',
+    'LibICU',
     'LibXML2',
     'Zlib',
     'LibCurl',

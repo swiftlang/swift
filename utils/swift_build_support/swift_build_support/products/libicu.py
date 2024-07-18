@@ -1,4 +1,4 @@
-# swift_build_support/products/lldb.py --------------------------*- python -*-
+# swift_build_support/products/libicu.py -------------------------------------
 #
 # This source file is part of the Swift.org open source project
 #
@@ -12,13 +12,11 @@
 
 from . import cmark
 from . import libcxx
-from . import libicu
 from . import llvm
 from . import product
-from . import swift
 
 
-class LLDB(product.Product):
+class LibICU(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -36,9 +34,19 @@ class LLDB(product.Product):
         return False
 
     @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return "icu"
+
+    @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True
+
+    @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 llvm.LLVM,
-                libcxx.LibCXX,
-                libicu.LibICU,
-                swift.Swift]
+                libcxx.LibCXX]
