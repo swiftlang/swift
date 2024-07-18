@@ -51,8 +51,8 @@ import NonExistent
 // DIRECT-NONEXISTENT: Could not load module: NonExistent
 
 // RUN: %target-swift-frontend -emit-module %t/Inputs/Transitive.swift -module-name NonExistent -o %t
-// RUN: %target-swift-frontend -emit-module %t/Inputs/LibraryNonExistant.swift -module-name LibraryNonExistent -I %t -o %t
-// RUN: rm -rf %t/NonExistant.swiftmodule
+// RUN: %target-swift-frontend -emit-module %t/Inputs/LibraryNonExistent.swift -module-name LibraryNonExistent -I %t -o %t
+// RUN: rm -rf %t/NonExistent.swiftmodule
 
 // RUN: not %sourcekitd-test -req=interface-gen -module LibraryNonExistent -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix TRANSITIVE-NONEXISTENT %s
 // TRANSITIVE-NONEXISTENT: Could not load module: LibraryNonExistent (missing required module 'NonExistent')
