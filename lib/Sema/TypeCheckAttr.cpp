@@ -7312,7 +7312,7 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   } else if (fn->getBaseName().isSpecial() ||
              !fn->getParentModule()->getName().str().equals("_Concurrency") ||
              !fn->getBaseIdentifier().str()
-                .startswith("_unsafeInheritExecutor_")) {
+                .starts_with("_unsafeInheritExecutor_")) {
     bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
         .str().equals("_Concurrency");
     auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
