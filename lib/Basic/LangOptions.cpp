@@ -729,7 +729,7 @@ namespace {
         "-working-directory=",
         "-working-directory"};
 
-  constexpr std::array<std::string_view, 16>
+  constexpr std::array<std::string_view, 15>
       knownClangDependencyIgnorablePrefiexes = {"-I",
                                                 "-F",
                                                 "-fmodule-map-file=",
@@ -744,8 +744,7 @@ namespace {
                                                 "-isystem",
                                                 "-isysroot",
                                                 "-working-directory=",
-                                                "-working-directory",
-                                                "-D"};
+                                                "-working-directory"};
 }
 
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
