@@ -590,6 +590,8 @@ struct PrunedLivenessBoundary {
 ///
 ///   bool isDef(SILInstruction *inst) const
 ///
+///   bool isDef(SILArgument *arg) const
+///
 ///   bool isDefBlock(SILBasicBlock *block) const
 ///
 template <typename LivenessWithDefs>
@@ -610,6 +612,15 @@ protected:
   LiveRangeSummary recursivelyUpdateForDef(SILValue initialDef,
                                            ValueSet &visited,
                                            SILValue value);
+
+  bool isInstructionLive(SILInstruction *instruction, bool liveOut) const;
+  bool isAvailableOut(SILBasicBlock *block, DeadEndBlocks &deadEndBlocks) const;
+  bool isInstructionAvailable(SILInstruction *user,
+                              DeadEndBlocks &deadEndBlocks) const;
+  /// Whether \p user is within the boundary extended from live regions into
+  /// dead-end regions up to the availability boundary.
+  bool isWithinExtendedBoundary(SILInstruction *user,
+                                DeadEndBlocks *deadEndBlocks) const;
 
 public:
   /// Add \p inst to liveness which uses the def as indicated by \p usage.
@@ -734,6 +745,8 @@ public:
   bool isInitialized() const { return bool(def); }
 
   bool isDef(SILInstruction *inst) const { return inst == defInst; }
+
+  bool isDef(SILArgument *arg) const { return def == arg; }
 
   bool isDefBlock(SILBasicBlock *block) const {
     return def->getParentBlock() == block;
