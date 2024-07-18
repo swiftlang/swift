@@ -3134,7 +3134,7 @@ ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
     IfConfigClauseRanges.Ranges.reserve(numRegions);
     for (intptr_t i = 0; i != numRegions; ++i)
       IfConfigClauseRanges.Ranges.push_back(regions[i].unbridged());
-    free(regions);
+    swift_ASTGen_freeConfiguredRegions(regions, numRegions);
 
     IfConfigClauseRanges.IsSorted = true;
   }

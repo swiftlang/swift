@@ -275,3 +275,11 @@ extension SyntaxProtocol {
     return false
   }
 }
+
+@_cdecl("swift_ASTGen_freeConfiguredRegions")
+public func freeConfiguredRegions(
+  regions: UnsafeMutablePointer<BridgedIfConfigClauseRangeInfo>?,
+  numRegions: Int
+) {
+  UnsafeMutableBufferPointer(start: regions, count: numRegions).deallocate()
+}
