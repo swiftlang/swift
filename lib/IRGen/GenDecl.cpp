@@ -5838,7 +5838,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
 static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
   if (ext->isObjCImplementation()) {
-    assert(!ext->getObjCCategoryName().empty());
+    assert(ext->getCategoryNameForObjCImplementation() != Identifier());
     return true;
   }
 
@@ -5882,7 +5882,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  if (ext->isObjCImplementation() && ext->getObjCCategoryName().empty()) {
+  if (ext->isObjCImplementation()
+        && ext->getCategoryNameForObjCImplementation() == Identifier()) {
     // This is the @_objcImplementation for the class--generate its class
     // metadata.
     emitClassDecl(origClass);

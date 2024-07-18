@@ -25,14 +25,12 @@ using namespace swift;
 std::optional<ObjCInterfaceAndImplementation>
 ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   auto passedDecl = std::get<0>(getStorage());
-  if (!passedDecl) {
+  if (!passedDecl)
     return {};
-  }
 
-  if (passedDecl->getCachedLacksObjCInterfaceOrImplementation()) {
+  if (!passedDecl->getCachedLacksObjCInterfaceOrImplementation())
     // We've computed this request and found that this is a normal declaration.
     return {};
-  }
 
   // Either we've computed this request and cached a result in the ImporterImpl,
   // or we haven't computed this request. Check the caches.
@@ -46,21 +44,20 @@ ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   // `ImplementationsByInterface`.
 
   Decl *implDecl = nullptr;
-  if (passedDecl->hasClangNode()) {
-    // `passedDecl` *could* be an interface.
+  if (!passedDecl->hasClangNode()) {
+    // `passedDecl` *could* be an implementation.
     auto iter = impl.ImplementationsByInterface.find(passedDecl);
     if (iter != impl.ImplementationsByInterface.end())
       implDecl = iter->second;
   } else {
-    // `passedDecl` *could* be an implementation.
+    // `passedDecl` *could* be an interface.
     implDecl = passedDecl;
   }
 
   if (implDecl) {
     auto iter = impl.InterfacesByImplementation.find(implDecl);
-    if (iter != impl.InterfacesByImplementation.end()) {
+    if (iter != impl.InterfacesByImplementation.end())
       return ObjCInterfaceAndImplementation(iter->second, implDecl);
-    }
   }
 
   // Nothing in the caches, so we must need to compute this.
@@ -71,7 +68,7 @@ void ObjCInterfaceAndImplementationRequest::
 cacheResult(ObjCInterfaceAndImplementation value) const {
   Decl *passedDecl = std::get<0>(getStorage());
 
-  if (value.empty()) {
+  if (!value) {
     // `decl` is neither an interface nor an implementation; remember this.
     passedDecl->setCachedLacksObjCInterfaceOrImplementation(true);
     return;

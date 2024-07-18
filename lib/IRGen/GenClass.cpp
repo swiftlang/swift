@@ -1140,13 +1140,12 @@ namespace {
       return pair.second;
     }
 
-    std::optional<StringRef> getCustomCategoryName() const {
-      if (!TheExtension)
+    std::optional<StringRef> getObjCImplCategoryName() const {
+      if (!TheExtension || !TheExtension->isObjCImplementation())
         return std::nullopt;
-      assert(!TheExtension->hasClangNode());
-      auto ident = TheExtension->getObjCCategoryName();
-      if (!ident.empty()) {
-        return ident.str();
+      if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
+        assert(!ident->empty());
+        return ident->str();
       }
       return std::nullopt;
     }
@@ -1428,8 +1427,8 @@ namespace {
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
 
-      if (auto customCategoryName = getCustomCategoryName()) {
-        os << *customCategoryName;
+      if (auto implementationCategoryName = getObjCImplCategoryName()) {
+        os << *implementationCategoryName;
         return;
       }
 
@@ -2451,8 +2450,8 @@ namespace {
         os << "@";
         TheExtension->getLoc().print(os, IGM.Context.SourceMgr);
       }
-      if (auto name = getCustomCategoryName()) {
-        os << " custom_category_name=" << *name;
+      if (auto name = getObjCImplCategoryName()) {
+        os << " objc_impl_category_name=" << *name;
       }
       
       if (HasNonTrivialConstructor)
@@ -2564,27 +2563,12 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
   Explosion params = IGF.collectParameters();
   (void) params.claimAll();
 
-  llvm::Value *metadata;
-  if (D->getObjCImplementationDecl()) {
-    // This is an @objc @implementation class, so it has no metadata completion
-    // function. We must do the completion function's work here, taking care to
-    // fetch the address of the ObjC class without going through either runtime.
-    metadata = IGM.getAddrOfObjCClass(D, NotForDefinition);
-    auto loweredTy = IGM.getLoweredType(D->getDeclaredTypeInContext());
-
-    IGF.emitInitializeFieldOffsetVector(loweredTy, metadata,
-                                        /*isVWTMutable=*/false,
-                                        /*collector=*/nullptr);
-  } else {
-    // Just call our metadata accessor, which will cause the Swift runtime to
-    // call the metadata completion function if there is one. This should
-    // actually return the same metadata; the Objective-C runtime enforces this.
-    auto type = D->getDeclaredType()->getCanonicalType();
-    metadata = IGF.emitTypeMetadataRef(type,
-                                       MetadataState::Complete)
-      .getMetadata();
-  }
-
+  // Just directly call our metadata accessor. This should actually
+  // return the same metadata; the Objective-C runtime enforces this.
+  auto type = D->getDeclaredType()->getCanonicalType();
+  auto *metadata = IGF.emitTypeMetadataRef(type,
+                                           MetadataState::Complete)
+    .getMetadata();
   IGF.Builder.CreateRet(
     IGF.Builder.CreateBitCast(metadata,
                               IGM.ObjCClassPtrTy));
