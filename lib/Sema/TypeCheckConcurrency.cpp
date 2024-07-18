@@ -3987,6 +3987,7 @@ namespace {
                                        diag::isolation_in_inherits_executor,
                                        inDefaultArgument);
         diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
+        diag.warnUntilSwiftVersion(6);
         replaceUnsafeInheritExecutorWithDefaultedIsolationParam(func, diag);
       }
 

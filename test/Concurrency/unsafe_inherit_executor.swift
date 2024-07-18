@@ -52,7 +52,7 @@ func unsafeCallerA(x: Int) async {
   // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   await inheritsIsolationProperly()
-  // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{50:1-24=}}{{51:26-26=, isolation: isolated (any Actor)? = #isolation}}
+  // expected-warning@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{50:1-24=}}{{51:26-26=, isolation: isolated (any Actor)? = #isolation}}
 }
 
 @_unsafeInheritExecutor
@@ -60,7 +60,7 @@ func unsafeCallerB() async {
   // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   await inheritsIsolationProperly(isolation: #isolation)
-  // expected-error@-1{{#isolation cannot be used within an '@_unsafeInheritExecutor' function}}{{58:1-24=}}{{59:20-20=isolation: isolated (any Actor)? = #isolation}}
+  // expected-warning@-1{{#isolation cannot be used within an '@_unsafeInheritExecutor' function}}{{58:1-24=}}{{59:20-20=isolation: isolated (any Actor)? = #isolation}}
 }
 
 @_unsafeInheritExecutor
@@ -68,7 +68,7 @@ func unsafeCallerC(x: Int, fn: () -> Void, fn2: () -> Void) async {
   // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   await inheritsIsolationProperly()
-  // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{66:1-24=}}{{67:28-28=, isolation: isolated (any Actor)? = #isolation, }}
+  // expected-warning@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{66:1-24=}}{{67:28-28=, isolation: isolated (any Actor)? = #isolation, }}
 }
 
 @_unsafeInheritExecutor
@@ -130,7 +130,7 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
   try await TL.$string.withValue("hello", operation: operation)
 
   // FIXME: Clock.measure does not currently support this hack.
-  // expected-error@+1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}
+  // expected-warning@+1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}
   _ = try! await clock.measure {
     print("so very slow")
     try await Task.sleep(nanoseconds: 500)
