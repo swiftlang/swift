@@ -97,6 +97,9 @@
         "curl": {
           "remote": { "id": "curl/curl" }
         },
+        "icu": {
+          "remote": { "id": "unicode-org/icu" }
+        },
         "libxml2": {
           "remote": { "id": "gnome/libxml2" }
         },
