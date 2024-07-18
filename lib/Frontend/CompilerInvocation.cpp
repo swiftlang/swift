@@ -1565,10 +1565,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.UseCheckedAsyncObjCBridging = true;
   }
 
-  // @DebugDescription uses @_section and @_used attributes.
-  if (Opts.hasFeature(Feature::DebugDescriptionMacro))
-    Opts.enableFeature(Feature::SymbolLinkageMarkers);
-
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
 
