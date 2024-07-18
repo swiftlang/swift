@@ -441,6 +441,8 @@ public:
 
   /// The entry point to this function transformation.
   void run() override;
+
+  void verifyOwnership();
 };
 
 } // end anonymous namespace
@@ -635,12 +637,17 @@ void CopyPropagation::run() {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     accessBlockAnalysis->unlockInvalidation();
     if (f->getModule().getOptions().VerifySILOwnership) {
-      auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-      f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
-                             ? nullptr
-                             : deBlocksAnalysis->get(f));
+      verifyOwnership();
     }
   }
+}
+
+void CopyPropagation::verifyOwnership() {
+  auto *f = getFunction();
+  auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+  f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
+                         ? nullptr
+                         : deBlocksAnalysis->get(f));
 }
 
 // MandatoryCopyPropagation is not currently enabled in the -Onone pipeline
