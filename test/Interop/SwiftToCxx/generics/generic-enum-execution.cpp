@@ -123,6 +123,13 @@ int main() {
     // CHECK-NEXT: after some
     // CHECK-NEXT: destroy-TracksDeinit
   }
+  {
+    auto opt = swift::Optional<int>::some(14);
+    auto x = GenericCustomType<int>::success(opt);
+    auto y = x;
+    assert(y.isSuccess());
+    assert(y.getSuccess().getSome() == 14);
+  }
   puts("EOF");
   // CHECK-NEXT: EOF
   return 0;
