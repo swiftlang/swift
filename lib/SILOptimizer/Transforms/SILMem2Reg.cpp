@@ -2203,6 +2203,12 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
     return true;
   }
 
+  // The value stored into an alloc_stack whose type address-only can never be
+  // represented in a register.  Bail out.
+  if (alloc->getType().isAddressOnly(f)) {
+    return false;
+  }
+
   // For AllocStacks that are only used within a single basic blocks, use
   // the linear sweep to remove the AllocStack.
   if (inSingleBlock) {
