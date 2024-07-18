@@ -2,6 +2,7 @@
 
 import Builtin
 import Swift
+import _Concurrency
 
 //////////////////
 // Declarations //
@@ -545,5 +546,35 @@ bb0:
   %empty = tuple ()
   %14 = tuple (%empty : $(), %13 : $())
   dealloc_stack %11 : $*(Builtin.BridgeObject, ())
+  return undef : $()
+}
+
+typealias ResilientTy = CheckedContinuation<(), Error>
+
+// CHECK-LABEL: sil @dont_promote_addronly_aggregate : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'dont_promote_addronly_aggregate'
+sil @dont_promote_addronly_aggregate : $@convention(thin) () -> () {
+bb0:
+  %11 = alloc_stack $Pair<ResilientTy, ()>
+  %12 = struct_element_addr %11 : $*Pair<ResilientTy, ()>, #Pair.u
+  %13 = load %12 : $*()
+  %empty = tuple ()
+  %14 = tuple (%empty : $(), %13 : $())
+  dealloc_stack %11 : $*Pair<ResilientTy, ()>
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_addronly_aggregate_2 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'dont_promote_addronly_aggregate_2'
+sil @dont_promote_addronly_aggregate_2 : $@convention(thin) <T> () -> () {
+bb0:
+  %11 = alloc_stack $Pair<T, ()>
+  %12 = struct_element_addr %11 : $*Pair<T, ()>, #Pair.u
+  %13 = load %12 : $*()
+  %empty = tuple ()
+  %14 = tuple (%empty : $(), %13 : $())
+  dealloc_stack %11 : $*Pair<T, ()>
   return undef : $()
 }
