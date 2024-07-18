@@ -38,12 +38,10 @@ typedef unsigned long _swift_shims_objc_associationPolicy;
 #endif
 
 #if !FOUNDATION_HELPER_FILE
-//`value` is actually `id`, but we need it to not import as `Any`
 extern void
 objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key,
-                         const void * _Nullable value, _swift_shims_objc_associationPolicy policy);
-//return type is actually `id`, but we need it to not import as `Any`
-extern const void * _Nullable
+                         id _Nullable value, _swift_shims_objc_associationPolicy policy);
+extern id _Nullable
 objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
 int objc_sync_enter(id _Nonnull object);
 int objc_sync_exit(id _Nonnull object);
