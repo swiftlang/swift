@@ -2333,7 +2333,8 @@ static bool isCCompatibleFuncDecl(FuncDecl *FD) {
 }
 
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::Extern)) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Extern)
+      && !D->getModuleContext()->isStdlibModule()) {
     diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
     return;
   }
