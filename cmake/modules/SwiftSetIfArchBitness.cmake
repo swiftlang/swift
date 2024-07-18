@@ -2,11 +2,13 @@ function(set_if_arch_bitness var_name)
   cmake_parse_arguments(
       SIA # prefix
       "" # options
-      "ARCH;CASE_32_BIT;CASE_64_BIT" # single-value args
+      "ARCH;CASE_16_BIT;CASE_32_BIT;CASE_64_BIT" # single-value args
       "" # multi-value args
       ${ARGN})
 
-  if("${SIA_ARCH}" STREQUAL "i386" OR
+  if("${SIA_ARCH}" STREQUAL "avr")
+      set("${var_name}" "${SIA_CASE_16_BIT}" PARENT_SCOPE)
+  elseif("${SIA_ARCH}" STREQUAL "i386" OR
      "${SIA_ARCH}" STREQUAL "i686" OR
      "${SIA_ARCH}" STREQUAL "x86" OR
      "${SIA_ARCH}" STREQUAL "armv4t" OR

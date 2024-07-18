@@ -14,6 +14,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       continue()
     endif()
 
+    if("${arch}" MATCHES "avr")
+      continue()
+    endif()
+
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       set(extra_c_compile_flags -ffreestanding)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")

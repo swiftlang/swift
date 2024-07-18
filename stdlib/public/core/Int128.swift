@@ -456,6 +456,8 @@ extension Int128: BinaryInteger {
     UInt(Builtin.trunc_Int128_Int64(_value))
 #elseif _pointerBitWidth(_32)
     UInt(Builtin.trunc_Int128_Int32(_value))
+#elseif _pointerBitWidth(_16)
+    UInt(Builtin.trunc_Int128_Int16(_value))
 #else
 #error("Unsupported platform")
 #endif
