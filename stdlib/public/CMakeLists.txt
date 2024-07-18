@@ -214,6 +214,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
     )
   endif()
+
+  if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "avr  avr-none-none-elf    avr-none-none-elf"
+    )
+  endif()  
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
