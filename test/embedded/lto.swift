@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -lto=llvm-full %s -enable-experimental-feature Embedded -emit-bc -o %t/a.o
+// RUN: %target-swift-frontend -enable-experimental-feature Extern -lto=llvm-full %s -enable-experimental-feature Embedded -emit-bc -o %t/a.o
 // RUN: %target-clang %t/a.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
