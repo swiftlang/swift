@@ -2114,6 +2114,19 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       getNativeCCEntryPointArgumentEmission(IGF, *entry, allParamValues);
   auto funcTy = IGF.CurSILFn->getLoweredFunctionType();
 
+  // Coroutine context should be the first parameter.
+  // Indirect returns (if present) follow it.
+  switch (funcTy->getCoroutineKind()) {
+  case SILCoroutineKind::None:
+    break;
+  case SILCoroutineKind::YieldOnce:
+    emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
+    break;
+  case SILCoroutineKind::YieldMany:
+    emitYieldManyCoroutineEntry(IGF, funcTy, *emission);
+    break;
+  }
+  
   // Map the indirect return if present.
   ArrayRef<SILArgument *> params = emitEntryPointIndirectReturn(
       *emission, IGF, entry, funcTy, [&](SILType retType) -> bool {
@@ -2128,18 +2141,6 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   if (funcTy->getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod) {
     collectTrailingWitnessMetadata(IGF, *IGF.CurSILFn, *emission,
                                    witnessMetadata);
-  }
-
-  // The coroutine context should be the first parameter.
-  switch (funcTy->getCoroutineKind()) {
-  case SILCoroutineKind::None:
-    break;
-  case SILCoroutineKind::YieldOnce:
-    emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
-    break;
-  case SILCoroutineKind::YieldMany:
-    emitYieldManyCoroutineEntry(IGF, funcTy, *emission);
-    break;
   }
 
   SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
