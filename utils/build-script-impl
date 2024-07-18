@@ -1386,6 +1386,10 @@ function common_swift_flags() {
         echo "error: a module cache path has not been set"
         exit 1
     fi
+
+    # Remove quotes from COMMON_SWIFT_FLAGS before using it
+    COMMON_SWIFT_FLAGS=`echo ${COMMON_SWIFT_FLAGS} | xargs`
+
     echo -n "${SWIFT_FLAGS[@]} ${COMMON_SWIFT_FLAGS} -module-cache-path \"${module_cache}\" "
 }
 
