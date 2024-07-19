@@ -2335,6 +2335,8 @@ static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
       macroDecl->getName().getBaseIdentifier()
           .str().equals("_DebugDescriptionProperty"))
     return true;
+
+  return false;
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
