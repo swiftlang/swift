@@ -475,6 +475,33 @@ struct TransferredNonTransferrableInfo {
         isolationRegionInfo(isolationRegionInfo) {}
 };
 
+struct AssignIsolatedIntoOutSendingParameterInfo {
+  /// The user that actually caused the transfer.
+  Operand *srcOperand;
+
+  /// The specific out sending result.
+  SILFunctionArgument *outSendingResult;
+
+  /// The non-transferrable value that is in the same region as \p
+  /// outSendingResult.
+  SILValue nonTransferrableValue;
+
+  /// The region info that describes the dynamic dataflow derived isolation
+  /// region info for the non-transferrable value.
+  ///
+  /// This is equal to the merge of the IsolationRegionInfo from all elements in
+  /// nonTransferrable's region when the error was diagnosed.
+  SILDynamicMergedIsolationInfo isolatedValueIsolationRegionInfo;
+
+  AssignIsolatedIntoOutSendingParameterInfo(
+      Operand *transferringOperand, SILFunctionArgument *outSendingResult,
+      SILValue nonTransferrableValue,
+      SILDynamicMergedIsolationInfo isolationRegionInfo)
+      : srcOperand(transferringOperand), outSendingResult(outSendingResult),
+        nonTransferrableValue(nonTransferrableValue),
+        isolatedValueIsolationRegionInfo(isolationRegionInfo) {}
+};
+
 /// Wrapper around a SILInstruction that internally specifies whether we are
 /// dealing with an inout reinitialization needed or if it is just a normal
 /// use after transfer.
@@ -514,6 +541,8 @@ class TransferNonSendableImpl {
       transferredNonTransferrableInfoList;
   SmallVector<InOutSendingNotDisconnectedInfo, 8>
       inoutSendingNotDisconnectedInfoList;
+  SmallVector<AssignIsolatedIntoOutSendingParameterInfo, 8>
+      assignIsolatedIntoOutSendingParameterInfoList;
 
 public:
   TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
@@ -527,6 +556,7 @@ private:
   void emitUseAfterTransferDiagnostics();
   void emitTransferredNonTransferrableDiagnostics();
   void emitInOutSendingNotDisconnectedInfoList();
+  void emitAssignIsolatedIntoSendingResultDiagnostics();
 };
 
 } // namespace
@@ -1820,6 +1850,208 @@ void TransferNonSendableImpl::emitInOutSendingNotDisconnectedInfoList() {
 }
 
 //===----------------------------------------------------------------------===//
+//           MARK: AssignTransferNonTransferrableIntoSendingResult
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class AssignIsolatedIntoSendingResultDiagnosticEmitter {
+  AssignIsolatedIntoOutSendingParameterInfo info;
+  bool emittedErrorDiagnostic = false;
+
+public:
+  AssignIsolatedIntoSendingResultDiagnosticEmitter(
+      AssignIsolatedIntoOutSendingParameterInfo info)
+      : info(info) {}
+
+  ~AssignIsolatedIntoSendingResultDiagnosticEmitter() {
+    // If we were supposed to emit a diagnostic and didn't emit an unknown
+    // pattern error.
+    if (!emittedErrorDiagnostic)
+      emitUnknownPatternError();
+  }
+
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return getDiagnosticBehaviorLimitForValue(info.outSendingResult);
+  }
+
+  void emitUnknownPatternError() {
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(info.srcOperand->getUser(),
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
+  }
+
+  void emit();
+
+  ASTContext &getASTContext() const {
+    return info.srcOperand->getFunction()->getASTContext();
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilSwiftVersion(6));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
+    return diagnoseError(op->getUser()->getLoc(), diag,
+                         std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(Operand *op, Diag<T...> diag, U &&...args) {
+    return diagnoseNote(op->getUser()->getLoc(), diag,
+                        std::forward<U>(args)...);
+  }
+};
+
+} // namespace
+
+/// Look through values looking for our out parameter. We want to tightly
+/// control this to be conservative... so we handroll this.
+static SILValue findOutParameter(SILValue v) {
+  while (true) {
+    SILValue temp = v;
+    if (auto *initOpt = dyn_cast<InitEnumDataAddrInst>(temp)) {
+      if (initOpt->getElement()->getParentEnum() ==
+          initOpt->getFunction()->getASTContext().getOptionalDecl()) {
+        temp = initOpt->getOperand();
+      }
+    }
+
+    if (temp == v) {
+      return v;
+    }
+
+    v = temp;
+  }
+}
+
+void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
+  // Then emit the note with greater context.
+  SmallString<64> descriptiveKindStr;
+  {
+    llvm::raw_svector_ostream os(descriptiveKindStr);
+    info.isolatedValueIsolationRegionInfo.printForDiagnostics(os);
+  }
+
+  // Grab the var name if we can find it.
+  if (auto varName = VariableNameInferrer::inferName(info.srcOperand->get())) {
+    // In general, when we do an assignment like this, we assume that srcOperand
+    // and our outSendingResult have the same type. This doesn't always happen
+    // though especially if our outSendingResult is used as an out parameter of
+    // a class_method. Check for such a case and if so, add to the end of our
+    // string a path component for that class_method.
+    if (info.srcOperand->get()->getType() != info.outSendingResult->getType()) {
+      if (auto fas = FullApplySite::isa(info.srcOperand->getUser())) {
+        if (fas.getSelfArgument() == info.srcOperand->get() &&
+            fas.getNumIndirectSILResults() == 1) {
+          // First check if our function argument is exactly our out parameter.
+          bool canEmit =
+              info.outSendingResult == fas.getIndirectSILResults()[0];
+
+          // If that fails, see if we are storing into a temporary
+          // alloc_stack. In such a case, find the root value that the temporary
+          // is initialized to and see if that is our target function
+          // argument. In such a case, we also want to add the decl name to our
+          // type.
+          if (!canEmit) {
+            canEmit = info.outSendingResult ==
+                      findOutParameter(fas.getIndirectSILResults()[0]);
+          }
+
+          if (canEmit) {
+            if (auto *callee =
+                    dyn_cast_or_null<MethodInst>(fas.getCalleeOrigin())) {
+              SmallString<64> resultingString;
+              resultingString.append(varName->str());
+              resultingString += '.';
+              resultingString += VariableNameInferrer::getNameFromDecl(
+                  callee->getMember().getDecl());
+              varName = fas->getFunction()->getASTContext().getIdentifier(
+                  resultingString);
+            }
+          }
+        }
+      }
+    }
+
+    diagnoseError(
+        info.srcOperand,
+        diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_named,
+        *varName, descriptiveKindStr)
+        .limitBehaviorIf(getBehaviorLimit());
+
+    diagnoseNote(
+        info.srcOperand,
+        diag::
+            regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named,
+        *varName, descriptiveKindStr);
+    return;
+  }
+
+  Type type = info.nonTransferrableValue->getType().getASTType();
+
+  diagnoseError(
+      info.srcOperand,
+      diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_type,
+      type, descriptiveKindStr)
+      .limitBehaviorIf(getBehaviorLimit());
+
+  diagnoseNote(
+      info.srcOperand,
+      diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type,
+      type, descriptiveKindStr);
+  diagnoseNote(info.srcOperand, diag::regionbasedisolation_type_is_non_sendable,
+               type);
+}
+
+void TransferNonSendableImpl::emitAssignIsolatedIntoSendingResultDiagnostics() {
+  for (auto &info : assignIsolatedIntoOutSendingParameterInfoList) {
+    AssignIsolatedIntoSendingResultDiagnosticEmitter emitter(info);
+    emitter.emit();
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: Diagnostic Evaluator
 //===----------------------------------------------------------------------===//
 
@@ -1842,6 +2074,12 @@ struct DiagnosticEvaluator final
   SmallVectorImpl<InOutSendingNotDisconnectedInfo>
       &inoutSendingNotDisconnectedInfoList;
 
+  /// A list of state that tracks specific 'inout sending' parameters that were
+  /// actor isolated on function exit with the necessary state to emit the
+  /// error.
+  SmallVectorImpl<AssignIsolatedIntoOutSendingParameterInfo>
+      &assignIsolatedIntoOutSendingParameterInfoList;
+
   DiagnosticEvaluator(Partition &workingPartition,
                       RegionAnalysisFunctionInfo *info,
                       SmallFrozenMultiMap<Operand *, RequireInst, 8>
@@ -1850,6 +2088,8 @@ struct DiagnosticEvaluator final
                           &transferredNonTransferrable,
                       SmallVectorImpl<InOutSendingNotDisconnectedInfo>
                           &inoutSendingNotDisconnectedInfoList,
+                      SmallVectorImpl<AssignIsolatedIntoOutSendingParameterInfo>
+                          &assignIsolatedIntoOutSendingParameterInfo,
                       TransferringOperandToStateMap &operandToStateMap)
       : PartitionOpEvaluatorBaseImpl(
             workingPartition, info->getOperandSetFactory(), operandToStateMap),
@@ -1857,7 +2097,9 @@ struct DiagnosticEvaluator final
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
         transferredNonTransferrable(transferredNonTransferrable),
         inoutSendingNotDisconnectedInfoList(
-            inoutSendingNotDisconnectedInfoList) {}
+            inoutSendingNotDisconnectedInfoList),
+        assignIsolatedIntoOutSendingParameterInfoList(
+            assignIsolatedIntoOutSendingParameterInfo) {}
 
   void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
                                    Element transferredVal,
@@ -1975,6 +2217,25 @@ struct DiagnosticEvaluator final
     }
   }
 
+  void handleAssignTransferNonTransferrableIntoSendingResult(
+      const PartitionOp &partitionOp, Element destElement,
+      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {
+    auto srcRep = info->getValueMap().getRepresentativeValue(srcElement);
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "    Emitting Error! Kind: Assign Isolated Into Sending Result!\n"
+        << "        Assign Inst: " << *partitionOp.getSourceInst()
+        << "        Dest Value: " << *destValue
+        << "        Dest Element: " << destElement << '\n'
+        << "        Src Value: " << srcValue
+        << "        Src Element: " << srcElement << '\n'
+        << "        Src Rep: " << srcRep
+        << "        Src Isolation: " << srcIsolationRegionInfo << '\n');
+    assignIsolatedIntoOutSendingParameterInfoList.emplace_back(
+        partitionOp.getSourceOp(), destValue, srcValue, srcIsolationRegionInfo);
+  }
+
   void
   handleInOutSendingNotInitializedAtExitError(const PartitionOp &partitionOp,
                                               Element inoutSendingVal,
@@ -2030,6 +2291,10 @@ struct DiagnosticEvaluator final
         .maybeGetValue();
   }
 
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return info->getValueMap().getRepresentativeValue(element);
+  }
+
   bool isClosureCaptured(Element element, Operand *op) const {
     auto value = info->getValueMap().maybeGetRepresentative(element);
     if (!value)
@@ -2061,6 +2326,7 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
                              transferOpToRequireInstMultiMap,
                              transferredNonTransferrableInfoList,
                              inoutSendingNotDisconnectedInfoList,
+                             assignIsolatedIntoOutSendingParameterInfoList,
                              regionInfo->getTransferringOpToStateMap());
 
     // And then evaluate all of our partition ops on the entry partition.
@@ -2094,6 +2360,7 @@ void TransferNonSendableImpl::emitDiagnostics() {
   emitTransferredNonTransferrableDiagnostics();
   emitUseAfterTransferDiagnostics();
   emitInOutSendingNotDisconnectedInfoList();
+  emitAssignIsolatedIntoSendingResultDiagnostics();
 }
 
 namespace {

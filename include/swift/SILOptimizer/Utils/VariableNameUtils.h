@@ -201,6 +201,13 @@ public:
   static std::optional<std::pair<Identifier, SILValue>>
   inferNameAndRoot(SILValue value);
 
+  /// Given a specific decl \p d, come up with a name for it.
+  ///
+  /// This is used internally for translating all decls to names. This is
+  /// exposed in case someone wants to wrap VariableNameUtils and needs to use
+  /// the same internal mapping that VariableNameUtils uses.
+  static StringRef getNameFromDecl(Decl *d);
+
 private:
   void drainVariableNamePath();
   void popSingleVariableName();
