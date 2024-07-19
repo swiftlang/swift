@@ -106,6 +106,8 @@ VarDecl *
 swift::getDistributedActorAsLocalActorComputedProperty(ModuleDecl *module) {
   auto &C = module->getASTContext();
   auto DA = C.getDistributedActorDecl();
+  if (!DA)
+    return nullptr;
   auto extension = findDistributedActorAsActorExtension(DA);
 
   if (!extension)
