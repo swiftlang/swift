@@ -57,6 +57,10 @@ using namespace reflection;
 #include <dlfcn.h>
 #endif
 
+#if __has_include(<mach-o/dyld_priv.h>)
+#include <mach-o/dyld_priv.h>
+#endif
+
 /// A Demangler suitable for resolving runtime type metadata strings.
 template <class Base = Demangler>
 class DemanglerForRuntimeTypeResolution : public Base {
@@ -325,14 +329,38 @@ namespace {
   };
 } // end anonymous namespace
 
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+struct SharedCacheInfoState {
+  uintptr_t dyldSharedCacheStart;
+  uintptr_t dyldSharedCacheEnd;
+
+  bool inSharedCache(const void *ptr) {
+    auto uintPtr = reinterpret_cast<uintptr_t>(ptr);
+    return dyldSharedCacheStart <= uintPtr && uintPtr < dyldSharedCacheEnd;
+  }
+
+  SharedCacheInfoState() {
+    size_t length;
+    dyldSharedCacheStart = (uintptr_t)_dyld_get_shared_cache_range(&length);
+    dyldSharedCacheEnd =
+        dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
+  }
+};
+
+static Lazy<SharedCacheInfoState> SharedCacheInfo;
+#endif
+
 struct TypeMetadataPrivateState {
   ConcurrentReadableHashMap<NominalTypeDescriptorCacheEntry> NominalCache;
   ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
-  
+
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  ConcurrentReadableArray<TypeMetadataSection> SharedCacheSectionsToScan;
+#endif
+
   TypeMetadataPrivateState() {
     initializeTypeMetadataRecordLookup();
   }
-
 };
 
 static Lazy<TypeMetadataPrivateState> TypeMetadataRecords;
@@ -341,6 +369,12 @@ static void
 _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  if (SharedCacheInfo.get().inSharedCache(begin)) {
+    T.SharedCacheSectionsToScan.push_back(TypeMetadataSection{begin, end});
+    return;
+  }
+#endif
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
 }
 
@@ -775,6 +809,111 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
   return true;
 }
 
+// Helper functions to allow _searchTypeMetadataRecordsInSections to work with
+// both type and protocol records.
+static const ContextDescriptor *
+getContextDescriptor(const TypeMetadataRecord &record) {
+  return record.getContextDescriptor();
+}
+
+static const ContextDescriptor *
+getContextDescriptor(const ProtocolRecord &record) {
+  return record.Protocol.getPointer();
+}
+
+// Perform a linear scan of the given records section, searching for a
+// descriptor that matches the mangling passed in `node`. `sectionsToScan` is a
+// ConcurrentReadableHashMap containing sections of type/protocol records.
+template <typename SectionsContainer>
+static const ContextDescriptor *
+_searchTypeMetadataRecordsInSections(SectionsContainer &sectionsToScan,
+                                     Demangle::NodePointer node) {
+  for (auto &section : sectionsToScan.snapshot()) {
+    for (const auto &record : section) {
+      if (auto context = getContextDescriptor(record)) {
+        if (_contextDescriptorMatchesMangling(context, node)) {
+          return context;
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+// Search for a context descriptor matching the mangling passed in `node`.
+// `state` is `TypeMetadataPrivateState` or `ProtocolMetadataPrivateState` and
+// the search will use the sections in those structures. `traceBegin` is a
+// function returning a trace state which is called around the linear scans of
+// type/protocol records. When available, the search will consult the
+// LibPrespecialized table, and perform validation on the result when validation
+// is enabled.
+template <typename State, typename TraceBegin>
+static const ContextDescriptor *
+_searchForContextDescriptor(State &state, NodePointer node,
+                            TraceBegin traceBegin) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  // Try LibPrespecialized first.
+  auto result = getLibPrespecializedTypeDescriptor(node);
+
+  // Validate the result if requested.
+  if (SWIFT_UNLIKELY(
+          runtime::environment::
+              SWIFT_DEBUG_VALIDATE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP())) {
+    // Only validate a definitive result.
+    if (result.first == LibPrespecializedLookupResult::Found ||
+        result.first == LibPrespecializedLookupResult::DefinitiveNotFound) {
+      // Perform a scan of the shared cache sections and see if the result
+      // matches.
+      auto scanResult = _searchTypeMetadataRecordsInSections(
+          state.SharedCacheSectionsToScan, node);
+
+      // Ignore a result that's outside the shared cache. This can happen for
+      // indirect descriptor records that get fixed up to point to a root.
+      if (SharedCacheInfo.get().inSharedCache(scanResult)) {
+        // We may find a different but equivalent context if they're not unique,
+        // as iteration order may be different between the two. Use
+        // equalContexts to compare distinct but equal non-unique contexts
+        // properly.
+        if (!equalContexts(result.second, scanResult)) {
+          auto tree = getNodeTreeAsString(node);
+          swift::fatalError(
+              0,
+              "Searching for type descriptor, prespecialized descriptor map "
+              "returned %p, but scan returned %p. Node tree:\n%s",
+              result.second, scanResult, tree.c_str());
+        }
+      }
+    }
+  }
+
+  // If we found something, we're done, return it.
+  if (result.first == LibPrespecializedLookupResult::Found) {
+    assert(result.second);
+    return result.second;
+  }
+
+  // If a negative result was not definitive, then we must search the shared
+  // cache sections.
+  if (result.first == LibPrespecializedLookupResult::NonDefinitiveNotFound) {
+    auto traceState = traceBegin(node);
+    auto descriptor = _searchTypeMetadataRecordsInSections(
+        state.SharedCacheSectionsToScan, node);
+    traceState.end(descriptor);
+    if (descriptor)
+      return descriptor;
+  }
+
+  // If we didn't find anything in the shared cache, then search the rest.
+#endif
+
+  auto traceState = traceBegin(node);
+  auto foundDescriptor =
+      _searchTypeMetadataRecordsInSections(state.SectionsToScan, node);
+  traceState.end(foundDescriptor);
+  return foundDescriptor;
+}
+
 // returns the nominal type descriptor for the type named by typeName
 static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
@@ -789,19 +928,8 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
           return nullptr;
 #endif
 
-  auto traceState = runtime::trace::metadata_scan_begin(node);
-
-  for (auto &section : T.SectionsToScan.snapshot()) {
-    for (const auto &record : section) {
-      if (auto context = record.getContextDescriptor()) {
-        if (_contextDescriptorMatchesMangling(context, node)) {
-          return traceState.end(context);
-        }
-      }
-    }
-  }
-
-  return nullptr;
+  return _searchForContextDescriptor(T, node,
+                                     runtime::trace::metadata_scan_begin);
 }
 
 #define DESCRIPTOR_MANGLING_SUFFIX_Structure Mn
@@ -980,6 +1108,10 @@ namespace {
     ConcurrentReadableHashMap<ProtocolDescriptorCacheEntry> ProtocolCache;
     ConcurrentReadableArray<ProtocolSection> SectionsToScan;
 
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+    ConcurrentReadableArray<ProtocolSection> SharedCacheSectionsToScan;
+#endif
+
     ProtocolMetadataPrivateState() {
       initializeProtocolLookup();
     }
@@ -992,6 +1124,12 @@ static void
 _registerProtocols(ProtocolMetadataPrivateState &C,
                    const ProtocolRecord *begin,
                    const ProtocolRecord *end) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  if (SharedCacheInfo.get().inSharedCache(begin)) {
+    C.SharedCacheSectionsToScan.push_back(ProtocolSection{begin, end});
+    return;
+  }
+#endif
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
@@ -1029,18 +1167,12 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        NodePointer node) {
-  auto traceState = runtime::trace::protocol_scan_begin(node);
-
-  for (auto &section : C.SectionsToScan.snapshot()) {
-    for (const auto &record : section) {
-      if (auto protocol = record.Protocol.getPointer()) {
-        if (_contextDescriptorMatchesMangling(protocol, node))
-          return traceState.end(protocol);
-      }
-    }
-  }
-
-  return nullptr;
+  auto descriptor =
+      _searchForContextDescriptor(C, node, runtime::trace::protocol_scan_begin);
+  assert(!descriptor ||
+         isa<ProtocolDescriptor>(descriptor) &&
+             "Protocol record search found non-protocol descriptor.");
+  return reinterpret_cast<const ProtocolDescriptor *>(descriptor);
 }
 
 static const ProtocolDescriptor *
