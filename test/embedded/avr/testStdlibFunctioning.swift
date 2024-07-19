@@ -1,6 +1,7 @@
 // RUN: %swift-frontend -typecheck %s -target avr-none-none-elf \
 // RUN:   -wmo -enable-experimental-feature Embedded
 // REQUIRES: embedded_stdlib_cross_compiling
+// REQUIRES: CODEGENERATOR=AVR
 
 import Swift
 
