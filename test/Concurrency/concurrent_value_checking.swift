@@ -380,6 +380,14 @@ final class C7<T>: Sendable { }
 
 class C9: Sendable { } // expected-warning{{non-final class 'C9' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
 
+@available(*, unavailable)
+extension HasUnavailableSendable : @unchecked Sendable { }
+
+class HasUnavailableSendable {
+}
+
+class NoRestated: HasUnavailableSendable {} // okay
+
 @globalActor
 struct SomeActor {
   static let shared = A1()
