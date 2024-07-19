@@ -6913,12 +6913,8 @@ VarDecl *swift::getReferencedParamOrCapture(
   // used for isolation purposes.
   if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
     if (auto refDecl = expr->getReferencedDecl(/*stopAtParenExpr=*/true)) {
-      if (auto decl = refDecl.getDecl()) {
-        auto module = decl->getDeclContext()->getParentModule();
-        auto AsLocalActorDecl =
-            getDistributedActorAsLocalActorComputedProperty(module);
-
-        if (decl == AsLocalActorDecl) {
+      if (auto decl = dyn_cast_or_null<VarDecl>(refDecl.getDecl())) {
+        if (isDistributedActorAsLocalActorComputedProperty(decl)) {
           return getCurrentIsolatedVar();
         }
       }
