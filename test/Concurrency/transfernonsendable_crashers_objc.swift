@@ -18,3 +18,10 @@ public func handleFile(at location: URL) throws {
 
 private func moveTheme(from location: URL) throws -> URL { fatalError() }
 private func unzipFile(at location: URL) throws -> URL { fatalError() }
+
+actor MyActor {
+  func test() {
+    var session: MySession?
+    defer { session?.end() }
+  }
+}

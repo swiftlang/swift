@@ -879,8 +879,14 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
     if (functionIsolation.isActorIsolated()) {
       assert(functionIsolation.isGlobalActor());
-      return SILIsolationInfo::getGlobalActorIsolated(
-          fArg, functionIsolation.getGlobalActor());
+      if (functionIsolation.isGlobalActor()) {
+        return SILIsolationInfo::getGlobalActorIsolated(
+            fArg, functionIsolation.getGlobalActor());
+      }
+
+      return SILIsolationInfo::getActorInstanceIsolated(
+          fArg, ActorInstance::getForActorAccessorInit(),
+          functionIsolation.getActor());
     }
   }
 
@@ -943,6 +949,12 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
         printOptions(os);
         os << '\n';
         os << "instance: actor accessor init\n";
+        return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated";
+        printOptions(os);
+        os << '\n';
+        os << "instance: captured actor instance self\n";
         return;
       }
     }
@@ -1062,6 +1074,9 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
       case ActorInstance::Kind::ActorAccessorInit:
         os << "'self'-isolated";
         return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated";
+        return;
       }
     }
 
@@ -1102,7 +1117,11 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
         break;
       }
       case ActorInstance::Kind::ActorAccessorInit:
-        os << "'self'-isolated";
+        os << "'self'-isolated (actor-accessor-init)";
+        printOptions(os);
+        return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated (captured-actor-self)";
         printOptions(os);
         return;
       }

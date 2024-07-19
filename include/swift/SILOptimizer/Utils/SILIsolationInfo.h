@@ -46,11 +46,18 @@ public:
     /// access to the self value and instead have access indirectly to the
     /// storage associated with the accessor.
     ActorAccessorInit = 0x1,
+
+    /// An actor instance that is represented by "self" being captured in a
+    /// closure of some sort. In such a case, we do not know which of the
+    /// parameters are the true "self" (since the closure is a thin
+    /// function)... so we just use an artificial ActorInstance to represent
+    /// self in this case.
+    CapturedActorSelf = 0x2,
   };
 
-  /// Set to (SILValue(), ActorAccessorInit) if we have an ActorAccessorInit. Is
-  /// null if we have (SILValue(), Kind::Value).
-  llvm::PointerIntPair<SILValue, 1> value;
+  /// Set to (SILValue(), $KIND) if we have an ActorAccessorInit|CapturedSelf.
+  /// Is null if we have (SILValue(), Kind::Value).
+  llvm::PointerIntPair<SILValue, 2> value;
 
   ActorInstance(SILValue value, Kind kind)
       : value(value, std::underlying_type<Kind>::type(kind)) {}
@@ -68,8 +75,16 @@ public:
     return ActorInstance(value, Kind::Value);
   }
 
+  /// See Kind::ActorAccessorInit for explanation on what a ActorAccessorInit
+  /// is.
   static ActorInstance getForActorAccessorInit() {
     return ActorInstance(SILValue(), Kind::ActorAccessorInit);
+  }
+
+  /// See Kind::CapturedActorSelf for explanation on what a CapturedActorSelf
+  /// is.
+  static ActorInstance getForCapturedSelf() {
+    return ActorInstance(SILValue(), Kind::CapturedActorSelf);
   }
 
   explicit operator bool() const { return bool(value.getOpaqueValue()); }
@@ -91,6 +106,10 @@ public:
 
   bool isAccessorInit() const { return getKind() == Kind::ActorAccessorInit; }
 
+  bool isCapturedActorSelf() const {
+    return getKind() == Kind::CapturedActorSelf;
+  }
+
   bool operator==(const ActorInstance &other) const {
     // If both are null, return true.
     if (!bool(*this) && !bool(other))
@@ -105,6 +124,7 @@ public:
     case Kind::Value:
       return getValue() == other.getValue();
     case Kind::ActorAccessorInit:
+    case Kind::CapturedActorSelf:
       return true;
     }
   }
@@ -492,5 +512,23 @@ public:
 };
 
 } // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::SILIsolationInfo &isolationInfo) {
+  isolationInfo.printForOneLineLogging(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::SILDynamicMergedIsolationInfo &isolationInfo) {
+  isolationInfo.printForOneLineLogging(os);
+  return os;
+}
+
+} // namespace llvm
 
 #endif
