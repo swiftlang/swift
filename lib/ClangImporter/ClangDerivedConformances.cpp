@@ -1164,23 +1164,22 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
   if (!elementType || !sizeType)
     return;
 
-  auto constPointerTypeDecl =
-      lookupNestedClangTypeDecl(clangDecl, "const_pointer");
+  auto pointerTypeDecl = lookupNestedClangTypeDecl(clangDecl, "pointer");
   auto countTypeDecl = lookupNestedClangTypeDecl(clangDecl, "size_type");
 
-  if (!constPointerTypeDecl || !countTypeDecl)
+  if (!pointerTypeDecl || !countTypeDecl)
     return;
 
-  // create fake variable for constPointer (constructor arg 1)
-  auto constPointerType = clangCtx.getTypeDeclType(constPointerTypeDecl);
-  auto fakeConstPointerVarDecl = clang::VarDecl::Create(
+  // create fake variable for pointer (constructor arg 1)
+  clang::QualType pointerType = clangCtx.getTypeDeclType(pointerTypeDecl);
+  auto fakePointerVarDecl = clang::VarDecl::Create(
       clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
       clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      constPointerType, clangCtx.getTrivialTypeSourceInfo(constPointerType),
+      pointerType, clangCtx.getTrivialTypeSourceInfo(pointerType),
       clang::StorageClass::SC_None);
 
-  auto fakeConstPointer = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakeConstPointerVarDecl, false, constPointerType,
+  auto fakePointer = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, fakePointerVarDecl, false, pointerType,
       clang::ExprValueKind::VK_LValue, clang::SourceLocation());
 
   // create fake variable for count (constructor arg 2)
@@ -1197,8 +1196,7 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
 
   // Use clangSema.BuildCxxTypeConstructExpr to create a CXXTypeConstructExpr,
   // passing constPointer and count
-  SmallVector<clang::Expr *, 2> constructExprArgs = {fakeConstPointer,
-                                                     fakeCount};
+  SmallVector<clang::Expr *, 2> constructExprArgs = {fakePointer, fakeCount};
 
   auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
       clang::QualType(clangDecl->getTypeForDecl(), 0));
@@ -1226,5 +1224,10 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
                                elementType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
                                sizeType->getUnderlyingType());
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
+
+  if (pointerType->getPointeeType().isConstQualified()) {
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
+  } else {
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
+  }
 }
