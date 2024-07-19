@@ -338,10 +338,6 @@ static bool usesFeatureOptionalIsolatedParameters(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureExtern(Decl *decl) {
-  return decl->getAttrs().hasAttribute<ExternAttr>();
-}
-
 static bool usesFeatureAssociatedTypeImplements(Decl *decl) {
   return isa<TypeDecl>(decl) && decl->getAttrs().hasAttribute<ImplementsAttr>();
 }
@@ -698,6 +694,7 @@ UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)
+UNINTERESTING_FEATURE(Extern)
 
 static bool usesFeatureConformanceSuppression(Decl *decl) {
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
