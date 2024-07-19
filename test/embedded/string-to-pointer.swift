@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
