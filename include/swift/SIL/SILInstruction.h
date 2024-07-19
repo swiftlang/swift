@@ -7069,6 +7069,12 @@ public:
                           getAllOperands()[i+1].get());
   }
 
+  std::pair<EnumElementDecl *, Operand *> getCaseOperand(unsigned i) const {
+    auto *self = const_cast<SelectEnumInstBase *>(this);
+    return std::make_pair(getEnumElementDeclStorage()[i],
+                          &self->getAllOperands()[i + 1]);
+  }
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
@@ -7081,6 +7087,18 @@ public:
     return getDefaultResult();
   }
 
+  Operand *getCaseResultOperand(EnumElementDecl *D) {
+    for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+      auto Entry = getCaseOperand(i);
+      if (Entry.first == D)
+        return Entry.second;
+    }
+
+    // select_enum is required to be fully covered, so return the default if we
+    // didn't find anything.
+    return getDefaultResultOperand();
+  }
+
   bool hasDefault() const {
     return sharedUInt8().SelectEnumInstBase.hasDefault;
   }
@@ -7088,6 +7106,12 @@ public:
   SILValue getDefaultResult() const {
     assert(hasDefault() && "doesn't have a default");
     return getAllOperands().back().get();
+  }
+
+  Operand *getDefaultResultOperand() const {
+    assert(hasDefault() && "doesn't have a default");
+    auto *self = const_cast<SelectEnumInstBase *>(this);
+    return &self->getAllOperands().back();
   }
 
   unsigned getNumCases() const {

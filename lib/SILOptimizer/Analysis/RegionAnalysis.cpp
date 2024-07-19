@@ -66,6 +66,21 @@ static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+using OperandRefRangeTransform = std::function<Operand *(Operand &)>;
+using OperandRefRange =
+    iterator_range<llvm::mapped_iterator<MutableArrayRef<Operand>::iterator,
+                                         OperandRefRangeTransform>>;
+
+} // anonymous namespace
+
+static OperandRefRange makeOperandRefRange(MutableArrayRef<Operand> input) {
+  auto toOperand = [](Operand &operand) { return &operand; };
+  auto baseRange = llvm::make_range(input.begin(), input.end());
+  return llvm::map_range(baseRange, OperandRefRangeTransform(toOperand));
+}
+
 std::optional<ApplyIsolationCrossing>
 regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
@@ -418,9 +433,9 @@ SILValue RegionAnalysisFunctionInfo::getUnderlyingTrackedValue(SILValue value) {
 namespace {
 
 struct TermArgSources {
-  SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
+  SmallFrozenMultiMap<SILValue, Operand *, 8> argSources;
 
-  template <typename ValueRangeTy = ArrayRef<SILValue>>
+  template <typename ValueRangeTy = ArrayRef<Operand *>>
   void addValues(ValueRangeTy valueRange, SILBasicBlock *destBlock) {
     for (auto pair : llvm::enumerate(valueRange))
       argSources.insert(destBlock->getArgument(pair.index()), pair.value());
@@ -461,19 +476,22 @@ struct TermArgSources {
   }
 
 private:
-  void init(BranchInst *bi) { addValues(bi->getArgs(), bi->getDestBB()); }
+  void init(BranchInst *bi) {
+    addValues(makeOperandRefRange(bi->getAllOperands()), bi->getDestBB());
+  }
 
   void init(CondBranchInst *cbi) {
-    addValues(cbi->getTrueArgs(), cbi->getTrueBB());
-    addValues(cbi->getFalseArgs(), cbi->getFalseBB());
+    addValues(makeOperandRefRange(cbi->getTrueOperands()), cbi->getTrueBB());
+    addValues(makeOperandRefRange(cbi->getFalseOperands()), cbi->getFalseBB());
   }
 
   void init(DynamicMethodBranchInst *dmBranchInst) {
-    addValues({dmBranchInst->getOperand()}, dmBranchInst->getHasMethodBB());
+    addValues({&dmBranchInst->getAllOperands()[0]},
+              dmBranchInst->getHasMethodBB());
   }
 
   void init(CheckedCastBranchInst *ccbi) {
-    addValues({ccbi->getOperand()}, ccbi->getSuccessBB());
+    addValues({&ccbi->getAllOperands()[0]}, ccbi->getSuccessBB());
   }
 };
 
@@ -1145,20 +1163,21 @@ struct PartitionOpBuilder {
         PartitionOp::AssignFresh(lookupValueID(value), currentInst));
   }
 
-  void addAssign(SILValue tgt, SILValue src) {
-    assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
+  void addAssign(SILValue destValue, Operand *srcOperand) {
+    assert(valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
-    Element srcID = lookupValueID(src);
-    if (lookupValueID(tgt) == srcID) {
+    Element srcID = lookupValueID(srcOperand->get());
+    if (lookupValueID(destValue) == srcID) {
       LLVM_DEBUG(llvm::dbgs() << "    Skipping assign since tgt and src have "
                                  "the same representative.\n");
       LLVM_DEBUG(llvm::dbgs() << "    Rep ID: %%" << srcID.num << ".\n");
       return;
     }
 
-    currentInstPartitionOps.emplace_back(PartitionOp::Assign(
-        lookupValueID(tgt), lookupValueID(src), currentInst));
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::Assign(lookupValueID(destValue),
+                            lookupValueID(srcOperand->get()), srcOperand));
   }
 
   void addTransfer(SILValue representative, Operand *op) {
@@ -1178,30 +1197,31 @@ struct PartitionOpBuilder {
         lookupValueID(representative), untransferringInst));
   }
 
-  void addMerge(SILValue fst, SILValue snd) {
-    assert(valueHasID(fst, /*dumpIfHasNoID=*/true) &&
-           valueHasID(snd, /*dumpIfHasNoID=*/true) &&
+  void addMerge(SILValue destValue, Operand *srcOperand) {
+    assert(valueHasID(destValue, /*dumpIfHasNoID=*/true) &&
+           valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
            "merged values should already have been encountered");
 
-    if (lookupValueID(fst) == lookupValueID(snd))
+    if (lookupValueID(destValue) == lookupValueID(srcOperand->get()))
       return;
 
-    currentInstPartitionOps.emplace_back(PartitionOp::Merge(
-        lookupValueID(fst), lookupValueID(snd), currentInst));
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::Merge(lookupValueID(destValue),
+                           lookupValueID(srcOperand->get()), srcOperand));
   }
 
   /// Mark \p value artifically as being part of an actor isolated region by
   /// introducing a new fake actor introducing representative and merging them.
-  void addActorIntroducingInst(SILValue value,
+  void addActorIntroducingInst(SILValue sourceValue, Operand *sourceOperand,
                                SILIsolationInfo actorIsolation) {
-    assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
+    assert(valueHasID(sourceValue, /*dumpIfHasNoID=*/true) &&
            "merged values should already have been encountered");
 
     auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps.emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
     currentInstPartitionOps.emplace_back(
-        PartitionOp::Merge(lookupValueID(value), elt, currentInst));
+        PartitionOp::Merge(lookupValueID(sourceValue), elt, sourceOperand));
   }
 
   void addRequire(SILValue value) {
@@ -1609,7 +1629,7 @@ public:
                           const SourceRange &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
-    SmallVector<SILValue, 8> assignOperands;
+    SmallVector<std::pair<Operand *, SILValue>, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
     // A helper we use to emit an unknown patten error if our merge is
@@ -1623,9 +1643,11 @@ public:
       mergedInfo = SILDynamicMergedIsolationInfo::getDisconnected(false);
     }
 
-    for (SILValue src : sourceValues) {
+    for (Operand *srcOperand : sourceValues) {
+      auto src = srcOperand->get();
       if (auto value = tryToTrackValue(src)) {
-        assignOperands.push_back(value->getRepresentative().getValue());
+        assignOperands.push_back(
+            {srcOperand, value->getRepresentative().getValue()});
         auto originalMergedInfo = mergedInfo;
         (void)originalMergedInfo;
         if (mergedInfo)
@@ -1684,11 +1706,11 @@ public:
     // uses of the store_borrow.
     if (requireSrcValues)
       for (auto src : assignOperands)
-        builder.addRequire(src);
+        builder.addRequire(src.second);
 
     // Merge all srcs.
     for (unsigned i = 1; i < assignOperands.size(); i++) {
-      builder.addMerge(assignOperands[i - 1], assignOperands[i]);
+      builder.addMerge(assignOperands[i - 1].second, assignOperands[i].first);
     }
 
     // If we do not have any non sendable results, return early.
@@ -1703,7 +1725,8 @@ public:
       // passed in a specific isolation info unlike earlier when processing
       // actual results.
       if (assignOperands.size() && resultIsolationInfoOverride) {
-        builder.addActorIntroducingInst(assignOperands.back(),
+        builder.addActorIntroducingInst(assignOperands.back().second,
+                                        assignOperands.back().first,
                                         resultIsolationInfoOverride);
       }
 
@@ -1718,7 +1741,7 @@ public:
       // If no non-sendable srcs, non-sendable tgts get a fresh region.
       builder.addAssignFresh(front);
     } else {
-      builder.addAssign(front, assignOperands.front());
+      builder.addAssign(front, assignOperands.front().first);
     }
 
     // Assign all targets to the target region.
@@ -1726,7 +1749,7 @@ public:
       SILValue next = assignResultsRef.front();
       assignResultsRef = assignResultsRef.drop_front();
 
-      builder.addAssign(next, front);
+      builder.addAssign(next, assignOperands.front().first);
     }
   }
 
@@ -1898,7 +1921,8 @@ public:
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(pai, applyResults);
-    translateSILMultiAssign(applyResults, pai->getOperandValues());
+    translateSILMultiAssign(applyResults,
+                            makeOperandRefRange(pai->getAllOperands()));
   }
 
   void translateCreateAsyncTask(BuiltinInst *bi) {
@@ -1922,13 +1946,14 @@ public:
 
     // If we do not have a special builtin, just do a multi-assign. Builtins do
     // not cross async boundaries.
-    return translateSILMultiAssign(bi->getResults(), bi->getOperandValues());
+    return translateSILMultiAssign(bi->getResults(),
+                                   makeOperandRefRange(bi->getAllOperands()));
   }
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
     // For non-self parameters, gather all of the transferring parameters and
     // gather our non-transferring parameters.
-    SmallVector<SILValue, 8> nonTransferringParameters;
+    SmallVector<Operand *, 8> nonTransferringParameters;
     if (fas.getNumArguments()) {
       // NOTE: We want to process indirect parameters as if they are
       // parameters... so we process them in nonTransferringParameters.
@@ -1945,7 +1970,7 @@ public:
             builder.addTransfer(value->getRepresentative().getValue(), &op);
           }
         } else {
-          nonTransferringParameters.push_back(op.get());
+          nonTransferringParameters.push_back(&op);
         }
       }
     }
@@ -1963,7 +1988,7 @@ public:
                               &selfOperand);
         }
       } else {
-        nonTransferringParameters.push_back(selfOperand.get());
+        nonTransferringParameters.push_back(&selfOperand);
       }
     }
 
@@ -2115,13 +2140,13 @@ public:
   }
 
   template <>
-  void translateSILAssign<SILValue>(SILValue dest, SILValue src) {
-    return translateSILAssign(dest, TinyPtrVector<SILValue>(src));
+  void translateSILAssign<Operand *>(SILValue dest, Operand *srcOperand) {
+    return translateSILAssign(dest, TinyPtrVector<Operand *>(srcOperand));
   }
 
   void translateSILAssign(SILInstruction *inst) {
     return translateSILMultiAssign(inst->getResults(),
-                                   inst->getOperandValues());
+                                   makeOperandRefRange(inst->getAllOperands()));
   }
 
   /// If the passed SILValue is NonSendable, then create a fresh region for it,
@@ -2131,7 +2156,7 @@ public:
   /// isolationInfo is set.
   void translateSILAssignFresh(SILValue val) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(val),
-                                   TinyPtrVector<SILValue>());
+                                   TinyPtrVector<Operand *>());
   }
 
   void translateSILAssignFresh(SILValue val, SILIsolationInfo info) {
@@ -2146,27 +2171,26 @@ public:
   }
 
   template <typename Collection>
-  void translateSILMerge(SILValue dest, Collection collection,
+  void translateSILMerge(SILValue dest, Collection srcCollection,
                          bool requireOperands = true) {
     auto trackableDest = tryToTrackValue(dest);
     if (!trackableDest)
       return;
-    for (SILValue elt : collection) {
-      if (auto trackableSrc = tryToTrackValue(elt)) {
+    for (Operand *op : srcCollection) {
+      if (auto trackableSrc = tryToTrackValue(op->get())) {
         if (requireOperands) {
           builder.addRequire(trackableSrc->getRepresentative().getValue());
           builder.addRequire(trackableDest->getRepresentative().getValue());
         }
-        builder.addMerge(trackableDest->getRepresentative().getValue(),
-                         trackableSrc->getRepresentative().getValue());
+        builder.addMerge(trackableDest->getRepresentative().getValue(), op);
       }
     }
   }
 
   template <>
-  void translateSILMerge<SILValue>(SILValue dest, SILValue src,
-                                   bool requireOperands) {
-    return translateSILMerge(dest, TinyPtrVector<SILValue>(src),
+  void translateSILMerge<Operand *>(SILValue dest, Operand *src,
+                                    bool requireOperands) {
+    return translateSILMerge(dest, TinyPtrVector<Operand *>(src),
                              requireOperands);
   }
 
@@ -2204,7 +2228,6 @@ public:
   /// them as merges, to ensure any aliases of \p dest are also updated.
   void translateSILStore(Operand *dest, Operand *src) {
     SILValue destValue = dest->get();
-    SILValue srcValue = src->get();
 
     if (auto nonSendableDest = tryToTrackValue(destValue)) {
       // In the following situations, we can perform an assign:
@@ -2220,10 +2243,10 @@ public:
       // per field basis to allow for us to assign.
       if (nonSendableDest.value().isNoAlias() &&
           !isProjectedFromAggregate(destValue))
-        return translateSILAssign(destValue, srcValue);
+        return translateSILAssign(destValue, src);
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(destValue, srcValue);
+      return translateSILMerge(destValue, src);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -2244,10 +2267,12 @@ public:
       // miscompiling. For memory like this, we probably need to track it on a
       // per field basis to allow for us to assign.
       if (nonSendableTgt.value().isNoAlias() && !isProjectedFromAggregate(dest))
-        return translateSILAssign(dest, inst->getElements());
+        return translateSILAssign(
+            dest, makeOperandRefRange(inst->getElementOperands()));
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(dest, inst->getElements());
+      return translateSILMerge(dest,
+                               makeOperandRefRange(inst->getElementOperands()));
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -2260,11 +2285,11 @@ public:
 
   /// An enum select is just a multi assign.
   void translateSILSelectEnum(SelectEnumOperation selectEnumInst) {
-    SmallVector<SILValue, 8> enumOperands;
+    SmallVector<Operand *, 8> enumOperands;
     for (unsigned i = 0; i < selectEnumInst.getNumCases(); i++)
-      enumOperands.push_back(selectEnumInst.getCase(i).second);
+      enumOperands.push_back(selectEnumInst.getCaseOperand(i).second);
     if (selectEnumInst.hasDefault())
-      enumOperands.push_back(selectEnumInst.getDefaultResult());
+      enumOperands.push_back(selectEnumInst.getDefaultResultOperand());
     return translateSILMultiAssign(
         TinyPtrVector<SILValue>(selectEnumInst->getResult(0)), enumOperands);
   }
@@ -2278,7 +2303,7 @@ public:
       if (dest->getNumArguments() > 0) {
         assert(dest->getNumArguments() == 1 &&
                "expected at most one bb arg in dest of enum switch");
-        argSources.addValues({switchEnumInst->getOperand()}, dest);
+        argSources.addValues({&switchEnumInst->getOperandRef()}, dest);
       }
     }
 
@@ -2378,8 +2403,8 @@ public:
       return;
 
     case TranslationSemantics::Assign:
-      return translateSILMultiAssign(inst->getResults(),
-                                     inst->getOperandValues());
+      return translateSILMultiAssign(
+          inst->getResults(), makeOperandRefRange(inst->getAllOperands()));
 
     case TranslationSemantics::Require:
       for (auto op : inst->getOperandValues())
@@ -2452,7 +2477,10 @@ Element PartitionOpBuilder::getActorIntroducingRepresentative(
 }
 
 bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
-  return translator->valueHasID(value, dumpIfHasNoID);
+  auto v = translator->valueMap.getTrackableValue(value);
+  if (auto m = v.getRepresentative().maybeGetValue())
+    return translator->valueHasID(m, dumpIfHasNoID);
+  return true;
 }
 
 void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
@@ -2922,7 +2950,6 @@ PartitionOpTranslator::visitStoreBorrowInst(StoreBorrowInst *sbi) {
   // store_borrow itself to be a require use. This prevents the store_borrow
   // from causing incorrect diagnostics.
   SILValue destValue = sbi->getDest();
-  SILValue srcValue = sbi->getSrc();
 
   auto nonSendableDest = tryToTrackValue(destValue);
   if (!nonSendableDest)
@@ -2941,11 +2968,13 @@ PartitionOpTranslator::visitStoreBorrowInst(StoreBorrowInst *sbi) {
   // per field basis to allow for us to assign.
   if (nonSendableDest.value().isNoAlias() &&
       !isProjectedFromAggregate(destValue)) {
-    translateSILMultiAssign(sbi->getResults(), sbi->getOperandValues(),
+    translateSILMultiAssign(sbi->getResults(),
+                            makeOperandRefRange(sbi->getAllOperands()),
                             SILIsolationInfo(), false /*require src*/);
   } else {
     // Stores to possibly aliased storage must be treated as merges.
-    translateSILMerge(destValue, srcValue, false /*require src*/);
+    translateSILMerge(destValue, &sbi->getAllOperands()[StoreBorrowInst::Src],
+                      false /*require src*/);
   }
 
   return TranslationSemantics::Special;
@@ -3033,7 +3062,7 @@ TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
   if (!isNonSendableType(r->getType()))
     return TranslationSemantics::Require;
-  translateSILAssign(SILValue(r), r->getPack());
+  translateSILAssign(SILValue(r), r->getPackOperand());
   return TranslationSemantics::Special;
 }
 
@@ -3042,7 +3071,7 @@ TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
   if (!isNonSendableType(r->getType())) {
     translateSILRequire(r->getTuple());
   } else {
-    translateSILAssign(SILValue(r), r->getTuple());
+    translateSILAssign(SILValue(r), r->getTupleOperand());
   }
   return TranslationSemantics::Special;
 }
@@ -3052,7 +3081,7 @@ PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
   if (!isNonSendableType(r->getType())) {
     translateSILRequire(r->getTuple());
   } else {
-    translateSILAssign(SILValue(r), r->getTuple());
+    translateSILAssign(SILValue(r), r->getTupleOperand());
   }
   return TranslationSemantics::Special;
 }
@@ -3216,7 +3245,8 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // differently depending on what the result of checked_cast_addr_br
   // is. For now just keep the current behavior. It is more conservative,
   // but still correct.
-  translateSILMultiAssign(ArrayRef<SILValue>(), ccabi->getOperandValues());
+  translateSILMultiAssign(ArrayRef<SILValue>(),
+                          makeOperandRefRange(ccabi->getAllOperands()));
   return TranslationSemantics::Special;
 }
 
@@ -3265,6 +3295,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
           .getTrackableValue(value)
           .getRepresentative()
           .maybeGetValue();
+    }
+
+    RepresentativeValue getRepresentativeValue(Element element) const {
+      return translator.getValueMap().getRepresentativeValue(element);
     }
 
     bool isClosureCaptured(Element elt, Operand *op) const {
@@ -3503,6 +3537,11 @@ RegionAnalysisValueMap::getRepresentative(Element trackableValueID) const {
 SILValue
 RegionAnalysisValueMap::maybeGetRepresentative(Element trackableValueID) const {
   return getValueForId(trackableValueID)->getRepresentative().maybeGetValue();
+}
+
+RepresentativeValue
+RegionAnalysisValueMap::getRepresentativeValue(Element trackableValueID) const {
+  return getValueForId(trackableValueID)->getRepresentative();
 }
 
 SILIsolationInfo
