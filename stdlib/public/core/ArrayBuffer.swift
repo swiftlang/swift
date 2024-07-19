@@ -584,9 +584,17 @@ extension _ArrayBuffer {
       to: (@convention(c)(
         AnyObject,
         UnsafeRawPointer
+      ) -> AnyObject?).self
+    )
+    // swiftc gets upset if we go straight to returning Unmanaged<AnyObject>?
+    let typedNonRetainingGetter = unsafeBitCast(
+      typedGetter,
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer
       ) -> Unmanaged<AnyObject>?).self
     )
-    if let assoc = typedGetter(
+    if let assoc = typedNonRetainingGetter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
