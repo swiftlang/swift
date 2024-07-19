@@ -30,21 +30,24 @@ extern "C" {
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
 typedef signed long long _swift_shims_CFIndex;
-typedef unsigned long long _swift_shims_objc_associationPolicy;
+
 #else
 typedef unsigned long _swift_shims_CFHashCode;
 typedef signed long _swift_shims_CFIndex;
-typedef unsigned long _swift_shims_objc_associationPolicy;
+
 #endif
 
 #if !FOUNDATION_HELPER_FILE
-extern void
-objc_setAssociatedObject(id _Nonnull object, const void * _Nonnull key,
-                         id _Nullable value, _swift_shims_objc_associationPolicy policy);
+
+extern void objc_setAssociatedObject(void);
 extern id _Nullable
 objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
 int objc_sync_enter(id _Nonnull object);
 int objc_sync_exit(id _Nonnull object);
+
+static void * _Nonnull getSetAssociatedObjectPtr() {
+  return (void *)&objc_setAssociatedObject;
+}
 #endif
 
 // Consider creating SwiftMacTypes.h for these

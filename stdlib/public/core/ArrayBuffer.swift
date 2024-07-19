@@ -571,13 +571,13 @@ extension _ArrayBuffer {
     }
   }
 
-  @inlinable
+  @inlinable @_alwaysEmitIntoClient
   static var associationKey: UnsafeRawPointer {
     //Doesn't need to be a valid pointer
     UnsafeRawPointer(OpaquePointer(bitPattern: 0x1).unsafelyUnwrapped)
   }
   
-  @inlinable
+  @inlinable @_alwaysEmitIntoClient
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
     let getter = objc_getAssociatedObject as @convention(c)(
       Any,
@@ -603,24 +603,15 @@ extension _ArrayBuffer {
     return nil
   }
   
-  @inlinable
+  @inlinable @_alwaysEmitIntoClient
   internal func setAssociatedBuffer(_ buffer: _ContiguousArrayBuffer<Element>) {
-    let setter = objc_setAssociatedObject as @convention(c)(
-      Any,
+    let setter = unsafeBitCast(getSetAssociatedObjectPtr(), to: (@convention(c)(
+      AnyObject,
       UnsafeRawPointer,
-      Any?,
+      AnyObject?,
       UInt
-    ) -> Void
-    let typedSetter = unsafeBitCast(
-      setter,
-      to: (@convention(c)(
-        AnyObject,
-        UnsafeRawPointer,
-        AnyObject?,
-        UInt
-      ) -> Void).self
-    )
-    typedSetter(
+    ) -> Void).self)
+    setter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey,
       buffer._storage,
@@ -628,7 +619,7 @@ extension _ArrayBuffer {
     )
   }
   
-  @inlinable @inline(never)
+  @_alwaysEmitIntoClient @inline(never)
   internal func withUnsafeBufferPointer_nonNative<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
