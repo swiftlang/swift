@@ -6,7 +6,6 @@
 // REQUIRES: asserts
 
 class NotConcurrent { } // expected-note 13{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
-// expected-complete-note @-1 13{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 // expected-tns-allow-typechecker-note @-2 {{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
@@ -67,23 +66,23 @@ actor A2 {
 }
 
 func testActorCreation(value: NotConcurrent) async {
-  _ = A2(value: value) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent' into actor-isolated context may introduce data races}}
+  _ = A2(value: value)
   // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
   // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(value:)' risks causing data races between actor-isolated and task-isolated uses}}
 
-  _ = await A2(valueAsync: value) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent' into actor-isolated context may introduce data races}}
+  _ = await A2(valueAsync: value)
   // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
   // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(valueAsync:)' risks causing data races between actor-isolated and task-isolated uses}}
 
-  _ = A2(delegatingSync: value) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent' into actor-isolated context may introduce data races}}
+  _ = A2(delegatingSync: value)
   // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
   // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingSync:)' risks causing data races between actor-isolated and task-isolated uses}}
 
-  _ = await A2(delegatingAsync: value, 9) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent' into actor-isolated context may introduce data races}}
+  _ = await A2(delegatingAsync: value, 9)
   // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
   // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
 
-  _ = await A2(nonisoAsync: value, 3) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent' into actor-isolated context may introduce data races}}
+  _ = await A2(nonisoAsync: value, 3)
   // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
   // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(nonisoAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
 }
@@ -104,7 +103,7 @@ extension A1 {
     // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@-2 {{property access is 'async'}}
     _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by call to actor-isolated function cannot cross actor boundary}}
-    _ = await other.asynchronous(nil) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into actor-isolated context may introduce data races}}
+    _ = await other.asynchronous(nil)
   }
 }
 
@@ -142,8 +141,8 @@ func globalTest() async {
   // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@+1 {{property access is 'async'}}
   let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
-  await globalAsync(a) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
-  await globalSync(a)  // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
+  await globalAsync(a)
+  await globalSync(a)
 
   // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@+1 {{property access is 'async'}}
@@ -154,7 +153,7 @@ func globalTest() async {
   // expected-typechecker-note@+2 {{call is 'async'}}
   // expected-typechecker-note@+1 {{property access is 'async'}}
   globalAsync(E.notSafe)
-  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
+
   // expected-typechecker-warning@-2 {{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot cross actor boundary}}
 #endif
 }
@@ -178,9 +177,9 @@ func globalTestMain(nc: NotConcurrent) async {
   // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@+1 {{property access is 'async'}}
   let a = globalValue // expected-warning {{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
-  await globalAsync(a) // expected-complete-warning {{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
-  await globalSync(a)  // expected-complete-warning {{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
-  _ = await ClassWithGlobalActorInits(nc) // expected-complete-warning {{passing argument of non-sendable type 'NotConcurrent' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
+  await globalAsync(a)
+  await globalSync(a)
+  _ = await ClassWithGlobalActorInits(nc)
   // expected-warning @-1 {{non-sendable type 'ClassWithGlobalActorInits' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   // expected-tns-warning @-2 {{sending 'nc' risks causing data races}}
   // expected-tns-note @-3 {{sending main actor-isolated 'nc' to global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'SomeGlobalActor'-isolated and main actor-isolated uses}}
