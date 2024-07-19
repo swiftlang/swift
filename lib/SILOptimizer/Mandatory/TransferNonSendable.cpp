@@ -157,23 +157,6 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
 //                             MARK: Diagnostics
 //===----------------------------------------------------------------------===//
 
-/// Emit the "unknown pattern error" at the SILLocation of \p inst.
-static void diagnoseUnknownPatternError(SILInstruction *inst) {
-  if (shouldAbortOnUnknownPatternMatchError()) {
-    llvm::report_fatal_error(
-        "RegionIsolation: Aborting on unknown pattern match error");
-  }
-
-  auto &ctx = inst->getFunction()->getASTContext();
-  auto loc = inst->getLoc().getSourceLoc();
-
-  ctx.Diags.diagnose(loc, diag::regionbasedisolation_unknown_pattern);
-}
-
-static void diagnoseUnknownPatternError(Operand *op) {
-  diagnoseUnknownPatternError(op->getUser());
-}
-
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnoseError(ASTContext &context, SourceLoc loc,
                                         Diag<T...> diag, U &&...args) {
@@ -748,7 +731,14 @@ public:
   }
 
   void emitUnknownPatternError() {
-    diagnoseUnknownPatternError(transferOp->getUser());
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(transferOp->getUser(),
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
 private:
@@ -1169,7 +1159,12 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // tells the user to file a bug. This importantly ensures that we can
     // guarantee that we always find the require if we successfully compile.
     if (!didEmitRequireNote) {
-      diagnoseUnknownPatternError(transferOp);
+      if (shouldAbortOnUnknownPatternMatchError()) {
+        llvm::report_fatal_error(
+            "RegionIsolation: Aborting on unknown pattern match error");
+      }
+
+      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
       continue;
     }
 
@@ -1231,7 +1226,14 @@ public:
   }
 
   void emitUnknownPatternError() {
-    diagnoseUnknownPatternError(getOperand()->getUser());
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(getOperand()->getUser(),
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emitUnknownUse(SILLocation loc) {
@@ -1724,7 +1726,14 @@ public:
   }
 
   void emitUnknownPatternError() {
-    diagnoseUnknownPatternError(info.functionExitingInst);
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(info.functionExitingInst,
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
   void emit();
@@ -1984,7 +1993,13 @@ struct DiagnosticEvaluator final
   }
 
   void handleUnknownCodePattern(const PartitionOp &op) const {
-    diagnoseUnknownPatternError(op.getSourceInst());
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(op.getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern);
   }
 
   bool isActorDerived(Element element) const {
