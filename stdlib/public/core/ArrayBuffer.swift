@@ -579,28 +579,15 @@ extension _ArrayBuffer {
       Any,
       UnsafeRawPointer
     ) -> Any?
-    let typedGetter = unsafeBitCast(
-      getter,
-      to: (@convention(c)(
-        AnyObject,
-        UnsafeRawPointer
-      ) -> AnyObject?).self
-    )
-    // swiftc gets upset if we go straight to returning Unmanaged<AnyObject>?
-    let typedNonRetainingGetter = unsafeBitCast(
-      typedGetter,
-      to: (@convention(c)(
-        AnyObject,
-        UnsafeRawPointer
-      ) -> Unmanaged<AnyObject>?).self
-    )
-    if let assoc = typedNonRetainingGetter(
+    let typedGetterType = (@convention(c)(AnyObject, UnsafeRawPointer)
+      -> UnsafeRawPointer?).self
+    let typedGetter = unsafeBitCast(getter, to: typedGetterType)
+    if let assocPtr = typedGetter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
-      let buffer = unsafeBitCast(
-        assoc,
-        to: _ContiguousArrayStorage<Element>.self
+      let buffer = assocPtr.loadUnaligned(
+        as: _ContiguousArrayStorage<Element>.self
       )
       return _ContiguousArrayBuffer(buffer)
     }
