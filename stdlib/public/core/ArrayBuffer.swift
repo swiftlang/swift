@@ -573,8 +573,8 @@ extension _ArrayBuffer {
 
   @inlinable @_alwaysEmitIntoClient
   static var associationKey: UnsafeRawPointer {
-    //Doesn't need to be a valid pointer
-    UnsafeRawPointer(OpaquePointer(bitPattern: 0x1).unsafelyUnwrapped)
+    //We never dereference this, we just need an address to use as a unique key
+    UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
   }
   
   @inlinable @_alwaysEmitIntoClient
