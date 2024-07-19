@@ -1,7 +1,7 @@
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -O                          | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -Osize                      | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -O     -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -Osize -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
+// RUN: %target-swift-emit-ir -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -O                          | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
+// RUN: %target-swift-emit-ir -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -Osize                      | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
+// RUN: %target-swift-emit-ir -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -O     -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
+// RUN: %target-swift-emit-ir -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -Xllvm -link-embedded-runtime=0 %s -Osize -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
