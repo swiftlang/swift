@@ -16,8 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
-#define FOUNDATION_HELPER_FILE 1
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP

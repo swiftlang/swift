@@ -189,10 +189,6 @@ extension _ArrayBuffer {
   internal __consuming func _consumeAndCreateNew(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) -> _ArrayBuffer {
-    if !_isNative && capacity >= minimumCapacity,
-       let associatedBuffer = getAssociatedBuffer() {
-      return _ArrayBuffer(_buffer: associatedBuffer, shiftedToStartIndex: 0) 
-    }
     let newCapacity = _growArrayCapacity(oldCapacity: capacity,
                                          minimumCapacity: minimumCapacity,
                                          growForAppend: growForAppend)
@@ -588,7 +584,7 @@ extension _ArrayBuffer {
       to: (@convention(c)(
         AnyObject,
         UnsafeRawPointer
-      ) -> AnyObject?).self
+      ) -> Unmanaged<AnyObject>?).self
     )
     if let assoc = typedGetter(
       _storage.objCInstance,
@@ -615,7 +611,7 @@ extension _ArrayBuffer {
       _storage.objCInstance,
       _ArrayBuffer.associationKey,
       buffer._storage,
-      0o1401 //OBJC_ASSOCIATION_RETAIN
+      1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
   }
   
@@ -623,18 +619,26 @@ extension _ArrayBuffer {
   internal func withUnsafeBufferPointer_nonNative<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    objc_sync_enter(_storage.objCInstance)
-    var associatedBuffer = getAssociatedBuffer()
     let unwrapped: _ContiguousArrayBuffer<Element>
-    if let associatedBuffer {
+    // libobjc already provides the necessary memory barriers for
+    // double checked locking to be safe, per comments on
+    // https://github.com/swiftlang/swift/pull/75148
+    if let associatedBuffer = getAssociatedBuffer() {
       unwrapped = associatedBuffer
     } else {
-      associatedBuffer = ContiguousArray(self)._buffer
-      unwrapped = associatedBuffer.unsafelyUnwrapped
-      setAssociatedBuffer(unwrapped)
+      let lock = _storage.objCInstance
+      objc_sync_enter(lock)
+      var associatedBuffer = getAssociatedBuffer()
+      if let associatedBuffer {
+        unwrapped = associatedBuffer
+      } else {
+        associatedBuffer = ContiguousArray(self)._buffer
+        unwrapped = associatedBuffer.unsafelyUnwrapped
+        setAssociatedBuffer(unwrapped)
+      }
+      defer { _fixLifetime(unwrapped) }
+      objc_sync_exit(lock)
     }
-    defer { _fixLifetime(unwrapped) }
-    objc_sync_exit(_storage.objCInstance)
     return try body(
       UnsafeBufferPointer(
         start: unwrapped.firstElementAddress,

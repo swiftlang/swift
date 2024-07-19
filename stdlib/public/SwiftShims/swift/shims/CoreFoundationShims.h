@@ -37,19 +37,6 @@ typedef signed long _swift_shims_CFIndex;
 
 #endif
 
-#if !FOUNDATION_HELPER_FILE
-
-extern void objc_setAssociatedObject(void);
-extern id _Nullable
-objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
-int objc_sync_enter(id _Nonnull object);
-int objc_sync_exit(id _Nonnull object);
-
-static void * _Nonnull getSetAssociatedObjectPtr() {
-  return (void *)&objc_setAssociatedObject;
-}
-#endif
-
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint8_t _swift_shims_UInt8;
