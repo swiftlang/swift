@@ -24,6 +24,7 @@ public let benchmarks = [BenchmarkInfo]()
 
 import CxxStdlibPerformance
 import Cxx
+import CxxStdlib // FIXME(rdar://128520766): this import should be redundant
 
 public let benchmarks = [
   BenchmarkInfo(
