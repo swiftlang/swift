@@ -188,6 +188,7 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
+UNINTERESTING_FEATURE(Extern)
 
 static bool usesFeatureBitwiseCopyable2(Decl *decl) {
   if (!decl->getModuleContext()->isStdlibModule()) {

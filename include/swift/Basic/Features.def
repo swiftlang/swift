@@ -185,7 +185,6 @@ BASELINE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 BASELINE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 BASELINE_LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
 BASELINE_LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
-BASELINE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 BASELINE_LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 BASELINE_LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateTask, 0, "Builtin.createTask and Builtin.createDiscardingTask")
@@ -394,6 +393,8 @@ EXPERIMENTAL_FEATURE(DebugDescriptionMacro, true)
 EXPERIMENTAL_FEATURE(ReinitializeConsumeInMultiBlockDefer, false)
 
 EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, false)
+
+EXPERIMENTAL_FEATURE(Extern, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
