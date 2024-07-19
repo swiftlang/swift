@@ -360,7 +360,7 @@ macro(configure_sdk_unix name architectures)
   # depending on the architecture, so having a single value is the only
   # possibility right now.
   set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
-      -Xcc --gcc-toolchain=/usr
+      -Xcc --gcc-toolchain=${CMAKE_SYSROOT}/usr
     CACHE STRING "Extra flags for compiling the C++ overlay")
 
   set(_default_threading_package "pthreads")
