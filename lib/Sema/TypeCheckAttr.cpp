@@ -2542,7 +2542,7 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
       if (auto *VD = dyn_cast<VarDecl>(accessor->getStorage()))
         Kind = VD->isLet() ? 1 : 0;
       diagnose(attr->getLocation(), diag::final_not_on_accessors,
-               Kind, accessor->getDescriptiveKind())
+               Kind)
         .fixItRemove(attr->getRange());
       return;
     }
