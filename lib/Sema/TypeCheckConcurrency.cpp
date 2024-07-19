@@ -6219,7 +6219,11 @@ bool swift::checkSendableConformance(
     return false;
 
   // If this is an always-unavailable conformance, there's nothing to check.
-  if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
+  // We always use the root conformance for this check, because inherited
+  // conformances need to walk back to the original declaration for the
+  // superclass conformance to find an unavailable attribute.
+  if (auto ext = dyn_cast<ExtensionDecl>(
+          conformance->getRootConformance()->getDeclContext())) {
     if (AvailableAttr::isUnavailable(ext))
       return false;
   }
