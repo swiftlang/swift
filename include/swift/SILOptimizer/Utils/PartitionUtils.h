@@ -1087,6 +1087,14 @@ public:
     return Impl::getIsolationInfo(partitionOp);
   }
 
+  /// Some evaluators do not support accessing fields on their SILInstruction
+  /// since they just pass in "mocked" SILInstruction. We allow for them to just
+  /// return false for this case to prevent dereference issues.
+  static bool
+  doesParentFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return Impl::doesFunctionHaveSendingResult(partitionOp);
+  }
+
   std::optional<Element> getElement(SILValue value) const {
     return asImpl().getElement(value);
   }
@@ -1130,10 +1138,7 @@ public:
 
       // See if we are assigning an a non-disconnected value into a 'out
       // sending' parameter. In such a case, we emit a diagnostic.
-      if (op.getSourceInst()
-              ->getFunction()
-              ->getLoweredFunctionType()
-              ->hasSendingResult()) {
+      if (doesParentFunctionHaveSendingResult(op)) {
         if (auto instance = getRepresentativeValue(op.getOpArgs()[0])) {
           if (auto value = instance.maybeGetValue()) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
@@ -1246,10 +1251,7 @@ public:
 
       // See if we are assigning an a non-disconnected value into a 'out
       // sending' parameter. In such a case, we emit a diagnostic.
-      if (op.getSourceInst()
-              ->getFunction()
-              ->getLoweredFunctionType()
-              ->hasSendingResult()) {
+      if (doesParentFunctionHaveSendingResult(op)) {
         if (auto instance = getRepresentativeValue(op.getOpArgs()[0])) {
           if (auto value = instance.maybeGetValue()) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
@@ -1563,6 +1565,12 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return SILIsolationInfo::get(partitionOp.getSourceInst());
+  }
+  static bool doesFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return partitionOp.getSourceInst()
+        ->getFunction()
+        ->getLoweredFunctionType()
+        ->hasSendingResult();
   }
 };
 
