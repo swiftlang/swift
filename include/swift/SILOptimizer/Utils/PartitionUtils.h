@@ -1375,13 +1375,6 @@ private:
   void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
                                          Operand *transferringOp) const {
     if (shouldTryToSquelchErrors()) {
-      if (auto isolationInfo = getIsolationInfo(op)) {
-        if (isolationInfo.isActorIsolated() &&
-            isolationInfo.hasSameIsolation(
-                SILIsolationInfo::get(transferringOp->getUser())))
-          return;
-      }
-
       if (SILValue equivalenceClassRep =
               getRepresentative(transferringOp->get())) {
 
