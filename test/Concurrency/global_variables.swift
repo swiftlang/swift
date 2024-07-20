@@ -15,7 +15,7 @@ actor TestGlobalActor {
 var mutableIsolatedGlobal = 1
 
 var mutableNonisolatedGlobal = 1 // expected-error{{var 'mutableNonisolatedGlobal' is not concurrency-safe because it is nonisolated global shared mutable state}}
-// expected-note@-1{{annotate 'mutableNonisolatedGlobal' with '@MainActor' if property should only be accessed from the main actor}}{{1-1=@MainActor }}
+// expected-note@-1{{add '@MainActor' to make var 'mutableNonisolatedGlobal' part of global actor 'MainActor'}}{{1-1=@MainActor }}
 // expected-note@-2{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}{{1-1=nonisolated(unsafe) }}
 // expected-note@-3{{convert 'mutableNonisolatedGlobal' to a 'let' constant to make 'Sendable' shared state immutable}}{{1-4=let}}
 
@@ -48,25 +48,25 @@ actor TestActor {
 struct TestStatics {
   static let immutableExplicitSendable = TestSendable()
   static let immutableNonsendable = TestNonsendable() // expected-error{{static property 'immutableNonsendable' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
-  // expected-note@-1 {{annotate 'immutableNonsendable' with '@MainActor' if property should only be accessed from the main actor}}
+  // expected-note@-1 {{add '@MainActor' to make static property 'immutableNonsendable' part of global actor 'MainActor'}}
   // expected-note@-2 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
   static nonisolated(unsafe) let immutableNonisolatedUnsafe = TestNonsendable()
   static nonisolated let immutableNonisolated = TestNonsendable() // expected-error{{static property 'immutableNonisolated' is not concurrency-safe because non-'Sendable' type 'TestNonsendable' may have shared mutable state}}
   // expected-note@-1 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
   // expected-error@-2 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'TestNonsendable'}}
-  // expected-note@-3{{annotate 'immutableNonisolated' with '@MainActor' if property should only be accessed from the main actor}}
+  // expected-note@-3{{add '@MainActor' to make static property 'immutableNonisolated' part of global actor 'MainActor'}}
   static nonisolated(unsafe) let immutableNonisolatedUnsafeSendable = TestSendable()
   // expected-warning@-1 {{'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'TestSendable', consider removing it}} {{10-30=}}
   static let immutableInferredSendable = 0
   static var mutable = 0 // expected-error{{static property 'mutable' is not concurrency-safe because it is nonisolated global shared mutable state}}
   // expected-note@-1{{convert 'mutable' to a 'let' constant to make 'Sendable' shared state immutable}}
   // expected-note@-2{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
-  // expected-note@-3{{annotate 'mutable' with '@MainActor' if property should only be accessed from the main actor}}
+  // expected-note@-3{{add '@MainActor' to make static property 'mutable' part of global actor 'MainActor'}}
   static var computedProperty: Int { 0 } // computed property that, though static, has no storage so is not a global
   @TestWrapper static var wrapped: Int // expected-error{{static property 'wrapped' is not concurrency-safe because it is nonisolated global shared mutable state}}
   // expected-note@-1{{convert 'wrapped' to a 'let' constant to make 'Sendable' shared state immutable}}{{23-26=let}}
   // expected-note@-2{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}{{16-16=nonisolated(unsafe) }}
-  // expected-note@-3{{annotate 'wrapped' with '@MainActor' if property should only be accessed from the main actor}}{{3-3=@MainActor }}
+  // expected-note@-3{{add '@MainActor' to make static property 'wrapped' part of global actor 'MainActor'}}{{3-3=@MainActor }}
 }
 
 public actor TestPublicActor {
