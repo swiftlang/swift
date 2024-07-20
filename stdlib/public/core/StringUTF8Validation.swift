@@ -104,6 +104,11 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     _ = iter.next()
     while let cu = iter.next(), UTF8.isContinuation(cu) {
       endIndex += 1
+      // Unicode's Maximal subpart of an ill-formed subsequence will yield
+      // at most 3 bytes of error.
+      if buf.distance(from: buf.startIndex, to: endIndex) >= 3 {
+        break
+      }
     }
     let illegalRange = Range(buf.startIndex...endIndex)
     _internalInvariant(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
