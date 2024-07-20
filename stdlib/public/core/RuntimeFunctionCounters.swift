@@ -105,7 +105,7 @@ struct _RuntimeFunctionCounters {
 
   public static let runtimeFunctionNames =
     getRuntimeFunctionNames()
-  public static let runtimeFunctionCountersOffsets =
+  public static nonisolated(unsafe) let runtimeFunctionCountersOffsets =
     _RuntimeFunctionCounters.getRuntimeFunctionCountersOffsets()
   public static let numRuntimeFunctionCounters =
     Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())

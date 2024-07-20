@@ -794,4 +794,6 @@ Var UnsafeMutableBufferPointer.debugDescription is now with @_preInverseGenerics
 
 Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
 
+EnumElement EncodingError.invalidValue has declared type change from (Swift.EncodingError.Type) -> (Any, Swift.EncodingError.Context) -> Swift.EncodingError to (Swift.EncodingError.Type) -> (any Swift.Sendable, Swift.EncodingError.Context) -> Swift.EncodingError
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
