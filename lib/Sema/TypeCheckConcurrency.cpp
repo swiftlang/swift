@@ -2436,7 +2436,7 @@ namespace {
             if (fn->getOverriddenDecl())
               return false;
 
-            fn->diagnose(diag::add_globalactor_to_function,
+            fn->diagnose(diag::add_globalactor_to_decl,
                          globalActor->getWithoutParens().getString(),
                          fn, globalActor)
                 .fixItInsert(fn->getAttributeInsertionLoc(false),
@@ -5403,7 +5403,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // Diagnose global state that is not either immutable plus Sendable or
   // isolated to a global actor.
-  auto checkGlobalIsolation = [var = dyn_cast<VarDecl>(value)](
+  auto checkGlobalIsolation = [var = dyn_cast<VarDecl>(value), &ctx](
                                   ActorIsolation isolation) {
     // Diagnose only declarations in the same module.
     //
@@ -5447,10 +5447,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
             }
           }
 
-          diagVar->diagnose(diag::shared_state_main_actor_node,
-                            diagVar)
-              .fixItInsert(diagVar->getAttributeInsertionLoc(false),
-                           "@MainActor ");
+          auto mainActor = ctx.getMainActorType();
+          if (mainActor) {
+            diagVar->diagnose(diag::add_globalactor_to_decl,
+                              mainActor->getWithoutParens().getString(),
+                              diagVar, mainActor)
+                .fixItInsert(diagVar->getAttributeInsertionLoc(false),
+                             diag::insert_globalactor_attr, mainActor);
+          }
           diagVar->diagnose(diag::shared_state_nonisolated_unsafe,
                             diagVar)
               .fixItInsert(diagVar->getAttributeInsertionLoc(true),
