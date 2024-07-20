@@ -5344,7 +5344,7 @@ NOTE(note_add_distributed_to_decl,none,
 ERROR(invalid_isolated_calls_in_body,none,
      "calls to '@%0'-isolated' code in %kind1",
      (StringRef, const ValueDecl *))
-NOTE(add_globalactor_to_function,none,
+NOTE(add_globalactor_to_decl,none,
      "add '@%0' to make %kind1 part of global actor %2",
      (StringRef, const ValueDecl *, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
@@ -5579,8 +5579,6 @@ ERROR(shared_immutable_state_decl,none,
 NOTE(shared_state_make_immutable,none,
      "convert %0 to a 'let' constant to make 'Sendable' shared state immutable",
      (const ValueDecl *))
-NOTE(shared_state_main_actor_node,none,
-     "annotate %0 with '@MainActor' if property should only be accessed from the main actor", (const ValueDecl *))
 NOTE(shared_state_nonisolated_unsafe,none,
      "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
