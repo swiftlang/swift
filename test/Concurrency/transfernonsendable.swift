@@ -14,7 +14,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 51{{}}
+class NonSendableKlass { // expected-complete-note 53{{}}
   // expected-typechecker-only-note @-1 3{{}}
   // expected-tns-note @-2 {{}}
   var field: NonSendableKlass? = nil
@@ -145,10 +145,7 @@ func closureInOut(_ a: MyActor) async {
   // expected-tns-note @-3 {{sending 'ns0' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
 
   if await booleanFlag {
-    // This is not an actual use since we are passing values to the same
-    // isolation domain.
-    await a.useKlass(ns1)
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+    await a.useKlass(ns1) // expected-tns-note {{access can happen concurrently}}
   } else {
     closure() // expected-tns-note {{access can happen concurrently}}
   }
@@ -1224,11 +1221,11 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
     // good... that is QoI though.
     await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
     // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-    // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
+    // expected-tns-note @-2 {{access can happen concurrently}}
 
     // This is treated as a use since test is in box form and is mutable. So we
     // treat assignment as a merge.
-    test = StructFieldTests() // expected-tns-note {{access can happen concurrently}}
+    test = StructFieldTests()
     cls = {
       useInOut(&test.varSendableNonTrivial)
     }
@@ -1259,7 +1256,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
   }
 
   test.varSendableNonTrivial = SendableKlass()
-  useValue(test) // expected-tns-note {{access can happen concurrently}}
+  useValue(test)
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
@@ -1428,7 +1425,7 @@ func controlFlowTest2() async {
     x = NonSendableKlass()
   }
 
-  useValue(x) // expected-tns-note {{access can happen concurrently}}
+  useValue(x)
 }
 
 ////////////////////////
@@ -1736,6 +1733,17 @@ func sendableGlobalActorIsolated() {
     // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
   }
   print(x) // expected-tns-note {{access can happen concurrently}}
+}
+
+// We do not get an error here since we are transferring x both times to a main
+// actor isolated thing function. We used to emit an error when using region
+// isolation since we would trip on the store_borrow we used to materialize the
+// value.
+func testIndirectParameterSameIsolationNoError() async {
+  let x = NonSendableKlass()
+  await transferToMain(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  await transferToMain(x) // expected-tns-note {{access can happen concurrently}}
 }
 
 extension MyActor {
