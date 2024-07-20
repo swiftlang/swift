@@ -786,6 +786,12 @@ BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
 /// targetOSVersionAtLeast has type (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
 BUILTIN_MISC_OPERATION(TargetOSVersionAtLeast, "targetOSVersionAtLeast", "n", Special)
 
+/// targetVariantOSVersionAtLeast has type (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+BUILTIN_MISC_OPERATION(TargetVariantOSVersionAtLeast, "targetVariantOSVersionAtLeast", "n", Special)
+
+/// targetOSVersionOrVariantOSVersionAtLeast has type (Builtin.UInt32, Builtin.UInt32, Builtin.UInt32, Builtin.UInt32, Builtin.UInt32, Builtin.UInt32) -> Builtin.UInt32
+BUILTIN_MISC_OPERATION(TargetOSVersionOrVariantOSVersionAtLeast, "targetOSVersionOrVariantOSVersionAtLeast", "n", Special)
+
 /// Resume a throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
                        "resumeThrowingContinuationReturning", "", Special)
