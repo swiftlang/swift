@@ -107,6 +107,12 @@ else()
   list(APPEND compile_options "-cxx-interoperability-mode=default")
 endif()
 
+# FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(
+if(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+  list(APPEND compile_options
+    "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
+endif()
+
 if(SWIFT_BUILD_SWIFT_SYNTAX)
   foreach(target swiftASTGen swiftIDEUtilsBridging)
     target_compile_options(${target} PRIVATE ${compile_options})

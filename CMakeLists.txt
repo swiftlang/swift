@@ -93,13 +93,18 @@ include(CheckSymbolExists)
 include(CMakeDependentOption)
 include(CheckLanguage)
 include(GNUInstallDirs)
-include(SwiftImplicitImport)
+include(SwiftCompilerCapability)
 include(FetchContent)
 
 # Enable Swift for the host compiler build if we have the language. It is
 # optional until we have a bootstrap story.
 check_language(Swift)
 if(CMAKE_Swift_COMPILER)
+  # we are not interested in logging any Swift module used
+  # when configuring the build system -- those are not useful
+  # since they will not contribute to the build of the compiler itself
+  unset(ENV{SWIFT_LOADED_MODULE_TRACE_FILE})
+
   enable_language(Swift)
   set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION "${CMAKE_Swift_COMPILER_VERSION}")
 else()
@@ -845,6 +850,10 @@ if (CMAKE_Swift_COMPILER)
   swift_supports_implicit_module("backtracing"
     SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
   message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
+
+  swift_get_package_cmo_support(
+    Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+  message(STATUS "  Package CMO: ${Swift_COMPILER_PACKAGE_CMO_SUPPORT}")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
