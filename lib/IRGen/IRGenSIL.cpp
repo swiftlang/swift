@@ -4371,6 +4371,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     if (fnType->hasErrorResult()) {
       error.add(getNullErrorValue());
     }
+
     emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result, error);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
@@ -4420,12 +4421,13 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
     }
 
     llvm::Value *expandedResult = llvm::UndefValue::get(combined.combinedTy);
+    auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy);
 
     if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
       auto nativeError =
           errorSchema.mapIntoNative(IGM, *this, errorResult, silErrorTy, false);
 
-      if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+      if (structTy) {
         for (unsigned i : combined.errorValueMapping) {
           llvm::Value *elt = nativeError.claimNext();
           auto *nativeTy = structTy->getElementType(i);
@@ -4444,7 +4446,11 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
                                   combined.combinedTy, /*forExtraction*/ false);
       }
     } else {
-      out = expandedResult;
+      if (forAsync && structTy) {
+        emitAllExtractValues(expandedResult, structTy, out);
+      } else {
+        out = expandedResult;
+      }
     }
   };
 
