@@ -575,14 +575,14 @@ extension _ArrayBuffer {
   
   @inlinable @_alwaysEmitIntoClient
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
-    let getter = objc_getAssociatedObject as @convention(c)(
-      Any,
-      UnsafeRawPointer
-    ) -> Any?
-    let typedGetterType = (@convention(c)(AnyObject, UnsafeRawPointer)
-      -> UnsafeRawPointer?).self
-    let typedGetter = unsafeBitCast(getter, to: typedGetterType)
-    if let assocPtr = typedGetter(
+    let getter = unsafeBitCast(
+      getGetAssociatedObjectPtr(),
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer
+      ) -> UnsafeRawPointer?).self
+    )
+    if let assocPtr = getter(
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {

@@ -29,13 +29,16 @@ extern "C" {
 #ifdef __OBJC2__
 
 extern void objc_setAssociatedObject(void);
-extern id _Nullable
-objc_getAssociatedObject(id _Nonnull object, const void * _Nonnull key);
+extern void objc_getAssociatedObject(void);
 int objc_sync_enter(id _Nonnull object);
 int objc_sync_exit(id _Nonnull object);
 
 static void * _Nonnull getSetAssociatedObjectPtr() {
   return (void *)&objc_setAssociatedObject;
+}
+
+static void * _Nonnull getGetAssociatedObjectPtr() {
+  return (void *)&objc_getAssociatedObject;
 }
 
 #endif // __OBJC2__
