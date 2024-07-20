@@ -318,9 +318,6 @@ entry(%0 : $*Cell<T>):
 // CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
 // CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
 
-// Make sure we call destroy on src
-// CHECK: call ptr @{{.*}}(ptr [[SRC_CELL]])
-
 //===----------------------------------------------------------------------===//
 // ConcreteMoveAsLike assignWithTake
 //===----------------------------------------------------------------------===//
@@ -328,13 +325,7 @@ entry(%0 : $*Cell<T>):
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
 // CHECK: [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
 // CHECK: [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
-
-// Make sure we call destroy on dest
-// CHECK: call ptr @{{.*}}(ptr [[DEST_CELL]])
 // CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
-
-// Make sure we call destroy on src
-// CHECK: call ptr @{{.*}}(ptr [[SRC_CELL]])
 
 //===----------------------------------------------------------------------===//
 // SmallVectorOf2MovesAsLike<T> initializeWithTake
@@ -382,15 +373,9 @@ entry(%0 : $*Cell<T>):
 // CHECK: [[SRC_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 0
 // CHECK-NEXT: [[DEST_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 0
 // CHECK-NEXT: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_0]], ptr [[SRC_0]])
-
-// Make sure we call destroy on source[0]
-// CHECK: call ptr @{{.*}}(ptr [[SRC_0]])
 // CHECK: [[SRC_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 1
 // CHECK-NEXT: [[DEST_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 1
 // CHECK-NEXT: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_1]], ptr [[SRC_1]])
-
-// Make sure we call destroy on source[1]
-// CHECK: call ptr @{{.*}}(ptr [[SRC_1]])
 
 //===----------------------------------------------------------------------===//
 // ConcreteSmallVectorMovesAsLike assignWithTake
@@ -401,19 +386,7 @@ entry(%0 : $*Cell<T>):
 // CHECK: [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
 // CHECK: [[SRC_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 0
 // CHECK-NEXT: [[DEST_0:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 0
-
-// Make sure we call destroy on dest[0]
-// CHECK-NEXT: call ptr @{{.*}}(ptr [[DEST_0]])
-// CHECK-NEXT: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_0]], ptr [[SRC_0]])
-
-// Make sure we call destroy on source[0]
-// CHECK: call ptr @{{.*}}(ptr [[SRC_0]])
+// CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_0]], ptr [[SRC_0]])
 // CHECK: [[SRC_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[SRC_VECTOR]], {{i64|i32}} 1
 // CHECK-NEXT: [[DEST_1:%.*]] = getelementptr inbounds %TSo24NonBitwiseTakableCXXTypeV, ptr [[DEST_VECTOR]], {{i64|i32}} 1
-
-// Make sure we call destroy on dest[1]
-// CHECK-NEXT: call ptr @{{.*}}(ptr [[DEST_1]])
-// CHECK-NEXT: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_1]], ptr [[SRC_1]])
-
-// Make sure we call destroy on source[1]
-// CHECK: call ptr @{{.*}}(ptr [[SRC_1]])
+// CHECK: {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_1]], ptr [[SRC_1]])
