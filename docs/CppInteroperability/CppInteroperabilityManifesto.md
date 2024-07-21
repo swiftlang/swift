@@ -283,7 +283,7 @@ manifesto](OwnershipManifesto.md) and in [SE-0176 Enforce Exclusive Access to
 Memory](https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md).
 When the caller binds a storage reference to an `inout` parameter, it starts a
 non-instantaneous access to the whole value that occupies the storage. This
-access ends when the callee returns.  Overlapping accesses are not allowed, and
+access ends when the caller returns.  Overlapping accesses are not allowed, and
 therefore, while an `inout` parameter is live, original value may not be
 accessed.
 
