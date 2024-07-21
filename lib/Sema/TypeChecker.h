@@ -580,10 +580,6 @@ void addImplicitConstructors(NominalTypeDecl *typeDecl);
 /// tree.
 Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
 
-/// Given an pre-folded expression, find LHS from the expression if a binary
-/// operator \c name appended to the expression.
-Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
-
 /// Type check the given expression.
 ///
 /// \param expr The expression to type-check, which will be modified in
