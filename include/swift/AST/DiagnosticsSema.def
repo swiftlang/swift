@@ -4628,8 +4628,6 @@ NOTE(duplicated_key_declared_here, none,
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,none,
       "cannot explicitly specialize a generic function", ())
-ERROR(not_a_generic_definition,none,
-      "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
 ERROR(protocol_declares_unknown_primary_assoc_type,none,
