@@ -2605,15 +2605,28 @@ AllowInvalidMemberReferenceInInitAccessor::create(ConstraintSystem &cs,
 
 bool AllowConcreteTypeSpecialization::diagnose(const Solution &solution,
                                                bool asNote) const {
-  ConcreteTypeSpecialization failure(solution, ConcreteType, getLocator());
+  ConcreteTypeSpecialization failure(solution, ConcreteType, Decl, getLocator(),
+                                     fixBehavior);
   return failure.diagnose(asNote);
 }
 
-AllowConcreteTypeSpecialization *
-AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
-                                        ConstraintLocator *locator) {
+AllowConcreteTypeSpecialization *AllowConcreteTypeSpecialization::create(
+    ConstraintSystem &cs, Type concreteTy, ValueDecl *decl,
+    ConstraintLocator *locator, FixBehavior fixBehavior) {
+  return new (cs.getAllocator()) AllowConcreteTypeSpecialization(
+      cs, concreteTy, decl, locator, fixBehavior);
+}
+
+bool AllowGenericFunctionSpecialization::diagnose(const Solution &solution,
+                                                  bool asNote) const {
+  GenericFunctionSpecialization failure(solution, Decl, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowGenericFunctionSpecialization *AllowGenericFunctionSpecialization::create(
+    ConstraintSystem &cs, ValueDecl *decl, ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowConcreteTypeSpecialization(cs, concreteTy, locator);
+      AllowGenericFunctionSpecialization(cs, decl, locator);
 }
 
 bool IgnoreOutOfPlaceThenStmt::diagnose(const Solution &solution,

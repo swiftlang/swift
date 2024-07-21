@@ -1171,7 +1171,8 @@ void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
       }
 
       if (auto *origRepr =
-              placeholder->getOriginator().dyn_cast<PlaceholderTypeRepr *>()) {
+              placeholder->getOriginator().dyn_cast<TypeRepr *>()) {
+        assert(isa<PlaceholderTypeRepr>(origRepr));
         t1->getASTContext()
             .Diags
             .diagnose(origRepr->getLoc(),
