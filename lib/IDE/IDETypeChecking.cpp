@@ -1022,9 +1022,8 @@ swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
     }
 
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
+      if (DC)
+        Init = resolveDeclRefExpr(UDRE, DC);
     }
 
     auto *ReferencedVar = Init->getReferencedDecl().getDecl();
@@ -1045,9 +1044,8 @@ swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
 
     Expr *Init = Cond.getInitializer();
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
+      if (DC)
+        Init = resolveDeclRefExpr(UDRE, DC);
     }
 
     auto ReferencedVar = Init->getReferencedDecl().getDecl();
