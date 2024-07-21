@@ -264,7 +264,7 @@ Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
   ```sh
   utils/build-script --skip-build-benchmarks \
     --swift-darwin-supported-archs "$(uname -m)" \
-    --sccache --release-debuginfo --swift-disable-dead-stripping \
+    --release-debuginfo --swift-disable-dead-stripping \
     --bootstrapping=hosttools
   ```
 - Linux:
