@@ -675,14 +675,14 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     os << "> = true;\n";
   }
 
-  if (!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode() &&
-      typeMetadataFuncRequirements.empty()) {
-    // FIXME: generic support.
-    os << "template<>\n";
+  if (!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode()) {
+    assert(NTD && "not a nominal type?");
+    if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
+      os << "template<>\n";
     os << "static inline const constexpr bool isValueType<";
     printer.printBaseName(typeDecl->getModuleContext());
     os << "::";
-    printer.printBaseName(typeDecl);
+    printer.printNominalTypeReference(NTD, moduleContext);
     os << "> = true;\n";
   }
   if (isOpaqueLayout) {
