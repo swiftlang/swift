@@ -406,8 +406,7 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
 Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
-                                      DeclContext *DC,
-                                      bool replaceInvalidRefsWithErrors) {
+                                      DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -431,10 +430,10 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     LookupName = DeclNameRef(lookupName);
   }
 
+  auto &Context = DC->getASTContext();
+
   auto errorResult = [&]() -> Expr * {
-    if (replaceInvalidRefsWithErrors)
-      return new (DC->getASTContext()) ErrorExpr(UDRE->getSourceRange());
-    return UDRE;
+    return new (Context) ErrorExpr(UDRE->getSourceRange());
   };
 
   // Perform standard value name lookup.
@@ -448,8 +447,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   bool AllDeclRefs = true;
   SmallVector<ValueDecl*, 4> ResultValues;
-
-  auto &Context = DC->getASTContext();
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
@@ -487,8 +484,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
           Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
                                  localDeclAfterUse);
-          Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
-          return error;
+          return errorResult();
         }
 
         Lookup.shiftDownResults();
@@ -705,7 +701,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           UDRE->getRefKind() == DeclRefKind::BinaryOperator
               ? 0
               : UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
-      return new (Context) ErrorExpr(UDRE->getSourceRange());
+      return errorResult();
     }
 
     // For operators, sort the results so that non-generic operations come
@@ -844,7 +840,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     auto *Decl = Result.getValueDecl();
     Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl);
   }
-  return new (Context) ErrorExpr(UDRE->getSourceRange());
+  return errorResult();
 }
 
 /// If an expression references 'self.init' or 'super.init' in an
@@ -1036,10 +1032,6 @@ namespace {
 
     Expr *ParentExpr;
 
-    /// Indicates whether pre-check is allowed to insert
-    /// implicit `ErrorExpr` in place of invalid references.
-    bool UseErrorExprs;
-
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1107,10 +1099,8 @@ namespace {
     void markAcceptableDiscardExprs(Expr *E);
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent,
-                       bool replaceInvalidRefsWithErrors)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
-          UseErrorExprs(replaceInvalidRefsWithErrors) {}
+    PreCheckExpression(DeclContext *dc, Expr *parent)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1232,8 +1222,7 @@ namespace {
                         new (Ctx) ErrorExpr(unresolved->getSourceRange()));
         }
 
-        auto *refExpr =
-            TypeChecker::resolveDeclRefExpr(unresolved, DC, UseErrorExprs);
+        auto *refExpr = TypeChecker::resolveDeclRefExpr(unresolved, DC);
 
         // Check whether this is standalone `self` in init accessor, which
         // is invalid.
@@ -2461,14 +2450,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
              : nullptr;
 }
 
-bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
-                                      bool replaceInvalidRefsWithErrors) {
+bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
   auto *DC = target.getDeclContext();
 
   bool hadErrors = false;
 
   if (auto *expr = target.getAsExpr()) {
-    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors);
+    hadErrors |= preCheckExpression(expr, DC);
     // Even if the pre-check fails, expression still has to be re-set.
     target.setExpr(expr);
   }
@@ -2479,12 +2467,10 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
     auto *sequenceExpr = stmt->getParsedSequence();
     auto *whereExpr = stmt->getWhere();
 
-    hadErrors |= preCheckExpression(sequenceExpr, DC,
-                                    /*replaceInvalidRefsWithErrors=*/true);
+    hadErrors |= preCheckExpression(sequenceExpr, DC);
 
     if (whereExpr) {
-      hadErrors |= preCheckExpression(whereExpr, DC,
-                                      /*replaceInvalidRefsWithErrors=*/true);
+      hadErrors |= preCheckExpression(whereExpr, DC);
     }
 
     // Update sequence and where expressions to pre-checked versions.
@@ -2501,12 +2487,11 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          bool replaceInvalidRefsWithErrors) {
+bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
+  PreCheckExpression preCheck(dc, expr);
 
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
