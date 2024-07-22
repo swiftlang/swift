@@ -89,6 +89,7 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
+    auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
 
     DiagnosticEmitter diagnosticEmitter(fn);
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
@@ -108,7 +109,8 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     } else {
       borrowtodestructure::IntervalMapAllocator allocator;
       MoveOnlyAddressChecker checker{getFunction(), diagnosticEmitter,
-                                     allocator, domTree, poa};
+                                     allocator,     domTree,
+                                     poa,           deadEndBlocksAnalysis};
       madeChange = checker.completeLifetimes();
       madeChange |= checker.check(moveIntroducersToProcess);
     }
