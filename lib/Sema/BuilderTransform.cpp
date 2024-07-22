@@ -1316,8 +1316,7 @@ public:
       // Suppress any diagnostics which could be produced by this expression.
       DiagnosticTransaction transaction(diagEngine);
 
-      HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/true);
+      HasError |= ConstraintSystem::preCheckExpression(E, DC);
 
       HasError |= transaction.hasErrors();
 

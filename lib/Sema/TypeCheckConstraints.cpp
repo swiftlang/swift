@@ -478,10 +478,8 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
   // First, pre-check the target, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckTarget(
-          target, /*replaceInvalidRefsWithErrors=*/true)) {
+  if (ConstraintSystem::preCheckTarget(target))
     return errorResult();
-  }
 
   // Check whether given target has a code completion token which requires
   // special handling. Returns true if handled, in which case we've already
