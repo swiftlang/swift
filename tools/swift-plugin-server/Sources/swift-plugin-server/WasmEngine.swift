@@ -89,3 +89,30 @@ struct WasmEngineError: Error, CustomStringConvertible {
     self.description = message
   }
 }
+
+// `pipe` support on Windows is not included in the latest swift-system release 1.3.1
+// but it is available in the latest main branch. Remove the following code when we
+// update to the next release of swift-system.
+#if os(Windows)
+import ucrt
+
+internal var system_errno: CInt {
+  var value: CInt = 0
+  _ = ucrt._get_errno(&value)
+  return value
+}
+
+extension FileDescriptor {
+  static func pipe() throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
+    var fds: (Int32, Int32) = (-1, -1)
+    return try withUnsafeMutablePointer(to: &fds) { pointer in
+      return try pointer.withMemoryRebound(to: Int32.self, capacity: 2) { fds in
+        guard _pipe(fds, 4096, _O_BINARY | _O_NOINHERIT) == 0 else {
+          throw Errno(rawValue: system_errno)
+        }
+        return (FileDescriptor(rawValue: fds[0]), FileDescriptor(rawValue: fds[1]))
+      }
+    }
+  }
+}
+#endif
