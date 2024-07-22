@@ -3476,7 +3476,7 @@ A sidecar annotation file allows to add arbitrary attributes to declarations
 parsed from a header file. You can find examples of such files in the [apinotes
 directory](../apinotes). APINotes files
 are handled by the [APINotes library in
-Clang](https://github.com/apple/llvm-project/tree/apple/main/clang/lib/APINotes).
+Clang](https://github.com/swiftlang/llvm-project/tree/apple/main/clang/lib/APINotes).
 Clang reads an APINotes file alongside the header file; Clang injects attributes
 specified by APINotes into the AST parsed from the header.
 
