@@ -467,7 +467,7 @@ def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
 def debug_inverse_requirements : Flag<["-"], "debug-inverse-requirements">,
-  HelpText<"Print real requirements in -debug_generic_signatures output">;
+  HelpText<"Print real requirements in -debug-generic-signatures output">;
 
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
@@ -799,7 +799,7 @@ def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
 
 def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-type-checking">,
   MetaVarName<"<n>">,
-  HelpText<"Warns when type-checking a function takes longer than <n> ms">;
+  HelpText<"Warns when type-checking an expression takes longer than <n> ms">;
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
