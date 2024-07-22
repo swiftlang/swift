@@ -892,7 +892,8 @@ static SILValue tryRewriteToPartialApplyStack(
         if (!origUse->getUser()->mayWriteToMemory()) {
           return true;
         }
-        if (closureLiveness.isWithinBoundary(origUse->getUser())) {
+        if (closureLiveness.isWithinBoundary(origUse->getUser(),
+                                             /*deadEndBlocks=*/nullptr)) {
           origIsUnmodifiedDuringClosureLifetime = false;
           LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing "
                                      "use during closure lifetime\n";

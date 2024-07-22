@@ -2714,7 +2714,7 @@ public:
                                   LinearLiveness::DoNotIncludeExtensions);
     linearLiveness.compute();
     auto &liveness = linearLiveness.getLiveness();
-    require(!liveness.isWithinBoundary(I),
+    require(!liveness.isWithinBoundary(I, /*deadEndBlocks=*/nullptr),
             "extend_lifetime use within unextended linear liveness boundary!?");
     PrunedLivenessBoundary boundary;
     liveness.computeBoundary(boundary);
@@ -2789,7 +2789,8 @@ public:
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
-      if (!scopedAddressLiveness->isWithinBoundary(user)) {
+      if (!scopedAddressLiveness->isWithinBoundary(user,
+                                                   /*deadEndBlocks=*/nullptr)) {
         llvm::errs() << "User found outside scope: " << *user;
         return false;
       }
