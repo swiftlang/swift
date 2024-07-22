@@ -357,7 +357,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -371,10 +371,6 @@ protected:
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
     FromClang : 1,
-
-    /// Whether this declaration was added to the surrounding
-    /// DeclContext of an active #if config clause.
-    EscapedFromIfConfig : 1,
 
     /// Whether this declaration is syntactically scoped inside of
     /// a local context, but should behave like a top-level
@@ -404,7 +400,13 @@ protected:
 
     /// True if we're in the common case where the SPIGroupsRequest
     /// request returned an empty array of identifiers.
-    NoSPIGroups : 1
+    NoSPIGroups : 1,
+
+    /// True if we have computed whether this declaration is unsafe.
+    IsUnsafeComputed : 1,
+
+    /// True if this declaration has been determined to be "unsafe".
+    IsUnsafe : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -857,6 +859,7 @@ protected:
   friend class ExpandPeerMacroRequest;
   friend class GlobalActorAttributeRequest;
   friend class SPIGroupsRequest;
+  friend class IsUnsafeRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -916,12 +919,13 @@ protected:
     Bits.Decl.Invalid = false;
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
-    Bits.Decl.EscapedFromIfConfig = false;
     Bits.Decl.Hoisted = false;
     Bits.Decl.LacksObjCInterfaceOrImplementation = false;
     Bits.Decl.NoMemberAttributeMacros = false;
     Bits.Decl.NoGlobalActorAttribute = false;
     Bits.Decl.NoSPIGroups = false;
+    Bits.Decl.IsUnsafeComputed = false;
+    Bits.Decl.IsUnsafe = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -1180,15 +1184,26 @@ public:
   /// Whether this declaration predates the introduction of concurrency.
   bool preconcurrency() const;
 
+  /// Whether this declaration is considered "unsafe", i.e., should not be
+  /// used in a "safe" dialect.
+  bool isUnsafe() const;
+
+private:
+  bool isUnsafeComputed() const {
+    return Bits.Decl.IsUnsafeComputed;
+  }
+
+  bool isUnsafeRaw() const {
+    return Bits.Decl.IsUnsafe;
+  }
+
+  void setUnsafe(bool value) {
+    assert(!Bits.Decl.IsUnsafeComputed);
+    Bits.Decl.IsUnsafe = value;
+    Bits.Decl.IsUnsafeComputed = true;
+  }
+
 public:
-  bool escapedFromIfConfig() const {
-    return Bits.Decl.EscapedFromIfConfig;
-  }
-
-  void setEscapedFromIfConfig(bool Escaped) {
-    Bits.Decl.EscapedFromIfConfig = Escaped;
-  }
-
   bool getSemanticAttrsComputed() const {
     return Bits.Decl.SemanticAttrsComputed;
   }

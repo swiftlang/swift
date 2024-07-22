@@ -3943,6 +3943,24 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   return true;
 }
 
+/// Diagnose uses of unsafe declarations.
+static bool
+diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
+                   const Expr *call, const ExportContext &Where) {
+  ASTContext &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::DisallowUnsafe))
+    return false;
+
+  if (!D->isUnsafe())
+    return false;
+
+  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+  ctx.Diags
+    .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
+  D->diagnose(diag::decl_declared_here, D);
+  return true;
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
@@ -3977,6 +3995,9 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return true;
 
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
+    return true;
+
+  if (diagnoseDeclUnsafe(D, R, call, Where))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
