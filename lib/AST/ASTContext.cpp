@@ -389,6 +389,23 @@ struct ASTContext::Implementation {
   ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
 
+  /// func _stdlib_isVariantOSVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsVariantOSVersionAtLeastDecl = nullptr;
+
+  /// func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.Word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsOSVersionAtLeastOrVariantVersionAtLeastDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -1839,6 +1856,31 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
     return nullptr;
 
   getImpl().IsOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
+  if (getImpl().IsVariantOSVersionAtLeastDecl)
+    return getImpl().IsVariantOSVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_stdlib_isVariantOSVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsVariantOSVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsOSVersionAtLeastOrVariantVersionAtLeast() const {
+if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
+    return getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this,
+      "_stdlib_isOSVersionAtLeastOrVariantVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl = decl;
   return decl;
 }
 
