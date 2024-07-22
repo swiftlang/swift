@@ -261,14 +261,14 @@ https://github.com/swiftlang/swift/pull/4574
 
 ```
 Please test with following PR:
-https://github.com/swiftlang/swift-lldb/pull/48
+https://github.com/apple/swift-lldb/pull/48
 https://github.com/swiftlang/swift-package-manager/pull/632
 
 @swift-ci Please test macOS platform
 ```
 
 ```
-swiftlang/swift-lldb#48
+apple/swift-lldb#48
 
 @swift-ci Please test Linux platform
 ```
