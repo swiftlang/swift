@@ -1760,3 +1760,13 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
   return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
                            /*isInOutParam=*/false);
 }
+
+void DeclAndTypeClangFunctionPrinter::printTypeName(
+    Type ty, const ModuleDecl *moduleContext) {
+  CFunctionSignatureTypePrinterModifierDelegate delegate;
+  CFunctionSignatureTypePrinter typePrinter(
+      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
+      delegate, moduleContext, declPrinter,
+      FunctionSignatureTypeUse::TypeReference);
+  typePrinter.visit(ty, std::nullopt, /*isInOut=*/false);
+}

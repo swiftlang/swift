@@ -39,13 +39,14 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 
+#include "SwiftToClangInteropContext.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
-#include "SwiftToClangInteropContext.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -561,8 +562,8 @@ private:
               outOfLineOS << "    return swift::";
               outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
               outOfLineOS << "::implClassFor<";
-              outOfLineSyntaxPrinter.printNominalTypeReference(
-                  objectTypeDecl,
+              owningPrinter.printTypeName(
+                  outOfLineOS, paramType,
                   elementDecl->getParentEnum()->getModuleContext());
               outOfLineOS << ">::type";
               if (!isOptional && isa<ClassDecl>(objectTypeDecl)) {
@@ -574,8 +575,8 @@ private:
                 outOfLineOS << "      swift::"
                             << cxx_synthesis::getCxxImplNamespaceName();
                 outOfLineOS << "::implClassFor<";
-                outOfLineSyntaxPrinter.printNominalTypeReference(
-                    objectTypeDecl,
+                owningPrinter.printTypeName(
+                    outOfLineOS, paramType,
                     elementDecl->getParentEnum()->getModuleContext());
                 outOfLineOS << ">::type";
                 outOfLineOS << "::initializeWithTake(result, "
@@ -729,31 +730,36 @@ private:
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
                     outOfLineOS << "    alignas(";
-                    outOfLineSyntaxPrinter.printNominalTypeReference(
-                        objectTypeDecl, ED->getModuleContext());
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ") unsigned char buffer[sizeof(";
-                    outOfLineSyntaxPrinter.printNominalTypeReference(
-                        objectTypeDecl, ED->getModuleContext());
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ")];\n";
                     outOfLineOS << "    auto *valCopy = new(buffer) ";
-                    outOfLineSyntaxPrinter.printNominalTypeReference(
-                        objectTypeDecl, ED->getModuleContext());
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << "(val);\n";
                     outOfLineOS << "    ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
-                    outOfLineSyntaxPrinter.printNominalTypeReference(
-                        objectTypeDecl, ED->getModuleContext());
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ">::type::initializeWithTake(result._"
                                    "getOpaquePointer(), ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
-                    outOfLineSyntaxPrinter.printNominalTypeReference(
-                        objectTypeDecl, ED->getModuleContext());
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                     outOfLineOS << ");\n";
                   }
@@ -2956,6 +2962,15 @@ void DeclAndTypePrinter::print(const Decl *D) {
 
 void DeclAndTypePrinter::print(Type ty) {
   getImpl().print(ty, /*overridingOptionality*/ std::nullopt);
+}
+
+void DeclAndTypePrinter::printTypeName(raw_ostream &os, Type ty,
+                                       const ModuleDecl *moduleContext) {
+  std::string dummy;
+  llvm::raw_string_ostream dummyOS(dummy);
+  DeclAndTypeClangFunctionPrinter printer(os, dummyOS, typeMapping,
+                                          interopContext, *this);
+  printer.printTypeName(ty, moduleContext);
 }
 
 void DeclAndTypePrinter::printAvailability(raw_ostream &os, const Decl *D) {
