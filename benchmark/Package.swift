@@ -1,4 +1,4 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.4
 
 import PackageDescription
 import Foundation
@@ -191,5 +191,6 @@ let p = Package(
   name: "swiftbench",
   products: products,
   targets: targets,
-  swiftLanguageVersions: [.v4]
+  swiftLanguageVersions: [.v4],
+  cxxLanguageStandard: .cxx20
 )
