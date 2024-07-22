@@ -42,7 +42,7 @@ Download the sources with the [Getting Started](/docs/HowToGuides/GettingStarted
   "default-branch-scheme": "main",
   "repos": {
     "cmark": { "remote": { "id": "swiftlang/swift-cmark" } },
-    "llvm-project": { "remote": { "id": "apple/llvm-project" } },
+    "llvm-project": { "remote": { "id": "swiftlang/llvm-project" } },
     "swift": { "remote": { "id": "swiftlang/swift" } }
   },
   "branch-schemes": {
