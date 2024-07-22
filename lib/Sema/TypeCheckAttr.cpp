@@ -4611,7 +4611,7 @@ void AttributeChecker::checkBackDeployedAttrs(
   auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
-  auto *ActiveAttr = D->getAttrs().getBackDeployed(Ctx);
+  auto *ActiveAttr = D->getAttrs().getBackDeployed(Ctx, false);
 
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
@@ -4698,7 +4698,6 @@ void AttributeChecker::checkBackDeployedAttrs(
       if (!inheritsAvailabilityFromPlatform(unavailableAttr->Platform,
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
-
         llvm::VersionTuple ignoredVersion;
 
         AvailabilityInference::updateBeforePlatformForFallback(
