@@ -3107,7 +3107,7 @@ Parker Schuh, and Dimitrios Vytiniotis.
 [Marc Rasi]: https://github.com/marcrasi
 [Bart Chrzaszcz]: https://github.com/bartchr808
 
-[swift-numerics]: https://github.com/swiftlang/swift-numerics
+[swift-numerics]: https://github.com/apple/swift-numerics
 [SE-0229]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0229-simd.md
 [SE-0233]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0233-additive-arithmetic-protocol.md
 [SE-0246]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0246-mathable.md
