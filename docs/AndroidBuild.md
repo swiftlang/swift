@@ -9,7 +9,7 @@ Windows.
 
 ## 1. Clone the repositories
 1. Configure git to work with Unix file endings
-1. Clone `swiftlang/swift-llvm` into a directory named `llvm`
+1. Clone `apple/swift-llvm` into a directory named `llvm`
 1. Clone `apple/swift-corelibs-libdispatch` into a directory named `swift-corelibs-libdispatch`
 1. Clone `apple/swift-corelibs-foundation` into a directory named `swift-corelibs-foundation`
 1. Clone `apple/swift-corelibs-xctest` into a directory named `swift-corelibs-xctest`
@@ -27,7 +27,7 @@ subst S: <path to sources>
 
 ```cmd
 S:
-git clone https://github.com/swiftlang/swift-llvm llvm
+git clone https://github.com/apple/swift-llvm llvm
 git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
