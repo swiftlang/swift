@@ -195,6 +195,6 @@ CxxInterop.main()
 - To generate an Xcode project run `cmake -GXcode`
 - To generate with Ninja run `cmake -GNinja`
 
-- For more information on `cmake` see the  'GettingStarted' documentation: (https://github.com/apple/swift/blob/main/docs/HowToGuides/GettingStarted.md)
+- For more information on `cmake` see the  'GettingStarted' documentation: (https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/GettingStarted.md)
 
 
