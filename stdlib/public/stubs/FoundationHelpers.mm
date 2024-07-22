@@ -112,6 +112,5 @@ _swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
           && SWIFT_RUNTIME_WEAK_USE(_dyld_is_objc_constant(dyld_objc_string_kind, addr))) ? 1 : 0;
 }
 
-
 #endif
 

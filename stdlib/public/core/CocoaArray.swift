@@ -51,16 +51,12 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
 
   @usableFromInline
   internal var endIndex: Int {
-    @_effects(releasenone) get {
-      core.count
-    }
+    return core.count
   }
 
   @usableFromInline
   internal subscript(i: Int) -> AnyObject {
-    @_effects(releasenone) get {
-      core.objectAt(i)
-    }
+    return core.objectAt(i)
   }
 
   @usableFromInline
