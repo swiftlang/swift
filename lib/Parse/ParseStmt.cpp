@@ -1523,8 +1523,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
       Status.setIsParseError();
     } else if (consumeIf(tok::comma)) {
       // End of list with a trailing comma.
-      if (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
-          Tok.is(tok::r_paren)) {
+      if (Source != AvailabilitySpecSource::Available && Tok.is(tok::r_paren)) {
         break;
       }
       // There is more to parse in this list.

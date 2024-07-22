@@ -134,8 +134,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
-    IsEndOfList = (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
-                   startsWithGreater(Tok));
+    IsEndOfList = startsWithGreater(Tok);
   } while (HasNextParam && !IsEndOfList);
 
   return Result;
