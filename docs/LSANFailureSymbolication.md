@@ -2,7 +2,7 @@
 
 ### Create Ubuntu Container 
 
-1. Clone (or pull) swift-docker: https://github.com/apple/swift-docker
+1. Clone (or pull) swift-docker: https://github.com/swiftlang/swift-docker
 2. Build the Ubuntu 18.04 container: `cd swift-ci/master/ubuntu/18.04; docker build .`
 3. `docker run -it --cpus <CPUs> --memory <Memory> -v ~/<path to your local sources>:/src-on-host:cached --name lsan-reproducer --cap-add=SYS_PTRACE --security-opt seccomp=unconfined <hash that docker build outputs> bash`
     - The `-cap-add` and `-security-opt` arguments are needed to run LLDB inside the Docker container

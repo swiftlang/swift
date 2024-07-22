@@ -8,7 +8,7 @@ device running Android or an emulator. This guide explains:
 2. How to run the Swift test suite on an Android device.
 
 If you encounter any problems following the instructions below, please
-[file an issue](https://github.com/apple/swift/issues) and apply the "Android"
+[file an issue](https://github.com/swiftlang/swift/issues) and apply the "Android"
 label.
 
 ## FAQ
