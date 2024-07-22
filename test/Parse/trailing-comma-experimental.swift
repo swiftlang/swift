@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -disable-experimental-parser-round-trip -enable-experimental-feature TrailingComma
 
-func f(_ block: (Bool) -> Bool) -> Bool { block(true) }
+// REQUIRES: asserts
+
+// Condition List
 
 func testConditionListTrailingComma() {
     if true, { }
@@ -48,4 +50,36 @@ func testConditionListTrailingComma() {
     guard true, , else { return } // expected-error {{expected expression in conditional}}
 
     guard true, { return } // expected-error {{expected 'else' after 'guard' condition}}
+
+    while true, { }
+}
+
+// Switch Case Pattern List
+
+switch 5 {
+    case 1, 2,:
+        break
+    default:
+        break
+}
+
+protocol P1 { }
+protocol P2 { }
+
+// Generic Where Clause List
+
+struct S1<T1, T2,> where T1: P1, T2: P2, { }
+
+protocol P3 {
+  func f<T1, T2>(a: T1, b: T2) where T1: P1, T2: P2, // expected-error {{expected type}} 
+}
+
+// Inheritance Clause List
+
+struct S2: P1, P2, { }
+
+struct S3<T>: P1, P2, where T: Equatable { }
+
+protocol P4 {
+    associatedtype T: P1, P2, // expected-error {{expected type}} 
 }
