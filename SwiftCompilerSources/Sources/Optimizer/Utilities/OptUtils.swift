@@ -163,6 +163,10 @@ extension FullApplySite {
 }
 
 extension Builder {
+  static func insert(after inst: Instruction, _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
+    Builder.insert(after: inst, location: inst.location, context, insertFunc: insertFunc)
+  }
+
   static func insert(after inst: Instruction, location: Location,
                      _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     if inst is TermInst {
