@@ -284,7 +284,7 @@ past that, so:
      import later.
 
      If you want debugging that's more than `-gline-tables-only`, this is the
-     only supported way to do it today [apple/llvm-project#4588](https://github.com/apple/llvm-project/issues/4588)
+     only supported way to do it today [swiftlang/llvm-project#4588](https://github.com/swiftlang/llvm-project/issues/4588)
      and [#45265](https://github.com/swiftlang/swift/issues/45265) are aimed at
      improving on this). On the plus side, this mode doesn't strictly need an
      output file map if you give up incremental builds.
@@ -302,7 +302,7 @@ _Can I link all the object files together in the same binary, even if they came
 from multiple modules?_
 
 This is not currently supported, and debugging probably won't work (see
-[apple/llvm-project#4588](https://github.com/apple/llvm-project/issues/4588) and
+[swiftlang/llvm-project#4588](https://github.com/swiftlang/llvm-project/issues/4588) and
 [#45265](https://github.com/swiftlang/swift/issues/45265) for more details).
 However, if you are using `-gnone` or `-gline-tables-only`, the worst you will
 suffer is more symbols being visible than are strictly necessary.
