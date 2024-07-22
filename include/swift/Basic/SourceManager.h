@@ -94,6 +94,7 @@ public:
 private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  bool EditorMode = false;
   unsigned IDEInspectionTargetBufferID = 0U;
   unsigned IDEInspectionTargetOffset;
 
@@ -164,6 +165,10 @@ public:
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const {
     return FileSystem;
+  }
+
+  void setEditorMode() {
+    EditorMode = true;
   }
 
   void setIDEInspectionTarget(unsigned BufferID, unsigned Offset) {
