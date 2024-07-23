@@ -713,7 +713,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// however a discarding group cannot poll child tasks for results and therefore assumes that child
 /// task throws are an indication of a group wide failure. In order to avoid such behavior,
 /// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
-/// operations submitted using `addTask`
+/// operations submitted using `addTask`.
 ///
 /// Since a `ThrowingDiscardingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
