@@ -586,7 +586,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
 
   if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl))
     os << "template<>\n";
-  os << "static inline const constexpr bool isUsableInGenericContext<";
+  os << "inline const constexpr bool isUsableInGenericContext<";
   printer.printNominalTypeReference(typeDecl,
                                     /*moduleContext=*/nullptr);
   os << "> = ";
@@ -635,7 +635,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   if (typeDecl->hasClangNode()) {
     // FIXME: share the code.
     os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<";
+    os << "inline const constexpr bool isUsableInGenericContext<";
     printer.printClangTypeReference(typeDecl->getClangDecl());
     os << "> = true;\n";
   }
@@ -670,7 +670,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   if (typeDecl->hasClangNode()) {
     os << "template<>\n";
-    os << "static inline const constexpr bool isSwiftBridgedCxxRecord<";
+    os << "inline const constexpr bool isSwiftBridgedCxxRecord<";
     printer.printClangTypeReference(typeDecl->getClangDecl());
     os << "> = true;\n";
   }
@@ -679,7 +679,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     assert(NTD && "not a nominal type?");
     if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
       os << "template<>\n";
-    os << "static inline const constexpr bool isValueType<";
+    os << "inline const constexpr bool isValueType<";
     printer.printBaseName(typeDecl->getModuleContext());
     os << "::";
     printer.printNominalTypeReference(NTD, moduleContext);
@@ -690,7 +690,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     assert(!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode());
     if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
       os << "template<>\n";
-    os << "static inline const constexpr bool isOpaqueLayout<";
+    os << "inline const constexpr bool isOpaqueLayout<";
     printer.printNominalTypeReference(NTD,
                                       /*moduleContext=*/nullptr);
     os << "> = true;\n";

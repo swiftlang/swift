@@ -30,7 +30,7 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct;
 
 // CHECK: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
 
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
@@ -91,9 +91,9 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isOpaqueLayout<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: inline const constexpr bool isOpaqueLayout<Structs::FirstSmallStruct> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct implClassFor<Structs::FirstSmallStruct> { using type = Structs::_impl::_impl_FirstSmallStruct; };
 // CHECK-NEXT: } // namespace

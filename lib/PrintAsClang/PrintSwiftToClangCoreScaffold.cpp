@@ -202,7 +202,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
     }
 
     os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<"
+    os << "inline const constexpr bool isUsableInGenericContext<"
        << typeInfo.name << "> = true;\n\n";
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
