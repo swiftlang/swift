@@ -856,7 +856,17 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
+    auto *nominal = dyn_cast<NominalTypeDecl>(d->getDeclContext());
+
+    // If this isn't in a nominal, it must be in an @objc @implementation
+    // extension. We don't serialize those since clients outside the module
+    // don't think of these as Swift classes.
+    if (!nominal) {
+      ASSERT(isa<ExtensionDecl>(d->getDeclContext()) &&
+             cast<ExtensionDecl>(d->getDeclContext())->isObjCImplementation());
+      return IsNotSerialized;
+    }
+
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
