@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+import Swift
+
 class C {}
 sil @getOwned : $@convention(thin) () -> @owned C
 sil @barrier : $@convention(thin) () -> ()
@@ -8,8 +10,8 @@ sil [ossa] @borrowC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @takeC : $@convention(thin) (@owned C) -> ()
 struct S {}
 
-@_moveOnly struct MoS {}
-@_moveOnly struct MoE {}
+struct MoS: ~Copyable {}
+struct MoE: ~Copyable {}
 
 // CHECK-LABEL: begin running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, true, @trace
 // CHECK-LABEL: end running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, true, @trace

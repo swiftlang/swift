@@ -22,8 +22,7 @@ class NonSendableKlass {}
 
 final class SendableKlass : Sendable {}
 
-@_moveOnly
-struct NonSendableMoveOnlyStruct {
+struct NonSendableMoveOnlyStruct: ~Copyable {
   var ns: NonSendableKlass
 }
 
