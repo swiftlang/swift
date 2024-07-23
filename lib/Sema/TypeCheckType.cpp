@@ -4977,23 +4977,22 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
   }
 
   NeverNullType resolvedType = resolveType(repr->getBase(), options);
-  
+
   // If resolved type is Sendable, warn about unnecessary 'sending' annotation.
-  if (options.is(TypeResolverContext::FunctionInput)) {
-    if(!resolvedType->hasTypeParameter()) {
-      if (resolvedType->isSendableType()) {
-        diagnose(repr->getSpecifierLoc(),
-                 diag::sending_applied_to_sendable,
-                 resolvedType.get())
-        .fixItRemove(repr->getSpecifierLoc());
-      }
-    } else {
-      if (resolvedType->getASTContext().getProtocol(KnownProtocolKind::Sendable)) {
-        diagnose(repr->getSpecifierLoc(),
-                 diag::sending_applied_to_sendable,
-                 resolvedType.get())
-        .fixItRemove(repr->getSpecifierLoc());
-      };
+  bool isFunctionParam = options.is(TypeResolverContext::FunctionInput);
+  bool isFunctionResult = options.is(TypeResolverContext::FunctionResult);
+  if (inStage(TypeResolutionStage::Interface) 
+      && (isFunctionParam || isFunctionResult)) {
+    auto contextTy = GenericEnvironment::mapTypeIntoContext(
+        resolution.getGenericSignature().getGenericEnvironment(), 
+        resolvedType);
+    if (contextTy->isSendableType()) {
+      diagnose(repr->getSpecifierLoc(),
+               isFunctionParam
+                 ? diag::sending_applied_to_sendable_parameter
+                 : diag::sending_applied_to_sendable_result,
+               resolvedType.get())
+      .fixItRemove(repr->getSpecifierLoc());
     }
   }
 
