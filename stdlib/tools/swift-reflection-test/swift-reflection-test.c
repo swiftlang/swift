@@ -241,14 +241,6 @@ const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
     Page = NewPage;
   }
 
-#undef assert
-#define assert(x) do { \
-    if (!(x)) { \
-      fprintf(stderr, "FAILED\n"); \
-      abort(); \
-    } \
-  } while (false)
-
   assert(Page->BaseAddress <= Address);
   assert(Page->BaseAddress + Page->Size >= Address + Size);
   void *Buf = malloc(Size);
