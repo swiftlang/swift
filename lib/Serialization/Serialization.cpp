@@ -1216,7 +1216,7 @@ void Serializer::writeHeader() {
           }
           case PluginSearchOption::Kind::LoadPlugin: {
             auto &opt = elem.get<PluginSearchOption::LoadPlugin>();
-            std::string optStr = opt.LibraryPath + ":" + opt.ServerPath + "#";
+            std::string optStr = opt.LibraryPath + "#" + opt.ServerPath + "#";
             llvm::interleave(
                 opt.ModuleNames, [&](auto &name) { optStr += name; },
                 [&]() { optStr += ","; });

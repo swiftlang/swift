@@ -1720,7 +1720,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       for (auto &moduleName : val.ModuleNames) {
         GenericArgs.push_back("-load-plugin");
         GenericArgs.push_back(
-            ArgSaver.save(val.LibraryPath + ":" + val.ServerPath + "#" + moduleName));
+            ArgSaver.save(val.LibraryPath + "#" + val.ServerPath + "#" + moduleName));
       }
       break;
     }

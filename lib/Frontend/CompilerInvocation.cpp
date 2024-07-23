@@ -2073,14 +2073,14 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
       break;
     }
     case OPT_load_plugin: {
-      // '<path to library>:<path to server>#<module names>' where the module names are
+      // '<path to library>#<path to server>#<module names>' where the module names are
       // comma separated.
       StringRef pathAndServer;
       StringRef modulesStr;
       std::tie(pathAndServer, modulesStr) = StringRef(A->getValue()).rsplit('#');
       StringRef path;
       StringRef server;
-      std::tie(path, server) = pathAndServer.rsplit(':');
+      std::tie(path, server) = pathAndServer.rsplit('#');
       std::vector<std::string> moduleNames;
       for (auto name : llvm::split(modulesStr, ',')) {
         moduleNames.emplace_back(name);

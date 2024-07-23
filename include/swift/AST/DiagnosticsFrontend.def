@@ -134,7 +134,7 @@ ERROR(error_load_plugin_executable,none,
       "make sure to use format '<plugin path>#<module names>'", (StringRef))
 ERROR(error_load_plugin,none,
       "invalid value '%0' in '-load-plugin'; "
-      "make sure to use format '<library path>:<server path>#<module names>'", (StringRef))
+      "make sure to use format '<library path>#<server path>#<module names>'", (StringRef))
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))

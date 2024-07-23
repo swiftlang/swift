@@ -4583,7 +4583,7 @@ int main(int argc, char *argv[]) {
       std::tie(pathAndServer, modulesStr) = StringRef(arg).rsplit('#');
       StringRef path;
       StringRef server;
-      std::tie(path, server) = pathAndServer.rsplit(':');
+      std::tie(path, server) = pathAndServer.rsplit('#');
       std::vector<std::string> moduleNames;
       for (auto name : llvm::split(modulesStr, ',')) {
         moduleNames.emplace_back(name);
