@@ -6,9 +6,9 @@ public func foo<each T>(args: repeat each T) {
   // CHECK-SAME: ptr {{.*}} %[[ARG_0:.*]], i{{.*}} %{{.*}},
   // CHECK-SAME: ptr %[[TYPE_PACK_ARG:.*]])
   // CHECK: %[[TYPE_PACK_ALLOCA:.*]] = alloca ptr
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[TYPE_PACK_ALLOCA]], metadata ![[TYPE_PACK_VAR:[0-9]+]], metadata !DIExpression())
+  // CHECK: #dbg_declare(ptr %[[TYPE_PACK_ALLOCA]], ![[TYPE_PACK_VAR:[0-9]+]], !DIExpression()
   // CHECK: %[[ARGS_ALLOCA:.*]] = alloca ptr
-  // CHECK-DAG: call void @llvm.dbg.declare(metadata ptr %[[ARGS_ALLOCA]], metadata ![[ARGS_VAR:[0-9]+]], metadata !DIExpression(DW_OP_deref))
+  // CHECK-DAG: #dbg_declare(ptr %[[ARGS_ALLOCA]], ![[ARGS_VAR:[0-9]+]], !DIExpression(DW_OP_deref)
   // CHECK-DAG: %[[TYPE_PACK_ARG_INT:[^,]+]] = ptrtoint ptr %[[TYPE_PACK_ARG]] to [[INT]]
   // CHECK-DAG: %[[TYPE_PACK_ARG_MASKED_INT:[^,]+]] = and [[INT]] %[[TYPE_PACK_ARG_INT]], -2
   // CHECK-DAG: %[[TYPE_PACK_ARG_MASKED:[^,]+]] = inttoptr [[INT]] %[[TYPE_PACK_ARG_MASKED_INT]] to ptr

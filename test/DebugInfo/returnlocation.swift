@@ -11,7 +11,7 @@ import Foundation
 // RUN: %FileCheck %s --check-prefix=CHECK_NONE < %t.ll
 // CHECK_NONE: define{{( protected)?}} {{.*}}void {{.*}}none
 public func none(_ a: inout Int64) {
-  // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
+  // CHECK_NONE: #dbg_{{.*}}
   // CHECK_NONE: store i64{{.*}}, !dbg ![[NONE_INIT:.*]]
   a -= 2
   // CHECK_NONE: ret {{.*}}, !dbg ![[NONE_RET:.*]]

@@ -8,7 +8,7 @@ func foo(_ x: inout Int64) {
   // not.
   // CHECK: define hidden swiftcc void @"$s4main3fooyys5Int64VzF"
   // CHECK: %[[X:.*]] = alloca ptr, align {{(4|8)}}
-  // CHECK-NEXT: call void @llvm.dbg.declare
+  // CHECK-NEXT: #dbg_declare
   // CHECK-NEXT: call void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[X]], i8 0
   // CHECK: store ptr %0, ptr %[[X]], align {{(4|8)}}
   // CHECK-SAME: !dbg ![[LOC0:.*]]
