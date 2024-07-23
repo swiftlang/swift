@@ -15,6 +15,7 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 @frozen
+@unsafe
 public struct Unmanaged<Instance: AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance

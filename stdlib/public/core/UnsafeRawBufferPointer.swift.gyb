@@ -95,6 +95,7 @@
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
 @frozen
+@unsafe
 public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
