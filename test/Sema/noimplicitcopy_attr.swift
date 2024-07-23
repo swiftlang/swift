@@ -139,8 +139,7 @@ func useGeneric<T>(_ x: T) {
     print(z)
 }
 
-@_moveOnly
-struct MoveOnly {
+struct MoveOnly: ~Copyable {
     var k = Klass()
 }
 

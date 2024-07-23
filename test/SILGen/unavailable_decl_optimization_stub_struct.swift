@@ -54,8 +54,7 @@ public struct ExplicitInitStruct {
 func foo() {}
 
 @available(*, unavailable)
-@_moveOnly
-struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   // CHECK-LABEL: sil{{.*}}@$s4Test14MoveOnlyStructVfD
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()

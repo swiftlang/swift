@@ -113,7 +113,7 @@ public:
   /// repressed or return the inverted type.
   Type add(Type ty, InverseTypeRepr &repr,
            llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl) {
-    if (!ty)
+    if (!ty || ty->hasError())
       return Type();
     assert(!ty->is<ExistentialMetatypeType>());
     auto kp = ty->getKnownProtocol();

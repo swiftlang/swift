@@ -20,14 +20,12 @@ func doSomething() {
     print("123")
 }
 
-@_moveOnly
-struct KlassPairWithoutDeinit {
+struct KlassPairWithoutDeinit: ~Copyable {
     var lhs = Klass()
     var rhs = Klass()
 }
 
-@_moveOnly
-struct KlassPairWithDeinit {
+struct KlassPairWithDeinit: ~Copyable {
     var lhs = Klass()
     var rhs = Klass()
 
@@ -36,14 +34,12 @@ struct KlassPairWithDeinit {
     }
 }
 
-@_moveOnly
-struct IntPairWithoutDeinit {
+struct IntPairWithoutDeinit: ~Copyable {
     var k: Int = 5
     var k2: Int = 6
 }
 
-@_moveOnly
-struct IntPairWithDeinit {
+struct IntPairWithDeinit: ~Copyable {
     var k: Int = 5
     var k2: Int = 6
 
@@ -290,14 +286,12 @@ public func testKlassPairWithDeinit() {
 // MARK: Enum Declarations //
 /////////////////////////////
 
-@_moveOnly
-enum KlassEnumPairWithoutDeinit {
+enum KlassEnumPairWithoutDeinit: ~Copyable {
     case lhs(Klass)
     case rhs(Klass)
 }
 
-@_moveOnly
-enum KlassEnumPairWithDeinit {
+enum KlassEnumPairWithDeinit: ~Copyable {
     case lhs(Klass)
     case rhs(Klass)
 
@@ -306,14 +300,12 @@ enum KlassEnumPairWithDeinit {
     }
 }
 
-@_moveOnly
-enum IntEnumPairWithoutDeinit {
+enum IntEnumPairWithoutDeinit: ~Copyable {
 case lhs(Int)
 case rhs(Int)
 }
 
-@_moveOnly
-enum IntEnumPairWithDeinit {
+enum IntEnumPairWithDeinit: ~Copyable {
     case lhs(Int)
     case rhs(Int)
 
