@@ -1448,17 +1448,7 @@ public:
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
-    auto decl = reinterpret_cast<ValueDecl*>(Pointer);
-
-    // FIXME: determine if this matters after all or not
-    // if it is a distributed thunk, find the thunk decl and mangled based on it
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (afd->isDistributed()) {
-        decl = afd->getDistributedThunk();
-      }
-    }
-
-    return decl;
+    return reinterpret_cast<ValueDecl*>(Pointer);
   }
   
   const ExtensionDecl *getExtension() const {
