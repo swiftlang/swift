@@ -208,8 +208,9 @@ static
 const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
                                        uint64_t Size, void **outFreeContext) {
   PipeMemoryReader *Reader = (PipeMemoryReader *)Context;
-
   PipeMemoryReaderPage *Page = Reader->Pages;
+
+  // Try to find an existing page with the requested bytes
   while (Page != NULL) {
     if (Page->BaseAddress <= Address
 	&& (Page->BaseAddress + Page->Size >= Address + Size)) {
@@ -218,6 +219,7 @@ const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
     Page = Page->Next;
   }
 
+  // If none, fetch page(s) from the target
   if (Page == NULL) {
     static uint64_t PageSize = 4 * 1024;
     uintptr_t TargetAddress = Address - (Address % PageSize);
@@ -241,6 +243,7 @@ const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
     Page = NewPage;
   }
 
+  // We have a page:  Copy bytes from it to satisfy the request
   assert(Page->BaseAddress <= Address);
   assert(Page->BaseAddress + Page->Size >= Address + Size);
   void *Buf = malloc(Size);
