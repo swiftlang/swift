@@ -1477,6 +1477,8 @@ struct MoveOnlyAddressCheckerPImpl {
   /// Information about destroys that we use when inserting destroys.
   ConsumeInfo consumes;
 
+  DeadEndBlocksAnalysis *deba;
+
   /// PostOrderAnalysis used by the BorrowToDestructureTransform.
   PostOrderAnalysis *poa;
 
@@ -1486,10 +1488,11 @@ struct MoveOnlyAddressCheckerPImpl {
   MoveOnlyAddressCheckerPImpl(
       SILFunction *fn, DiagnosticEmitter &diagnosticEmitter,
       DominanceInfo *domTree, PostOrderAnalysis *poa,
+      DeadEndBlocksAnalysis *deba,
       borrowtodestructure::IntervalMapAllocator &allocator)
       : fn(fn), deleter(), canonicalizer(fn, domTree, deleter),
         addressUseState(domTree), diagnosticEmitter(diagnosticEmitter),
-        poa(poa), allocator(allocator) {
+        deba(deba), poa(poa), allocator(allocator) {
     deleter.setCallbacks(std::move(
         InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
           if (auto *mvi =
@@ -2049,7 +2052,9 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     liveness->initializeDef(bai);
     liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
+      if (!liveness->areUsesWithinBoundary(
+              {consumingUse},
+              moveChecker.deba->get(consumingUse->getFunction()))) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;
@@ -3981,7 +3986,7 @@ bool MoveOnlyAddressChecker::check(
   assert(moveIntroducersToProcess.size() &&
          "Must have checks to process to call this function");
   MoveOnlyAddressCheckerPImpl pimpl(fn, diagnosticEmitter, domTree, poa,
-                                    allocator);
+                                    deadEndBlocksAnalysis, allocator);
 
 #ifndef NDEBUG
   static uint64_t numProcessed = 0;
