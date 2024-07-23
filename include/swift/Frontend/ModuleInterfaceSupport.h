@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_MODULEINTERFACESUPPORT_H
 #define SWIFT_FRONTEND_MODULEINTERFACESUPPORT_H
 
+#include "swift/AST/PrintOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "llvm/Support/Regex.h"

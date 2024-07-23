@@ -9,8 +9,7 @@
 
 class Klass {}
 
-@_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass: ~Copyable {
   var value: Int = 0
 }
 

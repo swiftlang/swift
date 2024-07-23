@@ -168,10 +168,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
-      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
-        // raise an error if this KeyPath contains an effectful member.
-        checkForEffectfulKeyPath(KPE);
-      }
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E))
+        checkForInvalidKeyPath(KPE);
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -364,11 +362,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     /// Visit each component of the keypath and emit a diagnostic if they
-    /// refer to a member that has effects.
-    void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
+    /// refer to a member that meets any of the following:
+    ///   - has effects.
+    ///   - is a noncopyable type.
+    void checkForInvalidKeyPath(KeyPathExpr *keyPath) {
       for (const auto &component : keyPath->getComponents()) {
         if (component.hasDeclRef()) {
           auto decl = component.getDeclRef().getDecl();
+
+          // Check for effects
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
             if (auto getter = asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
@@ -377,6 +379,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
+          }
+
+          // Check for the ability to copy.
+          if (component.getComponentType()->isNoncopyable()) {
+            Ctx.Diags.diagnose(component.getLoc(),
+                               diag::expr_keypath_noncopyable_type,
+                               component.getComponentType()->getRValueType());
           }
         }
       }

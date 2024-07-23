@@ -654,6 +654,8 @@ ERROR(expr_keypath_type_of_property,none,
       (DeclNameRef, Type))
 ERROR(expr_keypath_generic_type,none,
       "key path cannot refer to generic type %0", (Identifier))
+ERROR(expr_keypath_noncopyable_type,none,
+      "key path cannot refer to noncopyable type %0", (Type))
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
@@ -7741,6 +7743,8 @@ ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
+ERROR(moveOnly_deprecated,none,
+      "'@_moveOnly' attribute is deprecated and will be removed; use '~Copyable' instead", ())
 ERROR(consume_expression_needed_for_cast,none,
       "implicit conversion to %0 is consuming", (Type))
 NOTE(add_consume_to_silence,none,

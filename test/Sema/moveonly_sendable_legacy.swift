@@ -13,7 +13,7 @@
 @_marker protocol Sendable {}
 
 enum E: ~Copyable, Sendable {}
-@_moveOnly struct S: Sendable {}
+struct S: ~Copyable, Sendable {}
 
 // expected-note@+2 3{{add}}
 // expected-error@+1 {{parameter of noncopyable type 'T' must specify ownership}}

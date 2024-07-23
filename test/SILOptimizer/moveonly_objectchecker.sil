@@ -2,8 +2,9 @@
 
 sil_stage raw
 
-@_moveOnly
-class Klass {}
+import Swift
+
+class Klass: ~Copyable {}
 
 sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
 
