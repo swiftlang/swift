@@ -1555,27 +1555,27 @@ extension Collection {
     var result: [SubSequence] = []
     var subSequenceStart: Index = startIndex
 
-    func appendSubsequence(end: Index) -> Bool {
-      if subSequenceStart == end && omittingEmptySubsequences {
-        return false
+    func appendSubsequence(end: Index) {
+      if subSequenceStart != end || !omittingEmptySubsequences {
+        result.append(self[subSequenceStart..<end])
       }
-      result.append(self[subSequenceStart..<end])
-      return true
     }
 
     if maxSplits == 0 || isEmpty {
-      _ = appendSubsequence(end: endIndex)
+      appendSubsequence(end: endIndex)
       return result
     }
 
     var subSequenceEnd = subSequenceStart
     let cachedEndIndex = endIndex
+    var splitCount = 0
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
-        let didAppend = appendSubsequence(end: subSequenceEnd)
+        splitCount += 1
+        appendSubsequence(end: subSequenceEnd)
         formIndex(after: &subSequenceEnd)
         subSequenceStart = subSequenceEnd
-        if didAppend && result.count == maxSplits {
+        if splitCount == maxSplits {
           break
         }
         continue
