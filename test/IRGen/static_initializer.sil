@@ -213,7 +213,7 @@ sil @return_static_array : $@convention(thin) () -> TestArray {
 bb0:
   // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18static_initializer16TestArrayStorageCMa"(i64 0)
   // CHECK: [[MD:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
-  // CHECK: [[O:%[0-9a-z]+]] = call ptr @swift_initStaticObject(ptr [[MD]], ptr getelementptr inbounds (%T18static_initializer16TestArrayStorageC_tailelems0c, ptr @static_array, i32 0, i32 1))
+  // CHECK: [[O:%[0-9a-z]+]] = call ptr @swift_initStaticObject(ptr [[MD]], ptr getelementptr{{.*}} (%T18static_initializer16TestArrayStorageC_tailelems0c, ptr @static_array, i32 0, i32 1))
   // CHECK: ret ptr [[O]]
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
