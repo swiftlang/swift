@@ -7974,6 +7974,9 @@ ERROR(override_safe_withunsafe,none,
 ERROR(witness_unsafe,none,
      "unsafe %0 %1 cannot satisfy safe requirement",
       (DescriptiveDeclKind, DeclName))
+ERROR(type_witness_unsafe,none,
+      "unsafe type %0 cannot satisfy safe associated type %1",
+      (Type, DeclName))
 ERROR(unchecked_conformance_is_unsafe,none,
       "@unchecked conformance involves unsafe code", ())
 ERROR(unowned_unsafe_is_unsafe,none,
@@ -7983,6 +7986,11 @@ ERROR(nonisolated_unsafe_is_unsafe,none,
 ERROR(reference_to_unsafe_decl,none,
       "%select{reference|call}0 to unsafe %kindbase1",
       (bool, const ValueDecl *))
+ERROR(reference_to_unsafe_typed_decl,none,
+      "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
+      (bool, const ValueDecl *, Type))
+NOTE(unsafe_decl_here,none,
+     "unsafe %kindbase0 declared here", (const ValueDecl *))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

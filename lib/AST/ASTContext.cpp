@@ -3897,7 +3897,9 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = nullptr;
   RecursiveTypeProperties properties;
+  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
+
   auto arena = getArena(properties);
 
   if (auto unbound = C.getImpl().getArena(arena).UnboundGenericTypes
@@ -3948,6 +3950,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   llvm::FoldingSetNodeID ID;
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
   RecursiveTypeProperties properties;
+  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
@@ -4029,6 +4032,7 @@ EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4045,6 +4049,7 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4061,6 +4066,7 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4325,20 +4331,39 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // always materializable.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                                      Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 18,
+                                      Type result, Type globalActor,
+                                      Type thrownError) {
+  static_assert(RecursiveTypeProperties::BitWidth == 19,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
   for (auto param : params) {
     if (param.getPlainType()->getRecursiveProperties().hasError())
       properties |= RecursiveTypeProperties::HasError;
+    if (param.getPlainType()->getRecursiveProperties().isUnsafe())
+      properties |= RecursiveTypeProperties::IsUnsafe;
   }
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
   if (result->getRecursiveProperties().hasError())
     properties |= RecursiveTypeProperties::HasError;
+  if (result->getRecursiveProperties().isUnsafe())
+    properties |= RecursiveTypeProperties::IsUnsafe;
+  
+  if (globalActor) {
+    if (globalActor->getRecursiveProperties().hasError())
+      properties |= RecursiveTypeProperties::HasError;
+    if (globalActor->getRecursiveProperties().isUnsafe())
+      properties |= RecursiveTypeProperties::IsUnsafe;
+  }
+
+  if (thrownError) {
+    if (thrownError->getRecursiveProperties().hasError())
+      properties |= RecursiveTypeProperties::HasError;
+    if (thrownError->getRecursiveProperties().isUnsafe())
+      properties |= RecursiveTypeProperties::IsUnsafe;
+  }
 
   return properties;
 }
@@ -4671,7 +4696,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
       hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
-  auto properties = getGenericFunctionRecursiveProperties(params, result);
+  auto properties = getGenericFunctionRecursiveProperties(
+      params, result, globalActor, thrownError);
   auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
@@ -5044,7 +5070,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 18,
+  static_assert(RecursiveTypeProperties::BitWidth == 19,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -5132,6 +5158,7 @@ OptionalType *OptionalType::get(Type base) {
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
                                 const ASTContext &C) {
   RecursiveTypeProperties properties;
+  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 

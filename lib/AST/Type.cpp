@@ -3489,13 +3489,31 @@ std::string ArchetypeType::getFullName() const {
   return InterfaceType.getString();
 }
 
+/// Determine the recursive type properties for an archetype.
+static RecursiveTypeProperties archetypeProperties(
+    RecursiveTypeProperties properties,
+    ArrayRef<ProtocolDecl *> conformsTo,
+    Type superclass
+) {
+  for (auto proto : conformsTo) {
+    if (proto->isUnsafe()) {
+      properties |= RecursiveTypeProperties::IsUnsafe;
+      break;
+    }
+  }
+
+  if (superclass) properties |= superclass->getRecursiveProperties();
+
+  return properties;
+}
+
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                                      GenericEnvironment *GenericEnv,
                                      Type InterfaceType,
                                      ArrayRef<ProtocolDecl *> ConformsTo,
-                                     Type Superclass, LayoutConstraint Layout)
-  : ArchetypeType(TypeKind::PrimaryArchetype, Ctx,
-                  RecursiveTypeProperties::HasPrimaryArchetype,
+                                     Type Superclass, LayoutConstraint Layout,
+                                     RecursiveTypeProperties Properties)
+  : ArchetypeType(TypeKind::PrimaryArchetype, Ctx, Properties,
                   InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
 {
   assert(!InterfaceType->isParameterPack());
@@ -3514,6 +3532,11 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
+  RecursiveTypeProperties Properties = archetypeProperties(
+    RecursiveTypeProperties::HasPrimaryArchetype,
+    ConformsTo, Superclass);
+  assert(!Properties.hasTypeVariable());
+
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
     PrimaryArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
@@ -3521,7 +3544,8 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
       alignof(PrimaryArchetypeType), arena);
 
   return CanPrimaryArchetypeType(::new (mem) PrimaryArchetypeType(
-      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout,
+      Properties));
 }
 
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
@@ -3573,11 +3597,10 @@ UUID OpenedArchetypeType::getOpenedExistentialID() const {
 PackArchetypeType::PackArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
-    LayoutConstraint Layout, PackShape Shape)
-    : ArchetypeType(TypeKind::PackArchetype, Ctx,
-                    RecursiveTypeProperties::HasPrimaryArchetype |
-                    RecursiveTypeProperties::HasPackArchetype,
-                    InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
+    LayoutConstraint Layout, PackShape Shape,
+    RecursiveTypeProperties Properties
+) : ArchetypeType(TypeKind::PackArchetype, Ctx, Properties,
+                  InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;
 }
@@ -3594,6 +3617,12 @@ PackArchetypeType::get(const ASTContext &Ctx,
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
+  RecursiveTypeProperties properties = archetypeProperties(
+    (RecursiveTypeProperties::HasPrimaryArchetype |
+     RecursiveTypeProperties::HasPackArchetype),
+    ConformsTo, Superclass);
+  assert(!properties.hasTypeVariable());
+
   auto arena = AllocationArena::Permanent;
   void *mem =
       Ctx.Allocate(PackArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type,
@@ -3604,7 +3633,7 @@ PackArchetypeType::get(const ASTContext &Ctx,
 
   return CanPackArchetypeType(::new (mem) PackArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout,
-      {ShapeType}));
+      {ShapeType}, properties));
 }
 
 CanType PackArchetypeType::getReducedShape() {
