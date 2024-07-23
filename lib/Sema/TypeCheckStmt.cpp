@@ -412,7 +412,8 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   ParameterList *params = nullptr;
   ParamDecl *selfParam = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-    node = func->getBody();
+    if (!func->isBodySkipped())
+      node = func->getBody();
     selfParam = func->getImplicitSelfDecl();
     params = func->getParameters();
 
