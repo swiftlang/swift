@@ -35,3 +35,14 @@ func testAssertLikeUseDifferentBits() {
         }
     }
 }
+
+// issue #75312
+struct S
+{
+    @usableFromInline
+    init(utf8:consuming [UInt8])
+    {
+        utf8.withUnsafeBufferPointer { _ in }
+        fatalError()
+    }
+}
