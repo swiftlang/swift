@@ -485,6 +485,7 @@ function (swift_benchmark_compile_archopts)
       set(cxx_options "")
       if ("${module_name_path}" MATCHES ".*cxx-source/.*")
         list(APPEND cxx_options "-Xfrontend" "-enable-experimental-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
+        list(APPEND cxx_options "-Xcc" "-std=c++20")
         # FIXME: https://github.com/apple/swift/issues/61453
         list(APPEND cxx_options "-Xfrontend" "-validate-tbd-against-ir=none")
       endif()
@@ -596,6 +597,7 @@ function (swift_benchmark_compile_archopts)
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
       "-Xfrontend" "-enable-experimental-cxx-interop"
+      "-Xcc" "-std=c++20"
       "-I" "${srcdir}/utils/CxxTests/"
       "-o" "${objdir}/${module_name}.o"
       "${source}")
