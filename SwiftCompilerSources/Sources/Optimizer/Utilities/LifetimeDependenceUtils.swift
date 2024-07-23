@@ -195,7 +195,11 @@ extension LifetimeDependence {
     if arg.isIndirectResult {
       return nil
     }
-    self.scope = Scope(base: arg, context)!
+    guard let scope = Scope(base: arg, context) else {
+      // Ignore invalid argument types.
+      return nil
+    }
+    self.scope = scope
     self.dependentValue = arg
   }
 
@@ -309,7 +313,7 @@ extension LifetimeDependence.Scope {
       }
       self = scope
     case .none:
-      // lifetime dependence requires a nontrivial value"
+      // lifetime dependence requires a nontrivial value
       return nil
     case .unowned:
       self = .unknown(base)
