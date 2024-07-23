@@ -19,6 +19,46 @@ let _ = await withTaskGroup { group in
   group.addTask { 2 }
   return "result"
 }
+let _ = await withThrowingTaskGroup { group in
+  group.addTask { 1 }
+  group.addTask { 2 }
+  return "result"
+}
+
+let _ = await withTaskGroup { group in
+  group.addTask {
+    if Bool.random() {
+      return 1
+    } else {
+      return 0
+    }
+  }
+  group.addTask {
+    if Bool.random() {
+      return 1
+    } else {
+      return 0
+    }
+  }
+  return "result"
+}
+let _ = await withThrowingTaskGroup { group in
+  group.addTask {
+    if Bool.random() {
+      return 1
+    } else {
+      return 0
+    }
+  }
+  group.addTask {
+    if Bool.random() {
+      return 1
+    } else {
+      return 0
+    }
+  }
+  return "result"
+}
 
 // === Cases where inference fails
 
