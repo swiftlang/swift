@@ -33,8 +33,7 @@ class HasHasObj {
 
 public final class C {}
 
-@_moveOnly
-struct FD {
+struct FD: ~Copyable {
   var c = C()
 
   deinit {}

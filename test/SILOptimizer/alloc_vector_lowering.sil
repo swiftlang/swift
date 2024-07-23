@@ -7,7 +7,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-@_moveOnly public struct FixedArray<T> {
+public struct FixedArray<T>: ~Copyable {
   @_hasStorage let buffer: UnsafeMutablePointer<T> { get }
   @_hasStorage public let capacity: Int64 { get }
   @_hasStorage internal var _count: Int64 { get set }

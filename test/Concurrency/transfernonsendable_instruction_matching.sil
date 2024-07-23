@@ -42,8 +42,7 @@ sil @transferKlassContainingKlasses : $@convention(thin) @async (@guaranteed Kla
 sil @useKlassContainingKlasses : $@convention(thin) (@guaranteed KlassContainingKlasses) -> ()
 sil @constructKlassContainingKlasses : $@convention(thin) () -> @owned KlassContainingKlasses
 
-@_moveOnly
-struct NonSendableMoveOnlyStruct {
+struct NonSendableMoveOnlyStruct: ~Copyable {
   var ns: NonSendableKlass
 
   deinit

@@ -96,8 +96,7 @@ case lhs(Klass)
 case rhs(Builtin.NativeObject)
 }
 
-@_moveOnly
-struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   var value: MyInt
 }
 

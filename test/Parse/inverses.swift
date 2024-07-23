@@ -4,6 +4,8 @@ protocol U {}
 
 enum Maybe<Thing: ~Copyable> : ~Copyable {}
 
+struct Pluto: ~Planet {} // expected-error {{cannot find type 'Planet' in scope}}
+
 func more() {
   let _: any ~Copyable = 19
 

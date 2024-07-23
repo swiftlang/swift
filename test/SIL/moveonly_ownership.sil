@@ -10,7 +10,7 @@ struct FakeInt {
   var i: Builtin.Int32
 }
 
-@_moveOnly struct MO_DEINIT {
+struct MO_DEINIT: ~Copyable {
   @_hasStorage var value: FakeInt { get set }
   deinit
   init(value: FakeInt)
@@ -22,7 +22,7 @@ struct NC_DEINIT : ~Copyable {
   init(value: FakeInt)
 }
 
-@_moveOnly struct MO {
+struct MO: ~Copyable {
   @_hasStorage var value: FakeInt { get set }
 }
 

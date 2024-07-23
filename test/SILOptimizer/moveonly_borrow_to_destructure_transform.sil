@@ -3,56 +3,49 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
 //////////////////
 
 class Klass {}
-@_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass: ~Copyable {
   var value: Builtin.Int32
 }
 
-@_moveOnly
-struct KlassPair {
+struct KlassPair: ~Copyable {
   var lhs: Klass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct {
+struct AggStruct: ~Copyable {
   var pair: KlassPair
 }
 
-@_moveOnly
-struct KlassPair2 {
+struct KlassPair2: ~Copyable {
   var lhs: MoveOnlyKlass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct2 {
+struct AggStruct2: ~Copyable {
   var lhs: MoveOnlyKlass
   var pair: KlassPair2
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct SingleIntContainingStruct {
+struct SingleIntContainingStruct: ~Copyable {
     var value: Builtin.Int32
 }
 
-@_moveOnly
-enum E {
+enum E: ~Copyable {
 case first(MoveOnlyKlass)
 case second(SingleIntContainingStruct)
 case third(AggStruct2)
 case fourth(Klass)
 }
 
-@_moveOnly
-enum E2 {
+enum E2: ~Copyable {
 case lhs(AggStruct2)
 case rhs(E)
 }
@@ -232,18 +225,15 @@ bb3:
 // Tests that make sure that we can properly destructure/extract values from
 // chains of single field structs.
 
-@_moveOnly
-struct MultiLevelSingleFieldStructChild {
+struct MultiLevelSingleFieldStructChild: ~Copyable {
   var k: MoveOnlyKlass
 }
 
-@_moveOnly
-struct MultiLevelSingleFieldStructParent {
+struct MultiLevelSingleFieldStructParent: ~Copyable {
   var f: MultiLevelSingleFieldStructChild
 }
 
-@_moveOnly
-struct MultiLevelSingleFieldStructGrandParent {
+struct MultiLevelSingleFieldStructGrandParent: ~Copyable {
   var f: MultiLevelSingleFieldStructParent
 }
 
@@ -357,20 +347,17 @@ bb0(%0 : @guaranteed $MultiLevelSingleFieldStructGrandParent):
 // chain of multi-field structs.
 //
 
-@_moveOnly
-struct GrandParentMultiFieldStruct {
+struct GrandParentMultiFieldStruct: ~Copyable {
   var first: MoveOnlyKlass
   var second: SingleFieldParentOfMultiFieldChild
   var third: MoveOnlyKlass
 }
 
-@_moveOnly
-struct SingleFieldParentOfMultiFieldChild {
+struct SingleFieldParentOfMultiFieldChild: ~Copyable {
   var child: ChildMultiFieldStruct
 }
 
-@_moveOnly
-struct ChildMultiFieldStruct {
+struct ChildMultiFieldStruct: ~Copyable {
   var lhs: MoveOnlyKlass
   var rhs: MoveOnlyKlass
 }

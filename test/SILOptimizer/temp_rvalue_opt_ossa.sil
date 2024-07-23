@@ -39,7 +39,7 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
-@_moveOnly struct MOS {}
+struct MOS: ~Copyable {}
 
 sil [ossa] @getKlass : $@convention(thin) () -> @owned Klass
 sil [ossa] @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct

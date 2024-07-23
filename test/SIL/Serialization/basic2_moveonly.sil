@@ -7,8 +7,10 @@
 
 sil_stage raw
 
+import Swift
+
 class Klass {}
-@_moveOnly struct MoveOnlyPair {
+struct MoveOnlyPair: ~Copyable {
   var lhs: Klass
   var rhs: Klass
 }
