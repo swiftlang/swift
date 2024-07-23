@@ -20,6 +20,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -191,7 +192,7 @@ struct Obligation {
       }
       static bool isEqual(const Obligation::Key &LHS,
                           const Obligation::Key &RHS) {
-        return LHS.Name.equals(RHS.Name) && LHS.Kind == RHS.Kind;
+        return LHS.Name == RHS.Name && LHS.Kind == RHS.Kind;
       }
     };
   };

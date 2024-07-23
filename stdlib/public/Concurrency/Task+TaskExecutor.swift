@@ -159,11 +159,17 @@ public func withTaskExecutorPreference<T, Failure>(
   return try await operation()
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
-@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
-public func __abi__withTaskExecutorPreference<T: Sendable>(
+public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
 ) async rethrows -> T {
@@ -223,13 +229,12 @@ extension Task where Failure == Never {
   public init(
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
       return
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor && $BuiltinCreateTask
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -237,15 +242,18 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     self._task = task
-    #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor or $BuiltinCreateTask")
-    #endif
   }
 }
 
@@ -283,13 +291,12 @@ extension Task where Failure == Error {
   public init(
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
       return
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor && $BuiltinCreateTask
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -297,15 +304,18 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     self._task = task
-    #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor or $BuiltinCreateTask")
-    #endif
   }
 }
 
@@ -342,12 +352,11 @@ extension Task where Failure == Never {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor && $BuiltinCreateTask
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -355,16 +364,18 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
-      // initialTaskExecutor: executorBuiltin, deprecated
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor or $BuiltinCreateTask")
-    #endif
   }
 }
 
@@ -401,12 +412,11 @@ extension Task where Failure == Error {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor && $BuiltinCreateTask
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -414,15 +424,18 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor or $BuiltinCreateTask")
-    #endif
   }
 }
 

@@ -57,6 +57,7 @@
 
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
@@ -378,11 +379,11 @@ public:
   }
 
   bool isClosureGuaranteed() const {
-    return getClosureParameterInfo().isGuaranteed();
+    return getClosureParameterInfo().isGuaranteedInCaller();
   }
 
   bool isClosureConsumed() const {
-    return getClosureParameterInfo().isConsumed();
+    return getClosureParameterInfo().isConsumedInCaller();
   }
 
   bool isClosureOnStack() const {
@@ -1371,7 +1372,8 @@ bool SILClosureSpecializerTransform::gatherCallSites(
             isa<ThinToThickFunctionInst>(ClosureInst) && !HaveUsedReabstraction;
 
         llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
-        if ((ClosureParamInfo.isGuaranteed() || IsClosurePassedTrivially) &&
+        if ((ClosureParamInfo.isGuaranteedInCaller() ||
+             IsClosurePassedTrivially) &&
             !OnlyHaveThinToThickClosure &&
             !findAllNonFailureExitBBs(ApplyCallee, NonFailureExitBBs)) {
           continue;

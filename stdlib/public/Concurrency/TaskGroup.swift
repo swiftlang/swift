@@ -64,11 +64,44 @@ import Swift
 /// For tasks that need to handle cancellation by throwing an error,
 /// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
 @available(SwiftStdlib 5.1, *)
-@_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
-@_unsafeInheritExecutor
+@backDeployed(before: SwiftStdlib 6.0)
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  isolation: isolated (any Actor)? = #isolation,
+  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+) async -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = TaskGroup<ChildTaskResult>(group: _group)
+
+  // Run the withTaskGroup body.
+  let result = await body(&group)
+
+  await group.awaitAllRemainingTasks()
+
+  Builtin.destroyTaskGroup(_group)
+  return result
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
+@_unsafeInheritExecutor // for ABI compatibility
+@inlinable
+public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
@@ -80,7 +113,6 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   // Run the withTaskGroup body.
   let result = await body(&group)
 
-  // TODO(concurrency): should get isolation from param from withThrowingTaskGroup
   await group.awaitAllRemainingTasks()
 
   Builtin.destroyTaskGroup(_group)
@@ -167,11 +199,52 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// which gives you a chance to handle the individual error
 /// or to let the group rethrow the error.
 @available(SwiftStdlib 5.1, *)
-@_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
-@_unsafeInheritExecutor
+@backDeployed(before: SwiftStdlib 6.0)
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  isolation: isolated (any Actor)? = #isolation,
+  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+) async rethrows -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
+
+  do {
+    // Run the withTaskGroup body.
+    let result = try await body(&group)
+
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
+
+    return result
+  } catch {
+    group.cancelAll()
+
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
+
+    throw error
+  }
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
+@_unsafeInheritExecutor // for ABI compatibility
+public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
 ) async rethrows -> GroupResult {
@@ -184,7 +257,6 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
     // Run the withTaskGroup body.
     let result = try await body(&group)
 
-    // TODO(concurrency): should get isolation from param from withThrowingTaskGroup
     await group.awaitAllRemainingTasks()
     Builtin.destroyTaskGroup(_group)
 
@@ -192,7 +264,6 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   } catch {
     group.cancelAll()
 
-    // TODO(concurrency): should get isolation from param from withThrowingTaskGroup
     await group.awaitAllRemainingTasks()
     Builtin.destroyTaskGroup(_group)
 
@@ -266,12 +337,10 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -288,19 +357,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -313,12 +375,10 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -340,21 +400,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 #endif
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 #elseif $Embedded
@@ -362,9 +415,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @_alwaysEmitIntoClient
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+    operation: sending @escaping () async -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -382,17 +434,13 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+    operation: sending @escaping () async -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -417,18 +465,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
 #else // if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -438,11 +482,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Parameters:
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -450,26 +492,19 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       isDiscardingTask: false)
 
     // Create the task in this group.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#endif
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+    operation: sending @escaping () async -> ChildTaskResult
   ) -> Bool {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -481,11 +516,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping @isolated(any) () async -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -500,21 +533,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       isDiscardingTask: false)
 
     // Create the task in this group.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-#else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#endif
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 
@@ -811,12 +837,10 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -825,19 +849,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     )
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -853,12 +870,10 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> ChildTaskResult
+    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -873,28 +888,21 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       isDiscardingTask: false)
 
     // Create the task in this group.
-    #if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
-    #else
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    #endif
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   public mutating func addTask(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -908,9 +916,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func addTask(
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -919,16 +926,13 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) -> Bool {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -944,9 +948,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+    operation: sending @escaping () async throws -> ChildTaskResult
   ) -> Bool {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -964,9 +967,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 

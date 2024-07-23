@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
@@ -435,8 +436,8 @@ SILType AllocBoxInst::getAddressType() const {
 
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    bool poisonRefs, UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
-    bool trace)
+    PoisonRefs_t poisonRefs,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -453,7 +454,8 @@ DebugValueInst::DebugValueInst(
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var, bool poisonRefs,
+                                       SILDebugVariable Var,
+                                       PoisonRefs_t poisonRefs,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -477,8 +479,8 @@ DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
   if (!isa<AllocStackInst>(Operand))
     Var.DIExpr.prependElements(
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
-  return DebugValueInst::create(DebugLoc, Operand, M, Var,
-                                /*poisonRefs=*/false, wasMoved, trace);
+  return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
+                                wasMoved, trace);
 }
 
 bool DebugValueInst::exprStartsWithDeref() const {
@@ -922,7 +924,7 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
       fnTy->getDifferentiabilityParameterIndices(),
       fnTy->getDifferentiabilityResultIndices(), *kindOpt, module.Types,
-      LookUpConformanceInModule(module.getSwiftModule()));
+      LookUpConformanceInModule());
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 
@@ -952,7 +954,7 @@ getExtracteeType(
   case LinearDifferentiableFunctionTypeComponent::Transpose:
     auto transposeFnTy = originalFnTy->getAutoDiffTransposeFunctionType(
         fnTy->getDifferentiabilityParameterIndices(), module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }
   llvm_unreachable("invalid extractee");
@@ -979,14 +981,14 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
         witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, *derivativeKind, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig,
+        LookUpConformanceInModule(), witnessCanGenSig,
         isReabstractionThunk);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
   assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
   auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
       parameterIndices, module.Types,
-      LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+      LookUpConformanceInModule(), witnessCanGenSig);
   return SILType::getPrimitiveObjectType(transposeFnTy);
 }
 

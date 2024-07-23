@@ -22,6 +22,7 @@
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
@@ -1590,7 +1591,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
         SubstitutionMap subMap = SubstitutionMap::get(
             genericSig, [&](SubstitutableType *dependentType) {
               return exnMV.getType().getASTType();
-            }, LookUpConformanceInModule(getModule().getSwiftModule()));
+            }, LookUpConformanceInModule());
 
         // Generic errors are passed indirectly.
         if (!exnMV.getType().isAddress() && useLoweredAddresses()) {
@@ -1632,7 +1633,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {
-      getModule().getSwiftModule()->checkConformance(
+      ModuleDecl::checkConformance(
         exn->getType().getASTType(), getASTContext().getErrorDecl())
     };
 

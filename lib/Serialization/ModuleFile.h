@@ -285,10 +285,6 @@ private:
   ArrayRef<ProtocolConformanceID>
   claimLazyConformanceLoaderToken(uint64_t token);
 
-  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
-  /// resolve it to be absolute to the context's SDK.
-  std::string resolveModuleDefiningFilename(const ASTContext &ctx);
-
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
   /// If \c Ident is empty, the identifier has not been loaded yet.
@@ -1076,7 +1072,7 @@ public:
 
   // Reads lifetime dependence info from type if present.
   std::optional<LifetimeDependenceInfo>
-  maybeReadLifetimeDependenceInfo(unsigned numParams);
+  maybeReadLifetimeDependence(unsigned numParams);
 
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeDependenceSpecifier(

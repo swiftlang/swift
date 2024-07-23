@@ -378,6 +378,8 @@ private:
   std::optional<std::string> VCToolsRoot = std::nullopt;
   std::optional<std::string> VCToolsVersion = std::nullopt;
 
+  std::optional<StringRef> SysRoot = std::nullopt;
+
 public:
   StringRef getSDKPath() const { return SDKPath; }
 
@@ -414,6 +416,11 @@ public:
   std::optional<StringRef> getVCToolsVersion() const { return VCToolsVersion; }
   void setVCToolsVersion(StringRef version) {
     VCToolsVersion = version;
+  }
+
+  std::optional<StringRef> getSysRoot() const { return SysRoot; }
+  void setSysRoot(StringRef sysroot) {
+    SysRoot = sysroot;
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
@@ -468,6 +475,9 @@ public:
 
   /// Plugin search path options.
   std::vector<PluginSearchOption> PluginSearchOpts;
+
+  /// Path to in-process plugin server shared library.
+  std::string InProcessPluginServerPath;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;

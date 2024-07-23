@@ -17,6 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
@@ -419,7 +420,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
     if (auto metatypeType = derivedClass->getAs<MetatypeType>())
       derivedClass = metatypeType->getInstanceType();
     baseSubMap = derivedClass->getContextSubstitutionMap(
-        module.getSwiftModule(), baseClassDecl);
+        baseClassDecl);
   }
 
   SubstitutionMap origSubMap = applySite.getSubstitutionMap();
@@ -798,6 +799,17 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
     ++indirectResultArgIter;
   }
 
+  if (SILType errorTy = substConv.getIndirectErrorResultType(applySite.getFunction()->getTypeExpansionContext())) {
+    auto errorArgs = applySite.getIndirectSILErrorResults();
+    ASSERT(errorArgs.size() == 1);
+    SILValue errorArg = errorArgs[0];
+    auto castRes = castValueToABICompatibleType(
+        &builder, pm, loc, errorArg, errorArg->getType(),
+        errorTy, {applySite.getInstruction()});
+    newArgs.push_back(castRes.first);
+    changedCFG |= castRes.second;
+  }
+
   auto paramArgIter = applySite.getArgumentsWithoutIndirectResults().begin();
   // Skip the last parameter, which is `self`. Add it below.
   for (auto param : substConv.getParameters()) {
@@ -806,7 +818,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
     SILValue arg = *paramArgIter;
     if (builder.hasOwnership() && arg->getType().isObject() &&
         arg->getOwnershipKind() == OwnershipKind::Owned &&
-        param.isGuaranteed()) {
+        param.isGuaranteedInCaller()) {
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
@@ -1089,7 +1101,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
           applySite.getKind() != ApplySiteKind::PartialApplyInst &&
           arg->getType().isObject() &&
           arg->getOwnershipKind() == OwnershipKind::Owned &&
-          paramInfo.isGuaranteedConvention()) {
+          paramInfo.isGuaranteedConventionInCaller()) {
         SILBuilderWithScope borrowBuilder(applySite.getInstruction(),
                                           argBuilder);
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);

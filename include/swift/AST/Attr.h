@@ -2875,7 +2875,7 @@ public:
   /// Return whether this attribute set includes the given semantics attribute.
   bool hasSemanticsAttr(StringRef attrValue) const {
     return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
-      return attrValue.equals(attr->Value);
+      return attrValue == attr->Value;
     });
   }
 
@@ -3057,6 +3057,10 @@ public:
 
   /// Return the name (like "autoclosure") for an attribute ID.
   static const char *getAttrName(TypeAttrKind kind);
+
+  /// Returns whether the given attribute is considered "user inaccessible",
+  /// which affects e.g whether it shows up in code completion.
+  static bool isUserInaccessible(TypeAttrKind DK);
 
   static TypeAttribute *createSimple(const ASTContext &context,
                                      TypeAttrKind kind,

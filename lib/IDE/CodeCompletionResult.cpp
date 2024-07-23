@@ -14,6 +14,7 @@
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 
@@ -48,6 +49,10 @@ CodeCompletionMacroRoles swift::ide::getCompletionMacroRoles(const Decl *D) {
   if (macroRoles.contains(MacroRole::Peer)) {
     roles |= CodeCompletionMacroRole::AttachedDecl;
   }
+  if (macroRoles.contains(MacroRole::Body) ||
+      macroRoles.contains(MacroRole::Preamble)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
 
   return roles;
 }
@@ -63,6 +68,9 @@ swift::ide::getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds) {
   }
   if (kinds.contains(CustomAttributeKind::DeclMacro)) {
     roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  if (kinds.contains(CustomAttributeKind::FunctionMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
   }
   return roles;
 }
@@ -88,6 +96,9 @@ swift::ide::getCompletionMacroRoles(CodeCompletionFilter filter) {
   if (filter.contains(CodeCompletionFilterFlag::AttachedDeclMacro)) {
     roles |= CodeCompletionMacroRole::AttachedDecl;
   }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedFunctionMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
   return roles;
 }
 
@@ -111,6 +122,9 @@ swift::ide::getCompletionFilter(CodeCompletionMacroRoles roles) {
   }
   if (roles.contains(CodeCompletionMacroRole::AttachedDecl)) {
     filter |= CodeCompletionFilterFlag::AttachedDeclMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedFunction)) {
+    filter |= CodeCompletionFilterFlag::AttachedFunctionMacro;
   }
   return filter;
 }

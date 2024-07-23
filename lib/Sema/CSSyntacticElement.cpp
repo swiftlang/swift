@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -556,7 +557,7 @@ public:
   void visitExprPattern(ExprPattern *EP) {
     auto target = SyntacticElementTarget::forExprPattern(EP);
 
-    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true)) {
+    if (cs.preCheckTarget(target)) {
       hadError = true;
       return;
     }
@@ -770,8 +771,7 @@ private:
           init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
 
-      if (ConstraintSystem::preCheckTarget(
-              target, /*replaceInvalidRefsWithErrors=*/true))
+      if (ConstraintSystem::preCheckTarget(target))
         return std::nullopt;
 
       return target;

@@ -811,7 +811,7 @@ public:
   // callee.
   bool hasOwnedParameters() const {
     for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
-      if (ParamInfo.isConsumed())
+      if (ParamInfo.isConsumedInCallee())
         return true;
     }
     return false;

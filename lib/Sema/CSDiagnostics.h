@@ -1638,11 +1638,13 @@ private:
 /// ```
 class InaccessibleMemberFailure final : public FailureDiagnostic {
   ValueDecl *Member;
+  bool IsMissingImport;
 
 public:
   InaccessibleMemberFailure(const Solution &solution, ValueDecl *member,
-                            ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), Member(member) {}
+                            ConstraintLocator *locator, bool isMissingImport)
+      : FailureDiagnostic(solution, locator), Member(member),
+        IsMissingImport(isMissingImport) {}
 
   bool diagnoseAsError() override;
 };
@@ -2292,26 +2294,17 @@ private:
   void emitSuggestionNotes() const;
 };
 
-class SendingOnFunctionParameterMismatchFail final : public ContextualFailure {
+class SendingMismatchFailure final : public ContextualFailure {
 public:
-  SendingOnFunctionParameterMismatchFail(const Solution &solution, Type srcType,
-                                         Type dstType,
-                                         ConstraintLocator *locator,
-                                         FixBehavior fixBehavior)
+  SendingMismatchFailure(const Solution &solution, Type srcType, Type dstType,
+                         ConstraintLocator *locator, FixBehavior fixBehavior)
       : ContextualFailure(solution, srcType, dstType, locator, fixBehavior) {}
 
   bool diagnoseAsError() override;
-};
 
-class SendingOnFunctionResultMismatchFailure final : public ContextualFailure {
-public:
-  SendingOnFunctionResultMismatchFailure(const Solution &solution, Type srcType,
-                                         Type dstType,
-                                         ConstraintLocator *locator,
-                                         FixBehavior fixBehavior)
-      : ContextualFailure(solution, srcType, dstType, locator, fixBehavior) {}
-
-  bool diagnoseAsError() override;
+private:
+  bool diagnoseArgFailure();
+  bool diagnoseResultFailure();
 };
 
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
@@ -2625,6 +2618,20 @@ class MissingContextualTypeForNil final : public FailureDiagnostic {
 public:
   MissingContextualTypeForNil(const Solution &solution,
                               ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a placeholder type in an invalid place, e.g:
+///
+/// \code
+/// y as? _
+/// \endcode
+class InvalidPlaceholderFailure final : public FailureDiagnostic {
+public:
+  InvalidPlaceholderFailure(const Solution &solution,
+                            ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

@@ -149,7 +149,11 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .load:
       self._isFullyAssigned = false
     case .store:
-      self._isFullyAssigned = true
+      if let store = localAccess.instruction as? StoringInstruction {
+        self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.source)
+      } else {
+        self._isFullyAssigned = true
+      }
     case .apply:
       let apply = localAccess.instruction as! FullApplySite
       if let convention = apply.convention(of: localAccess.operand!) {
@@ -190,6 +194,18 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   var description: String {
     return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
       + "\(access)"
+  }
+
+  // Does this address correspond to the local variable's base address? Any writes to this address will be a full
+  // assignment. This should match any instructions that the LocalVariableAccessMap initializer below recognizes as an
+  // allocation.
+  static private func isBase(address: Value) -> Bool {
+    switch address {
+    case is AllocBoxInst, is AllocStackInst, is BeginAccessInst:
+      return true
+    default:
+      return false
+    }
   }
 }
 
@@ -363,24 +379,14 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  // Handle storage type projections, like MarkUninitializedInst. Path projections should not be visited. They only
-  // occur inside the access.
+  // Handle storage type projections, like MarkUninitializedInst. Path projections are visited for field
+  // initialization because SILGen does not emit begin_access [init] consistently.
   //
-  // Exception: stack-allocated temporaries may be treated like local variables for the purpose of finding all
-  // uses. Such temporaries do not have access scopes, so we need to walk down any projection that may be used to
-  // initialize the temporary.
+  // Stack-allocated temporaries are also treated like local variables for the purpose of finding all uses. Such
+  // temporaries do not have access scopes, so we need to walk down any projection that may be used to initialize the
+  // temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
-    // TODO: we need an abstraction for path projections. For local variables, these cannot occur outside of an access.
-    switch operand.instruction {
-    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst,
-         is UncheckedTakeEnumDataAddrInst, is OpenExistentialAddrInst:
-      return .abortWalk
-    // Projections used to initialize a temporary
-    case is InitEnumDataAddrInst, is InitExistentialAddrInst:
-      fallthrough
-    default:
-      return walkDownAddressUses(address: value)
-    }
+    return walkDownAddressUses(address: value)
   }
 
   mutating func scopedAddressUse(of operand: Operand) -> WalkResult {

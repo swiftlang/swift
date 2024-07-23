@@ -91,7 +91,7 @@ actor Actor {
 #if NEGATIVES
   nonisolated func testActor_negative() {
     defer {
-      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a non-isolated context}}
+      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
       actorProperty += 1
     }
     doSomething()
@@ -99,7 +99,7 @@ actor Actor {
 
   nonisolated func testActor_task_negative() {
     Task {
-      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a non-isolated context}}
+      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
       defer { actorProperty += 1 }
       doSomething()
     }
@@ -168,7 +168,7 @@ func testIsolatedActor_positive(actor: isolated Actor) {
 @available(SwiftStdlib 5.1, *)
 func testIsolatedActor_negative(actor: Actor) {
   defer {
-    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a non-isolated context}}
+    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
     actor.actorProperty += 1
   }
   doSomething()
@@ -213,7 +213,7 @@ func testIsolatedActor_closure_positive() {
 @available(SwiftStdlib 5.1, *)
 func testIsolatedActor_closure_negative() {
   takeClosureWithNotIsolatedParam { actor in
-    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a non-isolated context}}
+    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
     defer { actor.actorProperty += 1 }
     doSomething()
   }

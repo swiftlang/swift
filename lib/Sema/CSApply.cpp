@@ -37,6 +37,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -121,7 +122,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
 
     // FIXME: Retrieve the conformance from the solution itself.
     auto conformance =
-        getConstraintSystem().DC->getParentModule()->lookupConformance(
+        ModuleDecl::lookupConformance(
             replacement, protoType, /*allowMissing=*/true);
 
     if (conformance.isInvalid()) {
@@ -579,7 +580,7 @@ namespace {
 
       return SubstitutionMap::get(sig,
                                   QueryTypeSubstitutionMap{subs},
-                                  LookUpConformanceInModule(dc->getParentModule()));
+                                  LookUpConformanceInModule());
     }
 
     /// Determine whether the given reference is to a method on
@@ -619,7 +620,7 @@ namespace {
           // the protocol requirement with Self == the concrete type, and SILGen
           // (or later) can devirtualize as appropriate.
           auto conformance =
-            dc->getParentModule()->checkConformance(baseTy, proto);
+            ModuleDecl::checkConformance(baseTy, proto);
           if (conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
               bool isMemberOperator = witness->getDeclContext()->isTypeContext();
@@ -2554,7 +2555,7 @@ namespace {
 
       // Try to find the conformance of the value type to _BridgedToObjectiveC.
       auto bridgedToObjectiveCConformance
-        = dc->getParentModule()->checkConformance(valueType, bridgedProto);
+        = ModuleDecl::checkConformance(valueType, bridgedProto);
 
       FuncDecl *fn = nullptr;
 
@@ -2815,7 +2816,7 @@ namespace {
       ProtocolDecl *protocol = TypeChecker::getProtocol(
           ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (!dc->getParentModule()->checkConformance(type, protocol)) {
+      if (!ModuleDecl::checkConformance(type, protocol)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = TypeChecker::getProtocol(
@@ -2824,7 +2825,7 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!dc->getParentModule()->checkConformance(type, protocol)) {
+      if (!ModuleDecl::checkConformance(type, protocol)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = TypeChecker::getProtocol(
             cs.getASTContext(), expr->getLoc(),
@@ -2939,7 +2940,7 @@ namespace {
         assert(proto && "Missing string interpolation protocol?");
 
         auto conformance =
-          dc->getParentModule()->checkConformance(type, proto);
+          ModuleDecl::checkConformance(type, proto);
         assert(conformance && "string interpolation type conforms to protocol");
 
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
@@ -3080,7 +3081,7 @@ namespace {
       auto proto = TypeChecker::getLiteralProtocol(ctx, expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
-        dc->getParentModule()->checkConformance(conformingType, proto);
+        ModuleDecl::checkConformance(conformingType, proto);
       assert(conformance && "object literal type conforms to protocol");
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
@@ -3789,7 +3790,7 @@ namespace {
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       auto conformance =
-        dc->getParentModule()->checkConformance(arrayTy, arrayProto);
+        ModuleDecl::checkConformance(arrayTy, arrayProto);
       assert(conformance && "Type does not conform to protocol?");
 
       DeclName name(ctx, DeclBaseName::createConstructor(),
@@ -3835,7 +3836,7 @@ namespace {
           KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       auto conformance =
-        dc->getParentModule()->checkConformance(dictionaryTy, dictionaryProto);
+        ModuleDecl::checkConformance(dictionaryTy, dictionaryProto);
       if (conformance.isInvalid())
         return nullptr;
 
@@ -5408,8 +5409,8 @@ namespace {
         auto indexType = getTypeOfDynamicMemberIndex(overload);
         Expr *argExpr = nullptr;
         if (overload.choice.isKeyPathDynamicMemberLookup()) {
-          argExpr = buildKeyPathDynamicMemberArgExpr(
-              indexType->castTo<BoundGenericType>(), componentLoc, memberLoc);
+          argExpr = buildKeyPathDynamicMemberArgExpr(indexType, componentLoc,
+                                                     memberLoc);
         } else {
           auto fieldName = overload.choice.getName().getBaseIdentifier().str();
           argExpr = buildDynamicMemberLookupArgExpr(fieldName, componentLoc,
@@ -5449,7 +5450,7 @@ namespace {
         // verified by the solver, we just need to get it again
         // with all of the generic parameters resolved.
         auto hashableConformance =
-          dc->getParentModule()->checkConformance(indexType, hashable);
+          ModuleDecl::checkConformance(indexType, hashable);
         assert(hashableConformance);
 
         conformances.push_back(hashableConformance);
@@ -5962,23 +5963,26 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyContextualClosureFlags(
-      Expr *expr, bool implicitSelfCapture, bool inheritActorContext) {
+static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
+                                        bool inheritActorContext,
+                                        bool isPassedToSendingParameter) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
+    closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyContextualClosureFlags(
-        captureList->getClosureBody(), implicitSelfCapture,
-        inheritActorContext);
+    applyContextualClosureFlags(captureList->getClosureBody(),
+                                implicitSelfCapture, inheritActorContext,
+                                isPassedToSendingParameter);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
-    applyContextualClosureFlags(
-        identity->getSubExpr(), implicitSelfCapture, inheritActorContext);
+    applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
+                                inheritActorContext,
+                                isPassedToSendingParameter);
   }
 }
 
@@ -6206,8 +6210,12 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // implicit self capture or inheriting actor context.
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    applyContextualClosureFlags(
-        argExpr, isImplicitSelfCapture, inheritsActorContext);
+    bool isPassedToSendingParameter =
+        paramInfo.isPassedToSendingParameter(paramIdx);
+
+    applyContextualClosureFlags(argExpr, isImplicitSelfCapture,
+                                inheritsActorContext,
+                                isPassedToSendingParameter);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -7072,7 +7080,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Find the conformance of the source type to Hashable.
       auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
       auto conformance =
-        dc->getParentModule()->checkConformance(
+        ModuleDecl::checkConformance(
                         cs.getType(expr), hashable);
       assert(conformance && "must conform to Hashable");
 
@@ -7316,7 +7324,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           }
           return type;
         },
-        LookUpConformanceInModule(cs.DC->getParentModule()),
+        LookUpConformanceInModule(),
         SubstFlags::SubstituteOpaqueArchetypes);
 
       // Coerce the result expression to the underlying type.
@@ -7930,7 +7938,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
   if (builtinProtocol) {
-    auto builtinConformance = dc->getParentModule()->checkConformance(
+    auto builtinConformance = ModuleDecl::checkConformance(
         type, builtinProtocol);
     if (builtinConformance) {
       // Find the witness that we'll use to initialize the type via a builtin
@@ -7954,7 +7962,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
 
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
-  auto conformance = dc->getParentModule()->checkConformance(type, protocol);
+  auto conformance = ModuleDecl::checkConformance(type, protocol);
   assert(conformance && "must conform to literal protocol");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
@@ -8078,7 +8086,7 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        dc->getParentModule()->checkConformance(argumentType, dictLitProto);
+        ModuleDecl::checkConformance(argumentType, dictLitProto);
     auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
     auto valueType =
         conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
@@ -9459,7 +9467,7 @@ static std::optional<SequenceIterationInfo> applySolutionToForEachStmt(
         parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
     type = Type(solution.OpenedExistentialTypes[contextualLoc]);
   }
-  auto sequenceConformance = dc->getParentModule()->checkConformance(
+  auto sequenceConformance = ModuleDecl::checkConformance(
       type, sequenceProto);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");

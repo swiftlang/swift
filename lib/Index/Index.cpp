@@ -26,6 +26,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -1013,6 +1014,9 @@ private:
     return true;
   }
 
+  /// Whether the given decl should be marked implicit in the index data.
+  bool hasImplicitRole(Decl *D);
+
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
                        IndexSymbol &Info);
   bool initIndexSymbol(ExtensionDecl *D, ValueDecl *ExtendedD, SourceLoc Loc,
@@ -1052,6 +1056,26 @@ private:
     return {{line, col, inGeneratedBuffer}};
   }
 
+  bool shouldIndexImplicitDecl(const ValueDecl *D, bool IsRef) const {
+    // We index implicit constructors.
+    if (isa<ConstructorDecl>(D))
+      return true;
+
+    // Allow references to implicit getter & setter AccessorDecls on
+    // non-implicit storage, these are "pseudo accessors".
+    if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+      if (!IsRef)
+        return false;
+
+      auto Kind = AD->getAccessorKind();
+      if (Kind != AccessorKind::Get && Kind != AccessorKind::Set)
+        return false;
+
+      return shouldIndex(AD->getStorage(), IsRef);
+    }
+    return false;
+  }
+
   bool shouldIndex(const ValueDecl *D, bool IsRef) const {
     if (D->isImplicit() && isa<VarDecl>(D) && IsRef) {
       // Bypass the implicit VarDecls introduced in CaseStmt bodies by using the
@@ -1059,7 +1083,7 @@ private:
       D = cast<VarDecl>(D)->getCanonicalVarDecl();
     }
 
-    if (D->isImplicit() && !isa<ConstructorDecl>(D))
+    if (D->isImplicit() && !shouldIndexImplicitDecl(D, IsRef))
       return false;
 
     // Do not handle non-public imported decls.
@@ -1737,6 +1761,21 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
   return finishCurrentEntity();
 }
 
+bool IndexSwiftASTWalker::hasImplicitRole(Decl *D) {
+  if (D->isImplicit())
+    return true;
+
+  // Parsed accessors should be treated as implicit in a module since they won't
+  // have bodies in the generated interface (even if inlinable), and aren't
+  // useful symbols to jump to (the variable itself should be used instead).
+  // Currently generated interfaces don't even record USRs for them, so
+  // findUSRRange will always fail for them.
+  if (isa<AccessorDecl>(D) && IsModuleFile)
+    return true;
+
+  return false;
+}
+
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
@@ -1768,7 +1807,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     addContainedByRelationIfContained(Info);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
-    if (D->isImplicit())
+    if (hasImplicitRole(D))
       Info.roles |= (unsigned)SymbolRole::Implicit;
     if (auto Group = D->getGroupName())
       Info.group = Group.value();

@@ -20,6 +20,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "clang/AST/Mangle.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

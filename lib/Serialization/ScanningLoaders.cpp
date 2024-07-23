@@ -19,6 +19,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -185,7 +186,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
           Args.push_back("-direct-clang-cc1-module-build");
           auto *importer =
               static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args()) {
+          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args(
+                   /*isInterface=*/true)) {
             Args.push_back("-Xcc");
             Args.push_back(Arg);
           }
@@ -311,7 +313,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
          "Expected PlaceholderSwiftModuleScanner as the first dependency "
          "scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, nullptr,
+    if (scanner->canImportModule(modulePath, SourceLoc(), nullptr,
                                  isTestableDependencyLookup)) {
 
       ModuleDependencyVector moduleDependnecies;

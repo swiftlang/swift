@@ -9,8 +9,8 @@
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
 // RUN: -enable-library-evolution -wmo
 
-// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-sil-opt.sil
-// RUN: %FileCheck %s < %t/Lib-sil-opt.sil
+// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
+// RUN: %FileCheck %s < %t/Lib.sil
 
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -enable-library-evolution -I%t -emit-sil %t/main.swift -o %t/Main.sil
 // RUN: %FileCheck %s --check-prefix=CHECK-MAIN < %t/Main.sil
@@ -268,6 +268,7 @@ public class PubKlassZ: PubProto {
 }
 
 public struct PubStruct: PubProto {
+  // FIXME: rdar://130103572 witness thunks should get [serialized_for_package] in package-cmo.
   // protocol witness for static PubProto.root.getter in conformance PubStruct
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PubProto) (@thick PubStruct.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PubStructV4roots6UInt16VvgZ : $@convention(method) (@thin PubStruct.Type) -> UInt16
@@ -472,6 +473,19 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-NEXT:  #ParentPubKlass.parentPubFunc: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC4FuncyyF // ParentPubKlass.parentPubFunc()
 // CHECK-NEXT:  #ParentPubKlass.deinit!deallocator: @$s3Lib14ParentPubKlassCfD  // ParentPubKlass.__deallocating_deinit
 
+// CHECK-LABEL: sil_vtable [serialized_for_package] PubKlass {
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!getter: (ParentPubKlass) -> () -> Int : @$s3Lib14ParentPubKlassC06parentC3VarSivg [inherited]  // ParentPubKlass.parentPubVar.getter
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!setter: (ParentPubKlass) -> (Int) -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivs [inherited]  // ParentPubKlass.parentPubVar.setter
+// CHECK-NEXT:  #ParentPubKlass.parentPubVar!modify: (ParentPubKlass) -> () -> () : @$s3Lib14ParentPubKlassC06parentC3VarSivM [inherited]  // ParentPubKlass.parentPubVar.modify
+// CHECK-NEXT:  #ParentPubKlass.init!allocator: (ParentPubKlass.Type) -> (Int) -> ParentPubKlass : @$s3Lib8PubKlassCyACSicfC [override]  // PubKlass.__allocating_init(_:)
+// CHECK-NEXT:  #ParentPubKlass.parentPubFunc: (ParentPubKlass) -> () -> () : @$s3Lib8PubKlassC06parentB4FuncyyF [override]  // PubKlass.parentPubFunc()
+// CHECK-NEXT:  #PubKlass.pubVar!getter: (PubKlass) -> () -> String : @$s3Lib8PubKlassC6pubVarSSvg  // PubKlass.pubVar.getter
+// CHECK-NEXT:  #PubKlass.pubVar!setter: (PubKlass) -> (String) -> () : @$s3Lib8PubKlassC6pubVarSSvs  // PubKlass.pubVar.setter
+// CHECK-NEXT:  #PubKlass.pubVar!modify: (PubKlass) -> () -> () : @$s3Lib8PubKlassC6pubVarSSvM  // PubKlass.pubVar.modify
+// CHECK-NEXT:  #PubKlass.init!allocator: (PubKlass.Type) -> (String) -> PubKlass : @$s3Lib8PubKlassCyACSScfC  // PubKlass.__allocating_init(_:)
+// CHECK-NEXT:  #PubKlass.pubFunc: (PubKlass) -> () -> () : @$s3Lib8PubKlassC7pubFuncyyF  // PubKlass.pubFunc()
+// CHECK-NEXT:  #PubKlass.deinit!deallocator: @$s3Lib8PubKlassCfD  // PubKlass.__deallocating_deinit
+// CHECK-NEXT:  #PubKlass!ivardestroyer: @$s3Lib8PubKlassCfE  // PubKlass.__ivar_destroyer
 
 // CHECK-LABEL: sil_vtable [serialized_for_package] ParentPkgKlass {
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!getter: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivg  // ParentPkgKlass.parentPkgVar.getter
@@ -481,6 +495,19 @@ package func runPkg(_ arg: [any PkgProto]) {
 // CHECK-NEXT:  #ParentPkgKlass.parentPkgFunc: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC4FuncSiyF // ParentPkgKlass.parentPkgFunc()
 // CHECK-NEXT:  #ParentPkgKlass.deinit!deallocator: @$s3Lib14ParentPkgKlassCfD  // ParentPkgKlass.__deallocating_deinit
 
+// CHECK-LABEL: sil_vtable [serialized_for_package] PkgKlass {
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!getter: (ParentPkgKlass) -> () -> Int : @$s3Lib14ParentPkgKlassC06parentC3VarSivg [inherited]  // ParentPkgKlass.parentPkgVar.getter
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!setter: (ParentPkgKlass) -> (Int) -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivs [inherited]  // ParentPkgKlass.parentPkgVar.setter
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgVar!modify: (ParentPkgKlass) -> () -> () : @$s3Lib14ParentPkgKlassC06parentC3VarSivM [inherited]  // ParentPkgKlass.parentPkgVar.modify
+// CHECK-NEXT:  #ParentPkgKlass.init!allocator: (ParentPkgKlass.Type) -> (Int) -> ParentPkgKlass : @$s3Lib8PkgKlassCyACSicfC [override]  // PkgKlass.__allocating_init(_:)
+// CHECK-NEXT:  #ParentPkgKlass.parentPkgFunc: (ParentPkgKlass) -> () -> Int : @$s3Lib8PkgKlassC06parentB4FuncSiyF [override]  // PkgKlass.parentPkgFunc()
+// CHECK-NEXT:  #PkgKlass.pkgVar!getter: (PkgKlass) -> () -> String : @$s3Lib8PkgKlassC6pkgVarSSvg  // PkgKlass.pkgVar.getter
+// CHECK-NEXT:  #PkgKlass.pkgVar!setter: (PkgKlass) -> (String) -> () : @$s3Lib8PkgKlassC6pkgVarSSvs  // PkgKlass.pkgVar.setter
+// CHECK-NEXT:  #PkgKlass.pkgVar!modify: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC6pkgVarSSvM  // PkgKlass.pkgVar.modify
+// CHECK-NEXT:  #PkgKlass.init!allocator: (PkgKlass.Type) -> (String) -> PkgKlass : @$s3Lib8PkgKlassCyACSScfC  // PkgKlass.__allocating_init(_:)
+// CHECK-NEXT:  #PkgKlass.pkgFunc: (PkgKlass) -> () -> () : @$s3Lib8PkgKlassC7pkgFuncyyF  // PkgKlass.pkgFunc()
+// CHECK-NEXT:  #PkgKlass.deinit!deallocator: @$s3Lib8PkgKlassCfD  // PkgKlass.__deallocating_deinit
+// CHECK-NEXT:  #PkgKlass!ivardestroyer: @$s3Lib8PkgKlassCfE  // PkgKlass.__ivar_destroyer
 
 // CHECK-LABEL: sil_vtable [serialized_for_package] PubKlassZ {
 // CHECK-NEXT:  #PubKlassZ.env!getter: (PubKlassZ) -> () -> UInt16 : @$s3Lib9PubKlassZC3envs6UInt16Vvg  // PubKlassZ.env.getter

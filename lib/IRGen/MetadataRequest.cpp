@@ -42,6 +42,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -869,8 +870,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
 
   // Analyze the substitution map to determine if everything can be referenced
   // statically.
-  auto substitutions =
-      type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal);
+  auto substitutions = type->getContextSubstitutionMap();
 
   // If we cannot statically reference type metadata for our replacement types,
   // we cannot specialize.
@@ -915,6 +915,15 @@ bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
     IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality) {
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
+    if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (type->hasArchetype()) {
+        llvm::errs() << "Cannot get metadata of generic class for type "
+                     << type << "\n";
+        llvm::report_fatal_error("cannot get metadata");
+      }
+      return true;
+    }
+
     // TODO: On platforms without ObjC interop, we can do direct access to
     // class metadata.
     return false;
@@ -1413,7 +1422,7 @@ getFunctionTypeFlags(CanFunctionType type) {
       auto proto =
         type->getASTContext().getProtocol(KnownProtocolKind::Copyable);
       if (proto &&
-          proto->getParentModule()->lookupConformance(type, proto).isInvalid())
+          ModuleDecl::lookupConformance(type, proto).isInvalid())
         InvertedProtocols.insert(invertibleKind);
       break;
     }
@@ -2710,8 +2719,7 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   assert(!theType->hasUnboundGenericType());
 
   auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
-  auto substitutions =
-      theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
+  auto substitutions = theType->getContextSubstitutionMap();
   for (auto requirement : requirements.getRequirements()) {
     if (requirement.isAnyWitnessTable()) {
       continue;

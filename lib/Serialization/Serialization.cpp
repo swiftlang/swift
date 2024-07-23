@@ -40,6 +40,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMExtras.h"
@@ -2571,17 +2572,20 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
   }
 }
 
-void Serializer::writeLifetimeDependenceInfo(
-    LifetimeDependenceInfo lifetimeDependenceInfo) {
+void Serializer::writeLifetimeDependencies(
+    ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
   using namespace decls_block;
   SmallVector<bool> paramIndices;
-  lifetimeDependenceInfo.getConcatenatedData(paramIndices);
+  for (auto info : lifetimeDependencies) {
+    info.getConcatenatedData(paramIndices);
 
-  auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
-  LifetimeDependenceLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, lifetimeDependenceInfo.isImmortal(),
-      lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
-      lifetimeDependenceInfo.hasScopeLifetimeParamIndices(), paramIndices);
+    auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
+    LifetimeDependenceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, info.getTargetIndex(), info.isImmortal(),
+        info.hasInheritLifetimeParamIndices(),
+        info.hasScopeLifetimeParamIndices(), paramIndices);
+    paramIndices.clear();
+  }
 }
 
 #define SIMPLE_CASE(TYPENAME, VALUE) \
@@ -4586,9 +4590,9 @@ public:
 
     auto fnType = ty->getAs<AnyFunctionType>();
     if (fnType) {
-      if (auto *lifetimeDependenceInfo =
-              fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+      auto lifetimeDependencies = fnType->getLifetimeDependencies();
+      if (!lifetimeDependencies.empty()) {
+        S.writeLifetimeDependencies(lifetimeDependencies);
       }
     }
 
@@ -4713,9 +4717,9 @@ public:
 
     auto fnType = ty->getAs<AnyFunctionType>();
     if (fnType) {
-      if (auto *lifetimeDependenceInfo =
-              fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+      auto lifetimeDependencies = fnType->getLifetimeDependencies();
+      if (!lifetimeDependencies.empty()) {
+        S.writeLifetimeDependencies(lifetimeDependencies);
       }
     }
 
@@ -4883,9 +4887,9 @@ public:
 
     auto fnType = ty->getAs<AnyFunctionType>();
     if (fnType) {
-      if (auto *lifetimeDependenceInfo =
-              fnType->getLifetimeDependenceInfoOrNull()) {
-        S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+      auto lifetimeDependencies = fnType->getLifetimeDependencies();
+      if (!lifetimeDependencies.empty()) {
+        S.writeLifetimeDependencies(lifetimeDependencies);
       }
     }
 
@@ -5185,6 +5189,7 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   SIMPLE_CASE(ParameterConvention, Indirect_In_Guaranteed)
   SIMPLE_CASE(ParameterConvention, Indirect_Inout)
   SIMPLE_CASE(ParameterConvention, Indirect_InoutAliasable)
+  SIMPLE_CASE(ParameterConvention, Indirect_In_CXX)
   SIMPLE_CASE(ParameterConvention, Direct_Owned)
   SIMPLE_CASE(ParameterConvention, Direct_Unowned)
   SIMPLE_CASE(ParameterConvention, Direct_Guaranteed)
@@ -5629,9 +5634,9 @@ public:
 
     serializeFunctionTypeParams(fnTy);
 
-    if (auto *lifetimeDependenceInfo =
-            fnTy->getLifetimeDependenceInfoOrNull()) {
-      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    auto lifetimeDependencies = fnTy->getLifetimeDependencies();
+    if (!lifetimeDependencies.empty()) {
+      S.writeLifetimeDependencies(lifetimeDependencies);
     }
   }
 
@@ -5652,9 +5657,9 @@ public:
 
     serializeFunctionTypeParams(fnTy);
 
-    if (auto *lifetimeDependenceInfo =
-            fnTy->getLifetimeDependenceInfoOrNull()) {
-      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    auto lifetimeDependencies = fnTy->getLifetimeDependencies();
+    if (!lifetimeDependencies.empty()) {
+      S.writeLifetimeDependencies(lifetimeDependencies);
     }
   }
 
@@ -5745,9 +5750,9 @@ public:
         invocationSigID, invocationSubstMapID, patternSubstMapID,
         clangTypeID, variableData);
 
-    if (auto *lifetimeDependenceInfo =
-            fnTy->getLifetimeDependenceInfoOrNull()) {
-      S.writeLifetimeDependenceInfo(*lifetimeDependenceInfo);
+    auto lifetimeDependencies = fnTy->getLifetimeDependencies();
+    if (!lifetimeDependencies.empty()) {
+      S.writeLifetimeDependencies(lifetimeDependencies);
     }
   }
 

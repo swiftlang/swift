@@ -50,7 +50,7 @@ linesClose = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
 
 # Note: Where "# Absorb" appears below, the regexp attempts to eat up
 # through the end of ${...} and %{...}% constructs.  In reality we
-# handle this with the Python tokenizer, which avoids mis-detections
+# handle this with the Python tokenizer, which avoids misdetections
 # due to nesting, comments and strings.  This extra absorption in the
 # regexp facilitates testing the regexp on its own, by preventing the
 # interior of some of these constructs from being treated as literal

@@ -109,14 +109,14 @@ void emitIndirectConditionalCastWithScalar(
     ProfileCounter FalseCount = ProfileCounter());
 
 /// Does the type conform to the _ObjectiveCBridgeable protocol.
-bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
+bool isObjectiveCBridgeable(CanType Ty);
 
 /// Get the bridged NS class of a CF class if it exists. Returns
 /// an empty CanType if such class does not exist.
-CanType getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type);
+CanType getNSBridgedClassOfCFClass(CanType type);
 
 /// Does the type conform to Error.
-bool isError(ModuleDecl *M, CanType Ty);
+bool isError(CanType Ty);
 
 struct SILDynamicCastKind {
   enum innerty : std::underlying_type<SILInstructionKind>::type {

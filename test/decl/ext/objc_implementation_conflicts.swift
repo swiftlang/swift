@@ -11,7 +11,7 @@
 import objc_implementation_private
 #endif
 
-@_objcImplementation extension ObjCClass {
+@objc @implementation extension ObjCClass {
   @objc func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
   }
@@ -179,7 +179,7 @@ import objc_implementation_private
   let rdar122280735: (@escaping () -> ()) -> Void = { _ in }
 }
 
-@_objcImplementation(PresentAdditions) extension ObjCClass {
+@objc(PresentAdditions) @implementation extension ObjCClass {
   @objc func categoryMethod(fromHeader3: CInt) {
     // OK
   }

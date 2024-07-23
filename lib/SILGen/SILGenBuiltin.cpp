@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/AST/TypeCheckRequests.h" // FIXME: Temporary
@@ -1630,11 +1631,13 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
     auto &&fnArg = nextArg();
 
+    bool hasSending = ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
+
     auto extInfo =
         ASTExtInfoBuilder()
             .withAsync()
             .withThrows()
-            .withSendable(true)
+            .withSendable(!hasSending)
             .withRepresentation(GenericFunctionType::Representation::Swift)
             .build();
 
@@ -1756,10 +1759,12 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
                                         ManagedValue mainFunctionRef) {
   auto &ctx = getASTContext();
   CanType flagsType = ctx.getIntType()->getCanonicalType();
+  bool hasSending = ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
   CanType functionType =
-    FunctionType::get({}, ctx.TheEmptyTupleType,
-                      ASTExtInfo().withAsync().withThrows().withSendable(true))
-      ->getCanonicalType();
+      FunctionType::get(
+          {}, ctx.TheEmptyTupleType,
+          ASTExtInfo().withAsync().withThrows().withSendable(!hasSending))
+          ->getCanonicalType();
 
   using Param = FunctionType::Param;
   PreparedArguments args({Param(flagsType), Param(functionType)});

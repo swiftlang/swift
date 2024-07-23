@@ -26,6 +26,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
@@ -65,7 +66,7 @@ void swift::getTopLevelDeclsForDisplay(
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void)M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void)ModuleDecl::lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
@@ -357,7 +358,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         assert(!Req.getFirstType()->hasArchetype());
         assert(!Req.getSecondType()->hasArchetype());
 
-        auto *M = DC->getParentModule();
         auto SubstReq = Req.subst(
           [&](Type type) -> Type {
             if (type->isTypeParameter())
@@ -365,7 +365,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
             return type;
           },
-          LookUpConformanceInModule(M));
+          LookUpConformanceInModule());
 
         SmallVector<Requirement, 2> subReqs;
         switch (SubstReq.checkRequirement(subReqs)) {
@@ -395,7 +395,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return false;
     };
 
-    auto *M = DC->getParentModule();
     if (Ext->isConstrainedExtension()) {
       // Get the substitutions from the generic signature of
       // the extension to the interface types of the base type's
@@ -403,7 +402,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       SubstitutionMap subMap;
       if (!BaseType->isExistentialType()) {
         if (auto *NTD = Ext->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(M, NTD);
+          subMap = BaseType->getContextSubstitutionMap(NTD);
       }
 
       assert(Ext->getGenericSignature() && "No generic signature.");
@@ -416,7 +415,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       SubstitutionMap subMap;
       if (!BaseType->isExistentialType()) {
         if (auto *NTD = EnablingExt->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(M, NTD);
+          subMap = BaseType->getContextSubstitutionMap(NTD);
       }
       if (handleRequirements(subMap,
                              EnablingExt,
@@ -1023,9 +1022,8 @@ swift::getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC) {
     }
 
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
+      if (DC)
+        Init = resolveDeclRefExpr(UDRE, DC);
     }
 
     auto *ReferencedVar = Init->getReferencedDecl().getDecl();
@@ -1046,9 +1044,8 @@ swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
 
     Expr *Init = Cond.getInitializer();
     if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(Init)) {
-      if (DC) {
-        Init = resolveDeclRefExpr(UDRE, DC, /*replaceInvalidRefsWithErrors=*/false);
-      }
+      if (DC)
+        Init = resolveDeclRefExpr(UDRE, DC);
     }
 
     auto ReferencedVar = Init->getReferencedDecl().getDecl();

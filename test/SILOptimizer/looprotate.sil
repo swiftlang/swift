@@ -465,3 +465,39 @@ bb3:
  %1 = tuple ()
  return %1 : $()
 }
+
+struct Wrapper : Sendable {
+  let id: Int
+}
+ 
+// CHECK-LABEL: sil @test_open_pack_element :
+// CHECK: bb0{{.*}}:
+// CHECK-NOT: open_pack_element
+// CHECK: br bb2
+// CHECK:  } // end sil function 'test_open_pack_element'
+sil @test_open_pack_element : $@convention(thin) (@pack_guaranteed Pack{KeyPath<Wrapper, Wrapper>}) -> () {
+bb0(%0 : $*Pack{KeyPath<Wrapper, Wrapper>}):
+  %5 = alloc_stack $KeyPath<Wrapper, Wrapper>
+  %6 = integer_literal $Builtin.Word, 0           // user: %8
+  br bb2(%6 : $Builtin.Word)
+
+bb1:
+  dealloc_stack %5 : $*KeyPath<Wrapper, Wrapper>
+  %35 = tuple ()
+  return %35 : $()
+
+bb2(%37 : $Builtin.Word):
+  %38 = dynamic_pack_index %37 of $Pack{KeyPath<Wrapper, Wrapper>}
+  %39 = open_pack_element %38 of <Topic, each Value where Topic : AnyObject, repeat each Value : Sendable> at <Wrapper, Pack{Wrapper}>, shape $each Value, uuid "94218A22-3595-11EF-8496-4EA2A866E4C5"
+  %40 = pack_element_get %38 of %0 : $*Pack{KeyPath<Wrapper, Wrapper>} as $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %41 = unchecked_addr_cast %5 : $*KeyPath<Wrapper, Wrapper> to $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %42 = load %40 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  store %42 to %41 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %7 = integer_literal $Builtin.Word, 1           // users: %45, %44
+  %44 = builtin "add_Word"(%37 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Word // users: %48, %45
+  cond_br undef, bb1, bb3
+
+bb3:
+  strong_retain %42 : $KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  br bb2(%44 : $Builtin.Word)
+}

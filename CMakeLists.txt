@@ -93,7 +93,7 @@ include(CheckSymbolExists)
 include(CMakeDependentOption)
 include(CheckLanguage)
 include(GNUInstallDirs)
-include(SwiftImplicitImport)
+include(SwiftCompilerCapability)
 include(FetchContent)
 
 # Enable Swift for the host compiler build if we have the language. It is
@@ -682,7 +682,7 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 
 option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
-  FALSE)
+  TRUE)
 
 option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
   "Install the <swift/bridging> C++ interoperability header alongside compiler"
@@ -710,6 +710,10 @@ option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
 
 option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
+  FALSE)
+
+option(SWIFT_ENABLE_VOLATILE
+  "Enable build of the Swift Volatile module"
   FALSE)
 
 option(SWIFT_ENABLE_DISPATCH
@@ -846,6 +850,10 @@ if (CMAKE_Swift_COMPILER)
   swift_supports_implicit_module("backtracing"
     SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
   message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
+
+  swift_get_package_cmo_support(
+    Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+  message(STATUS "  Package CMO: ${Swift_COMPILER_PACKAGE_CMO_SUPPORT}")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
@@ -919,6 +927,12 @@ if (NOT BOOTSTRAPPING_MODE)
   message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
 endif()
 
+# As a temporary workaround, disable SwiftCompilerSources on
+# Windows/ARM64 because the compiler segfaults
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+  set(BOOTSTRAPPING_MODE "OFF")
+endif()
+
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
@@ -926,7 +940,7 @@ if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
   if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
-    message(WARNING "BOOSTRAPPING set to OFF because no Swift compiler is defined")
+    message(WARNING "BOOTSTRAPPING set to OFF because no Swift compiler is defined")
     set(BOOTSTRAPPING_MODE "OFF")
   endif()
 elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -1359,6 +1373,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
   message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
+  message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")

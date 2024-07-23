@@ -24,6 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/RequirementSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -216,7 +217,7 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   auto &ctx = cs.getASTContext();
 
   if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-      if (!cs.DC->getParentModule()->lookupConformance(unwrappedDict, proto))
+      if (!ModuleDecl::lookupConformance(unwrappedDict, proto))
         return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);
@@ -1151,16 +1152,16 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 
 bool AllowInaccessibleMember::diagnose(const Solution &solution,
                                        bool asNote) const {
-  InaccessibleMemberFailure failure(solution, getMember(), getLocator());
+  InaccessibleMemberFailure failure(solution, getMember(), getLocator(),
+                                    IsMissingImport);
   return failure.diagnose(asNote);
 }
 
-AllowInaccessibleMember *
-AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
-                                ValueDecl *member, DeclNameRef name,
-                                ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowInaccessibleMember(cs, baseType, member, name, locator);
+AllowInaccessibleMember *AllowInaccessibleMember::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclNameRef name,
+    ConstraintLocator *locator, bool isMissingImport) {
+  return new (cs.getAllocator()) AllowInaccessibleMember(
+      cs, baseType, member, name, locator, isMissingImport);
 }
 
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
@@ -1847,30 +1848,19 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
 
 bool AllowSendingMismatch::diagnose(const Solution &solution,
                                     bool asNote) const {
-  switch (kind) {
-  case Kind::Parameter: {
-    SendingOnFunctionParameterMismatchFail failure(
-        solution, getFromType(), getToType(), getLocator(), fixBehavior);
-    return failure.diagnose(asNote);
-  }
-  case Kind::Result: {
-    SendingOnFunctionResultMismatchFailure failure(
-        solution, getFromType(), getToType(), getLocator(), fixBehavior);
-    return failure.diagnose(asNote);
-  }
-  }
-  llvm_unreachable("Covered switch isn't covered?!");
+  SendingMismatchFailure failure(solution, getFromType(), getToType(),
+                                 getLocator(), fixBehavior);
+  return failure.diagnose(asNote);
 }
 
 AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
-                                                   ConstraintLocator *locator,
                                                    Type srcType, Type dstType,
-                                                   Kind kind) {
+                                                   ConstraintLocator *locator) {
   auto fixBehavior = cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
-      AllowSendingMismatch(cs, srcType, dstType, locator, kind, fixBehavior);
+      AllowSendingMismatch(cs, srcType, dstType, locator, fixBehavior);
 }
 
 bool SpecifyBaseTypeForContextualMember::diagnose(const Solution &solution,
@@ -2131,6 +2121,18 @@ SpecifyContextualTypeForNil *
 SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
+}
+
+bool IgnoreInvalidPlaceholder::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  InvalidPlaceholderFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreInvalidPlaceholder *
+IgnoreInvalidPlaceholder::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidPlaceholder(cs, locator);
 }
 
 bool SpecifyTypeForPlaceholder::diagnose(const Solution &solution,

@@ -17,6 +17,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
@@ -160,10 +161,26 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   ASTContext &ctx = Ty->getASTContext();
   llvm::SaveAndRestore<bool> savedConcurrencyStandardSubstitutions(
       AllowConcurrencyStandardSubstitutions);
+  llvm::SaveAndRestore<bool> savedIsolatedAny(AllowIsolatedAny);
+  llvm::SaveAndRestore<bool> savedTypedThrows(AllowTypedThrows);
+  llvm::SaveAndRestore<bool> savedLifetimeDependencies(AllowLifetimeDependencies);
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           ctx.LangOpts.Target)) {
+
     if (*runtimeCompatVersion < llvm::VersionTuple(5, 5))
       AllowConcurrencyStandardSubstitutions = false;
+
+    // Suppress @isolated(any) and typed throws if we're mangling for pre-6.0
+    // runtimes.
+    // This is unprincipled but, because of the restrictions in e.g.
+    // mangledNameIsUnknownToDeployTarget, should only happen when
+    // mangling for certain reflective uses where we have to hope that
+    // the exact type identity is generally unimportant.
+    if (*runtimeCompatVersion < llvm::VersionTuple(6, 0)) {
+      AllowIsolatedAny = false;
+      AllowTypedThrows = false;
+      AllowLifetimeDependencies = false;
+    }
   }
 
   llvm::SaveAndRestore<bool> savedAllowStandardSubstitutions(

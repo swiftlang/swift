@@ -21,6 +21,8 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace namelookup;
@@ -390,4 +392,57 @@ ArrayRef<ImportedModule>
 swift::namelookup::getAllImports(const DeclContext *dc) {
   return dc->getASTContext().getImportCache().getImportSet(dc)
     .getAllImports();
+}
+
+ArrayRef<ModuleDecl *> ImportCache::allocateArray(
+    ASTContext &ctx,
+    llvm::SetVector<ModuleDecl *> &results) {
+  if (results.empty())
+    return {};
+  else
+    return ctx.AllocateCopy(results.getArrayRef());
+}
+
+ArrayRef<ModuleDecl *>
+ImportCache::getWeakImports(const ModuleDecl *mod) {
+  auto found = WeakCache.find(mod);
+  if (found != WeakCache.end())
+    return found->second;
+
+  llvm::SetVector<ModuleDecl *> result;
+
+  for (auto file : mod->getFiles()) {
+    auto *sf = dyn_cast<SourceFile>(file);
+    // Other kinds of file units, like serialized modules, can just use this
+    // default implementation since the @_weakLinked attribute is not
+    // transitive. If module C is imported @_weakLinked by module B, that does
+    // not imply that module A imports module C @_weakLinked if it imports
+    // module B.
+    if (!sf)
+      continue;
+
+    for (auto &import : sf->getImports()) {
+      if (!import.options.contains(ImportFlags::WeakLinked))
+        continue;
+
+      ModuleDecl *importedModule = import.module.importedModule;
+      result.insert(importedModule);
+
+      auto reexportedModules = getImportSet(importedModule).getAllImports();
+      for (auto reexportedModule : reexportedModules) {
+        result.insert(reexportedModule.importedModule);
+      }
+    }
+  }
+
+  auto resultArray = allocateArray(mod->getASTContext(), result);
+  WeakCache[mod] = resultArray;
+  return resultArray;
+}
+
+bool ImportCache::isWeakImportedBy(const ModuleDecl *mod,
+                                   const ModuleDecl *from) {
+  auto weakImports = getWeakImports(from);
+  return std::find(weakImports.begin(), weakImports.end(), mod)
+      != weakImports.end();
 }

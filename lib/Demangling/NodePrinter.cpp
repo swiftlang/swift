@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Strings.h"
@@ -646,8 +647,7 @@ private:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
-    case Node::Kind::ParamLifetimeDependence:
-    case Node::Kind::SelfLifetimeDependence:
+    case Node::Kind::LifetimeDependence:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
       return false;
     }
@@ -905,11 +905,6 @@ private:
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
-    }
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::SelfLifetimeDependence) {
-      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
 
@@ -1783,31 +1778,19 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::ParamLifetimeDependence: {
-    Printer << "lifetime dependence: ";
+  case Node::Kind::LifetimeDependence: {
     auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
     switch (kind) {
     case MangledLifetimeDependenceKind::Inherit:
-      Printer << "inherit ";
+      Printer << "inherit lifetime dependence: ";
       break;
     case MangledLifetimeDependenceKind::Scope:
-      Printer << "scope ";
+      Printer << "scope lifetime dependence: ";
       break;
     }
     print(Node->getChild(1), depth + 1);
-    return nullptr;
-  }
-  case Node::Kind::SelfLifetimeDependence: {
-    Printer << "(self lifetime dependence: ";
-    auto kind = (MangledLifetimeDependenceKind)Node->getIndex();
-    switch (kind) {
-    case MangledLifetimeDependenceKind::Inherit:
-      Printer << "inherit) ";
-      break;
-    case MangledLifetimeDependenceKind::Scope:
-      Printer << "scope) ";
-      break;
-    }
+    Printer << " ";
+    print(Node->getChild(2), depth + 1);
     return nullptr;
   }
   case Node::Kind::NonObjCAttribute:
@@ -3625,6 +3608,17 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
             return argumentTypeNames[i];
           return std::string("<unknown>");
         };
+        auto getArgumentNodeName = [](NodePointer node) {
+          if (node->getKind() == Node::Kind::Identifier) {
+            return std::string(node->getText());
+          }
+          if (node->getKind() == Node::Kind::LocalDeclName) {
+            auto text = node->getChild(1)->getText();
+            auto index = node->getChild(0)->getIndex() + 1;
+            return std::string(text) + " #" + std::to_string(index);
+          }
+          return std::string("<unknown>");
+        };
         // Multiple arguments case
         NodePointer argList = matchSequenceOfKinds(
             child, {
@@ -3643,11 +3637,8 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
             if (argumentType->getKind() == Node::Kind::TupleElement) {
               argumentType =
                   argumentType->getChild(0)->getChild(0)->getChild(1);
-              if (argumentType->getKind() == Node::Kind::Identifier) {
-                argumentTypeNames.push_back(
-                    std::string(argumentType->getText()));
-                continue;
-              }
+              argumentTypeNames.push_back(getArgumentNodeName(argumentType));
+              continue;
             }
             argumentTypeNames.push_back("<Unknown>");
           }
@@ -3662,7 +3653,7 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
                      });
           if (argList != nullptr) {
             argumentTypeNames.push_back(
-                std::string(argList->getChild(0)->getChild(1)->getText()));
+                getArgumentNodeName(argList->getChild(0)->getChild(1)));
           }
         }
         child = child->getChild(1);

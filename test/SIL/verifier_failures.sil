@@ -18,3 +18,29 @@ sil [ossa] @end_borrow_1_addr_alloc_stack : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: Begin Error in function destroy_value_dead_end
+// CHECK:       SIL verification failed: a dead_end destroy_value must be in a dead-end block
+// CHECK:       Verifying instruction:
+// CHECK:            [[ARGUMENT:%[^,]+]] = argument
+// CHECK:       ->   destroy_value [dead_end] [[ARGUMENT]]
+// CHECK-LABEL: End Error in function destroy_value_dead_end
+sil [ossa] @destroy_value_dead_end : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  destroy_value [dead_end] %c : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function dealloc_box_dead_end
+// CHECK:       SIL verification failed: a dead_end dealloc_box must be in a dead-end block
+// CHECK:       Verifying instruction:
+// CHECK:            [[BOX:%[^,]+]] = alloc_box
+// CHECK:       ->   dealloc_box [dead_end] [[BOX]]
+// CHECK-LABEL: End Error in function dealloc_box_dead_end
+sil [ossa] @dealloc_box_dead_end : $@convention(thin) () -> () {
+  %b = alloc_box ${ var C }
+  dealloc_box [dead_end] %b : ${ var C }
+  %retval = tuple()
+  return %retval : $()
+}

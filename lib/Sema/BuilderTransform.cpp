@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/SolutionResult.h"
@@ -1315,8 +1316,7 @@ public:
       // Suppress any diagnostics which could be produced by this expression.
       DiagnosticTransaction transaction(diagEngine);
 
-      HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/true);
+      HasError |= ConstraintSystem::preCheckExpression(E, DC);
 
       HasError |= transaction.hasErrors();
 

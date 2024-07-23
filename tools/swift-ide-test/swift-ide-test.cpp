@@ -332,6 +332,11 @@ ImportObjCHeader("import-objc-header",
                  llvm::cl::desc("header to implicitly import"),
                  llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+InProcessPluginServerPath("in-process-plugin-server-path",
+                          llvm::cl::desc("in-process plugin server"),
+                          llvm::cl::cat(Category));
+
 static llvm::cl::list<std::string>
 PluginPath("plugin-path",
                llvm::cl::desc("plugin-path"),
@@ -503,7 +508,7 @@ static llvm::cl::opt<bool> CodeCompletionAddCallWithNoDefaultArgs(
 
 static llvm::cl::list<std::string>
 ConformingMethodListExpectedTypes("conforming-methods-expected-types",
-    llvm::cl::desc("Set expected types for comforming method list"),
+    llvm::cl::desc("Set expected types for conforming method list"),
     llvm::cl::cat(Category));
 
 // '-syntax-coloring' options.
@@ -1227,8 +1232,7 @@ static int printConformingMethodList(
         llvm::outs() << "\n";
         for (auto VD : Result->Members) {
           auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
-          funcTy = Result->ExprType->getTypeOfMember(
-              Result->DC->getParentModule(), VD, funcTy);
+          funcTy = Result->ExprType->getTypeOfMember(VD, funcTy);
           auto resultTy = funcTy->castTo<FunctionType>()->getResult();
 
           llvm::outs() << "   - Name: ";
@@ -3045,7 +3049,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Context.getModule(unloadedImport.module.getModulePath());
@@ -3112,7 +3116,7 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Context.getModule(unloadedImport.module.getModulePath());
@@ -4541,6 +4545,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (!options::InProcessPluginServerPath.empty()) {
+    InitInvok.getSearchPathOptions().InProcessPluginServerPath =
+        options::InProcessPluginServerPath;
+  }
   if (!options::LoadPluginLibrary.empty()) {
     std::vector<std::string> paths;
     for (auto path: options::LoadPluginLibrary) {
@@ -4567,6 +4575,7 @@ int main(int argc, char *argv[]) {
     InitInvok.getSearchPathOptions().PluginSearchOpts.emplace_back(
         PluginSearchOption::PluginPath{path});
   }
+  InitInvok.setDefaultInProcessPluginServerPathIfNecessary();
 
   // Process the clang arguments last and allow them to override previously
   // set options.

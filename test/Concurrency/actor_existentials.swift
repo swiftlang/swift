@@ -30,13 +30,13 @@ func from_isolated_existential2(_ x: isolated any P) async {
 
 func from_nonisolated(_ x: any P) async {
   await x.f()
-  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
-  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
+  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
+  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
 }
 
 func from_concrete(_ x: A) async {
-  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
-  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
+  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
+  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
 }
 
 func from_isolated_concrete(_ x: isolated A) async {
@@ -53,7 +53,7 @@ nonisolated let act = Act()
 
 func bad() async {
     // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
     await act.i = 666
 }
 
@@ -64,11 +64,11 @@ extension Act: Proto {}
 
 func good() async {
     // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
     await (act as any Proto).i = 42
     let aIndirect: any Proto = act
 
     // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
     await aIndirect.i = 777
 }

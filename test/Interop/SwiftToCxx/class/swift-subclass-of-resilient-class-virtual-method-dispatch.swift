@@ -9,7 +9,7 @@
 // RUN: echo '#include "class.h"' > %t/fixed-useclass.h
 // RUN: cat %t/useclass.h     >> %t/fixed-useclass.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // rdar://105396625
 // UNSUPPORTED: CPU=arm64e

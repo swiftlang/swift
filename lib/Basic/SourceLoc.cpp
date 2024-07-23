@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -287,7 +288,8 @@ StringRef SourceManager::getIdentifierForBuffer(
   // If this is generated source code, and we're supposed to force it to disk
   // so external clients can see it, do so now.
   if (ForceGeneratedSourceToDisk) {
-    if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
+    if (const GeneratedSourceInfo *generatedInfo =
+            getGeneratedSourceInfo(bufferID)) {
       // We only care about macros, so skip everything else.
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
           generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted ||
@@ -402,12 +404,12 @@ bool SourceManager::hasGeneratedSourceInfo(unsigned bufferID) {
   return GeneratedSourceInfos.count(bufferID);
 }
 
-std::optional<GeneratedSourceInfo>
+const GeneratedSourceInfo *
 SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   auto known = GeneratedSourceInfos.find(bufferID);
   if (known == GeneratedSourceInfos.end())
-    return std::nullopt;
-  return known->second;
+    return nullptr;
+  return &known->second;
 }
 
 namespace {

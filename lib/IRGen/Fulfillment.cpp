@@ -24,6 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -360,7 +361,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   bool hadFulfillment = false;
 
-  auto subs = type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal);
+  auto subs = type->getContextSubstitutionMap();
 
   GenericTypeRequirements requirements(IGM, nominal);
 

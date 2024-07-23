@@ -27,6 +27,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -120,7 +121,6 @@ void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
 // MARK: local instance initialization
 
 static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
-  auto *module = F.getModule().getSwiftModule();
   auto &C = F.getASTContext();
 
   auto *DAS = C.getDistributedActorSystemDecl();
@@ -132,7 +132,7 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
     auto argDecl = arg->getDecl();
 
     auto conformsToSystem =
-        module->lookupConformance(argDecl->getInterfaceType(), DAS);
+        ModuleDecl::lookupConformance(argDecl->getInterfaceType(), DAS);
 
     // Is it a protocol that conforms to DistributedActorSystem?
     if (argTy->isEqual(systemTy) || conformsToSystem) {
@@ -140,7 +140,7 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
     }
 
     // Is it some specific DistributedActorSystem?
-    auto result = module->lookupConformance(argTy, DAS);
+    auto result = ModuleDecl::lookupConformance(argTy, DAS);
     if (!result.isInvalid()) {
       return arg;
     }

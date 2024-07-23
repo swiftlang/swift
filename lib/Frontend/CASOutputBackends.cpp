@@ -12,6 +12,7 @@
 
 #include "swift/Frontend/CASOutputBackends.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
@@ -139,6 +140,21 @@ Error SwiftCASOutputBackend::storeCachedDiagnostics(unsigned InputIndex,
                                                     StringRef Bytes) {
   return storeImpl("<cached-diagnostics>", Bytes, InputIndex,
                    file_types::ID::TY_CachedDiagnostics);
+}
+
+Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
+                                                llvm::cas::CASID ID) {
+  auto Input = Impl.OutputToInputMap.find(OutputFilename);
+  if (Input == Impl.OutputToInputMap.end())
+    return llvm::createStringError("InputIndex for output file not found!");
+  auto InputIndex = Input->second.first;
+  auto MCRef = Impl.CAS.getReference(ID);
+  if (!MCRef)
+    return createStringError("Invalid CASID: " + ID.toString() +
+                             ". No associated ObjectRef found!");
+
+  Impl.OutputRefs[InputIndex].insert({file_types::TY_Object, *MCRef});
+  return Impl.finalizeCacheKeysFor(InputIndex);
 }
 
 void SwiftCASOutputBackend::Implementation::initBackend(

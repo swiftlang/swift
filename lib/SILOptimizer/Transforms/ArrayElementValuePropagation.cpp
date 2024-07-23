@@ -14,6 +14,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/DebugUtils.h"
@@ -324,9 +325,8 @@ bool ArrayAllocation::replaceAppendContentOf() {
       continue;
 
     SILType ArrayType = ArrayValue->getType();
-    auto *NTD = ArrayType.getASTType()->getAnyNominal();
     SubstitutionMap ArraySubMap = ArrayType.getASTType()
-      ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
+      ->getContextSubstitutionMap();
 
     AppendContentsOf.replaceByAppendingValues(AppendFn, ReserveFn,
                                               ElementValueVector,

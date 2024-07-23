@@ -12,6 +12,7 @@
 
 #include "swift/IDETool/CompilerInvocation.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "clang/AST/DeclObjC.h"

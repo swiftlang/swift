@@ -14,6 +14,7 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "silgen"
 
@@ -302,7 +303,7 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
       SubstitutionMap subMap = SubstitutionMap::get(
           genericSig, [&](SubstitutableType *dependentType) {
             return errorType.getASTType();
-          }, LookUpConformanceInModule(getModule().getSwiftModule()));
+          }, LookUpConformanceInModule());
 
       // Generic errors are passed indirectly.
       if (!error->getType().isAddress()) {

@@ -616,7 +616,7 @@ sil @end_addr_see_addr : $@convention(thin) (@in M, @in_guaranteed M) -> ()
 /// A single instruction, apply @end_addr_see_addr, consumes one field and
 /// borrows another.
 
-/// Varify that the consumed value isn't destroyed twice and that the borrowed
+/// Verify that the consumed value isn't destroyed twice and that the borrowed
 /// value isn't destroyed before it's used.
 ///
 /// Note: This test case doesn't have valid SIL (#M2.s1 is consumed twice), but

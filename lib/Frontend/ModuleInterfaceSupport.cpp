@@ -23,6 +23,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -59,8 +60,15 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
-  out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << Opts.Flags;
+  out << "// " SWIFT_MODULE_FLAGS_KEY ": " << Opts.PublicFlags.Flags;
+
+  if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Private &&
+      !Opts.PrivateFlags.Flags.empty())
+    out << " " << Opts.PrivateFlags.Flags;
+
+  if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Package &&
+      !Opts.PackageFlags.Flags.empty())
+    out << " " << Opts.PackageFlags.Flags;
 
   // Insert additional -module-alias flags
   if (Opts.AliasModuleNames) {
@@ -96,15 +104,28 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   }
   out << "\n";
 
-  if (!Opts.IgnorableFlags.empty()) {
-    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
-        << Opts.IgnorableFlags << "\n";
-  }
+  // Add swift-module-flags-ignorable: if non-empty.
+  {
+    llvm::SmallVector<StringRef, 4> ignorableFlags;
 
-  auto hasPrivateIgnorableFlags = !Opts.printPublicInterface() && !Opts.IgnorablePrivateFlags.empty();
-  if (hasPrivateIgnorableFlags) {
-    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY ": "
-        << Opts.IgnorablePrivateFlags << "\n";
+    if (!Opts.PublicFlags.IgnorableFlags.empty())
+      ignorableFlags.push_back(Opts.PublicFlags.IgnorableFlags);
+
+    if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Private &&
+        !Opts.PrivateFlags.IgnorableFlags.empty())
+      ignorableFlags.push_back(Opts.PrivateFlags.IgnorableFlags);
+
+    if (Opts.InterfaceContentMode >= PrintOptions::InterfaceMode::Package &&
+        !Opts.PackageFlags.IgnorableFlags.empty())
+      ignorableFlags.push_back(Opts.PackageFlags.IgnorableFlags);
+
+    if (!ignorableFlags.empty()) {
+      out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
+      llvm::interleave(
+          ignorableFlags, [&out](StringRef str) { out << str; },
+          [&out] { out << " "; });
+      out << "\n";
+    }
   }
 }
 

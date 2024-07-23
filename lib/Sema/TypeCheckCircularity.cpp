@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 
 using namespace swift;
@@ -248,8 +249,7 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
                                       unsigned depth) {
   startExpandingType(type);
 
-  auto subMap = type->getContextSubstitutionMap(
-      S->getModuleContext(), S);
+  auto subMap = type->getContextSubstitutionMap();
 
   for (auto field: S->getStoredProperties()) {
     auto fieldType =field->getValueInterfaceType().subst(subMap);
@@ -272,8 +272,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
 
   startExpandingType(type);
 
-  auto subMap = type->getContextSubstitutionMap(
-      E->getModuleContext(), E);
+  auto subMap = type->getContextSubstitutionMap();
 
   for (auto elt: E->getAllElements()) {
     // Indirect elements are representational leaves.
@@ -471,8 +470,7 @@ void CircularityChecker::addPathElement(Path &path, ValueDecl *member,
     elt.TupleIndex = 0;
 
     Type memberIfaceType = getMemberStorageInterfaceType(member);
-    elt.Ty = parentType->getTypeOfMember(member->getModuleContext(), member,
-                                         memberIfaceType);
+    elt.Ty = parentType->getTypeOfMember(member, memberIfaceType);
 
   } else {
     auto tupleType = parentType->castTo<TupleType>();

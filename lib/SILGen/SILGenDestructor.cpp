@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
@@ -120,8 +121,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILType dtorTy;
 
     auto subMap
-      = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                superclass);
+      = superclassTy->getContextSubstitutionMap(superclass);
 
     // We completely drop the generic signature if all generic parameters were
     // concrete.
@@ -634,8 +634,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   assert(superSelf->getOwnershipKind() == OwnershipKind::Owned);
 
   auto subMap
-    = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                              superclass);
+    = superclassTy->getContextSubstitutionMap(superclass);
 
   B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 

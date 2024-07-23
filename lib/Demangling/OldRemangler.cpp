@@ -19,6 +19,7 @@
 #include "DemanglerAssert.h"
 #include "RemanglerBase.h"
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
@@ -1943,13 +1944,7 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleParamLifetimeDependence(Node *node,
-                                                       unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
-
-ManglingError Remangler::mangleSelfLifetimeDependence(Node *node,
-                                                      unsigned depth) {
+ManglingError Remangler::mangleLifetimeDependence(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 

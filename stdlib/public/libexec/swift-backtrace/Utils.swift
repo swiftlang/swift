@@ -58,7 +58,7 @@ internal func parseUInt64<S: StringProtocol>(_ s: S) -> UInt64? {
 struct PosixError: Error {
   var errno: Int32
 
-  var desription: String {
+  var description: String {
     return String(cString: strerror(self.errno))
   }
 }

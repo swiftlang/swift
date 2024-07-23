@@ -330,6 +330,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_SYNCHRONIZATION")
   endif()
 
+  if(SWIFT_ENABLE_VOLATILE)
+    list(APPEND result "-D" "SWIFT_ENABLE_VOLATILE")
+  endif()
+
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()
@@ -592,7 +596,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-swift-version" "5")
   endif()
 
-  # Avoiding emiting ABI descriptor files while building stdlib.
+  # Avoiding emitting ABI descriptor files while building stdlib.
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-empty-abi-descriptor")
   endif()

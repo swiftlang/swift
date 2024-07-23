@@ -21,6 +21,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
 
@@ -111,6 +112,29 @@ void InheritedProtocolsRequest::writeDependencySink(
     tracker.addPotentialMember(parentProto);
   }
 }
+
+//----------------------------------------------------------------------------//
+// AllInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ArrayRef<ProtocolDecl *>>
+AllInheritedProtocolsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areAllInheritedProtocolsValid())
+    return std::nullopt;
+
+  return proto->AllInheritedProtocols;
+}
+
+void AllInheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->AllInheritedProtocols = PDs;
+  proto->setAllInheritedProtocolsValid();
+}
+
+//----------------------------------------------------------------------------//
+// ProtocolRequirementsRequest computation.
+//----------------------------------------------------------------------------//
 
 std::optional<ArrayRef<ValueDecl *>>
 ProtocolRequirementsRequest::getCachedResult() const {
@@ -375,8 +399,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.PD);
   out << " for ";
   out << desc.Ty.getString();
-  out << " in ";
-  simple_display(out, desc.Mod);
 }
 
 //----------------------------------------------------------------------------//
@@ -447,6 +469,28 @@ void UnqualifiedLookupRequest::writeDependencySink(
   track.addTopLevelName(desc.Name.getBaseName());
 }
 
+//----------------------------------------------------------------------------//
+// SPIGroupsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<llvm::ArrayRef<Identifier>> SPIGroupsRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->hasNoSPIGroups())
+    return ArrayRef<Identifier>();
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void SPIGroupsRequest::cacheResult(llvm::ArrayRef<Identifier> result) const {
+  auto *decl = std::get<0>(getStorage());
+  if (result.empty()) {
+    const_cast<Decl *>(decl)->setHasNoSPIGroups();
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
 // The following clang importer requests have some definitions here to prevent
 // linker errors when building lib syntax parser (which doesn't link with the
 // clang importer).
@@ -511,7 +555,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "Finding custom (foreign reference) reference counting operation '"
       << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
                                                               : "release")
-      << "for '" << desc.decl->getNameStr() << "'.\n";
+      << "' for '" << desc.decl->getNameStr() << "'.\n";
 }
 
 SourceLoc

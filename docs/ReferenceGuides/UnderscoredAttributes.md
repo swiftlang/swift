@@ -53,7 +53,7 @@ Adding this attribute to a type leads to remarks being emitted for all methods.
 
 ## `@_backDeploy(before: ...)`
 
-The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
+The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
 
 ## `@_borrowed`
 
@@ -591,11 +591,14 @@ class C {
 
 (Note that it is "inherit", not "inherits", unlike below.)
 
-Marks that a `@Sendable async` closure argument should inherit the actor
-context (i.e. what actor it should be run on) based on the declaration site
-of the closure. This is different from the typical behavior, where the closure
-may be runnable anywhere unless its type specifically declares that it will
-run on a specific actor.
+Marks that a `@Sendable async` or `sendable async` closure argument should
+inherit the actor context (i.e. what actor it should be run on) based on the
+declaration site of the closure rather than be non-Sendable. This does not do
+anything if the closure is synchronous.
+
+DISCUSSION: The reason why this does nothing when the closure is synchronous is
+since it does not have the ability to hop to the appropriate executor before it
+is run, so we may create concurrency errors.
 
 ## `@_inheritsConvenienceInitializers`
 
@@ -655,7 +658,7 @@ also work as a generic type constraint.
 Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
-For more details, see [](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
@@ -914,6 +917,46 @@ More generally, multiple availabilities can be specified, like so:
 enum Toast { ... }
 ```
 
+## `@_preInverseGenerics`
+
+By default when mangling a generic signature, the presence of a conformance 
+requirement for an invertible protocol, like Copyable and Escapable, is not
+explicitly mangled. Only the _absence_ of those conformance requirements for
+each generic parameter appears in the mangled name.
+
+This attribute changes the way generic signatures are mangled, by ignoring
+even the absences of those conformance requirements for invertible protocols.
+So, the following functions would have the same mangling because of the
+attribute:
+
+```swift
+@_preInverseGenerics
+func foo<T: ~Copyable>(_ t: borrowing T) {}
+
+// In 'bug.swift', the function above without the attribute would be:
+//
+//   $s3bug3fooyyxRi_zlF ---> bug.foo<A where A: ~Swift.Copyable>(A) -> ()
+//
+// With the attribute, the above becomes:
+//
+//   $s3bug3fooyyxlF ---> bug.foo<A>(A) -> ()
+//
+// which is exactly the same symbol for the function below.
+
+func foo<T>(_ t: T) {}
+```
+
+The purpose of this attribute is to aid in adopting noncopyable generics
+(SE-427) in existing libraries without breaking ABI; it is for advanced users
+only.
+
+> **WARNING:** Before applying this attribute, you _must manually verify_ that
+> there never were any implementations of `foo` that contained a copy of `t`, 
+> to ensure correctness. There is no way to prove this by simply inspecting the
+> Swift source code! You actually have to **check the assembly code** in all of
+> your existing libraries containing `foo`, because an older version of the
+> Swift compiler could have decided to insert a copy of `t` as an optimization!
+
 ## `@_private(sourceFile: "FileName.swift")`
 
 Fully bypasses access control, allowing access to private declarations
@@ -1068,7 +1111,7 @@ if so, it is assumed that the function/global is implemented in C.
 A function defined by `@_silgen_name` is assumed to use the Swift ABI.
 
 For more details, see the
-[Standard Library Programmer's Manual](https://github.com/apple/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
+[Standard Library Programmer's Manual](https://github.com/swiftlang/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
 
 ## `@_specialize(...)`
 

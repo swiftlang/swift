@@ -16,6 +16,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS
     CxxRandomAccessCollection.swift
     CxxSequence.swift
     CxxVector.swift
+    CxxSpan.swift
     UnsafeCxxIterators.swift
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
@@ -28,6 +29,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     DEPENDS ${SWIFT_CXX_DEPS}
+    MACCATALYST_BUILD_FLAVOR zippered
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED)
 

@@ -19,7 +19,7 @@
 // SIL-LABEL: // pgo_guard.guess1
 // SIL-LABEL: sil @$s9pgo_guard6guess11xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5002) {
 // IR-LABEL: define swiftcc i32 @"$s9pgo_guard6guess11xs5Int32VAE_tF"
-// IR-OPT-LABEL: define swiftcc i32 @"$s9pgo_guard6guess11xs5Int32VAE_tF"
+// IR-OPT-LABEL: define swiftcc{{.*}} i32 @"$s9pgo_guard6guess11xs5Int32VAE_tF"
 
 public func guess1(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(2)

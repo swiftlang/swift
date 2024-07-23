@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -595,6 +596,8 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     baseNLOptions |= NL_OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
     baseNLOptions |= NL_IgnoreAccessControl;
+  if (options.contains(Flags::IgnoreMissingImports))
+    baseNLOptions |= NL_IgnoreMissingImports;
   return baseNLOptions;
 }
 

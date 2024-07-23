@@ -31,6 +31,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -198,7 +199,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
     return declaredType;
 
   auto *dc = aliasDecl->getDeclContext();
-  auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
+  auto subs = parent->getContextSubstitutionMap(dc);
 
   return declaredType.subst(subs);
 }
@@ -238,7 +239,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   // Build a SubstitutionMap.
   auto genericSig = nominalDecl->getGenericSignature();
   auto subs = createSubstitutionMapFromGenericArgs(
-      genericSig, args, LookUpConformanceInModule(decl->getParentModule()));
+      genericSig, args, LookUpConformanceInModule());
   if (!subs)
     return Type();
   auto origType = nominalDecl->getDeclaredInterfaceType();
@@ -277,7 +278,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
         opaqueDecl->getGenericSignature(), allArgs,
-        LookUpConformanceInModule(parentModule));
+        LookUpConformanceInModule());
     Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
     return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
   }
@@ -317,11 +318,9 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
       substTy;
   }
 
-  // FIXME: This is the wrong module
-  auto *moduleDecl = decl->getParentModule();
   auto subMap = SubstitutionMap::get(genericSig,
                                      QueryTypeSubstitutionMap{subs},
-                                     LookUpConformanceInModule(moduleDecl));
+                                     LookUpConformanceInModule());
   if (!subMap)
     return Type();
 
@@ -470,13 +469,14 @@ Type ASTBuilder::createFunctionType(
                                                  representation);
 
   // TODO: Handle LifetimeDependenceInfo here.
-  auto einfo = FunctionType::ExtInfoBuilder(
-                   representation, noescape, flags.isThrowing(), thrownError,
-                   resultDiffKind, clangFunctionType, isolation,
-                   LifetimeDependenceInfo(), extFlags.hasSendingResult())
-                   .withAsync(flags.isAsync())
-                   .withSendable(flags.isSendable())
-                   .build();
+  auto einfo =
+      FunctionType::ExtInfoBuilder(
+          representation, noescape, flags.isThrowing(), thrownError,
+          resultDiffKind, clangFunctionType, isolation,
+          /*LifetimeDependenceInfo*/ std::nullopt, extFlags.hasSendingResult())
+          .withAsync(flags.isAsync())
+          .withSendable(flags.isSendable())
+          .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -689,11 +689,12 @@ Type ASTBuilder::createImplFunctionType(
     clangFnType = getASTContext().getCanonicalClangFunctionType(
         funcParams, result, representation);
   }
-  auto einfo = SILFunctionType::ExtInfoBuilder(
-                   representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isSendable(), flags.isAsync(), unimplementable,
-                   isolation, diffKind, clangFnType, LifetimeDependenceInfo())
-                   .build();
+  auto einfo =
+      SILFunctionType::ExtInfoBuilder(
+          representation, flags.isPseudogeneric(), !flags.isEscaping(),
+          flags.isSendable(), flags.isAsync(), unimplementable, isolation,
+          diffKind, clangFnType, /*LifetimeDependenceInfo*/ std::nullopt)
+          .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
@@ -954,7 +955,7 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   if (signature)
     substs = createSubstitutionMapFromGenericArgs(
         signature, replacements,
-        LookUpConformanceInSignature(signature.getPointer()));
+        LookUpConformanceInModule());
   return SILBoxType::get(Ctx, layout, substs);
 }
 
@@ -1053,7 +1054,7 @@ SubstitutionMap
 ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
                                   ArrayRef<BuiltType> replacements) {
   return SubstitutionMap::get(sig, replacements,
-                              LookUpConformanceInSignature(sig.getPointer()));
+                              LookUpConformanceInModule());
 }
 
 Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {

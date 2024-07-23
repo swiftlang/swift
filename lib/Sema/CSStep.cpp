@@ -20,6 +20,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -680,7 +681,6 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
     return false;
 
   auto result = checkRequirements(
-      declA->getDeclContext()->getParentModule(),
       genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 

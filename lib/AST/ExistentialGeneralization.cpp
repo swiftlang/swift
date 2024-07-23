@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
@@ -185,8 +186,7 @@ private:
   /// Generalize the generic arguments of the given generic type.s
   Type generalizeGenericArguments(NominalTypeDecl *decl, CanType type) {
     assert(decl->isGenericContext());
-    auto origSubs = type->getContextSubstitutionMap(decl->getModuleContext(),
-                                                    decl);
+    auto origSubs = type->getContextSubstitutionMap(decl);
 
     // Generalize all of the arguments.
     auto origArgs = origSubs.getReplacementTypes();

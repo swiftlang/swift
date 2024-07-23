@@ -230,16 +230,12 @@ extension Optional where Wrapped: ~Copyable {
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
-    #if compiler(>=6.0) && $NoncopyableGenerics
     switch self {
-    case .some(_borrowing y):
+    case .some(let y):
       return .some(try transform(y))
     case .none:
       return .none
     }
-    #else
-    fatalError("unsupported compiler")
-    #endif
   }
 }
 
@@ -308,16 +304,12 @@ extension Optional where Wrapped: ~Copyable {
   public func _borrowingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
-    #if compiler(>=6.0) && $NoncopyableGenerics
     switch self {
-    case .some(_borrowing y):
+    case .some(let y):
       return try transform(y)
     case .none:
       return .none
     }
-    #else
-    fatalError("Unsupported compiler")
-    #endif
   }
 }
 
@@ -418,8 +410,8 @@ extension Optional where Wrapped: ~Copyable {
   ///
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
-  @_alwaysEmitIntoClient // FIXME(NCG): Make this public.
-  public mutating func _take() -> Self {
+  @_alwaysEmitIntoClient
+  public mutating func take() -> Self {
     let result = consume self
     self = nil
     return result
@@ -437,6 +429,7 @@ extension Optional: CustomDebugStringConvertible {
       #if !$Embedded
       debugPrint(value, terminator: "", to: &result)
       #else
+      _ = value
       "(cannot print value in embedded Swift)".write(to: &result)
       #endif
       result += ")"

@@ -70,7 +70,7 @@ struct OtherValue : @preconcurrency TestSendability {
 // expected-note@+1 2 {{add '@MainActor' to make global function 'test(value:)' part of global actor 'MainActor'}}
 func test(value: Value) {
   _ = value.x
-  // expected-error@-1 {{main actor-isolated property 'x' can not be referenced from a non-isolated context}}
+  // expected-error@-1 {{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
   _ = value.test(nil)
   // expected-error@-1 {{call to main actor-isolated instance method 'test' in a synchronous nonisolated context}}
 }
@@ -88,7 +88,7 @@ extension MyActor : @preconcurrency TestSendability {
 
   func test_ref_diagnostics() {
     _ = value?.x
-    // expected-error@-1 {{main actor-isolated property 'x' can not be referenced on a non-isolated actor instance}}
+    // expected-error@-1 {{main actor-isolated property 'x' can not be referenced on a nonisolated actor instance}}
     _ = value?.test(nil)
     // expected-error@-1 {{call to main actor-isolated instance method 'test' in a synchronous actor-isolated context}}
   }

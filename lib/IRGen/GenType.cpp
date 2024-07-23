@@ -22,6 +22,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IRGen/Linking.h"
@@ -2941,8 +2942,7 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
          && !deinitTy->hasError()
          && "deinit should have only one parameter");
 
-  auto substitutions = ty->getContextSubstitutionMap(IGF.getSwiftModule(),
-                                                     nominal);
+  auto substitutions = ty->getContextSubstitutionMap();
                                                      
   CalleeInfo info(deinitTy,
                   deinitTy->substGenericArgs(IGF.getSILModule(),

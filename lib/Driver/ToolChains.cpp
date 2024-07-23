@@ -13,6 +13,7 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -243,6 +244,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(A->getValue()));
   }
 
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_sysroot)) {
+    arguments.push_back("-sysroot");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
 
   if (llvm::sys::Process::StandardErrHasColors()) {
     arguments.push_back("-color-diagnostics");
@@ -302,6 +307,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
   inputArgs.AddLastArg(arguments, options::OPT_experimental_package_bypass_resilience);
   inputArgs.AddLastArg(arguments, options::OPT_ExperimentalPackageCMO);
+  inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
@@ -1465,6 +1471,68 @@ void ToolChain::addLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
   getClangLibraryPath(Args, P);
   llvm::sys::path::append(P, LibName);
   Arguments.push_back(Args.MakeArgString(P));
+}
+
+static void appendInProcPluginServerPath(StringRef PluginPathRoot,
+                                         llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
+  InProcPluginServerPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
+#if defined(_WIN32)
+  llvm::sys::path::append(InProcPluginServerPath, "bin", "SwiftInProcPluginServer.dll");
+#elif defined(__APPLE__)
+  llvm::sys::path::append(InProcPluginServerPath, "lib", "swift", "host", "libSwiftInProcPluginServer.dylib");
+#elif defined(__unix__)
+  llvm::sys::path::append(InProcPluginServerPath, "lib", "swift", "host", "libSwiftInProcPluginServer.so");
+#else
+#error Unknown compiler host
+#endif
+}
+
+static void appendPluginsPath(StringRef PluginPathRoot,
+                              llvm::SmallVectorImpl<char> &PluginsPath) {
+  PluginsPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
+#if defined(_WIN32)
+  llvm::sys::path::append(PluginsPath, "bin");
+#elif defined(__APPLE__) || defined(__unix__)
+  llvm::sys::path::append(PluginsPath, "lib", "swift", "host", "plugins");
+#else
+#error Unknown compiler host
+#endif
+}
+
+#if defined(__APPLE__) || defined(__unix__)
+static void appendLocalPluginsPath(StringRef PluginPathRoot,
+                                   llvm::SmallVectorImpl<char> &LocalPluginsPath) {
+  SmallString<261> localPluginPathRoot = PluginPathRoot;
+  llvm::sys::path::append(localPluginPathRoot, "local");
+  appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
+}
+#endif
+
+void ToolChain::addPluginArguments(const ArgList &Args,
+                                   ArgStringList &Arguments) const {
+  SmallString<261> pluginPathRoot = StringRef(getDriver().getSwiftProgramPath());
+  llvm::sys::path::remove_filename(pluginPathRoot); // Remove `swift`
+  llvm::sys::path::remove_filename(pluginPathRoot); // Remove `bin`
+
+  // In-process plugin server path.
+  SmallString<261> inProcPluginServerPath;
+  appendInProcPluginServerPath(pluginPathRoot, inProcPluginServerPath);
+  Arguments.push_back("-in-process-plugin-server-path");
+  Arguments.push_back(Args.MakeArgString(inProcPluginServerPath));
+
+  // Default plugin path.
+  SmallString<261> defaultPluginPath;
+  appendPluginsPath(pluginPathRoot, defaultPluginPath);
+  Arguments.push_back("-plugin-path");
+  Arguments.push_back(Args.MakeArgString(defaultPluginPath));
+
+  // Local plugin path.
+#if defined(__APPLE__) || defined(__unix__)
+  SmallString<261> localPluginPath;
+  appendLocalPluginsPath(pluginPathRoot, localPluginPath);
+  Arguments.push_back("-plugin-path");
+  Arguments.push_back(Args.MakeArgString(localPluginPath));
+#endif
 }
 
 void ToolChain::getClangLibraryPath(const ArgList &Args,

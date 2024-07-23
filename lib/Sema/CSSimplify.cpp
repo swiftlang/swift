@@ -32,6 +32,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
@@ -3238,15 +3239,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
   if (func1->hasSendingResult() != func2->hasSendingResult() &&
       (!func1->hasSendingResult() || kind < ConstraintKind::Subtype)) {
-    auto *fix = AllowSendingMismatch::create(
-        *this, getConstraintLocator(locator), func1, func2,
-        AllowSendingMismatch::Kind::Result);
+    auto *fix = AllowSendingMismatch::create(*this, func1, func2,
+                                             getConstraintLocator(locator));
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
   }
 
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
+
+  if (func1->getLifetimeDependencies() != func2->getLifetimeDependencies()) {
+    return getTypeMatchFailure(locator);
+  }
 
   // To contextual type increase the score to avoid ambiguity when solver can
   // find more than one viable binding different only in representation e.g.
@@ -3680,8 +3684,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (func1Param.getParameterFlags().isSending() &&
           !func2Param.getParameterFlags().isSending()) {
         auto *fix = AllowSendingMismatch::create(
-            *this, getConstraintLocator(argumentLocator), func1, func2,
-            AllowSendingMismatch::Kind::Parameter);
+            *this, func1, func2, getConstraintLocator(argumentLocator));
         if (recordFix(fix))
           return getTypeMatchFailure(argumentLocator);
       }
@@ -6473,6 +6476,8 @@ bool ConstraintSystem::repairFailures(
     ConstraintFix *fix;
     if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>()) {
       fix = AllowFunctionTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    } else if (tupleLocator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      fix = AllowArgumentMismatch::create(*this, lhs, rhs, tupleLocator);
     } else {
       fix = AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
     }
@@ -6661,6 +6666,11 @@ bool ConstraintSystem::repairFailures(
     // If either type is a placeholder, consider this fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
+
+    // If we're converting to an existential, we'll diagnose failures in
+    // the conformance constraint.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+      return false;
 
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -8603,8 +8613,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
-        type, protocol, DC->getParentModule(),
-        /*allowMissing=*/true);
+        type, protocol, /*allowMissing=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -10281,7 +10290,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     if (shouldCheckSendabilityOfBase()) {
       auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = DC->getParentModule()->lookupConformance(
+      auto baseConformance = ModuleDecl::lookupConformance(
           instanceTy, sendableProtocol);
 
       if (llvm::any_of(
@@ -10450,30 +10459,45 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
     NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-    
-    // Ignore access control so we get candidates that might have been missed
-    // before.
-    lookupOptions |= NameLookupFlags::IgnoreAccessControl;
 
-    auto lookup =
-        TypeChecker::lookupMember(DC, instanceTy, memberName,
-                                  memberLoc, lookupOptions);
-    for (auto entry : lookup) {
-      auto *cand = entry.getValueDecl();
+    // Local function that looks up additional candidates using the given lookup
+    // options, recording the results as unviable candidates.
+    auto lookupUnviable =
+        [&](NameLookupOptions lookupOptions,
+            MemberLookupResult::UnviableReason reason) -> bool {
+      auto lookup = TypeChecker::lookupMember(DC, instanceTy, memberName,
+                                              memberLoc, lookupOptions);
+      for (auto entry : lookup) {
+        auto *cand = entry.getValueDecl();
 
-      // If the result is invalid, skip it.
-      if (cand->isInvalid()) {
-        result.markErrorAlreadyDiagnosed();
-        return result;
+        // If the result is invalid, skip it.
+        if (cand->isInvalid()) {
+          result.markErrorAlreadyDiagnosed();
+          break;
+        }
+
+        if (excludedDynamicMembers.count(cand))
+          continue;
+
+        result.addUnviable(getOverloadChoice(cand, /*isBridged=*/false,
+                                             /*isUnwrappedOptional=*/false),
+                           reason);
       }
 
-      if (excludedDynamicMembers.count(cand))
-        continue;
+      return !lookup.empty();
+    };
 
-      result.addUnviable(getOverloadChoice(cand, /*isBridged=*/false,
-                                           /*isUnwrappedOptional=*/false),
-                         MemberLookupResult::UR_Inaccessible);
-    }
+    // Ignore access control so we get candidates that might have been missed
+    // before.
+    if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreAccessControl,
+                       MemberLookupResult::UR_Inaccessible))
+      return result;
+
+    // Ignore missing import statements in order to find more candidates that
+    // might have been missed before.
+    if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreMissingImports,
+                       MemberLookupResult::UR_MissingImport))
+      return result;
   }
   
   return result;
@@ -10674,9 +10698,11 @@ static ConstraintFix *fixMemberRef(
     }
 
     case MemberLookupResult::UR_Inaccessible:
+    case MemberLookupResult::UR_MissingImport:
       assert(choice.isDecl());
-      return AllowInaccessibleMember::create(cs, baseTy, choice.getDecl(),
-                                             memberName, locator);
+      return AllowInaccessibleMember::create(
+          cs, baseTy, choice.getDecl(), memberName, locator,
+          *reason == MemberLookupResult::UR_MissingImport);
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()
@@ -10735,7 +10761,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
 
   DiagnosticTransaction diagnostics(ctx.Diags);
   {
-    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true)) {
+    if (cs.preCheckTarget(target)) {
       // Skip diagnostics if they are disabled, otherwise it would result in
       // duplicate diagnostics, since this operation is going to be repeated
       // in diagnostic mode.
@@ -11112,7 +11138,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
 
-      auto impact = 2;
+      auto impact = 4;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
@@ -11525,7 +11551,7 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     return SolutionKind::Error;
   }
 
-  auto resolvedType = wrapperType->getTypeOfMember(DC->getParentModule(), typeInfo.valueVar);
+  auto resolvedType = wrapperType->getTypeOfMember(typeInfo.valueVar);
   if (typeInfo.valueVar->isSettable(nullptr) && typeInfo.valueVar->isSetterAccessibleFrom(DC) &&
       !typeInfo.valueVar->isSetterMutating()) {
     resolvedType = LValueType::get(resolvedType);
@@ -13389,7 +13415,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Let's make this fix as high impact so if there is a function or member
     // overload with e.g. argument-to-parameter type mismatches it would take
     // a higher priority.
-    return recordFix(fix, /*impact=*/10) ? SolutionKind::Error
+    return recordFix(fix, /*impact=*/3) ? SolutionKind::Error
                                          : SolutionKind::Solved;
   }
 
@@ -13423,8 +13449,7 @@ lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {
     auto cand = cast<FuncDecl>(choice.getDecl());
-    return !isValidDynamicCallableMethod(cand, CS.DC->getParentModule(),
-                                         hasKeywordArgs);
+    return !isValidDynamicCallableMethod(cand, hasKeywordArgs);
   };
   candidates.erase(
       std::remove_if(candidates.begin(), candidates.end(), filter),
@@ -15447,6 +15472,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::DestructureTupleToMatchPackExpansionParameter:
   case FixKind::AllowValueExpansionWithoutPackReferences:
   case FixKind::IgnoreInvalidPatternInExpr:
+  case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
     llvm_unreachable("handled elsewhere");

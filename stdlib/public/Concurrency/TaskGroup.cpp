@@ -292,7 +292,12 @@ public:
   };
 
 protected:
-#if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+// Guard with SWIFT_THREADING_NONE and not just SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY 
+// because the latter just means that the global executor is cooperative, 
+// but it doesn't mean that the target platform is always single-threaded. For example, on 
+// wasm32-unknown-wasip1-threads, the global executor is cooperative, but users can still set up their 
+// own TaskExecutor with multiple threads.
+#if SWIFT_THREADING_NONE || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   // Synchronization is simple here. In a single threaded mode, all swift tasks
   // run on a single thread so no coordination is needed. In a task-to-thread
   // model, only the parent task which created the task group can

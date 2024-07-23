@@ -99,9 +99,6 @@ def _apply_default_arguments(args):
     if args.libdispatch_build_variant is None:
         args.libdispatch_build_variant = args.build_variant
 
-    if args.libicu_build_variant is None:
-        args.libicu_build_variant = args.build_variant
-
     if args.libxml2_build_variant is None:
         args.libxml2_build_variant = args.build_variant
 
@@ -820,9 +817,6 @@ def create_argument_parser():
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
 
-    option('--libicu', toggle_true('build_libicu'),
-           help='build libicu')
-
     option('--static-libxml2', toggle_true('build_libxml2'), default=False,
            help='build static libxml2')
 
@@ -945,10 +939,6 @@ def create_argument_parser():
     option('--debug-libdispatch', store('libdispatch_build_variant'),
            const='Debug',
            help='build the Debug variant of libdispatch')
-
-    option('--debug-libicu', store('libicu_build_variant'),
-           const='Debug',
-           help='build the Debug variant of libicu')
 
     option('--debug-libxml2', store('libxml2_build_variant'),
            const='Debug',
@@ -1146,6 +1136,9 @@ def create_argument_parser():
 
     option('--build-swift-stdlib-static-print', toggle_true,
            help='Build constant-folding print() support')
+
+    option('--build-embedded-stdlib-cross-compiling', toggle_true,
+           help='Build embedded stdlib for cross-compiling targets.')
 
     option('--build-swift-stdlib-unicode-data', toggle_true,
            default=True,
@@ -1352,7 +1345,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,
@@ -1465,6 +1458,10 @@ def create_argument_parser():
            default=True,
            help='Enable Swift Synchronization.')
 
+    option('--enable-volatile', toggle_true,
+           default=True,
+           help='Enable Volatile module.')
+
     option('--enable-experimental-parser-validation', toggle_true,
            default=False,
            help='Enable experimental Swift Parser validation by default.')
@@ -1576,7 +1573,6 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
-                     /icu                        (optional)
                      /libxml2                    (optional)
                      /zlib                       (optional)
                      /curl                       (optional)

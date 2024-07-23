@@ -330,7 +330,7 @@ public struct WrapperOnMainActor<Wrapped> {
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -341,7 +341,7 @@ public struct WrapperOnMainActorNonSendable<Wrapped> {
   @MainActor public var wrappedValue: Wrapped
 
   public init(wrappedValue: Wrapped) {
-    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -380,8 +380,8 @@ struct HasWrapperOnActor {
 
   // expected-note@+1 2{{to make instance method 'testErrors()'}}
   func testErrors() {
-    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a nonisolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a nonisolated context}}
     _ = _synced // okay
   }
 
@@ -495,7 +495,7 @@ class WrappedContainsNonisolatedAttr {
 
   nonisolated func test() {
     _ = value
-    _ = $value // expected-error {{main actor-isolated property '$value' can not be referenced from a non-isolated context}}
+    _ = $value // expected-error {{main actor-isolated property '$value' can not be referenced from a nonisolated context}}
   }
 }
 
@@ -572,14 +572,14 @@ struct HasWrapperOnUnsafeActor {
   func testUnsafeOkay() {
     // expected-complete-tns-note @-1 {{add '@SomeGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'SomeGlobalActor'}}
     // expected-complete-tns-note @-2 {{add '@MainActor' to make instance method 'testUnsafeOkay()' part of global actor 'MainActor'}}
-    _ = synced // expected-complete-tns-warning {{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-complete-tns-warning {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-complete-tns-warning {{main actor-isolated property 'synced' can not be referenced from a nonisolated context}}
+    _ = $synced // expected-complete-tns-warning {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a nonisolated context}}
     _ = _synced // okay
   }
 
   nonisolated func testErrors() {
-    _ = synced // expected-warning{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-warning{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-warning{{main actor-isolated property 'synced' can not be referenced from a nonisolated context}}
+    _ = $synced // expected-warning{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a nonisolated context}}
     _ = _synced // okay
   }
 
@@ -692,7 +692,7 @@ class Butter {
   var a = useFooInADefer() // expected-minimal-targeted-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
   // expected-complete-tns-warning@-1 {{main actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context; this is an error in the Swift 6 language mode}}
 
-  nonisolated let b = statefulThingy // expected-minimal-targeted-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
+  nonisolated let b = statefulThingy // expected-minimal-targeted-error {{main actor-isolated var 'statefulThingy' can not be referenced from a nonisolated context}}
   // expected-complete-tns-warning@-1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 
   var c: Int = {

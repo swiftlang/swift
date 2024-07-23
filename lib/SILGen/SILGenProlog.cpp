@@ -23,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
@@ -915,6 +916,7 @@ private:
                   MarkUnresolvedNonCopyableValueInst::CheckKind::
                       ConsumableAndAssignable);
               break;
+            case SILArgumentConvention::Indirect_In_CXX:
             case SILArgumentConvention::Indirect_In_Guaranteed:
               argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
                   loc, argrv,
@@ -1245,6 +1247,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       case SILArgumentConvention::Indirect_InoutAliasable:
       case SILArgumentConvention::Indirect_In:
       case SILArgumentConvention::Indirect_In_Guaranteed:
+      case SILArgumentConvention::Indirect_In_CXX:
       case SILArgumentConvention::Pack_Inout:
       case SILArgumentConvention::Pack_Owned:
       case SILArgumentConvention::Pack_Guaranteed:
@@ -1539,6 +1542,8 @@ uint16_t SILGenFunction::emitBasicProlog(
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getReducedType(genericSig);
+  if (errorType)
+    errorType = (*errorType)->getReducedType(genericSig);
 
   std::optional<AbstractionPattern> origClosureType;
   if (TypeContext) origClosureType = TypeContext->OrigType;

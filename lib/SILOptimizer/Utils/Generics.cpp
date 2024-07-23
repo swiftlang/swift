@@ -21,6 +21,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -770,6 +771,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       continue;
 
     switch (PI.getConvention()) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed: {
       Conversions.set(IdxToInsert);
@@ -983,7 +985,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // owned/guaranteed (except it's a trivial type).
     auto C = ParameterConvention::Direct_Unowned;
     if (!isTrivial) {
-      if (PI.isGuaranteed()) {
+      if (PI.isGuaranteedInCallee()) {
         C = ParameterConvention::Direct_Guaranteed;
       } else {
         C = ParameterConvention::Direct_Owned;
@@ -1397,9 +1399,10 @@ public:
       SubstitutionMap::get(
         SpecializedGenericSig,
         [&](SubstitutableType *type) -> Type {
-          return CalleeGenericEnv->mapTypeIntoContext(type);
+          return CalleeGenericEnv->mapTypeIntoContext(
+              SpecializedGenericSig.getReducedType(type));
         },
-        LookUpConformanceInSignature(SpecializedGenericSig.getPointer()));
+        LookUpConformanceInModule());
   }
 
   GenericSignature getSpecializedGenericSignature() {
@@ -1470,7 +1473,7 @@ void FunctionSignaturePartialSpecializer::
       [&](SubstitutableType *type) -> Type {
         return CallerInterfaceToSpecializedInterfaceMapping.lookup(type);
       },
-      LookUpConformanceInSignature(CallerGenericSig.getPointer()));
+      LookUpConformanceInModule());
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nCallerInterfaceToSpecializedInterfaceMap "
                              "map:\n";
@@ -1495,7 +1498,7 @@ void FunctionSignaturePartialSpecializer::
                    else llvm::dbgs() << "Not found!\n";);
         return SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
       },
-      LookUpConformanceInSignature(SpecializedGenericSig.getPointer()));
+      LookUpConformanceInModule());
   LLVM_DEBUG(llvm::dbgs() << "\n\nSpecializedInterfaceToCallerArchetypeMap "
                              "map:\n";
              SpecializedInterfaceToCallerArchetypeMap.dump(llvm::dbgs()));
@@ -1509,7 +1512,7 @@ void FunctionSignaturePartialSpecializer::
       [&](SubstitutableType *type) -> Type {
         return CalleeInterfaceToSpecializedInterfaceMapping.lookup(type);
       },
-      LookUpConformanceInSignature(CalleeGenericSig.getPointer()));
+      LookUpConformanceInModule());
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nCalleeInterfaceToSpecializedInterfaceMap:\n";
              CalleeInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs()));
@@ -1722,7 +1725,7 @@ SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs() {
       return SpecializedGenericEnv->mapTypeIntoContext(
           SpecializedInterfaceTy);
     },
-    LookUpConformanceInSignature(SpecializedGenericSig.getPointer()));
+    LookUpConformanceInModule());
 }
 
 SubstitutionMap FunctionSignaturePartialSpecializer::getCallerParamSubs() {
@@ -1742,7 +1745,7 @@ void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
       assert(!SpecializedInterfaceTy->hasError());
       return SpecializedInterfaceTy;
     },
-    LookUpConformanceInSignature(CalleeGenericSig.getPointer()));
+    LookUpConformanceInModule());
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nCallerInterfaceSubs map:\n";
              CallerInterfaceSubs.dump(llvm::dbgs()));
@@ -2265,7 +2268,7 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
       argConv = substConv.getSILArgumentConvention(ArgIdx);
     }
     SILValue Val;
-    if (!argConv.isGuaranteedConvention()) {
+    if (!argConv.isGuaranteedConventionInCaller()) {
       Val = Builder.emitLoadValueOperation(Loc, InputValue,
                                            LoadOwnershipQualifier::Take);
     } else {
@@ -2748,7 +2751,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
                                Builder.getTypeExpansionContext()));
       assert(ParamTy.isAddress());
       SILFunctionArgument *NewArg = addFunctionArgument(Thunk, ParamTy, specArg);
-      if (!NewArg->getArgumentConvention().isGuaranteedConvention()) {
+      if (!NewArg->getArgumentConvention().isGuaranteedConventionInCallee()) {
         SILValue argVal = Builder.emitLoadValueOperation(
             Loc, NewArg, LoadOwnershipQualifier::Take);
         Arguments.push_back(argVal);

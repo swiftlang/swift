@@ -29,6 +29,11 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let lifetimeDependenceDiagnosticsPass = FunctionPass(
   name: "lifetime-dependence-diagnostics")
 { (function: Function, context: FunctionPassContext) in
+#if os(Windows)
+  if !context.options.hasFeature(.NonescapableTypes) {
+    return
+  }
+#endif
   log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
@@ -121,10 +126,7 @@ private struct DiagnoseDependence {
   }
 
   func reportUnknown(operand: Operand) {
-#if !os(Windows)
-    // TODO: https://github.com/apple/swift/issues/73252
-    standardError.write("Unknown use: \(operand)\n\(function)")
-#endif
+    log("Unknown use: \(operand)\n\(function)")
     reportEscaping(operand: operand)
   }
 

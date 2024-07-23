@@ -25,14 +25,14 @@ struct X {
 
 func testInAsync(x: X) async {
   let _: Int = unsafelySendableClosure // expected-error{{type '@Sendable (@Sendable () -> Void) -> ()'}}
-  let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor () -> Void) -> ()'}}
+  let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
-  let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
+  let _: Int = x.mainActorVar // expected-error{{type '@MainActor @Sendable () -> Void'}}
 
   let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
@@ -40,14 +40,14 @@ func testInAsync(x: X) async {
 
 func testElsewhere(x: X) {
   let _: Int = unsafelySendableClosure // expected-error{{type '@Sendable (@Sendable () -> Void) -> ()'}}
-  let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor () -> Void) -> ()'}}
+  let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
-  let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
+  let _: Int = x.mainActorVar // expected-error{{type '@MainActor @Sendable () -> Void'}}
 
   let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
@@ -112,3 +112,53 @@ func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
 // expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}
+
+// Override matching with @preconcurrency properties.
+do {
+  class Base {
+    @preconcurrency
+    open var test1 : ([any Sendable])? // expected-note {{overridden declaration is here}}
+
+    @preconcurrency
+    open var test2: [String: [Int: any Sendable]] // expected-note {{overridden declaration is here}}
+
+    @preconcurrency
+    open var test3: any Sendable // expected-note {{overridden declaration is here}}
+
+    @preconcurrency
+    open var test4: (((Any)?) -> Void)? { // expected-note {{overridden declaration is here}}
+      nil
+    }
+
+    init() {
+      self.test1 = nil
+      self.test2 = [:]
+      self.test3 = 42
+    }
+  }
+
+  class Test : Base {
+    override var test1: [Any]? {
+      // expected-error@-1 {{declaration 'test1' has a type with different sendability from any potential overrides}}
+      get { nil }
+      set { }
+    }
+
+    override var test2: [String: [Int: Any]] {
+      // expected-error@-1 {{declaration 'test2' has a type with different sendability from any potential overrides}}
+      get { [:] }
+      set {}
+    }
+
+    override var test3: Any {
+      // expected-error@-1 {{declaration 'test3' has a type with different sendability from any potential overrides}}
+      get { 42 }
+      set { }
+    }
+
+    override var test4: (((any Sendable)?) -> Void)? {
+      // expected-error@-1 {{declaration 'test4' has a type with different sendability from any potential overrides}}
+      nil
+    }
+  }
+}

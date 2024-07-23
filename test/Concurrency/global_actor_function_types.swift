@@ -7,9 +7,6 @@
 // Emit SIL with targeted concurrency.
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
 
-// Emit SIL with strict concurrency but without region based isolation
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -verify-additional-prefix without-transferring- -disable-region-based-isolation-with-strict-concurrency
-
 // Emit SIL with strict concurrency + region based isolation + transferring
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
 
@@ -330,9 +327,12 @@ func stripActor(_ expr: @Sendable @autoclosure () -> (() -> ())) async {
   return await stripActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
 }
 
-// NOTE: this warning is correct, but is only being caught by TypeCheckConcurrency's extra check.
+// We used to not emit an error here with strict-concurrency enabled since we
+// were inferring the async let to main actor isolated (which was incorrect). We
+// now always treat async let as non-isolated, so we get the same error in all
+// contexts.
 @MainActor func exampleWhereConstraintSolverHasWrongDeclContext_v2() async -> Int {
-  async let a: () = noActor(mainActorFn) // expected-without-transferring-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+  async let a: () = noActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   await a
 }
 

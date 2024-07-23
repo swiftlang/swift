@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
@@ -96,6 +97,13 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   }
   case PartitionOpKind::UnknownPatternError:
     os << "unknown pattern error ";
+    os << "%%" << opArgs[0];
+    break;
+  case PartitionOpKind::RequireInOutSendingAtFunctionExit:
+    constexpr static char extraSpaceLiteral[10] = "     ";
+    os << "require_inout_sending_at_function_exit ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
     os << "%%" << opArgs[0];
     break;
   }

@@ -215,14 +215,21 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
       file: file, line: line)
   }
 
-  @usableFromInline
+  // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+  // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+  // to the type checker.
+  //
+  // This function also doubles as an ABI-compatibility shim predating the
+  // introduction of #isolation.
   @discardableResult
   @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
   @available(SwiftStdlib 5.1, *)
   @_silgen_name("$ss9TaskLocalC9withValue_9operation4file4lineqd__x_qd__yYaKXESSSutYaKlF")
-  internal func __abi_withValue<R>(_ valueDuringOperation: Value,
-                                   operation: () async throws -> R,
-                                   file: String = #fileID, line: UInt = #line) async rethrows -> R {
+  public func _unsafeInheritExecutor_withValue<R>(
+    _ valueDuringOperation: Value,
+    operation: () async throws -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
     return try await withValueImpl(valueDuringOperation, operation: operation, file: file, line: line)
   }
 
@@ -258,14 +265,16 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     return try await operation()
   }
 
+  @_silgen_name("$ss9TaskLocalC13withValueImpl_9operation4file4lineqd__xn_qd__yYaKXESSSutYaKlF")
   @inlinable
   @discardableResult
-  @_unsafeInheritExecutor
+  @_unsafeInheritExecutor // internal for backwards compatibility; though may be able to be removed safely?
   @available(SwiftStdlib 5.1, *)
-  @backDeployed(before: SwiftStdlib 5.9)
-  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
-                                 operation: () async throws -> R,
-                                 file: String = #fileID, line: UInt = #line) async rethrows -> R {
+  internal func _unsafeInheritExecutor_withValueImpl<R>(
+    _ valueDuringOperation: __owned Value,
+    operation: () async throws -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
 

@@ -833,3 +833,10 @@ public extension S3_54864 {
     get { s2_54864_instance[keyPath: member] } // expected-error {{key path with root type 'S3_54864' cannot be applied to a base of type 'S2_54864'}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/75244
+struct WithSendable {
+  subscript(dynamicMember member: KeyPath<String, Int> & Sendable) -> Bool { // Ok
+    get { false }
+  }
+}

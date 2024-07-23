@@ -1127,7 +1127,7 @@ bb0(%error_exi : @guaranteed $any Error):
 }
 
 // Test a chain of projections multiple nodes of which feature an opened
-// archetype AND the archetype-definining instruction for the first projection
+// archetype AND the archetype-defining instruction for the first projection
 // whose type has an opened archetype dominates all blocks but the
 // archetype-defining instruction for the SECOND projection does not.
 //

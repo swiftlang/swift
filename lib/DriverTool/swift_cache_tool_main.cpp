@@ -189,7 +189,7 @@ private:
     // command-line.
     if (StringRef(FrontendArgs[0]).ends_with("swift-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());
-    if (StringRef(FrontendArgs[0]).equals("-frontend"))
+    if (StringRef(FrontendArgs[0]) == "-frontend")
       FrontendArgs.erase(FrontendArgs.begin());
 
     SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4>

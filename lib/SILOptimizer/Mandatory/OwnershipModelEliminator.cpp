@@ -24,6 +24,7 @@
 
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
@@ -136,9 +137,19 @@ struct OwnershipModelEliminatorVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
   bool visitExplicitCopyAddrInst(ExplicitCopyAddrInst *cai);
+  bool visitApplyInst(ApplyInst *ai);
 
   void splitDestroy(DestroyValueInst *destroy);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
+  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
+    if (!dbi->isDeadEnd())
+      return false;
+
+    // dead_end instructions are required for complete OSSA lifetimes but should
+    // not exist post-OSSA.
+    eraseInstruction(dbi);
+    return true;
+  }
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitMoveValueInst(MoveValueInst *mvi) {
     eraseInstructionAndRAUW(mvi, mvi->getOperand());
@@ -359,6 +370,32 @@ bool OwnershipModelEliminatorVisitor::visitExplicitCopyAddrInst(
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
+  auto callee = ai->getCallee();
+
+  if (!callee)
+    return false;
+
+  // Insert destroy_addr for @in_cxx arguments.
+  auto fnTy = callee->getType().castTo<SILFunctionType>();
+  SILFunctionConventions fnConv(fnTy, ai->getModule());
+  bool changed = false;
+
+  for (int i = fnConv.getSILArgIndexOfFirstParam(),
+           e = i + fnConv.getNumParameters();
+       i < e; ++i) {
+    auto paramInfo = fnConv.getParamInfoForSILArg(i);
+    if (!paramInfo.isIndirectInCXX())
+      continue;
+    auto arg = ai->getArgument(i);
+    SILBuilderWithScope builder(ai->getNextInstruction(), builderCtx);
+    builder.createDestroyAddr(ai->getLoc(), arg);
+    changed = true;
+  }
+
+  return changed;
+}
+
 bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *urvi) {
   // Now that we have set the unqualified ownership flag, destroy value
@@ -427,8 +464,8 @@ static void injectDebugPoison(DestroyValueInst *destroy) {
     // This debug location is obviously inconsistent with surrounding code, but
     // IRGen is responsible for fixing this.
     builder.setCurrentDebugScope(scope);
-    auto *newDebugVal = builder.createDebugValue(loc, destroyedValue, *varInfo,
-                                                 /*poisonRefs*/ true);
+    auto *newDebugVal =
+        builder.createDebugValue(loc, destroyedValue, *varInfo, PoisonRefs);
     assert(*(newDebugVal->getVarInfo()) == *varInfo && "lost in translation");
     (void)newDebugVal;
   }
@@ -543,6 +580,13 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
 
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
     DestroyValueInst *dvi) {
+  if (dvi->isDeadEnd()) {
+    // dead_end instructions are required for complete OSSA lifetimes but should
+    // not exist post-OSSA.
+    eraseInstruction(dvi);
+    return true;
+  }
+
   // Nonescaping closures are represented ultimately as trivial pointers to
   // their context, but we use ownership to do borrow checking of their captures
   // in OSSA. Now that we're eliminating ownership, fold away destroys.

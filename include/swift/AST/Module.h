@@ -25,6 +25,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -388,7 +389,7 @@ public:
   void setBypassResilience() { BypassResilience = true; }
 
   ArrayRef<FileUnit *> getFiles() {
-    assert(!Files.empty() || failedToLoad());
+    ASSERT(!Files.empty() || failedToLoad());
     return Files;
   }
   ArrayRef<const FileUnit *> getFiles() const {
@@ -726,7 +727,7 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
-  /// Returns true if -experimental-allow-non-resilient-access was passed
+  /// Returns true if -allow-non-resilient-access was passed
   /// and the module is built from source.
   bool allowNonResilientAccess() const {
     return Bits.ModuleDecl.AllowNonResilientAccess &&
@@ -736,11 +737,12 @@ public:
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
-  /// Returns true if -experimental-package-cmo was passed, which
+  /// Returns true if -package-cmo was passed, which
   /// enables serialization of package, public, and inlinable decls in a
-  /// package. This requires -experimental-allow-non-resilient-access.
+  /// package. This requires -allow-non-resilient-access.
   bool serializePackageEnabled() const {
-    return Bits.ModuleDecl.SerializePackageEnabled;
+    return Bits.ModuleDecl.SerializePackageEnabled &&
+           allowNonResilientAccess();
   }
   void setSerializePackageEnabled(bool flag = true) {
     Bits.ModuleDecl.SerializePackageEnabled = flag;
@@ -886,8 +888,8 @@ public:
   ///
   /// \returns An invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
-                                           bool allowMissing = false);
+  static ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
+                                                  bool allowMissing = false);
 
   /// Global conformance lookup, checks conditional requirements.
   /// Requires a contextualized type.
@@ -903,9 +905,10 @@ public:
   ///
   /// \returns An invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
-  ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
-                              // Note: different default from lookupConformance
-                              bool allowMissing = true);
+  static ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
+                                                 // Note: different default from
+                                                 // lookupConformance
+                                                 bool allowMissing = true);
 
   /// Global conformance lookup, checks conditional requirements.
   /// Accepts interface types without context. If the conformance cannot be
@@ -925,22 +928,23 @@ public:
   /// if the search succeeded. `std::nullopt` if the type could have
   /// conditionally conformed depending on the context of the interface types.
   std::optional<ProtocolConformanceRef>
-  checkConformanceWithoutContext(Type type,
-                                 ProtocolDecl *protocol,
-                                 // Note: different default from lookupConformance
-                                 bool allowMissing = true);
+  static checkConformanceWithoutContext(Type type,
+                                        ProtocolDecl *protocol,
+                                        // Note: different default from
+                                        // lookupConformance
+                                        bool allowMissing = true);
 
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
-  ProtocolConformanceRef lookupExistentialConformance(Type type,
-                                                      ProtocolDecl *protocol);
+  static ProtocolConformanceRef lookupExistentialConformance(Type type,
+                                                             ProtocolDecl *protocol);
 
   /// Collect the conformances of \c fromType to each of the protocols of an
   /// existential type's layout.
   ArrayRef<ProtocolConformanceRef>
-  collectExistentialConformances(CanType fromType, CanType existential,
-                                 bool allowMissing = false);
+  static collectExistentialConformances(CanType fromType, CanType existential,
+                                        bool allowMissing = false);
 
   /// Find a member named \p name in \p container that was declared in this
   /// module.

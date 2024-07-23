@@ -32,6 +32,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -488,7 +490,6 @@ namespace {
     RecursiveProperties
     getNormalDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type, AbstractionPattern origType) {
-      auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       // Pass the original type of abstraction pattern to
       // `SILFunctionType:getAutoDiffDerivativeFunctionType` to get the
@@ -499,13 +500,13 @@ namespace {
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature(),
+          LookUpConformanceInModule(), CanGenericSignature(),
           false, origTypeOfAbstraction);
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature(),
+          LookUpConformanceInModule(), CanGenericSignature(),
           false, origTypeOfAbstraction);
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
@@ -517,11 +518,10 @@ namespace {
     RecursiveProperties
     getLinearDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type, AbstractionPattern origType) {
-      auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       auto transposeTy = origTy->getAutoDiffTransposeFunctionType(
           type->getDifferentiabilityParameterIndices(), TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, transposeTy, TC, Expansion));
@@ -1558,7 +1558,7 @@ namespace {
                 AutoDiffDerivativeFunctionKind::VJP}) {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
             paramIndices, resultIndices, kind, TC,
-            LookUpConformanceInModule(&TC.M));
+            LookUpConformanceInModule());
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         NormalDifferentiableFunctionTypeComponent extractee(kind);
         // Assert that we have the right extractee. A terrible bug in the past
@@ -1724,7 +1724,7 @@ namespace {
         TC.getTypeLowering(origFnTy, getExpansionContext())
       });
       auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
-          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+          paramIndices, TC, LookUpConformanceInModule());
       auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
       children.push_back(Child{
         LinearDifferentiableFunctionTypeComponent::Transpose,
@@ -2433,7 +2433,7 @@ namespace {
         return handleAddressOnly(structType, properties);
       }
 
-      auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
+      auto subMap = structType->getContextSubstitutionMap();
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
@@ -2530,7 +2530,7 @@ namespace {
                                                  Expansion);
       }
 
-      auto subMap = enumType->getContextSubstitutionMap(&TC.M, D);
+      auto subMap = enumType->getContextSubstitutionMap();
 
       // Accumulate the properties of all direct payloads.
       for (auto elt : D->getAllElements()) {
@@ -2936,7 +2936,7 @@ bool TypeConverter::visitAggregateLeaves(
                            field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
-          auto subMap = ty->getContextSubstitutionMap(&M, decl);
+          auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
               structField->getInterfaceType().subst(subMap)->getCanonicalType();
           auto sig =
@@ -2950,7 +2950,7 @@ bool TypeConverter::visitAggregateLeaves(
                              std::nullopt);
         }
       } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
-        auto subMap = ty->getContextSubstitutionMap(&M, decl);
+        auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
             continue;
@@ -3910,7 +3910,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
-          .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
+          .withLifetimeDependencies(funcType->getLifetimeDependencies())
           .withSendingResult(funcType->hasSendingResult())
           .build();
 
@@ -3991,7 +3991,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
     auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
         derivativeId->getParameterIndices(), derivativeId->getKind(),
-        LookUpConformanceInModule(&M),
+        LookUpConformanceInModule(),
         derivativeId->getDerivativeGenericSignature());
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
@@ -4002,6 +4002,16 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
+
+      // If we have a closure expr, see if we need to add Sendable to work
+      // issues with inheritActorContext and global actor isolation.
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (CE->inheritsActorContext() && CE->isBodyAsync() &&
+            CE->getActorIsolation().isActorIsolated() && !CE->isSendable()) {
+          auto newExtInfo = funcTy->getExtInfo().withSendable();
+          funcTy = funcTy.withExtInfo(newExtInfo);
+        }
+      }
     } else {
       funcTy = cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
     }
@@ -4886,14 +4896,93 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
     return ABIDifference::CompatibleRepresentation;
 }
 
+static void findCapturedEnvironments(
+              Type type,
+              SmallSetVector<GenericEnvironment *, 2> &boxCapturedEnvs) {
+  type.visit([&](Type t) {
+    if (auto *archetypeTy = t->getAs<LocalArchetypeType>()) {
+      boxCapturedEnvs.insert(archetypeTy->getGenericEnvironment());
+    }
+  });
+}
+
 CanSILBoxType
 TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
-                                             CanType loweredInterfaceType,
+                                             CanType loweredContextType,
+                                             GenericSignature genericSig,
+                                             ArrayRef<GenericEnvironment *> capturedEnvs,
                                              bool isMutable) {
+  auto boxType = getInterfaceBoxTypeForCapture(captured,
+                                               loweredContextType,
+                                               isMutable);
+
+  LLVM_DEBUG(llvm::dbgs() << "Generic signature of closure: "
+                          << genericSig << "\n";);
+  LLVM_DEBUG(llvm::dbgs() << "Box type: "
+                          << boxType << "\n";);
+
   auto &C = M.getASTContext();
-  auto signature = getCanonicalSignatureOrNull(
+  auto baseGenericSig = getCanonicalSignatureOrNull(
       captured->getDeclContext()->getGenericSignatureOfContext());
   
+  SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
+  findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
+
+  return cast<SILBoxType>(Type(boxType).subst(
+    [&](SubstitutableType *t) -> Type {
+      auto *paramTy = cast<GenericTypeParamType>(t);
+
+      // Depth of first captured local archetype in box generic signature.
+      unsigned depth = baseGenericSig.getNextDepth();
+
+      // Is this a captured local archetype?
+      if (paramTy->getDepth() >= depth) {
+        // Get the environment.
+        auto *genericEnv = boxCapturedEnvs[paramTy->getDepth() - depth];
+
+        // Find this environment in the captured environments of our
+        // closure.
+        auto found = std::find(capturedEnvs.begin(), capturedEnvs.end(),
+                               genericEnv);
+        assert(found != capturedEnvs.end());
+        unsigned capturedEnvIndex = found - capturedEnvs.begin();
+
+        // Remap the depth. This is necessary because the 'var' box might
+        // capture a subset of the captured environments of the closure.
+        return GenericTypeParamType::get(
+            /*isParameterPack=*/false,
+            genericSig.getNextDepth() - capturedEnvs.size() + capturedEnvIndex,
+            paramTy->getIndex(),
+            C);
+      }
+
+      return paramTy;
+    },
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::PreservePackExpansionLevel |
+    SubstFlags::AllowLoweredTypes)->getCanonicalType());
+}
+
+CanSILBoxType
+TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                             CanType loweredContextType,
+                                             bool isMutable) {
+  auto &C = M.getASTContext();
+  auto baseGenericSig = getCanonicalSignatureOrNull(
+      captured->getDeclContext()->getGenericSignatureOfContext());
+
+  SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
+  findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
+
+  MapLocalArchetypesOutOfContext mapOutOfContext(baseGenericSig,
+                                                 boxCapturedEnvs.getArrayRef());
+
+  auto loweredInterfaceType = loweredContextType.subst(
+      mapOutOfContext,
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::PreservePackExpansionLevel |
+      SubstFlags::AllowLoweredTypes)->getCanonicalType();
+
   // If the type is not dependent at all, we can form a concrete box layout.
   // We don't need to capture the generic environment.
   if (!loweredInterfaceType->hasTypeParameter()) {
@@ -4902,39 +4991,23 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
                                  /*captures generics*/ false);
     return SILBoxType::get(C, layout, {});
   }
+
+  auto boxGenericSig = buildGenericSignatureWithCapturedEnvironments(
+      M.getASTContext(), baseGenericSig,
+      boxCapturedEnvs.getArrayRef()).getCanonicalSignature();
   
   // Otherwise, the layout needs to capture the generic environment of its
   // originating scope.
   // TODO: We could conceivably minimize the captured generic environment to
   // only the parts used by the captured variable.
-  
-  auto layout = SILLayout::get(C, signature,
+  auto layout = SILLayout::get(C, boxGenericSig,
                                SILField(loweredInterfaceType, isMutable),
                                /*captures generics*/ false);
-  
+
   // Instantiate the layout with identity substitutions.
-  auto subMap = signature->getIdentitySubstitutionMap();
+  auto subMap = boxGenericSig->getIdentitySubstitutionMap();
 
-  auto boxTy = SILBoxType::get(C, layout, subMap);
-#ifndef NDEBUG
-  auto loweredContextType = loweredInterfaceType;
-  auto contextBoxTy = boxTy;
-  if (signature) {
-    auto env = signature.getGenericEnvironment();
-    loweredContextType = env->mapTypeIntoContext(loweredContextType)
-                            ->getCanonicalType();
-    contextBoxTy = cast<SILBoxType>(
-      env->mapTypeIntoContext(contextBoxTy)
-         ->getCanonicalType());
-  }
-
-  auto ty = getSILBoxFieldType(TypeExpansionContext::minimal(), contextBoxTy,
-                               *this, 0);
-  assert(contextBoxTy->getLayout()->getFields().size() == 1 &&
-         ty.getRawASTType() == loweredContextType &&
-         "box field type doesn't match capture!");
-#endif
-  return boxTy;
+  return SILBoxType::get(C, layout, subMap);
 }
 
 CanSILBoxType
@@ -4942,24 +5015,20 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
                                            CanType loweredContextType,
                                            GenericEnvironment *env,
                                            bool isMutable) {
-  CanType loweredInterfaceType = loweredContextType;
-  if (env) {
-    auto homeSig = captured->getDeclContext()
-        ->getGenericSignatureOfContext();
-    loweredInterfaceType =
-      loweredInterfaceType->mapTypeOutOfContext()
-        ->getReducedType(homeSig);
-  }
-  
+  SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
+  findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
+
   auto boxType = getInterfaceBoxTypeForCapture(captured,
-                                               loweredInterfaceType,
+                                               loweredContextType,
                                                isMutable);
-  if (env)
-    boxType = cast<SILBoxType>(
-      env->mapTypeIntoContext(boxType)
-         ->getCanonicalType());
-  
-  return boxType;
+
+  MapIntoLocalArchetypeContext mapIntoContext(env, boxCapturedEnvs.getArrayRef());
+
+  return cast<SILBoxType>(
+    Type(boxType).subst(mapIntoContext,
+                        LookUpConformanceInModule(),
+                        SubstFlags::PreservePackExpansionLevel |
+                        SubstFlags::AllowLoweredTypes)->getCanonicalType());
 }
 
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
@@ -4994,8 +5063,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
                                /*captures generics*/ false);
 
   // Instantiate the layout with enum's substitution list.
-  auto subMap = boundEnum->getContextSubstitutionMap(
-      &M, enumDecl, enumDecl->getGenericEnvironment());
+  auto subMap = boundEnum->getContextSubstitutionMap();
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
   return boxTy;

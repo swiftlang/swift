@@ -391,10 +391,10 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
-    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    /// Whether this module is built with -allow-non-resilient-access.
     unsigned AllowNonResilientAccess : 1;
 
-    /// Whether this module is built with -experimental-package-cmo.
+    /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
     // Explicitly pad out to the next word boundary.
@@ -622,6 +622,10 @@ public:
   bool isStaticLibrary() const {
     return Bits.IsStaticLibrary;
   }
+
+  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
+  /// resolve it to be absolute to the specified SDK.
+  std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
 
   /// Returns \c true if this module file contains a section with incremental
   /// information.

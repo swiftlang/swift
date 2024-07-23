@@ -81,30 +81,25 @@ public class OldSchool2: MP {
   public func takeClass() async { }
 }
 
-// CHECK:      #if compiler(>=5.3) && $RethrowsProtocol
-// CHECK-NEXT: @rethrows public protocol RP
+// CHECK: @rethrows public protocol RP
 @rethrows public protocol RP {
   func f() throws -> Bool
 }
 
 // CHECK: public struct UsesRP {
 public struct UsesRP {
-  // CHECK:     #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK-NEXT:  public var value: (any FeatureTest.RP)? {
-  // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK:         get
+  // CHECK:  public var value: (any FeatureTest.RP)? {
+  // CHECK-NEXT:  get
   public var value: RP? {
     nil
   }
 }
 
-// CHECK:      #if compiler(>=5.3) && $RethrowsProtocol
-// CHECK-NEXT: public struct IsRP
+// CHECK: public struct IsRP
 public struct IsRP: RP {
   // CHECK-NEXT: public func f()
   public func f() -> Bool { }
 
-  // CHECK-NOT: $RethrowsProtocol
   // CHECK-NEXT: public var isF:
   // CHECK-NEXT:   get
   public var isF: Bool {
@@ -112,8 +107,7 @@ public struct IsRP: RP {
   }
 }
 
-// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
-// CHECK-NEXT: public func acceptsRP
+// CHECK: public func acceptsRP
 public func acceptsRP<T: RP>(_: T) { }
 
 // CHECK:     extension Swift.Array : FeatureTest.MP where Element : FeatureTest.MP {

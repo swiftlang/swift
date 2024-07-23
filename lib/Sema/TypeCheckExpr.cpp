@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 
 using namespace swift;
@@ -188,58 +189,6 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
     Context.Diags.diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
-}
-
-/// Find LHS as if we append binary operator to existing pre-folded expression.
-/// Returns found expression, or \c nullptr if the operator is not applicable.
-///
-/// For example, given '(== R (* A B))':
-/// 'findLHS(DC, expr, "+")' returns '(* A B)'.
-/// 'findLHS(DC, expr, "<<")' returns 'B'.
-/// 'findLHS(DC, expr, '==')' returns nullptr.
-Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
-  auto right = lookupPrecedenceGroupForOperator(DC, name, E->getEndLoc());
-  if (!right)
-    return nullptr;
-
-  while (true) {
-
-    // Look through implicit conversions.
-    if (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
-      E = ICE->getSyntacticSubExpr();
-      continue;
-    }
-    if (auto ACE = dyn_cast<AutoClosureExpr>(E)) {
-      E = ACE->getSingleExpressionBody();
-      continue;
-    }
-
-    auto left = lookupPrecedenceGroupForInfixOperator(DC, E, /*diagnose=*/true);
-    if (!left)
-      // LHS is not binary expression.
-      return E;
-    switch (DC->getASTContext().associateInfixOperators(left, right)) {
-      case swift::Associativity::None:
-        return nullptr;
-      case swift::Associativity::Left:
-        return E;
-      case swift::Associativity::Right:
-        break;
-    }
-    // Find the RHS of the current binary expr.
-    if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
-      E = assignExpr->getSrc();
-    } else if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
-      E = ternary->getElseExpr();
-    } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
-      E = binaryExpr->getRHS();
-    } else {
-      // E.g. 'fn() as Int << 2'.
-      // In this case '<<' has higher precedence than 'as', but the LHS should
-      // be 'fn() as Int' instead of 'Int'.
-      return E;
-    }
-  }
 }
 
 // The way we compute isEndOfSequence relies on the assumption that

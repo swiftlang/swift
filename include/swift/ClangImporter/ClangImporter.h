@@ -227,7 +227,7 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
-  virtual bool canImportModule(ImportPath::Module named,
+  virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
                                bool isTestableImport = false) override;
 
@@ -517,7 +517,8 @@ public:
   std::string getClangModuleHash() const;
 
   /// Get clang import creation cc1 args for swift explicit module build.
-  std::vector<std::string> getSwiftExplicitModuleDirectCC1Args() const;
+  std::vector<std::string>
+  getSwiftExplicitModuleDirectCC1Args(bool isInterface) const;
 
   /// If we already imported a given decl successfully, return the corresponding
   /// Swift decl as an Optional<Decl *>, but if we previously tried and failed
@@ -684,6 +685,13 @@ bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
 llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
+
+/// Lookup and return the synthesized conformance operator like '==' '-' or '+='
+/// for the given type.
+ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
+                                     NominalTypeDecl *selfType,
+                                     std::optional<Type> parameterType);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {

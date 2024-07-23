@@ -19,6 +19,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -206,6 +207,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           ScanASTContext.getModuleInterfaceChecker()),
       &DependencyTracker,
       ScanCompilerInvocation.getSearchPathOptions().ModuleLoadMode);
+
+  llvm::cl::ResetAllOptionOccurrences();
 }
 
 ModuleDependencyVector
@@ -326,9 +329,10 @@ ModuleDependencyScanner::getModuleDependencies(ModuleDependencyID moduleID,
   }
 
   // Resolve cross-import overlays.
-  discoverCrossImportOverlayDependencies(
-      moduleID.ModuleName, allModules.getArrayRef().slice(1), cache,
-      [&](ModuleDependencyID id) { allModules.insert(id); });
+  if (ScanCompilerInvocation.getLangOptions().EnableCrossImportOverlays)
+    discoverCrossImportOverlayDependencies(
+        moduleID.ModuleName, allModules.getArrayRef().slice(1), cache,
+        [&](ModuleDependencyID id) { allModules.insert(id); });
 
   return allModules.takeVector();
 }
@@ -379,7 +383,8 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   std::vector<std::string> buildArgs;
   if (ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
     buildArgs.push_back("-direct-clang-cc1-module-build");
-    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
+    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args(
+             /*isInterface=*/false)) {
       buildArgs.push_back("-Xcc");
       buildArgs.push_back(arg);
     }
@@ -958,7 +963,8 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
     mainDep.addAuxiliaryFile(entry.second);
     cmdCopy.push_back("-swift-module-cross-import");
     cmdCopy.push_back(entry.first);
-    cmdCopy.push_back(entry.second);
+    auto overlayPath = cache.getScanService().remapPath(entry.second);
+    cmdCopy.push_back(overlayPath);
   }
   mainDep.updateCommandLine(cmdCopy);
 

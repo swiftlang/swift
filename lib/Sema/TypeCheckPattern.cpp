@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -449,8 +450,9 @@ public:
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
-    return new (Context) EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(),
-                                            ume->getName(), nullptr, ume, DC);
+    return EnumElementPattern::create(ume->getDotLoc(), ume->getNameLoc(),
+                                      ume->getName(), ume,
+                                      /*subPattern*/ nullptr, DC);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -490,9 +492,9 @@ public:
     auto *base =
         TypeExpr::createForMemberDecl(repr, ude->getNameLoc(), enumDecl);
     base->setType(MetatypeType::get(ty));
-    return new (Context)
-        EnumElementPattern(base, ude->getDotLoc(), ude->getNameLoc(),
-                           ude->getName(), referencedElement, nullptr, DC);
+    return EnumElementPattern::create(base, ude->getDotLoc(), ude->getNameLoc(),
+                                      ude->getName(), referencedElement,
+                                      /*subPattern*/ nullptr, DC);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -505,9 +507,9 @@ public:
     auto enumTy = elt->getParentEnum()->getDeclaredTypeInContext();
     auto *base = TypeExpr::createImplicit(enumTy, Context);
 
-    return new (Context)
-        EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
-                           elt->createNameRef(), elt, nullptr, DC);
+    return EnumElementPattern::create(base, SourceLoc(), de->getNameLoc(),
+                                      elt->createNameRef(), elt,
+                                      /*subPattern*/ nullptr, DC);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
     // FIXME: This shouldn't be needed.  It is only necessary because of the
@@ -522,15 +524,14 @@ public:
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       auto *base = TypeExpr::createImplicit(enumTy, Context);
 
-      return new (Context)
-          EnumElementPattern(base, SourceLoc(), ude->getNameLoc(),
-                             ude->getName(), referencedElement, nullptr, DC);
+      return EnumElementPattern::create(base, SourceLoc(), ude->getNameLoc(),
+                                        ude->getName(), referencedElement,
+                                        /*subPattern*/ nullptr, DC);
     }
       
     
     // Perform unqualified name lookup to find out what the UDRE is.
-    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(
-        ude, DC, /*replaceInvalidRefsWithErrors=*/true));
+    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(ude, DC));
   }
 
   // Call syntax forms a pattern if:
@@ -616,21 +617,17 @@ public:
     assert(!repr->hasGenericArgList() && "should be handled above");
 
     auto *subPattern = composeTupleOrParenPattern(ce->getArgs());
-    return new (Context) EnumElementPattern(
-        baseTE, SourceLoc(), repr->getNameLoc(), repr->getNameRef(),
-        referencedElement, subPattern, DC);
+    return EnumElementPattern::create(baseTE, SourceLoc(), repr->getNameLoc(),
+                                      repr->getNameRef(), referencedElement,
+                                      subPattern, DC);
   }
 };
 
 } // end anonymous namespace
 
-/// Perform top-down syntactic disambiguation of a pattern. Where ambiguous
-/// expr/pattern productions occur (tuples, function calls, etc.), favor the
-/// pattern interpretation if it forms a valid pattern; otherwise, leave it as
-/// an expression. This does no type-checking except for the bare minimum to
-/// disambiguate semantics-dependent pattern forms.
-Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
-                                     bool isStmtCondition) {
+Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
+                                         DeclContext *DC,
+                                         bool isStmtCondition) const {
   P = ResolvePattern(DC).visit(P);
 
   TypeChecker::diagnoseDuplicateBoundVars(P);
@@ -691,6 +688,13 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
+Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
+                                     bool isStmtCondition) {
+  auto &eval = DC->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ResolvePatternRequest{P, DC, isStmtCondition},
+                           nullptr);
+}
+
 static Type
 validateTypedPattern(TypedPattern *TP, DeclContext *dc,
                      TypeResolutionOptions options,
@@ -749,6 +753,8 @@ Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
   ASTContext &ctx = dc->getASTContext();
   if (auto type = evaluateOrDefault(ctx.evaluator, PatternTypeRequest{pattern},
                                     Type())) {
+    ASSERT(!type->hasTypeParameter() &&
+           "pattern should have a contextual type");
     return type;
   }
 
@@ -1057,13 +1063,9 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
   if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
     if (patternTy->getOptionalObjectType()) {
       auto *NoneEnumElement = ctx.getOptionalNoneDecl();
-      auto *BaseTE = TypeExpr::createImplicit(patternTy, ctx);
-      auto *EEP = new (ctx)
-          EnumElementPattern(BaseTE, NLE->getLoc(), DeclNameLoc(NLE->getLoc()),
-                             NoneEnumElement->createNameRef(), NoneEnumElement,
-                             nullptr, EP->getDeclContext());
-      EEP->setType(patternTy);
-      return EEP;
+      return EnumElementPattern::createImplicit(
+          patternTy, NLE->getLoc(), DeclNameLoc(NLE->getLoc()), NoneEnumElement,
+          /*subPattern*/ nullptr, EP->getDeclContext());
     } else {
       // ...but for non-optional types it can never match! Diagnose it.
       ctx.Diags
@@ -1384,14 +1386,12 @@ Pattern *TypeChecker::coercePatternToType(
     if (numExtraOptionals > 0) {
       Pattern *sub = IP;
       auto extraOpts =
-          llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
+          llvm::drop_end(inputTypeOptionals, castTypeOptionals.size());
       for (auto extraOptTy : llvm::reverse(extraOpts)) {
         auto some = Context.getOptionalSomeDecl();
-        auto *base = TypeExpr::createImplicit(extraOptTy, Context);
-        sub = new (Context) EnumElementPattern(
-            base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),
-            some->createNameRef(), nullptr, sub, dc);
-        sub->setImplicit();
+        sub = EnumElementPattern::createImplicit(extraOptTy, IP->getStartLoc(),
+                                                 DeclNameLoc(IP->getEndLoc()),
+                                                 some, sub, dc);
       }
 
       P = sub;
@@ -1616,8 +1616,7 @@ Pattern *TypeChecker::coercePatternToType(
       
       Type elementType;
       if (argType)
-        elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                              elt, argType);
+        elementType = enumTy->getTypeOfMember(elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
       auto newSubOptions = subOptions;
@@ -1638,8 +1637,7 @@ Pattern *TypeChecker::coercePatternToType(
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                                 elt, argType);
+      Type elementType = enumTy->getTypeOfMember(elt, argType);
       SmallVector<TuplePatternElt, 8> elements;
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {

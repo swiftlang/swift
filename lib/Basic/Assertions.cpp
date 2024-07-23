@@ -1,8 +1,8 @@
-//===--- Assertions.cpp - Swift Version Number -------------------------------===//
+//===--- Assertions.cpp - Assertion macros --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines custom assertion support functions
+// This file defines implementation details of include/swift/Basic/Assertions.h.
 //
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Assertions.h"
 #undef NDEBUG
 #include <cassert>
@@ -32,37 +33,31 @@ int CONDITIONAL_ASSERT_Global_enable_flag =
 #ifdef NDEBUG
   0; // Default to `off` in release builds
 #else
-  0; // TODO: Default to `on` in debug builds
+  1; // Default to `on` in debug builds
 #endif
 
-void ASSERT_failure(const char *expr, const char *file, int line, const char *func) {
-  // Only print the last component of `file`
-  const char *f = file;
-  for (const char *p = file; *p != '\0'; p++) {
+void ASSERT_failure(const char *expr, const char *filename, int line, const char *func) {
+  // Find the last component of `filename`
+  // Needed on Windows MSVC, which lacks __FILE_NAME__
+  // so we have to use __FILE__ instead:
+  for (const char *p = filename; *p != '\0'; p++) {
     if ((p[0] == '/' || p[0] == '\\')
-	&& p[1] != '/' && p[1] != '\\' && p[1] != '\0') {
-      f = p + 1;
+       && p[1] != '/' && p[1] != '\\' && p[1] != '\0') {
+      filename = p + 1;
     }
   }
 
-  if (AssertHelp) {
-    ASSERT_help();
-  } else {
-    std::cerr << "Assertion help:  -Xllvm -assert-help" << std::endl;
-  }
-
-
-  // Format here matches that used by `assert` on macOS:
-  std::cerr
+  llvm::errs()
     << "Assertion failed: "
     << "(" << expr << "), "
-    << "function " << func << ", "
-    << "file " << f << ", "
-    << "line " << line << "."
-    << std::endl;
+    << "function " << func << " at "
+    << filename << ":"
+    << line << ".\n";
+
+  ASSERT_help();
 
   if (AssertContinue) {
-    std::cerr << "Continuing after failed assertion (-Xllvm -assert-continue)" << std::endl;
+    llvm::errs() << "Continuing after failed assertion (-Xllvm -assert-continue)\n";
     return;
   }
 
@@ -76,12 +71,15 @@ void ASSERT_help() {
   }
   ASSERT_help_shown = 1;
 
-  std::cerr << std::endl;
-  std::cerr << "Control assertion behavior with one or more of the following options:" << std::endl;
-  std::cerr << std::endl;
-  std::cerr << " -Xllvm -assert-continue" << std::endl;
-  std::cerr << "     Continue after any failed assertion" << std::endl;
-  std::cerr << std::endl;
+  if (!AssertHelp) {
+    llvm::errs() << "(to display assertion configuration options: -Xllvm -assert-help)\n";
+    return;
+  }
+
+  llvm::errs() << "\n";
+  llvm::errs() << "Control assertion behavior with one or more of the following options:\n\n";
+  llvm::errs() << " -Xllvm -assert-continue\n";
+  llvm::errs() << "     Continue after any failed assertion\n\n";
 }
 
 // This has to be callable in the same way as the macro version,
@@ -90,4 +88,3 @@ void ASSERT_help() {
 int CONDITIONAL_ASSERT_enabled() {
   return (CONDITIONAL_ASSERT_Global_enable_flag != 0);
 }
-

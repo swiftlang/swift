@@ -32,19 +32,21 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 
+#include "SwiftToClangInteropContext.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
-#include "SwiftToClangInteropContext.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -324,8 +326,6 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
-      // FIXME: forward decl should be handled by ModuleWriter.
-      ClangValueTypePrinter::forwardDeclType(os, CD, owningPrinter);
       ClangClassTypePrinter(os).printClassTypeDecl(
           CD, [&]() { printMembers(CD->getMembers()); }, owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
@@ -544,25 +544,29 @@ private:
             std::tie(objectType, optKind) = getObjectTypeAndOptionality(
                 paramType->getNominalOrBoundGenericNominal(), paramType);
             auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+            assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-            if (auto knownCxxType =
-                    owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                        objectTypeDecl)) {
+            if (objectTypeDecl &&
+                owningPrinter.typeMapping.getKnownCxxTypeInfo(objectTypeDecl)) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
               outOfLineOS << "    "
                              "memcpy(&result, payloadFromDestruction, "
                              "sizeof(result));\n";
               outOfLineOS << "    return result;\n  ";
             } else {
+              bool isOptional = false;
+              if (!objectTypeDecl) {
+                objectTypeDecl = paramType->getNominalOrBoundGenericNominal();
+                isOptional = true;
+              }
               outOfLineOS << "    return swift::";
               outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
               outOfLineOS << "::implClassFor<";
-              outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                  objectTypeDecl->getModuleContext(),
+              owningPrinter.printTypeName(
+                  outOfLineOS, paramType,
                   elementDecl->getParentEnum()->getModuleContext());
-              outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
               outOfLineOS << ">::type";
-              if (isa<ClassDecl>(objectTypeDecl)) {
+              if (!isOptional && isa<ClassDecl>(objectTypeDecl)) {
                 outOfLineOS << "::makeRetained(*reinterpret_cast<void "
                                "**>(payloadFromDestruction));\n  ";
               } else {
@@ -571,10 +575,9 @@ private:
                 outOfLineOS << "      swift::"
                             << cxx_synthesis::getCxxImplNamespaceName();
                 outOfLineOS << "::implClassFor<";
-                outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                    objectTypeDecl->getModuleContext(),
+                owningPrinter.printTypeName(
+                    outOfLineOS, paramType,
                     elementDecl->getParentEnum()->getModuleContext());
-                outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
                 outOfLineOS << ">::type";
                 outOfLineOS << "::initializeWithTake(result, "
                                "payloadFromDestruction);\n";
@@ -708,14 +711,15 @@ private:
                           ED, paramType);
                   auto objectTypeDecl =
                       objectType->getNominalOrBoundGenericNominal();
-                  assert(objectTypeDecl != nullptr);
+                  assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-                  if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                  if (objectTypeDecl &&
+                      owningPrinter.typeMapping.getKnownCxxTypeInfo(
                           objectTypeDecl)) {
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
-                  } else if (isa<ClassDecl>(objectTypeDecl)) {
+                  } else if (isa_and_nonnull<ClassDecl>(objectTypeDecl)) {
                     outOfLineOS
                         << "    auto op = swift::"
                         << cxx_synthesis::getCxxImplNamespaceName()
@@ -726,46 +730,36 @@ private:
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
                     outOfLineOS << "    alignas(";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ") unsigned char buffer[sizeof(";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ")];\n";
                     outOfLineOS << "    auto *valCopy = new(buffer) ";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << "(val);\n";
                     outOfLineOS << "    ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ">::type::initializeWithTake(result._"
                                    "getOpaquePointer(), ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
-                    outOfLineSyntaxPrinter
-                        .printModuleNamespaceQualifiersIfNeeded(
-                            objectTypeDecl->getModuleContext(),
-                            ED->getModuleContext());
-                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    owningPrinter.printTypeName(
+                        outOfLineOS, paramType,
+                        elementDecl->getParentEnum()->getModuleContext());
                     outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                     outOfLineOS << ");\n";
                   }
@@ -1090,7 +1084,7 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Support operators.
-      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit()))
+      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit() && !isa<AccessorDecl>(AFD)))
         return;
 
       auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
@@ -1439,6 +1433,7 @@ private:
     assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
+    os << " SWIFT_NOEXCEPT";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << ";\n";
@@ -2925,16 +2920,34 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
-         (outputLang == OutputLanguageMode::Cxx
-              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
-                    isExposedToThisModule(M, VD, exposedModules) &&
-                    cxx_translation::isExposableToCxx(VD) &&
-                    isEnumExposableToCxx(VD, *this)
-              : isVisibleToObjC(VD, minRequiredAccess)) &&
-         !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
-         !isAsyncAlternativeOfOtherDecl(VD) &&
-         !excludeForObjCImplementation(VD);
+  if (VD->isInvalid())
+    return false;
+
+  if (requiresExposedAttribute && !hasExposeAttr(VD))
+    return false;
+
+  if (!isVisible(VD))
+    return false;
+
+  if (outputLang == OutputLanguageMode::Cxx) {
+    if (!isExposedToThisModule(M, VD, exposedModules))
+      return false;
+    if (!cxx_translation::isExposableToCxx(VD))
+      return false;
+    if (!isEnumExposableToCxx(VD, *this))
+      return false;
+  }
+
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+
+  if (isAsyncAlternativeOfOtherDecl(VD))
+    return false;
+
+  if (excludeForObjCImplementation(VD))
+    return false;
+
+  return true;
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
@@ -2949,6 +2962,15 @@ void DeclAndTypePrinter::print(const Decl *D) {
 
 void DeclAndTypePrinter::print(Type ty) {
   getImpl().print(ty, /*overridingOptionality*/ std::nullopt);
+}
+
+void DeclAndTypePrinter::printTypeName(raw_ostream &os, Type ty,
+                                       const ModuleDecl *moduleContext) {
+  std::string dummy;
+  llvm::raw_string_ostream dummyOS(dummy);
+  DeclAndTypeClangFunctionPrinter printer(os, dummyOS, typeMapping,
+                                          interopContext, *this);
+  printer.printTypeName(ty, moduleContext);
 }
 
 void DeclAndTypePrinter::printAvailability(raw_ostream &os, const Decl *D) {

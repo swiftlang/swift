@@ -544,7 +544,7 @@ def full_target_name(repository, target):
 
 def skip_list_for_platform(config, all_repos):
     """Computes a list of repositories to skip when updating or cloning, if not
-    overriden by `--all-repositories` CLI argument.
+    overridden by `--all-repositories` CLI argument.
 
     Args:
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
@@ -700,7 +700,10 @@ repositories.
 
     cross_repos_pr = {}
     if github_comment:
-        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+|apple/[-a-zA-Z0-9_]+#\d+)'
+        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+'\
+            r'|apple/[-a-zA-Z0-9_]+#\d+'\
+            r'|swiftlang/[-a-zA-Z0-9_]+/pull/\d+'\
+            r'|swiftlang/[-a-zA-Z0-9_]+#\d+)'
         repos_with_pr = re.findall(regex_pr, github_comment)
         print("Found related pull requests:", str(repos_with_pr))
         repos_with_pr = [pr.replace('/pull/', '#') for pr in repos_with_pr]

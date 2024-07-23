@@ -24,6 +24,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/FixBehavior.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -360,6 +361,9 @@ enum class FixKind : uint8_t {
   /// property wrapper.
   AllowWrappedValueMismatch,
 
+  /// Ignore an out-of-place placeholder type.
+  IgnoreInvalidPlaceholder,
+
   /// Specify a type for an explicitly written placeholder that could not be
   /// resolved.
   SpecifyTypeForPlaceholder,
@@ -479,8 +483,8 @@ enum class FixKind : uint8_t {
   /// parameter.
   ///
   /// 2. Where we have a function that expects a function typed parameter with a
-  /// sending result, but is passed a function typeed parameter without a
-  /// sending result.
+  /// sending result, but is passed a function typed parameter without a sending
+  /// result.
   AllowSendingMismatch,
 };
 
@@ -1919,11 +1923,14 @@ public:
 };
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
+  bool IsMissingImport;
+
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
                           ValueDecl *member, DeclNameRef name,
-                          ConstraintLocator *locator)
+                          ConstraintLocator *locator, bool isMissingImport)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
-                              member, name, locator) {}
+                              member, name, locator),
+        IsMissingImport(isMissingImport) {}
 
 public:
   std::string getName() const override {
@@ -1938,7 +1945,8 @@ public:
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
-                                         ConstraintLocator *locator);
+                                         ConstraintLocator *locator,
+                                         bool isMissingImport);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInaccessibleMember;
@@ -2636,26 +2644,16 @@ public:
 /// non-Sendable is safe to transfer onto other situations. The caller though
 /// that this is being sent to does not enforce that invariants within its body.
 class AllowSendingMismatch final : public ContextualMismatch {
-public:
-  enum class Kind {
-    Parameter,
-    Result,
-  };
-
-private:
-  Kind kind;
-
   AllowSendingMismatch(ConstraintSystem &cs, Type argType, Type paramType,
-                       ConstraintLocator *locator, Kind kind,
-                       FixBehavior fixBehavior)
+                       ConstraintLocator *locator, FixBehavior fixBehavior)
       : ContextualMismatch(cs, FixKind::AllowSendingMismatch, argType,
-                           paramType, locator, fixBehavior),
-        kind(kind) {}
+                           paramType, locator, fixBehavior) {}
 
 public:
   std::string getName() const override {
-    return "treat a function argument with sending parameter as a function "
-           "argument without sending parameters";
+    return "treat a function argument with sending parameters and results as a "
+           "function "
+           "argument without sending parameters and results";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -2664,9 +2662,8 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static AllowSendingMismatch *create(ConstraintSystem &cs,
-                                      ConstraintLocator *locator, Type srcType,
-                                      Type dstType, Kind kind);
+  static AllowSendingMismatch *create(ConstraintSystem &cs, Type srcType,
+                                      Type dstType, ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowSendingMismatch;
@@ -3140,6 +3137,29 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyContextualTypeForNil;
+  }
+};
+
+class IgnoreInvalidPlaceholder final : public ConstraintFix {
+  IgnoreInvalidPlaceholder(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidPlaceholder, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore out-of-place placeholder type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidPlaceholder *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidPlaceholder;
   }
 };
 

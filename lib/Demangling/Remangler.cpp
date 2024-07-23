@@ -19,6 +19,7 @@
 #include "DemanglerAssert.h"
 #include "RemanglerBase.h"
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -720,7 +721,7 @@ ManglingError Remangler::mangleAllocator(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleArgumentTuple(Node *node, unsigned depth) {
-  Node *Child = skipType(getSingleChild(node));
+  Node *Child = skipType(node->getChild(0));
   if (Child->getKind() == Node::Kind::Tuple &&
       Child->getNumChildren() == 0) {
     Buffer << 'y';
@@ -2106,6 +2107,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@inout", 'l')
                 .Case("@inout_aliasable", 'b')
                 .Case("@in_guaranteed", 'n')
+                .Case("@in_cxx", 'X')
                 .Case("@in_constant", 'c')
                 .Case("@owned", 'x')
                 .Case("@guaranteed", 'g')
@@ -2239,16 +2241,13 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleParamLifetimeDependence(Node *node,
-                                                       unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  Buffer << "Yl" << (char)node->getFirstChild()->getIndex();
-  return ManglingError::Success;
-}
-
-ManglingError Remangler::mangleSelfLifetimeDependence(Node *node,
-                                                      unsigned depth) {
-  Buffer << "YL" << (char)node->getIndex();
+ManglingError Remangler::mangleLifetimeDependence(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
+  Buffer
+      << "Yl"
+      << (char)node->getChild(0)->getIndex(); // mangle lifetime dependence kind
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1)); // mangle index subset
+  Buffer << "_";
   return ManglingError::Success;
 }
 
