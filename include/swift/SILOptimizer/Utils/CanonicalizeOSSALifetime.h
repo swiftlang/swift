@@ -100,6 +100,7 @@
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -247,6 +248,8 @@ private:
   // extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
+
   DominanceInfo *domTree = nullptr;
 
   BasicCalleeAnalysis *calleeAnalysis;
@@ -326,15 +329,14 @@ public:
     }
   };
 
-  CanonicalizeOSSALifetime(PruneDebugInsts_t pruneDebugMode,
-                           MaximizeLifetime_t maximizeLifetime,
-                           SILFunction *function,
-                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceInfo *domTree,
-                           BasicCalleeAnalysis *calleeAnalysis,
-                           InstructionDeleter &deleter)
+  CanonicalizeOSSALifetime(
+      PruneDebugInsts_t pruneDebugMode, MaximizeLifetime_t maximizeLifetime,
+      SILFunction *function, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+      DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
+      BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
+        accessBlockAnalysis(accessBlockAnalysis),
+        deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
   SILValue getCurrentDef() const { return currentDef; }
@@ -342,11 +344,7 @@ public:
   void initializeLiveness(SILValue def,
                           ArrayRef<SILInstruction *> lexicalLifetimeEnds) {
     assert(consumingBlocks.empty() && debugValues.empty());
-    // Clear the cached analysis pointer just in case the client invalidates the
-    // analysis, freeing its memory.
-    accessBlocks = nullptr;
-    consumes.clear();
-    destroys.clear();
+    clear();
 
     currentDef = def;
     currentLexicalLifetimeEnds = lexicalLifetimeEnds;
@@ -358,9 +356,18 @@ public:
   }
 
   void clear() {
+    // Clear the access blocks analysis pointer in case the client invalidates
+    // the analysis.  If the client did, the analysis will be recomputed in
+    // extendLivenessThroughOverlappingAccess; if it didn't, the analysis
+    // pointer will just be set back to its old value when the analysis' cache
+    // is consulted in extendLivenessThroughOverlappingAccess.
+    accessBlocks = nullptr;
+
     consumingBlocks.clear();
     debugValues.clear();
     discoveredBlocks.clear();
+    consumes.clear();
+    destroys.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
@@ -472,7 +479,7 @@ private:
   void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
                             PrunedLivenessBoundary &boundary);
 
-  void findDestroysOutsideBoundary(SmallVectorImpl<SILInstruction *> &destroys);
+  void extendLivenessToDeadEnds();
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
@@ -481,9 +488,10 @@ private:
       llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
           visitor);
 
-  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
+  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary,
+                                SmallVectorImpl<DestroyValueInst *> &destroys);
 
-  void rewriteCopies();
+  void rewriteCopies(SmallVectorImpl<DestroyValueInst *> const &destroys);
 };
 
 } // end namespace swift
