@@ -4,12 +4,12 @@
 import StdlibUnittest
 
 // CHECK: define {{.*}}i1 {{.*}}4main4sort
-// CHECK: call void @llvm.dbg.value(metadata i8*{{.*}}, metadata ![[A:.*]], metadata ![[P1:.*]])
-// CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[A]], metadata ![[P2:.*]])
-// CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[A]], metadata ![[P3:.*]])
-// CHECK: call void @llvm.dbg.value(metadata i8*{{.*}}, metadata ![[B:.*]], metadata ![[P1]])
-// CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P2]])
-// CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P3]])
+// CHECK: #dbg_value(i8*{{.*}}, ![[A:.*]], ![[P1:.*]]
+// CHECK: #dbg_value(i{{[0-9]+}} {{.*}}, ![[A]], ![[P2:.*]]
+// CHECK: #dbg_value(i{{[0-9]+}} {{.*}}, ![[A]], ![[P3:.*]]
+// CHECK: #dbg_value(i8*{{.*}}, ![[B:.*]], ![[P1]]
+// CHECK: #dbg_value(i{{[0-9]+}} {{.*}}, ![[B]], ![[P2]]
+// CHECK: #dbg_value(i{{[0-9]+}} {{.*}}, ![[B]], ![[P3]]
 // CHECK-DAG: ![[A]] = !DILocalVariable(name: "a",{{.*}} line: 17
 // CHECK-DAG: ![[B]] = !DILocalVariable(name: "b",{{.*}} line: 17
 // CHECK-DAG: ![[P1]] = !DIExpression(DW_OP_bit_piece, 0, {{(32|64)}})

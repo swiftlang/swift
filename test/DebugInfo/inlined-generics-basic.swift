@@ -50,11 +50,11 @@ public class C<R> {
     // SIL: debug_value %0 : $*S, let, name "s", argno 1, expr op_deref, {{.*}} scope [[F]]
     // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
     // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
-    // IR: dbg.value(metadata ptr %[[ARG_S]], metadata ![[MD_1_0:[0-9]+]]
+    // IR: #dbg_value(ptr %[[ARG_S]], ![[MD_1_0:[0-9]+]]
     // IR: %[[RS_PAIR:.*]] = alloca i8, i{{.*}} %
-    // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[S:[0-9]+]]
-    // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[GS_T:[0-9]+]]
-    // IR: dbg.value(metadata ptr %[[ARG_0]], metadata ![[GS_U:[0-9]+]]
+    // IR: #dbg_value(ptr %[[ARG_0]], ![[S:[0-9]+]]
+    // IR: #dbg_value(ptr %[[ARG_0]], ![[GS_T:[0-9]+]]
+    // IR: #dbg_value(ptr %[[ARG_0]], ![[GS_U:[0-9]+]]
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 2)
     g(s)
@@ -63,26 +63,26 @@ public class C<R> {
     // ref_element_addr in that removed block is left with a single
     // debug_value use, so they are both deleted. This means we have
     // no debug value for "t" in the call to `g(r)`.
-    //   dbg.value({{.*}}, metadata ![[GR_T:[0-9]+]]
+    //   dbg_value({{.*}}, ![[GR_T:[0-9]+]]
 
-    // IR: dbg.value({{.*}}, metadata ![[GR_U:[0-9]+]]
+    // IR: #dbg_value({{.*}}, ![[GR_U:[0-9]+]], !DIExp
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 3)
     g(r)
-    // IR: dbg.value(metadata ptr %[[RS_PAIR]], metadata ![[GRS_T:[0-9]+]],
-    // IR: dbg.value(metadata ptr %[[RS_PAIR]], metadata ![[GRS_U:[0-9]+]],
+    // IR: #dbg_value(ptr %[[RS_PAIR]], ![[GRS_T:[0-9]+]],
+    // IR: #dbg_value(ptr %[[RS_PAIR]], ![[GRS_U:[0-9]+]],
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 4)
     g((r, s))
-    // Note to maintainers: the relative order of the constant dbg.values here
+    // Note to maintainers: the relative order of the constant dbg_values here
     // seem to flip back and forth.
-    // IR: dbg.value(metadata i{{.*}} 0, metadata ![[GI_U:[0-9]+]]
-    // IR: dbg.value(metadata i{{.*}} 0, metadata ![[GI_T:[0-9]+]]
+    // IR: #dbg_value(i{{.*}} 0, ![[GI_U:[0-9]+]]
+    // IR: #dbg_value(i{{.*}} 0, ![[GI_T:[0-9]+]]
     // IR: call {{.*}}3use{{.*}}(i{{.*}} 0)
 #sourceLocation(file: "f.swift", line: 5)
     g(Int(0))
-    // IR: dbg.value(metadata i1 false, metadata ![[GB_U:[0-9]+]]
-    // IR: dbg.value(metadata i1 false, metadata ![[GB_T:[0-9]+]]
+    // IR: #dbg_value(i1 false, ![[GB_U:[0-9]+]]
+    // IR: #dbg_value(i1 false, ![[GB_T:[0-9]+]]
     // IR: call {{.*}}3use{{.*}}(i1 false)
 #sourceLocation(file: "f.swift", line: 6)
     g(false)
