@@ -31,6 +31,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
@@ -83,7 +84,7 @@ private:
   /// A cache of "dead end blocks" through which all paths it is known that the
   /// program will terminate. This means that we are allowed to leak
   /// objects.
-  DeadEndBlocks deadEndBlocks;
+  DeadEndBlocksAnalysis *DEBA;
 
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
