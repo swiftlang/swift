@@ -78,13 +78,13 @@ struct MoveOnlyChecker {
   SILFunction *fn;
   DominanceInfo *domTree;
   PostOrderAnalysis *poa;
+  DeadEndBlocksAnalysis *deba;
   bool madeChange = false;
   borrowtodestructure::IntervalMapAllocator allocator;
 
   MoveOnlyChecker(SILFunction *fn, DominanceInfo *domTree,
-                  PostOrderAnalysis *poa)
-      : diagnosticEmitter(fn), fn(fn), domTree(domTree), poa(poa) {
-  }
+                  PostOrderAnalysis *poa, DeadEndBlocksAnalysis *deba)
+      : diagnosticEmitter(fn), fn(fn), domTree(domTree), poa(poa), deba(deba) {}
 
   void checkObjects();
   void completeObjectLifetimes(ArrayRef<MarkUnresolvedNonCopyableValueInst *>);
@@ -200,8 +200,8 @@ void MoveOnlyChecker::checkAddresses() {
     return;
   }
 
-  MoveOnlyAddressChecker checker{fn, diagnosticEmitter, allocator, domTree,
-                                 poa};
+  MoveOnlyAddressChecker checker{
+      fn, diagnosticEmitter, allocator, domTree, poa, deba};
   madeChange |= checker.completeLifetimes();
   madeChange |= checker.check(moveIntroducersToProcess);
 }
@@ -253,9 +253,9 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs()
                << "===> MoveOnly Checker. Visiting: " << fn->getName() << '\n');
 
-    MoveOnlyChecker checker(
-        fn, getAnalysis<DominanceAnalysis>()->get(fn),
-        getAnalysis<PostOrderAnalysis>());
+    MoveOnlyChecker checker(fn, getAnalysis<DominanceAnalysis>()->get(fn),
+                            getAnalysis<PostOrderAnalysis>(),
+                            getAnalysis<DeadEndBlocksAnalysis>());
 
     checker.checkObjects();
     checker.checkAddresses();
