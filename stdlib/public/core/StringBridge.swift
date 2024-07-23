@@ -386,6 +386,16 @@ private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer
   return _NSStringASCIIPointer(str)
 }
 
+@_effects(readonly)
+internal func _getNSCFConstantStringContentsPointer(
+  _ cocoa: AnyObject
+) -> UnsafePointer<UInt8> {
+  return unsafeBitCast(
+    cocoa,
+    to: UnsafePointer<_swift_shims_builtin_CFString>.self
+  ).pointee.str
+}
+
 @_effects(readonly) // @opaque
 private func _withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
@@ -635,6 +645,31 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 }
 
 extension String {
+  @available(SwiftStdlib 6.1, *)
+  @_spi(Foundation)
+  public init<Encoding: Unicode.Encoding>(
+    _immortalCocoaString: AnyObject,
+    count: Int,
+    encoding: Encoding.Type
+  ) {
+    if encoding == Unicode.ASCII.self || encoding == Unicode.UTF8.self {
+      self._guts = _StringGuts(
+        constantCocoa: _immortalCocoaString,
+        providesFastUTF8: true,
+        isASCII: encoding == Unicode.ASCII.self,
+        length: count)
+    } else {
+      _precondition(encoding == Unicode.UTF16.self)
+      // Only need the very last bit of _bridgeCocoaString here,
+      // since we know the fast paths don't apply
+      self._guts = _StringGuts(
+        cocoa: _immortalCocoaString,
+        providesFastUTF8: false,
+        isASCII: false,
+        length: count)
+    }
+  }
+  
   @_spi(Foundation)
   public init(_cocoaString: AnyObject) {
     self._guts = _bridgeCocoaString(_cocoaString)
@@ -696,7 +731,7 @@ extension String {
         _internalInvariant(!copy._guts.isSmall)
         return copy._bridgeToObjectiveCImpl()
     }
-    if _guts._object.isImmortal {
+    if _guts._object.isImmortal && !_guts._object.largeFastIsConstantCocoa {
       // TODO: We'd rather emit a valid ObjC object statically than create a
       // shared string class instance.
       let gutsCountAndFlags = _guts._object._countAndFlags

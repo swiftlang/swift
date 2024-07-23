@@ -159,11 +159,17 @@ public func withTaskExecutorPreference<T, Failure>(
   return try await operation()
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
-public func __abi__withTaskExecutorPreference<T: Sendable>(
+public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
 ) async rethrows -> T {
@@ -236,11 +242,17 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     self._task = task
   }
 }
@@ -292,11 +304,17 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     self._task = task
   }
 }
@@ -346,12 +364,17 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
-      // initialTaskExecutor: executorBuiltin, deprecated
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     return Task(task)
   }
 }
@@ -401,11 +424,17 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
       flags: flags,
       initialTaskExecutorConsuming: taskExecutor,
       operation: operation)
-
+#else
+    let executorBuiltin: Builtin.Executor =
+      taskExecutor.asUnownedTaskExecutor().executor
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, executorBuiltin, operation)
+#endif
     return Task(task)
   }
 }

@@ -7,7 +7,7 @@
         "cmark": {
             "remote": { "id": "swiftlang/swift-cmark" } },
         "llbuild": {
-            "remote": { "id": "apple/swift-llbuild" } },
+            "remote": { "id": "swiftlang/swift-llbuild" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
         "swift-async-algorithms": {
@@ -72,27 +72,27 @@
         "swift-installer-scripts": {
             "remote": { "id": "swiftlang/swift-installer-scripts" } },
         "swift-docc": {
-            "remote": { "id": "apple/swift-docc" } },
+            "remote": { "id": "swiftlang/swift-docc" } },
         "swift-lmdb": {
-            "remote": { "id": "apple/swift-lmdb" } },
+            "remote": { "id": "swiftlang/swift-lmdb" } },
         "swift-docc-render-artifact": {
-            "remote": { "id": "apple/swift-docc-render-artifact" } },
+            "remote": { "id": "swiftlang/swift-docc-render-artifact" } },
         "swift-docc-symbolkit": {
-            "remote": { "id": "apple/swift-docc-symbolkit" } },
+            "remote": { "id": "swiftlang/swift-docc-symbolkit" } },
         "swift-markdown": {
-            "remote": { "id": "apple/swift-markdown" } },
+            "remote": { "id": "swiftlang/swift-markdown" } },
         "swift-nio": {
             "remote": { "id": "apple/swift-nio" } },
         "swift-nio-ssl": {
             "remote": { "id": "apple/swift-nio-ssl" } },
         "swift-experimental-string-processing": {
-            "remote": { "id": "apple/swift-experimental-string-processing" } },
+            "remote": { "id": "swiftlang/swift-experimental-string-processing" } },
         "swift-sdk-generator": {
             "remote": { "id": "swiftlang/swift-sdk-generator" } },
         "swift-llvm-bindings": {
-            "remote": { "id": "apple/swift-llvm-bindings" } },
+            "remote": { "id": "swiftlang/swift-llvm-bindings" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } },
+            "remote": { "id": "swiftlang/llvm-project" } },
         "wasi-libc": {
             "remote": { "id": "WebAssembly/wasi-libc" } },
         "wasmkit": {
@@ -123,9 +123,9 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.2.3",
+                "swift-argument-parser": "1.4.0",
                 "swift-atomics": "1.2.0",
-                "swift-collections": "1.1.1",
+                "swift-collections": "1.1.2",
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
@@ -161,7 +161,6 @@
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
                 "curl": "curl-8_5_0",
-                "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
             }
@@ -178,7 +177,7 @@
                 "swiftpm": "release/6.0",
                 "swift-argument-parser": "1.2.3",
                 "swift-atomics": "1.2.0",
-                "swift-collections": "1.1.1",
+                "swift-collections": "1.1.2",
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
@@ -189,6 +188,8 @@
                 "swift-stress-tester": "release/6.0",
                 "swift-corelibs-xctest": "release/6.0",
                 "swift-corelibs-foundation": "release/6.0",
+                "swift-foundation": "release/6.0",
+                "swift-foundation-icu": "release/6.0",
                 "swift-corelibs-libdispatch": "release/6.0",
                 "swift-integration-tests": "release/6.0",
                 "swift-xcode-playground-support": "release/6.0",
@@ -272,9 +273,9 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.2.3",
+                "swift-argument-parser": "1.4.0",
                 "swift-atomics": "1.2.0",
-                "swift-collections": "1.1.1",
+                "swift-collections": "1.1.2",
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",
@@ -654,10 +655,10 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.2.3",
+                "swift-argument-parser": "1.4.0",
                 "swift-async-algorithms": "1.0.1",
                 "swift-atomics": "1.2.0",
-                "swift-collections": "1.1.1",
+                "swift-collections": "1.1.2",
                 "swift-crypto": "3.0.0",
                 "swift-certificates": "1.0.1",
                 "swift-asn1": "1.0.0",

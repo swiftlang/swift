@@ -4396,23 +4396,14 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
+  // If the defining module is built with package-cmo, bypass
+  // resilient access from the use site that belongs to a module
+  // in the same package.
   auto declModule = getModuleContext();
-  if (declModule->inSamePackage(accessingModule) &&
-      declModule->allowNonResilientAccess()) {
-    // If the defining module is built with package-cmo,
-    // allow direct access from the use site that belongs
-    // to accessingModule (client module).
-    if (declModule->isResilient() &&
-        declModule->serializePackageEnabled())
-      return true;
-
-    // If not, check if the client can still opt in to
-    // have a direct access to this decl from the use
-    // site with a flag.
-    // FIXME: serialize this flag to Module and get it via accessingModule.
-    return getASTContext().LangOpts.EnableBypassResilienceInPackage;
-  }
-  return false;
+  return declModule->inSamePackage(accessingModule) &&
+         declModule->isResilient() &&
+         declModule->allowNonResilientAccess() &&
+         declModule->serializePackageEnabled();
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -5128,7 +5119,7 @@ NominalTypeDecl::canConformTo(InvertibleProtocolKind ip) const {
   Type selfTy = getDeclaredInterfaceType();
   assert(selfTy);
 
-  auto conformance = getModuleContext()->lookupConformance(selfTy, proto,
+  auto conformance = ModuleDecl::lookupConformance(selfTy, proto,
       /*allowMissing=*/false);
 
   if (conformance.isInvalid())
@@ -7409,6 +7400,8 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
   Bits.VarDecl.IsLazyStorageProperty = false;
   Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   Bits.VarDecl.IsTopLevelGlobal = false;
+  Bits.VarDecl.NoAttachedPropertyWrappers = false;
+  Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables = false;
 }
 
 Type VarDecl::getTypeInContext() const {
@@ -10290,8 +10283,8 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
-std::optional<LifetimeDependenceInfo>
-AbstractFunctionDecl::getLifetimeDependenceInfo() const {
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+AbstractFunctionDecl::getLifetimeDependencies() const {
   if (!isa<FuncDecl>(this) && !isa<ConstructorDecl>(this)) {
     return std::nullopt;
   }
@@ -10792,7 +10785,7 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 }
 
 bool ConstructorDecl::hasLifetimeDependentReturn() const {
-  return isa_and_nonnull<LifetimeDependentReturnTypeRepr>(getResultTypeRepr());
+  return isa_and_nonnull<LifetimeDependentTypeRepr>(getResultTypeRepr());
 }
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
@@ -11635,9 +11628,7 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
     auto baseType =
         memberRef->getBase()->getType()->getMetatypeInstanceType();
     if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
-      auto *dc = declRef.getDecl()->getDeclContext();
-      auto *module = dc->getParentModule();
-      auto conformance = module->checkConformance(baseType, globalActor);
+      auto conformance = ModuleDecl::checkConformance(baseType, globalActor);
       if (conformance &&
           conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
         return ActorIsolation::forGlobalActor(baseType);

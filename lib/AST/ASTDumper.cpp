@@ -1347,6 +1347,14 @@ namespace {
       printStorageImpl(VD);
       printFlag(VD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
+      if (auto *nonisolatedAttr =
+              VD->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolatedAttr->isUnsafe()) {
+          printFlag(true, "nonisolated(unsafe)", DeclModifierColor);
+        } else {
+          printFlag(true, "nonisolated", DeclModifierColor);
+        }
+      }
 
       printAccessors(VD);
       
@@ -3541,8 +3549,8 @@ public:
     printFoot();
   }
 
-  void visitLifetimeDependentReturnTypeRepr(LifetimeDependentReturnTypeRepr *T,
-                                            StringRef label) {
+  void visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T,
+                                      StringRef label) {
     printCommon("type_lifetime_dependent_return", label);
     for (auto &dep : T->getLifetimeDependencies()) {
       printFieldRaw(
@@ -3816,16 +3824,13 @@ public:
 
     auto genericParams = genericSig.getGenericParams();
     auto replacementTypes =
-    static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
+    static_cast<const SubstitutionMap &>(map).getReplacementTypes();
     for (unsigned i : indices(genericParams)) {
       if (style == SubstitutionMap::DumpStyle::Minimal) {
         printFieldRaw([&](raw_ostream &out) {
           genericParams[i]->print(out);
           out << " -> ";
-          if (replacementTypes[i])
-            out << replacementTypes[i];
-          else
-            out << "<unresolved concrete type>";
+          out << replacementTypes[i];
         }, "");
       } else {
         printRecArbitrary([&](StringRef label) {
@@ -3834,8 +3839,7 @@ public:
             genericParams[i]->print(out);
             out << " -> ";
           }, "");
-          if (replacementTypes[i])
-            printRec(replacementTypes[i]);
+          printRec(replacementTypes[i]);
           printFoot();
         });
       }
@@ -4667,6 +4671,7 @@ void Requirement::dump(raw_ostream &out) const {
 }
 
 void SILParameterInfo::dump() const {
+  // TODO: Fix LifetimeDependenceInfo printing here.
   print(llvm::errs());
   llvm::errs() << '\n';
 }

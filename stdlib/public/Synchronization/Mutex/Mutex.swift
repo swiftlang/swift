@@ -24,7 +24,7 @@
 ///     class Manager {
 ///       let cache = Mutex<[Key: Resource]>([:])
 ///
-///       func saveResouce(_ resource: Resouce, as key: Key) {
+///       func saveResource(_ resource: Resource, as key: Key) {
 ///         cache.withLock {
 ///           $0[key] = resource
 ///         }
@@ -57,7 +57,7 @@ extension Mutex: @unchecked Sendable where Value: ~Copyable {}
 
 @available(SwiftStdlib 6.0, *)
 extension Mutex where Value: ~Copyable {
-  /// Calls the given closure after acquring the lock and then releases
+  /// Calls the given closure after acquiring the lock and then releases
   /// ownership.
   ///
   /// This method is equivalent to the following sequence of code:
@@ -85,7 +85,7 @@ extension Mutex where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLock<Result: ~Copyable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> sending Result
+    _ body: (inout sending Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
     handle._lock()
 
@@ -132,7 +132,7 @@ extension Mutex where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(
-    _ body: @Sendable (inout Value) throws(E) -> sending Result
+    _ body: (inout sending Value) throws(E) -> sending Result
   ) throws(E) -> sending Result? {
     guard handle._tryLock() else {
       return nil

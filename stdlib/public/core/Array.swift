@@ -329,7 +329,7 @@ extension Array {
   @_effects(notEscaping self.**)
   public // @testable
   func _hoistableIsNativeTypeChecked() -> Bool {
-   return _buffer.arrayPropertyIsNativeTypeChecked
+    return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
   @inlinable

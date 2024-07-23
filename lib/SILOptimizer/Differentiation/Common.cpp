@@ -417,7 +417,7 @@ SILValue emitMemoryLayoutSize(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
           builtin->getGenericSignature(), ArrayRef<Type>{type},
-          LookUpConformanceInSignature(builtin->getGenericSignature().getPointer())),
+          LookUpConformanceInModule()),
       {metatypeVal});
 }
 

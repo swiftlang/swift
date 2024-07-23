@@ -361,6 +361,9 @@ enum class FixKind : uint8_t {
   /// property wrapper.
   AllowWrappedValueMismatch,
 
+  /// Ignore an out-of-place placeholder type.
+  IgnoreInvalidPlaceholder,
+
   /// Specify a type for an explicitly written placeholder that could not be
   /// resolved.
   SpecifyTypeForPlaceholder,
@@ -1920,11 +1923,14 @@ public:
 };
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
+  bool IsMissingImport;
+
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
                           ValueDecl *member, DeclNameRef name,
-                          ConstraintLocator *locator)
+                          ConstraintLocator *locator, bool isMissingImport)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
-                              member, name, locator) {}
+                              member, name, locator),
+        IsMissingImport(isMissingImport) {}
 
 public:
   std::string getName() const override {
@@ -1939,7 +1945,8 @@ public:
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
-                                         ConstraintLocator *locator);
+                                         ConstraintLocator *locator,
+                                         bool isMissingImport);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInaccessibleMember;
@@ -3130,6 +3137,29 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyContextualTypeForNil;
+  }
+};
+
+class IgnoreInvalidPlaceholder final : public ConstraintFix {
+  IgnoreInvalidPlaceholder(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidPlaceholder, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore out-of-place placeholder type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidPlaceholder *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidPlaceholder;
   }
 };
 

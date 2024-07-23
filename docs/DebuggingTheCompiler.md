@@ -830,7 +830,7 @@ For more information and a high level example, see:
 
 When bisecting it might be necessary to run the `update-checkout` script
 each time you change shas. To do this you can pass `--match-timestamp`
-to automatically checkout match the timestamp of the `apple/swift` repo
+to automatically checkout match the timestamp of the `swiftlang/swift` repo
 across the other repos.
 
 ## Disabling PCH Verification
@@ -859,7 +859,7 @@ such configuration.
 # Debugging the Compiler Driver
 
 The Swift compiler uses a standalone compiler-driver application written in
-Swift: [swift-driver](https://github.com/apple/swift-driver). When building the
+Swift: [swift-driver](https://github.com/swiftlang/swift-driver). When building the
 compiler using `build-script`, by default, the standalone driver will be built
 first, using the host toolchain, if the host toolchain contains a Swift
 compiler. If the host toolchain does not contain Swift, a warning is emitted and
@@ -870,7 +870,7 @@ is updated with a symlink to the standalone driver, ensuring calls to the build
 directory's `swift` and `swiftc` always forward to the standalone driver.
 
 For more information about the driver, see:
-[github.com/apple/swift-driver/blob/main/README.md](https://github.com/apple/swift-driver/blob/main/README.md)
+[github.com/swiftlang/swift-driver/blob/main/README.md](https://github.com/swiftlang/swift-driver/blob/main/README.md)
 
 ## Swift Compiler Driver F.A.Q.
 > What's the difference between invoking 'swiftc' vs. 'swift-driver' at the top
@@ -883,7 +883,7 @@ by examining the invoked program's name. The compiler frontend can be invoked
 directly by invoking the `swift-frontend` executable, or passing in the
 `-frontend` option to `swiftc`.
 
-The standalone [Compiler Driver](https://github.com/apple/swift-driver) is
+The standalone [Compiler Driver](https://github.com/swiftlang/swift-driver) is
 installed as a separate `swift-driver` executable in the Swift toolchain's `bin`
 directory. When a user launches the compiler by invoking `swiftc`, the C++ based
 compiler executable forwards the invocation to the `swift-driver` executable if
@@ -905,7 +905,7 @@ become symbolic links to the `swift-driver` executable directly.
 > Will 'swiftc ... -###' always print the same set of commands for the old/new
   driver? Do they call 'swift-frontend' the same way?
 
-The standalone [Compiler Driver](https://github.com/apple/swift-driver) is meant
+The standalone [Compiler Driver](https://github.com/swiftlang/swift-driver) is meant
 to be a direct drop-in replacement for the C++-based legacy driver. It has the
 exact same command-line interface. The expectation is that its behaviour closely
 matches the legacy driver; however, during, and after the transition to the new

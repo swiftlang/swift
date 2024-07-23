@@ -146,6 +146,24 @@ const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
   llvm_unreachable("unknown type attribute kind");
 }
 
+bool TypeAttribute::isUserInaccessible(TypeAttrKind DK) {
+  // Currently we can base this off whether it is underscored or for SIL.
+  // TODO: We could introduce a similar options scheme to DECL_ATTR if we ever
+  // need a user-inaccessible non-underscored attribute.
+  switch (DK) {
+    // SIL attributes are always considered user-inaccessible.
+#define SIL_TYPE_ATTR(SPELLING, C)                                             \
+  case TypeAttrKind::C:                                                        \
+    return true;
+    // For non-SIL attributes, check whether the spelling is underscored.
+#define TYPE_ATTR(SPELLING, C)                                                 \
+  case TypeAttrKind::C:                                                        \
+    return StringRef(#SPELLING).starts_with("_");
+#include "swift/AST/TypeAttr.def"
+  }
+  llvm_unreachable("unhandled case in switch!");
+}
+
 TypeAttribute *TypeAttribute::createSimple(const ASTContext &context,
                                            TypeAttrKind kind,
                                            SourceLoc atLoc,
@@ -1627,12 +1645,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
-
-    // Suppress @attached(extension) if needed.
-    if (!Options.PrintExtensionMacroAttributes &&
-        Attr->getMacroRole() == MacroRole::Extension) {
-      break;
-    }
 
     switch (Attr->getMacroSyntax()) {
     case MacroSyntax::Freestanding:

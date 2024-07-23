@@ -41,9 +41,12 @@ public struct HeapObject {
 #if _pointerBitWidth(_64)
   static let doNotFreeBit = Int(bitPattern: 0x8000_0000_0000_0000)
   static let refcountMask = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
-#else
+#elseif _pointerBitWidth(_32)
   static let doNotFreeBit = Int(bitPattern: 0x8000_0000)
   static let refcountMask = Int(bitPattern: 0x7fff_ffff)
+#elseif _pointerBitWidth(_16)
+  static let doNotFreeBit = Int(bitPattern: 0x8000)
+  static let refcountMask = Int(bitPattern: 0x7fff)
 #endif
 
   // Note: The immortalRefCount value of -1 is also hard-coded in IRGen in `irgen::emitConstantObject`.
@@ -55,8 +58,10 @@ public struct HeapObject {
 
 #if _pointerBitWidth(_64)
   static let bridgeObjectToPlainObjectMask = UInt(0x8fff_ffff_ffff_fff8)
-#else
+#elseif _pointerBitWidth(_32)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff_ffff)
+#elseif _pointerBitWidth(_16)
+  static let bridgeObjectToPlainObjectMask = UInt(0xffff)
 #endif
 }
 

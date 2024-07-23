@@ -1810,9 +1810,9 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
+bool swift::isValidDynamicCallableMethod(FuncDecl *decl,
                                          bool hasKeywordArguments) {
-  auto &ctx = module->getASTContext();
+  auto &ctx = decl->getASTContext();
   // There are two cases to check.
   // 1. `dynamicallyCall(withArguments:)`.
   //    In this case, the method is valid if the argument has type `A` where
@@ -1833,7 +1833,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return (bool) module->checkConformance(argType, arrayLitProto);
+    return (bool) ModuleDecl::checkConformance(argType, arrayLitProto);
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1842,11 +1842,11 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = module->checkConformance(argType, dictLitProto);
+  auto dictConf = ModuleDecl::checkConformance(argType, dictLitProto);
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return (bool) module->checkConformance(keyType, stringLitProtocol);
+  return (bool) ModuleDecl::checkConformance(keyType, stringLitProtocol);
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1861,10 +1861,9 @@ static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
   if (candidates.empty()) return false;
 
   // Filter valid candidates.
-  auto *module = decl->getParentModule();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) {
     auto candidate = cast<FuncDecl>(entry.getValueDecl());
-    return isValidDynamicCallableMethod(candidate, module, hasKeywordArgs);
+    return isValidDynamicCallableMethod(candidate, hasKeywordArgs);
   });
 
   // If there are no valid candidates, return false.
@@ -1913,17 +1912,15 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                ModuleDecl *module,
                                                 bool ignoreLabel) {
   // It could be
   // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
   // - `subscript(dynamicMember: String*)`
   return isValidKeyPathDynamicMemberLookup(decl, ignoreLabel) ||
-         isValidStringDynamicMemberLookup(decl, module, ignoreLabel);
+         isValidStringDynamicMemberLookup(decl, ignoreLabel);
 }
 
 bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                             ModuleDecl *module,
                                              bool ignoreLabel) {
   auto &ctx = decl->getASTContext();
   // There are two requirements:
@@ -1938,7 +1935,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
 
   // If this is `subscript(dynamicMember: String*)`
   return TypeChecker::conformsToKnownProtocol(
-      paramType, KnownProtocolKind::ExpressibleByStringLiteral, module);
+      paramType, KnownProtocolKind::ExpressibleByStringLiteral);
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1994,8 +1991,6 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto type = decl->getDeclaredType();
   auto &ctx = decl->getASTContext();
 
-  auto *module = decl->getParentModule();
-
   auto emitInvalidTypeDiagnostic = [&](const SourceLoc loc) {
     diagnose(loc, diag::invalid_dynamic_member_lookup_type, type);
     attr->setInvalid();
@@ -2011,7 +2006,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto oneCandidate = candidates.front().getValueDecl();
     candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      return isValidDynamicMemberLookupSubscript(cand, module);
+      return isValidDynamicMemberLookupSubscript(cand);
     });
 
     if (candidates.empty()) {
@@ -2033,8 +2028,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    return isValidDynamicMemberLookupSubscript(cand, module,
-                                               /*ignoreLabel*/ true);
+    return isValidDynamicMemberLookupSubscript(cand, /*ignoreLabel*/ true);
   });
 
   // If there were no potentially valid candidates, then throw an error.
@@ -2339,7 +2333,8 @@ static bool isCCompatibleFuncDecl(FuncDecl *FD) {
 }
 
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::Extern)) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Extern)
+      && !D->getModuleContext()->isStdlibModule()) {
     diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
     return;
   }
@@ -2382,8 +2377,38 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
   }
 }
 
+static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
+  if (ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers))
+    return true;
+
+  auto *sourceFile = D->getDeclContext()->getParentModule()
+      ->getSourceFileContainingLocation(D->getStartLoc());
+  if (!sourceFile)
+    return false;
+
+  auto expansion = sourceFile->getMacroExpansion();
+  auto *macroAttr = sourceFile->getAttachedMacroAttribute();
+  if (!expansion || !macroAttr)
+    return false;
+
+  auto *decl = expansion.dyn_cast<Decl *>();
+  if (!decl)
+    return false;
+
+  auto *macroDecl = decl->getResolvedMacro(macroAttr);
+  if (!macroDecl)
+    return false;
+
+  if (macroDecl->getParentModule()->isStdlibModule() &&
+      macroDecl->getName().getBaseIdentifier()
+          .str().equals("_DebugDescriptionProperty"))
+    return true;
+
+  return false;
+}
+
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+  if (!allowSymbolLinkageMarkers(Ctx, D)) {
     diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
     return;
   }
@@ -2391,7 +2416,10 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope,
              attr->getAttrName());
-  else if (D->getDeclContext()->isGenericContext())
+  else if (D->getDeclContext()->isGenericContext() &&
+           !D->getDeclContext()
+                ->getGenericSignatureOfContext()
+                ->areAllParamsConcrete())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
@@ -2406,7 +2434,7 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+  if (!allowSymbolLinkageMarkers(Ctx, D)) {
     diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
     return;
   }
@@ -2418,7 +2446,10 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     return; // already diagnosed
 
-  if (D->getDeclContext()->isGenericContext())
+  if (D->getDeclContext()->isGenericContext() &&
+      !D->getDeclContext()
+           ->getGenericSignatureOfContext()
+           ->areAllParamsConcrete())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
@@ -2687,8 +2718,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      !CD->getParentModule()->checkConformance(CD->getDeclaredInterfaceType(),
-                                               ApplicationDelegateProto)) {
+      !ModuleDecl::checkConformance(CD->getDeclaredInterfaceType(),
+                                    ApplicationDelegateProto)) {
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_not_ApplicationDelegate,
              applicationMainKind);
@@ -2753,7 +2784,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     substitutionMap = SubstitutionMap::get(
       environment->getGenericSignature(),
       [&](SubstitutableType *type) { return nominal->getDeclaredType(); },
-      LookUpConformanceInModule(nominal->getModuleContext()));
+      LookUpConformanceInModule());
   } else {
     substitutionMap = SubstitutionMap();
   }
@@ -3279,7 +3310,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
       VD->getFormalAccess() != AccessLevel::Package) {
     diagnoseAndRemoveAttr(attr,
                           diag::usable_from_inline_attr_with_explicit_access,
-                          VD->getName(), VD->getFormalAccess());
+                          VD, VD->getFormalAccess());
     return;
   }
 
@@ -3784,8 +3815,6 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
   // The type eraser must be a concrete nominal type
   auto nominalTypeDecl = typeEraser->getAnyNominal();
-  if (auto typeAliasDecl = dyn_cast_or_null<TypeAliasDecl>(nominalTypeDecl))
-    nominalTypeDecl = typeAliasDecl->getUnderlyingType()->getAnyNominal();
 
   if (!nominalTypeDecl || isa<ProtocolDecl>(nominalTypeDecl)) {
     diags.diagnose(attr->getLoc(), diag::non_nominal_type_eraser);
@@ -3802,7 +3831,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  if (!module->checkConformance(typeEraser, protocol)) {
+  if (!ModuleDecl::checkConformance(typeEraser, protocol)) {
     diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -3846,14 +3875,12 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     // type conforming to the annotated protocol. We will check this by
     // substituting the protocol's Self type for the generic arg and check that
     // the requirements in the generic signature are satisfied.
-    auto *module = nominalTypeDecl->getParentModule();
     auto baseMap =
-        typeEraser->getContextSubstitutionMap(module,
-                                              nominalTypeDecl);
+        typeEraser->getContextSubstitutionMap();
     QuerySubstitutionMap getSubstitution{baseMap};
 
     auto result = checkRequirements(
-          module, genericSignature.getRequirements(),
+          genericSignature.getRequirements(),
           [&](SubstitutableType *type) -> Type {
             if (type->isEqual(genericParamType))
               return protocol->getSelfTypeInContext();
@@ -5047,12 +5074,12 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// context. If `tangentVectorEqualsSelf` is true, also check whether the given
 /// type satisfies `TangentVector == Self`.
-static bool conformsToDifferentiable(Type type, ModuleDecl *module,
+static bool conformsToDifferentiable(Type type,
                                      bool tangentVectorEqualsSelf = false) {
-  auto &ctx = module->getASTContext();
+  auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = module->checkConformance(type, differentiableProto);
+  auto conf = ModuleDecl::checkConformance(type, differentiableProto);
   if (conf.isInvalid())
     return false;
   if (!tangentVectorEqualsSelf)
@@ -5087,7 +5114,7 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     if (paramType->isExistentialType())
       return false;
     // Return true if the type conforms to `Differentiable`.
-    return conformsToDifferentiable(paramType, module);
+    return conformsToDifferentiable(paramType);
   };
 
   // Get all parameter types.
@@ -5147,7 +5174,7 @@ static IndexSubset *computeDifferentiabilityParameters(
         selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
       else
         selfType = function->mapTypeIntoContext(selfType);
-      if (!conformsToDifferentiable(selfType, module)) {
+      if (!conformsToDifferentiable(selfType)) {
         diags
             .diagnose(attrLoc, diag::diff_function_no_parameters, function)
             .highlight(function->getSignatureSourceRange());
@@ -5799,7 +5826,7 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
   auto expectedLinearMapTypeOrError =
       originalFnRemappedTy->getAutoDiffDerivativeFunctionLinearMapType(
           diffParamIndices, AutoDiffLinearMapKind::Differential,
-          LookUpConformanceInModule(original->getModuleContext()),
+          LookUpConformanceInModule(),
           /*makeSelfParamFirst*/ true);
 
   // Helper for diagnosing derivative function type errors.
@@ -6421,7 +6448,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   auto expectedLinearMapTypeOrError =
       originalFnType->getAutoDiffDerivativeFunctionLinearMapType(
           resolvedDiffParamIndices, kind.getLinearMapKind(),
-          LookUpConformanceInModule(derivative->getModuleContext()),
+          LookUpConformanceInModule(),
           /*makeSelfParamFirst*/ true);
 
   // Helper for diagnosing derivative function type errors.
@@ -6677,7 +6704,7 @@ static bool checkLinearityParameters(
         parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
     // Parameter must conform to `Differentiable` and satisfy
     // `Self == Self.TangentVector`.
-    if (!conformsToDifferentiable(linearParamType, module,
+    if (!conformsToDifferentiable(linearParamType,
                                   /*tangentVectorEqualsSelf*/ true)) {
       diags.diagnose(loc,
                      diag::transpose_attr_invalid_linearity_parameter_or_result,
@@ -6724,7 +6751,6 @@ doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
-  auto *module = transpose->getParentModule();
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();
@@ -6790,7 +6816,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   if (expectedOriginalResultType->hasTypeParameter())
     expectedOriginalResultType = transpose->mapTypeIntoContext(
         expectedOriginalResultType);
-  if (!conformsToDifferentiable(expectedOriginalResultType, module,
+  if (!conformsToDifferentiable(expectedOriginalResultType,
                                 /*tangentVectorEqualsSelf*/ true)) {
     diagnoseAndRemoveAttr(
         attr, diag::transpose_attr_invalid_linearity_parameter_or_result,
@@ -7010,18 +7036,30 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
+    auto type = var->getTypeInContext();
     if (var->hasStorage()) {
-      // 'nonisolated' can not be applied to mutable stored properties unless
-      // qualified as 'unsafe'.
-      if (var->supportsMutation() && !attr->isUnsafe()) {
-        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-            .fixItInsertAfter(attr->getRange().End, "(unsafe)");
-        var->diagnose(diag::nonisolated_mutable_storage_note, var);
-        return;
+      {
+        // 'nonisolated' can not be applied to mutable stored properties unless
+        // qualified as 'unsafe', or is of a Sendable type on a Sendable
+        // value type.
+        bool canBeNonisolated = false;
+        if (auto nominal = dc->getSelfStructDecl()) {
+          if (nominal->getDeclaredTypeInContext()->isSendableType() &&
+              !var->isStatic() && type->isSendableType()) {
+            canBeNonisolated = true;
+          }
+        }
+
+        if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+          var->diagnose(diag::nonisolated_mutable_storage_note, var);
+          return;
+        }
       }
 
-      // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable variables.
-      auto type = var->getTypeInContext();
+      // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
+      // variables.
       if (!attr->isUnsafe() && !type->hasError()) {
         bool diagnosed = diagnoseIfAnyNonSendableTypes(
             type,
@@ -7274,6 +7312,16 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  } else if (fn->getBaseName().isSpecial() ||
+             !fn->getParentModule()->getName().str().equals("_Concurrency") ||
+             !fn->getBaseIdentifier().str()
+                .starts_with("_unsafeInheritExecutor_")) {
+    bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
+        .str().equals("_Concurrency");
+    auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
+    diag.warnUntilSwiftVersion(6);
+    diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
+    replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
 }
 

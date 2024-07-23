@@ -571,9 +571,9 @@ bool swift::typeCheckForCodeCompletion(
                                                  callback);
 }
 
-Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                                bool replaceInvalidRefsWithErrors) {
-  return TypeChecker::resolveDeclRefExpr(UDRE, Context, replaceInvalidRefsWithErrors);
+Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                DeclContext *Context) {
+  return TypeChecker::resolveDeclRefExpr(UDRE, Context);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
@@ -612,7 +612,7 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
   if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(dc->getParentModule()));
+      LookUpConformanceInModule());
   if (!tanSpace)
     return false;
   // If no `Self == Self.TangentVector` requirement, return true.

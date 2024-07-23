@@ -100,6 +100,53 @@ namespace swift {
 class Partition;
 class TransferringOperandToStateMap;
 
+/// The representative value of the equivalence class that makes up a tracked
+/// value.
+///
+/// We use a wrapper struct here so that we can inject "fake" actor isolated
+/// values into the regions of values that become merged into an actor by
+/// calling a function without a non-sendable result.
+class RepresentativeValue {
+  friend llvm::DenseMapInfo<RepresentativeValue>;
+
+  using InnerType = PointerUnion<SILValue, SILInstruction *>;
+
+  /// If this is set to a SILValue then it is the actual represented value. If
+  /// it is set to a SILInstruction, then this is a "fake" representative value
+  /// used to inject actor isolatedness. The instruction stored is the
+  /// instruction that introduced the actor isolated-ness.
+  InnerType value;
+
+public:
+  RepresentativeValue() : value() {}
+  RepresentativeValue(SILValue value) : value(value) {}
+  RepresentativeValue(SILInstruction *actorRegionInst)
+      : value(actorRegionInst) {}
+
+  operator bool() const { return bool(value); }
+
+  void print(llvm::raw_ostream &os) const {
+    if (auto *inst = value.dyn_cast<SILInstruction *>()) {
+      os << "ActorRegionIntroducingInst: " << *inst;
+      return;
+    }
+
+    os << *value.get<SILValue>();
+  }
+
+  SILValue getValue() const { return value.get<SILValue>(); }
+  SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
+  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
+  SILInstruction *getActorRegionIntroducingInst() const {
+    return value.get<SILInstruction *>();
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+private:
+  RepresentativeValue(InnerType value) : value(value) {}
+};
+
 /// A persistent data structure that is used to "rewind" partition history so
 /// that we can discover when values become part of the same region.
 ///
@@ -463,15 +510,23 @@ private:
            "Transfer needs a sourceInst");
   }
 
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
+              Operand *sourceOp = nullptr)
+      : opKind(opKind), opArgs({arg1, arg2}), source(sourceOp) {
+    assert((opKind == PartitionOpKind::Assign ||
+            opKind == PartitionOpKind::Merge) &&
+           "Only supported for assign and merge");
+  }
+
   PartitionOp(PartitionOpKind opKind, SILInstruction *sourceInst)
       : opKind(opKind), opArgs(), source(sourceInst) {}
 
   friend class Partition;
 
 public:
-  static PartitionOp Assign(Element tgt, Element src,
-                            SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Assign, tgt, src, sourceInst);
+  static PartitionOp Assign(Element destElt, Element srcElt,
+                            Operand *srcOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::Assign, destElt, srcElt, srcOperand);
   }
 
   static PartitionOp AssignFresh(Element tgt,
@@ -488,9 +543,10 @@ public:
     return PartitionOp(PartitionOpKind::UndoTransfer, tgt, untransferringInst);
   }
 
-  static PartitionOp Merge(Element tgt1, Element tgt2,
-                           SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::Merge, tgt1, tgt2, sourceInst);
+  static PartitionOp Merge(Element destElement, Element srcElement,
+                           Operand *sourceOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::Merge, destElement, srcElement,
+                       sourceOperand);
   }
 
   static PartitionOp Require(Element tgt,
@@ -940,6 +996,16 @@ public:
                                                    isolationRegionInfo);
   }
 
+  /// Just call our CRTP subclass.
+  void handleAssignTransferNonTransferrableIntoSendingResult(
+      const PartitionOp &op, Element destElement,
+      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {
+    return asImpl().handleAssignTransferNonTransferrableIntoSendingResult(
+        op, destElement, destValue, srcElement, srcValue,
+        srcIsolationRegionInfo);
+  }
+
   /// Call our CRTP subclass.
   void handleInOutSendingNotInitializedAtExitError(
       const PartitionOp &op, Element elt, Operand *transferringOp) const {
@@ -1021,12 +1087,24 @@ public:
     return Impl::getIsolationInfo(partitionOp);
   }
 
+  /// Some evaluators do not support accessing fields on their SILInstruction
+  /// since they just pass in "mocked" SILInstruction. We allow for them to just
+  /// return false for this case to prevent dereference issues.
+  static bool
+  doesParentFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return Impl::doesFunctionHaveSendingResult(partitionOp);
+  }
+
   std::optional<Element> getElement(SILValue value) const {
     return asImpl().getElement(value);
   }
 
   SILValue getRepresentative(SILValue value) const {
     return asImpl().getRepresentative(value);
+  }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return asImpl().getRepresentativeValue(element);
   }
 
   /// Apply \p op to the partition op.
@@ -1052,13 +1130,38 @@ public:
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
-    case PartitionOpKind::Assign:
+    case PartitionOpKind::Assign: {
       assert(op.getOpArgs().size() == 2 &&
              "Assign PartitionOp should be passed 2 arguments");
       assert(p.isTrackingElement(op.getOpArgs()[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
+
+      // See if we are assigning an a non-disconnected value into a 'out
+      // sending' parameter. In such a case, we emit a diagnostic.
+      if (doesParentFunctionHaveSendingResult(op)) {
+        if (auto instance = getRepresentativeValue(op.getOpArgs()[0])) {
+          if (auto value = instance.maybeGetValue()) {
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
+              if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                Region srcRegion = p.getRegion(op.getOpArgs()[1]);
+                auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+                // We can unconditionally getValue here since we can never
+                // assign an actor introducing inst.
+                auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
+                if (!dynamicRegionIsolation.isDisconnected()) {
+                  handleAssignTransferNonTransferrableIntoSendingResult(
+                      op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
+                      dynamicRegionIsolation);
+                }
+              }
+            }
+          }
+        }
+      }
+
       p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
+    }
     case PartitionOpKind::AssignFresh:
       assert(op.getOpArgs().size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
@@ -1139,15 +1242,39 @@ public:
       p.undoTransfer(op.getOpArgs()[0]);
       return;
     }
-    case PartitionOpKind::Merge:
+    case PartitionOpKind::Merge: {
       assert(op.getOpArgs().size() == 2 &&
              "Merge PartitionOp should be passed 2 arguments");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              p.isTrackingElement(op.getOpArgs()[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
 
+      // See if we are assigning an a non-disconnected value into a 'out
+      // sending' parameter. In such a case, we emit a diagnostic.
+      if (doesParentFunctionHaveSendingResult(op)) {
+        if (auto instance = getRepresentativeValue(op.getOpArgs()[0])) {
+          if (auto value = instance.maybeGetValue()) {
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
+              if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                Region srcRegion = p.getRegion(op.getOpArgs()[1]);
+                auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+                // We can unconditionally getValue here since we can never
+                // assign an actor introducing inst.
+                auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
+                if (!dynamicRegionIsolation.isDisconnected()) {
+                  handleAssignTransferNonTransferrableIntoSendingResult(
+                      op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
+                      dynamicRegionIsolation);
+                }
+              }
+            }
+          }
+        }
+      }
+
       p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
+    }
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
@@ -1248,13 +1375,6 @@ private:
   void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
                                          Operand *transferringOp) const {
     if (shouldTryToSquelchErrors()) {
-      if (auto isolationInfo = getIsolationInfo(op)) {
-        if (isolationInfo.isActorIsolated() &&
-            isolationInfo.hasSameIsolation(
-                SILIsolationInfo::get(transferringOp->getUser())))
-          return;
-      }
-
       if (SILValue equivalenceClassRep =
               getRepresentative(transferringOp->get())) {
 
@@ -1371,9 +1491,18 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo regionInfo) const {}
 
+  /// Please see documentation on the CRTP version of this call for information
+  /// about this entrypoint.
   void handleTransferNonTransferrable(
       const PartitionOp &op, Element elt, Element otherElement,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {}
+
+  /// Please see documentation on the CRTP version of this call for information
+  /// about this entrypoint.
+  void handleAssignTransferNonTransferrableIntoSendingResult(
+      const PartitionOp &partitionOp, Element destElement,
+      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {}
 
   /// Used to signify an "unknown code pattern" has occured while performing
   /// dataflow.
@@ -1416,6 +1545,10 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// have one.
   SILValue getRepresentative(SILValue value) const { return SILValue(); }
 
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return RepresentativeValue();
+  }
+
   /// Check if the representative value of \p elt is closure captured at \p
   /// op.
   ///
@@ -1433,6 +1566,12 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return SILIsolationInfo::get(partitionOp.getSourceInst());
   }
+  static bool doesFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return partitionOp.getSourceInst()
+        ->getFunction()
+        ->getLoweredFunctionType()
+        ->hasSendingResult();
+  }
 };
 
 /// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special
@@ -1447,5 +1586,37 @@ struct PartitionOpEvaluatorBasic final
 };
 
 } // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::RepresentativeValue &value) {
+  value.print(os);
+  return os;
+}
+
+template <>
+struct DenseMapInfo<swift::RepresentativeValue> {
+  using RepresentativeValue = swift::RepresentativeValue;
+  using InnerType = RepresentativeValue::InnerType;
+  using InnerDenseMapInfo = DenseMapInfo<InnerType>;
+
+  static RepresentativeValue getEmptyKey() {
+    return RepresentativeValue(InnerDenseMapInfo::getEmptyKey());
+  }
+  static RepresentativeValue getTombstoneKey() {
+    return RepresentativeValue(InnerDenseMapInfo::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(RepresentativeValue value) {
+    return InnerDenseMapInfo::getHashValue(value.value);
+  }
+
+  static bool isEqual(RepresentativeValue LHS, RepresentativeValue RHS) {
+    return InnerDenseMapInfo::isEqual(LHS.value, RHS.value);
+  }
+};
+
+} // namespace llvm
 
 #endif // SWIFT_PARTITIONUTILS_H

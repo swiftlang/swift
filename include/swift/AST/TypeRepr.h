@@ -112,7 +112,7 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(LifetimeDependentReturnTypeRepr, TypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(LifetimeDependentTypeRepr, TypeRepr, 32,
       : NumPadBits,
       NumDependencies : 32
    );
@@ -1118,7 +1118,7 @@ public:
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst ||
-           T->getKind() == TypeReprKind::LifetimeDependentReturn ||
+           T->getKind() == TypeReprKind::LifetimeDependent ||
            T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
@@ -1531,41 +1531,40 @@ private:
   friend TypeRepr;
 };
 
-class LifetimeDependentReturnTypeRepr final
+class LifetimeDependentTypeRepr final
     : public SpecifierTypeRepr,
-      private llvm::TrailingObjects<LifetimeDependentReturnTypeRepr,
+      private llvm::TrailingObjects<LifetimeDependentTypeRepr,
                                     LifetimeDependenceSpecifier> {
   friend TrailingObjects;
 
-  size_t
-  numTrailingObjects(OverloadToken<LifetimeDependentReturnTypeRepr>) const {
-    return Bits.LifetimeDependentReturnTypeRepr.NumDependencies;
+  size_t numTrailingObjects(OverloadToken<LifetimeDependentTypeRepr>) const {
+    return Bits.LifetimeDependentTypeRepr.NumDependencies;
   }
 
 public:
-  LifetimeDependentReturnTypeRepr(
-      TypeRepr *base, ArrayRef<LifetimeDependenceSpecifier> specifiers)
-      : SpecifierTypeRepr(TypeReprKind::LifetimeDependentReturn, base,
+  LifetimeDependentTypeRepr(TypeRepr *base,
+                            ArrayRef<LifetimeDependenceSpecifier> specifiers)
+      : SpecifierTypeRepr(TypeReprKind::LifetimeDependent, base,
                           specifiers.front().getLoc()) {
     assert(base);
-    Bits.LifetimeDependentReturnTypeRepr.NumDependencies = specifiers.size();
+    Bits.LifetimeDependentTypeRepr.NumDependencies = specifiers.size();
     std::uninitialized_copy(specifiers.begin(), specifiers.end(),
                             getTrailingObjects<LifetimeDependenceSpecifier>());
   }
 
-  static LifetimeDependentReturnTypeRepr *
+  static LifetimeDependentTypeRepr *
   create(ASTContext &C, TypeRepr *base,
          ArrayRef<LifetimeDependenceSpecifier> specifiers);
 
   ArrayRef<LifetimeDependenceSpecifier> getLifetimeDependencies() const {
     return {getTrailingObjects<LifetimeDependenceSpecifier>(),
-            Bits.LifetimeDependentReturnTypeRepr.NumDependencies};
+            Bits.LifetimeDependentTypeRepr.NumDependencies};
   }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::LifetimeDependentReturn;
+    return T->getKind() == TypeReprKind::LifetimeDependent;
   }
-  static bool classof(const LifetimeDependentReturnTypeRepr *T) { return true; }
+  static bool classof(const LifetimeDependentTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const;
@@ -1608,7 +1607,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
-  case TypeReprKind::LifetimeDependentReturn:
+  case TypeReprKind::LifetimeDependent:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

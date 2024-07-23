@@ -61,6 +61,10 @@ struct MockedPartitionOpEvaluator final
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return {};
   }
+
+  static bool doesFunctionHaveSendingResult(const PartitionOp &partitionOp) {
+    return false;
+  }
 };
 
 } // namespace

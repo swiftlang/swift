@@ -456,7 +456,6 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-      propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
 
   // mark as nonisolated, allowing access to it from everywhere
@@ -488,8 +487,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Let, C.Id_actorSystem,
-      propertyType, propertyType,
-      /*isStatic=*/false, /*isFinal=*/true);
+      propertyType, /*isStatic=*/false, /*isFinal=*/true);
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
@@ -720,7 +718,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
           return Type();
         },
-        LookUpConformanceInModule(getter->getParentModule())
+        LookUpConformanceInModule()
     );
     DeclRefExpr *buildRemoteExecutorExpr =
         new (ctx) DeclRefExpr(
@@ -791,8 +789,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 
   auto propertyPair = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
-      executorType, executorType,
-      /*static*/ false, /*final*/ false);
+      executorType, /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
@@ -815,8 +812,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   AvailabilityInference::applyInferredAvailableAttrs(
       property, asAvailableAs, ctx);
 
-  auto getter =
-      derived.addGetterToReadOnlyDerivedProperty(property, executorType);
+  auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);
 
   // IMPORTANT: MUST BE AFTER [id, actorSystem].

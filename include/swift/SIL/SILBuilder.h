@@ -1072,7 +1072,7 @@ public:
 
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
-      bool poisonRefs = false,
+      PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false);
   DebugValueInst *createDebugValueAddr(
@@ -1443,14 +1443,15 @@ public:
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
-                                       bool poisonRefs = false) {
+                                       PoisonRefs_t poisonRefs = DontPoisonRefs,
+                                       IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
     assert(getFunction().hasOwnership());
     assert(isLoadableOrOpaque(operand->getType()));
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
-    return insert(new (getModule()) DestroyValueInst(getSILDebugLocation(Loc),
-                                                     operand, poisonRefs));
+    return insert(new (getModule()) DestroyValueInst(
+        getSILDebugLocation(Loc), operand, poisonRefs, isDeadEnd));
   }
 
   MoveValueInst *createMoveValue(
@@ -2386,10 +2387,10 @@ public:
     return insert(new (getModule()) DeallocPartialRefInst(
         getSILDebugLocation(Loc), operand, metatype));
   }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc,
-                                   SILValue operand) {
-    return insert(new (getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), operand));
+  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILValue operand,
+                                   IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
+    return insert(new (getModule()) DeallocBoxInst(getSILDebugLocation(Loc),
+                                                   operand, isDeadEnd));
   }
   DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation Loc,
                                                          CanType concreteType,

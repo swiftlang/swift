@@ -858,7 +858,7 @@ merge(%sp : @owned $Pair<T>):
 //                ^^^    ^^^    ^^^
 //                %s projects out of %s2's storage
 //                       ^^^    ^^^
-//                       %box projects out of %s's strorage
+//                       %box projects out of %s's storage
 //                              ^^^
 //                              %t projects out of %box's storage
 // There is no interference (and only one incoming phi.)
@@ -911,7 +911,7 @@ exit:
 //                ^^^    ^^^    ^^^
 //                %s projects out of %s2's storage
 //                       ^^^    ^^^
-//                       %box projects out of %s's strorage
+//                       %box projects out of %s's storage
 //                              ^^^
 //                              %t projects out of %box's storage
 // There is interference of the _def_ projection (which can only be detected by

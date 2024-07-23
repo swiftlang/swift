@@ -1161,7 +1161,9 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   }
 
   ResultTypeInfo futureResultType;
+#if !SWIFT_CONCURRENCY_EMBEDDED
   futureResultType.metadata = futureResultTypeMetadata;
+#endif
 
   // Unpack the asynchronous function pointer.
   FutureAsyncSignature::FunctionType *closure;
@@ -1194,7 +1196,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t taskCreateFlags = 1 << TaskCreateFlags::Task_IsInlineTask;
 
   auto taskAndContext = swift_task_create_common(
-      taskCreateFlags, &option, futureResultType.metadata,
+      taskCreateFlags, &option, futureResultTypeMetadata,
       reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
       /*initialContextSize=*/closureContextSize);
 
@@ -1395,7 +1397,7 @@ enum class State : uint8_t { Uninitialized, On, Off };
 static std::atomic<State> CurrentState;
 
 static LazyMutex ActiveContinuationsLock;
-static Lazy<std::unordered_set<ContinuationAsyncContext *>> ActiveContinuations;
+static Lazy<std::unordered_set<AsyncTask *>> ActiveContinuations;
 
 static bool isEnabled() {
   auto state = CurrentState.load(std::memory_order_relaxed);
@@ -1408,31 +1410,31 @@ static bool isEnabled() {
   return state == State::On;
 }
 
-static void init(ContinuationAsyncContext *context) {
+static void init(AsyncTask *task) {
   if (!isEnabled())
     return;
 
   LazyMutex::ScopedLock guard(ActiveContinuationsLock);
-  auto result = ActiveContinuations.get().insert(context);
+  auto result = ActiveContinuations.get().insert(task);
   auto inserted = std::get<1>(result);
   if (!inserted)
     swift::fatalError(
         0,
-        "Initializing continuation context %p that was already initialized.\n",
-        context);
+        "Initializing continuation for task %p that was already initialized.\n",
+        task);
 }
 
-static void willResume(ContinuationAsyncContext *context) {
+static void willResume(AsyncTask *task) {
   if (!isEnabled())
     return;
 
   LazyMutex::ScopedLock guard(ActiveContinuationsLock);
-  auto removed = ActiveContinuations.get().erase(context);
+  auto removed = ActiveContinuations.get().erase(task);
   if (!removed)
     swift::fatalError(0,
-                      "Resuming continuation context %p that was not awaited "
+                      "Resuming continuation for task %p that was not awaited "
                       "(may have already been resumed).\n",
-                      context);
+                      task);
 }
 
 } // namespace continuationChecking
@@ -1440,7 +1442,6 @@ static void willResume(ContinuationAsyncContext *context) {
 SWIFT_CC(swift)
 static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                               AsyncContinuationFlags flags) {
-  continuationChecking::init(context);
   context->Flags = ContinuationAsyncContext::FlagsType();
   if (flags.canThrow()) context->Flags.setCanThrow(true);
   if (flags.isExecutorSwitchForced())
@@ -1477,6 +1478,7 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
   task->ResumeContext = context;
   task->ResumeTask = context->ResumeParent;
 
+  continuationChecking::init(task);
   concurrency::trace::task_continuation_init(task, context);
 
   return task;
@@ -1591,8 +1593,6 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 
 static void resumeTaskAfterContinuation(AsyncTask *task,
                                         ContinuationAsyncContext *context) {
-  continuationChecking::willResume(context);
-
   auto &sync = context->AwaitSynchronization;
 
   auto status = sync.load(std::memory_order_acquire);
@@ -1642,6 +1642,7 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
 
 SWIFT_CC(swift)
 static void swift_continuation_resumeImpl(AsyncTask *task) {
+  continuationChecking::willResume(task);
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, false);
   resumeTaskAfterContinuation(task, context);
@@ -1649,6 +1650,7 @@ static void swift_continuation_resumeImpl(AsyncTask *task) {
 
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
+  continuationChecking::willResume(task);
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, false);
   resumeTaskAfterContinuation(task, context);
@@ -1658,6 +1660,7 @@ static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
 SWIFT_CC(swift)
 static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
                                                 /* +1 */ SwiftError *error) {
+  continuationChecking::willResume(task);
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, true);
   context->ErrorResult = error;

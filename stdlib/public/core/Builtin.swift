@@ -429,6 +429,8 @@ internal var _objectPointerIsObjCBit: UInt {
     return 0x4000_0000_0000_0000
 #elseif _pointerBitWidth(_32)
     return 0x0000_0002
+#elseif _pointerBitWidth(_16)
+    return 0x0000
 #else
 #error("Unknown platform")
 #endif
@@ -1102,9 +1104,5 @@ func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
 @_alwaysEmitIntoClient
 public
 func _allocateVector<Element>(elementType: Element.Type, capacity: Int) -> UnsafeMutablePointer<Element> {
-#if $BuiltinAllocVector
   return UnsafeMutablePointer(Builtin.allocVector(elementType, capacity._builtinWordValue))
-#else
-  fatalError("unsupported compiler")
-#endif
 }

@@ -271,8 +271,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
       remappedOrigFnSubstTy
           ->getAutoDiffDerivativeFunctionType(
               parameters, results, derivativeFnKind, context.getTypeConverter(),
-              LookUpConformanceInModule(
-                  derivative->getModule().getSwiftModule()))
+              LookUpConformanceInModule())
           ->getUnsubstitutedType(original->getModule());
 
   auto linearMapSILType = derivativeFnType->getAllResultsInterfaceType();

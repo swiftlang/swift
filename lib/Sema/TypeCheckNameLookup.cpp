@@ -154,7 +154,7 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto conformance = DC->getParentModule()->lookupConformance(
+      auto conformance = ModuleDecl::lookupConformance(
           conformingType, foundProto);
       if (conformance.isInvalid()) {
         if (foundInType->isExistentialType()) {
@@ -221,6 +221,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::IncludeUsableFromInline;
   if (options.contains(NameLookupFlags::ExcludeMacroExpansions))
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+    newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
 
   return newOptions;
 }
@@ -324,6 +326,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   NLOptions subOptions = (NL_QualifiedDefault | NL_ProtocolMembers);
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
+  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+    subOptions |= NL_IgnoreMissingImports;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -420,6 +424,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
+  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+    subOptions |= NL_IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     subOptions |= NL_IncludeUsableFromInline;
 
@@ -475,8 +481,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                              typeDecl, type);
+    auto memberType = substMemberTypeWithBase(typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -491,7 +496,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      auto conformance = dc->getParentModule()->lookupConformance(type, protocol);
+      auto conformance = ModuleDecl::lookupConformance(type, protocol);
       if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
@@ -516,7 +521,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         continue;
 
       auto memberType =
-          substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
+          substMemberTypeWithBase(typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
         result.addResult({typeDecl, memberType, assocType});
     }

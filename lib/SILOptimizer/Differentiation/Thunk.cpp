@@ -455,9 +455,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto zeroSILType = zeroSILParameter.getSILStorageInterfaceType();
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
-    auto *swiftMod = parentThunk->getModule().getSwiftModule();
     auto tangentSpace =
-        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
+        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule());
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector: {
@@ -716,7 +715,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = fb.getModule();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();

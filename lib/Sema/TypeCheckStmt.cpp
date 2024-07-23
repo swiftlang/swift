@@ -499,15 +499,14 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 /// \endcode
 static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
                                                     Expr *E,
-                                                    Type ResultType,
-                                                    ModuleDecl *module) {
+                                                    Type ResultType) {
   auto *NTD = ResultType->getAnyNominal();
   if (!NTD)
     return;
   auto optionSetType = dyn_cast_or_null<ProtocolDecl>(Ctx.getOptionSetDecl());
   if (!optionSetType)
     return;
-  if (!module->lookupConformance(ResultType, optionSetType))
+  if (!ModuleDecl::lookupConformance(ResultType, optionSetType))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
@@ -1089,7 +1088,7 @@ public:
       RS->setResult(resultTarget->getAsExpr());
     } else {
       tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
-                                              ResultTy, DC->getParentModule());
+                                              ResultTy);
     }
     return RS;
   }
@@ -3288,6 +3287,11 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   // we're stuck using AsyncIteratorProtocol.next().
   auto nextElement = ctx.getAsyncIteratorNextIsolated();
   if (!nextElement)
+    return ctx.getAsyncIteratorNext();
+
+  // If the enclosing function has @_unsafeInheritsExecutor, then #isolation
+  // does not work and we need to avoid relying on it.
+  if (enclosingUnsafeInheritsExecutor(dc))
     return ctx.getAsyncIteratorNext();
 
   // If availability checking is disabled, use next(_:).

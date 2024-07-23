@@ -639,7 +639,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
   }
 }
 
-static StringRef getNameFromDecl(Decl *d) {
+StringRef VariableNameInferrer::getNameFromDecl(Decl *d) {
   if (d) {
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       return accessor->getStorage()->getBaseName().userFacingName();

@@ -637,7 +637,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
       [&](SubstitutableType *type) -> Type {
         return NewFGenericEnv->mapTypeIntoContext(type);
       },
-      LookUpConformanceInModule(F->getModule().getSwiftModule()));
+      LookUpConformanceInModule());
     ExistentialSpecializerCloner cloner(F, NewF, Subs, ArgumentDescList,
                                         ArgToGenericTypeMap,
                                         ExistentialArgDescriptor);

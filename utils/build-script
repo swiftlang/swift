@@ -778,7 +778,7 @@ def main_normal():
             "navigation or editing purposes, but are not a recommended means "
             "to building, running or debugging. For a full-fledged Xcode "
             "workflow using these generated projects, see "
-            "https://github.com/apple/swift/blob/main/docs/HowToGuides/"
+            "https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/"
             "GettingStarted.md#using-ninja-with-xcode"
         )
         print()

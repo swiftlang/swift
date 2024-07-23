@@ -158,8 +158,7 @@ namespace swift {
 
   /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to
   /// \c swift::ide
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                         bool replaceInvalidRefsWithErrors);
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);

@@ -279,7 +279,7 @@ CanSILFunctionType SILFunctionType::getDifferentiableComponentType(
     return originalFnTy->getAutoDiffDerivativeFunctionType(
         getDifferentiabilityParameterIndices(),
         getDifferentiabilityResultIndices(), *derivativeKind, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+        LookUpConformanceInModule());
   }
   return originalFnTy;
 }
@@ -295,7 +295,7 @@ CanSILFunctionType SILFunctionType::getLinearComponentType(
   case LinearDifferentiableFunctionTypeComponent::Transpose:
     return originalFnTy->getAutoDiffTransposeFunctionType(
         getDifferentiabilityParameterIndices(), module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
+        LookUpConformanceInModule());
   }
 }
 
@@ -2479,14 +2479,14 @@ static CanSILFunctionType getSILFunctionType(
         params, substFnInterfaceType.getResult(),
         convertRepresentation(silRep).value());
   }
-  auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
-                        .withIsPseudogeneric(pseudogeneric)
-                        .withSendable(isSendable)
-                        .withAsync(isAsync)
-                        .withUnimplementable(unimplementable)
-                        .withLifetimeDependenceInfo(
-                            extInfoBuilder.getLifetimeDependenceInfo())
-                        .build();
+  auto silExtInfo =
+      extInfoBuilder.withClangFunctionType(clangType)
+          .withIsPseudogeneric(pseudogeneric)
+          .withSendable(isSendable)
+          .withAsync(isAsync)
+          .withUnimplementable(unimplementable)
+          .withLifetimeDependencies(extInfoBuilder.getLifetimeDependencies())
+          .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
@@ -4218,7 +4218,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
 
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
         loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
-        *this, LookUpConformanceInModule(&M));
+        *this, LookUpConformanceInModule());
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";

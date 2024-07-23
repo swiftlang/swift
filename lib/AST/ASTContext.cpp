@@ -584,6 +584,8 @@ struct ASTContext::Implementation {
     }
 
     size_t getTotalMemory() const;
+
+    void dump(llvm::raw_ostream &out) const;
   };
 
   llvm::DenseMap<ModuleDecl*, ModuleType*> ModuleTypes;
@@ -672,6 +674,8 @@ struct ASTContext::Implementation {
   BuiltinTupleType *TheTupleType = nullptr;
 
   std::array<ProtocolDecl *, NumInvertibleProtocols> InvertibleProtocolDecls = {};
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 ASTContext::Implementation::Implementation()
@@ -803,7 +807,59 @@ ASTContext::ASTContext(
   }
 }
 
+void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
+  os << "-------------------------------------------------\n";
+  os << "Arena\t0\t" << Allocator.getBytesAllocated() << "\n";
+  Permanent.dump(os);
+
+#define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
+#define SIZE_AND_BYTES(Name) os << #Name << "\t"                          \
+                                << Name.size() << "\t"                    \
+                                << llvm::capacity_in_bytes(Name) << "\n"
+
+  SIZE(LoadedModules);
+  SIZE(IdentifierTable);
+  SIZE(Cleanups);
+  SIZE_AND_BYTES(ModuleLoaders);
+  SIZE_AND_BYTES(ExternalSourceLocs);
+  SIZE_AND_BYTES(ForeignErrorConventions);
+  SIZE_AND_BYTES(ForeignAsyncConventions);
+  SIZE_AND_BYTES(AssociativityCache);
+  SIZE_AND_BYTES(DelayedConformanceDiags);
+  SIZE_AND_BYTES(LazyContexts);
+  SIZE_AND_BYTES(ExistentialSignatures);
+  SIZE_AND_BYTES(ElementSignatures);
+  SIZE_AND_BYTES(Overrides);
+  SIZE_AND_BYTES(DefaultWitnesses);
+  SIZE_AND_BYTES(DefaultTypeWitnesses);
+  SIZE_AND_BYTES(DefaultAssociatedConformanceWitnesses);
+  SIZE_AND_BYTES(DefaultTypeRequestCaches);
+  SIZE_AND_BYTES(PropertyWrapperBackingVarTypes);
+  SIZE_AND_BYTES(OriginalWrappedProperties);
+  SIZE_AND_BYTES(BuiltinInitWitness);
+  SIZE_AND_BYTES(OriginalBodySourceRanges);
+  SIZE_AND_BYTES(NextMacroDiscriminator);
+  SIZE_AND_BYTES(NextDiscriminator);
+  SIZE_AND_BYTES(ModuleTypes);
+  SIZE_AND_BYTES(GenericParamTypes);
+  SIZE_AND_BYTES(SILBlockStorageTypes);
+  SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
+  SIZE_AND_BYTES(IntegerTypes);
+  SIZE_AND_BYTES(OpenedExistentialEnvironments);
+  SIZE_AND_BYTES(OpenedElementEnvironments);
+  SIZE_AND_BYTES(ForeignRepresentableCache);
+  SIZE(SearchPathsSet);
+
+#undef SIZE
+#undef SIZE_AND_BYTES
+}
+
 ASTContext::~ASTContext() {
+  if (LangOpts.AnalyzeRequestEvaluator) {
+    evaluator.dump(llvm::dbgs());
+    getImpl().dump(llvm::dbgs());
+  }
+
   getImpl().~Implementation();
 }
 
@@ -1257,6 +1313,14 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
     return proto;
 
   ModuleDecl *stdlib = getStdlibModule();
+  if (stdlib && stdlib->failedToLoad()) {
+    stdlib = nullptr; // Use the Builtin module instead.
+
+    // Ensure we emitted an error diagnostic!
+    if (!Diags.hadAnyError())
+      Diags.diagnose(SourceLoc(), diag::serialization_load_failed, "Swift");
+  }
+
   FileUnit *file = nullptr;
   if (stdlib) {
     file = &stdlib->getFiles()[0]->getOrCreateSynthesizedFile();
@@ -1342,6 +1406,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
+  case KnownProtocolKind::CxxMutableSpan:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
@@ -1531,7 +1596,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
 
   auto type = decl->getDeclaredInterfaceType();
   auto builtinProtocol = getProtocol(builtinProtocolKind);
-  auto builtinConformance = getStdlibModule()->lookupConformance(
+  auto builtinConformance = ModuleDecl::lookupConformance(
       type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
     assert(false && "Missing required conformance");
@@ -1561,7 +1626,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                             results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
-  auto subs = regexType->getMemberSubstitutionMap(spModule, foundDecl);
+  auto subs = regexType->getMemberSubstitutionMap(foundDecl);
   return ConcreteDeclRef(foundDecl, subs);
 }
 
@@ -3062,6 +3127,56 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // BuiltinConformances ?
 }
 
+void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
+#define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
+#define SIZE_AND_BYTES(Name) os << #Name << "\t"                          \
+                                << Name.size() << "\t"                    \
+                                << llvm::capacity_in_bytes(Name) << "\n"
+
+    SIZE_AND_BYTES(ErrorTypesWithOriginal);
+    SIZE(TypeAliasTypes);
+    SIZE(TupleTypes);
+    SIZE(PackTypes);
+    SIZE(PackExpansionTypes);
+    SIZE(PackElementTypes);
+    SIZE_AND_BYTES(MetatypeTypes);
+    SIZE_AND_BYTES(ExistentialMetatypeTypes);
+    SIZE_AND_BYTES(ArraySliceTypes);
+    SIZE_AND_BYTES(VariadicSequenceTypes);
+    SIZE_AND_BYTES(DictionaryTypes);
+    SIZE_AND_BYTES(OptionalTypes);
+    SIZE_AND_BYTES(ParenTypes);
+    SIZE_AND_BYTES(ReferenceStorageTypes);
+    SIZE_AND_BYTES(LValueTypes);
+    SIZE_AND_BYTES(InOutTypes);
+    SIZE_AND_BYTES(DependentMemberTypes);
+    SIZE(ErrorUnionTypes);
+    SIZE_AND_BYTES(PlaceholderTypes);
+    SIZE_AND_BYTES(DynamicSelfTypes);
+    SIZE_AND_BYTES(EnumTypes);
+    SIZE_AND_BYTES(StructTypes);
+    SIZE_AND_BYTES(ClassTypes);
+    SIZE_AND_BYTES(ProtocolTypes);
+    SIZE_AND_BYTES(ExistentialTypes);
+    SIZE(UnboundGenericTypes);
+    SIZE(BoundGenericTypes);
+    SIZE(ProtocolCompositionTypes);
+    SIZE(ParameterizedProtocolTypes);
+    SIZE(LayoutConstraints);
+    SIZE_AND_BYTES(OpaqueArchetypeEnvironments);
+    SIZE(FunctionTypes);
+    SIZE(NormalConformances);
+    SIZE(SelfConformances);
+    SIZE(SpecializedConformances);
+    SIZE(InheritedConformances);
+    SIZE_AND_BYTES(BuiltinConformances);
+    SIZE(PackConformances);
+    SIZE(SubstitutionMaps);
+
+#undef SIZE
+#undef SIZE_AND_BYTES
+}
+
 void AbstractFunctionDecl::setForeignErrorConvention(
                                          const ForeignErrorConvention &conv) {
   assert(hasThrows() && "setting error convention on non-throwing decl");
@@ -4352,12 +4467,14 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
-      info.has_value() && !info.value().getLifetimeDependenceInfo().empty();
-
+      info.has_value() ? !info->getLifetimeDependencies().empty() : false;
+  auto numLifetimeDependencies =
+      hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo,
-                                      Type, LifetimeDependenceInfo>(
+                                      Type, size_t, LifetimeDependenceInfo>(
       params.size(), hasClangInfo ? 1 : 0, numTypes,
-      hasLifetimeDependenceInfo ? 1 : 0);
+      hasLifetimeDependenceInfo ? 1 : 0,
+      hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
 
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
@@ -4414,9 +4531,12 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     }
     if (Type thrownError = info->getThrownError())
       getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
-    auto lifetimeDependenceInfo = info->getLifetimeDependenceInfo();
+    auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
-      *getTrailingObjects<LifetimeDependenceInfo>() = lifetimeDependenceInfo;
+      *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
+      std::uninitialized_copy(lifetimeDependenceInfo.begin(),
+                              lifetimeDependenceInfo.end(),
+                              getTrailingObjects<LifetimeDependenceInfo>());
     }
   }
 }
@@ -4494,13 +4614,16 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (globalActor && !sig->isReducedType(globalActor))
     isCanonical = false;
 
-  bool hasLifetimeDependenceInfo =
-      info.has_value() && !info.value().getLifetimeDependenceInfo().empty();
-
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
-  size_t allocSize =
-      totalSizeToAlloc<AnyFunctionType::Param, Type, LifetimeDependenceInfo>(
-          params.size(), numTypes, hasLifetimeDependenceInfo ? 1 : 0);
+  bool hasLifetimeDependenceInfo =
+      info.has_value() ? !info->getLifetimeDependencies().empty() : false;
+  auto numLifetimeDependencies =
+      hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
+
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type, size_t,
+                                      LifetimeDependenceInfo>(
+      params.size(), numTypes, hasLifetimeDependenceInfo ? 1 : 0,
+      hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
@@ -4531,9 +4654,12 @@ GenericFunctionType::GenericFunctionType(
     if (Type thrownError = info->getThrownError())
       getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
 
-    auto lifetimeDependenceInfo = info->getLifetimeDependenceInfo();
+    auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
-      *getTrailingObjects<LifetimeDependenceInfo>() = lifetimeDependenceInfo;
+      *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
+      std::uninitialized_copy(lifetimeDependenceInfo.begin(),
+                              lifetimeDependenceInfo.end(),
+                              getTrailingObjects<LifetimeDependenceInfo>());
     }
   }
 }
@@ -4620,8 +4746,6 @@ SILFunctionType::SILFunctionType(
   static_assert(SILExtInfoBuilder::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   Bits.SILFunctionType.HasClangTypeInfo = !ext.getClangTypeInfo().empty();
-  Bits.SILFunctionType.HasLifetimeDependenceInfo =
-      !ext.getLifetimeDependenceInfo().empty();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   assert((coroutineKind == SILCoroutineKind::None && yields.empty()) ||
@@ -4672,10 +4796,12 @@ SILFunctionType::SILFunctionType(
   if (!ext.getClangTypeInfo().empty())
     *getTrailingObjects<ClangTypeInfo>() = ext.getClangTypeInfo();
 
-  if (!ext.getLifetimeDependenceInfo().empty())
-    *getTrailingObjects<LifetimeDependenceInfo>() =
-        ext.getLifetimeDependenceInfo();
-
+  if (!ext.getLifetimeDependencies().empty()) {
+    NumLifetimeDependencies = ext.getLifetimeDependencies().size();
+    memcpy(getMutableLifetimeDependenceInfo().data(),
+           ext.getLifetimeDependencies().data(),
+           NumLifetimeDependencies * sizeof(LifetimeDependenceInfo));
+  }
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
     assert(!WitnessMethodConformance.isInvalid() &&
@@ -4866,7 +4992,9 @@ CanSILFunctionType SILFunctionType::get(
       params.size(), normalResults.size() + (errorResult ? 1 : 0),
       yields.size(), (patternSubs ? 1 : 0) + (invocationSubs ? 1 : 0),
       hasResultCache ? 2 : 0, ext.getClangTypeInfo().empty() ? 0 : 1,
-      ext.getLifetimeDependenceInfo().empty() ? 0 : 1);
+      !ext.getLifetimeDependencies().empty()
+          ? ext.getLifetimeDependencies().size()
+          : 0);
 
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
@@ -5190,21 +5318,11 @@ void SubstitutionMap::Storage::Profile(
   id.AddPointer(genericSig.getPointer());
   if (!genericSig) return;
 
-  // Profile those replacement types that corresponding to canonical generic
-  // parameters within the generic signature.
-  id.AddInteger(replacementTypes.size());
-
-  unsigned i = 0;
-  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
-    if (canonical)
-      id.AddPointer(replacementTypes[i].getPointer());
-    else
-      id.AddPointer(nullptr);
-    ++i;
-  });
+  // Replacement types.
+  for (auto replacementType : replacementTypes)
+    id.AddPointer(replacementType.getPointer());
 
   // Conformances.
-  id.AddInteger(conformances.size());
   for (auto conformance : conformances)
     id.AddPointer(conformance.getOpaqueValue());
 }
@@ -5671,7 +5789,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (nominal != dc->getASTContext().getOptionalDecl()) {
       if (auto objcBridgeable
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-        auto conformance = dc->getParentModule()->lookupConformance(
+        auto conformance = ModuleDecl::lookupConformance(
             nominal->getDeclaredInterfaceType(), objcBridgeable);
         if (conformance) {
           result =
@@ -5823,7 +5941,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (!proto)
       return ProtocolConformanceRef::forInvalid();
 
-    return dc->getParentModule()->lookupConformance(type, proto);
+    return ModuleDecl::lookupConformance(type, proto);
   };
 
   // Do we conform to _ObjectiveCBridgeable?
@@ -6480,14 +6598,6 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
 
   return result;
-}
-
-FuncDecl *ASTContext::getDiagnoseUnavailableCodeReachedDecl() {
-  // FIXME: Remove this with rdar://119892482
-  if (AvailabilityContext::forDeploymentTarget(*this).isContainedIn(
-      getSwift59Availability()))
-    return getDiagnoseUnavailableCodeReached();
-  return getDiagnoseUnavailableCodeReachedAEIC();
 }
 
 void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {

@@ -34,7 +34,7 @@ body:
     attributes:
       label: Reproduction
       description: >
-        Provide a test case, preferably in a Markdown codeblock, and explain
+        Provide a test case, preferably in a Markdown code block, and explain
         how to build or run it to reproduce the problem. Consider reducing the
         test case to the smallest amount of code possible — a smaller test case
         is easier to reason about and more appealing to contributors.

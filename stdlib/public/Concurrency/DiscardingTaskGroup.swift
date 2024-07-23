@@ -66,7 +66,7 @@ import Swift
 /// For tasks that need to handle cancellation by throwing an error,
 /// use the `withThrowingDiscardingTaskGroup(returning:body:)` method instead.
 ///
-/// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)
+/// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
@@ -90,11 +90,16 @@ public func withDiscardingTaskGroup<GroupResult>(
   return result
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @available(SwiftStdlib 5.9, *)
-@usableFromInline
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss23withDiscardingTaskGroup9returning4bodyxxm_xs0bcD0VzYaXEtYalF")
-internal func __abi_withDiscardingTaskGroup<GroupResult>(
+public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
@@ -192,7 +197,6 @@ public struct DiscardingTaskGroup {
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   #endif
@@ -234,7 +238,6 @@ public struct DiscardingTaskGroup {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   #endif
@@ -275,7 +278,6 @@ public struct DiscardingTaskGroup {
   }
 
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     operation: sending @escaping @isolated(any) () async -> Void
   ) {
@@ -304,7 +306,6 @@ public struct DiscardingTaskGroup {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
 #endif
-  @_allowFeatureSuppression(IsolatedAny)
   @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping @isolated(any) () async -> Void
@@ -641,10 +642,9 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 }
 
 @available(SwiftStdlib 5.9, *)
-@usableFromInline
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss31withThrowingDiscardingTaskGroup9returning4bodyxxm_xs0bcdE0Vys5Error_pGzYaKXEtYaKlF")
-internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
+public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
@@ -756,7 +756,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
 #endif
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Void
@@ -781,7 +780,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
 #endif
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Void

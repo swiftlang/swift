@@ -3003,8 +3003,7 @@ static Type mapGenericArgs(const DeclContext *fromDC,
   if (fromDC == toDC)
     return type;
 
-  auto subs = toDC->getDeclaredInterfaceType()->getContextSubstitutionMap(
-                                            toDC->getParentModule(), fromDC);
+  auto subs = toDC->getDeclaredInterfaceType()->getContextSubstitutionMap(fromDC);
   return type.subst(subs);
 }
 

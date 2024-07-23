@@ -411,3 +411,48 @@ bb0(%0 : @guaranteed $C, %1 : $*C):
   return %t : $()
 }
 
+// CHECK-LABEL: sil @test_dead_end_destroy_value : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// Verify that there's no release_value before this trap.
+// CHECK-NEXT:    unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         strong_release [[C]]
+// CHECK-LABEL: } // end sil function 'test_dead_end_destroy_value'
+sil [ossa] @test_dead_end_destroy_value : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  cond_br undef, die, exit
+
+die:
+  destroy_value [dead_end] %c : $C
+  unreachable
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @test_dead_end_dealloc_box : {{.*}} {
+// CHECK:         [[B:%[^,]+]] = alloc_box
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]                         
+// CHECK:       [[DIE]]:                                              
+// CHECK-NEXT:    unreachable                                     
+// CHECK:       [[EXIT]]:                                              
+// CHECK:         dealloc_box [[B]]
+// CHECK-LABEL: } // end sil function 'test_dead_end_dealloc_box'
+sil [ossa] @test_dead_end_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var C }
+  cond_br undef, die, exit
+
+die:
+  dealloc_box [dead_end] %b : ${ var C }
+  unreachable
+
+exit:
+  dealloc_box %b : ${ var C }
+  %retval = tuple ()
+  return %retval : $()
+}

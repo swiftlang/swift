@@ -1638,11 +1638,13 @@ private:
 /// ```
 class InaccessibleMemberFailure final : public FailureDiagnostic {
   ValueDecl *Member;
+  bool IsMissingImport;
 
 public:
   InaccessibleMemberFailure(const Solution &solution, ValueDecl *member,
-                            ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), Member(member) {}
+                            ConstraintLocator *locator, bool isMissingImport)
+      : FailureDiagnostic(solution, locator), Member(member),
+        IsMissingImport(isMissingImport) {}
 
   bool diagnoseAsError() override;
 };
@@ -2616,6 +2618,20 @@ class MissingContextualTypeForNil final : public FailureDiagnostic {
 public:
   MissingContextualTypeForNil(const Solution &solution,
                               ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a placeholder type in an invalid place, e.g:
+///
+/// \code
+/// y as? _
+/// \endcode
+class InvalidPlaceholderFailure final : public FailureDiagnostic {
+public:
+  InvalidPlaceholderFailure(const Solution &solution,
+                            ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

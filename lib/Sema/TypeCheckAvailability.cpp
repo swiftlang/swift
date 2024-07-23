@@ -2214,8 +2214,16 @@ void TypeChecker::diagnosePotentialUnavailability(
 }
 
 const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
-  if (auto *Attr = D->getAttrs().getDeprecated(D->getASTContext()))
+  auto &Ctx = D->getASTContext();
+  if (auto *Attr = D->getAttrs().getDeprecated(Ctx))
     return Attr;
+
+  if (Ctx.LangOpts.WarnSoftDeprecated) {
+    // When -warn-soft-deprecated is specified, treat any declaration that is
+    // deprecated in the future as deprecated.
+    if (auto *Attr = D->getAttrs().getSoftDeprecated(Ctx))
+      return Attr;
+  }
 
   // Treat extensions methods as deprecated if their extension
   // is deprecated.
@@ -3023,6 +3031,93 @@ static bool diagnoseIsolatedAnyAvailability(
       ReferenceDC);
 }
 
+static bool diagnoseTypedThrowsAvailability(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+  return TypeChecker::checkAvailability(
+      ReferenceRange,
+      ReferenceDC->getASTContext().getTypedThrowsAvailability(),
+      diag::availability_typed_throws_only_version_newer,
+      ReferenceDC);
+}
+
+/// Make sure the generic arguments conform to all known invertible protocols.
+/// Runtimes prior to NoncopyableGenerics do not check if any of the
+/// generic arguments conform to Copyable/Escapable during dynamic casts.
+/// But a dynamic cast *needs* to check if the generic arguments conform,
+/// to determine if the cast should be permitted at all. For example:
+///
+///    struct X<T> {}
+///    extension X: P where T: Y {}
+///
+///     func f<Y: ~Copyable>(...) {
+///       let x: X<Y> = ...
+///       _ = x as? any P   // <- cast should fail
+///     }
+///
+/// The dynamic cast here must fail because Y does not conform to Copyable,
+/// thus X<Y> doesn't conform to P!
+///
+/// \param boundTy The generic type with its generic arguments.
+/// \returns the invertible protocol for which a conformance is missing in
+///          one of the generic arguments, or none if all are present for
+///          every generic argument.
+static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
+    BoundGenericType *boundTy) {
+  for (auto arg : boundTy->getGenericArgs()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      switch (ip) {
+      case InvertibleProtocolKind::Copyable:
+        if (arg->isNoncopyable())
+          return ip;
+        break;
+      case InvertibleProtocolKind::Escapable:
+        if (!arg->isEscapable())
+          return ip;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Older runtimes won't check for required invertible protocol conformances
+/// at runtime during a cast.
+///
+/// \param srcType the source or initial type of the cast
+/// \param refLoc source location of the cast
+/// \param refDC decl context in which the cast occurs
+/// \return true if diagnosed
+static bool checkInverseGenericsCastingAvailability(Type srcType,
+                                                    SourceRange refLoc,
+                                                    const DeclContext *refDC) {
+  if (!srcType) return false;
+
+  auto type = srcType->getCanonicalType();
+
+  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
+    if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
+      std::optional<Diag<StringRef, llvm::VersionTuple>> diag;
+      switch (*missing) {
+      case InvertibleProtocolKind::Copyable:
+        diag =
+            diag::availability_copyable_generics_casting_only_version_newer;
+        break;
+      case InvertibleProtocolKind::Escapable:
+        diag =
+            diag::availability_escapable_generics_casting_only_version_newer;
+        break;
+      }
+
+      // Enforce the availability restriction.
+      return TypeChecker::checkAvailability(
+          refLoc,
+          refDC->getASTContext().getNoncopyableGenericsAvailability(),
+          *diag,
+          refDC);
+    }
+  }
+  return false;
+}
+
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
                                                   SourceRange refLoc,
                                                   const DeclContext *refDC) {
@@ -3033,6 +3128,8 @@ static bool checkTypeMetadataAvailabilityInternal(CanType type,
       auto isolation = fnType->getIsolation();
       if (isolation.isErased())
         return diagnoseIsolatedAnyAvailability(refLoc, refDC);
+      if (fnType.getThrownError())
+        return diagnoseTypedThrowsAvailability(refLoc, refDC);
     }
     return false;
   });
@@ -3064,7 +3161,13 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
   // there.
   if (type.isAnyExistentialType()) return false;
 
-  return checkTypeMetadataAvailabilityInternal(type, refLoc, refDC);
+  if (checkTypeMetadataAvailabilityInternal(type, refLoc, refDC))
+    return true;
+
+  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
+    return true;
+
+  return false;
 }
 
 namespace {
@@ -3465,6 +3568,9 @@ public:
     if (auto EE = dyn_cast<ErasureExpr>(E)) {
       checkTypeMetadataAvailability(EE->getSubExpr()->getType(),
                                     EE->getLoc(), Where.getDeclContext());
+      checkInverseGenericsCastingAvailability(EE->getSubExpr()->getType(),
+                                              EE->getLoc(),
+                                              Where.getDeclContext());
 
       for (ProtocolConformanceRef C : EE->getConformances()) {
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
@@ -3905,11 +4011,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
 /// Return true if the specified type looks like an integer of floating point
 /// type.
-static bool isIntegerOrFloatingPointType(Type ty, ModuleDecl *M) {
+static bool isIntegerOrFloatingPointType(Type ty) {
   return (TypeChecker::conformsToKnownProtocol(
-            ty, KnownProtocolKind::ExpressibleByIntegerLiteral, M) ||
+            ty, KnownProtocolKind::ExpressibleByIntegerLiteral) ||
           TypeChecker::conformsToKnownProtocol(
-            ty, KnownProtocolKind::ExpressibleByFloatLiteral, M));
+            ty, KnownProtocolKind::ExpressibleByFloatLiteral));
 }
 
 
@@ -3937,9 +4043,8 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
 
   // If the expression type is integer or floating point, then we can rewrite it
   // to "lvalue += 1".
-  auto *DC = Where.getDeclContext();
   std::string replacement;
-  if (isIntegerOrFloatingPointType(call->getType(), DC->getParentModule()))
+  if (isIntegerOrFloatingPointType(call->getType()))
     replacement = isInc ? " += 1" : " -= 1";
   else {
     // Otherwise, it must be an index type.  Rewrite to:
@@ -4225,8 +4330,7 @@ public:
     if (isa<ProtocolType>(ty))
       return Action::Continue;
 
-    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
-    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap();
     (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
     return Action::Continue;
   }
@@ -4234,8 +4338,7 @@ public:
   Action visitBoundGenericType(BoundGenericType *ty) override {
     visitTypeDecl(ty->getDecl());
 
-    ModuleDecl *useModule = Where.getDeclContext()->getParentModule();
-    auto subs = ty->getContextSubstitutionMap(useModule, ty->getDecl());
+    auto subs = ty->getContextSubstitutionMap();
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),

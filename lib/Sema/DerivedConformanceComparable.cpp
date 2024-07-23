@@ -114,23 +114,17 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 4> lhsPayloadVars;
-    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', ltDecl,
-                                                      lhsPayloadVars);
-    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat = new (C)
-        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
-                           elt, lhsSubpattern, /*DC*/ ltDecl);
-    lhsElemPat->setImplicit();
+    auto *lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(
+        elt, 'l', ltDecl, lhsPayloadVars);
+    auto *lhsElemPat = EnumElementPattern::createImplicit(
+        enumType, elt, lhsSubpattern, /*DC*/ ltDecl);
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 4> rhsPayloadVars;
-    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', ltDecl,
-                                                      rhsPayloadVars);
-    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat = new (C)
-        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
-                           elt, rhsSubpattern, /*DC*/ ltDecl);
-    rhsElemPat->setImplicit();
+    auto *rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(
+        elt, 'r', ltDecl, rhsPayloadVars);
+    auto *rhsElemPat = EnumElementPattern::createImplicit(
+        enumType, elt, rhsSubpattern, /*DC*/ ltDecl);
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
     std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;

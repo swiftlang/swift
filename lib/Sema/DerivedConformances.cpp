@@ -188,8 +188,8 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
-                                                 protocol)) {
+    if (!ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
+                                      protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -294,7 +294,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = nominal->getParentModule()->lookupConformance(
+    auto conformance = ModuleDecl::lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
@@ -474,10 +474,9 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
-    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
     auto subs = SubstitutionMap::get(generics, typeArgs,
-                                     LookUpConformanceInModule{builtinModule});
+                                     LookUpConformanceInModule{});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {
@@ -499,7 +498,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
 
 CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
     ASTContext &ctx) {
-  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReachedDecl();
+  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReached();
   assert(diagnoseDecl);
   auto diagnoseDeclRefExpr =
       new (ctx) DeclRefExpr(diagnoseDecl, DeclNameLoc(), true);
@@ -511,11 +510,9 @@ CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
   return callExpr;
 }
 
-AccessorDecl *DerivedConformance::
-addGetterToReadOnlyDerivedProperty(VarDecl *property,
-                                   Type propertyContextType) {
-  auto getter =
-    declareDerivedPropertyGetter(property, propertyContextType);
+AccessorDecl *
+DerivedConformance::addGetterToReadOnlyDerivedProperty(VarDecl *property) {
+  auto getter = declareDerivedPropertyGetter(property);
 
   property->setImplInfo(StorageImplInfo::getImmutableComputed());
   property->setAccessors(SourceLoc(), {getter}, SourceLoc());
@@ -524,8 +521,7 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
 }
 
 AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
-                                                 Type propertyContextType) {
+DerivedConformance::declareDerivedPropertyGetter(VarDecl *property) {
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
@@ -559,7 +555,6 @@ std::pair<VarDecl *, PatternBindingDecl *>
 DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
                                            Identifier name,
                                            Type propertyInterfaceType,
-                                           Type propertyContextType,
                                            bool isStatic, bool isFinal) {
   auto parentDC = getConformanceContext();
 
@@ -570,11 +565,13 @@ DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 
+  auto propertyContextType =
+      getConformanceContext()->mapTypeIntoContext(propertyInterfaceType);
+
   Pattern *propPat =
       NamedPattern::createImplicit(Context, propDecl, propertyContextType);
 
   propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
-  propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
       Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
@@ -771,7 +768,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   // generate: var indexVar
   Pattern *indexPat = NamedPattern::createImplicit(C, indexVar, intType);
   indexPat = TypedPattern::createImplicit(C, indexPat, intType);
-  indexPat->setType(intType);
+
   auto *indexBind = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
 
@@ -786,12 +783,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
     }
 
     // generate: case .<Case>:
-    auto pat = new (C)
-        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(), elt, nullptr,
-                           /*DC*/ funcDecl);
-    pat->setImplicit();
-    pat->setType(enumType);
+    auto *pat = EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ funcDecl);
 
     auto labelItem = CaseLabelItem(pat);
 
@@ -843,8 +836,8 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
-                                                  protocol).isInvalid()) {
+      if (ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
+                                       protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -943,17 +936,13 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
   // If the stdlib isn't new enough to contain the helper function for
   // diagnosing execution of unavailable code then just synthesize this case
   // normally.
-  if (!C.getDiagnoseUnavailableCodeReachedDecl())
+  if (!C.getDiagnoseUnavailableCodeReached())
     return nullptr;
 
   auto createElementPattern = [&]() -> EnumElementPattern * {
     // .<elt>
-    EnumElementPattern *eltPattern = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
-        DeclNameRef(elt->getBaseIdentifier()), elt, nullptr, /*DC*/ parentDC);
-    eltPattern->setImplicit();
-    eltPattern->setType(enumType);
-    return eltPattern;
+    return EnumElementPattern::createImplicit(
+        enumType, elt, /*subPattern*/ nullptr, /*DC*/ parentDC);
   };
 
   Pattern *labelItemPattern;

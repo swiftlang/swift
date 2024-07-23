@@ -71,8 +71,8 @@ func doit<T>(_ f: () -> T) -> T {
 // CHECK:         [[OUTPUT_TUPLE_ADDR:%[^,]+]] = alloc_stack $(Value, Value)
 // CHECK:         [[DUPLICATE_CLOSURE:%[^,]+]] = function_ref @$s19opaque_values_Onone10duplicate15valuex_xtx_tlFx_xtyXEfU_
 // CHECK:         [[DUPLICATE_INSTANCE_CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[DUPLICATE_CLOSURE]]<Value>([[INSTANCE_ADDR_IN]])
-// CHECK:         [[DEPENDENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[DUPLICATE_INSTANCE_CLOSURE]] : $@noescape @callee_guaranteed () -> @out (Value, Value) on [[INSTANCE_ADDR_IN]] : $*Value
-// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENDENCY]]
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[DUPLICATE_INSTANCE_CLOSURE]] : $@noescape @callee_guaranteed () -> @out (Value, Value) on [[INSTANCE_ADDR_IN]] : $*Value
+// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
 // CHECK:         apply {{%[^,]+}}<(Value, Value)>([[OUTPUT_TUPLE_ADDR]], [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate1'
 // CHECK-LABEL: sil private @$s19opaque_values_Onone10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
@@ -93,8 +93,8 @@ func duplicate1<Value>(value: Value) -> (Value, Value) {
 // CHECK:         [[OUTPUT_TUPLE_ADDR:%[^,]+]] = alloc_stack $(one: Value, two: Value)
 // CHECK:         [[DUPLICATE_CLOSURE:%[^,]+]] = function_ref @$s19opaque_values_Onone10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_
 // CHECK:         [[DUPLICATE_INSTANCE_CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[DUPLICATE_CLOSURE]]<Value>([[INSTANCE_ADDR_IN]])
-// CHECK:         [[DEPENDENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[DUPLICATE_INSTANCE_CLOSURE]] : $@noescape @callee_guaranteed () -> @out (one: Value, two: Value) on [[INSTANCE_ADDR_IN]] : $*Value
-// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENDENCY]]
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[DUPLICATE_INSTANCE_CLOSURE]] : $@noescape @callee_guaranteed () -> @out (one: Value, two: Value) on [[INSTANCE_ADDR_IN]] : $*Value
+// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
 // CHECK:         apply {{%[^,]+}}<(one: Value, two: Value)>([[OUTPUT_TUPLE_ADDR]], [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate2'
 // CHECK-LABEL: sil private @$s19opaque_values_Onone10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {

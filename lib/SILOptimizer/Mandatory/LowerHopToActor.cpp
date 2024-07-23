@@ -228,7 +228,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
       auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
       auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
                                        {actorType},
-                                       LookUpConformanceInModule(module));
+                                       LookUpConformanceInModule());
       return B.createBuiltin(loc, builtinName, executorType, subs, {actor});
     }
 
@@ -249,7 +249,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
       actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
     }
 
-    auto actorConf = module->lookupConformance(actorType, actorProtocol);
+    auto actorConf = ModuleDecl::lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
            "hop_to_executor with actor that doesn't conform to Actor or DistributedActor");
 

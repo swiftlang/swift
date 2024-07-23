@@ -374,6 +374,8 @@ ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
 ERROR(non_final_generic_class_function,none,
       "classes cannot have non-final generic fuctions in embedded Swift", ())
+ERROR(cannot_specialize_class,none,
+      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
 ERROR(embedded_swift_existential_type,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_existential,none,
@@ -396,6 +398,8 @@ ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
+ERROR(embedded_capture_of_generic_value_with_deinit,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
@@ -611,10 +615,6 @@ NOTE(autodiff_member_subset_indices_not_differentiable,none,
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
-NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
-     "cannot differentiate through multiple results", ())
-NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
-     "cannot differentiate through 'inout' arguments", ())
 NOTE(autodiff_cannot_differentiate_through_direct_yield,none,
      "cannot differentiate through a '_read' accessor", ())
 NOTE(autodiff_enums_unsupported,none,
@@ -792,14 +792,6 @@ NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
 
-// move operator used on generic or evalue
-ERROR(move_operator_used_on_generic_or_existential_value, none,
-      "move() used on a generic or existential value", ())
-
-// copy operator used on generic or evalue
-ERROR(copy_operator_used_on_generic_or_existential_value, none,
-      "copy() used on a generic or existential value", ())
-
 // noimplicitcopy on generic or existential binding
 ERROR(noimplicitcopy_used_on_generic_or_existential, none,
       "@_noImplicitCopy can not be used on a generic or existential typed "
@@ -972,12 +964,6 @@ ERROR(regionbasedisolation_arg_transferred, none,
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
       "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
       (StringRef, Type))
-NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
-     "value is %0 since it is in the same region as %1",
-     (StringRef, DeclBaseName))
-NOTE(regionbasedisolation_isolated_since_in_same_region_string, none,
-     "%0 is %1since it is in the same region as %2",
-     (Identifier, StringRef, Identifier))
 
 //===---
 // New Transfer Non Sendable Diagnostics
@@ -986,12 +972,29 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_string, none,
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
       "sending %0 risks causing data races",
       (Identifier))
+NOTE(regionbasedisolation_type_is_non_sendable, none,
+      "%0 is a non-Sendable type",
+      (Type))
 
 ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
       "'inout sending' parameter %0 cannot be %1at end of function",
       (Identifier, StringRef))
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
       "%1%0 risks causing races in between %1uses and caller uses since caller assumes value is not actor isolated",
+      (Identifier, StringRef))
+
+ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, none,
+      "returning a %1 %0 value as a 'sending' result risks causing data races",
+      (Type, StringRef))
+NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
+      "returning a %1 %0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains",
+      (Type, StringRef))
+
+ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, none,
+      "returning %1 %0 as a 'sending' result risks causing data races",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
+      "returning %1 %0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains",
       (Identifier, StringRef))
 
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
@@ -1023,6 +1026,10 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
+
+NOTE(regionbasedisolation_named_transfer_nt_asynclet_capture, none,
+      "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
+      (Identifier, StringRef))
 
 // Misc Error.
 ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,

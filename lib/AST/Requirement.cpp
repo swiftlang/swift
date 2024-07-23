@@ -112,8 +112,7 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
-    auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(
+    auto conformance = ModuleDecl::lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
@@ -327,12 +326,12 @@ swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
 }
 
 CheckRequirementsResult swift::checkRequirements(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> substReqs;
   for (auto req : requirements) {
     substReqs.push_back(req.subst(substitutions,
-                              LookUpConformanceInModule(module), options));
+                                  LookUpConformanceInModule(), options));
   }
 
   return checkRequirements(substReqs);

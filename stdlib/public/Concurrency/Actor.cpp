@@ -1195,7 +1195,7 @@ private:
   /// It can be done when actor transitions from Idle to Scheduled or
   /// when actor gets a priority override and we schedule a stealer.
   ///
-  /// When the task executor is `undefined` ths task will be scheduled on the
+  /// When the task executor is `undefined` the task will be scheduled on the
   /// default global executor.
   void scheduleActorProcessJob(JobPriority priority, TaskExecutorRef taskExecutor);
 
@@ -1274,6 +1274,13 @@ static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor)
 /******************** NEW DEFAULT ACTOR IMPLEMENTATION ***********************/
 /*****************************************************************************/
 
+TaskExecutorRef TaskExecutorRef::fromTaskExecutorPreference(Job *job) {
+  if (auto task = dyn_cast<AsyncTask>(job)) {
+    return task->getPreferredTaskExecutor();
+  }
+  return TaskExecutorRef::undefined();
+}
+
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 
 static void traceJobQueue(DefaultActorImpl *actor, Job *first) {
@@ -1318,13 +1325,6 @@ void DefaultActorImpl::scheduleActorProcessJob(
   }
 
   swift_task_enqueueGlobal(job);
-}
-
-TaskExecutorRef TaskExecutorRef::fromTaskExecutorPreference(Job *job) {
-  if (auto task = dyn_cast<AsyncTask>(job)) {
-    return task->getPreferredTaskExecutor();
-  }
-  return TaskExecutorRef::undefined();
 }
 
 void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {

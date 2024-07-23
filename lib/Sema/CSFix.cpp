@@ -217,7 +217,7 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   auto &ctx = cs.getASTContext();
 
   if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-      if (!cs.DC->getParentModule()->lookupConformance(unwrappedDict, proto))
+      if (!ModuleDecl::lookupConformance(unwrappedDict, proto))
         return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);
@@ -1152,16 +1152,16 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 
 bool AllowInaccessibleMember::diagnose(const Solution &solution,
                                        bool asNote) const {
-  InaccessibleMemberFailure failure(solution, getMember(), getLocator());
+  InaccessibleMemberFailure failure(solution, getMember(), getLocator(),
+                                    IsMissingImport);
   return failure.diagnose(asNote);
 }
 
-AllowInaccessibleMember *
-AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
-                                ValueDecl *member, DeclNameRef name,
-                                ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowInaccessibleMember(cs, baseType, member, name, locator);
+AllowInaccessibleMember *AllowInaccessibleMember::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclNameRef name,
+    ConstraintLocator *locator, bool isMissingImport) {
+  return new (cs.getAllocator()) AllowInaccessibleMember(
+      cs, baseType, member, name, locator, isMissingImport);
 }
 
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
@@ -2121,6 +2121,18 @@ SpecifyContextualTypeForNil *
 SpecifyContextualTypeForNil::create(ConstraintSystem &cs,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyContextualTypeForNil(cs, locator);
+}
+
+bool IgnoreInvalidPlaceholder::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  InvalidPlaceholderFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreInvalidPlaceholder *
+IgnoreInvalidPlaceholder::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidPlaceholder(cs, locator);
 }
 
 bool SpecifyTypeForPlaceholder::diagnose(const Solution &solution,

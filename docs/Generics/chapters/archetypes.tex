@@ -37,7 +37,7 @@ struct Box<T> {
   }
 }
 \end{Verbatim}
-The \texttt{take()} and \texttt{compare()} methods have different generic signatures, with \texttt{take()} inheriting the generic signature of struct~\texttt{Box}, and \texttt{compare()} adding a conformance requirement. The \index{type representation}type representation ``\texttt{T}'' resolves to the \emph{same} generic parameter type~\texttt{T} (or \rT) in all source locations where it appears. However, this generic parameter maps to two different archetypes in the generic environment of each function. Thus, the type of the expression ``\texttt{self.contents}'' is actually different in \texttt{take()} and \texttt{compare()}. Let's use the notation $\archetype{T}_d$ for the archetype obtained by mapping the type parameter \texttt{T} into the generic environment of some declaration~$d$. Here, we have two archetypes:
+The \texttt{take()} and \texttt{compare()} methods have different generic signatures, with \texttt{take()} inheriting the generic signature of struct~\texttt{Box}, and \texttt{compare()} adding a conformance requirement. The \index{type representation}type representation ``\tT'' resolves to the \emph{same} generic parameter type~\tT\ (or \rT) in all source locations where it appears. However, this generic parameter maps to two different archetypes in the generic environment of each function. Thus, the type of the expression ``\texttt{self.contents}'' is actually different in \texttt{take()} and \texttt{compare()}. Let's use the notation $\archetype{T}_d$ for the archetype obtained by mapping the type parameter \tT\ into the generic environment of some declaration~$d$. Here, we have two archetypes:
 \begin{enumerate}
 \item $\archetype{T}_\text{take}$, which does not conform to any protocols.
 \item $\archetype{T}_\text{compare}$, which conforms to \texttt{Equatable}.
@@ -110,11 +110,11 @@ In the following, let $G$ be a generic signature, and write \IndexSet{type}{\Typ
 \end{gather*}
 In \SecRef{type params}, we defined the reduced type equality relation on the valid type parameters of~$G$, and in \SecRef{genericsigqueries}, we extended this to all of $\TypeObj{G}$ via the recursive definition of a reduced type. The fact that an archetype's type parameter is a \index{reduced type}reduced type means the following when it comes to equivalence of types:
 \begin{enumerate}
-\item If $G\vdash\SameReq{T}{U}$ for type parameters \texttt{T}~and~\texttt{U}, then $\MapIn(\texttt{T})$ and $\MapIn(\texttt{U})$ give two equal pointers to the same archetype. The three relations of \index{reduced type equality}reduced type equality, \index{canonical type equality}canonical type equality and \index{type pointer equality}type pointer equality coincide on archetypes.
+\item If $G\vdash\TU$ for type parameters \tT~and~\tU, then $\MapIn(\tT)$ and $\MapIn(\tU)$ give two equal pointers to the same archetype. The three relations of \index{reduced type equality}reduced type equality, \index{canonical type equality}canonical type equality and \index{type pointer equality}type pointer equality coincide on archetypes.
 
-\item If $G\vdash\SameReq{T}{X}$ for some type parameter~\texttt{T} and concrete type~\texttt{X}, then we define $\MapIn(\texttt{T}):=\MapIn(\texttt{X})$. A type parameter fixed to a concrete type is not represented by an archetype; instead, we map it into the environment by recursively mapping the concrete type.
+\item If $G\vdash\TX$ for some type parameter~\tT\ and concrete type~\texttt{X}, then we define $\MapIn(\tT):=\MapIn(\texttt{X})$. A type parameter fixed to a concrete type is not represented by an archetype; instead, we map it into the environment by recursively mapping the concrete type.
 
-\item If \texttt{T} is some interface type, then $\MapOut(\MapIn(\texttt{T}))$ is canonically equal to the reduced type of~\texttt{T} when computed with \AlgRef{reduced type algorithm}.
+\item If \tT\ is some interface type, then $\MapOut(\MapIn(\tT))$ is canonically equal to the reduced type of~\tT\ when computed with \AlgRef{reduced type algorithm}.
 
 \item If two interface types are equivalent under reduced type equality, the corresponding contextual types are equivalent under canonical type equality.
 \end{enumerate}
@@ -122,11 +122,11 @@ Taken together, the operations of $\MapIn$ and canonical type equality faithfull
 
 \section{Local Requirements}\label{local requirements}
 
-If we have a type parameter~\texttt{T} in some generic signature~$G$, we can understand the behavior of its equivalence class by looking at the list of all conformance, superclass and layout requirements with a subject type of~\texttt{T} that can be derived from~$G$. When working with type parameters, we can recover this information by making use of \index{generic signature query}generic signature queries (\SecRef{genericsigqueries}). When working with an archetype~$\archetype{T}$, we can instead ask the archetype for its \emph{local requirements}, which are stored directly within the data structure for the archetype itself:
+If we have a type parameter~\tT\ in some generic signature~$G$, we can understand the behavior of its equivalence class by looking at the list of all conformance, superclass and layout requirements with a subject type of~\tT\ that can be derived from~$G$. When working with type parameters, we can recover this information by making use of \index{generic signature query}generic signature queries (\SecRef{genericsigqueries}). When working with an archetype~$\archetype{T}$, we can instead ask the archetype for its \emph{local requirements}, which are stored directly within the data structure for the archetype itself:
 \begin{itemize}
-\item \textbf{Required protocols:} A list of all protocols \texttt{P} such that $G\vdash\ConfReq{T}{P}$. This is the result of the \IndexQuery{getRequiredProtocols}$\Query{getRequiredProtocols}{}$ generic signature query.
-\item \textbf{Superclass bound:} A class type \texttt{C} such that $G\vdash\ConfReq{T}{C}$. This is the result of the \IndexQuery{getSuperclassBound}$\Query{getSuperclassBound}{}$ generic signature query.
-\item \textbf{Requires class flag:} True if $G\vdash\ConfReq{T}{AnyObject}$. This is the result of the \IndexQuery{requiresClass}$\Query{requiresClass}{}$ generic signature query.
+\item \textbf{Required protocols:} A list of all protocols \texttt{P} such that $G\vdash\TP$. This is the result of the \IndexQuery{getRequiredProtocols}$\Query{getRequiredProtocols}{}$ generic signature query.
+\item \textbf{Superclass bound:} A class type \texttt{C} such that $G\vdash\TC$. This is the result of the \IndexQuery{getSuperclassBound}$\Query{getSuperclassBound}{}$ generic signature query.
+\item \textbf{Requires class flag:} True if $G\vdash\TAnyObject$. This is the result of the \IndexQuery{requiresClass}$\Query{requiresClass}{}$ generic signature query.
 \item \textbf{Layout constraint:} A more fine-grained view than the previous, to differentiate between Objective-C and Swift-native reference counting. This is the result of the \IndexQuery{getLayoutConstraint}$\Query{getLayoutConstraint}{}$ generic signature query.
 \end{itemize}
 When we create an archetype, we issue the \IndexQuery{getLocalRequirements}$\Query{getLocalRequirements}{}$ generic signature query to gather all of the above information in one shot. Local requirements can be inspected directly by looking at an archetype. Even more importantly, they also allow archetypes to take on the behaviors of concrete types.
@@ -154,14 +154,14 @@ We will resume discussing substitution maps with contextual replacement types sh
 
 Recall that with a type parameter, global conformance lookup returns an abstract conformance without being able to check if the conformance actually holds (\SecRef{abstract conformances}). With archetypes, we implement a more useful behavior that distinguishes several cases. Let $\archetype{T}$ be an archetype with generic signature $G$, and let \texttt{P} be a protocol:
 \begin{enumerate}
-\item If $G\vdash\ConfReq{T}{C}$ for some class type~\texttt{C}, and \texttt{C} conforms to \texttt{P}, then the archetype \emph{conforms concretely} to \texttt{P}. The class type \texttt{C} may contain type parameters, so global conformance lookup recursively calls itself on~$\MapIn(\texttt{C})$:
+\item If $G\vdash\TC$ for some class type~\texttt{C}, and \texttt{C} conforms to \texttt{P}, then the archetype \emph{conforms concretely} to \texttt{P}. The class type \texttt{C} may contain type parameters, so global conformance lookup recursively calls itself on~$\MapIn(\texttt{C})$:
 \[\protosym{P}\otimes\archetype{T}=\protosym{P}\otimes\MapIn(\texttt{C})=\ConfReq{$\MapIn(\texttt{C})$}{P}\]
 The result is actually wrapped in an \index{inherited conformance}\emph{inherited conformance}, which doesn't do much except report the conforming type as $\archetype{T}$ rather than $\MapIn(\texttt{C})$ (\SecRef{inheritedconformance}).
-\item If $G\vdash\ConfReq{T}{P}$, the archetype \emph{conforms abstractly}, and thus global conformance lookup returns an abstract conformance:
+\item If $G\vdash\TP$, the archetype \emph{conforms abstractly}, and thus global conformance lookup returns an abstract conformance:
 \[\protosym{P}\otimes\archetype{T}=\ConfReq{$\archetype{T}$}{P}\]
 \item Otherwise, $\archetype{T}$ does not conform to \texttt{P}, and global conformance lookup returns an invalid conformance.
 \end{enumerate}
-In (2), we return an abstract conformance whose subject type is an archetype. We need to explain what this means. To recap, when the original type of an abstract conformance is a type parameter~\texttt{T}, the type witness for \texttt{[P]A} is a dependent member type~\texttt{T.[P]A}. Similarly, the associated conformance for $\ConfReq{Self.U}{Q}_\texttt{P}$ is the abstract conformance $\ConfReq{T.U}{Q}$. So, when the original type is an \index{abstract conformance!with archetype}archetype $\archetype{T}$, we must also map this \index{type witness!of abstract conformance}type witness or \index{associated conformance!of abstract conformance}associated conformance into the environment:
+In (2), we return an abstract conformance whose subject type is an archetype. We need to explain what this means. To recap, when the original type of an abstract conformance is a type parameter~\tT, the type witness for \texttt{[P]A} is a dependent member type~\texttt{T.[P]A}. Similarly, the associated conformance for $\AssocConfReq{Self.U}{Q}{P}$ is the abstract conformance $\ConfReq{T.U}{Q}$. So, when the original type is an \index{abstract conformance!with archetype}archetype $\archetype{T}$, we must also map this \index{type witness!of abstract conformance}type witness or \index{associated conformance!of abstract conformance}associated conformance into the environment:
 \begin{align*}
 \AssocType{[P]A}\otimes \ConfReq{$\archetype{T}$}{P} &=\archetype{T.[P]A}= \MapIn(\texttt{T.[P]A})\\
 \AssocConf{Self.U}{Q}\otimes \ConfReq{$\archetype{T}$}{P} &=\ConfReq{$\archetype{T.U}$}{Q}= \protosym{Q}\otimes\MapIn(\texttt{T.U})
@@ -173,8 +173,8 @@ Recall that $\SubMapObj{G}{H}$ is set of substitution maps with input generic si
 \[
 \TypeObj{\EquivClass{G}}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}
 \]
-To apply a substitution map $\Sigma$ to a contextual type $\texttt{T}^\prime\in\TypeObj{\EquivClass{G}}$, we first map the the contextual type out of its environment, and then apply the substitution map to this interface type:
-\[\texttt{T}^\prime\otimes \Sigma = \MapOut(\texttt{T}^\prime)\otimes \Sigma\]
+To apply a substitution map $\Sigma$ to a contextual type $\tT^\prime\in\TypeObj{\EquivClass{G}}$, we first map the the contextual type out of its environment, and then apply the substitution map to this interface type:
+\[\tT^\prime\otimes \Sigma = \MapOut(\tT^\prime)\otimes \Sigma\]
 If the replacement types of $\Sigma$ are interface types, we always get an interface type back, regardless of whether the original type was an interface type or a contextual type.
 
 Substitution maps can also have contextual replacement types. This will be important in \SecRef{checking generic arguments}, so we will introduce the notation now. We write \IndexSet{sub}{\SubMapObj{G}{H}}$\SubMapObj{G}{\EquivClass{H}}$ for the set of substitution maps whose replacement types are drawn from $\TypeObj{\EquivClass{H}}$. Now, if~$\Sigma$ has contextual replacement types, we always get a contextual type back, regardless of whether the original type was an interface type or contextual type:
@@ -192,12 +192,12 @@ Substitution maps can also have contextual replacement types. This will be impor
 \[1_{\EquivClass{G}}:=\{\ttgp{0}{0}\mapsto\MapIn(\ttgp{0}{0}),\,\ldots,\,\ttgp{m}{n}\mapsto\MapIn(\ttgp{m}{n});\,\ldots\}\]
 Note that $1_{\EquivClass{G}}\in\SubMapObj{G}{\EquivClass{G}}$. The forwarding substitution map looks similar to the identity substitution map $1_G\in\SubMapObj{G}{G}$ which sends every generic parameter to itself, from \SecRef{submapcomposition}:
 \[1_{G}:=\{\ttgp{0}{0}\mapsto\ttgp{0}{0},\,\ldots,\,\ttgp{m}{n}\mapsto\ttgp{m}{n};\,\ldots\}\]
-If $\texttt{T}\in\TypeObj{G}$ and $\texttt{T}^\prime\in\TypeObj{\EquivClass{G}}$, we can apply $1_G$ and $1_{\EquivClass{G}}$ to each one of \texttt{T} and $\texttt{T}^\prime$:
+If $\tT\in\TypeObj{G}$ and $\tT^\prime\in\TypeObj{\EquivClass{G}}$, we can apply $1_G$ and $1_{\EquivClass{G}}$ to each one of \tT\ and $\tT^\prime$:
 \begin{gather*}
-\texttt{T}\otimes 1_G=\texttt{T}\\
-\texttt{T}\otimes 1_{\EquivClass{G}}=\MapIn(\texttt{T})\\
-\texttt{T}^\prime\otimes 1_G=\MapOut(\texttt{T}^\prime)\otimes 1_G=\MapOut(\texttt{T}^\prime)\\
-\texttt{T}^\prime\otimes 1_{\EquivClass{G}}=\MapOut(\texttt{T}^\prime)\otimes 1_{\EquivClass{G}}=\MapIn(\MapOut(\texttt{T}^\prime))=\texttt{T}^\prime
+\tT\otimes 1_G=\tT\\
+\tT\otimes 1_{\EquivClass{G}}=\MapIn(\tT)\\
+\tT^\prime\otimes 1_G=\MapOut(\tT^\prime)\otimes 1_G=\MapOut(\tT^\prime)\\
+\tT^\prime\otimes 1_{\EquivClass{G}}=\MapOut(\tT^\prime)\otimes 1_{\EquivClass{G}}=\MapIn(\MapOut(\tT^\prime))=\tT^\prime
 \end{gather*}
 Or in words,
 \begin{itemize}
@@ -227,7 +227,7 @@ These predicates are used to check preconditions in cases where a piece of compi
 
 \section{The Type Parameter Graph}\label{type parameter graph}
 
-Let $G$ be the generic signature \texttt{<\rT\ where \rT:\ Sequence>}, and consider the type parameter \texttt{\rT.Element}. One way of thinking about the operation $\MapIn(\texttt{\rT.Element})$ is that we start from the archetype $\archetype{\rT}$, and then ``jump'' to $\archetype{\rT.Element}$ in one step, labeled ``\texttt{.Element}''. Similarly, if we wanted to find $\MapIn(\texttt{\rT.Iterator.Element})$, we start from $\archetype{\rT}$, take a step to $\archetype{\rT.Iterator}$, and then take one more step, at which point we again end up at $\archetype{\rT.Element}$, because \texttt{\rT.Element} is the reduced type of \texttt{\rT.Iterator.Element}:
+Let $G$ be the generic signature \texttt{<\rT\ where \rT:\ Sequence>}, and consider the type parameter \texttt{\rT.Element}. One way to think about the operation $\MapIn(\texttt{\rT.Element})$ is that we start from the archetype $\archetype{\rT}$, and then ``jump'' to $\archetype{\rT.Element}$ in one step, labeled ``\texttt{.Element}''. Similarly, to find $\MapIn(\texttt{\rT.Iterator.Element})$, we start from $\archetype{\rT}$, take a step to $\archetype{\rT.Iterator}$, and then take one more step, at which point we again end up at $\archetype{\rT.Element}$, because \texttt{\rT.Element} is the reduced type of \texttt{\rT.Iterator.Element}:
 \begin{center}
 \begin{tikzpicture}[x=3cm,y=1.3cm]
 \node (T) [root] at (0,1) {\rT};
@@ -296,7 +296,7 @@ The \IndexDefinition{type parameter graph}\emph{type parameter graph} of a gener
 \item The \index{vertex!of type parameter graph}vertex set contains a distinguished \index{root vertex!of type parameter graph}root vertex. (But we can sometimes omit it, as described later.)
 \item For each \index{equivalence class!of type parameters}equivalence class of type parameters of~$G$, the vertex set also contains a vertex labeled with the reduced type of the equivalence class. If the \index{reduced type!type parameter graph}reduced type of some equivalence class is a concrete type, the corresponding vertex is labeled with this concrete type.
 \item For each generic parameter $\ttgp{d}{i}$ of $G$, the \index{edge!of type parameter graph}edge set contains an edge with the root vertex as the source, and the equivalence class of this generic parameter, $\EquivClass{\ttgp{d}{i}}$, as the destination. We label this edge with the generic parameter type ``\ttgp{d}{i}''.
-\item If $G\vdash\texttt{U.A}$ and $G\vdash\SameReq{U.A}{V}$ for some pair of type parameters \texttt{T} and \texttt{U} and some identifier \texttt{A}, the edge set contains an edge with source~$\archetype{U}$ and destination~$\archetype{V}$, labeled ``\texttt{.A}''.
+\item If $G\vdash\texttt{U.A}$ and $G\vdash\SameReq{U.A}{V}$ for some pair of type parameters \tT\ and \tU\ and some identifier \texttt{A}, the edge set contains an edge with source~$\archetype{U}$ and destination~$\archetype{V}$, labeled ``\texttt{.A}''.
 \end{itemize}
 \end{definition}
 
@@ -305,16 +305,16 @@ The edge relation described above is \index{well-defined}\emph{well-defined}.
 \end{proposition}
 \begin{proof}
 That is, if we're given two equivalence classes, the question of whether there is an edge connecting one to the other does not depend on which representative type parameter we pick from each one.
-To see why, suppose that $G\vdash\SameReq{U}{$\texttt{U}^\prime$}$, $G\vdash\SameReq{V}{$\texttt{V}^\prime$}$, $G\vdash\texttt{U.A}$, and $G\vdash\SameReq{U.A}{V}$, so there is an edge labeled ``\texttt{.A}'' with source~\texttt{U} and destination~\texttt{V}. We note that the condition $G\vdash\texttt{U.A}$ means $G\vdash\ConfReq{U}{P}$ for some protocol~\texttt{P} that declares an associated type named~\texttt{A}. Using all this, we can then derive $G\vdash\SameReq{$\texttt{U}^\prime$\texttt{.A}}{$\texttt{V}^\prime$}$:
+To see why, suppose that $G\vdash\SameReq{U}{$\tU^\prime$}$, $G\vdash\SameReq{V}{$\texttt{V}^\prime$}$, $G\vdash\texttt{U.A}$, and $G\vdash\SameReq{U.A}{V}$, so there is an edge labeled ``\texttt{.A}'' with source~\tU\ and destination~\texttt{V}. We note that the condition $G\vdash\texttt{U.A}$ means $G\vdash\ConfReq{U}{P}$ for some protocol~\texttt{P} that declares an associated type named~\texttt{A}. Using all this, we can then derive $G\vdash\SameReq{$\tU^\prime$\texttt{.A}}{$\texttt{V}^\prime$}$:
 \begin{gather*}
-\AnyStep{\SameReq{U}{$\texttt{U}^\prime$}}{1}\\
+\AnyStep{\SameReq{U}{$\tU^\prime$}}{1}\\
 \AnyStep{\SameReq{V}{$\texttt{V}^\prime$}}{2}\\
 \AnyStep{\ConfReq{U}{P}}{3}\\
 \AnyStep{\SameReq{U.A}{V}}{4}\\
-\SameNameStep{3}{4}{U.A}{$\texttt{U}^\prime$.A}{5}\\
-\SymStep{5}{$\texttt{U}^\prime$.A}{U.A}{6}\\
-\TransStep{6}{4}{$\texttt{U}^\prime$.A}{V}{7}\\
-\TransStep{7}{2}{$\texttt{U}^\prime$.A}{$\texttt{V}^\prime$}{8}
+\SameNameStep{3}{4}{U.A}{$\tU^\prime$.A}{5}\\
+\SymStep{5}{$\tU^\prime$.A}{U.A}{6}\\
+\TransStep{6}{4}{$\tU^\prime$.A}{V}{7}\\
+\TransStep{7}{2}{$\tU^\prime$.A}{$\texttt{V}^\prime$}{8}
 \end{gather*}
 This result would no longer hold if we didn't have the \IndexStep{SameName}\textsc{SameName} inference rule, so this proposition gives us another justification for the existence of this inference rule.
 \end{proof}
@@ -397,7 +397,7 @@ We already studied the equivalence class structure of this generic signature ext
 \end{scope}
 \end{tikzpicture}
 \end{center}
-Notice how the paths in the graph defined by each of the type parameters \texttt{\rT.Element}, \texttt{\rU.Element}, \texttt{\rT.Iterator.Element}, \texttt{\rU.Iterator.Element} all have the same destination, because they are all in the same equivalence class $\archetype{\rT.Element}$.
+Notice how the paths corresponding to each one of the type parameters \texttt{\rT.Element}, \texttt{\rU.Element}, \texttt{\rT.Iterator.Element}, and \texttt{\rU.Iterator.Element} all have the same destination, because they belong to the same equivalence class $\archetype{\rT.Element}$.
 \end{example}
 
 When our generic signature only has a single generic parameter \rT, we can omit the root vertex. This changes our formulation slightly, because now a type parameter maps to a path that starts at \rT, so it has one fewer step.
@@ -441,10 +441,10 @@ Just like $G_\texttt{N}$, the protocol generic signature $G_\texttt{Z4}$ still d
 \node (TAA) [interior] at (1,0) {\texttt{\rT.A.A}};
 \node (TAAA) [interior] at (0,1) {\texttt{\rT.A.A.A}};
 
-\path [arrow, bend left] (T) edge [right] node {\tiny{\texttt{.A}}} (TA);
+\path [arrow, bend left] (T) edge [right] node [xshift=3pt] {\tiny{\texttt{.A}}} (TA);
 \path [arrow, bend left] (TA) edge [right] node {\tiny{\texttt{.A}}} (TAA);
 \path [arrow, bend left] (TAA) edge [left] node {\tiny{\texttt{.A}}} (TAAA);
-\path [arrow, bend left] (TAAA) edge [left] node {\tiny{\texttt{.A}}} (T);
+\path [arrow, bend left] (TAAA) edge [left] node [xshift=-3pt] {\tiny{\texttt{.A}}} (T);
 \end{tikzpicture}
 \end{center}
 For example, \texttt{\ttgp{0}{0}.A} and \texttt{\ttgp{0}{0}.A.A.A.A.A} are equivalent. Note that a generic signature with an \index{theory!infinite}infinite theory but only finitely many equivalence classes must have at least one infinite equivalence class. In $G_\texttt{Z4}$, \emph{every} equivalence class is infinite.
@@ -555,7 +555,7 @@ In \ChapRef{conformance paths}, we will construct a second directed graph for a 
 
 \section{The Archetype Builder}\label{archetype builder}
 
-A generic environment gives us a faithful representation of a generic signature: the $\MapIn$ operation encodes the \index{reduced type equality}reduced type equality relation, and the \index{local requirements}local requirements of its archetypes encode everything else. Today, a generic environment is a \emph{derived} representation, in the sense that it sits on top of \index{generic signature query}generic signature queries. This was not always the case, and back in Swift 3, archetypes were primitive. In this section, we will describe the \IndexDefinition{ArchetypeBuilder@\texttt{ArchetypeBuilder}}\texttt{ArchetypeBuilder} algorithm that was used to build them. While now obsolete and no longer part of the implementation, the algorithm has a certain elegance to it, and understanding it will motivate the material in \PartRef{part rqm}.
+A generic environment gives us a faithful representation of a generic signature: the $\MapIn$ operation encodes the \index{reduced type equality}reduced type equality relation, and the \index{local requirements}local requirements of its archetypes encode everything else. Today, a generic environment is a \emph{derived} representation, in the sense that it sits on top of \index{generic signature query}generic signature queries. This was not always the case, and back in Swift 3, archetypes were the fundamental primitives. In this section, we will describe the \IndexDefinition{ArchetypeBuilder@\texttt{ArchetypeBuilder}}\texttt{ArchetypeBuilder} algorithm that was used to build them. While now obsolete and no longer part of the implementation, the algorithm has a certain elegance to it, and understanding it will motivate the material in \PartRef{part rqm}.
 
 We can group generic signatures into three families of increasing complexity:
 \begin{enumerate}
@@ -582,14 +582,14 @@ $\PAMembers(t)$& A set of (identifier, pointer to potential archetype) pairs.\\
 \bottomrule
 \end{tabular}
 \end{center}
-A potential archetype~$t$ always represents a fixed type parameter \texttt{T}, so that $\PAType(t)=\texttt{T}$ for the lifetime of~$t$. In the initial state, we have $\PAForward(t)=\text{null}$, $\PAConforms(t)=\varnothing$, and $\PAMembers(t)=\varnothing$. Potential archetypes are allocated sequentially while the algorithm runs, and then freed all at once when the entire archetype builder instance is freed.
+A potential archetype~$t$ always represents a fixed type parameter \tT, so that $\PAType(t)=\tT$ for the lifetime of~$t$. In the initial state, we have $\PAForward(t)=\text{null}$, $\PAConforms(t)=\varnothing$, and $\PAMembers(t)=\varnothing$. Potential archetypes are allocated sequentially while the algorithm runs, and then freed all at once when the entire archetype builder instance is freed.
 
 The archetype builder establishes the following invariant. Any potential archetype with a null forwarding pointer represents the reduced type parameter of its equivalence class. In this case, $\PAConforms(t)$ is the set of all protocols this equivalence class conforms to, and $\PAMembers(t)$ lists all of the successors of the equivalence class in the type parameter graph. Otherwise, if a potential archetype~$t$ has a non-null forwarding pointer, it points to some other potential archetype in the same equivalence class, and the other potential archetype precedes it in type parameter order; that is, $\PAType(\PAForward(t))<\PAType(t)$. By following this chain, we eventually end up at the reduced type parameter.
 
 We now describe how this invariant is established, then show how the resulting data structure can implement generic signature queries.
 
 \paragraph{Eager expansion.}
-The archetype builder begins by creating a potential archetype for each declared generic parameter; these are called \emph{root} potential archetypes. Potential archetypes that correspond to \index{dependent member type!in archetype builder}dependent member types come into existence from the \emph{expansion} of \index{conformance requirement!in archetype builder}conformance requirements. The expansion of a conformance requirement is the first of the two principal operations on potential archetypes. A protocol can impose conformance requirements on its associated types, so this expansion process is recursive. Notice how in (5b), we must catch and diagnose recursive conformance requirements, to prevent runaway recursion; this is of course the principal limitation of this approach.
+The archetype builder begins by creating a potential archetype for each declared generic parameter; these are called \emph{root} potential archetypes. Potential archetypes that correspond to \index{dependent member type!in archetype builder}dependent member types come into existence from the \emph{expansion} of \index{conformance requirement!in archetype builder}conformance requirements. The expansion of a conformance requirement is the first of the two principal operations on potential archetypes. A protocol can impose conformance requirements on its associated types, so this expansion process is recursive. Notice how in Step~6b, we must catch and diagnose recursive conformance requirements to protocols we've already seen, to guarantee termination; this is of course the major limitation with the ``eager expansion'' approach.
 
 \begin{algorithm}[Expand conformance requirement]\label{archetype builder expand}
 Takes a potential archetype~$t$ and a protocol \texttt{P} as input. Has side effects.
@@ -598,7 +598,7 @@ Takes a potential archetype~$t$ and a protocol \texttt{P} as input. Has side eff
 \item If $\texttt{P}\in\PAConforms(t)$, return.
 \item Otherwise, set $\PAConforms(t)\leftarrow \PAConforms(t)\cup\{\texttt{P}\}$.
 \item For each protocol~\texttt{Q} appearing in the inheritance clause of the declaration of \texttt{P}, recursively apply this algorithm to $t$ and \texttt{Q}.
-\item Let $\texttt{T}:=\PAType(t)$.
+\item Let $\tT:=\PAType(t)$.
 \item For each associated type declaration \texttt{A} of \texttt{P}:
 \begin{enumerate}
 \item If $\PAMembers(t)$ does not have an entry for \texttt{A}, create a new potential archetype~$v$ with $\PAType(v)=\texttt{T.A}$. Add the ordered pair $(\texttt{A}, v)$ to $\PAMembers(t)$.
@@ -619,7 +619,7 @@ Receives a pair of potential archetypes $t$~and~$u$ as input. Has side effects.
 \item If $\PAType(u)<\PAType(t)$ under \AlgRef{type parameter order}, first swap $t$ and $u$. (This step is what eventually guarantees that $\PAForward(t)=\text{null}$ if and only if $\PAType(t)$ is a reduced type parameter.)
 \item Set $\PAForward(u)\leftarrow t$.
 \item Set $\PAConforms(t)\leftarrow\PAConforms(t)\cup\PAConforms(u)$.
-\item Let $\texttt{T}:=\PAType(t)$.
+\item Let $\tT:=\PAType(t)$.
 \item For each entry $(\texttt{A},w)\in\PAMembers(u)$,
 \begin{enumerate}
 \item If $\PAMembers(t)$ does not contain a potential archetype for \texttt{A}, create a new potential archetype~$v$ such that $\PAType(v)=\texttt{T.A}$. Add $(\texttt{A},v)$ to $\PAMembers(t)$.
@@ -631,12 +631,12 @@ Receives a pair of potential archetypes $t$~and~$u$ as input. Has side effects.
 
 We need one more utility subroutine to actually resolve an arbitrary type parameter to a potential archetype, starting from the roots:
 
-\begin{algorithm}[Resolve potential archetype]\label{archetype builder lookup} Receives the array of root potential archetypes, and a type parameter~\texttt{T}. Returns the potential archetype for~\texttt{T}, or null if one has not been created.
+\begin{algorithm}[Resolve potential archetype]\label{archetype builder lookup} Receives the array of root potential archetypes, and a type parameter~\tT. Returns the potential archetype for~\tT, or null if one has not been created.
 \begin{enumerate}
-\item If \texttt{T} is a generic parameter, let $t$ be the corresponding root potential archetype. If $\PAForward(t)$ is non-null, load $t\leftarrow\PAForward(t)$, and repeat if necessary. Return~$t$.
-\item Otherwise, \texttt{T} must be a dependent member type \texttt{U.A} with some base type~\texttt{T} and identifier~\texttt{A}. First, invoke the algorithm recursively to resolve \texttt{U} to a potential archetype~$u$.
+\item If \tT\ is a generic parameter, let $t$ be the corresponding root potential archetype. If $\PAForward(t)$ is non-null, load $t\leftarrow\PAForward(t)$, and repeat if necessary. Return~$t$.
+\item Otherwise, \tT\ must be a dependent member type \texttt{U.A} with some base type~\tT\ and identifier~\texttt{A}. First, invoke the algorithm recursively to resolve \tU\ to a potential archetype~$u$.
 \item If $\PAMembers(u)$ contains a potential archetype for \texttt{A}, let $t$ be this potential archetype. If $\PAForward(t)$ is non-null, load $t\leftarrow\PAForward(t)$, and repeat if necessary. Return~$t$.
-\item Otherwise, return null. The type parameter \texttt{T} is either invalid, or we haven't yet expanded a conformance requirement involved in its derivation.
+\item Otherwise, return null. The type parameter \tT\ is either invalid, or we haven't yet expanded a conformance requirement involved in its derivation.
 \end{enumerate}
 \end{algorithm}
 
@@ -647,8 +647,8 @@ We're now ready to look at the main algorithm. We visit each requirement written
 \item (Reprocess) If the pending list is empty and the flag is set, move any requirements from the delayed list to the pending list, and clear the flag.
 \item (Check) If the pending list is still empty, go to Step~8.
 \item (Resolve) Remove a requirement from the pending list.
-\item (Conformance) For a conformance requirement $\ConfReq{T}{P}$, invoke \AlgRef{archetype builder lookup} to resolve \texttt{T} to a potential archetype. If this potential archetype does not exist, add $\ConfReq{T}{P}$ to the delayed list and set the flag. Otherwise, invoke \AlgRef{archetype builder expand} to expand the conformance requirement.
-\item (Same-type) For a same-type requirement $\SameReq{T}{U}$, invoke \AlgRef{archetype builder lookup} to resolve each one of \texttt{T} and \texttt{U} to an potential archetype. If either potential archetype does not exist, add $\SameReq{T}{U}$ to the delayed list and set the flag. Otherwise, invoke \AlgRef{archetype builder merge} to merge the two potential archetypees.
+\item (Conformance) For a conformance requirement $\TP$, invoke \AlgRef{archetype builder lookup} to resolve \tT\ to a potential archetype. If this potential archetype does not exist, add $\TP$ to the delayed list and set the flag. Otherwise, invoke \AlgRef{archetype builder expand} to expand the conformance requirement.
+\item (Same-type) For a same-type requirement $\TU$, invoke \AlgRef{archetype builder lookup} to resolve each one of \tT\ and \tU\ to an potential archetype. If either potential archetype does not exist, add $\TU$ to the delayed list and set the flag. Otherwise, invoke \AlgRef{archetype builder merge} to merge the two potential archetypes.
 \item (Repeat) Go back to Step~2.
 \item (Diagnose) If we end up here, there are no more pending requirements. Any requirements remaining on the delayed list reference type parameters which cannot be resolved; diagnose them as invalid.
 \end{enumerate}
@@ -656,11 +656,11 @@ We're now ready to look at the main algorithm. We visit each requirement written
 
 Once the algorithm returns, the potential archetype structure now encodes the finite type parameter graph built from the input requirements, assuming we didn't diagnose an invalid recursive conformance. At this point, no more expansion or merging takes place; the remaining potential archetypes, those without forwarding pointers, are ``frozen'' into immutable archetype \emph{types} that describe this generic signature to the rest of the compiler. While generic signature queries did not exist back then, we can reconcile this algorithm with our present model by defining each generic signature query as follows:
 \begin{itemize}
-\item \IndexQuery{isValidTypeParameter}$\Query{isValidTypeParameter}{G,\,\texttt{T}}$: Resolve \texttt{T} to a potential archetype~$t$, and check if~$t$ is non-null.
-\item \IndexQuery{getReducedType}$\Query{getReducedType}{G,\,\texttt{T}}$: Resolve \texttt{T} to a potential archetype~$t$, and return $\PAType(t)$.
-\item \IndexQuery{areReducedTypeParametersEqual}$\Query{areReducedTypeParametersEqual}{G,\,\texttt{T},\,\texttt{U}}$: Resolve both \texttt{T}~and~\texttt{U} to potential archetypes $t$~and~$u$, and check if $t$ and $u$ are equal pointers to the same potential archetype.
-\item \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\texttt{T},\,\texttt{P}}$: Resolve \texttt{T} to a potential archetype~$t$, and check if $\texttt{P}\in\PAConforms(t)$.
-\item \IndexQuery{getRequiredProtocols}$\Query{getRequiredProtocols}{G,\,\texttt{T}}$: Resolve \texttt{T} to a potential archetype~$t$, and return $\PAConforms(t)$.
+\item \IndexQuery{isValidTypeParameter}$\Query{isValidTypeParameter}{G,\,\tT}$: Resolve \tT\ to a potential archetype~$t$, and check if~$t$ is non-null.
+\item \IndexQuery{getReducedType}$\Query{getReducedType}{G,\,\tT}$: Resolve \tT\ to a potential archetype~$t$, and return $\PAType(t)$.
+\item \IndexQuery{areReducedTypeParametersEqual}$\Query{areReducedTypeParametersEqual}{G,\,\tT,\,\tU}$: Resolve both \tT~and~\tU\ to potential archetypes $t$~and~$u$, and check if $t$ and $u$ are equal pointers to the same potential archetype.
+\item \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{G,\,\tT,\,\texttt{P}}$: Resolve \tT\ to a potential archetype~$t$, and check if $\texttt{P}\in\PAConforms(t)$.
+\item \IndexQuery{getRequiredProtocols}$\Query{getRequiredProtocols}{G,\,\tT}$: Resolve \tT\ to a potential archetype~$t$, and return $\PAConforms(t)$.
 \end{itemize}
 
 The archetype builder is an example of a \IndexDefinition{union-find}\emph{union-find} or \index{disjoint set|see{union-find}}\emph{disjoint set} data structure (see, for example, Section~2.3.3 of~\cite{art1}). An instance of this data structure defines an equivalence relation. Starting from a collection of singleton equivalence classes, the two fundamental operations are \emph{union}, to merge two equivalence classes, and \emph{find}, to resolve an element to its equivalence class. In our case, \AlgRef{archetype builder merge} is \emph{union}, and \AlgRef{archetype builder lookup} is \emph{find} (whereas the expansion in \AlgRef{archetype builder expand} is our own thing).
@@ -678,7 +678,7 @@ In the lazy expansion model, the potential archetype structure was highly mutabl
 
 Lazy expansion also suffered from correctness problems. Even the second family of generic signatures, those with an infinite theory but a finite set of equivalence classes, did not always work properly. \ExRef{protocol z4 graph} happened to be one such instance, and we will later see another in \ExRef{proto assoc rule}. An even more fundamental problem was discovered later. As we will see in \SecRef{word problem}, the third family of generic signatures, those having an infinite set of equivalence classes, actually contains generic signatures where the question of reduced type equality is \emph{undecidable}. Such generic signatures must be rejected by any correct implementation of Swift. By virtue of its design, the \texttt{GenericSignatureBuilder} pretended to be able to accept any generic signature and answer queries about it. Lazy expansion was a dead end! This seemed surprising at the time, because in the absence of recursive conformances, eager expansion completely ``solved'' Swift generics in a straightforward way.
 
-These problems motivated the search for a sound and decidable foundation on top of which Swift generics should be built, which became the Requirement Machine. Instead of attempting to construct a finite subgraph of the type parameter graph, the correct approach is to construct a \emph{string rewrite system}. While considerably more abstract, this is actually much \emph{simpler} than lazy expansion of the type parameter graph. Just like the original eager expansion design, the rewrite system is a finite data structure, and it is immutable after construction. Unlike eager expansion, a rewrite system can describe an infinite type parameter graph, and it can encode a \emph{finite} type parameter graph in a more efficient way that avoids exhaustive enumeration of all equivalence classes. We will describe the contemporary approach and present a correctness proof in \PartRef{part rqm}.
+These problems motivated the search for a sound and decidable foundation on top of which Swift generics should be built, which became the Requirement Machine. Instead of incrementally constructing finite subgraphs of the type parameter graph, the correct approach is to construct a \emph{convergent rewriting system}. While more abstract, this is actually much \emph{simpler} than lazy expansion of the type parameter graph. Just like with the original eager expansion design, the rewriting system is a finite data structure that is built once and then remains immutable after construction. Unlike eager expansion, a rewriting system can describe an infinite set of equivalence classes, and in many cases, it can also encode a \emph{finite} set without exhaustive enumeration. We will describe the contemporary approach and present a correctness proof in \PartRef{part rqm}.
 
 
 

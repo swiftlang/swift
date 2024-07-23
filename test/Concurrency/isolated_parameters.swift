@@ -131,7 +131,7 @@ actor MyActor {
   func hello() {} // expected-typechecker-note {{calls to instance method 'hello()' from outside of its actor context are implicitly asynchronous}}
 }
 
-// Compiler >= 5.3 is eneded to suppress the parser error
+// Compiler >= 5.3 is ended to suppress the parser error
 #if compiler(>=5.3) && ALLOW_TYPECHECKER_ERRORS
 typealias MyFn = (isolated: Int) -> Void // expected-typechecker-error {{function types cannot have argument labels; use '_' before 'isolated'}}
 #endif
@@ -439,8 +439,9 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   let myActor = A()
 
   await optionalIsolated(ns, to: myActor)
-  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{pattern that the region based isolation checker does not understand how to check. Please file a bug}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
+  // expected-tns-note @-3 {{sending task-isolated 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated and task-isolated uses}}
 
 #if ALLOW_TYPECHECKER_ERRORS
   optionalIsolatedSync(ns, to: myActor)
@@ -456,13 +457,14 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
   // expected-tns-note @-3 {{sending main actor-isolated 'ns' to nonisolated global function 'optionalIsolated(_:to:)' risks causing data races between nonisolated and main actor-isolated uses}}
 
-  optionalIsolatedSync(ns, to: nil) // expected-tns-warning {{pattern that the region based isolation checker does not understand how to check. Please file a bug}}
+  optionalIsolatedSync(ns, to: nil)
 
   let myActor = A()
 
   await optionalIsolated(ns, to: myActor)
   // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{pattern that the region based isolation checker does not understand how to check. Please file a bug}}
+  // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
+  // expected-tns-note @-3 {{sending main actor-isolated 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated and main actor-isolated uses}}
 
 #if ALLOW_TYPECHECKER_ERRORS
   optionalIsolatedSync(ns, to: myActor)
@@ -566,4 +568,15 @@ public func useDefaultIsolationWithoutIsolatedParam(
 @MainActor func callUseDefaultIsolation() async {
   useDefaultIsolation()
   useDefaultIsolationWithoutIsolatedParam()
+}
+
+public actor MyActorIsolatedParameterMerge {
+  private var inProgressIndexTasks: [Int: Int] = [:]
+
+  public func test() async {
+    await withTaskGroup(of: Void.self) { taskGroup in
+      for (_, _) in inProgressIndexTasks {}
+      await taskGroup.waitForAll()
+    }
+  }
 }

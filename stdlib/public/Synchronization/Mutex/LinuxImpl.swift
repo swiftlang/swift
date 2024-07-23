@@ -19,13 +19,13 @@ import Glibc
 
 extension Atomic where Value == UInt32 {
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
-  // specifc error value.
+  // specific error value.
   internal borrowing func _futexLock() -> UInt32 {
     _swift_stdlib_futex_lock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
-  // specifc error value.
+  // specific error value.
   internal borrowing func _futexTryLock() -> UInt32 {
     _swift_stdlib_futex_trylock(.init(_rawAddress))
   }
@@ -189,7 +189,7 @@ extension _MutexHandle {
       // ESRCH  - "The thread ID in the futex word at uaddr does not exist."
       default:
         // TODO: Replace with a colder function / one that takes a StaticString
-        fatalError("Unknown error occured while attempting to acquire a Mutex")
+        fatalError("Unknown error occurred while attempting to acquire a Mutex")
       }
     }
   }
@@ -359,7 +359,7 @@ extension _MutexHandle {
       //           space.)"
       default:
         // TODO: Replace with a colder function / one that takes a StaticString
-        fatalError("Unknown error occured while attempting to release a Mutex")
+        fatalError("Unknown error occurred while attempting to release a Mutex")
       }
     }
   }

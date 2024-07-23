@@ -87,7 +87,7 @@ struct S {
 
 #endif
 
-#if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}
+#if arch(arn) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}
 #endif
 
 #if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}} expected-note{{did you mean 'big'?}} {{13-16=big}}
@@ -123,26 +123,26 @@ undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 #endif
 
 /// Invalid platform condition arguments don't invalidate the whole condition.
-#if !arch(tecture) && !os(ystem) && !_endian(ness)
+#if !arch(arn) && !os(ystem) && !_endian(ness)
 // expected-warning@-1 {{unknown architecture for build configuration 'arch'}}
-// expected-note@-2 {{did you mean 'arm'?}} {{11-18=arm}}
+// expected-note@-2 {{did you mean 'arm'?}} {{11-14=arm}}
 // expected-warning@-3 {{unknown operating system for build configuration 'os'}}
-// expected-note@-4 {{did you mean 'OSX'?}} {{27-32=OSX}}
-// expected-note@-5 {{did you mean 'PS4'?}} {{27-32=PS4}}
-// expected-note@-6 {{did you mean 'none'?}} {{27-32=none}}
+// expected-note@-4 {{did you mean 'OSX'?}} {{23-28=OSX}}
+// expected-note@-5 {{did you mean 'PS4'?}} {{23-28=PS4}}
+// expected-note@-6 {{did you mean 'none'?}} {{23-28=none}}
 // expected-warning@-7 {{unknown endianness for build configuration '_endian'}}
-// expected-note@-8 {{did you mean 'big'?}} {{46-50=big}}
+// expected-note@-8 {{did you mean 'big'?}} {{42-46=big}}
 func fn_k() {}
 #endif
 fn_k()
 
-#if os(cillator) || arch(ive)
+#if os(cillator) || arch(i3rm)
 // expected-warning@-1 {{unknown operating system for build configuration 'os'}}
 // expected-note@-2 {{did you mean 'macOS'?}} {{8-16=macOS}}
 // expected-note@-3 {{did you mean 'iOS'?}} {{8-16=iOS}}
 // expected-warning@-4 {{unknown architecture for build configuration 'arch'}}
-// expected-note@-5 {{did you mean 'arm'?}} {{26-29=arm}}
-// expected-note@-6 {{did you mean 'i386'?}} {{26-29=i386}}
+// expected-note@-5 {{did you mean 'arm'?}} {{26-30=arm}}
+// expected-note@-6 {{did you mean 'i386'?}} {{26-30=i386}}
 // expected-note@-7 {{did you mean 'visionOS'?}} {{8-16=visionOS}}
 func undefinedFunc() // ignored.
 #endif

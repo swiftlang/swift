@@ -1676,9 +1676,9 @@ namespace {
                                      TVO_CanBindToHole);
       }
       // Diagnose top-level usages of placeholder types.
-      if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
-        CS.getASTContext().Diags.diagnose(repr->getLoc(),
-                                          diag::placeholder_type_not_allowed);
+      if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
+        auto *loc = CS.getConstraintLocator(locator, {LocatorPathElt::PlaceholderType(ty)});
+        CS.recordFix(IgnoreInvalidPlaceholder::create(CS, loc));
       }
       return result;
     }
@@ -2175,15 +2175,13 @@ namespace {
         if (!contextualType)
           return false;
 
-        auto *M = CS.DC->getParentModule();
-
         auto type = contextualType->lookThroughAllOptionalTypes();
 
-        if (M->lookupConformance(type, arrayProto))
+        if (ModuleDecl::lookupConformance(type, arrayProto))
           return false;
 
         if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-          if (M->lookupConformance(type, proto))
+          if (ModuleDecl::lookupConformance(type, proto))
             return true;
 
         return false;
@@ -4413,8 +4411,6 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
 
 bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
     VarDecl *wrappedVar, Type initializerType, Type propertyType) {
-  auto dc = wrappedVar->getInnermostDeclContext();
-
   Type wrappedValueType;
   Type wrapperType;
   auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();
@@ -4448,7 +4444,7 @@ bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
     setType(typeExpr, wrapperType);
 
     wrappedValueType = wrapperType->getTypeOfMember(
-        dc->getParentModule(), wrapperInfo.valueVar);
+        wrapperInfo.valueVar);
   }
 
   // The property type must be equal to the wrapped value type

@@ -19,7 +19,7 @@
 // SIL-LABEL: // pgo_if.guess1
 // SIL-LABEL: sil @$s6pgo_if6guess11xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
 // IR-LABEL: define swiftcc i32 @"$s6pgo_if6guess11xs5Int32VAE_tF"
-// IR-OPT-LABEL: define swiftcc i32 @"$s6pgo_if6guess11xs5Int32VAE_tF"
+// IR-OPT-LABEL: define swiftcc{{.*}} i32 @"$s6pgo_if6guess11xs5Int32VAE_tF"
 public func guess1(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(1)
   // SIL-OPT: cond_br {{.*}} !true_count(5000) !false_count(1)
@@ -35,7 +35,7 @@ public func guess1(x: Int32) -> Int32 {
 // SIL-LABEL: // pgo_if.guess2
 // SIL-LABEL: sil @$s6pgo_if6guess21xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
 // IR-LABEL: define swiftcc i32 @"$s6pgo_if6guess21xs5Int32VAE_tF"
-// IR-OPT-LABEL: define swiftcc i32 @"$s6pgo_if6guess21xs5Int32VAE_tF"
+// IR-OPT-LABEL: define swiftcc{{.*}} i32 @"$s6pgo_if6guess21xs5Int32VAE_tF"
 public func guess2(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(1)
   // SIL-OPT: cond_br {{.*}} !true_count(5000) !false_count(1)

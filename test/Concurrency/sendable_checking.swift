@@ -102,7 +102,10 @@ public actor MyActor: MyProto {
 }
 
 // Make sure the generic signature doesn't minimize away Sendable requirements.
-@_nonSendable class NSClass { }
+class NSClass { }
+
+@available(*, unavailable)
+extension NSClass: @unchecked Sendable {} // expected-note {{conformance of 'NSClass' to 'Sendable' has been explicitly marked unavailable here}}
 
 struct WrapClass<T: NSClass> {
   var t: T
@@ -110,13 +113,13 @@ struct WrapClass<T: NSClass> {
 
 extension WrapClass: Sendable where T: Sendable { }
 
-// Make sure we don't inherit the unavailable Sendable conformance from
-// our superclass.
+// expected-warning@+2 {{conformance of 'SendableSubclass' to protocol 'Sendable' is already unavailable}}
+// expected-note@+1 {{'SendableSubclass' inherits conformance to protocol 'Sendable' from superclass here}}
 class SendableSubclass: NSClass, @unchecked Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 func testSubclassing(obj: SendableSubclass) async {
-  acceptCV(obj) // okay!
+  acceptCV(obj) // expected-warning {{conformance of 'NSClass' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
 }
 
 
@@ -292,9 +295,12 @@ func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{sending 't' risks causing data races}}
+  // expected-tns-note @-3 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-tns-note @-2 {{access can happen concurrently}}
 }
 
 // We get the region isolation error here since t.y is custom actor isolated.

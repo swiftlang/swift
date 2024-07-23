@@ -310,8 +310,7 @@ Type TypeResolution::resolveDependentMemberType(
     }
   }
 
-  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
-                                              baseTy);
+  return TypeChecker::substMemberTypeWithBase(concrete, baseTy);
 }
 
 bool TypeResolution::areSameType(Type type1, Type type2) const {
@@ -580,7 +579,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   // Finally, substitute the base type into the member type.
   return TypeChecker::substMemberTypeWithBase(
-      fromDC->getParentModule(), typeDecl, selfType, /*useArchetypes=*/false);
+      typeDecl, selfType, /*useArchetypes=*/false);
 }
 
 /// This function checks if a bound generic type is UnsafePointer<Void> or
@@ -1166,14 +1165,14 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule(module));
+                                LookUpConformanceInModule());
 
   // Form a sugared typealias reference.
   if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule(module));
+                                       LookUpConformanceInModule());
     resultType = TypeAliasType::get(typealias, parentTy, subMap, resultType);
   }
 
@@ -1229,8 +1228,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (protocol) {
-    auto conformanceRef = dc->getParentModule()->lookupConformance(
-        parentTy, protocol);
+    auto conformanceRef = ModuleDecl::lookupConformance(parentTy, protocol);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
@@ -1369,10 +1367,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
       auto formalAccess = first->getFormalAccess();
       auto nameLoc = repr->getNameLoc();
-      if (formalAccess >= AccessLevel::Public &&
-          diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
-        return ErrorType::get(ctx);
-
       diags.diagnose(nameLoc, diag::candidate_inaccessible, first,
                      formalAccess);
 
@@ -1381,6 +1375,20 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       for (auto lookupResult : inaccessibleResults)
         lookupResult.getValueDecl()->diagnose(diag::kind_declared_here,
                                               DescriptiveDeclKind::Type);
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if we do.
+      return ErrorType::get(ctx);
+    }
+
+    // Try ignoring missing imports.
+    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    auto nonImportedResults = TypeChecker::lookupUnqualifiedType(
+        dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
+    if (!nonImportedResults.empty()) {
+      auto first = cast<TypeDecl>(nonImportedResults.front().getValueDecl());
+      auto nameLoc = repr->getNameLoc();
+      diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -1465,10 +1473,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     const TypeDecl *first = inaccessibleMembers.front().Member;
     auto formalAccess = first->getFormalAccess();
     auto nameLoc = repr->getNameLoc();
-    if (formalAccess >= AccessLevel::Public &&
-        diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc()))
-      return ErrorType::get(ctx);
-
     diags.diagnose(nameLoc, diag::candidate_inaccessible, first, formalAccess);
 
     // FIXME: If any of the candidates (usually just one) are in the same module
@@ -1477,6 +1481,19 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       lookupResult.Member->diagnose(diag::kind_declared_here,
                                     DescriptiveDeclKind::Type);
 
+    // Don't try to recover here; we'll get more access-related diagnostics
+    // downstream if we do.
+    return ErrorType::get(ctx);
+  }
+
+  // Try ignoring missing imports.
+  relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+  auto nonImportedMembers = TypeChecker::lookupMemberType(
+      dc, parentType, repr->getNameRef(), repr->getLoc(), relookupOptions);
+  if (nonImportedMembers) {
+    const TypeDecl *first = nonImportedMembers.front().Member;
+    auto nameLoc = repr->getNameLoc();
+    diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
     // Don't try to recover here; we'll get more access-related diagnostics
     // downstream if we do.
     return ErrorType::get(ctx);
@@ -1493,7 +1510,8 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     // Let's try to look any member of the parent type with the given name,
     // even if it is not a type, allowing for a more precise diagnostic.
     NLOptions memberLookupOptions = (NL_QualifiedDefault |
-                                     NL_IgnoreAccessControl);
+                                     NL_IgnoreAccessControl |
+                                     NL_IgnoreMissingImports);
     SmallVector<ValueDecl *, 2> results;
     dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
                         memberLookupOptions, results);
@@ -1872,8 +1890,7 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   // Phase 2: If a declaration has already been bound, use it.
   if (auto *typeDecl = repr->getBoundDecl()) {
     auto memberType =
-      TypeChecker::substMemberTypeWithBase(DC->getParentModule(), typeDecl,
-                                           parentTy);
+      TypeChecker::substMemberTypeWithBase(typeDecl, parentTy);
     return maybeDiagnoseBadMemberType(typeDecl, memberType, nullptr);
   }
 
@@ -2159,8 +2176,9 @@ namespace {
     NeverNullType
     resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                     TypeResolutionOptions options);
-    NeverNullType resolveLifetimeDependentReturnTypeRepr(
-        LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
+    NeverNullType
+    resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2765,9 +2783,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
 
-  case TypeReprKind::LifetimeDependentReturn:
-    return resolveLifetimeDependentReturnTypeRepr(
-        cast<LifetimeDependentReturnTypeRepr>(repr), options);
+  case TypeReprKind::LifetimeDependent:
+    return resolveLifetimeDependentTypeRepr(
+        cast<LifetimeDependentTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -3109,18 +3127,6 @@ void TypeAttrSet::diagnoseUnclaimed(CustomAttr *attr,
   diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
 }
 
-static bool isSILAttribute(TypeAttrKind attrKind) {
-  switch (attrKind) {
-#define SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
-#include "swift/AST/TypeAttr.def"
-  case TypeAttrKind::NoEscape: // noescape is only used in SIL now
-    return true;
-
-  default:
-    return false;
-  }
-}
-
 static bool isFunctionAttribute(TypeAttrKind attrKind) {
   static const TypeAttrKind FunctionAttrs[] = {
       TypeAttrKind::Convention,
@@ -3152,7 +3158,7 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
 
   // Use a special diagnostic for SIL attributes.
   if (!(options & TypeResolutionFlags::SILType) &&
-      isSILAttribute(attr->getKind())) {
+      TypeAttribute::isSilOnly(attr->getKind())) {
     diagnose(attr->getStartLoc(), diag::unknown_attribute, attr->getAttrName());
     return;
   }
@@ -3976,6 +3982,12 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
+          repr->getResultTypeRepr())) {
+    diagnoseInvalid(lifetimeRepr, lifetimeRepr->getLoc(),
+                    diag::lifetime_dependence_function_type);
+  }
+
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
@@ -4008,7 +4020,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !resolution.getDeclContext()->getParentModule()->checkConformance(
+               !ModuleDecl::checkConformance(
                   thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
@@ -4025,7 +4037,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      LifetimeDependenceInfo(), hasSendingResult);
+      /*LifetimeDependenceInfo*/ std::nullopt, hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4111,7 +4123,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
     subMap = SubstitutionMap::get(
         genericSig, QueryTypeSubstitutionMap{genericArgMap},
-        LookUpConformanceInModule(getDeclContext()->getParentModule()));
+        LookUpConformanceInModule());
   }
 
   bool capturesGenerics = claim<CapturesGenericsTypeAttr>(attrs);
@@ -4234,7 +4246,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType, LifetimeDependenceInfo());
+      isolation, diffKind, clangFnType,
+      /*LifetimeDependenceInfo*/ std::nullopt);
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -4319,7 +4332,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
     return SubstitutionMap::get(
                sig, QueryTypeSubstitutionMap{subsMap},
-               LookUpConformanceInModule(getDeclContext()->getParentModule()))
+               LookUpConformanceInModule())
         .getCanonical();
   };
 
@@ -4389,8 +4402,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       selfType = next;
     }
 
-    witnessMethodConformance = getDeclContext()->getParentModule()
-      ->checkConformance(selfType, protocolType->getDecl());
+    witnessMethodConformance = ModuleDecl::checkConformance(
+        selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }
@@ -4404,16 +4417,11 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
   }
 
-  std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
-  if (auto *lifetimeDependentTypeRepr =
-          dyn_cast<LifetimeDependentReturnTypeRepr>(
-              repr->getResultTypeRepr())) {
-    lifetimeDependenceInfo = LifetimeDependenceInfo::fromTypeRepr(
-        lifetimeDependentTypeRepr, params, getDeclContext());
-    if (lifetimeDependenceInfo.has_value()) {
-      extInfoBuilder =
-          extInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
-    }
+  auto lifetimeDependencies =
+      LifetimeDependenceInfo::get(repr, params, results, getDeclContext());
+  if (lifetimeDependencies.has_value()) {
+    extInfoBuilder =
+        extInfoBuilder.withLifetimeDependencies(*lifetimeDependencies);
   }
 
   return SILFunctionType::get(genericSig.getCanonicalSignature(),
@@ -4530,11 +4538,11 @@ bool TypeResolver::resolveSingleSILResult(
 
   options.setContext(TypeResolverContext::FunctionResult);
 
-  // Look through LifetimeDependentReturnTypeRepr.
-  // LifetimeDependentReturnTypeRepr will be processed separately when building
+  // Look through LifetimeDependentTypeRepr.
+  // LifetimeDependentTypeRepr will be processed separately when building
   // SILFunctionType.
   if (auto *lifetimeDependentTypeRepr =
-          dyn_cast<LifetimeDependentReturnTypeRepr>(repr)) {
+          dyn_cast<LifetimeDependentTypeRepr>(repr)) {
     repr = lifetimeDependentTypeRepr->getBase();
   }
 
@@ -5012,14 +5020,16 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   return ArraySliceType::get(baseTy);
 }
 
-NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
-    LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+NeverNullType
+TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
+                                               TypeResolutionOptions options) {
   if (options.is(TypeResolverContext::TupleElement)) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
                     diag::lifetime_dependence_cannot_be_applied_to_tuple_elt);
     return ErrorType::get(getASTContext());
   }
-  if (!options.is(TypeResolverContext::FunctionResult)) {
+  if (!options.is(TypeResolverContext::FunctionResult) &&
+      !options.is(TypeResolverContext::FunctionInput)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(),
         diag::lifetime_dependence_only_on_function_method_init_result);
@@ -5808,8 +5818,7 @@ NeverNullType TypeResolver::buildProtocolType(
   return MetatypeType::get(instanceType, storedRepr);
 }
 
-Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
-                                          TypeDecl *member,
+Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
                                           Type baseTy,
                                           bool useArchetypes) {
   Type sugaredBaseTy = baseTy;
@@ -5878,7 +5887,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     if (baseTy->is<ErrorType>())
       return ErrorType::get(memberType);
 
-    subs = baseTy->getMemberSubstitutionMap(module, member);
+    subs = baseTy->getMemberSubstitutionMap(member);
     resultType = memberType.subst(subs);
   } else {
     resultType = memberType;
@@ -6006,7 +6015,7 @@ private:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
-    case TypeReprKind::LifetimeDependentReturn:
+    case TypeReprKind::LifetimeDependent:
       return false;
     }
   }

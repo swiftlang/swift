@@ -27,6 +27,14 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
         "$ORIGIN")
   endif()
 
+  # FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(
+  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+    target_compile_options(swift-plugin-server PRIVATE
+      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
+    target_compile_options(SwiftInProcPluginServer PRIVATE
+      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
+  endif()
+
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)
 

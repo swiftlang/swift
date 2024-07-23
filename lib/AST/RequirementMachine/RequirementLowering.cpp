@@ -606,7 +606,7 @@ struct InferRequirementsWalker : public TypeWalker {
                                          AssociatedTypeDecl *assocType) {
           auto secondType = assocType->getDeclaredInterfaceType()
               ->castTo<DependentMemberType>()
-              ->substBaseType(module, firstType);
+              ->substBaseType(firstType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});
@@ -637,7 +637,9 @@ struct InferRequirementsWalker : public TypeWalker {
       }
     }
 
-    if (!ty->isSpecialized())
+    // Both is<ExistentialType>() and isSpecialized() end up being true if we
+    // have invalid code where a protocol is nested inside a generic nominal.
+    if (ty->is<ExistentialType>() || !ty->isSpecialized())
       return Action::Continue;
 
     // Infer from generic nominal types.
@@ -649,7 +651,7 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Continue;
 
     /// Retrieve the substitution.
-    auto subMap = ty->getContextSubstitutionMap(module, decl);
+    auto subMap = ty->getContextSubstitutionMap(decl);
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.

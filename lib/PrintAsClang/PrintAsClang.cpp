@@ -624,7 +624,9 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
         !frontendOpts.ClangHeaderExposedDecls.has_value() ||
         *frontendOpts.ClangHeaderExposedDecls ==
             FrontendOptions::ClangHeaderExposeBehavior::
-                HasExposeAttrOrImplicitDeps;
+                HasExposeAttrOrImplicitDeps ||
+        *frontendOpts.ClangHeaderExposedDecls ==
+            FrontendOptions::ClangHeaderExposeBehavior::AllPublic;
 
     std::string moduleContentsBuf;
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};

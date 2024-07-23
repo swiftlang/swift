@@ -11,7 +11,9 @@
 // which aren't yet supported in Swift. Therefore initializing a std::function from Swift closures
 // will not work on the platforms that are shipped with this version of libstdc++ (rdar://125816354).
 // XFAIL: LinuxDistribution=ubuntu-22.04
+// XFAIL: LinuxDistribution=rhel-9.3
 // XFAIL: LinuxDistribution=rhel-9.4
+// XFAIL: LinuxDistribution=fedora-39
 
 import StdlibUnittest
 import StdFunction
@@ -55,10 +57,16 @@ StdFunctionTestSuite.test("FunctionIntToInt init from closure and pass as parame
   expectEqual(222, res)
 }
 
+StdFunctionTestSuite.test("FunctionStringToString init from closure and pass as parameter") {
+  let res = invokeFunctionTwice(.init({ $0 + std.string("abc") }),
+                                std.string("prefix"))
+  expectEqual(std.string("prefixabcabc"), res)
+}
+
 // FIXME: assertion for address-only closure params (rdar://124501345)
-//StdFunctionTestSuite.test("FunctionStringToString init from closure and pass as parameter") {
-//  let res = invokeFunctionTwice(.init({ $0 + std.string("abc") }),
-//                                std.string("prefix"))
+//StdFunctionTestSuite.test("FunctionStringToStringConstRef init from closure and pass as parameter") {
+//  let res = invokeFunctionTwiceConstRef(.init({ $0 + std.string("abc") }),
+//                                        std.string("prefix"))
 //  expectEqual(std.string("prefixabcabc"), res)
 //}
 #endif
