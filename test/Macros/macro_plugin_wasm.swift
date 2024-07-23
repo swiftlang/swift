@@ -21,7 +21,7 @@
 
 // CHECK: ->(plugin:[[#PID:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK: <-(plugin:[[#PID]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":7}}}
-// CHECK: ->(plugin:[[#PID]]) {"loadPluginLibrary":{"libraryPath":"{{.+}}/Plugin.wasm","moduleName":"MacroDefinition"}}
+// CHECK: ->(plugin:[[#PID]]) {"loadPluginLibrary":{"libraryPath":"{{.*[\\/]}}Plugin.wasm","moduleName":"MacroDefinition"}}
 // CHECK: <-(plugin:[[#PID]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"constInt","typeName":"ConstMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":16,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":4,"offset":143},"source":"#constInt"}}}
 // CHECK: <-(plugin:[[#PID]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"1"}}
