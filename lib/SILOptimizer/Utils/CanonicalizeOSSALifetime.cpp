@@ -1168,8 +1168,8 @@ void CanonicalizeOSSALifetime::rewriteCopies(
       liveness->updateForUse(destroy, /*lifetimeEnding=*/true);
     }
     for (auto *dvi : debugValues) {
-      if (liveness->areUsesWithinBoundary(
-              {&dvi->getOperandRef()},
+      if (liveness->isWithinBoundary(
+              dvi,
               deadEndBlocksAnalysis->get(getCurrentDef()->getFunction()))) {
         continue;
       }
