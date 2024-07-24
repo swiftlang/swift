@@ -131,7 +131,8 @@ static void visitUsersOutsideLinearLivenessBoundary(
       continue;
     }
     auto *user = pair.first;
-    if (linearLiveness.getLiveness().isWithinBoundary(user)) {
+    if (linearLiveness.getLiveness().isWithinBoundary(
+            user, /*deadEndBlocks=*/nullptr)) {
       continue;
     }
     visitor(user);
