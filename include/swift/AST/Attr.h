@@ -2316,7 +2316,7 @@ public:
   const llvm::VersionTuple Version;
 
   /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  bool isActivePlatform(const ASTContext &ctx, bool forTargetVariant) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::BackDeployed;
@@ -2745,7 +2745,8 @@ public:
 
   /// Returns the `@backDeployed` attribute that is active for the current
   /// platform.
-  const BackDeployedAttr *getBackDeployed(const ASTContext &ctx) const;
+  const BackDeployedAttr *getBackDeployed(const ASTContext &ctx,
+                                          bool forTargetVariant) const;
 
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
