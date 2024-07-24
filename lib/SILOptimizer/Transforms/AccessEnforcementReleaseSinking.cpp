@@ -142,6 +142,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TypePtrAuthDiscriminator:
     case BuiltinValueKind::TargetOSVersionAtLeast:
+    case BuiltinValueKind::TargetVariantOSVersionAtLeast:
+    case BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast:
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::GetCurrentAsyncTask:

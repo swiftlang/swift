@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -1725,17 +1726,26 @@ emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
 /// the specified version range and 0 otherwise. The returned SILValue
 /// (which has type Builtin.Int1) represents the result of this check.
 SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
-                                                 const VersionRange &range) {
+                                                 const VersionRange &range,
+                                                 bool forTargetVariant) {
   // Emit constants for the checked version range.
   SILValue majorValue;
   SILValue minorValue;
   SILValue subminorValue;
+
   std::tie(majorValue, minorValue, subminorValue) =
       emitVersionLiterals(loc, B, getASTContext(), range.getLowerEndpoint());
 
   // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
   FuncDecl *versionQueryDecl =
       getASTContext().getIsOSVersionAtLeastDecl();
+
+  // When targeting macCatalyst, the version number will be an iOS version number
+  // and so we call a variant of the query function that understands iOS
+  // versions.
+  if (forTargetVariant)
+    versionQueryDecl = getASTContext().getIsVariantOSVersionAtLeastDecl();
+
   assert(versionQueryDecl);
 
   auto silDeclRef = SILDeclRef(versionQueryDecl);
@@ -1746,6 +1756,130 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
   return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
 }
 
+SILValue SILGenFunction::emitOSVersionOrVariantVersionRangeCheck(
+    SILLocation loc, const VersionRange &targetRange,
+    const VersionRange &variantRange) {
+  SILValue targetMajorValue;
+  SILValue targetMinorValue;
+  SILValue targetSubminorValue;
+
+  const llvm::VersionTuple &targetVersion = targetRange.getLowerEndpoint();
+  std::tie(targetMajorValue, targetMinorValue, targetSubminorValue) =
+      emitVersionLiterals(loc, B, getASTContext(), targetVersion);
+
+  SILValue variantMajorValue;
+  SILValue variantMinorValue;
+  SILValue variantSubminorValue;
+
+  const llvm::VersionTuple &variantVersion = variantRange.getLowerEndpoint();
+  std::tie(variantMajorValue, variantMinorValue, variantSubminorValue) =
+      emitVersionLiterals(loc, B, getASTContext(), variantVersion);
+
+  FuncDecl *versionQueryDecl =
+    getASTContext().getIsOSVersionAtLeastOrVariantVersionAtLeast();
+
+  assert(versionQueryDecl);
+
+  auto silDeclRef = SILDeclRef(versionQueryDecl);
+  SILValue availabilityGTEFn = emitGlobalFunctionRef(
+      loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
+
+  SILValue args[] = {
+      targetMajorValue,
+      targetMinorValue,
+      targetSubminorValue,
+      variantMajorValue,
+      variantMinorValue,
+      variantSubminorValue
+  };
+  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
+}
+
+SILValue SILGenFunction::emitZipperedOSVersionRangeCheck(
+    SILLocation loc, const VersionRange &targetRange,
+    const VersionRange &variantRange) {
+  assert(getASTContext().LangOpts.TargetVariant);
+
+  VersionRange OSVersion = targetRange;
+  VersionRange VariantOSVersion = variantRange;
+
+  // We're building zippered, so we need to pass both macOS and iOS
+  // versions to the the runtime version range check. At run time
+  // that check will determine what kind of process this code is loaded
+  // into. In a macOS process it will use the macOS version; in an
+  // macCatalyst process it will use the iOS version.
+  llvm::Triple VariantTriple = *getASTContext().LangOpts.TargetVariant;
+  llvm::Triple TargetTriple = getASTContext().LangOpts.Target;
+  assert(triplesAreValidForZippering(TargetTriple, VariantTriple));
+
+  // From perspective of the driver and most of the frontend,
+  // -target and -target-variant are symmetric. That is, the user
+  // can pass either:
+  //    -target x86_64-apple-macosx10.15 \
+  //    -target-variant x86_64-apple-ios13.1-macabi
+  // or:
+  //    -target x86_64-apple-ios13.1-macabi \
+  //    -target-variant x86_64-apple-macosx10.15
+  //
+  // However, the runtime availability-checking entry points need
+  // to compare against an actual running OS version and so can't be
+  // symmetric. Here we standardize on "target" means macOS version
+  // and "targetVariant" means iOS version.
+  if (tripleIsMacCatalystEnvironment(TargetTriple)) {
+    assert(VariantTriple.isMacOSX());
+    // Normalize so that "variant" always means iOS version.
+    std::swap(OSVersion, VariantOSVersion);
+    std::swap(TargetTriple, VariantTriple);
+  }
+
+  // If there is no check for either the target platform
+  // or the target-variant platform then the condition is
+  // trivially true.
+  if (OSVersion.isAll() && VariantOSVersion.isAll()) {
+    SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+    return B.createIntegerLiteral(loc, i1, true);
+  }
+
+  // The variant-only availability-checking entrypoint is not part
+  // of the Swift 5.0 ABI. It is only available in macOS 10.15 and above.
+  bool isVariantEntrypointAvailable = !TargetTriple.isMacOSXVersionLT(10, 15);
+
+  // If there is no check for the target but there is for the
+  // variant, then we only need to emit code for the variant check.
+  if (isVariantEntrypointAvailable && OSVersion.isAll() &&
+      !VariantOSVersion.isAll())
+    return emitOSVersionRangeCheck(loc, VariantOSVersion,
+                                   /*forVariant*/ true);
+
+  // Similarly, if there is a check for the target but not for the
+  // target variant then we only to emit code for the target check.
+  if (!OSVersion.isAll() && VariantOSVersion.isAll())
+    return emitOSVersionRangeCheck(loc, OSVersion,
+                                   /*forVariant*/ false);
+
+  if (!isVariantEntrypointAvailable ||
+      (!OSVersion.isAll() && !VariantOSVersion.isAll())) {
+
+    // If the variant-only entrypoint isn't available (as is the
+    // case pre-macOS 10.15) we need to use the zippered entrypoint
+    // (which is part of the Swift 5.0 ABI) even when the macOS version
+    // is '*' (all).
+    // In this case, use the minimum macOS deployment version from
+    // the target triple. This ensures the check always passes on macOS.
+    if (!isVariantEntrypointAvailable && OSVersion.isAll()) {
+      assert(TargetTriple.isMacOSX());
+
+      llvm::VersionTuple macosVersion;
+      TargetTriple.getMacOSXVersion(macosVersion);
+      OSVersion = VersionRange::allGTE(macosVersion);
+    }
+
+    return emitOSVersionOrVariantVersionRangeCheck(loc, OSVersion,
+                                                   VariantOSVersion);
+  }
+
+  llvm_unreachable("Unhandled zippered configuration");
+}
 
 /// Emit the boolean test and/or pattern bindings indicated by the specified
 /// stmt condition.  If the condition fails, control flow is transferred to the
@@ -1795,12 +1929,27 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // specified by elt.
       PoundAvailableInfo *availability = elt.getAvailability();
       VersionRange OSVersion = availability->getAvailableRange();
-      
+
       // The OS version might be left empty if availability checking was
       // disabled. Treat it as always-true in that case.
       assert(!OSVersion.isEmpty()
              || getASTContext().LangOpts.DisableAvailabilityChecking);
-        
+
+      if (getASTContext().LangOpts.TargetVariant) {
+        // We're building zippered, so we need to pass both macOS and iOS
+        // versions to the the runtime version range check. At run time
+        // that check will determine what kind of process this code is loaded
+        // into. In a macOS process it will use the macOS version; in an
+        // macCatalyst process it will use the iOS version.
+
+        VersionRange VariantOSVersion =
+            elt.getAvailability()->getVariantAvailableRange();
+        assert(!VariantOSVersion.isEmpty());
+        booleanTestValue =
+            emitZipperedOSVersionRangeCheck(loc, OSVersion, VariantOSVersion);
+        break;
+      }
+
       if (OSVersion.isEmpty() || OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
         // trivially true  (or false, for unavailability).
@@ -1808,7 +1957,10 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         bool value = !availability->isUnavailability();
         booleanTestValue = B.createIntegerLiteral(loc, i1, value);
       } else {
-        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
+        bool isMacCatalyst =
+            tripleIsMacCatalystEnvironment(getASTContext().LangOpts.Target);
+        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion,
+                                                   isMacCatalyst);
         if (availability->isUnavailability()) {
           // If this is an unavailability check, invert the result
           // by emitting a call to Builtin.xor_Int1(lhs, -1).

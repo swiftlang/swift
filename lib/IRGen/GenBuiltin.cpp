@@ -1390,7 +1390,34 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(result);
     return;
   }
-  
+
+  if (Builtin.ID == BuiltinValueKind::TargetVariantOSVersionAtLeast) {
+    auto major = args.claimNext();
+    auto minor = args.claimNext();
+    auto patch = args.claimNext();
+    auto result = IGF.emitTargetVariantOSVersionAtLeastCall(major, minor,
+                                                            patch);
+    out.add(result);
+    return;
+  }
+
+  if (Builtin.ID ==
+          BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast) {
+    auto major1 = args.claimNext();
+    auto minor1 = args.claimNext();
+    auto patch1 = args.claimNext();
+
+    auto major2 = args.claimNext();
+    auto minor2 = args.claimNext();
+    auto patch2 = args.claimNext();
+
+    auto result = IGF.emitTargetOSVersionOrVariantOSVersionAtLeastCall(major1,
+        minor1, patch1, major2, minor2, patch2);
+
+    out.add(result);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::TypePtrAuthDiscriminator) {
     (void)args.claimAll();
     Type valueTy = substitutions.getReplacementTypes()[0];

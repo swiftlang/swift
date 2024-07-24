@@ -565,8 +565,9 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 std::optional<llvm::VersionTuple>
-Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
-  if (auto *attr = getAttrs().getBackDeployed(Ctx)) {
+Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx,
+                                     bool forTargetVariant) const {
+  if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
     auto version = attr->Version;
     StringRef ignoredPlatformString;
     AvailabilityInference::updateBeforePlatformForFallback(
@@ -582,13 +583,22 @@ Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
 
   // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx);
+    return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx,
+                                                            forTargetVariant);
 
   return std::nullopt;
 }
 
 bool Decl::isBackDeployed(ASTContext &Ctx) const {
-  return getBackDeployedBeforeOSVersion(Ctx) != std::nullopt;
+  if (getBackDeployedBeforeOSVersion(Ctx))
+    return true;
+
+  if (Ctx.LangOpts.TargetVariant) {
+    if (getBackDeployedBeforeOSVersion(Ctx, /*forTargetVariant=*/true))
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::hasBackDeployedAttr() const {
