@@ -1057,9 +1057,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
 
     if (auto *decl = type->getNominalOrBoundGenericNominal()) {
       if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
-        if (!directTypeEncoding.empty())
-          os << cxx_synthesis::getCxxImplNamespaceName()
+        if (!directTypeEncoding.empty()) {
+          ClangSyntaxPrinter(os).printBaseName(moduleContext);
+          os << "::" << cxx_synthesis::getCxxImplNamespaceName()
              << "::swift_interop_passDirect_" << directTypeEncoding << '(';
+        }
         if (decl->hasClangNode()) {
             if (!directTypeEncoding.empty())
                 os << "reinterpret_cast<const char *>(";
@@ -1298,8 +1300,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   auto printCallToCFunc = [&](std::optional<StringRef> additionalParam) {
     if (indirectFunctionVar)
       os << "(* " << *indirectFunctionVar << ')';
-    else
-      os << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName;
+    else {
+      ClangSyntaxPrinter(os).printBaseName(moduleContext);
+      os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::" << swiftSymbolName;
+    }
     os << '(';
 
     bool needsComma = false;
@@ -1423,7 +1428,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         if (auto directResultType = signature.getDirectResultType()) {
           std::string typeEncoding =
               encodeTypeInfo(*directResultType, moduleContext, typeMapping);
-          os << cxx_synthesis::getCxxImplNamespaceName()
+
+          ClangSyntaxPrinter(os).printBaseName(moduleContext);
+          os << "::" << cxx_synthesis::getCxxImplNamespaceName()
              << "::swift_interop_returnDirect_" << typeEncoding << '('
              << resultPointerName << ", ";
           printCallToCFunc(std::nullopt);

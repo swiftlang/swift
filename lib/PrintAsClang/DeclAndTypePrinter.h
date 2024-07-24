@@ -148,6 +148,8 @@ public:
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty);
 };
 
+bool isStringNestedType(const ValueDecl *VD, StringRef Typename);
+
 } // end namespace swift
 
 #endif
