@@ -7368,6 +7368,10 @@ static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
 /// Recursively checks that there are no pointers in any fields or base classes.
 /// Does not check C++ records with specific API annotations.
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
+  clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
+                                    decl->getASTContext().getSourceManager(),
+                                    "looking for pointers in subobjects of");
+
   // Probably a class template that has not yet been specialized:
   if (!decl->getDefinition())
     return false;
