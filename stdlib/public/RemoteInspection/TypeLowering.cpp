@@ -444,7 +444,7 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     // Initial metadata pointer has spare bits
     auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
     mask.andMask(mpePointerSpareBits, 0);
-    mask.keepOnlyLeastSignificantBytes(8);
+    mask.keepOnlyLeastSignificantBytes(TC.targetPointerSize());
     return mask;
   }
   case RecordKind::ErrorExistential:
