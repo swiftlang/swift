@@ -4,6 +4,11 @@
 
 // REQUIRES: concurrency
 
+// Fails with an unoptimized stdlib currently.
+// rdar://128858036
+//
+// REQUIRES: optimized_stdlib
+
 extension Error {
   func printMe() { }
 }
