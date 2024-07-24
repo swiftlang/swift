@@ -843,7 +843,7 @@ public protocol BinaryInteger :
   /// If you want to opt out of overflow checking and wrap the result in case
   /// of any overflow, use the overflow subtraction operator (`&-`).
   ///
-  ///     x &- 50                // 227
+  ///     x &- 50                 // 227
   ///
   /// - Parameters:
   ///   - lhs: A numeric value.
@@ -896,7 +896,7 @@ public protocol BinaryInteger :
   /// If you want to opt out of overflow checking and wrap the result in case
   /// of any overflow, use the overflow multiplication operator (`&*`).
   ///
-  ///     x &* 21                // -115
+  ///     x &* 21                 // -71
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
