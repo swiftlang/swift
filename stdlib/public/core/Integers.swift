@@ -780,12 +780,35 @@ public protocol BinaryInteger :
   ///     let y: Int = 1000000
   ///     Int(x) + y              // 1000021
   ///
+  /// The sum of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 + 120` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     x + 120                 // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow addition operator (`&+`).
+  ///
+  ///     x &+ 120                // -115
+  ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
   override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
+  ///
+  /// The sum of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 + 120` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x += 120
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
@@ -809,6 +832,19 @@ public protocol BinaryInteger :
   ///     let y: UInt = 1000000
   ///     y - UInt(x)             // 999979
   ///
+  /// The difference of the two arguments must be representable in the
+  /// arguments' type. In the following example, the result of `21 - 50` is
+  /// less than zero, the minimum representable `UInt8` value:
+  ///
+  ///     x - 50                  // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow subtraction operator (`&-`).
+  ///
+  ///     x &- 50                // 227
+  ///
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
@@ -816,6 +852,16 @@ public protocol BinaryInteger :
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
+  ///
+  /// The difference of the two arguments must be representable in the
+  /// arguments' type. In the following example, the result of `21 - 50` is
+  /// less than zero, the minimum representable `UInt8` value:
+  ///
+  ///     var x: UInt8 = 21
+  ///     x -= 50
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
   /// - Parameters:
   ///   - lhs: A numeric value.
@@ -839,6 +885,19 @@ public protocol BinaryInteger :
   ///     let y: Int = 1000000
   ///     Int(x) * y              // 21000000
   ///
+  /// The product of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 * 21` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     x * 21                  // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow multiplication operator (`&*`).
+  ///
+  ///     x &* 21                // -115
+  ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
@@ -846,6 +905,16 @@ public protocol BinaryInteger :
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
+  ///
+  /// The product of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 * 21` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x *= 21
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
