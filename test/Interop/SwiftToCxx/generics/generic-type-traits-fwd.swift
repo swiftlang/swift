@@ -31,10 +31,10 @@ public struct LaterGeneric<T> {
 // CHECK: class SWIFT_SYMBOL("s:8Generics12LaterGenericV") LaterGeneric;
 
 // CHECK: class SWIFT_SYMBOL("s:8Generics16ComesFirstStructV") ComesFirstStruct;
-// CHECK: static inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstStruct> = true;
+// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstStruct> = true;
 
 // CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum;
-// CHECK: static inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstEnum> = true;
+// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstEnum> = true;
 
 // CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum final {
 // CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO15returnsLaterOptAA0F7GenericVyACGyF");
