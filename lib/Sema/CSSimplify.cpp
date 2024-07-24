@@ -4653,6 +4653,9 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
     return MissingConformance::forRequirement(cs, type1, type2, reqLoc);
+
+  case RequirementKind::Value:
+    return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
   }
   llvm_unreachable("covered switch");
 }
@@ -7685,6 +7688,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::ErrorUnion:
       break;
+
+    case TypeKind::Integer:
+      if (shouldAttemptFixes())
+        break;
+
+      // If we're asking if two integer types are the same, then we know they
+      // aren't.
+      return getTypeMatchFailure(locator);
     }
   }
 
@@ -7834,7 +7845,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
     }
   }
-  
+
+  // It is legal to convert between '(let N).Type' and its underlying value type.
+  //
+  // E.g. '(let N).Type' => 'Int'
+  if (kind >= ConstraintKind::Conversion) {
+    if (auto metaTy = type1->getAs<MetatypeType>()) {
+      if (auto archetype = metaTy->getInstanceType()->getAs<ArchetypeType>()) {
+        if (archetype->getValueType() &&
+            archetype->getValueType()->isEqual(type2)) {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::ValueGeneric);
+        }
+      }
+    }
+  }
+
   if (kind == ConstraintKind::BindToPointerType) {
     if (desugar2->isEqual(getASTContext().TheEmptyTupleType))
       return getTypeMatchSuccess();
@@ -8360,6 +8385,10 @@ ConstraintSystem::simplifyConstructionConstraint(
       break;
 
     return SolutionKind::Error;
+  }
+
+  case TypeKind::Integer: {
+    llvm_unreachable("implement me");
   }
   }
 
@@ -14836,6 +14865,16 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
+
+  case ConversionRestrictionKind::ValueGeneric: {
+    auto metatype = type1->castTo<MetatypeType>();
+    auto archetype = metatype->getInstanceType()->castTo<ArchetypeType>();
+
+    addConstraint(ConstraintKind::Equal, archetype->getValueType(), type2,
+                  getConstraintLocator(locator));
+
+    return SolutionKind::Solved;
+  }
   }
   
   llvm_unreachable("bad conversion restriction");
@@ -15907,6 +15946,11 @@ void ConstraintSystem::addConstraint(Requirement req,
       llvm_unreachable("unexpected LayoutConstraint kind");
     }
     return;
+
+  case RequirementKind::Value:
+    // FIXME: Should we be adding a constraint here? Is there some new constraint
+    // to add?
+    break;
   }
 
   auto firstType = req.getFirstType();

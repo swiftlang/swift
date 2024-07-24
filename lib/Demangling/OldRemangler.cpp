@@ -3055,3 +3055,12 @@ Remangler::mangleDependentGenericInverseConformanceRequirement(Node *node,
   RETURN_IF_ERROR(mangleConstrainedType(node->getChild(0), depth + 1));
   return mangle(node->getChild(1), depth + 1);
 }
+
+ManglingError Remangler::mangleInteger(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleDependentGenericValueRequirement(Node *node,
+                                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}

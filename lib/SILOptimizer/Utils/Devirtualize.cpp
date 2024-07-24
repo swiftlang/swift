@@ -1035,6 +1035,7 @@ getWitnessMethodSubstitutions(
         if (depth < baseDepth) {
           paramType = GenericTypeParamType::get(
               paramType->isParameterPack(),
+              paramType->isValue(),
               depth, paramType->getIndex(), ctx);
 
           return Type(paramType).subst(baseSubMap);
@@ -1044,6 +1045,7 @@ getWitnessMethodSubstitutions(
 
         paramType = GenericTypeParamType::get(
             paramType->isParameterPack(),
+            paramType->isValue(),
             depth, paramType->getIndex(), ctx);
         return Type(paramType).subst(origSubMap);
       },
@@ -1066,6 +1068,7 @@ getWitnessMethodSubstitutions(
             if (t == paramType) {
               return Type(GenericTypeParamType::get(
                   paramType->isParameterPack(),
+                  paramType->isValue(),
                   depth, paramType->getIndex(), ctx));
             }
 
@@ -1082,6 +1085,7 @@ getWitnessMethodSubstitutions(
           if (t ==paramType) {
             return Type(GenericTypeParamType::get(
                 paramType->isParameterPack(),
+                paramType->isValue(),
                 depth, paramType->getIndex(), ctx));
           }
 

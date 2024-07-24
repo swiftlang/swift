@@ -60,12 +60,20 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
-    // Parse the 'each' keyword for a type parameter pack 'each T'.
     SourceLoc EachLoc;
+    SourceLoc LetLoc;
+
+    // Parse the 'each' keyword for a type parameter pack 'each T'.
     if (Tok.isContextualKeyword("each")) {
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
       EachLoc = consumeToken();
+
+    // Parse the 'let' keyword for a variable type parameter 'let N'.
+    } else if (Tok.is(tok::kw_let)) {
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::kw_let);
+      LetLoc = consumeToken();
     }
 
     // Parse the name of the parameter.
@@ -122,9 +130,17 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     }
 
     const bool isParameterPack = EachLoc.isValid();
+    const bool isValue = LetLoc.isValid();
+
+    // If we're a value type parameter with no inherited entry, then diagnose
+    // because we must have a type that we're assigning to the value.
+    if (isValue && Inherited.empty()) {
+      diagnose(LetLoc, diag::expected_value_generic_type);
+    }
+
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, EachLoc,
-        /*index*/ GenericParams.size(), isParameterPack);
+        CurDeclContext, Name, NameLoc, EachLoc, LetLoc,
+        /*index*/ GenericParams.size(), isParameterPack, isValue);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);

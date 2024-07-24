@@ -415,6 +415,21 @@ static void desugarSameShapeRequirement(
                       req.getFirstType(), req.getSecondType());
 }
 
+static void desugarValueRequirement(Requirement req, SourceLoc loc,
+                                    SmallVectorImpl<Requirement> &result,
+                                    SmallVectorImpl<InverseRequirement> &inverses,
+                                    SmallVectorImpl<RequirementError> &errors) {
+  if (req.getFirstType()->isTypeParameter()) {
+    result.push_back(req);
+    return;
+  }
+
+  // FIXME: Are there scenarios were desugaring a value requirement actually
+  // doesn't have a first type type parameter?
+  llvm_unreachable("desugar value requirement");
+}
+
+
 /// Convert a requirement where the subject type might not be a type parameter,
 /// or the constraint type in the conformance requirement might be a protocol
 /// composition, into zero or more "proper" requirements which can then be
@@ -446,6 +461,10 @@ swift::rewriting::desugarRequirement(
   case RequirementKind::SameType:
     desugarSameTypeRequirement(req, loc, result, inverses, errors);
     break;
+
+  case RequirementKind::Value:
+    desugarValueRequirement(req, loc, result, inverses, errors);
+    break;
   }
 }
 
@@ -470,7 +489,7 @@ void swift::rewriting::desugarRequirements(
 // Requirement realization and inference.
 //
 
-static void realizeTypeRequirement(DeclContext *dc,
+static void realizeTypeRequirement(TypeDecl *decl, DeclContext *dc,
                                    Type subjectType, Type constraintType,
                                    SourceLoc loc,
                                    SmallVectorImpl<StructuralRequirement> &result,
@@ -502,6 +521,8 @@ static void realizeTypeRequirement(DeclContext *dc,
     }
   }
 
+  auto gpDecl = dyn_cast_or_null<GenericTypeParamDecl>(decl);
+
   if (constraintType->isConstraintType()) {
     result.push_back({Requirement(RequirementKind::Conformance,
                                   subjectType, constraintType),
@@ -509,6 +530,12 @@ static void realizeTypeRequirement(DeclContext *dc,
   } else if (constraintType->getClassOrBoundGenericClass()) {
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
+                      loc});
+  } else if (gpDecl &&
+             gpDecl->isValue() &&
+             constraintType->isLegalValueGenericType()) {
+    result.push_back({Requirement(RequirementKind::Value,
+                                subjectType, constraintType),
                       loc});
   } else {
     errors.push_back(
@@ -703,6 +730,9 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::SameShape:
     llvm_unreachable("Same-shape requirement not supported here");
 
+  case RequirementKind::Value:
+    llvm_unreachable("Value requirement not supported here");
+
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
     auto firstType = req.getFirstType();
@@ -713,7 +743,8 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, moduleForInference, dc, result);
     }
 
-    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
+    realizeTypeRequirement(/*decl*/ nullptr, dc, firstType, secondType, loc,
+                           result, errors);
     break;
   }
 
@@ -773,6 +804,13 @@ void swift::rewriting::applyInverses(
     // Noncopyable checking support for parameter packs is not implemented yet.
     if (canSubject->isParameterPack()) {
       errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
+      continue;
+    }
+
+    // Variable generics never have inverse requirements (or the positive
+    // thereof).
+    if (canSubject->is<GenericTypeParamType>() &&
+        canSubject->castTo<GenericTypeParamType>()->isValue()) {
       continue;
     }
 
@@ -854,14 +892,13 @@ void swift::rewriting::realizeInheritedRequirements(
     if (!inheritedType) continue;
 
     if (shouldInferRequirements) {
-      inferRequirements(inheritedType, moduleForInference,
-                        decl->getInnermostDeclContext(), result);
+      inferRequirements(inheritedType, moduleForInference, dc, result);
     }
 
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(decl, dc, type, inheritedType, loc, result, errors);
   }
 
   // Also check for `SynthesizedProtocolAttr`s with additional constraints added
@@ -872,7 +909,7 @@ void swift::rewriting::realizeInheritedRequirements(
     auto inheritedType = attr->getProtocol()->getDeclaredType();
     auto loc = attr->getLocation();
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(decl, dc, type, inheritedType, loc, result, errors);
   }
 }
 

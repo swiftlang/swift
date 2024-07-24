@@ -38,6 +38,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitPlaceholderType(PlaceholderType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
+  bool visitIntegerType(IntegerType *ty) { return false; }
   bool visitTypeAliasType(TypeAliasType *ty) {
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
@@ -139,6 +140,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
       case RequirementKind::SameType:
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
+      case RequirementKind::Value:
         if (doIt(req.getSecondType()))
           return true;
         break;

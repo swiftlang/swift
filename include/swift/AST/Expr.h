@@ -3531,6 +3531,18 @@ public:
   }
 };
 
+/// The implicit conversion from a variable generic metatype to its underlying
+/// value type.
+class TypeValueExpr : public ImplicitConversionExpr {
+public:
+  TypeValueExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::TypeValue, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::TypeValue;
+  }
+};
+
 /// Extracts the isolation of a dynamically isolated function value.
 class ExtractFunctionIsolationExpr : public Expr {
   /// The function value expression from which to extract the

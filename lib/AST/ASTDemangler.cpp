@@ -765,6 +765,8 @@ Type ASTBuilder::createConstrainedExistentialType(
       switch (req.getKind()) {
       case RequirementKind::SameShape:
         llvm_unreachable("Same-shape requirement not supported here");
+      case RequirementKind::Value:
+        llvm_unreachable("Value requirement not supported here");
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
       case RequirementKind::Layout:
@@ -847,13 +849,14 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
     for (auto pair : ParameterPacks) {
       if (pair.first == depth && pair.second == index) {
         return GenericTypeParamType::get(/*isParameterPack*/ true,
-                                         depth, index, Ctx);
+                                         /*isValue*/ false, depth, index,
+                                         Ctx);
       }
     }
   }
 
   return GenericTypeParamType::get(/*isParameterPack*/ false,
-                                   depth, index, Ctx);
+                                   /*isValue*/ false, depth, index, Ctx);
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
@@ -1035,6 +1038,10 @@ Type ASTBuilder::createDictionaryType(Type key, Type value) {
 
 Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
+}
+
+Type ASTBuilder::createIntegerType(unsigned value, bool isNegative) {
+  return IntegerType::get(std::to_string(value), isNegative, Ctx);
 }
 
 GenericSignature

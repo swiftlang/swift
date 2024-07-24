@@ -183,9 +183,12 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
         case RequirementKind::SameShape:
           illegalSecondType = req.getSecondType();
           break;
+
+        case RequirementKind::Value:
+          llvm_unreachable("Value requirement not supported here");
         }
 
-        static_assert((unsigned)RequirementKind::LAST_KIND == 4,
+        static_assert((unsigned)RequirementKind::LAST_KIND == 5,
                       "update %select in diagnostic!");
         if (illegalSecondType) {
           auto t = ctx.Diags.diagnose(conformanceLoc,

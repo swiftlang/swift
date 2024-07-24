@@ -2389,6 +2389,10 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitIntegerTypeRepr(IntegerTypeRepr *T) {
+  return false;
+}
+
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

@@ -410,6 +410,16 @@ void RuleBuilder::addRequirement(const Requirement &req,
 
     break;
   }
+
+  case RequirementKind::Value: {
+    // A value requirement let N: UInt8 becomes a rewrite rule
+    //
+    //   T.[value: UInt8] => T
+    auto rangeType = CanType(req.getSecondType());
+    constraintTerm = subjectTerm;
+    constraintTerm.add(Symbol::forValue(rangeType, Context));
+    break;
+  }
   }
 
   RequirementRules.emplace_back(std::move(subjectTerm), std::move(constraintTerm));

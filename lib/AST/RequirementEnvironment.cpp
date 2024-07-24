@@ -47,6 +47,7 @@ RequirementEnvironment::RequirementEnvironment(
   auto conformanceToWitnessThunkGenericParamFn = [&](GenericTypeParamType *genericParam)
       -> GenericTypeParamType * {
     return GenericTypeParamType::get(genericParam->isParameterPack(),
+                                     genericParam->isValue(),
                                      genericParam->getDepth() + (covariantSelf ? 1 : 0),
                                      genericParam->getIndex(), ctx);
   };
@@ -98,6 +99,7 @@ RequirementEnvironment::RequirementEnvironment(
       if (type->isEqual(selfType)) {
         if (covariantSelf)
           return GenericTypeParamType::get(/*isParameterPack=*/false,
+                                           /*isValue*/ false,
                                            /*depth=*/0, /*index=*/0, ctx);
         return substConcreteType;
       }
@@ -110,7 +112,8 @@ RequirementEnvironment::RequirementEnvironment(
       if (genericParam->getDepth() != 1)
         return Type();
       Type substGenericParam = GenericTypeParamType::get(
-          genericParam->isParameterPack(), depth, genericParam->getIndex(), ctx);
+          genericParam->isParameterPack(), genericParam->isValue(), depth,
+          genericParam->getIndex(), ctx);
       if (genericParam->isParameterPack()) {
         substGenericParam = PackType::getSingletonPackExpansion(
             substGenericParam);
@@ -160,6 +163,7 @@ RequirementEnvironment::RequirementEnvironment(
   // parameter.
   if (covariantSelf) {
     auto paramTy = GenericTypeParamType::get(/*isParameterPack=*/false,
+                                             /*isValue=*/ false,
                                              /*depth=*/0, /*index=*/0, ctx);
     genericParamTypes.push_back(paramTy);
   }
@@ -176,6 +180,7 @@ RequirementEnvironment::RequirementEnvironment(
   SmallVector<Requirement, 2> requirements;
   if (covariantSelf) {
     auto paramTy = GenericTypeParamType::get(/*isParameterPack=*/false,
+                                             /*isValue=*/ false,
                                              /*depth=*/0, /*index=*/0, ctx);
     Requirement reqt(RequirementKind::Superclass, paramTy, substConcreteType);
     requirements.push_back(reqt);
@@ -199,7 +204,8 @@ RequirementEnvironment::RequirementEnvironment(
 
     // Create an equivalent generic parameter at the next depth.
     auto substGenericParam = GenericTypeParamType::get(
-        genericParam->isParameterPack(), depth, genericParam->getIndex(), ctx);
+        genericParam->isParameterPack(), genericParam->isValue(), depth,
+        genericParam->getIndex(), ctx);
 
     genericParamTypes.push_back(substGenericParam);
   }

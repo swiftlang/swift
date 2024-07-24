@@ -755,6 +755,9 @@ static GenericSignature getPlaceholderGenericSignature(
     ASTContext &ctx, ArrayRef<GenericTypeParamType *> genericParams) {
   SmallVector<Requirement, 2> requirements;
   for (auto param : genericParams) {
+    if (param->isValue())
+      continue;
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       requirements.emplace_back(RequirementKind::Conformance, param,

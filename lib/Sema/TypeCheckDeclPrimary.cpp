@@ -1370,6 +1370,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
           return false;
 
         case RequirementKind::SameType:
+        case RequirementKind::Value:
           return false;
         }
         llvm_unreachable("unhandled kind");

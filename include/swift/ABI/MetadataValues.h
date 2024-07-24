@@ -2048,6 +2048,9 @@ enum class GenericParamKind : uint8_t {
   /// A type parameter pack.
   TypePack = 1,
 
+  /// A value type parameter.
+  Value = 2,
+
   Max = 0x3F,
 };
 
@@ -2138,6 +2141,8 @@ enum class GenericRequirementKind : uint8_t {
   /// This is more of an "anti-requirement", specifing which checks don't need
   /// to happen for a given type.
   InvertedProtocols = 5,
+  /// A value requirement.
+  Value = 6,
   /// A layout requirement.
   Layout = 0x1F,
 };

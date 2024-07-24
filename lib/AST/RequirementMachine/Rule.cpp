@@ -68,6 +68,8 @@ const ProtocolDecl *Rule::isAnyConformanceRule() const {
     case Symbol::Kind::Layout:
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
+    case Symbol::Kind::Value:
+    case Symbol::Kind::ConcreteValue:
       return nullptr;
 
     case Symbol::Kind::Name:

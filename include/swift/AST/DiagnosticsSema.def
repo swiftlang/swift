@@ -2830,7 +2830,7 @@ ERROR(protocol_has_missing_requirements_versioned,none,
       (Type, Type, llvm::VersionTuple, llvm::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%kindonly0 requirement %0 cannot add constraint "
-      "'%1%select{:|:| ==|:| has same shape as}2 %3' on 'Self'",
+      "'%1%select{:|:| ==|:| has same shape as|}2 %3' on 'Self'",
       (const ValueDecl *, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%kind0 has different argument labels "
@@ -3001,6 +3001,16 @@ WARNING(associated_type_not_usable_from_inline_warn,none,
         "%select{default definition|requirement}0 of an associated type in a "
         "'@usableFromInline' protocol should be '@usableFromInline' or public",
         (unsigned))
+
+ERROR(invalid_value_variable_generic,none,
+      "%0 requires that %1 must be a valid value for %2",
+      (Type, Type, Type))
+NOTE(invalid_value_variable_generic_requirement,none,
+     "requirement specified as %0 == %1%2",
+     (Type, Type, StringRef))
+ERROR(cannot_pass_type_for_value_generic,none,
+      "cannot pass type %1 as a value for generic value of %2",
+      (Type, Type, Type))
 
 NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
@@ -4109,6 +4119,8 @@ ERROR(attr_rawlayout_cannot_have_stored_properties,none,
       "type with @_rawLayout cannot have stored properties", ())
 ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
       "type with @_rawLayout cannot also have an @_alignment attribute", ())
+ERROR(attr_rawlayout_invalid_count_type,none,
+      "@_rawLayout count must either be integer literal or a generic argument", ())
       
 // lazy
 ERROR(lazy_not_on_let,none,
@@ -4738,6 +4750,9 @@ NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())
 NOTE(add_self_to_type,none,
      "use '.self' to reference the type object", ())
+
+ERROR(cannot_self_value_generic,none,
+      "cannot reference '.self' on value generic parameter %0", (Type))
 
 WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %kind2",
@@ -7697,7 +7712,7 @@ ERROR(copyable_illegal_deinit, none,
       (const ValueDecl *))
 ERROR(inverse_cannot_be_conditional_on_requirement, none,
       "conditional conformance to suppressible %kind0 cannot depend on "
-      "'%noformat1%select{:|:| ==|:| has same shape as}2 %noformat3'",
+      "'%noformat1%select{:|:| ==|:| has same shape as|}2 %noformat3'",
       (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "

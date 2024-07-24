@@ -3153,6 +3153,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Existential:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Sending:
+  case TypeReprKind::Integer:
     return result;
 
   case TypeReprKind::Fixed:
@@ -3625,8 +3626,8 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
       // Allocate a new generic parameter to represent this opaque type.
       auto *gp = GenericTypeParamDecl::createImplicit(
           dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
-          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr,
-          /*nameLoc*/ repr->getStartLoc());
+          /*isParameterPack*/ false, /*isValue*/ false,
+          /*isOpaqueType*/ true, repr, /*nameLoc*/ repr->getStartLoc());
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs

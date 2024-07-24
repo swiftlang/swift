@@ -166,6 +166,15 @@ namespace irgen {
                                         unsigned reqtIndex,
                                         llvm::Value *metadata);
 
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to the value for the nth argument metadata.
+  /// The type must have generic arguments.
+  llvm::Value *emitValueGenericRef(IRGenFunction &IGF,
+                                   NominalTypeDecl *theDecl,
+                                   const GenericTypeRequirements &reqts,
+                                   unsigned reqtIndex,
+                                   llvm::Value *metadata);
+
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
                                         llvm::Value *metatypeMetadata);

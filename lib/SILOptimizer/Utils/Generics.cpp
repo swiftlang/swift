@@ -1090,6 +1090,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::Layout:
+    case RequirementKind::Value:
       // FIXME: Second type of a superclass requirement may contain
       // generic parameters.
       continue;
@@ -1135,6 +1136,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::Layout:
+    case RequirementKind::Value:
       // If it is a generic param or something derived from it, add this
       // requirement.
 
@@ -1450,7 +1452,8 @@ public:
 
 GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
-  auto GP = GenericTypeParamType::get(/*isParameterPack*/ false, 0, GPIdx++, Ctx);
+  auto GP = GenericTypeParamType::get(/*isParameterPack*/ false,
+                                      /*isValue*/ false, 0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
   return GP;
 }

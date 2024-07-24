@@ -2166,6 +2166,7 @@ void ConstraintSystem::openGenericRequirement(
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
   case RequirementKind::SameShape:
+  case RequirementKind::Value:
     openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
     break;
   case RequirementKind::Layout:
@@ -7159,6 +7160,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::ValueGeneric:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.
@@ -7522,6 +7524,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
     }
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
+    case RequirementKind::Value:
       break;
     }
   }

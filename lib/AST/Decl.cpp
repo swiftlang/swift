@@ -5001,6 +5001,9 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
       case RequirementKind::SameShape:
         llvm_unreachable("Same-shape requirement not supported here");
 
+      case RequirementKind::Value:
+        llvm_unreachable("Value requirement not supported here");
+
       case RequirementKind::Conformance:
       case RequirementKind::Layout:
         continue;
@@ -5646,25 +5649,30 @@ Type TypeAliasDecl::getStructuralType() const {
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc, SourceLoc eachLoc,
-                                           unsigned depth, unsigned index,
-                                           bool isParameterPack,
-                                           bool isOpaqueType,
+                                           SourceLoc letLoc, unsigned depth,
+                                           unsigned index, bool isParameterPack,
+                                           bool isValue, bool isOpaqueType,
                                            TypeRepr *opaqueTypeRepr)
     : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, {}) {
   assert(!(eachLoc && !isParameterPack) &&
          "'each' keyword always means type parameter pack");
+  assert(!(letLoc && !isValue) &&
+         "'let' keyword always means variable type parameter");
 
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   Bits.GenericTypeParamDecl.ParameterPack = isParameterPack;
+  Bits.GenericTypeParamDecl.Value = isValue;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
   assert(isOpaqueType || !opaqueTypeRepr);
   if (isOpaqueType)
     *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
   if (isParameterPack)
-    *getTrailingObjects<SourceLoc>() = eachLoc;
+    getTrailingObjects<SourceLoc>()[0] = eachLoc;
+  if (isValue)
+    getTrailingObjects<SourceLoc>()[1] = letLoc;
 
   auto &ctx = dc->getASTContext();
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
@@ -5676,44 +5684,61 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(
     DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc eachLoc,
-    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
-    TypeRepr *opaqueTypeRepr) {
+    SourceLoc letLoc, unsigned depth, unsigned index, bool isParameterPack,
+    bool isValue, bool isOpaqueType, TypeRepr *opaqueTypeRepr) {
   auto &ctx = dc->getASTContext();
+
+  auto numSourceLocs = 0;
+
+  if (isParameterPack) {
+    numSourceLocs += 1;
+  }
+
+  if (isValue) {
+    numSourceLocs += 1;
+  }
+
   auto allocSize = totalSizeToAlloc<TypeRepr *, SourceLoc>(
-      isOpaqueType ? 1 : 0, isParameterPack ? 1 : 0);
+      isOpaqueType ? 1 : 0, numSourceLocs);
   auto mem = ctx.Allocate(allocSize, alignof(GenericTypeParamDecl));
   return new (mem)
-      GenericTypeParamDecl(dc, name, nameLoc, eachLoc, depth, index,
-                           isParameterPack, isOpaqueType, opaqueTypeRepr);
+      GenericTypeParamDecl(dc, name, nameLoc, eachLoc, letLoc, depth, index,
+                           isParameterPack, isValue, isOpaqueType,
+                           opaqueTypeRepr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createDeserialized(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType) {
-  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(), depth,
-                                      index, isParameterPack, isOpaqueType,
+    bool isParameterPack, bool isValue, bool isOpaqueType) {
+  return GenericTypeParamDecl::create(dc, name, SourceLoc(), SourceLoc(),
+                                      SourceLoc(), depth, index, isParameterPack,
+                                      isValue, isOpaqueType,
                                       /*opaqueRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *
 GenericTypeParamDecl::createParsed(DeclContext *dc, Identifier name,
                                    SourceLoc nameLoc, SourceLoc eachLoc,
-                                   unsigned index, bool isParameterPack) {
+                                   SourceLoc letLoc, unsigned index,
+                                   bool isParameterPack, bool isValue) {
   // We always create generic type parameters with an invalid depth.
   // Semantic analysis fills in the depth when it processes the generic
   // parameter list.
   return GenericTypeParamDecl::create(
-      dc, name, nameLoc, eachLoc, GenericTypeParamDecl::InvalidDepth, index,
-      isParameterPack, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
+      dc, name, nameLoc, eachLoc, letLoc, GenericTypeParamDecl::InvalidDepth,
+      index, isParameterPack, isValue, /*isOpaqueType*/ false,
+      /*opaqueTypeRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
-    bool isParameterPack, bool isOpaqueType, TypeRepr *opaqueTypeRepr,
-    SourceLoc nameLoc, SourceLoc eachLoc) {
-  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, eachLoc, depth,
-                                             index, isParameterPack,
-                                             isOpaqueType, opaqueTypeRepr);
+    bool isParameterPack, bool isValue, bool isOpaqueType,
+    TypeRepr *opaqueTypeRepr, SourceLoc nameLoc, SourceLoc eachLoc,
+    SourceLoc letLoc) {
+  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, eachLoc, letLoc,
+                                             depth, index, isParameterPack,
+                                             isValue, isOpaqueType,
+                                             opaqueTypeRepr);
   param->setImplicit();
   return param;
 }

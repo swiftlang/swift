@@ -1358,6 +1358,9 @@ public:
       case GenericRequirementKind::InvertedProtocols:
         return TypeLookupError(
             "Unexpected invertible protocol in runtime generic signature");
+      case GenericRequirementKind::Value:
+        return TypeLookupError(
+            "Unexpected value requirement in runtime generic signature");
       }
     }
 
@@ -2888,6 +2891,8 @@ private:
           case GenericRequirementKind::SameShape:
             llvm_unreachable("Implement me");
           case GenericRequirementKind::InvertedProtocols:
+            llvm_unreachable("Implement me");
+          case GenericRequirementKind::Value:
             llvm_unreachable("Implement me");
           }
         }

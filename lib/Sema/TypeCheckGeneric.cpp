@@ -161,6 +161,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       }
 
       auto *paramType = GenericTypeParamType::get(/*isParameterPack*/ false,
+                                                  /*isValue*/ false,
                                                   opaqueSignatureDepth, i, ctx);
       genericParamTypes.push_back(paramType);
     
@@ -300,7 +301,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      static_assert((unsigned)RequirementKind::LAST_KIND == 4,
+      static_assert((unsigned)RequirementKind::LAST_KIND == 5,
                     "update %select in diagnostic!");
       ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
                          req.getFirstType().getString(),
@@ -401,6 +402,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
+    case RequirementKind::Value:
       first = req.getFirstType();
       break;
     }
@@ -920,6 +922,13 @@ void TypeChecker::diagnoseRequirementFailure(
   Diag<Type, Type, StringRef> diagnosticNote;
 
   const auto reqKind = req.getKind();
+
+  Type secondTy, substSecondTy;
+  if (reqKind != RequirementKind::Layout) {
+    secondTy = req.getSecondType();
+    substSecondTy = substReq.getSecondType();
+  }
+
   switch (reqKind) {
   case RequirementKind::SameShape:
     diagnostic = diag::types_not_same_shape;
@@ -952,12 +961,17 @@ void TypeChecker::diagnoseRequirementFailure(
     diagnostic = diag::types_not_equal;
     diagnosticNote = diag::types_not_equal_requirement;
     break;
-  }
 
-  Type secondTy, substSecondTy;
-  if (req.getKind() != RequirementKind::Layout) {
-    secondTy = req.getSecondType();
-    substSecondTy = substReq.getSecondType();
+  case RequirementKind::Value:
+    if (substReq.getFirstType()->is<IntegerType>()) {
+      diagnostic = diag::invalid_value_variable_generic;
+      diagnosticNote = diag::invalid_value_variable_generic_requirement;
+    } else {
+      diagnostic = diag::cannot_pass_type_for_value_generic;
+      diagnosticNote = diag::invalid_value_variable_generic_requirement;
+    }
+
+    break;
   }
 
   ASTContext &ctx = module->getASTContext();

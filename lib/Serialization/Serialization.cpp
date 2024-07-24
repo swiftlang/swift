@@ -1497,6 +1497,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(Superclass)
   CASE(SameType)
   CASE(Layout)
+  CASE(Value)
   }
 #undef CASE
 
@@ -3334,30 +3335,34 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       uint32_t rawSize;
       uint8_t rawAlign;
       TypeID typeID;
+      TypeID countID;
       
       auto SD = const_cast<StructDecl*>(cast<StructDecl>(D));
       
       if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
         typeID = 0;
+        countID = 0;
         rawSize = sizeAndAlign->first;
         rawAlign = sizeAndAlign->second;
       } else if (auto likeType
                    = attr->getResolvedScalarLikeType(SD)) {
         typeID = S.addTypeRef(*likeType);
+        countID = 0;
         rawSize = 0;
         rawAlign = 0;
       } else if (auto likeArrayTypeAndCount
                    = attr->getResolvedArrayLikeTypeAndCount(SD)) {
         typeID = S.addTypeRef(likeArrayTypeAndCount->first);
-        rawSize = likeArrayTypeAndCount->second;
-        rawAlign = static_cast<uint8_t>(~0u);
+        countID = S.addTypeRef(likeArrayTypeAndCount->second);
+        rawSize = 0;
+        rawAlign = 0;
       } else {
         llvm_unreachable("unhandled raw layout attribute, or trying to serialize unresolved attr!");
       }
       
       RawLayoutDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-        typeID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
+        typeID, countID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
     }
     }
   }
@@ -4181,8 +4186,8 @@ public:
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(genericParam->getName()),
         genericParam->isImplicit(), genericParam->isParameterPack(),
-        genericParam->getDepth(), genericParam->getIndex(),
-        genericParam->isOpaqueType());
+        genericParam->isValue(), genericParam->getDepth(),
+        genericParam->getIndex(), genericParam->isOpaqueType());
   }
 
   void visitAssociatedTypeDecl(const AssociatedTypeDecl *assocType) {
@@ -5564,6 +5569,7 @@ public:
     }
     GenericTypeParamTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                            genericParam->isParameterPack(),
+                                           genericParam->isValue(),
                                            declIDOrDepth, indexPlusOne);
   }
 
@@ -5866,6 +5872,10 @@ public:
                                        S.addDeclRef(generic->getDecl()),
                                        S.addTypeRef(generic->getParent()),
                                        genericArgIDs);
+  }
+
+  void visitIntegerType(const IntegerType *integer) {
+    llvm_unreachable("implement me");
   }
 };
 

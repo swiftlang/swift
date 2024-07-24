@@ -37,7 +37,7 @@ using namespace rewriting;
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents() {
   for (auto *props : Entries) {
-    if (props->getConformsTo().empty())
+    if (props->getConformsTo().empty() && !props->ValueType)
       continue;
 
     if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
@@ -63,6 +63,14 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
             pair.first.getSubstitutions(),
             props->ConformsToRules,
             props->ConformsTo);
+
+        concretizeNestedTypesFromConcreteParent(
+          props->getKey(),
+          pair.second,
+          pair.first.getConcreteType(),
+          pair.first.getSubstitutions(),
+          props->ValueRule,
+          props->ValueType);
       }
     }
 
@@ -184,8 +192,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
 
-    recordConcreteConformanceRule(concreteRuleID, conformanceRuleID,
-                                  requirementKind, concreteConformanceSymbol);
+    recordConcreteRelationRule(concreteRuleID, conformanceRuleID,
+                               concreteConformanceSymbol);
 
     // This is disabled by default because we fail to produce a convergent
     // rewrite system if the opaque archetype has infinitely-recursive
@@ -213,6 +221,41 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         key.getRootProtocol() == nullptr)
       inferConditionalRequirements(conformance.getConcrete(), substitutions);
   }
+}
+
+void PropertyMap::concretizeNestedTypesFromConcreteParent(
+    Term key,
+    unsigned concreteRuleID,
+    CanType concreteType,
+    ArrayRef<Term> substitutions,
+    std::optional<unsigned> valueRuleID,
+    std::optional<Symbol> valueType) {
+  if (!valueRuleID || !valueType) {
+    return;
+  }
+
+  // If we've already processed this pair of rules, record the conformance
+  // and move on.
+  //
+  // This occurs when a pair of rules are inherited from the property map
+  // entry for this key's suffix.
+  if (!checkRulePairOnce(concreteRuleID, *valueRuleID))
+    return;
+
+  auto req = Requirement(RequirementKind::Value, concreteType,
+                         valueType->getConcreteType());
+  SmallVector<Requirement, 1> subReqs;
+
+  if (req.checkRequirement(subReqs) ==
+        CheckRequirementResult::RequirementFailure) {
+    System.recordConflict(*valueRuleID, concreteRuleID);
+    return;
+  }
+
+  auto concreteValue = Symbol::forConcreteValue(concreteType, substitutions,
+                                                Context);
+
+  recordConcreteRelationRule(concreteRuleID, *valueRuleID, concreteValue);
 }
 
 void PropertyMap::concretizeTypeWitnessInConformance(
@@ -467,13 +510,12 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   return constraintType;
 }
 
-void PropertyMap::recordConcreteConformanceRule(
+void PropertyMap::recordConcreteRelationRule(
     unsigned concreteRuleID,
-    unsigned conformanceRuleID,
-    RequirementKind requirementKind,
-    Symbol concreteConformanceSymbol) const {
+    unsigned relationRuleID,
+    Symbol concreteRelationSymbol) const {
   const auto &concreteRule = System.getRule(concreteRuleID);
-  const auto &conformanceRule = System.getRule(conformanceRuleID);
+  const auto &relationRule = System.getRule(relationRuleID);
 
   RewritePath path;
 
@@ -481,15 +523,15 @@ void PropertyMap::recordConcreteConformanceRule(
   // Either T == T', or T is a prefix of T', or T' is a prefix of T.
   //
   // Let T'' be the longest of T and T'.
-  MutableTerm rhs(concreteRule.getRHS().size() > conformanceRule.getRHS().size()
+  MutableTerm rhs(concreteRule.getRHS().size() > relationRule.getRHS().size()
                   ? concreteRule.getRHS()
-                  : conformanceRule.getRHS());
+                  : relationRule.getRHS());
 
   // First, apply the conformance rule in reverse to obtain T''.[P].
   path.add(RewriteStep::forRewriteRule(
-      /*startOffset=*/rhs.size() - conformanceRule.getRHS().size(),
+      /*startOffset=*/rhs.size() - relationRule.getRHS().size(),
       /*endOffset=*/0,
-      /*ruleID=*/conformanceRuleID,
+      /*ruleID=*/relationRuleID,
       /*inverse=*/true));
 
   // Now, apply the concrete type rule in reverse to obtain T''.[concrete: C].[P].
@@ -505,7 +547,7 @@ void PropertyMap::recordConcreteConformanceRule(
   unsigned prefixLength = rhs.size() - concreteRule.getRHS().size();
 
   if (prefixLength > 0 &&
-      !concreteConformanceSymbol.getSubstitutions().empty()) {
+      !concreteRelationSymbol.getSubstitutions().empty()) {
     path.add(RewriteStep::forPrefixSubstitutions(prefixLength, /*endOffset=*/1,
                                                  /*inverse=*/false));
 
@@ -514,11 +556,18 @@ void PropertyMap::recordConcreteConformanceRule(
         prefix, Context);
   }
 
-  auto protocolSymbol = *conformanceRule.isPropertyRule();
+  auto symbol = *relationRule.isPropertyRule();
+  unsigned relationID;
 
   // Now, transform T''.[concrete: C].[P] into T''.[concrete: C].[concrete: C : P].
-  unsigned relationID = System.recordConcreteConformanceRelation(
-      concreteSymbol, protocolSymbol, concreteConformanceSymbol);
+  if (concreteRelationSymbol.getKind() == Symbol::Kind::ConcreteConformance) {
+    relationID = System.recordConcreteConformanceRelation(
+      concreteSymbol, symbol, concreteRelationSymbol);
+  } else {
+    ASSERT(concreteRelationSymbol.getKind() == Symbol::Kind::ConcreteValue);
+    relationID = System.recordConcreteValueRelation(concreteSymbol, symbol,
+                                                    concreteRelationSymbol);
+  }
 
   path.add(RewriteStep::forRelation(
       /*startOffset=*/rhs.size(), relationID,
@@ -527,7 +576,7 @@ void PropertyMap::recordConcreteConformanceRule(
   // If T' is a suffix of T, prepend the prefix to the concrete type's
   // substitutions.
   if (prefixLength > 0 &&
-      !concreteConformanceSymbol.getSubstitutions().empty()) {
+      !concreteRelationSymbol.getSubstitutions().empty()) {
     path.add(RewriteStep::forPrefixSubstitutions(prefixLength, /*endOffset=*/1,
                                                  /*inverse=*/true));
   }
@@ -540,7 +589,7 @@ void PropertyMap::recordConcreteConformanceRule(
       /*inverse=*/false));
 
   MutableTerm lhs(rhs);
-  lhs.add(concreteConformanceSymbol);
+  lhs.add(concreteRelationSymbol);
 
   // The path turns T'' (RHS) into T''.[concrete: C : P] (LHS), but we need
   // it to go in the other direction.

@@ -158,3 +158,22 @@ unsigned RewriteSystem::recordSameTypeWitnessRelation(
       Term::get(lhsTerm, Context),
       Term::get(rhsTerm, Context));
 }
+
+unsigned RewriteSystem::recordConcreteValueRelation(Symbol concreteSymbol,
+                                                    Symbol valueSymbol,
+                                                    Symbol concreteValueSymbol) {
+  ASSERT(valueSymbol.getKind() == Symbol::Kind::Value);
+  ASSERT(concreteSymbol.getKind() == Symbol::Kind::ConcreteType);
+
+  MutableTerm lhsTerm;
+  lhsTerm.add(concreteSymbol);
+  lhsTerm.add(valueSymbol);
+
+  MutableTerm rhsTerm;
+  rhsTerm.add(concreteSymbol);
+  rhsTerm.add(concreteValueSymbol);
+
+  return recordRelation(
+      Term::get(lhsTerm, Context),
+      Term::get(rhsTerm, Context));
+}

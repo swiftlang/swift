@@ -48,6 +48,7 @@ static void forAllRequirementTypes(
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
+    case RequirementKind::Value:
       callback(req.getFirstType(),
                RequirementRepr::getFirstTypeRepr(reqRepr));
       callback(req.getSecondType(),

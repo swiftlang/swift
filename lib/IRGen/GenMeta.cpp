@@ -3193,7 +3193,7 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 }
 
 static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
-                                       int32_t count, SILType T,
+                                       llvm::Value *count, SILType T,
                                        llvm::Value *metadata,
                                        MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
@@ -3248,9 +3248,9 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
                                        ValueWitnessFlags::IsNonPOD,
                                        "vwtFlags");
 
-  // Count is only ever -1 if we're not an array like layout.
-  if (count != -1) {
-    stride = IGF.Builder.CreateMul(stride, IGM.getSize(Size(count)));
+  // Count is only ever null if we're not an array like layout.
+  if (count != nullptr) {
+    stride = IGF.Builder.CreateMul(stride, count);
     size = stride;
   }
 
@@ -3276,7 +3276,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
 }
 
 static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
-                                    int32_t count, SILType T,
+                                    llvm::Value *count, SILType T,
                                     llvm::Value *metadata,
                                     MetadataDependencyCollector *collector) {
   // If our deployment target doesn't contain the new swift_initRawStructMetadata,
@@ -3297,10 +3297,16 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
   StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
 
+  // If we don't have a count, then we're the 'like:' variant and we need to
+  // pass '-1' to the runtime call.
+  if (!count) {
+    count = llvm::ConstantInt::get(IGF.IGM.SizeTy, -1);
+  }
+
   // Call swift_initRawStructMetadata().
   IGF.Builder.CreateCall(IGM.getInitRawStructMetadataFunctionPointer(),
                          {metadata, IGM.getSize(Size(uintptr_t(flags))),
-                          likeTypeLayout, IGM.getInt32(count)});
+                          likeTypeLayout, count});
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -3325,17 +3331,17 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
     // is the wrong thing for these types.
     if (auto rawLayout = nominalDecl->getAttrs().getAttribute<RawLayoutAttr>()) {
       SILType loweredLikeType;
-      int32_t count = -1;
+      llvm::Value *count = nullptr;
 
       if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
         loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                              *likeType);
       } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
         auto likeType = likeArray->first;
+        auto countType = likeArray->second;
         loweredLikeType = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                              likeType);
-
-        count = likeArray->second;
+        count = IGF.emitValueGenericRef(countType->getCanonicalType());
       }
 
       emitInitializeRawLayout(IGF, loweredLikeType, count, loweredTy, metadata,
@@ -4516,6 +4522,7 @@ namespace {
                                ClassDecl *forClass) {
       switch (requirement.getKind()) {
       case GenericRequirement::Kind::Shape:
+      case GenericRequirement::Kind::Value:
         B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
         break;
       case GenericRequirement::Kind::Metadata:
@@ -6963,10 +6970,17 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
 static GenericParamDescriptor
 getGenericParamDescriptor(GenericTypeParamType *param, bool canonical) {
-  return GenericParamDescriptor(param->isParameterPack()
-                                ? GenericParamKind::TypePack
-                                : GenericParamKind::Type,
-                                /*key argument*/ canonical);
+  auto kind = GenericParamKind::Type;
+
+  if (param->isParameterPack()) {
+    kind = GenericParamKind::TypePack;
+  }
+
+  if (param->isValue()) {
+    kind = GenericParamKind::Value;
+  }
+
+  return GenericParamDescriptor(kind, /*key argument*/ canonical);
 }
 
 static bool canUseImplicitGenericParamDescriptors(CanGenericSignature sig) {
@@ -7099,6 +7113,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     case RequirementKind::Layout:
       abiKind = GenericRequirementKind::Layout;
       break;
+    case RequirementKind::Value:
+      abiKind = GenericRequirementKind::Value;
+      break;
     }
 
     switch (kind) {
@@ -7194,6 +7211,20 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       // ABI TODO: Same type and superclass constraints also imply
       // "same conformance" constraints on any protocol requirements of
       // the constrained type, which we should emit.
+      break;
+    }
+
+    case RequirementKind::Value: {
+      ++metadata.NumRequirements;
+
+      auto flags = GenericRequirementFlags(abiKind,
+                                           /*key argument*/ false,
+                                           /*is pack*/ false);
+
+      addGenericRequirement(IGM, B, metadata, sig, flags,
+                            requirement.getFirstType(), [&]{
+        B.addInt32(0); // FIXME ALEX
+      });
       break;
     }
     }

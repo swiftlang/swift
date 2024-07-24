@@ -917,6 +917,10 @@ public:
     return nullptr;
   }
 
+  const TypeRef *createIntegerType(unsigned value) {
+    return nullptr;
+  }
+
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.

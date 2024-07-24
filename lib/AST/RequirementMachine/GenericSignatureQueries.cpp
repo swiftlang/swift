@@ -69,6 +69,11 @@ RequirementMachine::getLocalRequirements(
     return result;
   }
 
+  if (props->isValue()) {
+    result.valueType = props->getValueType();
+    return result;
+  }
+
   if (props->hasSuperclassBound()) {
     result.superclass = props->getSuperclassBound({}, term, Map);
   }
@@ -282,6 +287,8 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::ConcreteConformance:
     case Symbol::Kind::Shape:
     case Symbol::Kind::PackElement:
+    case Symbol::Kind::Value:
+    case Symbol::Kind::ConcreteValue:
       llvm::errs() <<"Invalid symbol in a type term: " << term << "\n";
       abort();
     }
@@ -819,6 +826,8 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
       case Symbol::Kind::Shape:
+      case Symbol::Kind::Value:
+      case Symbol::Kind::ConcreteValue:
         llvm::errs() << "Bad initial symbol in " << term << "\n";
         abort();
         break;
@@ -846,6 +855,8 @@ void RequirementMachine::verify(const MutableTerm &term) const {
     case Symbol::Kind::ConcreteType:
     case Symbol::Kind::ConcreteConformance:
     case Symbol::Kind::PackElement:
+    case Symbol::Kind::Value:
+    case Symbol::Kind::ConcreteValue:
       llvm::errs() << "Bad interior symbol " << symbol << " in " << term << "\n";
       abort();
       break;

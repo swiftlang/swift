@@ -150,6 +150,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     case RequirementKind::Layout:
       out << "layout";
       break;
+    case RequirementKind::Value:
+      out << "value";
+      break;
     }
     out << ")";
   };

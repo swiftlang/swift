@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 887; // extravagant opened existentials
+const uint16_t SWIFTMODULE_VERSION_MINOR = 888; // Value generics
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -485,6 +485,7 @@ enum GenericRequirementKind : uint8_t {
   SameType    = 2,
   Superclass  = 3,
   Layout = 4,
+  Value = 5,
 };
 using GenericRequirementKindField = BCFixed<3>;
 
@@ -1214,6 +1215,7 @@ namespace decls_block {
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
     GENERIC_TYPE_PARAM_TYPE,
     BCFixed<1>,  // parameter pack?
+    BCFixed<1>, // value?
     DeclIDField, // generic type parameter decl or depth
     BCVBR<4> // index + 1, or zero if we have a generic type
             // parameter decl
@@ -1481,6 +1483,7 @@ namespace decls_block {
     IdentifierIDField, // name
     BCFixed<1>,        // implicit flag
     BCFixed<1>,        // parameter pack?
+    BCFixed<1>,        // value?
     BCVBR<4>,          // depth
     BCVBR<4>,          // index
     BCFixed<1>         // opaque type?
@@ -2170,6 +2173,7 @@ namespace decls_block {
     RawLayout_DECL_ATTR,
     BCFixed<1>, // implicit
     TypeIDField, // like type
+    TypeIDField, // count type
     BCVBR<32>, // size
     BCVBR<8>, // alignment
     BCFixed<1> // movesAsLike

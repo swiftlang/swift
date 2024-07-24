@@ -2183,6 +2183,8 @@ namespace {
     NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
+    NeverNullType resolveIntegerTypeRepr(IntegerTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2790,6 +2792,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::LifetimeDependent:
     return resolveLifetimeDependentTypeRepr(
         cast<LifetimeDependentTypeRepr>(repr), options);
+
+  case TypeReprKind::Integer:
+    return resolveIntegerTypeRepr(cast<IntegerTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -5045,6 +5050,13 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
 }
 
 NeverNullType
+TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  return IntegerType::get(repr->getValue(), (bool)repr->getMinusLoc(),
+                          getASTContext());
+}
+
+NeverNullType
 TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                     TypeResolutionOptions options) {
   auto argOptions = options.withoutContext().withContext(
@@ -6022,6 +6034,7 @@ private:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
+    case TypeReprKind::Integer:
       return false;
     }
   }

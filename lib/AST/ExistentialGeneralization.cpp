@@ -161,6 +161,7 @@ private:
   NO_PRESERVABLE_STRUCTURE(Pack)
   NO_PRESERVABLE_STRUCTURE(PackExpansion)
   NO_PRESERVABLE_STRUCTURE(PackElement)
+  NO_PRESERVABLE_STRUCTURE(Integer)
 #undef NO_PRESERVABLE_STRUCTURE
 
   // These types simply shouldn't appear in types that we generalize at all.
@@ -253,7 +254,8 @@ private:
 
     // Create a new generalization type parameter and record the
     // substitution.
-    auto newParam = GenericTypeParamType::get(/*sequence*/ false,
+    auto newParam = GenericTypeParamType::get(/*isParameterPack*/ false,
+                                              /*isValue*/ false,
                                               /*depth*/ 0,
                                               /*index*/ substTypes.size(),
                                               ctx);

@@ -85,6 +85,7 @@ static bool isRequirement(Node::Kind kind) {
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
+    case Node::Kind::DependentGenericValueRequirement:
       return true;
     default:
       return false;
@@ -1100,6 +1101,7 @@ recur:
       // outlined copy functions. We treat such a suffix as "unmangled suffix".
       pushBack();
       return createNode(Node::Kind::Suffix, consumeAll());
+    case '$': return demangleIntegerType();
     default:
       pushBack();
       return demangleIdentifier();
@@ -4153,7 +4155,7 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
 
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse } ConstraintKind;
+  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse, Value } ConstraintKind;
 
   NodePointer inverseKind = nullptr;
   switch (nextChar()) {
@@ -4174,6 +4176,7 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
     case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
+    case 'V': ConstraintKind = Value; TypeKind = Generic; break;
     case 'i': 
       ConstraintKind = Inverse;
       TypeKind = Generic;
@@ -4232,6 +4235,10 @@ NodePointer Demangler::demangleGenericRequirement() {
   case SameShape:
     return createWithChildren(Node::Kind::DependentGenericSameShapeRequirement,
                               ConstrTy, popNode(Node::Kind::Type));
+  case Value: {
+    return createWithChildren(Node::Kind::DependentGenericValueRequirement,
+                              ConstrTy, popNode(Node::Kind::Type));
+  }
   case Layout: {
     auto c = nextChar();
     NodePointer size = nullptr;
@@ -4399,4 +4406,29 @@ NodePointer Demangler::demangleMacroExpansion() {
   if (privateDiscriminator)
     result->addChild(privateDiscriminator, *this);
   return result;
+}
+
+NodePointer Demangler::demangleIntegerType() {
+  NodePointer negative = nullptr;
+  NodePointer number = nullptr;
+
+  switch (peekChar()) {
+  case 'n':
+    nextChar();
+    negative = createNode(Node::Kind::PrefixOperator);
+    number = createNode(Node::Kind::Number, demangleNatural());
+    break;
+
+  default:
+    number = createNode(Node::Kind::Number, demangleNatural());
+    break;
+  }
+
+  auto value = createWithChild(Node::Kind::Integer, number);
+
+  if (negative) {
+    value->addChild(negative, *this);
+  }
+
+  return createType(value);
 }

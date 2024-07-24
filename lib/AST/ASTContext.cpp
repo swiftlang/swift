@@ -56,6 +56,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -618,7 +619,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
   llvm::DenseMap<CanType, SILMoveOnlyWrappedType *> SILMoveOnlyWrappedTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
-  llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
+  llvm::FoldingSet<IntegerType> IntegerTypes;
+  llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
@@ -863,7 +865,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(GenericParamTypes);
   SIZE_AND_BYTES(SILBlockStorageTypes);
   SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
-  SIZE_AND_BYTES(IntegerTypes);
+  SIZE_AND_BYTES(BuiltinIntegerTypes);
   SIZE_AND_BYTES(OpenedElementEnvironments);
   SIZE_AND_BYTES(ForeignRepresentableCache);
   SIZE(SearchPathsSet);
@@ -3121,11 +3123,12 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().GenericFunctionTypes ?
     // getImpl().SILFunctionTypes ?
     llvm::capacity_in_bytes(getImpl().SILBlockStorageTypes) +
-    llvm::capacity_in_bytes(getImpl().IntegerTypes) +
+    llvm::capacity_in_bytes(getImpl().BuiltinIntegerTypes) +
     // getImpl().ProtocolCompositionTypes ?
     // getImpl().BuiltinVectorTypes ?
     // getImpl().GenericSignatures ?
     // getImpl().CompoundNames ?
+    // getImpl().IntegerTypes ?
     getImpl().Permanent.getTotalMemory();
 
     Size += getSolverMemory();
@@ -3463,10 +3466,26 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
   return entry;
 }
 
+IntegerType *IntegerType::get(StringRef value, bool isNegative,
+                              const ASTContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  IntegerType::Profile(id, value, isNegative);
+
+  void *insertPos;
+  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos))
+    return intType;
+
+  auto intType = new (ctx, AllocationArena::Permanent)
+      IntegerType(value, isNegative, ctx);
+
+  ctx.getImpl().IntegerTypes.InsertNode(intType, insertPos);
+  return intType;
+}
+
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {
   assert(!BitWidth.isArbitraryWidth());
-  BuiltinIntegerType *&Result = C.getImpl().IntegerTypes[BitWidth];
+  BuiltinIntegerType *&Result = C.getImpl().BuiltinIntegerTypes[BitWidth];
   if (Result == nullptr)
     Result = new (C, AllocationArena::Permanent) BuiltinIntegerType(BitWidth,C);
   return Result;
@@ -4737,10 +4756,12 @@ GenericFunctionType::GenericFunctionType(
 }
 
 GenericTypeParamType *GenericTypeParamType::get(bool isParameterPack,
-                                                unsigned depth, unsigned index,
+                                                bool isValue, unsigned depth,
+                                                unsigned index,
                                                 const ASTContext &ctx) {
   const auto depthKey = depth | ((isParameterPack ? 1 : 0) << 30);
-  auto known = ctx.getImpl().GenericParamTypes.find({depthKey, index});
+  const auto indexKey = index | ((isValue ? 1 : 0) << 30);
+  auto known = ctx.getImpl().GenericParamTypes.find({depthKey, indexKey});
   if (known != ctx.getImpl().GenericParamTypes.end())
     return known->second;
 
@@ -4749,8 +4770,9 @@ GenericTypeParamType *GenericTypeParamType::get(bool isParameterPack,
     props |= RecursiveTypeProperties::HasParameterPack;
 
   auto result = new (ctx, AllocationArena::Permanent)
-      GenericTypeParamType(isParameterPack, depth, index, props, ctx);
-  ctx.getImpl().GenericParamTypes[{depthKey, index}] = result;
+      GenericTypeParamType(isParameterPack, isValue, depth, index, props,
+                           ctx);
+  ctx.getImpl().GenericParamTypes[{depthKey, indexKey}] = result;
   return result;
 }
 
@@ -5286,18 +5308,29 @@ static RecursiveTypeProperties getOpaqueTypeArchetypeProperties(
 OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-    LayoutConstraint layout) {
+    LayoutConstraint layout, Type valueType) {
   auto properties = getOpaqueTypeArchetypeProperties(
       environment->getOuterSubstitutions());
   auto arena = getArena(properties);
+
+  auto numTypes = 0;
+
+  if (superclass) {
+    numTypes += 1;
+  }
+
+  if (valueType) {
+    numTypes += 1;
+  }
+
   auto size = OpaqueTypeArchetypeType::totalSizeToAlloc<
       ProtocolDecl *, Type, LayoutConstraint>(
-         conformsTo.size(), superclass ? 1 : 0, layout ? 1 : 0);
+         conformsTo.size(), numTypes, layout ? 1 : 0);
   ASTContext &ctx = interfaceType->getASTContext();
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeArchetypeType), arena);
   return ::new (mem)
       OpaqueTypeArchetypeType(environment, properties, interfaceType,
-                              conformsTo, superclass, layout);
+                              conformsTo, superclass, layout, valueType);
 }
 
 Type OpaqueTypeArchetypeType::get(
@@ -5317,21 +5350,32 @@ static RecursiveTypeProperties getOpenedArchetypeProperties(SubstitutionMap subs
 CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-    LayoutConstraint layout) {
+    LayoutConstraint layout, Type valueType) {
   auto properties = getOpenedArchetypeProperties(
       environment->getOuterSubstitutions());
   auto arena = getArena(properties);
+
+  auto numTypes = 0;
+
+  if (superclass) {
+    numTypes += 1;
+  }
+
+  if (valueType) {
+    numTypes += 1;
+  }
+
   auto size = OpenedArchetypeType::totalSizeToAlloc<
       ProtocolDecl *, Type, LayoutConstraint>(
       conformsTo.size(),
-      superclass ? 1 : 0,
+      numTypes,
       layout ? 1 : 0);
 
   ASTContext &ctx = interfaceType->getASTContext();
   void *mem = ctx.Allocate(size, alignof(OpenedArchetypeType), arena);
 
   return CanOpenedArchetypeType(::new (mem) OpenedArchetypeType(
-      environment, interfaceType, conformsTo, superclass, layout,
+      environment, interfaceType, conformsTo, superclass, layout, valueType,
       properties));
 }
 
@@ -6125,7 +6169,8 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
     return theSig;
 
   auto param = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                         /*depth*/ 0, /*index*/ 0, *this);
+                                         /*isValue*/ false, /*depth*/ 0,
+                                         /*index*/ 0, *this);
   auto sig = GenericSignature::get(param, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;

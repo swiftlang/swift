@@ -76,8 +76,8 @@ GenericParamList::clone(DeclContext *dc) const {
   for (auto param : getParams()) {
     auto *newParam = GenericTypeParamDecl::createImplicit(
         dc, param->getName(), GenericTypeParamDecl::InvalidDepth,
-        param->getIndex(), param->isParameterPack(), param->isOpaqueType(),
-        param->getOpaqueTypeRepr());
+        param->getIndex(), param->isParameterPack(), param->isValue(),
+        param->isOpaqueType(), param->getOpaqueTypeRepr());
     params.push_back(newParam);
   }
 

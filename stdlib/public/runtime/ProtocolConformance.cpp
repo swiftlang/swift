@@ -1463,6 +1463,10 @@ checkGenericRequirement(
     suppressed[index] |= req.getInvertedProtocols();
     return std::nullopt;
   }
+
+  case GenericRequirementKind::Value: {
+    return std::nullopt; // FIXME
+  }
   }
 
   // Unknown generic requirement kind.
@@ -1640,6 +1644,10 @@ checkGenericPackRequirement(
     // Record these suppressed protocols for this generic parameter.
     suppressed[index] |= req.getInvertedProtocols();
     return std::nullopt;
+  }
+
+  case GenericRequirementKind::Value: {
+    return std::nullopt; // FIXME
   }
   }
 

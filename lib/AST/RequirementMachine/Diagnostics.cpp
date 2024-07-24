@@ -259,6 +259,10 @@ getRequirementForDiagnostics(Type subject, Symbol property,
     return Requirement(RequirementKind::Layout, subject,
                        property.getLayoutConstraint());
 
+  case Symbol::Kind::Value:
+    return Requirement(RequirementKind::Value, subject,
+                       property.getConcreteType());
+
   default:
     llvm::errs() << "Bad property symbol: " << property << "\n";
     abort();

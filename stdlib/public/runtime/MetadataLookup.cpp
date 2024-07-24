@@ -2432,6 +2432,11 @@ public:
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
   }
+
+  TypeLookupErrorOr<BuiltType> createIntegerType(unsigned value,
+                                                 bool isNegative) {
+    fatalError(0, "fixme");
+  }
 };
 
 }

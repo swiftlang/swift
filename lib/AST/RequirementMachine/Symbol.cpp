@@ -34,7 +34,8 @@ const StringRef Symbol::Kinds[] = {
   "shape",
   "layout",
   "super",
-  "concrete"
+  "concrete",
+  "value"
 };
 
 /// Symbols are uniqued and immutable, stored as a single pointer;
@@ -96,9 +97,19 @@ struct Symbol::Storage final
     Name = name;
   }
 
+  Storage(CanType type) {
+    ASSERT(!type->hasTypeParameter());
+
+    Kind = Symbol::Kind::Value;
+    ConcreteType = type;
+
+    *getTrailingObjects<unsigned>() = 0;
+  }
+
   Storage(Symbol::Kind kind, CanType type, ArrayRef<Term> substitutions) {
     DEBUG_ASSERT(kind == Symbol::Kind::Superclass ||
-                 kind == Symbol::Kind::ConcreteType);
+                 kind == Symbol::Kind::ConcreteType ||
+                 kind == Symbol::Kind::ConcreteValue);
     ASSERT(!type->hasUnboundGenericType());
     ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
@@ -129,7 +140,9 @@ struct Symbol::Storage final
   size_t numTrailingObjects(OverloadToken<unsigned>) const {
     return (Kind == Symbol::Kind::Superclass ||
             Kind == Symbol::Kind::ConcreteType ||
-            Kind == Symbol::Kind::ConcreteConformance);
+            Kind == Symbol::Kind::ConcreteConformance ||
+            Kind == Symbol::Kind::Value ||
+            Kind == Symbol::Kind::ConcreteValue);
   }
 
   size_t numTrailingObjects(OverloadToken<Term>) const {
@@ -190,7 +203,9 @@ LayoutConstraint Symbol::getLayoutConstraint() const {
 CanType Symbol::getConcreteType() const {
   DEBUG_ASSERT(getKind() == Kind::Superclass ||
                getKind() == Kind::ConcreteType ||
-               getKind() == Kind::ConcreteConformance);
+               getKind() == Kind::ConcreteConformance ||
+               getKind() == Kind::Value ||
+               getKind() == Kind::ConcreteValue);
   return Ptr->ConcreteType;
 }
 
@@ -460,6 +475,61 @@ Symbol Symbol::forConcreteConformance(CanType type,
   return symbol;
 }
 
+Symbol Symbol::forValue(CanType type, RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Value));
+  id.AddPointer(type.getPointer());
+
+  void *insertPos = nullptr;
+  if (auto symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+    return symbol;
+
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *symbol = new (mem) Storage(type);
+
+  if (CONDITIONAL_ASSERT_enabled()) {
+    llvm::FoldingSetNodeID newID;
+    symbol->Profile(newID);
+    ASSERT(id == newID);
+  }
+
+  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::Value));
+
+  return symbol;
+}
+
+Symbol Symbol::forConcreteValue(CanType type, ArrayRef<Term> substitutions,
+                                RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::ConcreteValue));
+  id.AddPointer(type.getPointer());
+  id.AddInteger(unsigned(substitutions.size()));
+  for (auto substitution : substitutions)
+    id.AddPointer(substitution.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+    return symbol;
+
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
+      1, substitutions.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *symbol = new (mem) Storage(Kind::ConcreteValue, type, substitutions);
+
+  if (CONDITIONAL_ASSERT_enabled()) {
+    llvm::FoldingSetNodeID newID;
+    symbol->Profile(newID);
+    ASSERT(id == newID);
+  }
+
+  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::ConcreteValue));
+
+  return symbol;
+}
+
 /// Given that this symbol is the first symbol of a term, return the
 /// "domain" of the term.
 ///
@@ -484,6 +554,8 @@ const ProtocolDecl *Symbol::getRootProtocol() const {
   case Symbol::Kind::ConcreteType:
   case Symbol::Kind::ConcreteConformance:
   case Symbol::Kind::Shape:
+  case Symbol::Kind::Value:
+  case Symbol::Kind::ConcreteValue:
     break;
   }
 
@@ -591,7 +663,9 @@ std::optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
   }
 
   case Kind::Superclass:
-  case Kind::ConcreteType: {
+  case Kind::ConcreteType:
+  case Kind::Value:
+  case Kind::ConcreteValue: {
     if (getConcreteType() == other.getConcreteType()) {
       // If the concrete types are identical, compare substitution terms.
       ASSERT(getSubstitutions().size() == other.getSubstitutions().size());
@@ -636,6 +710,9 @@ Symbol Symbol::withConcreteSubstitutions(
     return Symbol::forConcreteConformance(getConcreteType(), substitutions,
                                           getProtocol(), ctx);
 
+  case Kind::ConcreteValue:
+    return Symbol::forConcreteValue(getConcreteType(), substitutions, ctx);
+
   case Kind::GenericParam:
   case Kind::Name:
   case Kind::Protocol:
@@ -643,6 +720,7 @@ Symbol Symbol::withConcreteSubstitutions(
   case Kind::Shape:
   case Kind::PackElement:
   case Kind::Layout:
+  case Kind::Value:
     break;
   }
 
@@ -700,7 +778,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
       os << substitution;
 
       auto key = CanType(GenericTypeParamType::get(
-          /*isParameterPack=*/false, 0, index, ctx));
+          /*isParameterPack=*/false, /*isValue*/ false, 0, index, ctx));
       substitutionNames[key] = ctx.getIdentifier(s);
     }
   }
@@ -742,6 +820,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     return;
 
   case Kind::ConcreteType:
+  case Kind::ConcreteValue:
     out << "[concrete: ";
     getConcreteType().print(out, opts);
     out << "]";
@@ -764,6 +843,12 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     out << "[element]";
     return;
   }
+
+  case Kind::Value:
+    out << "[value: ";
+    getConcreteType().print(out, opts);
+    out << "]";
+    return;
   }
 
   llvm_unreachable("Bad symbol kind");
@@ -801,7 +886,8 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   }
 
   case Symbol::Kind::Superclass:
-  case Symbol::Kind::ConcreteType: {
+  case Symbol::Kind::ConcreteType:
+  case Symbol::Kind::ConcreteValue: {
     id.AddPointer(ConcreteType.getPointer());
     id.AddInteger(getNumSubstitutions());
     for (auto term : getSubstitutions())
@@ -818,6 +904,11 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     for (auto term : getSubstitutions())
       id.AddPointer(term.getOpaquePointer());
 
+    return;
+  }
+
+  case Symbol::Kind::Value: {
+    id.AddPointer(ConcreteType.getPointer());
     return;
   }
   }

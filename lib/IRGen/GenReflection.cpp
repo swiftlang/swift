@@ -1404,6 +1404,9 @@ public:
       case GenericRequirement::Kind::WitnessTablePack:
         // Skip protocol requirements (FIXME: for now?)
         break;
+
+      case GenericRequirement::Kind::Value:
+        llvm_unreachable("implement me");
       }
     }
 
@@ -1452,6 +1455,7 @@ public:
 
       case GenericRequirement::Kind::WitnessTable:
       case GenericRequirement::Kind::WitnessTablePack:
+      case GenericRequirement::Kind::Value:
         llvm_unreachable("Bad kind");
       }
 

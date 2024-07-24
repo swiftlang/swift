@@ -255,6 +255,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILPack:
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
+  case TypeKind::Integer:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -1674,7 +1675,8 @@ CanType TypeBase::computeCanonicalType() {
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
     Result =
-        GenericTypeParamType::get(gpDecl->isParameterPack(), gpDecl->getDepth(),
+        GenericTypeParamType::get(gpDecl->isParameterPack(),
+                                  gpDecl->isValue(), gpDecl->getDepth(),
                                   gpDecl->getIndex(), gpDecl->getASTContext());
     break;
   }
@@ -2028,6 +2030,14 @@ Identifier GenericTypeParamType::getName() const {
   return name;
 }
 
+bool GenericTypeParamType::isValue() const {
+  if (auto param = getDecl()) {
+    return param->isValue();
+  }
+
+  return IsValue;
+}
+
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
   case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf();
@@ -2145,6 +2155,13 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
       return true;
   } while ((ty = ty->getSuperclass()));
   return false;
+}
+
+bool TypeBase::isValueParameter() {
+  Type t(this);
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isValue();
 }
 
 namespace {
@@ -3356,7 +3373,7 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                              Type InterfaceType,
                              ArrayRef<ProtocolDecl *> ConformsTo,
                              Type Superclass, LayoutConstraint Layout,
-                             GenericEnvironment *Environment)
+                             Type ValueType, GenericEnvironment *Environment)
   : SubstitutableType(Kind, &Ctx, properties),
     InterfaceType(InterfaceType),
     Environment(Environment)
@@ -3365,10 +3382,11 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
   Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
   Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
   Bits.ArchetypeType.NumProtocols = ConformsTo.size();
+  Bits.ArchetypeType.HasValue = static_cast<bool>(ValueType);
 
   // Record the superclass.
   if (Superclass)
-    *getSubclassTrailingObjects<Type>() = Superclass;
+    getSubclassTrailingObjects<Type>()[0] = Superclass;
 
   // Record the layout constraint.
   if (Layout)
@@ -3377,6 +3395,15 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
   // Copy the protocols.
   std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
                           getSubclassTrailingObjects<ProtocolDecl *>());
+
+  // Record the value type.
+  if (ValueType) {
+    if (Superclass) {
+      getSubclassTrailingObjects<Type>()[1] = ValueType;
+    } else {
+      getSubclassTrailingObjects<Type>()[0] = ValueType;
+    }
+  }
 }
 
 bool ArchetypeType::isRoot() const {
@@ -3467,9 +3494,11 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                                      Type InterfaceType,
                                      ArrayRef<ProtocolDecl *> ConformsTo,
                                      Type Superclass, LayoutConstraint Layout,
+                                     Type ValueType,
                                      RecursiveTypeProperties Properties)
   : ArchetypeType(TypeKind::PrimaryArchetype, Ctx, Properties,
-                  InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
+                  InterfaceType, ConformsTo, Superclass, Layout, ValueType,
+                  GenericEnv)
 {
   assert(!InterfaceType->isParameterPack());
 }
@@ -3480,7 +3509,8 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       Type InterfaceType,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
-                      LayoutConstraint Layout) {
+                      LayoutConstraint Layout,
+                      Type ValueType) {
   assert(!Superclass || Superclass->getClassOrBoundGenericClass());
   assert(GenericEnv && "missing generic environment for archetype");
 
@@ -3493,14 +3523,23 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
   assert(!Properties.hasTypeVariable());
 
   auto arena = AllocationArena::Permanent;
+
+  auto numTypes = 0;
+
+  if (Superclass)
+    numTypes += 1;
+
+  if (ValueType)
+    numTypes += 1;
+
   void *mem = Ctx.Allocate(
     PrimaryArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+          ConformsTo.size(), numTypes, Layout ? 1 : 0),
       alignof(PrimaryArchetypeType), arena);
 
   return CanPrimaryArchetypeType(::new (mem) PrimaryArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout,
-      Properties));
+      ValueType, Properties));
 }
 
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
@@ -3508,10 +3547,10 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
     RecursiveTypeProperties properties,
     Type interfaceType,
     ArrayRef<ProtocolDecl*> conformsTo,
-    Type superclass, LayoutConstraint layout)
+    Type superclass, LayoutConstraint layout, Type valueType)
   : ArchetypeType(TypeKind::OpaqueTypeArchetype, interfaceType->getASTContext(),
                   properties, interfaceType, conformsTo, superclass, layout,
-                  environment)
+                  valueType, environment)
 {
   assert(!interfaceType->isParameterPack());
 }
@@ -3527,10 +3566,10 @@ SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
 OpenedArchetypeType::OpenedArchetypeType(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-    LayoutConstraint layout, RecursiveTypeProperties properties)
+    LayoutConstraint layout, Type valueType, RecursiveTypeProperties properties)
   : LocalArchetypeType(TypeKind::OpenedArchetype,
                        interfaceType->getASTContext(), properties,
-                       interfaceType, conformsTo, superclass, layout,
+                       interfaceType, conformsTo, superclass, layout, valueType,
                        environment)
 {
   assert(!interfaceType->isParameterPack());
@@ -3542,7 +3581,8 @@ PackArchetypeType::PackArchetypeType(
     LayoutConstraint Layout, PackShape Shape,
     RecursiveTypeProperties Properties
 ) : ArchetypeType(TypeKind::PackArchetype, Ctx, Properties,
-                  InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
+                  InterfaceType, ConformsTo, Superclass, Layout, Type(),
+                  GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;
 }
@@ -3599,7 +3639,7 @@ ElementArchetypeType::ElementArchetypeType(
     : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
                          RecursiveTypeProperties::HasElementArchetype,
                          InterfaceType,
-                         ConformsTo, Superclass, Layout, GenericEnv) {
+                         ConformsTo, Superclass, Layout, Type(), GenericEnv) {
 }
 
 CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(
@@ -4251,6 +4291,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::SILPack:
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
+  case TypeKind::Integer:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4753,6 +4794,11 @@ SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
                           subs, SubstitutionMap(),
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           witnessConformance);
+}
+
+APInt IntegerType::getValue() {
+  return BuiltinIntegerWidth::arbitrary().parse(getDigitsText(), /*radix*/ 0,
+                                                isNegative());
 }
 
 SourceLoc swift::extractNearestSourceLoc(Type ty) {

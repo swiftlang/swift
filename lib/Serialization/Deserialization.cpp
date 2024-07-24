@@ -1237,6 +1237,7 @@ getActualRequirementKind(uint64_t rawKind) {
   CASE(Superclass)
   CASE(SameType)
   CASE(Layout)
+  CASE(Value)
   }
 #undef CASE
 
@@ -1580,7 +1581,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
         auto *paramDecl = GenericTypeParamDecl::createDeserialized(
             getAssociatedModule(), name, paramTy->getDepth(),
             paramTy->getIndex(), paramTy->isParameterPack(),
-            /*isOpaqueType*/ false);
+            paramTy->isValue(), /*isOpaqueType*/ false);
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -3450,19 +3451,20 @@ public:
     IdentifierID nameID;
     bool isImplicit;
     bool isParameterPack;
+    bool isValue;
     unsigned depth;
     unsigned index;
     bool isOpaqueType;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isParameterPack, depth, index,
+        scratch, nameID, isImplicit, isParameterPack, isValue, depth, index,
         isOpaqueType);
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
     auto *genericParam = GenericTypeParamDecl::createDeserialized(
-        DC, MF.getIdentifier(nameID), depth, index, isParameterPack,
+        DC, MF.getIdentifier(nameID), depth, index, isParameterPack, isValue,
         isOpaqueType);
     declOrOffset = genericParam;
 
@@ -6350,11 +6352,13 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       case decls_block::RawLayout_DECL_ATTR: {
         bool isImplicit;
         TypeID typeID;
+        TypeID countID;
         uint32_t rawSize;
         uint8_t rawAlign;
         bool movesAsLike;
         serialization::decls_block::RawLayoutDeclAttrLayout::
-          readRecord(scratch, isImplicit, typeID, rawSize, rawAlign, movesAsLike);
+          readRecord(scratch, isImplicit, typeID, countID, rawSize, rawAlign,
+                     movesAsLike);
         
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
@@ -6362,14 +6366,20 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             return type.takeError();
           }
           auto typeRepr = new (ctx) FixedTypeRepr(type.get(), SourceLoc());
-          if (rawAlign == 0) {
+          if (!countID) {
             Attr = new (ctx) RawLayoutAttr(typeRepr,
                                            movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;
           } else {
-            Attr = new (ctx) RawLayoutAttr(typeRepr, rawSize, movesAsLike,
+            auto count = MF.getTypeChecked(countID);
+            if (!count) {
+              return count.takeError();
+            }
+            auto countRepr = new (ctx) FixedTypeRepr(count.get(), SourceLoc());
+
+            Attr = new (ctx) RawLayoutAttr(typeRepr, countRepr, movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;
@@ -7301,11 +7311,12 @@ Expected<Type>
 DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   bool parameterPack;
+  bool value;
   DeclID declIDOrDepth;
   unsigned indexPlusOne;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, parameterPack, declIDOrDepth, indexPlusOne);
+      scratch, parameterPack, value, declIDOrDepth, indexPlusOne);
 
   if (indexPlusOne == 0) {
     auto genericParamOrError = MF.getDeclChecked(declIDOrDepth);
@@ -7320,7 +7331,7 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     return genericParam->getDeclaredInterfaceType();
   }
 
-  return GenericTypeParamType::get(parameterPack, declIDOrDepth,
+  return GenericTypeParamType::get(parameterPack, value, declIDOrDepth,
                                    indexPlusOne - 1, MF.getContext());
 }
 

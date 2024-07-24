@@ -3964,6 +3964,56 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
   // We don't support absolute references in the mangling of these
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
+
+ManglingError Remangler::mangleInteger(Node *node, unsigned int depth) {
+  Buffer << "$";
+
+  if (node->getNumChildren() == 2) {
+    Buffer << "n";
+  }
+
+  Buffer << node->getChild(0)->getIndex();
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleDependentGenericValueRequirement(Node *node,
+                                                          unsigned int depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+
+  if (!Mangling.isSuccess()) {
+    return Mangling.error();
+  }
+
+  auto NumMembersAndParamIdx = Mangling.result();
+  // DEMANGLER_ASSERT(
+  //     NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
+
+  // FIXME: Substitution?
+  Buffer << "RV";
+
+  // switch (NumMembersAndParamIdx.first) {
+  // case -1:
+  //   Buffer << "RI";
+  //   mangleIndex(node->getChild(1)->getIndex());
+  //   return ManglingError::Success; // substitution
+  // case 0:
+  //   Buffer << "Ri";
+  //   break;
+  // case 1:
+  //   Buffer << "Rj";
+  //   break;
+  // default:
+  //   Buffer << "RJ";
+  //   break;
+  // }
+
+  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  return ManglingError::Success;
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

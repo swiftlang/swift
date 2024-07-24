@@ -279,7 +279,8 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   // A generic parameter that represents instance of invocation decoder.
   auto *decoderType =
       GenericTypeParamType::get(/*isParameterPack=*/false,
-                                /*depth=*/0, /*index=*/0, Context);
+                                /*isValue=*/ false, /*depth=*/0, /*index=*/0,
+                                Context);
 
   // decoder
   parameters.push_back(GenericFunctionType::Param(

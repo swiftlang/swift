@@ -166,7 +166,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
           checkUseOfMetaTypeName(Base);
       }
-      if (isa<TypeExpr>(Base))
+
+      // Don't diagnose a missing '.self' for type value expressions.
+      if (isa<TypeExpr>(Base) && !isa<TypeValueExpr>(E))
         checkUseOfMetaTypeName(Base);
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E))

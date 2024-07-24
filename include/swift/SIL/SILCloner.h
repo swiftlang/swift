@@ -2853,6 +2853,16 @@ void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitTypeValueInst(TypeValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createTypeValue(getOpLocation(Inst->getLoc()),
+                                         getOpType(Inst->getType()),
+                                         getOpASTType(Inst->getParamType())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitPackLengthInst(PackLengthInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
 

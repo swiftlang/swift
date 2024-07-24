@@ -74,6 +74,10 @@ struct TargetGenericContextDescriptorHeader {
   ///   same order as the requirement descriptors which satisfy
   ///   hasKeyArgument().
   ///
+  ///   a sequence of values, in the same order as the parameter descriptors
+  ///   which satisify getKind() == GenericParamKind::Value and
+  ///   hasKeyArgument();
+  ///
   /// The elements above which are packs are precisely those appearing
   /// in the sequence of trailing GenericPackShapeDescriptors.
   uint16_t NumKeyArguments;
@@ -157,6 +161,9 @@ public:
       uint16_t GenericParamIndex;
       InvertibleProtocolSet Protocols;
     } InvertedProtocols;
+
+    /// FIXME ALEX DOCS
+    uint32_t ValueType;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -248,6 +255,7 @@ public:
     case GenericRequirementKind::SameType:
     case GenericRequirementKind::SameShape:
     case GenericRequirementKind::InvertedProtocols:
+    case GenericRequirementKind::Value:
       return true;
     }
 

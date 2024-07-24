@@ -329,6 +329,7 @@ private:
     case Node::Kind::SugaredArray:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
+    case Node::Kind::Integer:
       return true;
 
     case Node::Kind::Type:
@@ -648,6 +649,7 @@ private:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
     case Node::Kind::LifetimeDependence:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
+    case Node::Kind::DependentGenericValueRequirement:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3390,6 +3392,18 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::OpaqueReturnTypeIndex:
   case Node::Kind::OpaqueReturnTypeParent:
     return nullptr;
+  case Node::Kind::Integer:
+    Printer << Node->getIndex();
+    return nullptr;
+  case Node::Kind::DependentGenericValueRequirement: {
+    NodePointer type = Node->getChild(0);
+    NodePointer reqt = Node->getChild(1);
+    Printer << "let ";
+    print(type, depth + 1);
+    Printer << ": ";
+    print(reqt, depth + 1);
+    return nullptr;
+  }
   }
 
   printer_unreachable("bad node kind!");

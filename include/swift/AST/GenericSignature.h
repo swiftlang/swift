@@ -179,6 +179,8 @@ public:
     LayoutConstraint layout;
 
     Type packShape;
+
+    Type valueType;
   };
 
 private:

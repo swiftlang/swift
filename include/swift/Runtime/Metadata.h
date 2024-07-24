@@ -1059,7 +1059,7 @@ SWIFT_RUNTIME_EXPORT
 void swift_initRawStructMetadata(StructMetadata *self,
                                  StructLayoutFlags flags,
                                  const TypeLayout *likeType,
-                                 int32_t count);
+                                 ssize_t count);
 
 /// Check if the given generic arguments are valid inputs for the generic type
 /// context and if so call the metadata access function and return the metadata.

@@ -178,6 +178,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
+    case RequirementKind::Value:
       switch (getTypeLinkage(CanType(req.getSecondType()))) {
       case FormalLinkage::PublicUnique:
       case FormalLinkage::PublicNonUnique:

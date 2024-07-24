@@ -473,7 +473,8 @@ static CanType getAutoDiffTangentTypeForLinearMap(
   // tangent type.
   auto gpIndex = substGenericParams.size();
   auto gpType = CanGenericTypeParamType::get(/*isParameterPack*/ false,
-                                             0, gpIndex, context);
+                                             /*isValue*/ false, 0, gpIndex,
+                                             context);
   substGenericParams.push_back(gpType);
   substReplacements.push_back(tanType);
   return gpType;

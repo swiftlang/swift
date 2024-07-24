@@ -110,6 +110,16 @@ struct SmallVectorBuf<T>: ~Copyable {}
 @_rawLayout(likeArrayOf: T, count: 3)
 struct SmallVectorOf3<T>: ~Copyable {}
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}6VectorVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
+@_rawLayout(likeArrayOf: T, count: N)
+struct Vector<T, let N: UInt>: ~Copyable {}
+
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}8UsesCellVWV" = {{.*}} %swift.vwtable
 // size
 // CHECK-SAME:  , {{i64|i32}} 8
@@ -142,6 +152,28 @@ struct BufferOf3Bool: ~Copyable {
 // CHECK-SAME:  , <i32 0x820007>
 struct BadBuffer: ~Copyable {
     let buffer: SmallVectorOf3<Int64?>
+}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}10UsesVectorVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 2
+// stride
+// CHECK-SAME:  , {{i64|i32}} 2
+// flags: alignment 0, noncopyable
+// CHECK-SAME:  , <i32 0x800000>
+struct UsesVector: ~Copyable {
+    let buffer: Vector<UInt8, 2>
+}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}10BadBuffer2VWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 48
+// stride
+// CHECK-SAME:  , {{i64|i32}} 48
+// flags: alignment 7, noncopyable, is not inline
+// CHECK-SAME:  , <i32 0x820007>
+struct BadBuffer2: ~Copyable {
+    let buffer: Vector<Int64?, 3>
 }
 
 // Raw Layout types that move like their like type

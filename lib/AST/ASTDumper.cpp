@@ -439,6 +439,7 @@ static StringRef getDumpString(RequirementKind kind) {
     case RequirementKind::Layout: return "has_layout";
     case RequirementKind::Superclass: return "subclass_of";
     case RequirementKind::SameType: return "same_type";
+    case RequirementKind::Value: return "value";
   }
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
@@ -3257,6 +3258,12 @@ public:
 
     printFoot();
   }
+
+  void visitTypeValueExpr(TypeValueExpr *E, StringRef label) {
+    printCommon(E, "type_value_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
@@ -3560,6 +3567,17 @@ public:
           "");
     }
     printRec(T->getBase());
+    printFoot();
+  }
+
+  void visitIntegerTypeRepr(IntegerTypeRepr *T, StringRef label) {
+    printCommon("type_integer", label);
+
+    if (T->getMinusLoc()) {
+      printCommon("is_negative", label);
+    }
+
+    printFieldQuoted(T->getValue(), "value", IdentifierColor);
     printFoot();
   }
 };
@@ -4533,6 +4551,13 @@ namespace {
       printCommon("error_union_type", label);
       for (auto term : T->getTerms())
         printRec(term);
+      printFoot();
+    }
+
+    void visitIntegerType(IntegerType *T, StringRef label) {
+      printCommon("integer_type", label);
+      printFlag(T->isNegative(), "is_negative");
+      printFieldQuoted(T->getValue(), "value", LiteralValueColor);
       printFoot();
     }
 

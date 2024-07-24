@@ -29,8 +29,8 @@ namespace irgen {
 class IRGenModule;
 }
 
-/// The three kinds of entities passed in the runtime calling convention for
-/// generic code: pack shapes, type metadata, and witness tables.
+/// The four kinds of entities passed in the runtime calling convention for
+/// generic code: pack shapes, type metadata, witness tables, and values.
 ///
 /// A pack shape describes an equivalence class of type parameter packs; the
 /// runtime value is a single integer, which is the length of the pack.
@@ -40,6 +40,8 @@ class IRGenModule;
 ///
 /// A witness table is emitted for each conformance requirement in the
 /// generic signature.
+///
+/// A value is emitted for each variable generic parameter, 'let N'.
 class GenericRequirement {
 public:
   enum class Kind : uint8_t {
@@ -48,6 +50,7 @@ public:
     WitnessTable,
     MetadataPack,
     WitnessTablePack,
+    Value,
   };
 
 private:
@@ -106,6 +109,9 @@ public:
   bool isAnyWitnessTable() const {
     return kind == Kind::WitnessTable || kind == Kind::WitnessTablePack;
   }
+  bool isValue() const {
+    return kind == Kind::Value;
+  }
 
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto) {
     auto kind = ((type->isParameterPack() ||
@@ -113,6 +119,10 @@ public:
                  ? Kind::WitnessTablePack
                  : Kind::WitnessTable);
     return GenericRequirement(kind, type, proto);
+  }
+
+  static GenericRequirement forValue(CanType type) {
+    return GenericRequirement(Kind::Value, type, nullptr);
   }
 
   static llvm::Type *typeForKind(irgen::IRGenModule &IGM,
@@ -138,6 +148,9 @@ public:
       break;
     case Kind::WitnessTablePack:
       out << "witness_table_pack: " << type << " : " << proto->getName();
+      break;
+    case Kind::Value:
+      out << "value: " << type;
       break;
     }
   }

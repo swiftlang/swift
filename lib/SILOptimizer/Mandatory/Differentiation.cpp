@@ -228,6 +228,9 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
     case RequirementKind::SameShape:
       llvm_unreachable("Same-shape requirement not supported here");
 
+    case RequirementKind::Value:
+      llvm_unreachable("Value requirement not supported here");
+
     // Check layout requirements.
     case RequirementKind::Layout: {
       auto layout = req.getLayoutConstraint();

@@ -435,9 +435,10 @@ protected:
     NumParams : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
     HasSuperclass : 1,
     HasLayoutConstraint : 1,
+    HasValue : 1,
     : NumPadBits,
     NumProtocols : 16
   );
@@ -528,6 +529,11 @@ protected:
 
     /// Whether we have a substitution map.
     HasSubstitutionMap : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,
+    /// Whether there is a prefix '-' before this type.
+    IsNegative : 1
   );
 
   } Bits;
@@ -825,6 +831,13 @@ public:
   /// can only be a GenericTypeParamType.
   bool isRootParameterPack();
 
+  /// Determine whether this type is a value parameter 'let N: Int', which is a
+  /// GenericTypeParamType.
+  ///
+  /// Like \c isTypeParameter, this routine will return \c false for types that
+  /// include value parameters in nested positions e.g. \c X<T...>.
+  bool isValueParameter();
+
   /// Determine whether this type can dynamically be an optional type.
   ///
   /// \param includeExistential Whether an existential type should be considered
@@ -894,6 +907,9 @@ public:
 
   /// Whether this type represents a generic constraint.
   bool isConstraintType() const;
+
+  /// Whether this type is one of the set of types legal for variable generics.
+  bool isLegalValueGenericType();
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -6511,12 +6527,23 @@ protected:
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.ArchetypeType.HasSuperclass ? 1 : 0;
+    auto numTypes = 0;
+
+    if (Bits.ArchetypeType.HasSuperclass) {
+      numTypes += 1;
+    }
+
+    if (Bits.ArchetypeType.HasValue) {
+      numTypes += 1;
+    }
+
+    return numTypes;
   }
 
   size_t numTrailingObjects(OverloadToken<LayoutConstraint>) const {
     return Bits.ArchetypeType.HasLayoutConstraint ? 1 : 0;
   }
+
   Type InterfaceType;
   GenericEnvironment *Environment = nullptr;
 
@@ -6558,7 +6585,7 @@ public:
   Type getSuperclass() const {
     if (!Bits.ArchetypeType.HasSuperclass) return Type();
 
-    return *getSubclassTrailingObjects<Type>();
+    return getSubclassTrailingObjects<Type>()[0];
   }
 
   /// Retrieve the layout constraint of this type, if such a requirement exists.
@@ -6566,6 +6593,18 @@ public:
     if (!Bits.ArchetypeType.HasLayoutConstraint) return LayoutConstraint();
 
     return *getSubclassTrailingObjects<LayoutConstraint>();
+  }
+
+  /// Retrieve the value type of this generic parameter, if such a requirement
+  /// exists.
+  Type getValueType() const {
+    if (!Bits.ArchetypeType.HasValue) return Type();
+
+    if (Bits.ArchetypeType.HasSuperclass) {
+      return getSubclassTrailingObjects<Type>()[1];
+    }
+
+    return getSubclassTrailingObjects<Type>()[0];
   }
 
   /// Retrieve the nested type with the given associated type.
@@ -6603,7 +6642,7 @@ protected:
                 Type InterfaceType,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, LayoutConstraint Layout,
-                GenericEnvironment *Environment);
+                Type ValueType, GenericEnvironment *Environment);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
@@ -6626,7 +6665,8 @@ public:
                                GenericEnvironment *GenericEnv,
                                Type InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass, LayoutConstraint Layout);
+                               Type Superclass, LayoutConstraint Layout,
+                               Type ValueType);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PrimaryArchetype;
@@ -6637,6 +6677,7 @@ private:
                        Type InterfaceType,
                        ArrayRef<ProtocolDecl *> ConformsTo,
                        Type Superclass, LayoutConstraint Layout,
+                       Type ValueType,
                        RecursiveTypeProperties Properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
@@ -6655,7 +6696,7 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   static OpaqueTypeArchetypeType *getNew(
       GenericEnvironment *environment, Type interfaceType,
       ArrayRef<ProtocolDecl*> conformsTo, Type superclass,
-      LayoutConstraint layout);
+      LayoutConstraint layout, Type valueType);
 
 public:
   /// Get an opaque archetype representing the underlying type of the given
@@ -6681,7 +6722,8 @@ private:
                           RecursiveTypeProperties properties,
                           Type interfaceType,
                           ArrayRef<ProtocolDecl*> conformsTo,
-                          Type superclass, LayoutConstraint layout);
+                          Type superclass, LayoutConstraint layout,
+                          Type valueType);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
@@ -6783,7 +6825,7 @@ class OpenedArchetypeType final : public LocalArchetypeType,
   static CanTypeWrapper<OpenedArchetypeType>
   getNew(GenericEnvironment *environment, Type interfaceType,
          ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-         LayoutConstraint layout);
+         LayoutConstraint layout, Type valueType);
 
 public:
   /// Get or create an archetype that represents the opened type
@@ -6814,6 +6856,7 @@ private:
                       ArrayRef<ProtocolDecl *> conformsTo,
                       Type superclass,
                       LayoutConstraint layout,
+                      Type valueType,
                       RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
@@ -6928,10 +6971,15 @@ class GenericTypeParamType : public SubstitutableType {
   /// The generic type parameter or depth/index.
   llvm::PointerUnion<GenericTypeParamDecl *, DepthIndexTy> ParamOrDepthIndex;
 
+  /// Whether this is a value type parameter.
+  /// Note: This is only set when the ParamOrDepthIndex is a DepthIndex.
+  bool IsValue = false;
+
 public:
   /// Retrieve a generic type parameter at the given depth and index.
-  static GenericTypeParamType *get(bool isParameterPack, unsigned depth,
-                                   unsigned index, const ASTContext &ctx);
+  static GenericTypeParamType *get(bool isParameterPack, bool isValue,
+                                   unsigned depth, unsigned index,
+                                   const ASTContext &ctx);
 
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
@@ -6974,6 +7022,13 @@ public:
   /// \endcode
   bool isParameterPack() const;
 
+  /// Returns \c true if this type parameter is declared as a value.
+  ///
+  /// \code
+  /// struct Vector<Element, let N: Int>
+  /// \endcode
+  bool isValue() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::GenericTypeParam;
@@ -6987,18 +7042,21 @@ private:
     : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
       ParamOrDepthIndex(param) { }
 
-  explicit GenericTypeParamType(bool isParameterPack, unsigned depth,
-                                unsigned index, RecursiveTypeProperties props,
+  explicit GenericTypeParamType(bool isParameterPack, bool isValue,
+                                unsigned depth, unsigned index,
+                                RecursiveTypeProperties props,
                                 const ASTContext &ctx)
       : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
         ParamOrDepthIndex(depth << 16 | index |
-                          ((isParameterPack ? 1 : 0) << 30)) {}
+                          ((isParameterPack ? 1 : 0) << 30)),
+        IsValue(isValue) {}
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-static CanGenericTypeParamType get(bool isParameterPack, unsigned depth,
-                                   unsigned index, const ASTContext &C) {
+static CanGenericTypeParamType get(bool isParameterPack, bool isValue,
+                                   unsigned depth, unsigned index,
+                                   const ASTContext &C) {
   return CanGenericTypeParamType(
-      GenericTypeParamType::get(isParameterPack, depth, index, C));
+      GenericTypeParamType::get(isParameterPack, isValue, depth, index, C));
 }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
@@ -7526,6 +7584,57 @@ BEGIN_CAN_TYPE_WRAPPER(PackElementType, Type)
   }
 END_CAN_TYPE_WRAPPER(PackElementType, Type)
 
+/// Represents an integer literal used in a type position.
+///
+/// Consider the following example:
+///
+/// \code
+/// struct T<let N: Int> {}
+/// T<123>
+/// \encode
+///
+/// 'T' is a BoundGenericStructType with an IntegerType generic argument with
+/// the value '123'.
+class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  StringRef Value;
+
+  IntegerType(StringRef value, bool isNegative, const ASTContext &ctx) :
+      TypeBase(TypeKind::Integer, &ctx, RecursiveTypeProperties()),
+      Value(value) {
+    Bits.IntegerType.IsNegative = isNegative;
+  }
+
+public:
+  static IntegerType *get(StringRef value, bool isNegative,
+                          const ASTContext &ctx);
+
+  APInt getValue();
+
+  StringRef getDigitsText() const {
+    return Value;
+  }
+
+  bool isNegative() const {
+    return Bits.IntegerType.IsNegative;
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDigitsText(), isNegative());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef value,
+                      bool isNegative) {
+    ID.AddString(value);
+    ID.AddInteger(isNegative);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Integer;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {
   // If this type is canonical, it has the ASTContext in it.
@@ -7582,6 +7691,10 @@ inline bool CanType::isConstraintTypeImpl(CanType type) {
   return (isa<ProtocolType>(type) ||
           isa<ProtocolCompositionType>(type) ||
           isa<ParameterizedProtocolType>(type));
+}
+
+inline bool TypeBase::isLegalValueGenericType() {
+  return isInt();
 }
 
 inline bool TypeBase::isExistentialType() {

@@ -710,6 +710,10 @@ Types
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
 
+  #if SWIFT_RUNTIME_VERSION >= 6.TBD
+    type ::= '$' 'n'? NATURAL_ZERO           // integer type
+  #endif
+
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
@@ -1040,6 +1044,10 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= type substitution 'RM' LAYOUT-CONSTRAINT                           // layout requirement with substitution
 
   requirement ::= type 'Rh' GENERIC-PARAM-INDEX                     // same-shape requirement (only supported on a generic parameter)
+
+#if SWIFT_RUNTIME_VERSION >= 6.TBD
+  requirement ::= type 'RV' GENERIC-PARAM-INDEX                     // value requirement
+#endif
 
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1

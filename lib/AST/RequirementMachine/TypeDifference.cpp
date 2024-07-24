@@ -306,7 +306,8 @@ swift::rewriting::buildTypeDifference(
     unsigned index = resultSubstitutions.size();
     resultSubstitutions.push_back(t);
     return GenericTypeParamType::get(/*isParameterPack=*/false,
-                                     /*depth=*/0, index, astCtx);
+                                     /*isValue*/ false, /*depth=*/0, index,
+                                     astCtx);
   };
 
   auto type = symbol.getConcreteType();
@@ -361,6 +362,8 @@ swift::rewriting::buildTypeDifference(
                                             resultSubstitutions,
                                             symbol.getProtocol(),
                                             ctx);
+    case Symbol::Kind::Value:
+      return Symbol::forValue(resultType->getCanonicalType(), ctx);
     default:
       break;
     }

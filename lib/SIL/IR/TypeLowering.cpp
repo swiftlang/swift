@@ -353,6 +353,7 @@ namespace {
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
+    IMPL(Integer, Trivial)
 
 #undef IMPL
 
@@ -3116,6 +3117,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (3) being a special type that's not worth forming a conformance for
     //     - ModuleType
     //     - SILTokenType
+    //     - IntegerType
     // (4) being an unowned(unsafe) reference to a class/class-bound existential
     //     NOTE: ReferenceStorageType(C) does not conform HOWEVER the presence
     //           of an unowned(unsafe) field within an aggregate DOES NOT allow
@@ -3200,7 +3202,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
-          if (isa<ModuleType>(ty) || isa<SILTokenType>(ty)) {
+          if (isa<ModuleType>(ty) ||
+              isa<SILTokenType>(ty) ||
+              isa<IntegerType>(ty)) {
             // These types should never appear within aggregates.
             assert(isTopLevel && "aggregate containing marker type!?");
             // If they did, though, they would not justify the aggregate's
@@ -4937,7 +4941,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
         // Remap the depth. This is necessary because the 'var' box might
         // capture a subset of the captured environments of the closure.
         return GenericTypeParamType::get(
-            /*isParameterPack=*/false,
+            /*isParameterPack=*/false, /*isValue*/ false,
             genericSig.getNextDepth() - capturedEnvs.size() + capturedEnvIndex,
             paramTy->getIndex(),
             C);

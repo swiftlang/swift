@@ -488,6 +488,11 @@ void decodeRequirement(
       inverseRequirements.push_back(
           Builder.createInverseRequirement(subjectType, protocolKind));
       continue;
+    } else if (child->getKind() ==
+          Demangle::Node::Kind::DependentGenericValueRequirement) {
+      constraintType = Builder.decodeMangledType(child->getChild(1));
+      if (!constraintType)
+        return;
     }
 
 
@@ -501,6 +506,11 @@ void decodeRequirement(
     }
     case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
       requirements.push_back(BuiltRequirement(RequirementKind::SameType,
+                                              subjectType, constraintType));
+      break;
+    }
+    case Demangle::Node::Kind::DependentGenericValueRequirement: {
+      requirements.push_back(BuiltRequirement(RequirementKind::Value,
                                               subjectType, constraintType));
       break;
     }
@@ -1515,6 +1525,22 @@ protected:
       
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
     }
+
+    case NodeKind::Integer: {
+      if (Node->getNumChildren() == 0) {
+        // Non-negative number.
+        return Builder.createIntegerType(Node->getIndex(), /*isNegative*/ false);
+      }
+
+      auto prefix = Node->getFirstChild();
+
+      if (prefix->getKind() != NodeKind::PrefixOperator) {
+        return MAKE_NODE_TYPE_ERROR0(Node, "unexpected child");
+      }
+
+      return Builder.createIntegerType(Node->getIndex(), /*isNegative*/ true);
+    }
+
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
     // the defining decl
     default:

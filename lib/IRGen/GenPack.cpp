@@ -325,6 +325,7 @@ static void bindElementSignatureRequirementsAtIndex(
         case GenericRequirement::Kind::Shape:
         case GenericRequirement::Kind::Metadata:
         case GenericRequirement::Kind::WitnessTable:
+        case GenericRequirement::Kind::Value:
           break;
         case GenericRequirement::Kind::MetadataPack: {
           auto ty = requirement.getTypeParameter();
@@ -1080,6 +1081,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
         case GenericRequirement::Kind::Shape:
         case GenericRequirement::Kind::Metadata:
         case GenericRequirement::Kind::WitnessTable:
+        case GenericRequirement::Kind::Value:
           break;
         }
       });

@@ -274,6 +274,11 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
 
   // Get all of the type metadata.
   signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (gp->isValue() && canonical) {
+      callback(GenericRequirement::forValue(CanType(gp)));
+      return;
+    }
+
     if (canonical)
       callback(GenericRequirement::forMetadata(CanType(gp)));
   });
@@ -286,6 +291,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::Layout:
+      case RequirementKind::Value:
         continue;
 
       case RequirementKind::Conformance: {
@@ -3004,7 +3010,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   switch (component.getKind()) {
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance:
-  case Component::Kind::NominalTypeArgumentShape: {
+  case Component::Kind::NominalTypeArgumentShape:
+  case Component::Kind::NominalValueArgument: {
     assert(sourceKey.Kind == LocalTypeDataKind::forFormalTypeMetadata());
     auto type = sourceKey.Type;
     if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
@@ -3081,6 +3088,20 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       setProtocolWitnessTableName(IGF.IGM, wtable, sourceKey.Type, protocol);
 
       return MetadataResponse::forComplete(wtable);
+    } else if (component.getKind() == Component::Kind::NominalValueArgument) {
+      assert(requirement.isValue() && "index mismatch!");
+
+      sourceKey.Kind = LocalTypeDataKind::forValue();
+
+      if (!source) return MetadataResponse();
+
+      auto sourceMetadata = source.getMetadata();
+      auto value = emitValueGenericRef(IGF, nominal, requirements, reqtIndex,
+                                       sourceMetadata);
+
+      setTypeMetadataName(IGF.IGM, value, sourceKey.Type);
+
+      return MetadataResponse::forComplete(value);
     }
 
     llvm_unreachable("Bad component kind");
@@ -3424,6 +3445,10 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
       break;
     case Component::Kind::NominalTypeArgumentShape:
       out << "nominal_type_argument_shape["
+          << component.getPrimaryIndex() << "]";
+      break;
+    case Component::Kind::NominalValueArgument:
+      out << "nominal_value_argument["
           << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::PackExpansionCount:
@@ -3897,6 +3922,9 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
 
     return wtable;
   }
+
+  case GenericRequirement::Kind::Value:
+    return IGF.emitValueGenericRef(argType);
   }
 }
 
@@ -3939,6 +3967,7 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
                                             GenericRequirement::Kind kind) {
   switch (kind) {
   case GenericRequirement::Kind::Shape:
+  case GenericRequirement::Kind::Value:
     return IGM.SizeTy;
   case GenericRequirement::Kind::Metadata:
     return IGM.TypeMetadataPtrTy;
@@ -4012,6 +4041,13 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
     break;
   }
+
+  case GenericRequirement::Kind::Value: {
+    setTypeMetadataName(IGF.IGM, value, type);
+    auto kind = LocalTypeDataKind::forValue();
+    IGF.setUnscopedLocalTypeData(type, kind, value);
+    break;
+  }
   }
 }
 
@@ -4050,6 +4086,8 @@ namespace {
         case GenericRequirement::Kind::WitnessTablePack:
           ++numWitnessTablePtrs;
           break;
+        case GenericRequirement::Kind::Value:
+          llvm_unreachable("implement me");
         }
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&

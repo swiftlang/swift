@@ -314,6 +314,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             break;
           case RequirementKind::SameShape:
           case RequirementKind::Layout:
+          case RequirementKind::Value:
             break;
           }
         }
@@ -1555,7 +1556,8 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
     llvm_unreachable("Same-shape requirements not supported here");
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
-  case RequirementKind::Superclass: {
+  case RequirementKind::Superclass:
+  case RequirementKind::Value: {
     auto subject = req.getFirstType();
     auto result = findRelevantDeclAndDirectUse(subject);
 
@@ -1635,7 +1637,8 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
-  case RequirementKind::SameShape: {
+  case RequirementKind::SameShape:
+  case RequirementKind::Value: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
     unsigned secondDepth = getDepthOfType(req.getSecondType());
@@ -1850,6 +1853,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
           } else if (auto *GP = param->getDecl()) {
             if (param->isParameterPack())
               Printer << "each ";
+            if (param->isValue())
+              Printer << "let ";
+
             Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                           GP);
             Printer.printName(GP->getName(),
@@ -1926,6 +1932,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
         case RequirementKind::Conformance:
         case RequirementKind::Superclass:
+        case RequirementKind::Value:
           printType(second);
           break;
 
@@ -2055,6 +2062,10 @@ void PrintAST::printRequirement(const Requirement &req) {
       Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " == ";
+    break;
+  case RequirementKind::Value:
+    printTransformedType(req.getFirstType());
+    Printer << " : ";
     break;
   }
   printTransformedType(req.getSecondType());
@@ -3410,6 +3421,8 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
     if (decl->isParameterPack())
       Printer << "each ";
+    if (decl->isValue())
+      Printer << "let ";
     Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
   });
 
@@ -5306,6 +5319,10 @@ void PrintAST::visitUnreachableExpr(UnreachableExpr *E) {
 void PrintAST::visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 }
 
+void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }
@@ -7025,6 +7042,10 @@ public:
     Printer << "each ";
   }
 
+  void printLet() {
+    Printer << "let ";
+  }
+
   void printArchetypeCommon(Type interfaceTy, GenericEnvironment *env) {
     if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
       if (Options.AlternativeTypeNames) {
@@ -7033,6 +7054,7 @@ public:
           auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
           if (found != Options.AlternativeTypeNames->end()) {
             if (paramTy->isParameterPack()) printEach();
+            if (paramTy->isValue()) printLet();
             Printer << found->second.str();
             return;
           }
@@ -7155,6 +7177,7 @@ public:
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     auto printPrefix = [&]{
       if (T->isParameterPack()) printEach();
+      if (T->isValue()) printLet();
     };
 
     auto decl = T->getDecl();
@@ -7240,6 +7263,14 @@ public:
     }
 
     Printer << "_";
+  }
+
+  void visitIntegerType(IntegerType *T) {
+    if (T->isNegative()) {
+      Printer << "-";
+    }
+
+    Printer << T->getDigitsText();
   }
 };
 } // unnamed namespace

@@ -1961,7 +1961,27 @@ namespace {
     }
 
     Type visitIdentityExpr(IdentityExpr *expr) {
-      return CS.getType(expr->getSubExpr());
+      auto subType = CS.getType(expr->getSubExpr());
+
+      if (!isa<TypeExpr>(expr->getSubExpr()) || !isa<DotSelfExpr>(expr)) {
+        return subType;
+      }
+
+      // Disallow 'N.self' where N is a value generic 'let N'.
+      auto metatype = subType->castTo<MetatypeType>();
+      auto archetype = metatype->getInstanceType()->getAs<ArchetypeType>();
+
+      if (!archetype) {
+        return subType;
+      }
+
+      if (archetype->getValueType()) {
+        auto &de = CS.getASTContext().Diags;
+        de.diagnose(expr->getLoc(), diag::cannot_self_value_generic, archetype);
+        return Type();
+      }
+
+      return subType;
     }
 
     Type visitCopyExpr(CopyExpr *expr) {

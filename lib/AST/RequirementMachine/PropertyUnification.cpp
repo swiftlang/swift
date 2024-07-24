@@ -635,6 +635,21 @@ void PropertyMap::addConcreteTypeProperty(
                      property, ruleID);
 }
 
+void PropertyMap::addValueProperty(Term key, Symbol property, unsigned ruleID) {
+  auto *props = getOrCreateProperties(key);
+
+  if (!props->ValueType) {
+    props->ValueType = property;
+    props->ValueRule = ruleID;
+    return;
+  }
+
+  unifyConcreteTypes(key,
+                     *props->ValueType,
+                     *props->ValueRule,
+                     property, ruleID);
+}
+
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
@@ -659,7 +674,12 @@ void PropertyMap::addProperty(
     addConcreteTypeProperty(key, property, ruleID);
     return;
 
+  case Symbol::Kind::Value:
+    addValueProperty(key, property, ruleID);
+    return;
+
   case Symbol::Kind::ConcreteConformance:
+  case Symbol::Kind::ConcreteValue:
     // Concrete conformance rules are not recorded in the property map, since
     // they're not needed for unification, and generic signature queries don't
     // care about them.

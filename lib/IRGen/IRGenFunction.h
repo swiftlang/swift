@@ -404,7 +404,9 @@ public:
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
   llvm::Value *emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request);
-  
+
+  llvm::Value *emitValueGenericRef(CanType type);
+
   llvm::Value *emitValueWitnessTableRef(SILType type,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRef(SILType type,
