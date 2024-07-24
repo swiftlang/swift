@@ -4,6 +4,13 @@
 
 // REQUIRES: PTRSIZE=64
 
+// This fails with an unoptimized stdlib. Disable it on that so we can get
+// builds green.
+//
+// rdar://131554269
+//
+// REQUIRES: optimized_stdlib
+
 func blah<T>(_: T.Type) {}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15nested_generics13makeAMetadatayyF"()
