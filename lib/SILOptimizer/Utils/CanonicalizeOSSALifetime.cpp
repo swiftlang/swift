@@ -259,7 +259,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
 
   for (auto destroy : destroys) {
-    if (liveness->isWithinBoundary(destroy))
+    if (liveness->isWithinBoundary(destroy, /*deadEndBlocks=*/nullptr))
       continue;
     completeLiveness.updateForUse(destroy, /*lifetimeEnding*/ true);
   }
@@ -592,7 +592,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
 
 #ifndef NDEBUG
   for (auto *consume : consumes) {
-    assert(!liveness->isWithinBoundary(consume));
+    assert(!liveness->isWithinBoundary(consume, /*deadEndBlocks=*/nullptr));
   }
 #endif
 

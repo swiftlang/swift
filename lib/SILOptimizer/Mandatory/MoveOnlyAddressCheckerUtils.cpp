@@ -2052,8 +2052,8 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     liveness->initializeDef(bai);
     liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness->areUsesWithinBoundary(
-              {consumingUse},
+      if (!liveness->isWithinBoundary(
+              consumingUse->getUser(),
               moveChecker.deba->get(consumingUse->getFunction()))) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
