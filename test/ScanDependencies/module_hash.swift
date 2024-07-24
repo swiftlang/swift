@@ -18,14 +18,14 @@
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-1.json Library modulePath > %t/path-1
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-2.json Library modulePath > %t/path-2
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-3.json Library modulePath > %t/path-3
-// RUN: diff %t/path-1 %t/path-2
+// RUN: not diff %t/path-1 %t/path-2
 // RUN: not diff %t/path-1 %t/path-3
 
 /// Check build command (exclude dependency module file path). 1 and 2 should match, but not 3.
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-1.json Library | grep -v fmodule-file= > %t/lib-1.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-2.json Library | grep -v fmodule-file= > %t/lib-2.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-3.json Library | grep -v fmodule-file= > %t/lib-3.cmd
-// RUN: diff %t/lib-1.cmd %t/lib-2.cmd
+// RUN: not diff %t/lib-1.cmd %t/lib-2.cmd
 // RUN: not diff %t/lib-1.cmd %t/lib-3.cmd
 
 /// Test direct-cc1 mode.
@@ -42,12 +42,12 @@
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-4.json Library modulePath > %t/path-4
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-5.json Library modulePath > %t/path-5
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps-6.json Library modulePath > %t/path-6
-// RUN: diff %t/path-4 %t/path-5
+// RUN: not diff %t/path-4 %t/path-5
 // RUN: not diff %t/path-4 %t/path-6
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-4.json Library | grep -v fmodule-file= > %t/lib-4.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-5.json Library | grep -v fmodule-file= > %t/lib-5.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps-6.json Library | grep -v fmodule-file= > %t/lib-6.cmd
-// RUN: diff %t/lib-4.cmd %t/lib-5.cmd
+// RUN: not diff %t/lib-4.cmd %t/lib-5.cmd
 // RUN: not diff %t/lib-4.cmd %t/lib-6.cmd
 
 //--- main.swift

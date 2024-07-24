@@ -4097,7 +4097,7 @@ std::string ClangImporter::getClangModuleHash() const {
 }
 
 std::vector<std::string>
-ClangImporter::getSwiftExplicitModuleDirectCC1Args(bool isInterface) const {
+ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   llvm::SmallVector<const char*> clangArgs;
   clangArgs.reserve(Impl.ClangArgs.size());
   llvm::for_each(Impl.ClangArgs, [&](const std::string &Arg) {
@@ -4146,14 +4146,6 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args(bool isInterface) const {
   auto &PPOpts = instance.getPreprocessorOpts();
   PPOpts.MacroIncludes.clear();
   PPOpts.Includes.clear();
-
-  // Clear specific options that will not affect swiftinterface compilation, but
-  // might affect main Module.
-  if (isInterface) {
-    // Interfacefile should not need `-D` but pass to main module in case it
-    // needs to directly import clang headers.
-    PPOpts.Macros.clear();
-  }
 
   if (Impl.SwiftContext.ClangImporterOpts.UseClangIncludeTree) {
     // FileSystemOptions.
