@@ -1,5 +1,11 @@
 // RUN: %target-swift-frontend -parse -verify %s -disable-experimental-parser-round-trip
 
+// Array Literal
+
+let values = [1,2,3,]
+
+let values: [Int,] = [] // expected-note {{to match this opening '['}} expected-error {{expected ']' in array type}} expected-error {{expected pattern}} 
+
 // Tuple and Tuple Pattern
 
 let _ = (a: 1, b: 2, c: 3,)
@@ -63,6 +69,45 @@ macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "Option
 // Availability Spec List
 
 if #unavailable(iOS 15, watchOS 9,) { }
+
+if #available(iOS 15,) { }  // expected-error {{expected platform name}}
+
+// Built-in Attributes
+
+@inline(never,) // expected-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
+func foo() { }
+
+@available(iOS 15,) // expected-error {{expected platform name}} expected-error {{expected declaration}} 
+func foo() { }
+
+@backDeployed(before: SwiftStdlib 6.0,) // expected-error {{unexpected ',' separator}}
+func foo() { }
+
+struct Foo {
+    
+  var x: Int
+  var y: Int
+  
+  var value: (Int, Int) {
+    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in @storageRestrictions list}}
+    init(initialValue) {
+      self.x = initialValue.0
+      self.y = initialValue.1
+    }
+    get { (x, y) }
+  }
+
+}
+
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{unexpected ',' separator}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}} 
+
+@derivative(of: Self.other,) // expected-error {{unexpected ',' separator}}
+func foo() {}
+
+@transpose(of: S.instanceMethod,) // expected-error {{unexpected ',' separator}}
+func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
+    other + t
+}
 
 // The following cases are only supported with the 'TrailingComma' experimental feature flag enabled
  
