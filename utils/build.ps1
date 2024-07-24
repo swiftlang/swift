@@ -1618,26 +1618,41 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
 }
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-  $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
-  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
-  $ShortArch = $Arch.LLVMName
+  if ($Test) {
+    # Foundation tests build via swiftpm rather than CMake
+    $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-foundation-tests
 
-  Isolate-EnvVars {
-    if ($Test) {
-      $XCTestBinaryCache = Get-TargetProjectBinaryCache $Arch XCTest
-      $TestingDefines = @{
-        ENABLE_TESTING = "YES";
-        XCTest_DIR = "$XCTestBinaryCache\cmake\modules";
-      }
-      $Targets = @("default", "test")
-      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-TargetProjectBinaryCache $Arch Runtime)\bin;$env:Path"
-      $InstallPath = ""
-    } else {
+    Isolate-EnvVars {
+      $env:SWIFTCI_USE_LOCAL_DEPS=1
+      Build-SPMProject `
+        -Test `
+        -Src $SourceCache\swift-foundation `
+        -Bin $OutDir `
+        -Arch $HostArch
+    }
+
+    $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
+
+    Isolate-EnvVars {
+      $env:SWIFTCI_USE_LOCAL_DEPS=1
+      $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
+      Build-SPMProject `
+        -Test `
+        -Src $SourceCache\swift-corelibs-foundation `
+        -Bin $OutDir `
+        -Arch $HostArch
+    }
+  } else {
+    $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
+    $SwiftSyntaxDir = Get-HostProjectCMakeModules Compilers
+    $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
+    $ShortArch = $Arch.LLVMName
+
+    Isolate-EnvVars {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
       $InstallPath = "$($Arch.SDKInstallRoot)\usr"
-    }
+
 
     $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
@@ -1670,6 +1685,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
         _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
       } + $TestingDefines)
+    }
   }
 }
 
