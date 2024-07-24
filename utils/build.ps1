@@ -1653,8 +1653,6 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       $Targets = @("default", "install")
       $InstallPath = "$($Arch.SDKInstallRoot)\usr"
 
-
-    $env:CTEST_OUTPUT_ON_FAILURE = 1
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin $FoundationBinaryCache `
