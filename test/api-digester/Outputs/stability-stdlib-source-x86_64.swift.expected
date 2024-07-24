@@ -3,3 +3,18 @@
 // NOTE: Most differences from the baseline are common across all architectures
 // should go into stability-stdlib-source-base.swift.expected. Only capture
 // x86_64-specific differences from the baseline here.
+
+// Adoption of @unsafe
+Func unsafeBitCast(_:to:) is now with @unsafe
+Func unsafeDowncast(_:to:) is now with @unsafe
+Struct OpaquePointer is now with @unsafe
+Struct Unmanaged is now with @unsafe
+Struct UnsafeBufferPointer is now with @unsafe
+Struct UnsafeMutableBufferPointer is now with @unsafe
+Struct UnsafeMutablePointer is now with @unsafe
+Struct UnsafeMutableRawBufferPointer is now with @unsafe
+Struct UnsafeMutableRawPointer is now with @unsafe
+Struct UnsafePointer is now with @unsafe
+Struct UnsafeRawBufferPointer is now with @unsafe
+Struct UnsafeRawPointer is now with @unsafe
+Var Optional.unsafelyUnwrapped is now with @unsafe
