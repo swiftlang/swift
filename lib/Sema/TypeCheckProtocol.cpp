@@ -6276,7 +6276,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     }
 
     if ((existingModule != dc->getParentModule() && conformanceInOrigModule) ||
-        isSendable) {
+        diag.Protocol->isMarkerProtocol()) {
       // Warn about the conformance.
       if (isSendable && SendableConformance &&
           isa<InheritedProtocolConformance>(SendableConformance)) {
