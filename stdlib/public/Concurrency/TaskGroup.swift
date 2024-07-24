@@ -50,7 +50,7 @@ import Swift
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled
+/// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation,
@@ -161,7 +161,7 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
 /// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled
+/// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation,
