@@ -1957,6 +1957,12 @@ ERROR(section_linkage_markers_disabled,none,
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
+// @_silgen_name and friends
+WARNING(reserved_runtime_symbol_name,none,
+        "symbol name '%0' is reserved for the Swift runtime and cannot be "
+        "directly referenced without causing unpredictable behavior; "
+        "this will become an error", (StringRef))
+
 // @_extern
 ERROR(attr_extern_experimental,none,
       "@_extern requires '-enable-experimental-feature Extern'", ())

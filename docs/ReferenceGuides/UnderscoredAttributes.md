@@ -465,6 +465,10 @@ Also similar to `@_silgen_name`, but a function declared with
 `@_extern(c)` is assumed to use the C ABI, while `@_silgen_name`
 assumes the Swift ABI.
 
+It is always better to refer to C declarations by importing their
+native declarations from a header or module using Swift's C interop
+support when possible.
+
 ## `@_fixed_layout`
 
 Same as `@frozen` but also works for classes.
@@ -1106,9 +1110,43 @@ Darwin) is maintained, unless "raw:" is used, in which case the name provided is
 expected to already be mangled.
 
 Since this has label-like behavior, it may not correspond to any declaration;
-if so, it is assumed that the function/global is implemented in C.
+if so, it is assumed that the function/global is implemented possibly
+in some other language; that implementation however is assumed to use
+the Swift ABI as if it were defined in Swift.
 
-A function defined by `@_silgen_name` is assumed to use the Swift ABI.
+There are very few legitimate uses for this attribute. There are many
+ways to misuse it:
+
+- Don't use `@_silgen_name` to access C functions, since those use the C ABI.
+  Import a header or C module to access C functions.
+- Don't use `@_silgen_name` to export Swift functions to C/ObjC. `@_cdecl` or
+  `@objc` can do that.
+- Don't use `@_silgen_name` to link to `swift_*` symbols from the Swift runtime.
+  Calls to these functions have special semantics to the compiler, and accessing
+  them directly will lead to unpredictable compiler crashes and undefined
+  behavior. Use language features, or if you must, the `Builtin` module, instead.
+- Don't use `@_silgen_name` for dynamic linker discovery. Swift symbols cannot
+  be reliably recovered through C interfaces like `dlsym`. If you want to
+  implement a plugin-style interface, use `Bundle`/`NSBundle` if available, or
+  export your plugin entry points as C entry points using `@_cdecl`.
+  
+Legitimate uses may include:
+
+- Use `@_silgen_name` if you're implementing the Swift runtime.
+- Use `@_silgen_name` if you need to make a change to an ABI-stable
+  declaration's signature that would normally alter its mangled name, but you
+  need to preserve the old mangled name for ABI compatibility. You will need
+  to be careful that the change doesn't materially affect the actual calling
+  convention of the function in an incompatible way.
+- Use `@_silgen_name` if certain declarations need to have predictable symbol
+  names, such as to be easily referenced by linker scripts or other highly
+  customized build environments (and it's OK for those predictable symbols to
+  reference functions with a Swift ABI).
+- Use `@_silgen_name` to interface build products that must be linked
+  together but built completely separately, such that one can't import the other
+  normally. For this to work, the declaration(s) and definition must exactly
+  match, using the exact same definitions of any referenced types or other
+  declarations. The compiler can't help you if you mismatch.
 
 For more details, see the
 [Standard Library Programmer's Manual](https://github.com/swiftlang/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
