@@ -5786,9 +5786,6 @@ ERROR(distributed_property_cannot_be_static,none,
 ERROR(distributed_property_can_only_be_computed,none,
       "%kind0 cannot be 'distributed', only computed properties can",
       (const ValueDecl *))
-ERROR(distributed_property_accessor_only_get_can_be_distributed,none,
-      "only getters may be 'distributed'",
-      ())
 NOTE(distributed_actor_isolated_property,none,
       "access to %kind0 is only permitted within distributed actor %1",
       (const ValueDecl *, DeclName))
