@@ -57,43 +57,6 @@ maskingShifts = [
       llvmName=lambda _: 'shl'),
 ]
 
-#===-----------------------------------------------------------------------===//
-#===--- Operator Documentation --------------------------------------------===//
-#===-----------------------------------------------------------------------===//
-
-
-# documentation for binary operators: +, -, *
-def operatorComment(operator, fixedWidth):
-    comments = {
-        '+': '',
-        '-': '',
-        '*': '',
-        '/': '',
-        '%': '',
-        '&': '',
-        '|': '',
-        '^': '',
-        '&>>': '',
-        '&<<': '',
-  }
-    return comments[operator].rstrip()
-
-# documentation for assignment operators: +=, -=, *=
-def assignmentOperatorComment(operator, fixedWidth):
-    comments = {
-        '+': '',
-        '-': '',
-        '*': '',
-        '/': '',
-        '%': '',
-        '&': '',
-        '|': '',
-        '^': '',
-        '&>>': '',
-        '&<<': '',
-  }
-    return comments[operator].rstrip()
-
 }%
 
 //===----------------------------------------------------------------------===//
@@ -273,7 +236,6 @@ public struct ${Self}
 
 // See corresponding definitions in the FixedWidthInteger extension.
 %       for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
-${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(lhs: inout ${Self}, rhs: ${Self}) {
 %   if x.kind == '/':
@@ -368,7 +330,6 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
 % for x in binaryBitwise:
-${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs = ${Self}(Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
@@ -377,7 +338,6 @@ ${assignmentOperatorComment(x.operator, True)}
 
 % for x in maskingShifts:
 
-${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(lhs: inout ${Self}, rhs: ${Self}) {
     let rhs_ = rhs & ${bits - 1}
@@ -697,7 +657,6 @@ extension ${Self} {
 
 %   for x in binaryBitwise + maskingShifts + list(chain(*binaryArithmetic.values())):
 
-${operatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
