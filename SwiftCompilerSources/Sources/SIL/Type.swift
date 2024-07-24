@@ -65,6 +65,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
+  // Note that invalid types are not considered Escapable. This makes it difficult to make any assumptions about
+  // nonescapable types.
   public func isEscapable(in function: Function) -> Bool {
     bridged.isEscapable(function.bridged)
   }
