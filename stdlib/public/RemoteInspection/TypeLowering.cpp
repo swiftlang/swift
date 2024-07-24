@@ -327,8 +327,7 @@ BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) cons
     auto mask = BitMask::oneMask(getSize());
     mask.keepOnlyMostSignificantBits(getSize() * 8 - intSize);
     return mask;
-  } else if (
-    Name == "ypXp" // Any.Type
+  } else if (Name == "ypXp" // Any.Type
   ) {
     // Builtin types that expose pointer spare bits
     auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
@@ -426,7 +425,7 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     // Thick functions have two fields:
     // * Code pointer that might be signed and/or misaligned
     // * Context that could be a tagged pointer
-    mask.makeZero();  // No spare bits
+    mask.makeZero(); // No spare bits
     return mask;
   case RecordKind::OpaqueExistential: {
     // Existential storage isn't recorded as a field,
