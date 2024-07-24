@@ -202,7 +202,8 @@ bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
 
   for (auto *otherStoreBorrow : otherStoreBorrows) {
     // Return true, if otherStoreBorrow was in \p storeBorrow's scope
-    if (liveness->isWithinBoundary(otherStoreBorrow)) {
+    if (liveness->isWithinBoundary(otherStoreBorrow,
+                                   /*deadEndBlocks=*/nullptr)) {
       return true;
     }
   }

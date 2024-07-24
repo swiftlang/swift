@@ -499,7 +499,8 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         mvi->setAllowsDiagnostics(false);
 
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
-        if (livenessInfo.liveness->isWithinBoundary(mvi)) {
+        if (livenessInfo.liveness->isWithinBoundary(
+                mvi, /*deadEndBlocks=*/nullptr)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {

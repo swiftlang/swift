@@ -501,7 +501,7 @@ static FunctionTest SSAUseLivenessTest("ssa_use_liveness", [](auto &function,
 } // end namespace swift::test
 
 template <typename LivenessWithDefs>
-bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
+bool PrunedLiveRange<LivenessWithDefs>::isWithinLivenessBoundary(
     SILInstruction *inst) const {
   assert(asImpl().isInitialized());
 
@@ -574,8 +574,18 @@ bool PrunedLiveRange<LivenessWithDefs>::isInstructionAvailable(
 }
 
 template <typename LivenessWithDefs>
-bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
+bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
     SILInstruction *inst, DeadEndBlocks *deadEndBlocks) const {
+  if (deadEndBlocks) {
+    return asImpl().isWithinExtendedBoundary(inst, *deadEndBlocks);
+  } else {
+    return asImpl().isWithinLivenessBoundary(inst);
+  }
+}
+
+template <typename LivenessWithDefs>
+bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
+    SILInstruction *inst, DeadEndBlocks &deadEndBlocks) const {
   // A value has a pruned live region, a live region and an available region.
   // (Note: PrunedLiveness does not distinguish between the pruned live region
   // and the live region; the pruned live region coincides with the live region
@@ -628,21 +638,13 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
   // That this region is of interest is another result of lacking complete
   // OSSA lifetimes.
 
-  if (asImpl().isWithinBoundary(inst)) {
+  if (asImpl().isWithinLivenessBoundary(inst)) {
     // The extended region is a superset of the pruned live region.
     return true;
   }
 
-  if (!deadEndBlocks) {
-    // Without knowledge of the dead-end region, the extended region can't be
-    // determined.  It could, of course, be rediscovered here, but that would
-    // be silly; instead, allowing a nullable pointer provides a mechanism for
-    // the client to indicate what invariants hold.  Specifically, omitting
-    // dead-end blocks is equivalent to asserting that lifetimes are complete.
-    return false;
-  }
   SILBasicBlock *parent = inst->getParent();
-  if (!deadEndBlocks->isDeadEnd(parent)) {
+  if (!deadEndBlocks.isDeadEnd(parent)) {
     // The extended region intersected with the non-dead-end region is equal to
     // the pruned live region.
     return false;
@@ -652,7 +654,7 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
     break;
   case PrunedLiveBlocks::LiveWithin:
     // Dead defs may result in LiveWithin but AvailableOut blocks.
-    return isInstructionAvailable(inst, *deadEndBlocks);
+    return isInstructionAvailable(inst, deadEndBlocks);
   case PrunedLiveBlocks::LiveOut:
     // The instruction is not within the boundary, but its parent is LiveOut;
     // therefore it must be a def block.
@@ -687,7 +689,7 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
   worklist.push(parent);
   while (auto *block = worklist.pop()) {
     auto isLive = liveBlocks.getBlockLiveness(block);
-    if (!deadEndBlocks->isDeadEnd(block)) {
+    if (!deadEndBlocks.isDeadEnd(block)) {
       // The first block beyond the dead-end region has been reached.
       if (isLive != PrunedLiveBlocks::LiveOut) {
         // Cases (2) above.
@@ -706,7 +708,7 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
     case PrunedLiveBlocks::LiveWithin:
       // Availability may have ended in this block.  Check whether the block is
       // "AvailableOut".
-      if (!isAvailableOut(block, *deadEndBlocks)) {
+      if (!isAvailableOut(block, deadEndBlocks)) {
         // Case (1) above.
         return false;
       }
@@ -799,7 +801,7 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
 
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (!isWithinExtendedBoundary(user, deadEndBlocks))
+    if (!isWithinBoundary(user, deadEndBlocks))
       return false;
   }
   return true;
@@ -812,7 +814,7 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(
 
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (isWithinExtendedBoundary(user, deadEndBlocks))
+    if (isWithinBoundary(user, deadEndBlocks))
       return false;
   }
   return true;
