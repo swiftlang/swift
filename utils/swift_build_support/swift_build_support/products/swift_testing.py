@@ -14,7 +14,7 @@ import os
 
 from . import cmake_product
 from . import swift
-from . import swiftsyntax
+
 
 class SwiftTesting(cmake_product.CMakeProduct):
     @classmethod
@@ -31,8 +31,7 @@ class SwiftTesting(cmake_product.CMakeProduct):
 
     @classmethod
     def get_dependencies(cls):
-        return [swift.Swift,
-                swiftsyntax.SwiftSyntax]
+        return [swift.Swift]
 
     def should_build(self, host_target):
         return True
@@ -43,6 +42,8 @@ class SwiftTesting(cmake_product.CMakeProduct):
         # Use empty CMake install prefix, since the `DESTDIR` env var is set by
         # `install_with_cmake` later which already has the same prefix.
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '')
+
+        self.cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
 
         build_root = os.path.dirname(self.build_dir)
         swift_build_dir = os.path.join(
