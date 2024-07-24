@@ -296,6 +296,10 @@ bool BridgedType::isMetatype() const {
   return unbridged().isMetatype();
 }
 
+bool BridgedType::isClassExistential() const {
+  return unbridged().isClassExistentialType();
+}
+
 bool BridgedType::isNoEscapeFunction() const {
   return unbridged().isNoEscapeFunction();
 }

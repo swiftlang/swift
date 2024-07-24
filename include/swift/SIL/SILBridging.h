@@ -400,6 +400,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isEnumOrBoundGenericEnum() const;
   BRIDGED_INLINE bool isFunction() const;
   BRIDGED_INLINE bool isMetatype() const;
+  BRIDGED_INLINE bool isClassExistential() const;
   BRIDGED_INLINE bool isNoEscapeFunction() const;
   BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isThickFunction() const;
