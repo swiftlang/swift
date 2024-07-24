@@ -291,8 +291,11 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     }
     for idx in indirectSILResultCount..<endIndex {
       str += "\n[\(idx)]        parameter: " + self[idx].description
+      if let deps = self[parameterDependencies: idx] {
+        str += "\n          lifetime: \(deps)"
+      }
       if let dep = self[resultDependsOn: idx] {
-        str += "resultDependsOn: " + dep.description
+        str += "\n   result dependence: " + dep.description
       }
     }
     return str

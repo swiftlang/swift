@@ -36,6 +36,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 #endif
   log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
+  log("\(function.convention)")
 
   for argument in function.arguments
       where !argument.type.isEscapable(in: function)

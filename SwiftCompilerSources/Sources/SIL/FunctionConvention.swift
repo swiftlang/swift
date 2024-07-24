@@ -91,11 +91,15 @@ public struct FunctionConvention : CustomStringConvertible {
 
   public var description: String {
     var str = String(taking: bridgedFunctionType.getDebugDescription())
-    parameters.forEach { str += "\nparameter: " + $0.description }
+    for paramIdx in 0..<parameters.count {
+      str += "\nparameter: " + parameters[paramIdx].description
+      if let deps = parameterDependencies(for: paramIdx) {
+        str += "\n lifetime: \(deps)"
+      }
+    }
     results.forEach { str += "\n   result: " + $0.description }
-    str += (hasLoweredAddresses ? "\n[lowered_address]" : "\n[sil_opaque]")
     if let deps = resultDependencies {
-      str += "\nresult dependences \(deps)"
+      str += "\n lifetime: \(deps)"
     }
     return str
   }
