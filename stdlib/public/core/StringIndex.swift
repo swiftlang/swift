@@ -524,16 +524,10 @@ extension String.Index {
     }
   }
 
-  // The definitions below are placeholders for potential future `String.Index`
-  // conformances to `CustomStringConvertible` and
-  // `CustomDebugStringConvertible`. They are supplied here to make working with
-  // string indices somewhat bearable while we're working on adding the actual
-  // conformances.
-
   /// A textual representation of this instance.
-  @_alwaysEmitIntoClient
+  @backDeployed(before: SwiftStdlib 6.1)
   @inline(never)
-  public var _description: String {
+  public var description: String {
     // 23[utf8]+1
     var d = "\(_encodedOffset)[\(_encodingDescription)]"
     if transcodedOffset != 0 {
@@ -542,10 +536,24 @@ extension String.Index {
     return d
   }
 
-  /// A textual representation of this instance, suitable for debugging.
+  /// A textual representation of this instance.
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "description")
+  public var _description: String {
+    description
+  }
+}
+
+@available(SwiftStdlib 6.1, *)
+extension String.Index: CustomStringConvertible {}
+
+extension String.Index {
+  /// A more detailed description of this string index.
   @_alwaysEmitIntoClient
   @inline(never)
   public var _debugDescription: String {
+    /// Note: This would not make a good `debugDescription`; the current
+    /// `description` is fine for that.
     var d = "String.Index("
     d += "offset: \(_encodedOffset)[\(_encodingDescription)]"
     if transcodedOffset != 0 {
