@@ -869,6 +869,22 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-mcx16");
   }
 
+  if (triple.isOSDarwin()) {
+    if (auto variantTriple = ctx.LangOpts.TargetVariant) {
+      // Passing the -target-variant along to clang causes clang's
+      // CodeGenerator to emit zippered .o files.
+      invocationArgStrs.push_back("-darwin-target-variant");
+      invocationArgStrs.push_back(variantTriple->str());
+    }
+
+    if (ctx.LangOpts.VariantSDKVersion) {
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back(
+        ("-darwin-target-variant-sdk-version=" +
+         ctx.LangOpts.VariantSDKVersion->getAsString()));
+    }
+  }
+
   if (std::optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-root");
     invocationArgStrs.emplace_back(*R);
