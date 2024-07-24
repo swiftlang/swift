@@ -437,6 +437,56 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                                 consumeExpr->getSubExpr());
       for (auto &diag : diags)
         diag.emit(Ctx);
+
+      // As of now, SE-366 is not correctly implemented (rdar://102780553),
+      // so warn about certain consume's being no-ops today that will no longer
+      // be a no-op in the future once we fix this.
+      if (auto ty = consumeExpr->getType()) {
+        bool shouldWarn = true;
+
+        // Look through any load.
+        auto *expr = consumeExpr->getSubExpr();
+        if (auto *load = dyn_cast<LoadExpr>(expr))
+          expr = load->getSubExpr();
+
+        // Don't warn if explicit ownership was provided on a parameter.
+        // Those seem to be checked just fine in SIL.
+        if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
+          if (auto *decl = declRef->getDecl()) {
+            if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
+              switch (paramDecl->getSpecifier()) {
+              case ParamSpecifier::InOut:
+              case ParamSpecifier::Borrowing:
+              case ParamSpecifier::Consuming:
+              case ParamSpecifier::ImplicitlyCopyableConsuming:
+                shouldWarn = false;
+                break;
+              case ParamSpecifier::Default:
+              case ParamSpecifier::LegacyShared:
+              case ParamSpecifier::LegacyOwned:
+                break; // warn
+              }
+            }
+          }
+        }
+
+        // Only warn about obviously concrete BitwiseCopyable types, since we
+        // know those won't get checked for consumption.
+        if (diags.empty() &&
+            shouldWarn &&
+            !ty->hasError() &&
+            !ty->hasTypeParameter() &&
+            !ty->hasUnboundGenericType() &&
+            !ty->hasArchetype()) {
+          auto bitCopy = Ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+          if (DC->getParentModule()->checkConformance(ty, bitCopy)) {
+            Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                               diag::consume_of_bitwisecopyable_noop, ty)
+                   .fixItRemoveChars(consumeExpr->getStartLoc(),
+                                     consumeExpr->getSubExpr()->getStartLoc());
+          }
+        }
+      }
     }
 
     void checkCopyExpr(CopyExpr *copyExpr) {
