@@ -525,7 +525,7 @@ extension String.Index {
   }
 
   /// A textual representation of this instance.
-  @backDeployed(before: SwiftStdlib 6.1)
+  @_alwaysEmitIntoClient // FIXME: Use @backDeployed
   @inline(never)
   public var description: String {
     // 23[utf8]+1
