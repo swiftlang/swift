@@ -318,6 +318,15 @@ public protocol ExpressibleByIntegerLiteral {
   init(integerLiteral value: IntegerLiteralType)
 }
 
+extension ExpressibleByIntegerLiteral
+  where Self: _ExpressibleByBuiltinIntegerLiteral {
+
+  @_transparent
+  public init(integerLiteral value: Self) {
+    self = value
+  }
+}
+
 public protocol _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
