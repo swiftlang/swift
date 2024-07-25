@@ -6,7 +6,7 @@ class Klass {
 
 var global: Int = 5
 func testGlobal() {
-    let _ = consume global
+    let _ = consume global // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 func testLet() {
@@ -23,14 +23,14 @@ func testVar() {
 func testExprFailureLet() {
     let t = 5
     // Next line is parsed as move(t) + t
-    let _ = consume t + t
+    let _ = consume t + t // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 func testExprFailureVar() {
     var t = 5
     t = 5
     // Next line is parsed as move(t) + t
-    let _ = consume t + t
+    let _ = consume t + t // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 func letAddressOnly<T>(_ v: T) {
