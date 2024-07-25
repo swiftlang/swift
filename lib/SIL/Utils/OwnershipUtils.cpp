@@ -103,7 +103,7 @@ namespace swift::test {
 // - the value
 // - whether it has a pointer escape
 static FunctionTest OwnershipUtilsHasPointerEscape(
-    "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
+    "has_pointer_escape", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto has = findPointerEscape(value);
       value->print(llvm::outs());
