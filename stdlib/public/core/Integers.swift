@@ -126,21 +126,21 @@ public protocol AdditiveArithmetic: Equatable {
   static func -=(lhs: inout Self, rhs: Self)
 }
 
-public extension AdditiveArithmetic {
+extension AdditiveArithmetic {
   @_alwaysEmitIntoClient
-  static func +=(lhs: inout Self, rhs: Self) {
+  public static func +=(lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
   @_alwaysEmitIntoClient
-  static func -=(lhs: inout Self, rhs: Self) {
+  public static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
 }
 
-public extension AdditiveArithmetic where Self: ExpressibleByIntegerLiteral {
+extension AdditiveArithmetic where Self: ExpressibleByIntegerLiteral {
   @inlinable @inline(__always)
-  static var zero: Self {
+  public static var zero: Self {
     return 0
   }
 }
