@@ -761,26 +761,6 @@ extension Int {
   }
 }
 
-@_transparent
-@inlinable
-internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
-#if INTERNAL_CHECKS_ENABLED
-  return lhs + rhs
-#else
-  return lhs &+ rhs
-#endif
-}
-
-@_transparent
-@inlinable
-internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
-#if INTERNAL_CHECKS_ENABLED
-  return lhs - rhs
-#else
-  return lhs &- rhs
-#endif
-}
-
 @_unavailableInEmbedded
 internal struct _IntegerAnyHashableBox<
   Base: FixedWidthInteger
