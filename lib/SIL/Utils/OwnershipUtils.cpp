@@ -2169,7 +2169,7 @@ namespace swift::test {
 // - function
 // - the borrow introducers
 static FunctionTest FindBorrowIntroducers(
-    "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
+    "find_borrow_introducers", [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       llvm::outs() << "Introducers:\n";
       visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
