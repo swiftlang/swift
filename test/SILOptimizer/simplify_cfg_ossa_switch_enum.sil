@@ -25,7 +25,7 @@ enum E2 {
 // CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum1'
 sil [ossa] @test_canonicalize_switch_enum1 : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
 bb0(%0 : @owned $FakeOptional<Klass>):
-  specify_test "simplify-cfg-canonicalize-switch-enum"
+  specify_test "simplify_cfg_canonicalize_switch_enum"
   switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.none!enumelt: bb1, default bb2
 
 bb1:
@@ -45,7 +45,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum2'
 sil [ossa] @test_canonicalize_switch_enum2 : $@convention(thin) (@owned E1) -> () {
 bb0(%0 : @owned $E1):
-  specify_test "simplify-cfg-canonicalize-switch-enum"
+  specify_test "simplify_cfg_canonicalize_switch_enum"
   switch_enum %0 : $E1, case #E1.A!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Klass):
@@ -66,7 +66,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum3'
 sil [ossa] @test_canonicalize_switch_enum3 : $@convention(thin) (@owned E2) -> () {
 bb0(%0 : @owned $E2):
-  specify_test "simplify-cfg-canonicalize-switch-enum"
+  specify_test "simplify_cfg_canonicalize_switch_enum"
   switch_enum %0 : $E2, case #E2.A!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Klass):

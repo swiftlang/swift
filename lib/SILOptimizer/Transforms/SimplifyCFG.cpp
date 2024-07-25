@@ -2911,7 +2911,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
-    "simplify-cfg-canonicalize-switch-enum",
+    "simplify_cfg_canonicalize_switch_enum",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
