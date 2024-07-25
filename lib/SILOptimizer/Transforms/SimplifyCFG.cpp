@@ -2215,7 +2215,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
-    "simplify-cfg-simplify-switch-enum-block",
+    "simplify_cfg_simplify_switch_enum_block",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
