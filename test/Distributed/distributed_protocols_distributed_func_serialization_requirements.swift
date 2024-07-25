@@ -96,6 +96,18 @@ extension ProtocolWithChecksSeqReqDA {
   }
 }
 
+protocol Recipient: DistributedActor where ActorSystem == FakeActorSystem {
+  associatedtype Info: Sendable & Codable // is Codable, should be ok
+  distributed var info: Info { get async }
+  distributed func getInfo() -> Info
+}
+
+distributed actor RecipientImpl: Recipient {
+  typealias Info = String
+  distributed var info: Info { "info" }
+  distributed func getInfo() -> Info { "info" }
+}
+
 // FIXME(distributed): remove the -verify-ignore-unknown
 // <unknown>:0: error: unexpected error produced: instance method 'recordReturnType' requires that 'NotCodable' conform to 'Decodable'
 // <unknown>:0: error: unexpected error produced: instance method 'recordReturnType' requires that 'NotCodable' conform to 'Encodable'
