@@ -812,7 +812,7 @@ namespace swift::test {
 // Dumps:
 // - the function
 static FunctionTest LexicalDestroyFoldingTest(
-    "lexical-destroy-folding", [](auto &function, auto &arguments, auto &test) {
+    "lexical_destroy_folding", [](auto &function, auto &arguments, auto &test) {
       auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
       DominanceInfo *domTree = dominanceAnalysis->get(&function);
       auto value = arguments.takeValue();
