@@ -38,13 +38,13 @@ sil [ossa] @empty_fn_caller_caller : $@convention(thin) () -> () {
 }
 
 
-// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on call_functions: dump-function
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on call_functions: dump_function
 // CHECK:       [[EMPTY_FN:%[^,]+]] = function_ref @empty_fn
 // CHECK:       [[EMPTY_FN_CALLER:%[^,]+]] = function_ref @empty_fn_caller
 // CHECK:       [[EMPTY_FN_CALLER_CALLER:%[^,]+]] = function_ref @empty_fn_caller_caller
 // CHECK:       [[UNKNOWN:%[^,]+]] = function_ref @unknown
 // CHECK:       [[UNKNOWN_CALLER:%[^,]+]] = function_ref @unknown_caller
-// CHECK-LABEL: end running test 1 of {{[0-9]+}} on call_functions: dump-function
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on call_functions: dump_function
 // CHECK-LABEL: begin running test 2 of {{[0-9]+}} on call_functions: is_deinit_barrier
 // CHECK:   apply [[EMPTY_FN]]
 // CHECK:   false
@@ -67,7 +67,7 @@ sil [ossa] @empty_fn_caller_caller : $@convention(thin) () -> () {
 // CHECK-LABEL: end running test 6 of {{[0-9]+}} on call_functions: is_deinit_barrier
 sil [ossa] @call_functions : $@convention(thin) () -> () {
 entry:
-  specify_test "dump-function"
+  specify_test "dump_function"
   specify_test "is_deinit_barrier @instruction[1]"
   %empty_fn = function_ref @empty_fn : $@convention(thin) () -> ()
   apply %empty_fn() : $@convention(thin) () -> ()
