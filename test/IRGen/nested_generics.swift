@@ -10,6 +10,7 @@
 // rdar://131554269
 //
 // REQUIRES: optimized_stdlib
+// UNSUPPORTED: CPU=arm64e
 
 func blah<T>(_: T.Type) {}
 
