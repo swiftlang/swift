@@ -2139,7 +2139,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
-    "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+    "simplify_cfg_simplify_switch_enum_on_objc_class_optional",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
