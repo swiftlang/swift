@@ -6798,12 +6798,12 @@ ParserStatus Parser::parseInheritance(
 
   ParserStatus Status;
   SourceLoc prevComma;
-  bool HasNextType;
+  bool HasComma;
   bool IsEndOfList;
   do {
     SWIFT_DEFER {
       // Check for a ',', which indicates that there are more protocols coming.
-      HasNextType = consumeIf(tok::comma, prevComma);
+      HasComma = consumeIf(tok::comma, prevComma);
       IsEndOfList = (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
                      (Tok.is(tok::l_brace) || Tok.is(tok::kw_where)));
     };
@@ -6857,7 +6857,7 @@ ParserStatus Parser::parseInheritance(
     // Record the type if its a single type.
     if (ParsedTypeResult.isNonNull())
       Inherited.push_back(InheritedEntry(ParsedTypeResult.get()));
-  } while (HasNextType && !IsEndOfList);
+  } while (HasComma && !IsEndOfList);
 
   return Status;
 }

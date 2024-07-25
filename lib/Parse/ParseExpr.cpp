@@ -1926,6 +1926,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   default:
   UnknownCharacter:
     checkForInputIncomplete();
+    // Enable trailing comma in string literal interpolation
+    // Note that 'Tok.is(tok::r_paren)' is not used because the text is ")\"\n" but the kind is actualy 'eof'
     if (Tok.is(tok::eof) && Tok.getText() == ")") {
       return nullptr;
     }

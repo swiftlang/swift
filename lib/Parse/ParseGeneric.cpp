@@ -47,7 +47,7 @@ ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
   ParserStatus Result;
-  bool HasNextParam{};
+  bool HasComma{};
   bool IsEndOfList;
   do {
     // Note that we're parsing a declaration.
@@ -133,9 +133,9 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     Param->getAttrs() = attributes;
 
     // Parse the comma, if the list continues.
-    HasNextParam = consumeIf(tok::comma);
+    HasComma = consumeIf(tok::comma);
     IsEndOfList = startsWithGreater(Tok);
-  } while (HasNextParam && !IsEndOfList);
+  } while (HasComma && !IsEndOfList);
 
   return Result;
 }
@@ -278,7 +278,7 @@ ParserStatus Parser::parseGenericWhereClause(
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
-  bool HasNextReq;
+  bool HasComma;
   bool IsEndOfList;
   do {
     if (Tok.is(tok::code_complete)) {
@@ -404,18 +404,18 @@ ParserStatus Parser::parseGenericWhereClause(
       Status.setIsParseError();
       break;
     }
-    HasNextReq = consumeIf(tok::comma);
+    HasComma = consumeIf(tok::comma);
     IsEndOfList = (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
                    Tok.is(tok::l_brace));
     // If there's a comma, keep parsing the list.
     // If there's a "&&", diagnose replace with a comma and keep parsing
-    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasNextReq) {
+    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasComma) {
       diagnose(Tok, diag::requires_comma)
         .fixItReplace(SourceRange(Tok.getLoc()), ",");
       consumeToken();
-      HasNextReq = true;
+      HasComma = true;
     }
-  } while (HasNextReq && !IsEndOfList);
+  } while (HasComma && !IsEndOfList);
 
   if (!Requirements.empty())
     EndLoc = Requirements.back().getSourceRange().End;

@@ -1522,8 +1522,8 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
       consumeToken();
       Status.setIsParseError();
     } else if (consumeIf(tok::comma)) {
-      // End of list with a trailing comma.
-      if (Source != AvailabilitySpecSource::Available && Tok.is(tok::r_paren)) {
+      // End of unavailable spec list with a trailing comma.
+      if (Source == AvailabilitySpecSource::Unavailable && Tok.is(tok::r_paren)) {
         break;
       }
       // There is more to parse in this list.
