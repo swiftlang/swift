@@ -5,20 +5,19 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend %t/library.swift \
-// RUN:     -enable-library-evolution  \
-// RUN:     -disable-availability-checking \
-// RUN:     -emit-ir -o %t/test.ll -emit-tbd \
+// RUN: %target-swift-frontend %t/library.swift                                \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -disable-availability-checking                                     \
+// RUN:     -emit-ir -o %t/test.ll -emit-tbd                                   \
 // RUN:     -emit-tbd-path %t/library.tbd -I %t -tbd-install_name protocol
 
-// RUN: %target-swift-frontend %t/library.swift \
-// RUN:     -enable-library-evolution \
-// RUN:     -disable-availability-checking \
-// RUN:     -emit-module                                                   \
-// RUN:     -package-name Package                                          \
-// RUN:     -enable-library-evolution                                      \
-// RUN:     -module-name Library                                           \
-// RUN:     -emit-module-path %t/Library.swiftmodule                       \
+// RUN: %target-swift-frontend %t/library.swift                                \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -disable-availability-checking                                     \
+// RUN:     -emit-module                                                       \
+// RUN:     -package-name Package                                              \
+// RUN:     -module-name Library                                               \
+// RUN:     -emit-module-path %t/Library.swiftmodule                           \
 // RUN:     -emit-module-interface-path %t/Library.swiftinterface
 
 // RUN: %target-swift-frontend %t/actor.swift -enable-library-evolution \
