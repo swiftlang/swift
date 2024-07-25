@@ -181,8 +181,8 @@ public protocol Decoder {
 /// A type that provides a view into an encoder's storage and is used to hold
 /// the encoded properties of an encodable type in a keyed manner.
 ///
-/// Encoders should provide types conforming to
-/// `KeyedEncodingContainerProtocol` for their format.
+/// Encoders should provide types conforming to `KeyedEncodingContainerProtocol`
+/// for their format.
 public protocol KeyedEncodingContainerProtocol {
   associatedtype Key: CodingKey
 
@@ -784,8 +784,8 @@ extension KeyedEncodingContainer: Sendable {}
 /// A type that provides a view into a decoder's storage and is used to hold
 /// the encoded properties of a decodable type in a keyed manner.
 ///
-/// Decoders should provide types conforming to `UnkeyedDecodingContainer` for
-/// their format.
+/// Decoders should provide types conforming to `KeyedDecodingContainerProtocol`
+/// for their format.
 public protocol KeyedDecodingContainerProtocol {
   associatedtype Key: CodingKey
 
