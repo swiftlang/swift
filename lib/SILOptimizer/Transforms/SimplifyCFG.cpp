@@ -2665,7 +2665,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
-    "simplify-cfg-simplify-term-with-identical-dest-blocks",
+    "simplify_cfg_simplify_term_with_identical_dest_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
