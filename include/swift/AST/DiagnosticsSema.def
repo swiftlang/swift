@@ -7755,6 +7755,8 @@ ERROR(consume_expression_needed_for_cast,none,
       "implicit conversion to %0 is consuming", (Type))
 NOTE(add_consume_to_silence,none,
      "add 'consume' to make consumption explicit", ())
+WARNING(consume_of_bitwisecopyable_noop,none,
+      "'consume' applied to bitwise-copyable type %0 has no effect", (Type))
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(consume_expression_partial_copyable,none,
