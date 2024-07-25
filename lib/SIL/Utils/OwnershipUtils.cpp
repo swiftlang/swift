@@ -2144,7 +2144,7 @@ namespace swift::test {
 // - function
 // - the enclosing defs
 static FunctionTest FindEnclosingDefsTest(
-    "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
+    "find_enclosing_defs", [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       llvm::outs() << "Enclosing Defs:\n";
       visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
