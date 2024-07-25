@@ -3132,7 +3132,18 @@ public:
   ConcreteTypeSpecialization(const Solution &solution, Type concreteTy,
                              ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
-        ConcreteType(resolveType(concreteTy)) {}
+        ConcreteType(concreteTy) {}
+
+  bool diagnoseAsError() override;
+};
+
+class GenericFunctionSpecialization final : public FailureDiagnostic {
+  ValueDecl *Decl;
+
+public:
+  GenericFunctionSpecialization(const Solution &solution, ValueDecl *decl,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Decl(decl) {}
 
   bool diagnoseAsError() override;
 };
