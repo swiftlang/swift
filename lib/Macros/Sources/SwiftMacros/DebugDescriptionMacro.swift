@@ -13,6 +13,7 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
+import _StringProcessing
 
 public enum DebugDescriptionMacro {}
 public enum _DebugDescriptionPropertyMacro {}
@@ -188,12 +189,20 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
       return []
     }
 
+    // LLDB syntax is not allowed in debugDescription/description.
+    let allowLLDBSyntax = onlyBinding.name == "lldbDescription"
+
     // Iterate the string's segments, and convert property expressions into LLDB variable references.
     var summarySegments: [String] = []
     for segment in descriptionString.segments {
       switch segment {
       case let .stringSegment(segment):
-        summarySegments.append(segment.content.text)
+        var literal = segment.content.text
+        if !allowLLDBSyntax {
+          // To match debugDescription/description, escape `$` characters. LLDB must treat them as a literals they are.
+          literal = literal.escapedForLLDB()
+        }
+        summarySegments.append(literal)
       case let .expressionSegment(segment):
         guard let onlyLabeledExpr = segment.expressions.only, onlyLabeledExpr.label == nil else {
           // This catches `appendInterpolation` overrides.
@@ -262,7 +271,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
 /// The names of properties that can be converted to LLDB type summaries, in priority order.
 fileprivate let DESCRIPTION_PROPERTIES = [
-  "_debugDescription",
+  "lldbDescription",
   "debugDescription",
   "description",
 ]
@@ -500,6 +509,28 @@ extension String {
       return nil
     }
     self = string
+  }
+}
+
+extension String {
+  fileprivate func escapedForLLDB() -> String {
+    guard #available(macOS 13, *) else {
+      guard self.firstIndex(of: "$") != nil else {
+        return self
+      }
+
+      var result = ""
+      for char in self {
+        if char == "$" {
+          result.append("\\$")
+        } else {
+          result.append(char)
+        }
+      }
+      return result
+    }
+
+    return self.replacing("$", with: "\\$")
   }
 }
 
