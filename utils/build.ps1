@@ -215,6 +215,7 @@ $ArchX64 = @{
   PlatformInstallRoot = "$BinaryCache\x64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\SDKs\Windows.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
+  SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
 }
 
@@ -230,6 +231,7 @@ $ArchX86 = @{
   PlatformInstallRoot = "$BinaryCache\x86\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\Windows.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
+  SwiftTestingInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\Testing-development";
 }
 
 $ArchARM64 = @{
@@ -245,6 +247,7 @@ $ArchARM64 = @{
   SDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\Windows.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
+  SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
 }
 
 $AndroidARM64 = @{
@@ -258,6 +261,7 @@ $AndroidARM64 = @{
   PlatformInstallRoot = "$BinaryCache\arm64\Android.platform";
   SDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\XCTest-development";
+  SwiftTestingInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\Testing-development";
 }
 
 $AndroidARMv7 = @{
@@ -271,6 +275,7 @@ $AndroidARMv7 = @{
   PlatformInstallRoot = "$BinaryCache\armv7\Android.platform";
   SDKInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\XCTest-development";
+  SwiftTestingInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\Testing-development";
 }
 
 $AndroidX86 = @{
@@ -284,6 +289,7 @@ $AndroidX86 = @{
   PlatformInstallRoot = "$BinaryCache\x86\Android.platform";
   SDKInstallRoot = "$BinaryCache\x86\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\XCTest-development";
+  SwiftTestingInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\Testing-development";
 }
 
 $AndroidX64 = @{
@@ -297,6 +303,7 @@ $AndroidX64 = @{
   PlatformInstallRoot = "$BinaryCache\x64\Android.platform";
   SDKInstallRoot = "$BinaryCache\x64\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\XCTest-development";
+  SwiftTestingInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\Testing-development";
 }
 
 $HostArch = switch ($HostArchName) {
@@ -387,6 +394,7 @@ enum TargetComponent {
   Dispatch
   Foundation
   XCTest
+  SwiftTesting
 }
 
 function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
@@ -413,6 +421,7 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
+  SwiftTestingMacros
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -1731,11 +1740,43 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
         Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
       } + $TestingDefines)
-
-    $PList = Join-Path -Path $Arch.PlatformInstallRoot -ChildPath "Info.plist"
-    Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
-      -OutFile "$PList"
   }
+}
+
+function Build-SwiftTesting([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch SwiftTesting
+
+  Isolate-EnvVars {
+    if ($Test) {
+      # TODO: Test
+      return
+    } else {
+      $Targets = @("default")
+      $InstallPath = "$($Arch.SwiftTestingInstallRoot)\usr"
+    }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift-testing `
+      -Bin $SwiftTestingBinaryCache `
+      -InstallTo $InstallPath `
+      -Arch $Arch `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -BuildTargets $Targets `
+      -Defines (@{
+        BUILD_SHARED_LIBS = "YES";
+        CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+        SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+        # FIXME: Build the plugin for the builder and specify the path.
+        SwiftTesting_MACRO = "NO";
+      })
+  }
+}
+
+function Write-PlatformInfoPlist($Arch) {
+    $PList = Join-Path -Path $Arch.PlatformInstallRoot -ChildPath "Info.plist"
+    Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+      -OutFile "$PList"
 }
 
 # Copies files installed by CMake from the arch-specific platform root,
@@ -2167,6 +2208,21 @@ function Build-SourceKitLSP($Arch) {
     }
 }
 
+function Build-SwiftTestingMacros($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-testing\Sources\TestingMacros `
+    -Bin (Get-HostProjectBinaryCache SwiftTestingMacros) `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK (Get-HostSwiftSDK) `
+    -BuildTargets default `
+    -Defines @{
+      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+    }
+}
+
 function Install-HostToolchain() {
   if ($ToBatch) { return }
 
@@ -2325,20 +2381,24 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Dispatch Windows $Arch
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
+    Invoke-BuildStep Build-SwiftTesting Windows $Arch
+    Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 
-   foreach ($Arch in $AndroidSDKArchs) {
-     Invoke-BuildStep Build-ZLib Android $Arch
-     Invoke-BuildStep Build-XML2 Android $Arch
-     Invoke-BuildStep Build-CURL Android $Arch
-     Invoke-BuildStep Build-LLVM Android $Arch
+  foreach ($Arch in $AndroidSDKArchs) {
+    Invoke-BuildStep Build-ZLib Android $Arch
+    Invoke-BuildStep Build-XML2 Android $Arch
+    Invoke-BuildStep Build-CURL Android $Arch
+    Invoke-BuildStep Build-LLVM Android $Arch
 
-     # Build platform: SDK, Redist and XCTest
-     Invoke-BuildStep Build-Runtime Android $Arch
-     Invoke-BuildStep Build-Dispatch Android $Arch
-     Invoke-BuildStep Build-Foundation Android $Arch
-     Invoke-BuildStep Build-XCTest Android $Arch
-   }
+    # Build platform: SDK, Redist and XCTest
+    Invoke-BuildStep Build-Runtime Android $Arch
+    Invoke-BuildStep Build-Dispatch Android $Arch
+    Invoke-BuildStep Build-Foundation Android $Arch
+    Invoke-BuildStep Build-XCTest Android $Arch
+    Invoke-BuildStep Build-SwiftTesting Android $Arch
+    Invoke-BuildStep Write-PlatformInfoPlist $Arch
+  }
 }
 
 if (-not $ToBatch) {
@@ -2360,6 +2420,8 @@ if (-not $ToBatch) {
 }
 
 if (-not $SkipBuild) {
+  # TestingMacros can't be built before the standard library for the host as it is required for the Swift code.
+  Invoke-BuildStep Build-SwiftTestingMacros $HostArch
   Invoke-BuildStep Build-SQLite $HostArch
   Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-ToolsSupportCore $HostArch
@@ -2413,6 +2475,9 @@ if (-not $IsCrossCompiling) {
   }
   if ($Test -contains "xctest") {
     Build-XCTest Windows $HostArch -Test
+  }
+  if ($Test -contains "testing") {
+    Build-SwiftTesting Windows $HostArch -Test
   }
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
