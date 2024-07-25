@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-experimental-parser-round-trip -enable-experimental-feature TrailingComma
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TrailingComma
 
 // REQUIRES: asserts
 

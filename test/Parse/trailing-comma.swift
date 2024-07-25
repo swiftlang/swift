@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s -disable-experimental-parser-round-trip
+// RUN: %target-swift-frontend -parse -verify %s
 
 // Array Literal
 
