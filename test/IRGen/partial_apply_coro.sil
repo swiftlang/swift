@@ -2223,14 +2223,44 @@ bb0(%thick : $@callee_guaranteed @yield_once @convention(thick) (Int64, Int32) -
   return %pa_f : $@yield_once @callee_guaranteed (Int64) -> Int64
 }
 
-// FIXME: Assertion `LastArgWritten >= adjusted.size()' failed.
-// sil @external_closure : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
-// sil @dont_crash : $@convention(thin) (Int) -> @owned @yield_once @callee_guaranteed (Int) -> (Int, @error Error) {
-// bb0(%0 : $Int):
-//   %2 = function_ref @external_closure : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
-//   %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
-//   return %3 : $@yield_once @callee_guaranteed (Int) -> (Int, @error Error)
-// }
+// CHECK: define {{.*}} { ptr, ptr } @dont_crash
+// CHECK-SAME: (i64 %[[ARG:.*]])
+// CHECK: entry:
+// CHECK:   %[[BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata
+// CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSi }>, ptr %1, i32 0, i32 1
+// CHECK:   %[[ARGPTR:.*]] = getelementptr inbounds %TSi, ptr %2, i32 0, i32 0
+// CHECK:   store i64 %[[ARG]], ptr %[[ARGPTR]]
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s16external_closureTA", ptr undef }, ptr %[[BOX]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
+//
+// CHECK: define {{.*}} ptr @"$s16external_closureTA"
+// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], i64 %[[ARG1:.*]], ptr swiftself %[[PA_CTX_BOX:.*]], ptr noalias nocapture swifterror {{.*}} %[[ERROR:.*]])
+// CHECK: entry:
+// CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
+// CHECK:   store ptr %[[SPILL]], ptr %[[CTX]]
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$s16external_closureTA.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[PA_ARG:.*]] = getelementptr inbounds %TSi, ptr %[[PA_CTX]], i32 0, i32 0
+// CHECK:   %[[ARG2:.*]] = load i64, ptr %[[PA_ARG]]
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
+// CHECK:   store ptr null, ptr %[[ERROR]]
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc ptr @external_closure(ptr noalias {{.*}} %[[FRAMEPTR]], i64 %[[ARG1]], i64 %[[ARG2]], ptr swiftself undef, ptr noalias nocapture swifterror {{.*}} %[[ERROR]])
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s16external_closureTA.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   store ptr %[[YIELD_PAIR]], ptr %[[SPILL1]]
+// CHECK:   %[[ERRORVAL:.*]] = load ptr, ptr %[[ERROR]]
+// CHECK:   store ptr %[[ERRORVAL]], ptr %[[ERROR]]
+// CHECK:   ret ptr @"$s16external_closureTA.resume.0"
+// CHECK: }
+//
+sil @external_closure : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
+sil @dont_crash : $@convention(thin) (Int) -> @owned @yield_once @callee_guaranteed (Int) -> (Int, @error Error) {
+bb0(%0 : $Int):
+  %2 = function_ref @external_closure : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) @yield_once (Int, Int) -> (Int, @error Error)
+  return %3 : $@yield_once @callee_guaranteed (Int) -> (Int, @error Error)
+}
 
 // CHECK: define {{.*}} { ptr, ptr } @partially_apply_method_with_out_return
 // CHECK-SAME: (ptr %[[ARG:.*]])
@@ -2245,4 +2275,23 @@ bb(%class : $SwiftClass):
   %method_with_out_param = function_ref @method_with_out_return : $@convention(method) @yield_once (SwiftClass) -> @out Int
   %result = partial_apply [callee_guaranteed] %method_with_out_param(%class) : $@convention(method) @yield_once (SwiftClass) -> @out Int
   return %result : $@callee_guaranteed @yield_once () -> @out Int
+}
+
+// CHECK: define {{.*}} { ptr, ptr } @convert_thin_test(i64 %[[ARG:.*]])
+// CHECK: entry:
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata
+// CHECK:   %[[PA_ARG:.*]] = getelementptr inbounds <{ %swift.refcounted, %TSi }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[ARG_PTR:.*]] = getelementptr inbounds %TSi, ptr %[[PA_ARG]], i32 0, i32 0
+// CHECK:   store i64 %[[ARG]], ptr %[[ARG_PTR]]
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s4afunTA", ptr undef }, ptr %[[PA_CTX_BOX]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
+
+sil @afun : $@yield_once @convention(thin) (Int) -> (@error Error, @yields Int)
+sil @convert_thin_test : $@convention(thin) (Int) -> @yield_once @callee_guaranteed () -> (@error Error, @yields Int) {
+bb(%0 : $Int):
+  %f = function_ref @afun : $@yield_once @convention(thin) (Int) -> (@error Error, @yields Int)
+  %c = convert_function %f : $@yield_once @convention(thin) (Int) -> (@error Error, @yields Int) to $@yield_once @convention(thin) @noescape (Int) -> (@error Error, @yields Int)
+  %pa = partial_apply [callee_guaranteed] %c(%0) : $@yield_once @convention(thin) @noescape (Int) -> (@error Error, @yields Int)
+  return %pa : $@yield_once @callee_guaranteed () -> (@error Error, @yields Int)
 }

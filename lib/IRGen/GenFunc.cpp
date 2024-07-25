@@ -2200,7 +2200,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     }
 
   // Pass a placeholder for thin function calls.
-  } else if (origType->hasErrorResult() && !origType->isAsync()) {
+  } else if (origType->hasErrorResult() && !origType->isAsync() && !origType->isCoroutine()) {
     emission->addArgument(llvm::UndefValue::get(IGM.RefCountedPtrTy));
   }
 
