@@ -2288,7 +2288,7 @@ namespace swift::test {
 // - function
 // - the adjacent phis
 static FunctionTest VisitInnerAdjacentPhisTest(
-    "visit-inner-adjacent-phis",
+    "visit_inner_adjacent_phis",
     [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),

@@ -299,7 +299,7 @@ exit:
 // visitInnerAdjacentPhis
 // =============================================================================
 
-// CHECK-LABEL: pay_the_phi: visit-inner-adjacent-phis with: %owned
+// CHECK-LABEL: pay_the_phi: visit_inner_adjacent_phis with: %owned
 // CHECK: sil [ossa] @pay_the_phi : {{.*}} {
 // CHECK:   [[C:%[^,]+]] = apply
 // CHECK:   [[BORROW1:%[^,]+]] = begin_borrow %1
@@ -310,7 +310,7 @@ exit:
 //
 // CHECK:[[GUARANTEED1]] = argument of [[EXIT]]
 // CHECK:[[GUARANTEED2]] = argument of [[EXIT]]
-// CHECK-LABEL: pay_the_phi: visit-inner-adjacent-phis with: %owned
+// CHECK-LABEL: pay_the_phi: visit_inner_adjacent_phis with: %owned
 sil [ossa] @pay_the_phi : $@convention(thin) () -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> @owned C
@@ -321,7 +321,7 @@ entry:
   br exit(%c : $C, %borrow1 : $C, %borrow2 : $C, %borrow3 : $C)
 
 exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaranteed $C, %guaranteed_3 : @guaranteed $C):
-  specify_test "visit-inner-adjacent-phis %owned"
+  specify_test "visit_inner_adjacent_phis %owned"
   end_borrow %guaranteed_3 : $C
   end_borrow %guaranteed_2 : $C
   end_borrow %guaranteed_1 : $C
@@ -330,11 +330,11 @@ exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaran
   return %retval : $()
 }
 
-// CHECK-LABEL: pay_the_phi_forward: visit-inner-adjacent-phis with: %reborrow
+// CHECK-LABEL: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
 // CHECK: bb1(%{{.*}} : @reborrow @guaranteed $C, [[INNER:%.*]] : @guaranteed $D):    // Preds: bb0
 // CHECK: } // end sil function 'pay_the_phi_forward'
 // CHECK: [[INNER]] = argument of bb1 : $D
-// CHECK: pay_the_phi_forward: visit-inner-adjacent-phis with: %reborrow
+// CHECK: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
 sil [ossa] @pay_the_phi_forward : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow0 = begin_borrow %0 : $C
@@ -342,7 +342,7 @@ bb0(%0 : @guaranteed $C):
   br exit(%borrow0 : $C, %d0 : $D)
 
 exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
-  specify_test "visit-inner-adjacent-phis %reborrow"
+  specify_test "visit_inner_adjacent_phis %reborrow"
   %f = ref_element_addr %phi : $D, #D.object
   %o = load [copy] %f : $*C
   destroy_value %o : $C
