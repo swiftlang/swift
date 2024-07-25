@@ -17,9 +17,35 @@ import SwiftDiagnostics
 public enum DebugDescriptionMacro {}
 public enum _DebugDescriptionPropertyMacro {}
 
+/// The member role is used only to perform diagnostics. The member role ensures any diagnostics are emitted once per
+/// type. The macro's core behavior begins with the `MemberAttributeMacro` conformance.
+extension DebugDescriptionMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  )
+  throws -> [DeclSyntax]
+  {
+    guard !declaration.is(ProtocolDeclSyntax.self) else {
+      let message: ErrorMessage = "cannot be attached to a protocol"
+      context.diagnose(node: node, error: message)
+      return []
+    }
+
+    guard declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause == nil else {
+      let message: ErrorMessage = "cannot be attached to a generic definition"
+      context.diagnose(node: node, error: message)
+      return []
+    }
+
+    return []
+  }
+}
+
 /// A macro which orchestrates conversion of a description property to an LLDB type summary.
 ///
-/// The job of conversion is split across two macros. This macro performs some analysis on the attached
+/// The process of conversion is split across multiple macros/roles. This role performs some analysis on the attached
 /// type, and then delegates to `@_DebugDescriptionProperty` to perform the conversion step.
 extension DebugDescriptionMacro: MemberAttributeMacro {
   public static func expansion(
@@ -31,8 +57,12 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
   throws -> [AttributeSyntax]
   {
     guard !declaration.is(ProtocolDeclSyntax.self) else {
-      let message: ErrorMessage = "cannot be attached to a protocol"
-      context.diagnose(node: node, error: message)
+      // Diagnostics for this case are emitted by the `MemberMacro` conformance.
+      return []
+    }
+
+    guard declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause == nil else {
+      // Diagnostics for this case are emitted by the `MemberMacro` conformance.
       return []
     }
 
