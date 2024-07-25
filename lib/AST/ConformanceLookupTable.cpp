@@ -596,31 +596,47 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     }
   }
 
-  // Unavailable Sendable conformances cannot be replaced by available ones.
-  if (!lhs->getProtocol()->isMarkerProtocol()) {
-    // If only one of the conformances is unconditionally available on the
-    // current deployment target, pick that one.
-    //
-    // FIXME: Conformance lookup should really depend on source location for
-    // this to be 100% correct.
-    // FIXME: When a class and an extension with the same availability declare the
-    // same conformance, this silently takes the class and drops the extension.
-    if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
-        rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
-      return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
-              ? Ordering::Before
-              : Ordering::After);
-    }
+  // If only one of the conformances is unconditionally available on the
+  // current deployment target, pick that one.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  // FIXME: When a class and an extension with the same availability declare the
+  // same conformance, this silently takes the class and drops the extension.
+  if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
+      rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
+    return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
+            ? Ordering::Before
+            : Ordering::After);
   }
 
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
+    auto isReplaceableOrMarker = [](ConformanceEntry *entry) -> bool {
+      ConformanceEntryKind kind = entry->getRankingKind();
+      if (isReplaceable(kind))
+        return true;
+
+      // Allow replacement of an explicit conformance to a marker protocol.
+      // (This permits redundant explicit declarations of `Sendable`.)
+      //
+      // FIXME: We need to warn on attempts to make an unavailable Sendable
+      // conformance available, which does not work.
+      //
+      // We probably also want to warn if there is an existing, explicit
+      // conformance, so clients are prompted to remove retroactive unchecked
+      // Sendable conformances when the proper Sendable conformance is added
+      // in the original module.
+      return (kind == ConformanceEntryKind::Explicit
+              && entry->getProtocol()->isMarkerProtocol());
+    };
+
     // If the non-fixed conformance is not replaceable, we have a failure to
     // diagnose.
     // FIXME: We should probably diagnose if they have different constraints.
-    diagnoseSuperseded = (lhs->isFixed() && !isReplaceable(rhs->getRankingKind())) ||
-                         (rhs->isFixed() && !isReplaceable(lhs->getRankingKind()));
-
+    diagnoseSuperseded = (lhs->isFixed() && !isReplaceableOrMarker(rhs)) ||
+                         (rhs->isFixed() && !isReplaceableOrMarker(lhs));
+      
     return lhs->isFixed() ? Ordering::Before : Ordering::After;
   }
 

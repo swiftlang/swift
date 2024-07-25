@@ -113,8 +113,8 @@ struct WrapClass<T: NSClass> {
 
 extension WrapClass: Sendable where T: Sendable { }
 
-// expected-warning@+2 {{conformance of 'SendableSubclass' to protocol 'Sendable' is already unavailable}}
-// expected-note@+1 {{'SendableSubclass' inherits conformance to protocol 'Sendable' from superclass here}}
+// Make sure we don't inherit the unavailable Sendable conformance from
+// our superclass.
 class SendableSubclass: NSClass, @unchecked Sendable { }
 
 @available(SwiftStdlib 5.1, *)
