@@ -18,12 +18,14 @@
 #ifndef SWIFT_IMMEDIATE_IMMEDIATE_H
 #define SWIFT_IMMEDIATE_IMMEDIATE_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace swift {
   class CompilerInstance;
+  class DiagnosticEngine;
   class IRGenOptions;
   class SILOptions;
   class SILModule;
@@ -44,6 +46,12 @@ namespace swift {
 
   int RunImmediatelyFromAST(CompilerInstance &CI);
 
+  /// On platforms that support ObjC bridging from the Foundation framework,
+  /// ensure that Foundation is loaded early enough by re-execing the process if
+  /// it is not already loaded. Otherwise does nothing.
+  void execWithFoundationIfNotLoaded(llvm::ArrayRef<const char *> Args,
+                                     const char *Argv0,
+                                     DiagnosticEngine &Diags);
 } // end namespace swift
 
 #endif // SWIFT_IMMEDIATE_IMMEDIATE_H

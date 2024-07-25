@@ -28,6 +28,7 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Program.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -56,6 +57,7 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+extern const char **environ;
 #endif
 
 using namespace swift;
@@ -431,4 +433,68 @@ int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
   }
 
   return *Result;
+}
+
+void swift::execWithFoundationIfNotLoaded(ArrayRef<const char *> Args,
+                                          const char *Argv0,
+                                          DiagnosticEngine &Diags) {
+#if defined(__APPLE__)
+  StringRef FoundationPath =
+      "/System/Library/Frameworks/Foundation.framework/Foundation";
+  void *handle = dlopen(FoundationPath.data(), RTLD_NOLOAD);
+  if (handle) {
+    // Foundation is already loaded. Use dlclose to release the ref-count that
+    // was incremented by dlopen and return.
+    dlclose(handle);
+    return;
+  }
+
+  bool HasDyldInsertLibs = false;
+  SmallString<70> EnvStorage("DYLD_INSERT_LIBRARIES=");
+  SmallVector<const char *> NewEnv;
+  for (const char **envIt = environ; *envIt != nullptr; ++envIt) {
+    StringRef EnvVar(*envIt);
+    if (EnvVar.starts_with(EnvStorage)) {
+      HasDyldInsertLibs = true;
+
+      StringRef Value = EnvVar.split('=').second;
+      size_t I = Value.find(FoundationPath);
+      size_t EndI = I == StringRef::npos ? I : I + FoundationPath.size();
+      if (I != StringRef::npos &&
+          (EndI == Value.size() || Value[EndI] == ':') &&
+          (I == 0 || Value[I - 1] == ':')) {
+        // Already tried to load Foundation but something went wrong.
+        Diags.diagnose(SourceLoc(),
+                       diag::warning_immediate_mode_cannot_load_foundation,
+                       "library not found in process");
+        return;
+      }
+      EnvStorage.assign(EnvVar);
+      continue;
+    }
+    NewEnv.push_back(*envIt);
+  }
+
+  if (HasDyldInsertLibs)
+    EnvStorage.push_back(':');
+  EnvStorage.append(FoundationPath);
+  NewEnv.push_back(EnvStorage.c_str());
+
+  NewEnv.push_back(nullptr);
+
+  SmallVector<const char *> NewArgs;
+  NewArgs.reserve(Args.size() + 2);
+  NewArgs.push_back(Argv0);
+  NewArgs.append(Args.begin(), Args.end());
+  NewArgs.push_back(nullptr);
+
+  int result = ExecuteInPlace(Argv0, NewArgs.data(), NewEnv.data());
+  if (result != 0)
+    Diags.diagnose(SourceLoc(),
+                   diag::warning_immediate_mode_cannot_load_foundation,
+                   (llvm::Twine("exec failed: ") + strerror(errno)).str());
+
+#else
+  // Nothing to do.
+#endif
 }
