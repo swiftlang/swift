@@ -1924,8 +1924,7 @@ namespace {
             OpenPackElementType(CS, locator, elementEnv));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
-          auto *repr = new (ctxt) PlaceholderTypeRepr(specializationArg->getLoc());
-          result = PlaceholderType::get(ctxt, repr);
+          result = PlaceholderType::get(ctxt, specializationArg);
           ctxt.Diags.diagnose(lAngleLoc,
                               diag::while_parsing_as_left_angle_bracket);
         }
@@ -4806,11 +4805,11 @@ bool ConstraintSystem::generateConstraints(
         // If we have a placeholder originating from a PlaceholderTypeRepr,
         // tack that on to the locator.
         if (auto *placeholderTy = ty->getAs<PlaceholderType>())
-          if (auto *placeholderRepr = placeholderTy->getOriginator()
-                                          .dyn_cast<PlaceholderTypeRepr *>())
+          if (auto *typeRepr = placeholderTy->getOriginator()
+                                          .dyn_cast<TypeRepr *>())
             return getConstraintLocator(
                 convertTypeLocator,
-                LocatorPathElt::PlaceholderType(placeholderRepr));
+                LocatorPathElt::PlaceholderType(typeRepr));
         return convertTypeLocator;
       };
 

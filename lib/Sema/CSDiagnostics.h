@@ -3116,7 +3116,7 @@ public:
   ConcreteTypeSpecialization(const Solution &solution, Type concreteTy,
                              ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
-        ConcreteType(concreteTy) {}
+        ConcreteType(resolveType(concreteTy)) {}
 
   bool diagnoseAsError() override;
 };
