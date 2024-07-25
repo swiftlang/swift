@@ -725,7 +725,7 @@ namespace swift::test {
 // - SILValue: value
 // Dumps:
 // - message
-static FunctionTest GetOwnershipKind("get-ownership-kind", [](auto &function,
+static FunctionTest GetOwnershipKind("get_ownership_kind", [](auto &function,
                                                               auto &arguments,
                                                               auto &test) {
   SILValue value = arguments.takeValue();
