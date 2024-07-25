@@ -1079,7 +1079,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGTryJumpThreading(
-    "simplify-cfg-try-jump-threading",
+    "simplify_cfg_try_jump_threading",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
