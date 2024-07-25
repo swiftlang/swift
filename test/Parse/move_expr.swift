@@ -2,7 +2,7 @@
 
 var global: Int = 5
 func testGlobal() {
-    let _ = consume global
+    let _ = consume global // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 func testLet() {
