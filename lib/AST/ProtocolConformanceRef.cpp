@@ -287,8 +287,7 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
 
   // Check whether this conformance is on an unavailable extension.
   auto concrete = getConcrete();
-  auto *dc = concrete->getRootConformance()->getDeclContext();
-  auto ext = dyn_cast<ExtensionDecl>(dc);
+  auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
   if (ext && AvailableAttr::isUnavailable(ext))
     return true;
 

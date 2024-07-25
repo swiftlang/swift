@@ -6513,6 +6513,9 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
       auto inheritedConformance = classModule->checkConformance(
           classDecl->mapTypeIntoContext(superclass),
           proto, /*allowMissing=*/false);
+      if (inheritedConformance.hasUnavailableConformance())
+        inheritedConformance = ProtocolConformanceRef::forInvalid();
+
       if (inheritedConformance) {
         inheritedConformance = inheritedConformance
             .mapConformanceOutOfContext();
