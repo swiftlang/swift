@@ -420,7 +420,10 @@ static bool checkDistributedTargetResultType(
   if (auto func = dyn_cast<FuncDecl>(valueDecl)) {
     resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
   } else if (auto var = dyn_cast<VarDecl>(valueDecl)) {
-    resultType = var->getInterfaceType();
+    // Distributed computed properties are always getters,
+    // so get the get accessor for mapping the type into context:
+    auto getter = var->getAccessor(swift::AccessorKind::Get);
+    resultType = getter->mapTypeIntoContext(var->getInterfaceType());
   } else {
     llvm_unreachable("Unsupported distributed target");
   }
