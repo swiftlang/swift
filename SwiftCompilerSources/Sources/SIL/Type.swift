@@ -56,6 +56,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isEnum: Bool { bridged.isEnumOrBoundGenericEnum() }
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
+  public var isClassExistential: Bool { bridged.isClassExistential() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
   public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }

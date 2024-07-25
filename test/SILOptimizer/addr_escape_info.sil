@@ -17,6 +17,8 @@ class X {
   @_hasStorage var s: Str
 }
 
+class D: X {}
+
 struct Container {
   @_hasStorage var x: X
 }
@@ -753,5 +755,44 @@ bb0:
   dealloc_stack %0 : $*Int
   %8 = tuple ()
   return %8 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_unchecked_ref_cast:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %4 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    %6 = ref_element_addr %3 : $X, #X.s
+// CHECK-NEXT:  no alias
+// CHECK:       End function test_unchecked_ref_cast
+sil @test_unchecked_ref_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $D
+  %1 = alloc_ref $D
+  %2 = unchecked_ref_cast %0 : $D to $X
+  %3 = unchecked_ref_cast %1 : $D to $X
+  %4 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %4 : $*Str
+  %6 = ref_element_addr %3 : $X, #X.s
+  fix_lifetime %6 : $*Str
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Address escape information for test_anyobject_cast:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %3 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:    %5 = ref_element_addr %2 : $X, #X.s
+// CHECK-NEXT:  may alias
+// CHECK:       End function test_anyobject_cast
+sil @test_anyobject_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %1 = init_existential_ref %0 : $X : $X, $AnyObject
+  %2 = unchecked_ref_cast %1 : $AnyObject to $X
+  %3 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %3 : $*Str
+  %5 = ref_element_addr %2 : $X, #X.s
+  fix_lifetime %5 : $*Str
+  %r = tuple ()
+  return %r : $()
 }
 
