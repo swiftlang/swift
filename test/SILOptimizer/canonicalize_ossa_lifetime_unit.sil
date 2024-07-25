@@ -600,3 +600,15 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test {{.*}} on dead_arg_debug_dead_end
+// CHECK-LABEL: sil [ossa] @dead_arg_debug_dead_end : {{.*}} {
+// CHECK:         debug_value
+// CHECK-LABEL: } // end sil function 'dead_arg_debug_dead_end'
+// CHECK-LABEL: end running test {{.*}} on dead_arg_debug_dead_end
+sil [ossa] @dead_arg_debug_dead_end : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  debug_value %c : $C
+  specify_test "canonicalize-ossa-lifetime true false true %c"
+  unreachable
+}
