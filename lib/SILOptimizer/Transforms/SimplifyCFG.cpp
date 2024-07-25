@@ -3793,7 +3793,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyArgument(
-    "simplify-cfg-simplify-argument",
+    "simplify_cfg_simplify_argument",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
