@@ -801,7 +801,7 @@ namespace swift::test {
 // - The inferred name
 // - The inferred value.
 static FunctionTest VariableNameInferrerTests(
-    "variable-name-inference", [](auto &function, auto &arguments, auto &test) {
+    "variable_name_inference", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       SmallString<64> finalString;
       VariableNameInferrer::Options options;
