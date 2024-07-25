@@ -208,6 +208,23 @@ static
 const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
                                        uint64_t Size, void **outFreeContext) {
   PipeMemoryReader *Reader = (PipeMemoryReader *)Context;
+
+#if __has_feature(address_sanitizer)
+  // ASAN dislikes reading arbitrary pages of memory, so
+  // be more conservative and only read exactly the requested bytes.
+  uintptr_t TargetAddress = Address;
+  size_t TargetSize = Size;
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_READ_BYTES, 2);
+  write(WriteFD, &TargetAddress, sizeof(TargetAddress));
+  write(WriteFD, &TargetSize, sizeof(size_t));
+
+  void *Buf = malloc(TargetSize);
+  PipeMemoryReader_collectBytesFromPipe(Reader, Buf, TargetSize);
+  *outFreeContext = NULL;
+  return Buf;
+
+#else
   PipeMemoryReaderPage *Page = Reader->Pages;
 
   // Try to find an existing page with the requested bytes
@@ -249,8 +266,8 @@ const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
   void *Buf = malloc(Size);
   memcpy(Buf, Page->Data + Address - Page->BaseAddress, Size);
   *outFreeContext = NULL;
-
   return Buf;
+#endif
 }
 
 static
