@@ -1273,7 +1273,7 @@ namespace swift::test {
 // Dumps:
 // - The inferred isolation.
 static FunctionTest
-    IsolationInfoInferrence("sil-isolation-info-inference",
+    IsolationInfoInferrence("sil_isolation_info_inference",
                             [](auto &function, auto &arguments, auto &test) {
                               auto value = arguments.takeValue();
 
