@@ -176,6 +176,18 @@ StdSpanTestSuite.test("Init SpanOfInt") {
   expectFalse(cs.empty())
 }
 
+StdSpanTestSuite.test("Init SpanOfInt from Swift array") {
+  var arr: [Int32] = [1, 2, 3]
+  arr.withUnsafeMutableBufferPointer{ ubpointer in
+    let s = initSpan(ubpointer.baseAddress!, ubpointer.count)
+    expectEqual(s.size(), 3)
+    expectFalse(s.empty())
+    expectEqual(s[0], 1)
+    expectEqual(s[1], 2)
+    expectEqual(s[2], 3)
+  }
+}
+
 StdSpanTestSuite.test("Access static SpanOfInt") {
   expectEqual(icspan.size(), 3)
   expectFalse(icspan.empty())
