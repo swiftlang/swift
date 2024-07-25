@@ -2616,18 +2616,6 @@ AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
       AllowConcreteTypeSpecialization(cs, concreteTy, locator);
 }
 
-bool AllowGenericFunctionSpecialization::diagnose(const Solution &solution,
-                                                  bool asNote) const {
-  GenericFunctionSpecialization failure(solution, Decl, getLocator());
-  return failure.diagnose(asNote);
-}
-
-AllowGenericFunctionSpecialization *AllowGenericFunctionSpecialization::create(
-    ConstraintSystem &cs, ValueDecl *decl, ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowGenericFunctionSpecialization(cs, decl, locator);
-}
-
 bool IgnoreOutOfPlaceThenStmt::diagnose(const Solution &solution,
                                         bool asNote) const {
   OutOfPlaceThenStmtFailure failure(solution, getLocator());
