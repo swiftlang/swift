@@ -1218,6 +1218,10 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
       impl.importDecl(constructorDecl, impl.CurrentVersion);
   if (!importedConstructor)
     return;
+
+  auto attr = AvailableAttr::createPlatformAgnostic(importedConstructor->getASTContext(), "use 'init(_:)' instead.", "", PlatformAgnosticAvailabilityKind::Deprecated);
+  importedConstructor->getAttrs().add(attr);
+
   decl->addMember(importedConstructor);
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
