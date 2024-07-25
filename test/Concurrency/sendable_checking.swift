@@ -102,10 +102,7 @@ public actor MyActor: MyProto {
 }
 
 // Make sure the generic signature doesn't minimize away Sendable requirements.
-class NSClass { }
-
-@available(*, unavailable)
-extension NSClass: @unchecked Sendable {} // expected-note {{conformance of 'NSClass' to 'Sendable' has been explicitly marked unavailable here}}
+@_nonSendable class NSClass { }
 
 struct WrapClass<T: NSClass> {
   var t: T
@@ -119,7 +116,7 @@ class SendableSubclass: NSClass, @unchecked Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 func testSubclassing(obj: SendableSubclass) async {
-  acceptCV(obj) // expected-warning {{conformance of 'NSClass' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
+  acceptCV(obj) // okay!
 }
 
 
