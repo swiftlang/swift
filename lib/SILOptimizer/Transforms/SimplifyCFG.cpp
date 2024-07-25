@@ -3680,7 +3680,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyBlockArgs(
-    "simplify-cfg-simplify-block-args",
+    "simplify_cfg_simplify_block_args",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
