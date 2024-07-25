@@ -1829,7 +1829,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
-    "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+    "simplify_cfg_simplify_switch_enum_unreachable_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
