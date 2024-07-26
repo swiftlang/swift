@@ -1978,6 +1978,7 @@ enum HasPointerEscape_t : bool {
   HasPointerEscape = true,
 };
 
+// See SILValue::isFromVarDecl()
 enum IsFromVarDecl_t : bool {
   IsNotFromVarDecl = false,
   IsFromVarDecl = true,

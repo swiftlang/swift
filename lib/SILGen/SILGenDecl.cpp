@@ -756,16 +756,16 @@ public:
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
       SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-    } else if (!lowering->isTrivial()) {
-      // Push a cleanup to destroy the let declaration.  This has to be
-      // inactive until the variable is initialized: if control flow exits the
-      // before the value is bound, we don't want to destroy the value.
-      SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
-                                                    CleanupState::Dormant, vd);
-      DestroyCleanup = SGF.Cleanups.getTopCleanup();
-    } else {
-      DestroyCleanup = CleanupHandle::invalid();
     }
+    // Push a cleanup to destroy the let declaration.  This has to be
+    // inactive until the variable is initialized: if control flow exits the
+    // before the value is bound, we don't want to destroy the value.
+    //
+    // Cleanups are required for all lexically scoped variables to delimite
+    // the variable scope, even if the cleanup does nothing.
+    SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
+      CleanupState::Dormant, vd);
+    DestroyCleanup = SGF.Cleanups.getTopCleanup();
   }
 
   ~LetValueInitialization() override {
@@ -810,50 +810,26 @@ public:
                                             SplitCleanups);
   }
 
-  /// This is a helper method for bindValue that handles any changes to the
-  /// value needed for lexical lifetime or no implicit copy purposes.
+  /// This is a helper method for bindValue that creates a scopes operation for
+  /// the lexical variable lifetime and handles any changes to the value needed
+  /// for move-only values.
   SILValue getValueForLexicalLifetimeBinding(SILGenFunction &SGF,
                                              SILLocation PrologueLoc,
                                              SILValue value, bool wasPlusOne) {
-    // If we have none...
-    if (value->getOwnershipKind() == OwnershipKind::None) {
-      // Then check if we have a pure move only type. In that case, we need to
-      // insert a no implicit copy
-      if (value->getType().isMoveOnly(/*orWrapped=*/false)) {
-        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-            PrologueLoc, value,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
-      }
-
-      // If we have a no implicit copy trivial type, wrap it in the move only
-      // wrapper and mark it as needing checking by the move checker.
-      if (vd->isNoImplicitCopy() && value->getType().isTrivial(SGF.F)) {
-        value =
-            SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-            PrologueLoc, value,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
-      }
-
-      if (!value->getType().isTrivial(SGF.F)) {
-        // A value without ownership of non-trivial type, e.g. Optional<K>.none.
-        // Mark that it is from a VarDecl.
-        return SGF.B.createMoveValue(PrologueLoc, value, IsNotLexical,
-                                     DoesNotHavePointerEscape, IsFromVarDecl);
-      }
-
+    // TODO: emitPatternBindingInitialization creates fake local variables for
+    // metatypes within function_conversion expressions that operate on static
+    // functions. Creating SIL local variables for all these is impractical and
+    // undesirable. We need a better way of representing these "capture_list"
+    // locals in a way that doesn't produce SIL locals. For now, bypassing
+    // metatypes mostly avoids the issue, but it's not robust and doesn't allow
+    // SIL-level analysis of real metatype variables.
+    if (isa<MetatypeType>(value->getType().getASTType())) {
       return value;
     }
 
-    // Otherwise, we need to perform some additional processing. First, if we
-    // have an owned moveonly value that had a cleanup, then create a move_value
-    // that acts as a consuming use of the value. The reason why we want this is
-    // even if we are only performing a borrow for our lexical lifetime, we want
-    // to ensure that our defs see this initialization as consuming this value.
+    // Preprocess an owned moveonly value that had a cleanup. Even if we are
+    // only performing a borrow for our lexical lifetime, this ensures that
+    // defs see this initialization as consuming this value.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
         value->getType().isMoveOnlyWrapped()) {
       assert(wasPlusOne);
@@ -864,50 +840,35 @@ public:
       value =
           SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(PrologueLoc, value);
     }
-
-    // If we still have a trivial thing, just return that.
-    if (value->getType().isTrivial(SGF.F))
-      return value;
-
-    // Check if we have a move only type. In that case, we perform a lexical
-    // move and insert a mark_unresolved_non_copyable_value.
-    //
-    // We do this before the begin_borrow "normal" path below since move only
-    // types do not have no implicit copy attr on them.
-    if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().isMoveOnly(/*orWrapped=*/false)) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
-      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-          PrologueLoc, value,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
-    }
-
-    // If we have a no implicit copy lexical, emit the instruction stream so
-    // that the move checker knows to check this variable.
-    if (vd->isNoImplicitCopy()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical,
-                                    DoesNotHavePointerEscape, IsFromVarDecl);
-      value =
-          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
-          PrologueLoc, value,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::
-              ConsumableAndAssignable);
-    }
-
-    // Otherwise, if we do not have a no implicit copy variable, just follow
-    // the "normal path".
-
     auto isLexical =
         IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical());
-
-    if (value->getOwnershipKind() == OwnershipKind::Owned)
-      return SGF.B.createMoveValue(PrologueLoc, value, isLexical,
-                                   DoesNotHavePointerEscape, IsFromVarDecl);
-
-    return SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
-                                   DoesNotHavePointerEscape, IsFromVarDecl);
+    switch (value->getOwnershipKind()) {
+    case OwnershipKind::None:
+    case OwnershipKind::Owned:
+      value = SGF.B.createMoveValue(PrologueLoc, value, isLexical,
+                                    DoesNotHavePointerEscape, IsFromVarDecl);
+      break;
+    case OwnershipKind::Guaranteed:
+      value = SGF.B.createBeginBorrow(PrologueLoc, value, isLexical,
+                                      DoesNotHavePointerEscape, IsFromVarDecl);
+      break;
+    case OwnershipKind::Unowned:
+    case OwnershipKind::Any:
+      llvm_unreachable("unexpected ownership");
+    }
+    if (vd->isNoImplicitCopy()) {
+      value =
+          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+      // fall-through to the owned move-only case...
+    }
+    if (value->getType().isMoveOnly(/*orWrapped=*/true)
+        && value->getOwnershipKind() == OwnershipKind::Owned) {
+      value = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+        PrologueLoc, value,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::
+        ConsumableAndAssignable);
+    }
+    return value;
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
@@ -2336,23 +2297,37 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
 
+  auto emitEndBorrow = [this, silLoc](SILValue value){
+    if (value->getOwnershipKind() == OwnershipKind::None) {
+      B.createExtendLifetime(silLoc, value);
+    } else {
+      B.createEndBorrow(silLoc, value);
+    }
+  };
+
+  auto emitDestroy = [this, silLoc](SILValue value){
+    if (value->getOwnershipKind() == OwnershipKind::None) {
+      B.createExtendLifetime(silLoc, value);
+    } else {
+      B.emitDestroyValueOperation(silLoc, value);
+    }
+  };
+
   auto loc = VarLocs[vd];
 
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
-  if (loc.box) {
+  if (auto boxValue = loc.box) {
     if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
-      B.emitDestroyValueOperation(silLoc, loc.box);
+      emitDestroy(boxValue);
       return;
     }
 
-    if (auto *bbi = dyn_cast<BeginBorrowInst>(loc.box)) {
-      B.createEndBorrow(silLoc, bbi);
-      B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-      return;
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(boxValue)) {
+      emitEndBorrow(bbi);
+      boxValue = bbi->getOperand();
     }
-
-    B.emitDestroyValueOperation(silLoc, loc.box);
+    emitDestroy(boxValue);
     return;
   }
 
@@ -2366,11 +2341,14 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   }
 
   if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
-    B.emitDestroyValueOperation(silLoc, Val);
+    emitDestroy(Val);
     return;
   }
 
-  if (Val->getOwnershipKind() == OwnershipKind::None) {
+  // If no variable scope was emitted, then we might not have a defining
+  // instruction.
+  if (!Val.getDefiningInstruction()) {
+    emitDestroy(Val);
     return;
   }
 
@@ -2378,61 +2356,57 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // + begin_borrow. In either case we just need to end the lifetime of the
   // begin_borrow's operand.
   if (auto *bbi = dyn_cast<BeginBorrowInst>(Val.getDefiningInstruction())) {
-    B.createEndBorrow(silLoc, bbi);
-    B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+    emitEndBorrow(bbi);
+    emitDestroy(bbi->getOperand());
     return;
   }
 
   if (auto *mvi = dyn_cast<MoveValueInst>(Val.getDefiningInstruction())) {
-    B.emitDestroyValueOperation(silLoc, mvi);
+    emitDestroy(mvi);
     return;
   }
 
-  if (auto *mvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+  // Handle BeginBorrow and MoveValue before bailing-out on trivial values.
+  if (Val->getOwnershipKind() == OwnershipKind::None) {
+    return;
+  }
+
+  if (auto *mark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
           Val.getDefiningInstruction())) {
-    if (mvi->hasMoveCheckerKind()) {
-      if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
+    if (mark->hasMoveCheckerKind()) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(mark->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-          if (bbi->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            B.createEndBorrow(silLoc, bbi);
-            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-            return;
-          }
+          emitDestroy(mark);
+          emitEndBorrow(bbi);
+          emitDestroy(bbi->getOperand());
+          return;
         }
       }
 
       if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
-              mvi->getOperand())) {
-        if (auto *move = dyn_cast<MoveValueInst>(copyToMove->getOperand())) {
-          if (move->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            return;
-          }
+              mark->getOperand())) {
+        if (copyToMove->getOperand()->isFromVarDecl()) {
+          emitDestroy(mark);
+          return;
         }
       }
 
-      if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
+      if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mark->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-          if (bbi->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            B.createEndBorrow(silLoc, bbi);
-            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-            return;
-          }
+          emitDestroy(mark);
+          emitEndBorrow(bbi);
+          emitDestroy(bbi->getOperand());
+          return;
         }
       }
 
       // Handle trivial arguments.
-      if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
-        if (move->isLexical()) {
-          B.emitDestroyValueOperation(silLoc, mvi);
-          return;
-        }
+      if (auto *move = dyn_cast<MoveValueInst>(mark->getOperand())) {
+        emitDestroy(mark);
+        return;
       }
     }
-  }
-
+  }  
   llvm_unreachable("unhandled case");
 }
 

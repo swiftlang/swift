@@ -583,6 +583,9 @@ func test_multiple_patterns1() {
   }
 }
 
+// FIXME: The extend_lifetime is the local variable's cleanup. It should occur after all uses of the local. Instead, it
+// is emitted before the branch to the switch case body.
+//
 // CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
 func test_multiple_patterns2() {
   let t1 = 2
@@ -593,15 +596,18 @@ func test_multiple_patterns2() {
     // CHECK-NOT: br bb
   case (_, let x) where x > t1, (let x, _) where x > t2:
     // CHECK:   ([[FIRST:%[0-9]+]], [[SECOND:%[0-9]+]]) = destructure_tuple {{%.+}} : $(Int, Int)
-    // CHECK:   apply {{%.+}}([[SECOND]], [[T1]], {{%.+}})
+    // CHECK:   [[MV_SECOND:%.*]] = move_value [var_decl] [[SECOND]] : $Int
+    // CHECK:   apply {{%.+}}([[MV_SECOND]], [[T1]], {{%.+}})
     // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
     // CHECK:   [[FIRST_MATCH_CASE]]:
-    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[SECOND]] : $Int)
+    // CHECK:     extend_lifetime [[MV_SECOND]] : $Int
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_SECOND]] : $Int)
     // CHECK:   [[FIRST_FAIL]]:
-    // CHECK:     apply {{%.*}}([[FIRST]], [[T2]], {{%.+}})
+    // CHECK:     [[MV_FIRST:%.*]] = move_value [var_decl] %21 : $Int
+    // CHECK:     apply {{%.*}}([[MV_FIRST]], [[T2]], {{%.+}})
     // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
     // CHECK:   [[SECOND_MATCH_CASE]]:
-    // CHECK:     br [[CASE_BODY]]([[FIRST]] : $Int)
+    // CHECK:     br [[CASE_BODY]]([[MV_FIRST]] : $Int)
     // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
     // CHECK:     [[A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
     // CHECK:     apply [[A]]([[BODY_VAR]])
@@ -619,6 +625,9 @@ enum Foo {
   case C(Int, Int, Double)
 }
 
+// FIXME: The extend_lifetime is the local variable's cleanup. It should occur after all uses of the local. Instead, it
+// is emitted before the branch to the switch case body.
+//
 // CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns3yyF : $@convention(thin) () -> () {
 func test_multiple_patterns3() {
   let f = Foo.C(0, 1, 2.0)
@@ -627,15 +636,23 @@ func test_multiple_patterns3() {
   case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
-    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int, [[A_N]] : $Double)
+    // CHECK:     [[MV_A_X:%.*]] = move_value [var_decl] [[A_X]] : $Int
+    // CHECK:     [[MV_A_N:%.*]] = move_value [var_decl] [[A_N]] : $Double
+    // CHECK:     extend_lifetime [[MV_A_N]] : $Double
+    // CHECK:     extend_lifetime [[MV_A_X]] : $Int
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_A_X]] : $Int, [[MV_A_N]] : $Double)
     
     // CHECK:   [[B]]([[B_TUP:%.*]] : $(Double, Int)):
     // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
-    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int, [[B_N]] : $Double)
+    // CHECK:     [[MV_B_N:%.*]] = move_value [var_decl] [[B_N]] : $Double
+    // CHECK:     [[MV_B_X:%.*]] = move_value [var_decl] [[B_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_B_X]] : $Int, [[MV_B_N]] : $Double)
 
     // CHECK:   [[C]]([[C_TUP:%.*]] : $(Int, Int, Double)):
     // CHECK:     ([[C__:%.*]], [[C_X:%.*]], [[C_N:%.*]]) = destructure_tuple [[C_TUP]]
-    // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
+    // CHECK:     [[MV_C_X:%.*]] = move_value [var_decl] [[C_X]] : $Int
+    // CHECK:     [[MV_C_N:%.*]] = move_value [var_decl] [[C_N]] : $Double
+    // CHECK:     br [[CASE_BODY]]([[MV_C_X]] : $Int, [[MV_C_N]] : $Double)
 
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int, [[BODY_N:%.*]] : $Double):
     // CHECK:     [[FUNC_A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
@@ -661,18 +678,22 @@ func test_multiple_patterns4() {
     
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
-    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
+    // CHECK:     [[MV_A:%.*]] = move_value [var_decl] %30 : $Int
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_A]] : $Int)
     
     // CHECK:   [[B]]([[B_TUP:%.*]] : $(Double, Int)):
     // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
-    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
+    // CHECK:     [[MV_B_X:%.*]] = move_value [var_decl] [[B_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_B_X]] : $Int)
     
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
-    // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
+    // CHECK:     [[MV_Y_X:%.*]] = move_value [var_decl] [[Y_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_Y_X]] : $Int)
 
     // CHECK:   [[Z]]([[Z_TUP:%.*]] : $(Int, Foo)):
     // CHECK:     ([[Z_X:%.*]], [[Z_F:%.*]]) = destructure_tuple [[Z_TUP]]
-    // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
+    // CHECK:     [[MV_Z_X:%.*]] = move_value [var_decl] [[Z_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_Z_X]] : $Int)
 
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
     // CHECK:     [[FUNC_A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
@@ -695,18 +716,22 @@ func test_multiple_patterns5() {
     
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
-    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
+    // CHECK:     [[MV_X:%.*]] = move_value [var_decl] [[A_X]] : $Int
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_X]] : $Int)
     
     // CHECK:   [[B]]([[B_TUP:%.*]] : $(Double, Int)):
     // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
-    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
+    // CHECK:     [[MV_B_X:%.*]] = move_value [var_decl] [[B_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_B_X]] : $Int)
     
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
-    // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
+    // CHECK:     [[MV_Y_X:%.*]] = move_value [var_decl] [[Y_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_Y_X]] : $Int)
     
     // CHECK:   [[Z]]([[Z_TUP:%.*]] : $(Int, Foo)):
     // CHECK:     ([[Z_X:%.*]], [[Z_F:%.*]]) = destructure_tuple [[Z_TUP]]
-    // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
+    // CHECK:     [[MV_Z_X:%.*]] = move_value [var_decl] [[Z_X]] : $Int
+    // CHECK:     br [[CASE_BODY]]([[MV_Z_X]] : $Int)
     
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
     // CHECK:     store [[BODY_X]] to [trivial] [[BOX_X:%.*]] : $*Int

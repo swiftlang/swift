@@ -1061,6 +1061,15 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasOwnership()
+          && B.getModule().getStage() == SILStage::Raw
+          && value->isFromVarDecl()) {
+        // Do not use destroy_value for trivial values. The lifetime introducer
+        // may be implicitly copied and used outside of its original scope,
+        // which violates the invariants of destroy_value.
+        B.createExtendLifetime(loc, value);
+        return;
+      }
       // Trivial
     }
   };

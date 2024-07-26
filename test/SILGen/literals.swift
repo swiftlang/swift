@@ -288,7 +288,8 @@ class TakesDictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8literals23returnsCustomDictionaryAA05TakesD7LiteralCyS2iGyF : $@convention(thin) () -> @owned TakesDictionaryLiteral<Int, Int> {
-// CHECK: [[TMP:%.*]] = apply %2(%0, %1) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [[TMP_VAL:%.*]] = apply %2(%0, %1) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [[TMP:%.*]] = move_value [var_decl] [[TMP_VAL]] : $Int
 // CHECK: [[ARRAY_LENGTH:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK: // function_ref _allocateUninitializedArray<A>(_:)
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)

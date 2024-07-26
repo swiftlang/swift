@@ -10,12 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file contains an optimizer pass that lowers away move only types from
-/// SIL. It can run on all types or just trivial types. It works by Walking all
-/// values in the IR and unsafely converting their type to be without move
+/// Eliminate SIL constructs required by ownership diagnostics.
+///
+/// 1. Remove ownership operations on nonowned values: move_value, begin_borrow,
+/// extend_lifetime.
+///
+/// 2. Remove instructions that convert to and from MoveOnlyWrapped types.
+///
+/// This pass can run on all types or just trivial types. It works by Walking
+/// all values in the IR and unsafely converting their type to be without move
 /// only. If a change is made, we add the defining instruction to a set list for
 /// post-processing. Once we have updated all types in the function, we revisit
 /// the instructions that we touched and update/delete them as appropriate.
+///
+/// TODO: Rename this pass to OwnershipDiagnosticLowering.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -139,6 +147,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
   DELETE_IF_TRIVIAL_OP(DestroyValue)
   DELETE_IF_TRIVIAL_OP(EndBorrow)
+  DELETE_IF_TRIVIAL_OP(ExtendLifetime)
 #undef DELETE_IF_TRIVIAL_OP
 
 #define NEED_TO_CONVERT_FORWARDING_TO_NONE_IF_TRIVIAL_OP(CLS)                  \
@@ -300,6 +309,19 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
   // - record its users for later visitation
   auto visitValue = [&touchedInsts, fn = fn,
                      trivialOnly = trivialOnly](SILValue value) -> bool {
+    // Trivial move_value instructions are relevant. After they are stripped,
+    // any extend_lifetime uses are also stripped.
+    if (isa<MoveValueInst>(value)
+        && value->getOwnershipKind() == OwnershipKind::None) {
+      for (auto *use : value->getNonTypeDependentUses()) {
+        auto *user = use->getUser();
+        if (isa<ExtendLifetimeInst>(user)) {
+          touchedInsts.insert(user);
+        }
+      }
+      return true;
+    }
+
     if (!value->getType().hasAnyMoveOnlyWrapping(fn))
       return false;
 
