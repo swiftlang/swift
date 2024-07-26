@@ -558,6 +558,26 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is IsUniqueInst, is DebugValueInst:
       return .continueWalk
+    case let uac as UncheckedAddrCastInst:
+      if uac.type != uac.fromAddress.type {
+        // It's dangerous to continue walking over an `unchecked_addr_cast` which casts between two different types.
+        // We can only do this if the result is known to be the end of the walk, i.e. the cast result is not used
+        // in a relevant way.
+        for uacUse in uac.uses {
+          // Following instructions turned out to appear in code coming from the stdlib.
+          switch uacUse.instruction {
+          case is IsUniqueInst:
+            break
+          case is LoadInst, is LoadBorrowInst:
+            if followLoads(at: path) {
+              return .abortWalk
+            }
+          default:
+            return .abortWalk
+          }
+        }
+      }
+      return walkDownUses(ofAddress: uac, path: path)
     default:
       return isEscaping
     }
