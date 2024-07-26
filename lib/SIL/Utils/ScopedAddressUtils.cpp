@@ -113,7 +113,7 @@ namespace swift::test {
 // Dumps:
 // - the liveness result and boundary
 static FunctionTest ScopedAddressLivenessTest(
-    "scoped-address-liveness", [](auto &function, auto &arguments, auto &test) {
+    "scoped_address_liveness", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       assert(!arguments.hasUntaken());
       llvm::outs() << "Scoped address analysis: " << value;

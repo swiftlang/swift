@@ -1310,7 +1310,7 @@ namespace swift::test {
 // - SILValue: value
 // Dumps:
 // - message
-static FunctionTest IsSILTrivial("is-sil-trivial", [](auto &function,
+static FunctionTest IsSILTrivial("is_sil_trivial", [](auto &function,
                                                       auto &arguments,
                                                       auto &test) {
   SILValue value = arguments.takeValue();

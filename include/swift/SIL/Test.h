@@ -148,7 +148,7 @@ public:
   /// To create a new test, just write
   ///
   ///     namespace swift::test {
-  ///     static FunctionTest myTest("my-test", [](
+  ///     static FunctionTest myTest("my_new_test", [](
   ///       SILFunction &function, Arguments &arguments, FunctionTest &test){
   ///         // test code
   ///       });

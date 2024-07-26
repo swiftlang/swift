@@ -94,7 +94,7 @@ namespace swift::test {
 // Dumps:
 // - instruction
 // - whether it's a deinit barrier
-static FunctionTest IsDeinitBarrierTest("is-deinit-barrier", [](auto &function,
+static FunctionTest IsDeinitBarrierTest("is_deinit_barrier", [](auto &function,
                                                                 auto &arguments,
                                                                 auto &test) {
   auto *instruction = arguments.takeInstruction();

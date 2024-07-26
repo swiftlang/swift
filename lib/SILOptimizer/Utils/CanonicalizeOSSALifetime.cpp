@@ -1357,7 +1357,7 @@ namespace swift::test {
 // Dumps:
 // - function after value canonicalization
 static FunctionTest CanonicalizeOSSALifetimeTest(
-    "canonicalize-ossa-lifetime",
+    "canonicalize_ossa_lifetime",
     [](auto &function, auto &arguments, auto &test) {
       auto *accessBlockAnalysis =
           test.template getAnalysis<NonLocalAccessBlockAnalysis>();
