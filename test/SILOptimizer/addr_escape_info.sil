@@ -845,3 +845,17 @@ bb0(%0 :  @owned $XandIntClass):
   return %8 : $()
 }
 
+// CHECK-LABEL: Address escape information for test_store_borrow:
+// CHECK:       value:  %2 = store_borrow %0 to %1 : $*X                // users: %4, %3
+// CHECK-NEXT:  End function test_store_borrow
+sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 :  @guaranteed $X):
+  %1 = alloc_stack $X
+  %2 = store_borrow %0 to %1 : $*X
+  fix_lifetime %2 : $*X
+  end_borrow %2 : $*X
+  dealloc_stack %1 : $*X
+  %3 = tuple ()
+  return %3 : $()
+}
+

@@ -509,6 +509,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if path.followStores {
         return walkUp(value: store.source, path: path)
       }
+    case let storeBorrow as StoreBorrowInst:
+      assert(operand == storeBorrow.destinationOperand)
+      return walkDownUses(ofAddress: storeBorrow, path: path)
     case let copyAddr as CopyAddrInst:
       if !followLoads(at: path) {
         return .continueWalk
@@ -845,6 +848,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex).with(knownType: nil))
     case let pb as ProjectBoxInst:
       return walkUp(value: pb.box, path: path.push(.classField, index: pb.fieldIndex).with(knownType: nil))
+    case let storeBorrow as StoreBorrowInst:
+      return walkUp(address: storeBorrow.destination, path: path)
     default:
       return isEscaping
     }
