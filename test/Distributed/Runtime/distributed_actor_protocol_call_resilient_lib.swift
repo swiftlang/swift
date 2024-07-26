@@ -58,6 +58,10 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// Locating the built libraries failed on Linux (construction of test case),
+// but we primarily care about macOS in this test
+// UNSUPPORTED: OS=linux-gnu
+
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
@@ -95,15 +99,16 @@ import FakeDistributedActorSystems
 @main struct Main {
   static func main() async {
     let system = FakeRoundtripActorSystem()
-    let impl = Impl(actorSystem: system)
-    let anyAct: any SomeProtocol = impl
 
     print("start")
 
+    let impl = Impl(actorSystem: system)
+
+    let anyAct: any SomeProtocol = impl
     let anyReply = try! await anyAct.function()
     print("any reply = \(anyReply)") // CHECK: any reply = Success!
 
-    let proxy = try! Impl.resolve(id: impl.id, using: system)
+    let proxy: any SomeProtocol = try! Impl.resolve(id: impl.id, using: system)
     let proxyReply = try! await proxy.function()
     print("proxy reply = \(proxyReply)") // CHECK: proxy reply = Success!
 
