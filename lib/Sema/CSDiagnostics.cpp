@@ -9360,12 +9360,7 @@ bool InvalidMemberReferenceWithinInitAccessor::diagnoseAsError() {
 }
 
 bool ConcreteTypeSpecialization::diagnoseAsError() {
-  emitDiagnostic(diag::not_a_generic_type, resolveType(ConcreteType));
-  return true;
-}
-
-bool GenericFunctionSpecialization::diagnoseAsError() {
-  emitDiagnostic(diag::cannot_explicitly_specialize_generic_function);
+  emitDiagnostic(diag::not_a_generic_type, ConcreteType);
   return true;
 }
 

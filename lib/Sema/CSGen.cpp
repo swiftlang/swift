@@ -1903,9 +1903,9 @@ namespace {
     /// introduce them as an explicit generic arguments constraint.
     ///
     /// \returns true if resolving any of the specialization types failed.
-    void addSpecializationConstraint(ConstraintLocator *locator, Type boundType,
-                                     SourceLoc lAngleLoc,
-                                     ArrayRef<TypeRepr *> specializationArgs) {
+    bool addSpecializationConstraint(
+        ConstraintLocator *locator, Type boundType,
+        ArrayRef<TypeRepr *> specializationArgs) {
       // Resolve each type.
       SmallVector<Type, 2> specializationArgTypes;
       auto options =
@@ -1916,36 +1916,61 @@ namespace {
           options |= TypeResolutionFlags::AllowPackReferences;
           elementEnv = OuterExpansions.back();
         }
-        auto result = TypeResolution::resolveContextualType(
+        const auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, locator),
             HandlePlaceholderType(CS, locator),
             OpenPackElementType(CS, locator, elementEnv));
-        if (result->hasError()) {
-          auto &ctxt = CS.getASTContext();
-          auto *repr = new (ctxt) PlaceholderTypeRepr(specializationArg->getLoc());
-          result = PlaceholderType::get(ctxt, repr);
-          ctxt.Diags.diagnose(lAngleLoc,
-                              diag::while_parsing_as_left_angle_bracket);
-        }
+        if (result->hasError())
+          return true;
+
         specializationArgTypes.push_back(result);
       }
 
-      auto constraint = Constraint::create(
-          CS, ConstraintKind::ExplicitGenericArguments, boundType,
-          PackType::get(CS.getASTContext(), specializationArgTypes), locator);
-      CS.addUnsolvedConstraint(constraint);
-      CS.activateConstraint(constraint);
+      CS.addConstraint(
+          ConstraintKind::ExplicitGenericArguments, boundType,
+          PackType::get(CS.getASTContext(), specializationArgTypes),
+          locator);
+      return false;
     }
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
-      auto *overloadLocator = CS.getConstraintLocator(expr->getSubExpr());
-      addSpecializationConstraint(
-          overloadLocator, baseTy->getMetatypeInstanceType(),
-          expr->getLAngleLoc(), expr->getUnresolvedParams());
-      return baseTy;
+
+      if (baseTy->isTypeVariableOrMember()) {
+        return baseTy;
+      }
+
+      // We currently only support explicit specialization of generic types.
+      // FIXME: We could support explicit function specialization.
+      auto &de = CS.getASTContext().Diags;
+      if (baseTy->is<AnyFunctionType>()) {
+        de.diagnose(expr->getSubExpr()->getLoc(),
+                    diag::cannot_explicitly_specialize_generic_function);
+        de.diagnose(expr->getLAngleLoc(),
+                    diag::while_parsing_as_left_angle_bracket);
+        return Type();
+      }
+      
+      if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
+        auto *overloadLocator = CS.getConstraintLocator(expr->getSubExpr());
+        if (addSpecializationConstraint(overloadLocator,
+                                        meta->getInstanceType(),
+                                        expr->getUnresolvedParams())) {
+          return Type();
+        }
+
+        return baseTy;
+      }
+
+      // FIXME: If the base type is a type variable, constrain it to a metatype
+      // of a bound generic type.
+      de.diagnose(expr->getSubExpr()->getLoc(),
+                  diag::not_a_generic_definition);
+      de.diagnose(expr->getLAngleLoc(),
+                  diag::while_parsing_as_left_angle_bracket);
+      return Type();
     }
     
     Type visitSequenceExpr(SequenceExpr *expr) {
@@ -4055,9 +4080,10 @@ namespace {
 
       // Add explicit generic arguments, if there were any.
       if (expr->getGenericArgsRange().isValid()) {
-        addSpecializationConstraint(CS.getConstraintLocator(expr), macroRefType,
-                                    expr->getGenericArgsRange().Start,
-                                    expr->getGenericArgs());
+        if (addSpecializationConstraint(
+              CS.getConstraintLocator(expr), macroRefType,
+              expr->getGenericArgs()))
+          return Type();
       }
 
       // Form the applicable-function constraint. The result type
