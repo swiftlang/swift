@@ -1723,7 +1723,17 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
                                               FunctionConversionExpr *e,
                                               SILType loweredResultTy,
                                 llvm::function_ref<ManagedValue ()> fnEmitter) {
-  SILType loweredDestTy = SGF.getLoweredType(e->getType());
+  SILType loweredDestTy;
+  auto destTy = e->getType();
+  auto clangInfo =
+      destTy->castTo<AnyFunctionType>()->getExtInfo().getClangTypeInfo();
+  if (clangInfo.empty())
+    loweredDestTy = SGF.getLoweredType(destTy);
+  else
+    loweredDestTy = SGF.getLoweredType(
+        AbstractionPattern(destTy->getCanonicalType(), clangInfo.getType()),
+        destTy);
+
   ManagedValue result;
 
   // We're converting between C function pointer types. They better be
@@ -1794,7 +1804,9 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
 #endif
     semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
   }
-  
+
+  const clang::Type *destFnType = nullptr;
+
   if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(declRef->getDeclRef());
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
@@ -1808,12 +1820,18 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
       loc = closure;
       return ManagedValue();
     });
+    auto clangInfo = conversionExpr->getType()
+                         ->castTo<FunctionType>()
+                         ->getExtInfo()
+                         .getClangTypeInfo();
+    if (!clangInfo.empty())
+      destFnType = clangInfo.getType();
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*foreign*/ true);
+  SILDeclRef constant(loc, /*foreign*/ true, false, false, destFnType);
   SILConstantInfo constantInfo =
       SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant);
 
