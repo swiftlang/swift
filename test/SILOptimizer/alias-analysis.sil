@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa-kind=all -aa-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-alias-info -o /dev/null | %FileCheck %s
 
 // General black-box alias analysis tests. White-box unit tests are
 // specific to the aa-kind, such as basic-aa.sil and typed-access-tb-aa.sil.
@@ -60,14 +60,14 @@ bb0(%0 : $*OuterStruct):
 }
 
 // CHECK-LABEL: @testIndexOf0
-// CHECK: PAIR #8.
-// CHECK:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
-// CHECK:   %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
-// CHECK: MayAlias
-// CHECK: PAIR #9.
-// CHECK:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
-// CHECK:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
-// CHECK: MustAlias
+// CHECK:       PAIR #8.
+// CHECK-NEXT:    %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #9.
+// CHECK-NEXT:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:   MayAlias
 sil @testIndexOf0 : $@convention(thin) (@inout MyStruct) -> () {
 bb0(%0 : $*MyStruct):
   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i

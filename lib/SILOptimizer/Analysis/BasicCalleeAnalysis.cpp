@@ -67,7 +67,7 @@ void BridgedCalleeAnalysis::registerAnalysis(IsDeinitBarrierFn instructionIsDein
 }
 
 MemoryBehavior BasicCalleeAnalysis::
-getMemoryBehavior(ApplySite as, bool observeRetains) {
+getMemoryBehavior(FullApplySite as, bool observeRetains) {
   if (getMemBehvaiorFunction) {
     auto b = getMemBehvaiorFunction({as.getInstruction()->asSILNode()},
                                     observeRetains,

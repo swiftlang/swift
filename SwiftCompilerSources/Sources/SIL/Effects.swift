@@ -604,6 +604,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       write = write || other.write
     }
 
+    public static var noEffects: Memory {
+      Memory(read: false, write: false)
+    }
+
     public static var worstEffects: Memory {
       Memory(read: true, write: true)
     }
