@@ -538,11 +538,12 @@ func testExistentialsGetters(_ p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE5prop2Sbvg
   // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]], any P1) Self>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
+  // CHECK: [[MV_B:%.*]] = move_value [var_decl] [[B]] : $Bool
   let b: Bool = p1.prop2
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAEyS2bcig
-  // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
+  // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[MV_B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
 }
 

@@ -44,9 +44,9 @@ func print2(_ x: Int) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy8printIntyyF : $@convention(thin) () -> () {
-// CHECK:   [[X_MOVEONLY:%.*]] = copyable_to_moveonlywrapper [owned] {{%.*}} : $Int
-// CHECK:   [[X:%.*]] = move_value [lexical] [[X_MOVEONLY]]
-// CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X]]
+// CHECK:   [[X:%.*]] = move_value [var_decl] {{%.*}}
+// CHECK:   [[X_MOVEONLY:%.*]] = copyable_to_moveonlywrapper [owned] [[X]] : $Int
+// CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_MOVEONLY]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED_1:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED_2:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[FUNC:%.*]] = function_ref @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
@@ -96,8 +96,9 @@ func printIntArg(@_noImplicitCopy _ x: Int) {
 //
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
+// CHECK: [[MV_VAL:%.*]] = move_value [var_decl] [[VALUE]] : $Int
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy11printIntArgyySiF : $@convention(thin) (Int) -> ()
-// CHECK: apply [[FUNC]]([[VALUE]])
+// CHECK: apply [[FUNC]]([[MV_VAL]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
 // CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
@@ -146,8 +147,9 @@ func printIntOwnedArg(@_noImplicitCopy _ x: __owned Int) {
 //
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
+// CHECK: [[MV_VAL:%.*]] = move_value [var_decl] [[VALUE]] : $Int
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy16printIntOwnedArgyySinF : $@convention(thin) (Int) -> ()
-// CHECK: apply [[FUNC]]([[VALUE]])
+// CHECK: apply [[FUNC]]([[MV_VAL]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
 // CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
@@ -196,8 +198,9 @@ func printIntArgThrows(@_noImplicitCopy _ x: Int) throws {
 //
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
+// CHECK: [[MV_VAL:%.*]] = move_value [var_decl] [[VALUE]] : $Int
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error
-// CHECK: try_apply [[FUNC]]([[VALUE]])
+// CHECK: try_apply [[FUNC]]([[MV_VAL]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
 // CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
@@ -237,8 +240,9 @@ func printIntOwnedArgThrows(@_noImplicitCopy _ x: __owned Int) throws {
 //
 // CHECK: [[INT_LITERAL_FUNC:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [[VALUE:%.*]] = apply [[INT_LITERAL_FUNC]](
+// CHECK: [[MV_VAL:%.*]] = move_value [var_decl] [[VALUE]] : $Int
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error
-// CHECK: try_apply [[FUNC]]([[VALUE]])
+// CHECK: try_apply [[FUNC]]([[MV_VAL]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
 // CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
@@ -480,9 +484,9 @@ func callPrintKlassOwnedOwnedArgThrows() throws {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy19test_nontrivial_gepyyAA7TrivialVF : $@convention(thin) (Trivial) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Trivial):
-// CHECK:   [[WRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
-// CHECK:   [[MV_WRAPPED:%.*]] = move_value [lexical] [[WRAPPED]]
-// CHECK:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[MV_WRAPPED]]
+// CHECK:   [[MV:%.*]] = move_value [var_decl] [[ARG]] : $Trivial
+// CHECK:   [[WRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[MV]]
+// CHECK:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[WRAPPED]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[MARKED]]
 // CHECK:   [[EXT:%.*]] = struct_extract [[BORROW]]
 // CHECK:   [[UNWRAPPED:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[EXT]]

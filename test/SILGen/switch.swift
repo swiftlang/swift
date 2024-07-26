@@ -1117,8 +1117,9 @@ func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
   // CHECK:   [[X:%.*]] = destructure_tuple [[TUPLE]]
+  // CHECK:   [[MV:%.*]] = move_value [var_decl] [[X]] : $Int
   // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential_addr {{%.*}}, $Int
-  // CHECK:   store [[X]] to [trivial] [[ANY_X_ADDR]]
+  // CHECK:   store [[MV]] to [trivial] [[ANY_X_ADDR]]
   case let .Payload(x):
     return x
   }
@@ -1148,7 +1149,8 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
     return 0
 
   // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
-  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
+  // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] [[X]] : $Int
+  // CHECK-NEXT: debug_value [[MV]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case .none:
@@ -1170,7 +1172,8 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
     return 0
 
   // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
-  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
+  // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] [[X]] : $Int
+  // CHECK-NEXT: debug_value [[MV]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case nil:
@@ -1188,16 +1191,24 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
 
   case (.some(let base), .some(let filter)):
-    // CHECK: bb2(%10 : $Int):
-    // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
-    // CHECK-NEXT: debug_value %10 : $Int, let, name "filter"
+    // CHECK: bb1([[BASE:%[0-9]+]] : $Int):
+    // CHECK:   switch_enum
+    // CHECK: bb2([[FILTER:%[0-9]+]] : $Int):
+    // CHECK-NEXT: [[MV_BASE:%.*]] = move_value [var_decl] [[BASE]]
+    // CHECK-NEXT: [[MV_FILTER:%.*]] = move_value [var_decl] [[FILTER]]
+    // CHECK-NEXT: debug_value [[MV_BASE]] : $Int, let, name "base"
+    // CHECK-NEXT: debug_value [[MV_FILTER]] : $Int, let, name "filter"
     print("both: \(base), \(filter)")
   case (.some(let base), .none), (.none, .some(let base)):
     // CHECK: bb3:
-    // CHECK-NEXT: br bb6(%8 : $Int)
+    // CHECK-NEXT: [[MV_BASE_PATTERN:%.*]] = move_value [var_decl] [[BASE]] : $Int
+    // CHECK-NEXT: extend_lifetime [[MV_BASE_PATTERN]] : $Int
+    // CHECK-NEXT: br bb6([[MV_BASE_PATTERN]] : $Int)
 
     // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
-    // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
+    // CHECK-NEXT: [[MV_OTHER_BASE:%.*]] = move_value [var_decl] [[OTHER_BASE]] : $Int
+    // CHECK-NEXT: extend_lifetime [[MV_OTHER_BASE]] : $Int
+    // CHECK-NEXT: br bb6([[MV_OTHER_BASE]] : $Int)
 
     // CHECK: bb6([[ARG:%.*]] : $Int):
     // CHECK-NEXT: debug_value [[ARG]] : $Int, let, name "base"

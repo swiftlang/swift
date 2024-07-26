@@ -1459,7 +1459,7 @@ public:
       HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
       IsFromVarDecl_t fromVarDecl = IsNotFromVarDecl) {
     assert(getFunction().hasOwnership());
-    assert(!operand->getType().isTrivial(getFunction()) &&
+    assert(fromVarDecl || !operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitMoveValueOperation");
     return insert(new (getModule())
