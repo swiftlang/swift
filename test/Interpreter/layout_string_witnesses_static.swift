@@ -1319,6 +1319,35 @@ func testNestedTwoPayload() {
 
 testNestedTwoPayload()
 
+func testMultiPayloadOneExtraTagValue() {
+    let ptr = UnsafeMutablePointer<OneExtraTagValue>.allocate(capacity: 1)
+
+    do {
+        let x = OneExtraTagValue.y(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = OneExtraTagValue.y(SimpleClass(x: 1))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadOneExtraTagValue()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)
