@@ -26,21 +26,15 @@ var a, b, c, d : Int
 _ = a < b
 _ = (a < b, c > d)
 // Parses as generic because of lparen after '>'
-(a < b, c > (d)) // expected-error{{cannot find type 'b' in scope}}
-// expected-note@-1 2 {{while parsing this '<' as a type parameter bracket}}
-// expected-error@-2 {{cannot specialize non-generic type 'Int'}}
-// expected-error@-3 {{cannot call value of non-function type 'Int'}}
-// expected-error@-4 {{cannot find type 'c' in scope}}
+(a < b, c > (d)) // expected-error{{cannot specialize a non-generic definition}}
+// expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
 // Parses as generic because of lparen after '>'
-(a<b, c>(d)) // expected-error{{cannot find type 'b' in scope}}
-// expected-note@-1 2 {{while parsing this '<' as a type parameter bracket}}
-// expected-error@-2 {{cannot specialize non-generic type 'Int'}}
-// expected-error@-3 {{cannot call value of non-function type 'Int'}}
-// expected-error@-4 {{cannot find type 'c' in scope}}
+(a<b, c>(d)) // expected-error{{cannot specialize a non-generic definition}}
+// expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
 _ = a>(b)
 _ = a > (b)
 
-generic<Int>(0) // expected-error{{cannot explicitly specialize a generic function}}
+generic<Int>(0) // expected-error{{cannot explicitly specialize a generic function}} expected-note{{while parsing this '<' as a type parameter bracket}}
 
 A<B>.c()
 A<A<B>>.c()
