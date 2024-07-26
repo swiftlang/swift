@@ -646,3 +646,41 @@ bb0:
   return %99 : $()
 }
  
+class GenericClass<T> {
+  var x : T
+}
+
+// CHECK-LABEL: @test_generic_class
+// CHECK:       PAIR #10.
+// CHECK-NEXT:      %2 = ref_element_addr %0 : $GenericClass<T>, #GenericClass.x
+// CHECK-NEXT:      %3 = ref_element_addr %1 : $GenericClass<Int>, #GenericClass.x
+// CHECK-NEXT:    MayAlias
+sil [ossa] @test_generic_class : $@convention(thin) <T> (@guaranteed GenericClass<T>, @guaranteed GenericClass<Int>) -> () {
+bb0(%0 : @guaranteed $GenericClass<T>, %1 : @guaranteed $GenericClass<Int>):
+  %2 = ref_element_addr %0 : $GenericClass<T>, #GenericClass.x
+  %3 = ref_element_addr %1 : $GenericClass<Int>, #GenericClass.x
+
+  fix_lifetime %2 : $*T
+  fix_lifetime %3 : $*Int
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: @test_bound_generic_class
+// CHECK:       PAIR #10.
+// CHECK-NEXT:      %2 = ref_element_addr %0 : $GenericClass<Int32>, #GenericClass.x
+// CHECK-NEXT:      %3 = ref_element_addr %1 : $GenericClass<Int>, #GenericClass.x
+// CHECK-NEXT:    NoAlias
+sil [ossa] @test_bound_generic_class : $@convention(thin) (@guaranteed GenericClass<Int32>, @guaranteed GenericClass<Int>) -> () {
+bb0(%0 : @guaranteed $GenericClass<Int32>, %1 : @guaranteed $GenericClass<Int>):
+  %2 = ref_element_addr %0 : $GenericClass<Int32>, #GenericClass.x
+  %3 = ref_element_addr %1 : $GenericClass<Int>, #GenericClass.x
+
+  fix_lifetime %2 : $*Int32
+  fix_lifetime %3 : $*Int
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
