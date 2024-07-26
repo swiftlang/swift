@@ -162,7 +162,7 @@ namespace swift::test {
 // Dumps:
 // - value
 // - whether it's lexical
-static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
+static FunctionTest IsLexicalTest("is_lexical", [](auto &function,
                                                    auto &arguments,
                                                    auto &test) {
   auto value = arguments.takeValue();
