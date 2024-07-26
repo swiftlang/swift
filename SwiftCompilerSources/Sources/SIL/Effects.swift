@@ -539,7 +539,8 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       }
       switch convention {
       case .indirectIn, .packOwned:
-        result.memory.write = false
+        // indirect-in arguments are consumed by the caller and that not only counts as read but also as a write.
+        break
       case .indirectInGuaranteed, .packGuaranteed:
         result.memory.write = false
         result.ownership.destroy = false
