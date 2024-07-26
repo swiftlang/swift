@@ -180,8 +180,8 @@ public:
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 
-  /// Introduce linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = true;
+  /// Require linear OSSA lifetimes after SILGen
+  bool OSSACompleteLifetimes = false;
 
   /// Verify linear OSSA lifetimes after SILGen
   bool OSSAVerifyComplete = false;
