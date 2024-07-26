@@ -286,11 +286,11 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case (.storeBorrow(let arg), .storeBorrow(let otherArg)):
       return arg.allocStack != otherArg.allocStack
 
-    // A StoreBorrow location can only be used by other StoreBorrows.
-    case (.storeBorrow, _):
-      return true
-    case (_, .storeBorrow):
-      return true
+    // Handle the special case of store_borrow - alloc_stack, because that would give a false result in the default case.
+    case (.storeBorrow(let sbi), .stack(let asi)):
+      return sbi.allocStack != asi
+    case (.stack(let asi), .storeBorrow(let sbi)):
+      return sbi.allocStack != asi
 
     default:
       // As we already handled pairs of the same kind, here we handle pairs with different kinds.

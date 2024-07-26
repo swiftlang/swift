@@ -684,3 +684,25 @@ bb0(%0 : @guaranteed $GenericClass<Int32>, %1 : @guaranteed $GenericClass<Int>):
   return %9999 : $()
 }
 
+// CHECK-LABEL: @test_store_borrow
+// CHECK:       PAIR #7.
+// CHECK-NEXT:      %1 = alloc_stack $X
+// CHECK-NEXT:      %2 = store_borrow %0 to %1 : $*X
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #13.
+// CHECK-NEXT:      %2 = store_borrow %0 to %1 : $*X
+// CHECK-NEXT:      %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*X
+// CHECK-NEXT:    MayAlias
+sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 :  @guaranteed $X):
+  %1 = alloc_stack $X
+  %2 = store_borrow %0 to %1 : $*X
+  %3 = address_to_pointer %2 : $*X to $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*X
+  fix_lifetime %4 : $*X
+  end_borrow %2 : $*X
+  dealloc_stack %1 : $*X
+  %7 = tuple ()
+  return %7 : $()
+}
+
