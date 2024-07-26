@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -103,14 +103,6 @@ extension String.Index {
     return s.utf16.distance(from: s.utf16.startIndex, to: self)
   }
 
-  /// The offset into a string's code units for this index.
-  @available(swift, deprecated: 4.2, message: """
-    encodedOffset has been deprecated as most common usage is incorrect. \
-    Use utf16Offset(in:) to achieve the same behavior.
-    """)
-  @inlinable
-  public var encodedOffset: Int { return _encodedOffset }
-
   @inlinable @inline(__always)
   internal var _encodedOffset: Int {
     return Int(truncatingIfNeeded: _rawBits &>> 16)
@@ -149,18 +141,6 @@ extension String.Index {
       return
     }
     self = idx
-  }
-
-  /// Creates a new index at the specified code unit offset.
-  ///
-  /// - Parameter offset: An offset in code units.
-  @available(swift, deprecated: 4.2, message: """
-    encodedOffset has been deprecated as most common usage is incorrect. \
-    Use String.Index(utf16Offset:in:) to achieve the same behavior.
-    """)
-  @inlinable
-  public init(encodedOffset offset: Int) {
-    self.init(_encodedOffset: offset)
   }
 
   @inlinable @inline(__always)

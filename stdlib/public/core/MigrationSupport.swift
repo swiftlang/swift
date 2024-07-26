@@ -2,16 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
+//
 // This file contains only support for types deprecated from previous versions
 // of Swift
+//
+//===----------------------------------------------------------------------===//
 
 #if !$Embedded
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "BidirectionalCollection")
@@ -26,7 +28,7 @@ public typealias MutableIndexable = MutableCollection
 public typealias RandomAccessIndexable = RandomAccessCollection
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "RangeReplaceableIndexable")
 public typealias RangeReplaceableIndexable = RangeReplaceableCollection
-@available(swift, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
+@available(swift, deprecated: 4.2, obsoleted: 6, renamed: "EnumeratedSequence.Iterator")
 public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterator
 @available(swift,deprecated: 4.2, obsoleted: 5.0, renamed: "CollectionOfOne.Iterator")
 public typealias IteratorOverOne<T> = CollectionOfOne<T>.Iterator
@@ -180,7 +182,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 #if !$Embedded
-@available(swift, deprecated: 5.0, renamed: "KeyValuePairs")
+@available(swift, deprecated: 5.0, obsoleted: 6, renamed: "KeyValuePairs")
 public typealias DictionaryLiteral<Key, Value> = KeyValuePairs<Key, Value>
 #endif
 
@@ -196,7 +198,7 @@ extension LazySequenceProtocol {
   ///   as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)", message: "Please use compactMap(_:) for the case where closure returns an optional value")
+  @available(swift, deprecated: 4.1, obsoleted: 6, renamed: "compactMap(_:)", message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
@@ -243,7 +245,7 @@ extension String {
 }
 
 extension String.UnicodeScalarView: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -262,14 +264,14 @@ public typealias UnicodeScalar = Unicode.Scalar
 
 
 extension String.UTF16View: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }
 
 extension String.UTF8View: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UTF8View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -317,7 +319,7 @@ extension Substring {
 
 #if SWIFT_ENABLE_REFLECTION
 extension Substring: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
@@ -410,7 +412,7 @@ extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
     : "UnsafeRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -425,7 +427,7 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
     : "UnsafeMutableRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -439,8 +441,8 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
     : "UnsafePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
 }
@@ -453,8 +455,8 @@ extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
     : "UnsafeMutablePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnsafeMutablePointer.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafeMutablePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
 }
@@ -534,7 +536,7 @@ extension UnsafeMutableRawBufferPointer {
 // Note that the second overload is declared on a more specific protocol.
 // See: test/stdlib/StringFlatMap.swift for tests.
 extension Sequence {
-  @available(swift, deprecated: 4.1/*, obsoleted: 5.1 */, renamed: "compactMap(_:)",
+  @available(swift, deprecated: 4.1, obsoleted: 6, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
@@ -556,7 +558,7 @@ extension Collection {
 extension Collection {
   /// Returns the first index in which an element of the collection satisfies
   /// the given predicate.
-  @available(swift, deprecated: 5.0, renamed: "firstIndex(where:)")
+  @available(swift, deprecated: 5.0, obsoleted: 6, renamed: "firstIndex(where:)")
   @inlinable
   public func index(
     where _predicate: (Element) throws -> Bool
@@ -568,7 +570,7 @@ extension Collection {
 extension Collection where Element: Equatable {
   /// Returns the first index where the specified value appears in the
   /// collection.
-  @available(swift, deprecated: 5.0, renamed: "firstIndex(of:)")
+  @available(swift, deprecated: 5.0, obsoleted: 6, renamed: "firstIndex(of:)")
   @inlinable
   public func index(of element: Element) -> Index? {
     return firstIndex(of: element)
@@ -603,7 +605,7 @@ extension Zip2Sequence {
 ///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
 ///         // and the CustomPlaygroundQuickLookable protocol.
 ///     #endif
-@available(swift, deprecated: 4.2, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(swift, deprecated: 4.2, obsoleted: 6, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias PlaygroundQuickLook = _PlaygroundQuickLook
 
 @frozen // rdar://problem/38719739 - needed by LLDB
@@ -718,4 +720,27 @@ extension String {
   /// the other through zero or more applications of `index(after:)`.
   @available(*, deprecated, message: "All index distances are now of type Int")
   public typealias IndexDistance = Int
+}
+
+// [SE-0241] Deprecate String Index Encoded Offsets
+extension String.Index {
+  /// The offset into a string's code units for this index.
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: """
+    encodedOffset has been deprecated as most common usage is incorrect. \
+    Use utf16Offset(in:) to achieve the same behavior.
+    """)
+  @inlinable
+  public var encodedOffset: Int { return _encodedOffset }
+
+  /// Creates a new index at the specified code unit offset.
+  ///
+  /// - Parameter offset: An offset in code units.
+  @available(swift, deprecated: 4.2, obsoleted: 6, message: """
+    encodedOffset has been deprecated as most common usage is incorrect. \
+    Use String.Index(utf16Offset:in:) to achieve the same behavior.
+    """)
+  @inlinable
+  public init(encodedOffset offset: Int) {
+    self.init(_encodedOffset: offset)
+  }
 }
