@@ -88,7 +88,7 @@ extension String.UTF16View {
   internal var _shortHeuristic: Int { return 32 }
 }
 
-@inlinable @_transparent
+@usableFromInline
 internal func unimplemented_utf8_32bit(
   _ message: String = "",
   file: StaticString = #file, line: UInt = #line
@@ -96,8 +96,7 @@ internal func unimplemented_utf8_32bit(
   fatalError("32-bit: Unimplemented for UTF-8 support", file: file, line: line)
 }
 
-@_transparent
-@inlinable
+@usableFromInline
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs + rhs
@@ -106,8 +105,7 @@ internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
-@_transparent
-@inlinable
+@usableFromInline
 internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs - rhs
