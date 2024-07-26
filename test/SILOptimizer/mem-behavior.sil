@@ -380,6 +380,24 @@ bb2:
   unreachable
 }
 
+// CHECK-LABEL:  @test_indirect_yield
+// CHECK:        PAIR #3.
+// CHECK-NEXT:       store %0 to %4 : $*Int32
+// CHECK-NEXT:       %1 = alloc_stack $Int32
+// CHECK-NEXT:     r=0,w=1
+sil @test_indirect_yield : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32
+  store %0 to %1 : $*Int32
+  %3 = function_ref @indirect_yield_coroutine : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
+  (%4, %5) = begin_apply %3(%1) : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
+  store %0 to %4 : $*Int32
+  end_apply %5 as $()
+  dealloc_stack %1 : $*Int32
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: @refelementaddr_and_reference
 // CHECK:       PAIR #0.
 // CHECK-NEXT:      %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> Int32

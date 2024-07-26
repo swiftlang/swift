@@ -615,10 +615,14 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     }
 
     // Indirect arguments cannot escape the function, but loaded values from such can.
-    if !followLoads(at: path) &&
-       // Except for begin_apply: it can yield an address value.
-       !apply.isBeginApplyWithIndirectResults {
-      return .continueWalk
+    if !followLoads(at: path) {
+      guard let beginApply = apply as? BeginApplyInst else {
+        return .continueWalk
+      }
+      // Except for begin_apply: it can yield an address value.
+      if !indirectResultEscapes(of: beginApply, path: path) {
+        return .continueWalk
+      }
     }
 
     if argOp.value.type.isNoEscapeFunction {
@@ -658,7 +662,16 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     }
     return .continueWalk
   }
-  
+
+  private mutating func indirectResultEscapes(of beginApply: BeginApplyInst, path: Path) -> Bool {
+    for result in beginApply.yieldedValues where result.type.isAddress {
+      if walkDownUses(ofAddress: result, path: path) == .abortWalk {
+        return true
+      }
+    }
+    return false
+  }
+
   /// Handle `.escaping` effects for an apply argument during the walk-down.
   private mutating
   func walkDownArgument(calleeArgIdx: Int, argPath: Path,
@@ -926,15 +939,5 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 private extension SmallProjectionPath {
   var escapePath: EscapeUtilityTypes.EscapePath {
     EscapeUtilityTypes.EscapePath(projectionPath: self, followStores: false, addressIsStored: false, knownType: nil)
-  }
-}
-
-private extension ApplySite {
-  var isBeginApplyWithIndirectResults: Bool {
-    guard let ba = self as? BeginApplyInst else {
-      return false
-    }
-    // Note that the token result is always a non-address type.
-    return ba.results.contains { $0.type.isAddress }
   }
 }
