@@ -796,3 +796,18 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: Address escape information for test_is_unique:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:  End function test_is_unique
+sil [ossa] @test_is_unique : $@convention(thin) (@owned X) -> () {
+bb0(%0 :  @owned $X):
+  %1 = alloc_stack $X
+  store %0 to [init] %1 : $*X
+  fix_lifetime %1 : $*X
+  %3 = is_unique %1 : $*X
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
+  %4 = tuple ()
+  return %4 : $()
+}
+

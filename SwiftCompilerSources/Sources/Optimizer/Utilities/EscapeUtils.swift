@@ -556,7 +556,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case let atp as AddressToPointerInst:
       return walkDownUses(ofValue: atp, path: path.with(knownType: nil))
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
-         is DebugValueInst:
+         is IsUniqueInst, is DebugValueInst:
       return .continueWalk
     default:
       return isEscaping
