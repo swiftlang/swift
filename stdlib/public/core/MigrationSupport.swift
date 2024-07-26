@@ -245,7 +245,7 @@ extension String {
 }
 
 extension String.UnicodeScalarView: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -264,14 +264,14 @@ public typealias UnicodeScalar = Unicode.Scalar
 
 
 extension String.UTF16View: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }
 
 extension String.UTF8View: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UTF8View.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UTF8View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -319,7 +319,7 @@ extension Substring {
 
 #if SWIFT_ENABLE_REFLECTION
 extension Substring: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
@@ -412,7 +412,7 @@ extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
     : "UnsafeRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -427,7 +427,7 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
     : "UnsafeMutableRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -441,7 +441,7 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
     : "UnsafePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -455,7 +455,7 @@ extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
     : "UnsafeMutablePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(swift, deprecated: 4.2, obsoleted: 6, message: "UnsafeMutablePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(swift, deprecated: 4.2, message: "UnsafeMutablePointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -605,7 +605,7 @@ extension Zip2Sequence {
 ///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
 ///         // and the CustomPlaygroundQuickLookable protocol.
 ///     #endif
-@available(swift, deprecated: 4.2, obsoleted: 6, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(swift, deprecated: 4.2, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias PlaygroundQuickLook = _PlaygroundQuickLook
 
 @frozen // rdar://problem/38719739 - needed by LLDB
