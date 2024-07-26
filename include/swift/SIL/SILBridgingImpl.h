@@ -1147,6 +1147,10 @@ void BridgedInstruction::RefElementAddrInst_setImmutable(bool isImmutable) const
   getAs<swift::RefElementAddrInst>()->setImmutable(isImmutable);
 }
 
+bool BridgedInstruction::RefTailAddrInst_isImmutable() const {
+  return getAs<swift::RefTailAddrInst>()->isImmutable();
+}
+
 SwiftInt BridgedInstruction::PartialApplyInst_numArguments() const {
   return getAs<swift::PartialApplyInst>()->getNumArguments();
 }
@@ -1254,6 +1258,10 @@ SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
 
 bool BridgedInstruction::BeginAccessInst_isStatic() const {
   return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Static;
+}
+
+bool BridgedInstruction::BeginAccessInst_isUnsafe() const {
+  return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Unsafe;
 }
 
 bool BridgedInstruction::CopyAddrInst_isTakeOfSrc() const {

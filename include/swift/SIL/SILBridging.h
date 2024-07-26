@@ -960,6 +960,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool RefElementAddrInst_fieldIsLet() const;
   BRIDGED_INLINE bool RefElementAddrInst_isImmutable() const;
   BRIDGED_INLINE void RefElementAddrInst_setImmutable(bool isImmutable) const;
+  BRIDGED_INLINE bool RefTailAddrInst_isImmutable() const;
   BRIDGED_INLINE SwiftInt PartialApplyInst_numArguments() const;
   BRIDGED_INLINE SwiftInt ApplyInst_numArguments() const;
   BRIDGED_INLINE bool ApplyInst_getNonThrowing() const;
@@ -987,6 +988,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE void MarkDependenceInst_resolveToNonEscaping() const;
   BRIDGED_INLINE SwiftInt BeginAccessInst_getAccessKind() const;
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
+  BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
