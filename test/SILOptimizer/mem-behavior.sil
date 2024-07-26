@@ -89,7 +89,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-LABEL: @call_store_to_int_not_aliased
 // CHECK:     PAIR #0.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
-// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}
 // CHECK-NEXT:  r=0,w=1
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -107,7 +107,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-LABEL: @call_store_to_int_aliased
 // CHECK:     PAIR #0.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
-// CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}             // user: %6
+// CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}
 // CHECK-NEXT:  r=0,w=1
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -184,15 +184,15 @@ bb0(%0 : $X, %1 : $X):
 // CHECK-LABEL: @allocstack_apply_no_side_effect
 // CHECK:     PAIR #0
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                         // user: %5
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}
 // CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
-  %1 = alloc_stack $Int32                         // user: %5
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %1 = alloc_stack $Int32
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
-  %4 = tuple ()                                   // user: %6
-  dealloc_stack %1 : $*Int32     // id: %5
+  %4 = tuple ()
+  dealloc_stack %1 : $*Int32
   return %4 : $()
 }
 
@@ -203,30 +203,30 @@ bb0(%0 : $Int32):
 // CHECK-NEXT:  r=0,w=1
 sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
-  %1 = alloc_stack $Int32                         // users: %3, %5
+  %1 = alloc_stack $Int32
   // function_ref store_to_int
-  %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
   %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
-  %4 = tuple ()                                   // user: %6
-  dealloc_stack %1 : $*Int32     // id: %5
-  return %4 : $()                                 // id: %6
+  %4 = tuple ()
+  dealloc_stack %1 : $*Int32
+  return %4 : $()
 }
 
 // CHECK-LABEL: @allocstack_apply_no_escaping
 // CHECK: PAIR #0.
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %7, %5
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}
 // CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
-  %1 = alloc_stack $Int32                         // users: %3, %5
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %1 = alloc_stack $Int32
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
-  %4 = function_ref @store_to_int: $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %4 = function_ref @store_to_int: $@convention(thin) (Int32, @inout Int32) -> ()
   %5 = apply %4(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
-  %6 = tuple ()                                   // user: %6
-  dealloc_stack %1 : $*Int32     // id: %5
-  return %6 : $()                                 // id: %6
+  %6 = tuple ()
+  dealloc_stack %1 : $*Int32
+  return %6 : $()
 }
 
 // CHECK-LABEL: @allocstack_apply_read_only
@@ -303,8 +303,8 @@ bb0(%0 : $*Int32):
 
 // CHECK-LABEL:  @escaping_allocstack_to_known_function
 // CHECK:        PAIR #2.
-// CHECK-NEXT:       %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8 // user: %7
-// CHECK-NEXT:       %1 = alloc_stack $UInt8                         // users: %6, %3, %2
+// CHECK-NEXT:       %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8
+// CHECK-NEXT:       %1 = alloc_stack $UInt8
 // CHECK-NEXT:     r=1,w=0
 sil @escaping_allocstack_to_known_function : $@convention(thin) (UInt8) -> UInt8 {
 bb0(%0 : $UInt8):
@@ -836,7 +836,7 @@ sil hidden @testGlobalLet : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalC : $*C
   %1 = load %0 : $*C
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
   %8 = tuple ()
   return %8 : $()
@@ -851,7 +851,7 @@ sil hidden @testGlobalVar : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalCVar : $*C
   %1 = load %0 : $*C
-  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
   %8 = tuple ()
   return %8 : $()
@@ -890,8 +890,8 @@ struct Int64Wrapper {
 
 // CHECK-LABEL: @testNestedAccessWithInterposedProjection
 // CHECK: PAIR #2.
-// CHECK-NEXT:   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
-// CHECK-NEXT:   %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
+// CHECK-NEXT:   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper
+// CHECK-NEXT:   %3 = begin_access [read] [static] %2 : $*Int64
 // CHECK-NEXT: r=1,w=1
 sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
 bb0(%0 : $*Int64Wrapper):
@@ -1246,7 +1246,7 @@ bb0:
 // CHECK-LABEL: @test_stored_pointer
 // CHECK:       PAIR #3.
 // CHECK-NEXT:      %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
-// CHECK-NEXT:      %0 = alloc_stack $Int                           // users: %7, %1
+// CHECK-NEXT:      %0 = alloc_stack $Int
 // CHECK-NEXT:    r=1,w=1
 sil @test_stored_pointer : $@convention(thin) () -> () {
 bb0:
