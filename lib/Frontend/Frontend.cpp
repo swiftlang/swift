@@ -552,11 +552,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   if (LangOpts.EnableModuleLoadingRemarks) {
     Invocation.getSearchPathOptions().dump(LangOpts.Target.isOSDarwin());
   }
-  
-  // If the compiler instance is managed by an IDE, inform the source manager to avoid
-  // memory-mapping source files that are likely to be mutated in an editor.
-  if (LangOpts.DiagnosticsEditorMode) {
-    this->getSourceMgr().setEditorMode();
+
+  if (LangOpts.OpenSourcesAsVolatile) {
+    this->getSourceMgr().setOpenSourcesAsVolatile();
   }
 
   // If we expect an implicit stdlib import, load in the standard library. If we

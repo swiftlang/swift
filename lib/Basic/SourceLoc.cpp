@@ -699,7 +699,7 @@ unsigned SourceManager::getExternalSourceBufferID(StringRef Path) {
       swift::vfs::getFileOrSTDIN(*getFileSystem(), Path,
                                  /* FileSize */ -1,
                                  /* RequiresNullTerminator */ true,
-                                 /* isVolatile */ this->EditorMode);
+                                 /* isVolatile */ this->OpenSourcesAsVolatile);
   if (InputFileOrErr) {
     // This assertion ensures we can look up from the map in the future when
     // using the same Path.
