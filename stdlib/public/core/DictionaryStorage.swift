@@ -110,9 +110,6 @@ internal class __RawDictionaryStorage: __SwiftNativeNSDictionary {
   }
 }
 
-@available(*, unavailable)
-extension __RawDictionaryStorage: Sendable {}
-
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
 // NOTE: older runtimes called this class _EmptyDictionarySingleton.
@@ -138,9 +135,6 @@ internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
   }
 #endif
 }
-
-@available(*, unavailable)
-extension __EmptyDictionarySingleton: Sendable {}
 
 #if _runtime(_ObjC)
 extension __EmptyDictionarySingleton: _NSDictionaryCore {
@@ -511,6 +505,3 @@ extension _DictionaryStorage {
     return storage
   }
 }
-
-extension _DictionaryStorage: @unchecked Sendable
-  where Key: Sendable, Value: Sendable {}
