@@ -41,7 +41,7 @@ EXPECTED_DEFAULTS = {
     'android_api_level': '21',
     'android_deploy_device_path': '/data/local/tmp',
     'android_ndk': None,
-    'android_arch': 'armv7',
+    'android_arch': 'aarch64',
     'assertions': True,
     'benchmark': False,
     'benchmark_num_o_iterations': 3,
@@ -764,7 +764,7 @@ EXPECTED_OPTIONS = [
     ChoicesOption('--swift-analyze-code-coverage',
                   choices=['false', 'not-merged', 'merged']),
     ChoicesOption('--android-arch',
-                  choices=['armv7', 'aarch64']),
+                  choices=['armv7', 'aarch64', 'x86_64']),
 
     StrOption('--android-api-level'),
     StrOption('--build-args'),
