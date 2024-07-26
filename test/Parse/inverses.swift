@@ -143,7 +143,7 @@ struct Burrito<Filling: ~Copyable>: ~Copyable {}
 extension Burrito: Alias {} // expected-error {{conformance to 'Copyable' must be declared in a separate extension}}
 // expected-note@-1 {{'Burrito<Filling>' declares conformance to protocol 'Copyable' here}}
 
-extension Burrito: Copyable & Edible & P {} // expected-warning {{redundant conformance of 'Burrito<Filling>' to protocol 'Copyable'}}
+extension Burrito: Copyable & Edible & P {} // expected-error {{redundant conformance of 'Burrito<Filling>' to protocol 'Copyable'}}
 
 struct Blah<T: ~Copyable>: ~Copyable {}
 extension Blah: P, Q, Copyable, R {} // expected-error {{generic struct 'Blah' required to be 'Copyable' but is marked with '~Copyable'}}
