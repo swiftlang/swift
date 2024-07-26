@@ -17,9 +17,12 @@ private protocol VerifyableInstruction : Instruction {
   func verify(_ context: FunctionPassContext)
 }
 
-private func require(_ condition: Bool, _ message: @autoclosure () -> String) {
+private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction? = nil) {
   if !condition {
-    fatalError(message())
+    let msg = message()
+    msg._withBridgedStringRef { stringRef in
+      verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
+    }
   }
 }
 

@@ -386,6 +386,8 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, Bridge
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
 
+void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction, OptionalBridgedArgument atArgument);
+
 //===----------------------------------------------------------------------===//
 //                          Pass registration
 //===----------------------------------------------------------------------===//

@@ -1070,6 +1070,14 @@ struct BridgedArgument {
 
 struct OptionalBridgedArgument {
   OptionalSwiftObject obj;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::SILArgument * _Nullable unbridged() const {
+    if (!obj)
+      return nullptr;
+    return static_cast<swift::SILArgument *>(obj);
+  }
+#endif
 };
 
 struct OptionalBridgedBasicBlock {
