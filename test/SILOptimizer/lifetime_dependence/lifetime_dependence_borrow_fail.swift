@@ -12,7 +12,6 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @_unsafeNonescapableResult
   init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
@@ -36,7 +35,6 @@ struct NE : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @_unsafeNonescapableResult
   init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i

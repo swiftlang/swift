@@ -47,7 +47,7 @@ actor A: P2 {
   // CHECK: hop_to_executor {{.*}} : $MainActor
   // CHECK: [[F:%.*]] = function_ref @$s4test11mainActorFnyyF : $@convention(thin) () -> ()
   // CHECK: [[THICK_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
-  // CHECK: [[THICK_F_VAR:%.*]] = move_value [var_decl] [[THICK_F]]
+  // CHECK: [[THICK_F_VAR:%.*]] = move_value [lexical] [var_decl] [[THICK_F]]
   // CHECK: [[THICK_F_BORROW:%.*]] = begin_borrow [[THICK_F_VAR]]
   // CHECK: [[THICK_F_COPY:%.*]] = copy_value [[THICK_F_BORROW]]
   // CHECK: [[THUNK:%.*]] = function_ref @$sIeg_IegH_TR : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()

@@ -782,8 +782,10 @@ func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12rebindMemory{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
 // CHECK: [[BIND:%.*]] = bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
-// CHECK: [[REBIND:%.*]] = rebind_memory [[P]] : $Builtin.RawPointer to [[BIND]] : $Builtin.Word
-// CHECK: %{{.*}} = rebind_memory [[P]] : $Builtin.RawPointer to [[REBIND]] : $Builtin.Word
+// CHECK: [[MV1:%.*]] = move_value [var_decl] [[BIND]] : $Builtin.Word
+// CHECK: [[REBIND:%.*]] = rebind_memory [[P]] : $Builtin.RawPointer to [[MV1]] : $Builtin.Word
+// CHECK: [[MV2:%.*]] = move_value [var_decl] [[REBIND]] : $Builtin.Word
+// CHECK: %{{.*}} = rebind_memory [[P]] : $Builtin.RawPointer to [[MV2]] : $Builtin.Word
 // CHECK:   return {{%.*}} : $()
 // CHECK: }
 func rebindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {

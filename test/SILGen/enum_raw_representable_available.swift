@@ -54,6 +54,7 @@ public enum E: Int {
 // CHECK: {{enum \$E|inject_enum_addr %[0-9]+ : \$\*E}}, #E.notObsoleteYet!enumelt
 
 // CHECK: [[potentiallyUnavailable]]:
+// CHECK-NEXT: extend_lifetime
 // CHECK-NEXT: integer_literal $Builtin.Word, 10
 // CHECK-NEXT: integer_literal $Builtin.Word, 55
 // CHECK-NEXT: integer_literal $Builtin.Word, 0

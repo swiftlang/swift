@@ -209,6 +209,16 @@ bool ValueBase::hasDebugTrace() const {
   return false;
 }
 
+bool ValueBase::isFromVarDecl() {
+  if (auto *mvi = dyn_cast<MoveValueInst>(this)) {
+    return mvi->isFromVarDecl();
+  }
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(this)) {
+    return bbi->isFromVarDecl();
+  }
+  return false;
+}
+
 SILBasicBlock *SILNode::getParentBlock() const {
   if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();

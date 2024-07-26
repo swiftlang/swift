@@ -51,17 +51,20 @@ func test6() -> Int {
 // CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK:       [[Y_LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK:       [[Y:%[0-9]+]] = apply {{%[0-9]+}}([[Y_LIT]], {{%[0-9]+}})
+// CHECK:       [[MVY:%.*]] = move_value [var_decl] [[Y]] : $Int
 // CHECK:       [[THROWS_ERR_FN:%[0-9]+]] = function_ref @$s7do_expr11throwsErroryS2iKF : $@convention(thin) (Int) -> (Int, @error any Error)
 // CHECK:       try_apply [[THROWS_ERR_FN]]({{%[0-9]+}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
 //
 // CHECK:       [[BB_NORMAL]]
-// CHECK-NEXT:  store [[Y]] to [trivial] [[RESULT]] : $*Int
+// CHECK-NEXT:  store [[MVY]] to [trivial] [[RESULT]] : $*Int
+// CHECK-NEXT:  extend_lifetime [[MVY]] : $Int
 // CHECK-NEXT:  br [[BB_EXIT:bb[0-9]+]]
 //
 // CHECK:       [[BB_EXIT]]
 // CHECK:       [[RET:%[0-9]+]] = load [trivial] [[RESULT]] : $*Int
+// CHECK:       [[MVR:%[0-9]+]] = move_value [var_decl] [[RET]] : $Int
 // CHECK:       dealloc_stack [[RESULT]] : $*Int
-// CHECK:       return [[RET]] : $Int
+// CHECK:       return [[MVR]] : $Int
 //
 // CHECK:       [[BB_ERR]]
 // CHECK:       [[SEVEN_LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 7
@@ -84,17 +87,20 @@ func test7() throws -> Int {
 // CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK:       [[Y_LIT:%[0-9]]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK:       [[Y:%[0-9]+]] = apply {{%[0-9]+}}([[Y_LIT]], {{%[0-9]+}})
+// CHECK:       [[MVY:%.*]] = move_value [var_decl] [[Y]] : $Int
 // CHECK:       [[THROWS_ERR_FN:%[0-9]]] = function_ref @$s7do_expr11throwsErroryS2iKF : $@convention(thin) (Int) -> (Int, @error any Error)
-// CHECK:       try_apply [[THROWS_ERR_FN]]([[Y]]) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
+// CHECK:       try_apply [[THROWS_ERR_FN]]([[MVY]]) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
 //
 // CHECK:       [[BB_NORMAL]]([[I:%[0-9]+]] : $Int)
 // CHECK-NEXT:  store [[I]] to [trivial] [[RESULT]] : $*Int
+// CHECK-NEXT:  extend_lifetime [[MVY]] : $Int
 // CHECK-NEXT:  br [[BB_EXIT:bb[0-9]+]]
 //
 // CHECK:       [[BB_EXIT]]
 // CHECK:       [[RET:%[0-9]+]] = load [trivial] [[RESULT]] : $*Int
+// CHECK:       [[MVR:%.*]] = move_value [var_decl] [[RET]] : $Int
 // CHECK:       dealloc_stack [[RESULT]] : $*Int
-// CHECK:       return [[RET]] : $Int
+// CHECK:       return [[MVR]] : $Int
 //
 // CHECK:       [[BB_ERR]]
 // CHECK:       function_ref @$sSb6randomSbyFZ : $@convention(method) (@thin Bool.Type) -> Bool

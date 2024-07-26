@@ -1768,6 +1768,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
       isa<EndBorrowInst>(inst) || isa<DebugStepInst>(inst) ||
+      isa<ExtendLifetimeInst>(inst) ||
       // Skip instrumentation
       isInstrumentation(inst))
     return std::nullopt;
