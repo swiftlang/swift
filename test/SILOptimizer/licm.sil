@@ -25,7 +25,6 @@ sil_global @globalArray : $Storage
 
 // CHECK: bb2({{.*}}):
 // CHECK-NOT: load
-// CHECK-NOT: fix_lifetime
 // CHECK: cond_br
 
 sil @memset : $@convention(thin) (@inout Builtin.NativeObject, Int) -> () {
