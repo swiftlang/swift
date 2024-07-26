@@ -231,9 +231,9 @@ struct SILOptOptions {
   EnableSILOpaqueValues = llvm::cl::opt<bool>("enable-sil-opaque-values",
                         llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
-  llvm::cl::opt<bool> EnableOSSACompleteLifetimes = llvm::cl::opt<bool>(
-      "enable-ossa-complete-lifetimes", llvm::cl::init(true),
-      llvm::cl::desc("Require linear OSSA lifetimes after SILGenCleanup."));
+  llvm::cl::opt<bool>
+  EnableOSSACompleteLifetimes = llvm::cl::opt<bool>("enable-ossa-complete-lifetimes",
+                        llvm::cl::desc("Require linear OSSA lifetimes after SILGenCleanup."));
   llvm::cl::opt<bool>
   EnableOSSAVerifyComplete = llvm::cl::opt<bool>("enable-ossa-verify-complete",
                         llvm::cl::desc("Verify linear OSSA lifetimes after SILGenCleanup."));
