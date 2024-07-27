@@ -5693,10 +5693,14 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     } else if (auto param = dyn_cast<GenericTypeParamType>(T.getPointer())) {
       if (param->isParameterPack())
         return false;
+      if (param->isValue())
+        return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
       if (isa<PackArchetypeType>(archetype))
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
+        return false;
+      if (archetype->getValueType())
         return false;
     }
     return T->hasSimpleTypeRepr();

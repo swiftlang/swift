@@ -4762,6 +4762,37 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     return ErrorType::get(result->getASTContext());
   }
 
+  // Diagnose an error if an IntegerType or GenericTypeParamType who is a value
+  // is being used as a type parameter instead of a value parameter.
+  //
+  // FIXME: This runs through every bound generic type, is there a better way
+  // of doing this or perhaps add a quicker check so that we aren't doing this
+  // for all types..?
+  if (auto generic = result->getAs<BoundGenericType>()) {
+    auto subs = generic->getContextSubstitutionMap();
+    auto replacements = subs.getReplacementTypes();
+    auto params = subs.getGenericSignature().getGenericParams();
+
+    for (auto p : llvm::zip(params, replacements)) {
+      auto param = std::get<0>(p);
+      auto replacement = std::get<1>(p);
+
+      if (replacement->is<IntegerType>() && !param->isValue()) {
+        result->getASTContext().Diags.diagnose(repr->getLoc(),
+          diag::value_type_used_in_type_parameter, replacement, param);
+        return ErrorType::get(result->getASTContext());
+      }
+
+      if (replacement->is<GenericTypeParamType>() &&
+          replacement->getAs<GenericTypeParamType>()->isValue() &&
+          !param->isValue()) {
+        result->getASTContext().Diags.diagnose(repr->getLoc(),
+          diag::value_type_used_in_type_parameter, replacement, param);
+        return ErrorType::get(result->getASTContext());
+      }
+    }
+  }
+
   if (auto moduleTy = result->getAs<ModuleType>()) {
     // Allow module types only if flag is specified.
     if (options.contains(TypeResolutionFlags::AllowModule))

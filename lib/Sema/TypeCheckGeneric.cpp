@@ -964,11 +964,11 @@ void TypeChecker::diagnoseRequirementFailure(
 
   case RequirementKind::Value:
     if (substReq.getFirstType()->is<IntegerType>()) {
-      diagnostic = diag::invalid_value_variable_generic;
-      diagnosticNote = diag::invalid_value_variable_generic_requirement;
+      diagnostic = diag::invalid_value_value_generic;
+      diagnosticNote = diag::invalid_value_value_generic_requirement;
     } else {
       diagnostic = diag::cannot_pass_type_for_value_generic;
-      diagnosticNote = diag::invalid_value_variable_generic_requirement;
+      diagnosticNote = diag::invalid_value_value_generic_requirement;
     }
 
     break;

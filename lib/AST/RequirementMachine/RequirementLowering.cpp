@@ -337,6 +337,12 @@ static void desugarConformanceRequirement(
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (req.getFirstType()->isTypeParameter()) {
+      // Value generic types cannot conform to protocols.
+      if (req.getFirstType()->getAs<GenericTypeParamType>()->isValue()) {
+        errors.push_back(RequirementError::forInvalidValueGenericConformance(req, loc));
+        return;
+      }
+
       result.push_back(req);
       return;
     }
@@ -419,6 +425,12 @@ static void desugarValueRequirement(Requirement req, SourceLoc loc,
                                     SmallVectorImpl<Requirement> &result,
                                     SmallVectorImpl<InverseRequirement> &inverses,
                                     SmallVectorImpl<RequirementError> &errors) {
+
+  if (!req.getSecondType()->isLegalValueGenericType()) {
+    errors.push_back(RequirementError::forInvalidValueGenericType(req, loc));
+    return;
+  }
+
   if (req.getFirstType()->isTypeParameter()) {
     result.push_back(req);
     return;
@@ -531,9 +543,7 @@ static void realizeTypeRequirement(TypeDecl *decl, DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
-  } else if (gpDecl &&
-             gpDecl->isValue() &&
-             constraintType->isLegalValueGenericType()) {
+  } else if (gpDecl && gpDecl->isValue()) {
     result.push_back({Requirement(RequirementKind::Value,
                                 subjectType, constraintType),
                       loc});
@@ -688,6 +698,10 @@ struct InferRequirementsWalker : public TypeWalker {
     for (const auto &rawReq : genericSig.getRequirements()) {
       if (skipRequirement(rawReq, decl))
         continue;
+
+      if (rawReq.getKind() == RequirementKind::Value) {
+        continue;
+      }
 
       reqs.push_back({rawReq.subst(subMap), SourceLoc()});
     }
