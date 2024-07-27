@@ -67,3 +67,11 @@ func testTopLevelTypes() {
   _ = EnumInB_package.self // expected-error{{cannot find 'EnumInB_package' in scope}}
   _ = EnumInC.self
 }
+
+class DerivedFromClassInC: DerivedClassInC {
+  override func methodInA() {}
+  override func methodInB() {} // expected-member-visibility-error{{method does not override any method from its superclass}}
+  override func methodInC() {}
+}
+
+struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}}

@@ -27,3 +27,11 @@ public enum EnumInB {
 package enum EnumInB_package {
   case caseInB
 }
+
+open class DerivedClassInB: BaseClassInA {
+  open func methodInB() {}
+}
+
+extension ProtocolInA {
+  public func defaultedRequirementInB() { }
+}
