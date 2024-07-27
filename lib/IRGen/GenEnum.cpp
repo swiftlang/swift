@@ -1699,7 +1699,7 @@ namespace {
             projectedBits = IGF.Builder.CreateElementBitCast(projectedBits, IGM.Int8Ty);
           }
           extraTag = IGF.Builder.CreateLoad(projectedBits);
-          auto maskBits = llvm::PowerOf2Ceil(NumExtraTagValues) - 1;
+          auto maskBits = (1 << ExtraTagBitCount) - 1;
           auto mask = llvm::ConstantInt::get(extraTag->getType(), maskBits);
           extraTag = IGF.Builder.CreateAnd(extraTag, mask);
         } else {
