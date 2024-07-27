@@ -316,6 +316,10 @@ bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
 }
 
+bool BridgedType::isVoid() const {
+  return unbridged().isVoid();
+}
+
 bool BridgedType::isEmpty(BridgedFunction f) const {
   return unbridged().isEmpty(*f.getFunction());
 }
