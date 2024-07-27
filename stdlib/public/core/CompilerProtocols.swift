@@ -117,7 +117,7 @@ public protocol RawRepresentable<RawValue> {
   ///     }
   ///
   ///     print(PaperSize(rawValue: "Legal"))
-  ///     // Prints "Optional("PaperSize.Legal")"
+  ///     // Prints "Optional(PaperSize.Legal)"
   ///
   ///     print(PaperSize(rawValue: "Tabloid"))
   ///     // Prints "nil"
@@ -658,7 +658,7 @@ public protocol ExpressibleByArrayLiteral {
 ///
 ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana",
 ///                         "JP": "Japan", "US": "United States"]
-///     // 'countryCodes' has type [String: String]
+///     // 'countryCodes' has type '[String: String]'
 ///
 ///     print(countryCodes["BR"]!)
 ///     // Prints "Brazil"
