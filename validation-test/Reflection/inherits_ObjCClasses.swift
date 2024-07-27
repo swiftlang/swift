@@ -10,6 +10,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: asan
 
 import simd
 import ObjCClasses
