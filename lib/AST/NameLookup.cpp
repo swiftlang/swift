@@ -2292,46 +2292,15 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
                            ObjCCategoryNameMap());
 }
 
-static bool missingExplicitImportForMemberDecl(const DeclContext *dc,
-                                               ValueDecl *decl) {
+static bool missingImportForMemberDecl(const DeclContext *dc, ValueDecl *decl) {
   // Only require explicit imports for members when MemberImportVisibility is
   // enabled.
-  if (!dc->getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility))
+  auto &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
     return false;
 
-  // If the decl is in the same module, no import is required.
   auto declModule = decl->getDeclContext()->getParentModule();
-  if (declModule == dc->getParentModule())
-    return false;
-
-  // Source files are not expected to contain an import for the clang header
-  // module.
-  if (auto *loader = dc->getASTContext().getClangModuleLoader()) {
-    if (declModule == loader->getImportedHeaderModule())
-      return false;
-  }
-
-  // Only require an import in the context of user authored source file.
-  auto sf = dc->getParentSourceFile();
-  if (!sf)
-    return false;
-
-  switch (sf->Kind) {
-  case SourceFileKind::SIL:
-  case SourceFileKind::Interface:
-  case SourceFileKind::MacroExpansion:
-  case SourceFileKind::DefaultArgument:
-    return false;
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-    break;
-  }
-
-  // If we've found an import, we're done.
-  if (decl->findImport(dc))
-    return false;
-
-  return true;
+  return !ctx.getImportCache().isImportedBy(declModule, dc);
 }
 
 /// Determine whether the given declaration is an acceptable lookup
@@ -2368,7 +2337,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   // Check that there is some import in the originating context that makes this
   // decl visible.
   if (!(options & NL_IgnoreMissingImports)) {
-    if (missingExplicitImportForMemberDecl(dc, decl))
+    if (missingImportForMemberDecl(dc, decl))
       return false;
   }
 
