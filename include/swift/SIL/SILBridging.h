@@ -405,6 +405,7 @@ struct BridgedType {
   BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isThickFunction() const;
   BRIDGED_INLINE bool isAsyncFunction() const;
+  BRIDGED_INLINE bool isVoid() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   BRIDGED_INLINE bool isMoveOnly() const;

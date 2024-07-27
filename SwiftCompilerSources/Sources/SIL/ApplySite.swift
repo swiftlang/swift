@@ -301,7 +301,7 @@ extension FullApplySite {
       beginApply.yieldedValues.forEach { values.push($0) }
     } else {
       let result = singleDirectResult!
-      if !result.type.isEmpty(in: parentFunction) {
+      if !result.type.isVoid {
         values.push(result)
       }
     }
