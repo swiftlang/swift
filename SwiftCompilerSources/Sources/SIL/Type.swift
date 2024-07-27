@@ -95,6 +95,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     bridged.isExactSuperclassOf(type.bridged)
   }
 
+  public var isVoid: Bool {
+    bridged.isVoid()
+  }
+
   public func isEmpty(in function: Function) -> Bool {
     bridged.isEmpty(function.bridged)
   }
