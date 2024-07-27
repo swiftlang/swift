@@ -9,6 +9,7 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: asan
 
 import Swift
 import _Concurrency
