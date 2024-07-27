@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,14 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
-
-@inlinable @_transparent
-internal func unimplemented_utf8_32bit(
-  _ message: String = "",
-  file: StaticString = #file, line: UInt = #line
-) -> Never {
-  fatalError("32-bit: Unimplemented for UTF-8 support", file: file, line: line)
-}
 
 /// A Unicode string value that is a collection of characters.
 ///
