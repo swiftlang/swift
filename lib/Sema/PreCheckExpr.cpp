@@ -484,10 +484,26 @@ diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
 /// for the lookup.
 Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                       DeclContext *DC) {
-  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
+  auto &Context = DC->getASTContext();
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
+  auto errorResult = [&]() -> Expr * {
+    return new (Context) ErrorExpr(UDRE->getSourceRange());
+  };
+
+  TypeChecker::checkForForbiddenPrefix(Context, Name.getBaseName());
+
+  // Try and recover if we have an unqualified 'init'.
+  if (Name.getBaseName().isConstructor()) {
+    auto *recoveryExpr = diagnoseUnqualifiedInit(UDRE, DC, Context);
+    if (!recoveryExpr)
+      return errorResult();
+
+    return recoveryExpr;
+  }
+
+  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclNameRef LookupName = Name;
   if (Name.isCompoundName()) {
     auto &context = DC->getASTContext();
@@ -506,12 +522,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     DeclName lookupName(context, Name.getBaseName(), lookupLabels);
     LookupName = DeclNameRef(lookupName);
   }
-
-  auto &Context = DC->getASTContext();
-
-  auto errorResult = [&]() -> Expr * {
-    return new (Context) ErrorExpr(UDRE->getSourceRange());
-  };
 
   // Perform standard value name lookup.
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -1208,38 +1218,8 @@ namespace {
         return finish(true, expr);
       }
 
-      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        TypeChecker::checkForForbiddenPrefix(
-            getASTContext(), unresolved->getName().getBaseName());
-
-        if (unresolved->getName().getBaseName().isConstructor()) {
-          if (auto *recoveryExpr =
-                  diagnoseUnqualifiedInit(unresolved, DC, Ctx)) {
-            return finish(true, recoveryExpr);
-          }
-
-          return finish(false,
-                        new (Ctx) ErrorExpr(unresolved->getSourceRange()));
-        }
-
-        auto *refExpr = TypeChecker::resolveDeclRefExpr(unresolved, DC);
-
-        // Check whether this is standalone `self` in init accessor, which
-        // is invalid.
-        if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
-          if (accessor->isInitAccessor() && isa<DeclRefExpr>(refExpr)) {
-            auto *DRE = cast<DeclRefExpr>(refExpr);
-            if (accessor->getImplicitSelfDecl() == DRE->getDecl() &&
-                !isa_and_nonnull<UnresolvedDotExpr>(Parent.getAsExpr())) {
-              diags.diagnose(unresolved->getLoc(),
-                             diag::invalid_use_of_self_in_init_accessor);
-              refExpr = new (Ctx) ErrorExpr(unresolved->getSourceRange());
-            }
-          }
-        }
-
-        return finish(true, refExpr);
-      }
+      if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
+        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
 
       // Let's try to figure out if `InOutExpr` is out of place early
       // otherwise there is a risk of producing solutions which can't
@@ -1328,7 +1308,21 @@ namespace {
         if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
           return Action::Continue(typeExpr);
       }
-      
+
+      // Check whether this is standalone `self` in init accessor, which
+      // is invalid.
+      if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+        if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
+          if (accessor->isInitAccessor() &&
+              accessor->getImplicitSelfDecl() == DRE->getDecl() &&
+              !isa_and_nonnull<UnresolvedDotExpr>(Parent.getAsExpr())) {
+            Ctx.Diags.diagnose(DRE->getLoc(),
+                               diag::invalid_use_of_self_in_init_accessor);
+            return Action::Continue(new (Ctx) ErrorExpr(DRE->getSourceRange()));
+          }
+        }
+      }
+
       // If we're about to step out of a ClosureExpr, restore the DeclContext.
       if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
         assert(DC == ce && "DeclContext imbalance");
