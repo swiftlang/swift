@@ -118,7 +118,7 @@ struct SmallVectorOf3<T>: ~Copyable {}
 // flags: alignment 0, incomplete
 // CHECK-SAME:  , <i32 0x400000>
 @_rawLayout(likeArrayOf: T, count: N)
-struct Vector<T, let N: UInt>: ~Copyable {}
+struct Vector<T, let N: Int>: ~Copyable {}
 
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}8UsesCellVWV" = {{.*}} %swift.vwtable
 // size
