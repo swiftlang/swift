@@ -2003,12 +2003,12 @@ public:
     : Value(value) {}
 
   constexpr GenericContextDescriptorFlags(
-      bool hasTypePacks, bool hasConditionalInvertedProtocols
+      bool hasTypePacks, bool hasConditionalInvertedProtocols, bool hasValues
   ) : GenericContextDescriptorFlags(
         GenericContextDescriptorFlags((uint16_t)0)
           .withHasTypePacks(hasTypePacks)
-          .withConditionalInvertedProtocols(
-            hasConditionalInvertedProtocols)) {}
+          .withConditionalInvertedProtocols(hasConditionalInvertedProtocols)
+          .withHasValues(hasValues)) {}
 
   /// Whether this generic context has at least one type parameter
   /// pack, in which case the generic context will have a trailing
@@ -2024,6 +2024,12 @@ public:
     return (Value & 0x2) != 0;
   }
 
+  /// Whether this generic context has at least one value parameter, in which
+  /// case the generic context will have a trailing GenericValueHeader.
+  constexpr bool hasValues() const {
+    return (Value & 0x4) != 0;
+  }
+
   constexpr GenericContextDescriptorFlags
   withHasTypePacks(bool hasTypePacks) const {
     return GenericContextDescriptorFlags((uint16_t)(
@@ -2034,6 +2040,12 @@ public:
   withConditionalInvertedProtocols(bool value) const {
     return GenericContextDescriptorFlags((uint16_t)(
       (Value & ~0x2) | (value ? 0x2 : 0)));
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withHasValues(bool hasValues) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x4) | (hasValues ? 0x4 : 0)));
   }
 
   constexpr uint16_t getIntValue() const {
@@ -2141,8 +2153,6 @@ enum class GenericRequirementKind : uint8_t {
   /// This is more of an "anti-requirement", specifing which checks don't need
   /// to happen for a given type.
   InvertedProtocols = 5,
-  /// A value requirement.
-  Value = 6,
   /// A layout requirement.
   Layout = 0x1F,
 };
@@ -2156,16 +2166,14 @@ class GenericRequirementFlags {
 public:
   constexpr GenericRequirementFlags(GenericRequirementKind kind,
                                     bool hasKeyArgument,
-                                    bool isPackRequirement)
+                                    bool isPackRequirement,
+                                    bool isValueRequirement)
     : GenericRequirementFlags(GenericRequirementFlags(0)
                          .withKind(kind)
                          .withKeyArgument(hasKeyArgument)
-                         .withPackRequirement(isPackRequirement))
+                         .withPackRequirement(isPackRequirement)
+                         .withValueRequirement(isValueRequirement))
   {}
-
-  constexpr bool hasKeyArgument() const {
-    return (Value & 0x80u) != 0;
-  }
 
   /// If this is true, the subject type of the requirement is a pack.
   /// When the requirement is a conformance requirement, the corresponding
@@ -2174,14 +2182,27 @@ public:
     return (Value & 0x20u) != 0;
   }
 
+  constexpr bool hasKeyArgument() const {
+    return (Value & 0x80u) != 0;
+  }
+
+  /// If this is true, the subject type of the requirement is a value.
+  ///
+  /// Note: We could introduce a new SameValue requirement instead of burning a
+  /// a bit for value requirements, but if somehow an existing requirement makes
+  /// sense for values besides "SameType" then this would've been better.
+  constexpr bool isValueRequirement() const {
+    return (Value & 0x100u) != 0;
+  }
+
   constexpr GenericRequirementKind getKind() const {
     return GenericRequirementKind(Value & 0x1Fu);
   }
 
   constexpr GenericRequirementFlags
-  withKeyArgument(bool hasKeyArgument) const {
-    return GenericRequirementFlags((Value & 0x7Fu)
-      | (hasKeyArgument ? 0x80u : 0));
+  withKind(GenericRequirementKind kind) const {
+    return assert((uint8_t(kind) & 0x1Fu) == uint8_t(kind)),
+      GenericRequirementFlags((Value & 0xE0u) | uint8_t(kind));
   }
 
   constexpr GenericRequirementFlags
@@ -2191,9 +2212,15 @@ public:
   }
 
   constexpr GenericRequirementFlags
-  withKind(GenericRequirementKind kind) const {
-    return assert((uint8_t(kind) & 0x1Fu) == uint8_t(kind)),
-      GenericRequirementFlags((Value & 0xE0u) | uint8_t(kind));
+  withKeyArgument(bool hasKeyArgument) const {
+    return GenericRequirementFlags((Value & 0x7Fu)
+      | (hasKeyArgument ? 0x80u : 0));
+  }
+
+  constexpr GenericRequirementFlags
+  withValueRequirement(bool isValueRequirement) const {
+    return GenericRequirementFlags((Value & 0xFFu)
+      | (isValueRequirement ? 0x100u : 0));
   }
 
   constexpr uint32_t getIntValue() const {
@@ -2209,6 +2236,10 @@ enum class GenericRequirementLayoutKind : uint32_t {
 enum class GenericPackKind : uint16_t {
   Metadata = 0,
   WitnessTable = 1
+};
+
+enum class GenericValueType : uint32_t {
+  Int = 0,
 };
 
 class GenericEnvironmentFlags {

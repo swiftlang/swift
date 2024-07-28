@@ -4057,6 +4057,7 @@ namespace {
     unsigned numShapes = 0;
     unsigned numTypeMetadataPtrs = 0;
     unsigned numWitnessTablePtrs = 0;
+    unsigned numValues = 0;
 
   public:
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
@@ -4087,12 +4088,13 @@ namespace {
           ++numWitnessTablePtrs;
           break;
         case GenericRequirement::Kind::Value:
-          llvm_unreachable("implement me");
+          ++numValues;
+          break;
         }
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
              "missing type source for type");
-      return {numShapes, numTypeMetadataPtrs, numWitnessTablePtrs};
+      return {numShapes, numTypeMetadataPtrs, numWitnessTablePtrs, numValues};
     }
 
   private:

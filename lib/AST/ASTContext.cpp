@@ -3475,8 +3475,10 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
   if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos))
     return intType;
 
+  auto strCopy = ctx.AllocateCopy(value);
+
   auto intType = new (ctx, AllocationArena::Permanent)
-      IntegerType(value, isNegative, ctx);
+      IntegerType(strCopy, isNegative, ctx);
 
   ctx.getImpl().IntegerTypes.InsertNode(intType, insertPos);
   return intType;

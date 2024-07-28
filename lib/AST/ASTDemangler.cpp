@@ -1040,8 +1040,12 @@ Type ASTBuilder::createParenType(Type base) {
   return ParenType::get(Ctx, base);
 }
 
-Type ASTBuilder::createIntegerType(unsigned value, bool isNegative) {
-  return IntegerType::get(std::to_string(value), isNegative, Ctx);
+Type ASTBuilder::createIntegerType(size_t value) {
+  return IntegerType::get(std::to_string(value), /*isNegative*/ false, Ctx);
+}
+
+Type ASTBuilder::createNegativeIntegerType(size_t value) {
+  return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
 }
 
 GenericSignature

@@ -255,7 +255,6 @@ public:
     case GenericRequirementKind::SameType:
     case GenericRequirementKind::SameShape:
     case GenericRequirementKind::InvertedProtocols:
-    case GenericRequirementKind::Value:
       return true;
     }
 
@@ -327,6 +326,18 @@ struct ConditionalInvertibleProtocolSet: InvertibleProtocolSet {
 template<typename Runtime>
 struct TargetConditionalInvertibleProtocolRequirement: TargetGenericRequirementDescriptor<Runtime> { };
 
+struct GenericValueHeader {
+  /// The total number of generic parameters in this signature where
+  /// getKind() == GenericParamKind::Value.
+  uint32_t NumValues;
+};
+
+/// The GenericValueHeader is followed by an array of these descriptors,
+/// whose length is given by the header's NumValues field.
+struct GenericValueDescriptor {
+  GenericValueType Type;
+};
+
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
 /// the most common case.  Some generic context storage can
@@ -364,20 +375,26 @@ class RuntimeGenericSignature {
   const TargetGenericRequirementDescriptor<Runtime> *Requirements;
   GenericPackShapeHeader PackShapeHeader;
   const GenericPackShapeDescriptor *PackShapeDescriptors;
+  GenericValueHeader ValueHeader;
+  const GenericValueDescriptor *ValueDescriptors;
 
 public:
   RuntimeGenericSignature()
-    : Header{0, 0, 0, GenericContextDescriptorFlags(false, false)},
+    : Header{0, 0, 0, GenericContextDescriptorFlags(false, false, false)},
       Params(nullptr), Requirements(nullptr),
-      PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr) {}
+      PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr), ValueHeader{0},
+      ValueDescriptors(nullptr) {}
 
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
                           const GenericParamDescriptor *params,
                           const TargetGenericRequirementDescriptor<Runtime> *requirements,
                           const GenericPackShapeHeader &packShapeHeader,
-                          const GenericPackShapeDescriptor *packShapeDescriptors)
+                          const GenericPackShapeDescriptor *packShapeDescriptors,
+                          const GenericValueHeader &valueHeader,
+                          const GenericValueDescriptor *valueDescriptors)
     : Header(header), Params(params), Requirements(requirements),
-      PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors) {}
+      PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors),
+      ValueHeader(valueHeader), ValueDescriptors(valueDescriptors) {}
 
   llvm::ArrayRef<GenericParamDescriptor> getParams() const {
     return llvm::ArrayRef(Params, Header.NumParams);
@@ -393,6 +410,14 @@ public:
 
   llvm::ArrayRef<GenericPackShapeDescriptor> getGenericPackShapeDescriptors() const {
     return llvm::ArrayRef(PackShapeDescriptors, PackShapeHeader.NumPacks);
+  }
+
+  const GenericValueHeader &getGenericValueHeader() const {
+    return ValueHeader;
+  }
+
+  llvm::ArrayRef<GenericValueDescriptor> getGenericValueDescriptors() const {
+    return llvm::ArrayRef(ValueDescriptors, ValueHeader.NumValues);
   }
 
   size_t getArgumentLayoutSizeInWords() const {
@@ -490,6 +515,8 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       ConditionalInvertibleProtocolSet,
       ConditionalInvertibleProtocolsRequirementCount,
       TargetConditionalInvertibleProtocolRequirement<Runtime>,
+      GenericValueHeader,
+      GenericValueDescriptor,
       FollowingTrailingObjects...>
 {
 protected:
@@ -508,6 +535,8 @@ protected:
     ConditionalInvertibleProtocolSet,
     ConditionalInvertibleProtocolsRequirementCount,
     GenericConditionalInvertibleProtocolRequirement,
+    GenericValueHeader,
+    GenericValueDescriptor,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -656,13 +685,33 @@ public:
             header.NumPacks};
   }
 
+  GenericValueHeader getGenericValueHeader() const {
+    if (!asSelf()->isGeneric())
+      return {0};
+    if (!getGenericContextHeader().Flags.hasValues())
+      return {0};
+    return *this->template getTrailingObjects<GenericValueHeader>();
+  }
+
+  llvm::ArrayRef<GenericValueDescriptor> getGenericValueDescriptors() const {
+    auto header = getGenericValueHeader();
+
+    if (header.NumValues == 0)
+      return {};
+
+    return {this->template getTrailingObjects<GenericValueDescriptor>(),
+            header.NumValues};
+  }
+
   RuntimeGenericSignature<Runtime> getGenericSignature() const {
     if (!asSelf()->isGeneric()) return RuntimeGenericSignature<Runtime>();
     return {getGenericContextHeader(),
             getGenericParams().data(),
             getGenericRequirements().data(),
             getGenericPackShapeHeader(),
-            getGenericPackShapeDescriptors().data()};
+            getGenericPackShapeDescriptors().data(),
+            getGenericValueHeader(),
+            getGenericValueDescriptors().data()};
   }
 
 protected:
@@ -719,6 +768,23 @@ protected:
   ) const {
     auto counts = getConditionalInvertibleProtocolRequirementCounts();
     return counts.empty() ? 0 : counts.back().count;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericValueHeader>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    return getGenericContextHeader().Flags.hasValues() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericValueDescriptor>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    if (!getGenericContextHeader().Flags.hasValues())
+      return 0;
+
+    return getGenericValueHeader().NumValues;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

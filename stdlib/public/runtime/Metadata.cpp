@@ -7185,6 +7185,10 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
         break;
       }
 
+      case GenericParamKind::Value: {
+        break;
+      }
+
       default:
         llvm_unreachable("Unsupported generic parameter kind");
       }

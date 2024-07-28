@@ -1527,18 +1527,11 @@ protected:
     }
 
     case NodeKind::Integer: {
-      if (Node->getNumChildren() == 0) {
-        // Non-negative number.
-        return Builder.createIntegerType(Node->getIndex(), /*isNegative*/ false);
-      }
+      return Builder.createIntegerType((size_t)Node->getIndex());
+    }
 
-      auto prefix = Node->getFirstChild();
-
-      if (prefix->getKind() != NodeKind::PrefixOperator) {
-        return MAKE_NODE_TYPE_ERROR0(Node, "unexpected child");
-      }
-
-      return Builder.createIntegerType(Node->getIndex(), /*isNegative*/ true);
+    case NodeKind::NegativeInteger: {
+      return Builder.createNegativeIntegerType((size_t)Node->getIndex());
     }
 
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing

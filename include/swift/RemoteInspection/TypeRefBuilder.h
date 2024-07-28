@@ -917,7 +917,7 @@ public:
     return nullptr;
   }
 
-  const TypeRef *createIntegerType(unsigned value) {
+  const TypeRef *createIntegerType(unsigned value, bool isNegative) {
     return nullptr;
   }
 

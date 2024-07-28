@@ -3966,13 +3966,13 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
 }
 
 ManglingError Remangler::mangleInteger(Node *node, unsigned int depth) {
-  Buffer << "$";
+  Buffer << "$" << node->getIndex();
 
-  if (node->getNumChildren() == 2) {
-    Buffer << "n";
-  }
+  return ManglingError::Success;
+}
 
-  Buffer << node->getChild(0)->getIndex();
+ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned int depth) {
+  Buffer << "$n" << node->getIndex();
 
   return ManglingError::Success;
 }

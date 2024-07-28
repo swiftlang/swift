@@ -330,6 +330,7 @@ private:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
     case Node::Kind::Integer:
+    case Node::Kind::NegativeInteger:
       return true;
 
     case Node::Kind::Type:
@@ -3395,6 +3396,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::Integer:
     Printer << Node->getIndex();
     return nullptr;
+  case Node::Kind::NegativeInteger: {
+    auto signedValue = (ssize_t)Node->getIndex();
+
+    Printer << signedValue;
+    return nullptr;
+  }
   case Node::Kind::DependentGenericValueRequirement: {
     NodePointer type = Node->getChild(0);
     NodePointer reqt = Node->getChild(1);

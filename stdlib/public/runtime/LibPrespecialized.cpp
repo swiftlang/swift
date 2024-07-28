@@ -314,8 +314,8 @@ struct LibPrespecializedState {
 
 static Lazy<LibPrespecializedState> LibPrespecialized;
 
-// Returns true if the type has any arguments that aren't plain types (packs or
-// unknown kinds).
+// Returns true if the type has any arguments that aren't plain types (packs,
+// values, or unknown kinds).
 static bool
 hasNonTypeGenericArguments(const TargetGenericContext<InProcess> *generics) {
   for (auto param : generics->getGenericParams())

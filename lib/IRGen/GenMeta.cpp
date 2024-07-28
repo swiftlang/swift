@@ -428,6 +428,7 @@ namespace {
     SmallVector<CanType, 2> ShapeClasses;
     SmallVector<GenericPackArgument, 2> GenericPackArguments;
     InvertibleProtocolSet ConditionalInvertedProtocols;
+    SmallVector<GenericValueArgument, 2> GenericValueArguments;
 
     GenericSignatureHeaderBuilder(IRGenModule &IGM,
                                   ConstantStructBuilder &builder)
@@ -450,6 +451,10 @@ namespace {
       }
 
       NumGenericKeyArguments += info.NumGenericKeyArguments;
+
+      for (auto value : info.GenericValueArguments) {
+        GenericValueArguments.push_back(value);
+      }
     }
 
     void finish(IRGenModule &IGM, ConstantStructBuilder &b) {
@@ -470,8 +475,9 @@ namespace {
       bool hasTypePacks = !GenericPackArguments.empty();
       bool hasConditionalInvertedProtocols =
           !ConditionalInvertedProtocols.empty();
+      bool hasValues = !GenericValueArguments.empty();
       GenericContextDescriptorFlags flags(
-          hasTypePacks, hasConditionalInvertedProtocols);
+          hasTypePacks, hasConditionalInvertedProtocols, hasValues);
       b.fillPlaceholderWithInt(FlagsPP, IGM.Int16Ty,
                                flags.getIntValue());
     }
@@ -527,6 +533,7 @@ namespace {
       asImpl().addGenericRequirements();
       asImpl().addGenericPackShapeDescriptors();
       asImpl().addConditionalInvertedProtocols();
+      asImpl().addGenericValueDescriptors();
       asImpl().finishGenericParameters();
     }
     
@@ -600,6 +607,20 @@ namespace {
 
       // Emit each GenericPackShapeDescriptor collected previously.
       irgen::addGenericPackShapeDescriptors(IGM, B, shapes, packArgs);
+    }
+
+    void addGenericValueDescriptors() {
+      auto values = SignatureHeader->GenericValueArguments;
+
+      // If we don't have any value arguments, there is nothing to emit.
+      if (values.empty())
+        return;
+
+      // NumValues
+      B.addInt(IGM.Int32Ty, values.size());
+
+      // Emit each GenericValueDescriptor collected previously.
+      irgen::addGenericValueDescriptors(IGM, B, values);
     }
 
     /// Retrieve the set of protocols that are suppressed in this context.
@@ -7095,6 +7116,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
   for (auto &requirement : requirements) {
     auto kind = requirement.getKind();
     bool isPackRequirement = requirement.getFirstType()->isParameterPack();
+    bool isValueRequirement = requirement.getFirstType()->isValueParameter();
 
     GenericRequirementKind abiKind;
     switch (kind) {
@@ -7114,7 +7136,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       abiKind = GenericRequirementKind::Layout;
       break;
     case RequirementKind::Value:
-      abiKind = GenericRequirementKind::Value;
+      // Value requirements don't introduce requirements in the runtime generic
+      // signature. We set them up in the value header and descriptors.
       break;
     }
 
@@ -7128,7 +7151,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
         // Encode the class constraint.
         auto flags = GenericRequirementFlags(abiKind,
                                              /*key argument*/ false,
-                                             isPackRequirement);
+                                             isPackRequirement,
+                                             isValueRequirement);
         addGenericRequirement(IGM, B, metadata, sig, flags,
                               requirement.getFirstType(),
          [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
@@ -7154,8 +7178,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
 
         auto flags = GenericRequirementFlags(
             GenericRequirementKind::InvertedProtocols,
-            /*key argument*/ false,
-            /* is parameter pack */false);
+            /* key argument */ false,
+            /* is parameter pack */ false,
+            /* isValue */ false);
         addGenericRequirement(IGM, B, metadata, sig, flags,
                               requirement.getFirstType(),
          [&]{
@@ -7175,7 +7200,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(abiKind,
                                            /*key argument*/needsWitnessTable,
-                                           isPackRequirement);
+                                           isPackRequirement,
+                                           isValueRequirement);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,
@@ -7199,7 +7225,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind,
                                            /*key argument*/false,
-                                           isPackRequirement);
+                                           isPackRequirement,
+                                           isValueRequirement);
       auto typeName =
           IGM.getTypeRef(requirement.getSecondType(), nullptr,
                          MangledTypeRefRole::Metadata).first;
@@ -7215,16 +7242,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     }
 
     case RequirementKind::Value: {
-      ++metadata.NumRequirements;
-
-      auto flags = GenericRequirementFlags(abiKind,
-                                           /*key argument*/ false,
-                                           /*is pack*/ false);
-
-      addGenericRequirement(IGM, B, metadata, sig, flags,
-                            requirement.getFirstType(), [&]{
-        B.addInt32(0); // FIXME ALEX
-      });
+      metadata.GenericValueArguments.push_back(
+          GenericValueArgument(requirement.getSecondType()->getCanonicalType()));
       break;
     }
     }
@@ -7260,7 +7279,8 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     auto flags = GenericRequirementFlags(
         GenericRequirementKind::InvertedProtocols,
         /*key argument*/ false,
-        genericParam->isParameterPack());
+        genericParam->isParameterPack(),
+        genericParam->isValue());
     addGenericRequirement(IGM, B, metadata, sig, flags,
                           Type(genericParam),
      [&]{ 
@@ -7292,6 +7312,29 @@ void irgen::addGenericPackShapeDescriptors(IRGenModule &IGM,
 
     // Unused
     B.addInt(IGM.Int16Ty, 0);
+  }
+}
+
+void irgen::addGenericValueDescriptors(IRGenModule &IGM,
+                                       ConstantStructBuilder &B,
+                                       ArrayRef<GenericValueArgument> values) {
+  for (auto value : values) {
+    auto valueType = 0;
+
+    if (value.Type->isInt()) {
+      valueType = 0;
+    } else {
+      llvm_unreachable("Unknown generic value value type?");
+    }
+
+    // TODO: Maybe this should be a relative pointer to the type that this value
+    // is? For the full generality of user defined value types. If we wanted to
+    // keep reserving this for just standard library types, then appending a kind
+    // here makes the most sense because we don't need to chase standard library
+    // type metadata at runtime.
+
+    // Value type
+    B.addInt(IGM.Int32Ty, valueType);
   }
 }
 

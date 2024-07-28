@@ -3060,6 +3060,10 @@ ManglingError Remangler::mangleInteger(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleDependentGenericValueRequirement(Node *node,
                                                                unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);

@@ -338,7 +338,7 @@ static void desugarConformanceRequirement(
   if (constraintType->is<ProtocolType>()) {
     if (req.getFirstType()->isTypeParameter()) {
       // Value generic types cannot conform to protocols.
-      if (req.getFirstType()->getAs<GenericTypeParamType>()->isValue()) {
+      if (req.getFirstType()->getRootGenericParam()->isValue()) {
         errors.push_back(RequirementError::forInvalidValueGenericConformance(req, loc));
         return;
       }

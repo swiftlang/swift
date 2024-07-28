@@ -4409,26 +4409,18 @@ NodePointer Demangler::demangleMacroExpansion() {
 }
 
 NodePointer Demangler::demangleIntegerType() {
-  NodePointer negative = nullptr;
-  NodePointer number = nullptr;
+  NodePointer integer = nullptr;
 
   switch (peekChar()) {
   case 'n':
     nextChar();
-    negative = createNode(Node::Kind::PrefixOperator);
-    number = createNode(Node::Kind::Number, demangleNatural());
+    integer = createNode(Node::Kind::NegativeInteger, demangleNatural());
     break;
 
   default:
-    number = createNode(Node::Kind::Number, demangleNatural());
+    integer = createNode(Node::Kind::Integer, demangleNatural());
     break;
   }
 
-  auto value = createWithChild(Node::Kind::Integer, number);
-
-  if (negative) {
-    value->addChild(negative, *this);
-  }
-
-  return createType(value);
+  return createType(integer);
 }

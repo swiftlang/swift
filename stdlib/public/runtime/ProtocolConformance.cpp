@@ -1463,10 +1463,6 @@ checkGenericRequirement(
     suppressed[index] |= req.getInvertedProtocols();
     return std::nullopt;
   }
-
-  case GenericRequirementKind::Value: {
-    return std::nullopt; // FIXME
-  }
   }
 
   // Unknown generic requirement kind.
@@ -1645,15 +1641,21 @@ checkGenericPackRequirement(
     suppressed[index] |= req.getInvertedProtocols();
     return std::nullopt;
   }
-
-  case GenericRequirementKind::Value: {
-    return std::nullopt; // FIXME
-  }
   }
 
   // Unknown generic requirement kind.
   return TYPE_LOOKUP_ERROR_FMT("unknown generic requirement kind %u",
                                (unsigned)req.getKind());
+}
+
+static std::optional<TypeLookupError>
+checkGenericValueRequirement(const GenericRequirementDescriptor &req,
+                             llvm::SmallVectorImpl<const void *> &extraArguments,
+                             SubstGenericParameterFn substGenericParam,
+                             SubstDependentWitnessTableFn substWitnessTable,
+                     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
+  // FIXME: implement
+  return std::nullopt;
 }
 
 static std::optional<TypeLookupError>
@@ -1882,6 +1884,13 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
                                                allSuppressed);
       if (error)
         return error;
+    } else if (req.getFlags().isValueRequirement()) {
+      auto error = checkGenericValueRequirement(req, extraArguments,
+                                                substGenericParam,
+                                                substWitnessTable,
+                                                allSuppressed);
+      if (error)
+        return error;
     } else {
       auto error = checkGenericRequirement(req, extraArguments,
                                            substGenericParam,
@@ -1905,15 +1914,15 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     if (index < allSuppressed.size())
       suppressed = allSuppressed[index];
 
-    MetadataOrPack metadataOrPack(substGenericParamOrdinal(index, keyIndex));
+    MetadataPackOrValue MetadataPackOrValue(substGenericParamOrdinal(index, keyIndex));
     switch (genericParams[index].getKind()) {
     case GenericParamKind::Type: {
-      if (!metadataOrPack || metadataOrPack.isMetadataPack()) {
+      if (!MetadataPackOrValue || MetadataPackOrValue.isMetadataPack()) {
         return TYPE_LOOKUP_ERROR_FMT(
             "unexpected pack for generic parameter %u", index);
       }
 
-      auto metadata = metadataOrPack.getMetadata();
+      auto metadata = MetadataPackOrValue.getMetadata();
       if (auto error = checkInvertibleRequirements(metadata, suppressed))
         return error;
 
@@ -1922,15 +1931,15 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
 
     case GenericParamKind::TypePack: {
       // NULL can be used to indicate an empty pack.
-      if (!metadataOrPack)
+      if (!MetadataPackOrValue)
         break;
 
-      if (metadataOrPack.isMetadata()) {
+      if (MetadataPackOrValue.isMetadata()) {
         return TYPE_LOOKUP_ERROR_FMT(
             "unexpected metadata for generic pack parameter %u", index);
       }
 
-      auto pack = metadataOrPack.getMetadataPack();
+      auto pack = MetadataPackOrValue.getMetadataPack();
       if (pack.getElements() != 0) {
         llvm::ArrayRef<const Metadata *> elements(
             pack.getElements(), pack.getNumElements());
@@ -1939,6 +1948,11 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
             return error;
         }
       }
+      break;
+    }
+
+    case GenericParamKind::Value: {
+      // Value parameter can never conform to protocols or the inverse thereof.
       break;
     }
 
