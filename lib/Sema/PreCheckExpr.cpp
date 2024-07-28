@@ -402,6 +402,83 @@ static BinaryExpr *getCompositionExpr(Expr *expr) {
   return nullptr;
 }
 
+/// Diagnoses an unqualified `init` expression.
+///
+/// \param initExpr The \c init expression.
+/// \param dc The declaration context of \p initExpr.
+///
+/// \returns An expression matching `self.init` or `super.init` that can be used
+/// to recover, or `nullptr` if cannot recover.
+static UnresolvedDotExpr *
+diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
+                        ASTContext &ctx) {
+  const auto loc = initExpr->getLoc();
+
+  enum class Suggestion : unsigned {
+    None = 0,
+    Self = 1,
+    Super = 2,
+  };
+
+  Suggestion suggestion = [dc]() {
+    NominalTypeDecl *nominal = nullptr;
+    {
+      auto *typeDC = dc->getInnermostTypeContext();
+      if (!typeDC) {
+        // No type context--no suggestion.
+        return Suggestion::None;
+      }
+
+      nominal = typeDC->getSelfNominalTypeDecl();
+    }
+
+    auto *classDecl = dyn_cast<ClassDecl>(nominal);
+    if (!classDecl || !classDecl->hasSuperclass()) {
+      // No class or no superclass--suggest 'self.'.
+      return Suggestion::Self;
+    }
+
+    if (auto *initDecl = dyn_cast<ConstructorDecl>(dc)) {
+      if (initDecl->getAttrs().hasAttribute<ConvenienceAttr>()) {
+        // Innermost context is a convenience initializer--suggest 'self.'.
+        return Suggestion::Self;
+      } else {
+        // Innermost context is a designated initializer--suggest 'super.'.
+        return Suggestion::Super;
+      }
+    }
+
+    // Class context but innermost context is not an initializer--suggest
+    // 'self.'. 'super.' might be possible too, but is far lesss likely to be
+    // the right answer.
+    return Suggestion::Self;
+  }();
+
+  auto diag =
+      ctx.Diags.diagnose(loc, diag::unqualified_init, (unsigned)suggestion);
+
+  Expr *base = nullptr;
+  switch (suggestion) {
+  case Suggestion::None:
+    return nullptr;
+  case Suggestion::Self:
+    diag.fixItInsert(loc, "self.");
+    base = new (ctx)
+        UnresolvedDeclRefExpr(DeclNameRef(ctx.Id_self), DeclRefKind::Ordinary,
+                              initExpr->getNameLoc());
+    base->setImplicit(true);
+    break;
+  case Suggestion::Super:
+    diag.fixItInsert(loc, "super.");
+    base = new (ctx) SuperRefExpr(/*Self=*/nullptr, loc, /*Implicit=*/true);
+    break;
+  }
+
+  return new (ctx)
+      UnresolvedDotExpr(base, /*dotloc=*/SourceLoc(), initExpr->getName(),
+                        initExpr->getNameLoc(), /*implicit=*/true);
+}
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -865,83 +942,6 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
         return ctorContext->getImplicitSelfDecl();
   }
   return nullptr;
-}
-
-/// Diagnoses an unqualified `init` expression.
-///
-/// \param initExpr The \c init expression.
-/// \param dc The declaration context of \p initExpr.
-///
-/// \returns An expression matching `self.init` or `super.init` that can be used
-/// to recover, or `nullptr` if cannot recover.
-static UnresolvedDotExpr *
-diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
-                        ASTContext &ctx) {
-  const auto loc = initExpr->getLoc();
-
-  enum class Suggestion : unsigned {
-    None = 0,
-    Self = 1,
-    Super = 2,
-  };
-
-  Suggestion suggestion = [dc]() {
-    NominalTypeDecl *nominal = nullptr;
-    {
-      auto *typeDC = dc->getInnermostTypeContext();
-      if (!typeDC) {
-        // No type context--no suggestion.
-        return Suggestion::None;
-      }
-
-      nominal = typeDC->getSelfNominalTypeDecl();
-    }
-
-    auto *classDecl = dyn_cast<ClassDecl>(nominal);
-    if (!classDecl || !classDecl->hasSuperclass()) {
-      // No class or no superclass--suggest 'self.'.
-      return Suggestion::Self;
-    }
-
-    if (auto *initDecl = dyn_cast<ConstructorDecl>(dc)) {
-      if (initDecl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-        // Innermost context is a convenience initializer--suggest 'self.'.
-        return Suggestion::Self;
-      } else {
-        // Innermost context is a designated initializer--suggest 'super.'.
-        return Suggestion::Super;
-      }
-    }
-
-    // Class context but innermost context is not an initializer--suggest
-    // 'self.'. 'super.' might be possible too, but is far lesss likely to be
-    // the right answer.
-    return Suggestion::Self;
-  }();
-
-  auto diag =
-      ctx.Diags.diagnose(loc, diag::unqualified_init, (unsigned)suggestion);
-
-  Expr *base = nullptr;
-  switch (suggestion) {
-  case Suggestion::None:
-    return nullptr;
-  case Suggestion::Self:
-    diag.fixItInsert(loc, "self.");
-    base = new (ctx)
-        UnresolvedDeclRefExpr(DeclNameRef(ctx.Id_self), DeclRefKind::Ordinary,
-                              initExpr->getNameLoc());
-    base->setImplicit(true);
-    break;
-  case Suggestion::Super:
-    diag.fixItInsert(loc, "super.");
-    base = new (ctx) SuperRefExpr(/*Self=*/nullptr, loc, /*Implicit=*/true);
-    break;
-  }
-
-  return new (ctx)
-      UnresolvedDotExpr(base, /*dotloc=*/SourceLoc(), initExpr->getName(),
-                        initExpr->getNameLoc(), /*implicit=*/true);
 }
 
 namespace {
