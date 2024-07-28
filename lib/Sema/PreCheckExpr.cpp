@@ -1056,9 +1056,6 @@ namespace {
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
-    /// The current number of nested \c SequenceExprs that we're within.
-    unsigned SequenceExprDepth = 0;
-
     /// The current number of nested \c SingleValueStmtExprs that we're within.
     unsigned SingleValueStmtExprDepth = 0;
 
@@ -1127,6 +1124,16 @@ namespace {
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       auto &diags = Ctx.Diags;
 
+      // Fold sequence expressions.
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        auto result = TypeChecker::foldSequence(seqExpr, DC);
+        result = result->walk(*this);
+        if (!result)
+          return Action::Stop();
+        // Already walked.
+        return Action::SkipNode(result);
+      }
+
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
@@ -1158,11 +1165,9 @@ namespace {
           return Action::Stop();
 
         // If we're going to recurse, record this expression on the stack.
-        if (recursive) {
-          if (isa<SequenceExpr>(expr))
-            SequenceExprDepth++;
+        if (recursive)
           ExprStack.push_back(expr);
-        }
+
         return Action::VisitNodeIf(recursive, expr);
       };
 
@@ -1292,17 +1297,6 @@ namespace {
       assert(ExprStack.back() == expr);
       ExprStack.pop_back();
 
-      // Fold sequence expressions.
-      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
-        auto result = TypeChecker::foldSequence(seqExpr, DC);
-        SequenceExprDepth--;
-        result = result->walk(*this);
-        if (!result)
-          return Action::Stop();
-
-        return Action::Continue(result);
-      }
-
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
@@ -1426,12 +1420,9 @@ namespace {
         return Action::Continue(simplified);
 
       // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
-      // skip diagnostics if we've explicitly marked the expression as valid,
-      // or if we're inside a SequenceExpr (since the whole tree will be
-      // re-checked when we finish folding anyway).
+      // skip diagnostics if we've explicitly marked the expression as valid.
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
-        if (!CorrectDiscardAssignmentExprs.count(DAE) &&
-            SequenceExprDepth == 0) {
+        if (!CorrectDiscardAssignmentExprs.count(DAE)) {
           ctx.Diags.diagnose(expr->getLoc(),
                              diag::discard_expr_outside_of_assignment);
           return Action::Stop();
@@ -1688,7 +1679,7 @@ bool PreCheckExpression::possiblyInTypeContext(Expr *E) {
 /// been explicitly marked as correct, and the current AST state allows it.
 bool PreCheckExpression::canSimplifyDiscardAssignmentExpr(
     DiscardAssignmentExpr *DAE) {
-  return !CorrectDiscardAssignmentExprs.count(DAE) && SequenceExprDepth == 0 &&
+  return !CorrectDiscardAssignmentExprs.count(DAE) &&
          possiblyInTypeContext(DAE);
 }
 

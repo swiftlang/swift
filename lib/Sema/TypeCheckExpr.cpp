@@ -631,6 +631,15 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
+  // First resolve any unresolved decl references in operator positions.
+  for (auto i : indices(expr->getElements())) {
+    if (i % 2 == 0)
+      continue;
+    auto *elt = expr->getElement(i);
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(elt))
+      elt = TypeChecker::resolveDeclRefExpr(UDRE, dc);
+    expr->setElement(i, elt);
+  }
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");
   assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
