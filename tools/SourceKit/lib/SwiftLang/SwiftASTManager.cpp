@@ -174,13 +174,13 @@ namespace SourceKit {
   void ASTUnit::Implementation::consumeAsync(SwiftASTConsumerRef ConsumerRef,
                                              ASTUnitRef ASTRef) {
 #if defined(_WIN32)
-	// Windows uses more up for stack space (why?) than macOS/Linux which
-	// causes stack overflows in a dispatch thread with 64k stack. Passing
-	// useDeepStack=true means it's given a _beginthreadex thread with an 8MB
-	// stack.
-	bool useDeepStack = true;
+    // Windows uses more up for stack space (why?) than macOS/Linux which
+    // causes stack overflows in a dispatch thread with 64k stack. Passing
+    // useDeepStack=true means it's given a _beginthreadex thread with an 8MB
+    // stack.
+    bool useDeepStack = true;
 #else
-	bool useDeepStack = false;
+    bool useDeepStack = ConsumerRef->requiresDeepStack();
 #endif
     Queue.dispatch([ASTRef, ConsumerRef]{
       SwiftASTConsumer &ASTConsumer = *ConsumerRef;
