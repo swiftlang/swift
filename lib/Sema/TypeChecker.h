@@ -1535,6 +1535,10 @@ void recordRequiredImportAccessLevelForDecl(
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// If the import that would make the given declaration visibile is absent,
+/// emit a diagnostic and a fix-it suggesting adding the missing import.
+bool diagnoseMissingImportForMember(const ValueDecl *decl,
+                                    const DeclContext *dc, SourceLoc loc);
 } // end namespace swift
 
 #endif
