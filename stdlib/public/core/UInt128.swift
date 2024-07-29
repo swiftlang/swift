@@ -552,3 +552,30 @@ extension UInt128: FixedWidthInteger, UnsignedInteger {
     return Self(_low: _high.byteSwapped, _high: _low.byteSwapped)
   }
 }
+
+// MARK: - Integer comparison type inference
+@available(SwiftStdlib 6.0, *)
+extension UInt128 {
+  // IMPORTANT: The following four apparently unnecessary overloads of
+  // comparison operations are necessary for literal comparands to be
+  // inferred as the desired type.
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs == rhs)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func <= (lhs: Self, rhs: Self) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func >= (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs < rhs)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func > (lhs: Self, rhs: Self) -> Bool {
+    return rhs < lhs
+  }
+}
