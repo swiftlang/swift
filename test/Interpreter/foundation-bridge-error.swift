@@ -6,7 +6,7 @@
 // REQUIRES: OS=macosx
 
 // RUN: %target-jit-run %s
-// RUN: DYLD_INSERT_LIBRARIES=/usr/lib/libm.dylib %target-jit-run %s
+// RUN: DYLD_INSERT_LIBRARIES=/usr/lib/libobjc.dylib %target-jit-run %s
 
 import Foundation
 
