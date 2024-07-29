@@ -286,7 +286,12 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
                       rhsExistential.metatype is MetatypeInst
 
   if typesAreExact {
-    if lhsTy == rhsTy {
+    // We need to compare the not lowered types, because function types may differ in their original version
+    // but are equal in the lowered version, e.g.
+    //   ((Int, Int) -> ())
+    //   (((Int, Int)) -> ())
+    //
+    if lhsMetatype == rhsMetatype {
       return true
     }
     // Comparing types of different classes which are in a sub-class relation is not handled by the
