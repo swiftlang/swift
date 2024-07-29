@@ -1033,15 +1033,17 @@ forms are currently accepted:
 
 - `@_rawLayout(size: N, alignment: M)` specifies the type's size and alignment
   in bytes.
-- `@_rawLayout(like: T)` specifies the type's size and alignment should be
-  equal to the type `T`'s.
-- `@_rawLayout(likeArrayOf: T, count: N)` specifies the type's size should be
-  `MemoryLayout<T>.stride * N` and alignment should match `T`'s, like an
-  array of N contiguous elements of `T` in memory.
-- `@_rawLayout(like: T, movesAsLike)` specifies the type's size and alignment
-  should be equal to the type `T`'s. It also guarantees that moving a value of
-  this raw layout type will have the same move semantics as the type it's like.
-  This is important for things like ObjC weak references and non-trivial move
+- `@_rawLayout(like: T(, movesAsLike))` specifies the type's size and alignment
+  should be equal to the type `T`'s. An optional `movesAsLike` parameter can be
+  passed to guarantee that moving a value of this raw layout type will have the
+  same move semantics as the type it's like. This is important for things like
+  ObjC weak references and non-trivial move constructors in C++.
+- `@_rawLayout(likeArrayOf: T, count: N(, movesAsLike))` specifies the type's
+  size should be `MemoryLayout<T>.stride * N` and alignment should match `T`'s,
+  like an array of N contiguous elements of `T` in memory. An optional
+  `movesAsLike` parameter can be passed to guarantee that moving a value of this
+  raw layout type will have the same move semantics as the type it's like. This
+  is important for things like ObjC weak references and non-trivial move
   constructors in C++.
 
 A notable difference between `@_rawLayout(like: T)` and

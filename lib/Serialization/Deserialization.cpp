@@ -6354,7 +6354,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
                                            SourceRange());
             break;
           } else {
-            Attr = new (ctx) RawLayoutAttr(typeRepr, rawSize,
+            Attr = new (ctx) RawLayoutAttr(typeRepr, rawSize, movesAsLike,
                                            SourceLoc(),
                                            SourceRange());
             break;
