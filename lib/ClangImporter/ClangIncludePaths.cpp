@@ -418,29 +418,6 @@ GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
   return "";
 }
 
-SmallVector<std::pair<std::string, std::string>, 2>
-GetAndroidFileMappings(
-    ASTContext &Context, const std::string &sysroot,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &VFS) {
-  const llvm::Triple &Triple = Context.LangOpts.Target;
-  const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
-  SmallVector<std::pair<std::string, std::string>, 2> Mappings;
-  std::string AuxiliaryFile;
-
-  if (!Triple.isAndroid()) return Mappings;
-
-  llvm::SmallString<261> NDKInjection{sysroot};
-  llvm::sys::path::append(NDKInjection, "posix_filesystem.apinotes");
-
-  AuxiliaryFile =
-      GetPlatformAuxiliaryFile("android", "posix_filesystem.apinotes",
-                               SearchPathOpts);
-  if (!AuxiliaryFile.empty())
-    Mappings.emplace_back(std::string(NDKInjection), AuxiliaryFile);
-
-  return Mappings;
-}
-
 SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
     ASTContext &Context,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
@@ -612,9 +589,5 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   result.redirectedFiles.append(GetWindowsFileMappings(
       ctx, vfs, result.requiresBuiltinHeadersInSystemModules));
-
-  result.redirectedFiles.append(GetAndroidFileMappings(ctx, sysroot.str().str(),
-                                                       vfs));
-
   return result;
 }
