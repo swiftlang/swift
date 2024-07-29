@@ -31,6 +31,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/IR/Module.h"
 
 using namespace swift;
 using namespace irgen;
