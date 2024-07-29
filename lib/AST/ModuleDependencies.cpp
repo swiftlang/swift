@@ -507,6 +507,7 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
       /* SharedFS */ nullptr);
+  SharedFilesystemCache.emplace();
 }
 
 bool
