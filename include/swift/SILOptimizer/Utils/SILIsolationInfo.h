@@ -140,15 +140,26 @@ public:
 /// matching.
 class SILIsolationInfo {
 public:
-  /// The lattice is:
+  /// This forms a lattice of semantics. The lattice progresses from left ->
+  /// right below:
   ///
   /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
   ///
-  /// Unknown means no information. We error when merging on it.
   enum Kind : uint8_t {
+    /// Unknown means no information. We error when merging on it.
     Unknown,
+
+    /// An entity with disconnected isolation can be freely transferred into
+    /// another isolation domain. These are associated with "use after transfer"
+    /// diagnostics.
     Disconnected,
+
+    /// An entity that is in the same region as a task-isolated value. Cannot be
+    /// sent into another isolation domain.
     Task,
+
+    /// An entity that is in the same region as an actor-isolated value. Cannot
+    /// be sent into another isolation domain.
     Actor,
   };
 
