@@ -519,7 +519,7 @@ getActualClangDeclPathComponentKind(uint64_t raw) {
   return std::nullopt;
 }
 
-ParameterList *ModuleFile::readParameterList() {
+Expected<ParameterList *> ModuleFile::readParameterList() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -534,8 +534,11 @@ ParameterList *ModuleFile::readParameterList() {
   decls_block::ParameterListLayout::readRecord(scratch, rawMemberIDs);
 
   SmallVector<ParamDecl *, 8> params;
-  for (DeclID paramID : rawMemberIDs)
-    params.push_back(cast<ParamDecl>(getDecl(paramID)));
+  for (DeclID paramID : rawMemberIDs) {
+    Decl *param;
+    UNWRAP(getDeclChecked(paramID), param);
+    params.push_back(cast<ParamDecl>(param));
+  }
 
   return ParameterList::create(getContext(), params);
 }
@@ -3680,7 +3683,8 @@ public:
     else
       return MF.diagnoseFatal();
 
-    auto *bodyParams = MF.readParameterList();
+    ParameterList *bodyParams;
+    UNWRAP(MF.readParameterList(), bodyParams);
     assert(bodyParams && "missing parameters for constructor");
     ctor->setParameters(bodyParams);
 
@@ -4264,7 +4268,8 @@ public:
     fn->setStatic(isStatic);
     fn->setImplicitlyUnwrappedOptional(isIUO);
 
-    ParameterList *paramList = MF.readParameterList();
+    ParameterList *paramList;
+    UNWRAP(MF.readParameterList(), paramList);
     fn->setParameters(paramList);
 
     auto lifetimeDependenceInfo = MF.maybeReadLifetimeDependenceInfo(
@@ -4992,7 +4997,8 @@ public:
 
     // Read payload parameter list, if it exists.
     if (hasPayload) {
-      auto *paramList = MF.readParameterList();
+      ParameterList *paramList;
+      UNWRAP(MF.readParameterList(), paramList);
       elem->setParameterList(paramList);
     }
 
@@ -5111,7 +5117,9 @@ public:
 
     subscript->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    subscript->setIndices(MF.readParameterList());
+    ParameterList *paramList;
+    UNWRAP(MF.readParameterList(), paramList);
+    subscript->setIndices(paramList);
 
     MF.configureStorage(subscript, opaqueReadOwnership,
                         readImpl, writeImpl, readWriteImpl, accessors);
@@ -5138,9 +5146,12 @@ public:
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     
     if (opaqueReturnTypeID) {
+      Decl *opaqueReturnType;
+      UNWRAP(MF.getDeclChecked(opaqueReturnTypeID), opaqueReturnType);
+
       ctx.evaluator.cacheOutput(
           OpaqueResultTypeRequest{subscript},
-          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+          cast<OpaqueTypeDecl>(opaqueReturnType));
     }
     
     return subscript;
@@ -5352,8 +5363,9 @@ public:
     macro->setGenericSignature(MF.getGenericSignature(genericSigID));
     macro->resultType.setType(resultInterfaceType);
 
-    if (hasParameterList)
-      macro->parameterList = MF.readParameterList();
+    if (hasParameterList) {
+      UNWRAP(MF.readParameterList(), macro->parameterList);
+    }
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       macro->setAccess(*accessLevel);
