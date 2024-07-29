@@ -200,7 +200,7 @@ private extension BuiltinInst {
       return
     }
     
-    let instanceType = type.instanceTypeOfMetatype(in: parentFunction)
+    let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
     let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
     operands[argument].set(to: newMetatype, context)
@@ -277,8 +277,8 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
   if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
     return nil
   }
-  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
+  let lhsTy = lhsMetatype.loweredInstanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.loweredInstanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.

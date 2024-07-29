@@ -131,8 +131,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
 
-  public func instanceTypeOfMetatype(in function: Function) -> Type {
-    bridged.getInstanceTypeOfMetatype(function.bridged).type
+  public func loweredInstanceTypeOfMetatype(in function: Function) -> Type {
+    bridged.getLoweredInstanceTypeOfMetatype(function.bridged).type
   }
 
   public var isDynamicSelfMetatype: Bool {

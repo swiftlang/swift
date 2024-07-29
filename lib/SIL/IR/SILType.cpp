@@ -1142,7 +1142,7 @@ bool SILType::isValueTypeWithDeinit() const {
   return false;
 }
 
-SILType SILType::getInstanceTypeOfMetatype(SILFunction *function) const {
+SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   auto metaType = castTo<MetatypeType>();
   CanType instanceTy = metaType.getInstanceType();
   auto &tl = function->getModule().Types.getTypeLowering(instanceTy, TypeExpansionContext(*function));
