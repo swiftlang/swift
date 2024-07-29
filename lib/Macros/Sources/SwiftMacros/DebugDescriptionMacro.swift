@@ -262,7 +262,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
 /// The names of properties that can be converted to LLDB type summaries, in priority order.
 fileprivate let DESCRIPTION_PROPERTIES = [
-  "_debugDescription",
+  "lldbDescription",
   "debugDescription",
   "description",
 ]
