@@ -64,6 +64,7 @@ import SwiftShims
 ///   and other arbitrary computation are not supported. Of note, conditional
 ///   logic and computed properties are not supported.
 /// * Overloaded string interpolation cannot be used.
+@attached(member)
 @attached(memberAttribute)
 public macro DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")

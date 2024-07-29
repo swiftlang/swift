@@ -56,6 +56,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isEnum: Bool { bridged.isEnumOrBoundGenericEnum() }
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
+  public var isClassExistential: Bool { bridged.isClassExistential() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
   public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
   public var isThickFunction: Bool { bridged.isThickFunction() }
@@ -65,6 +66,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
+  // Note that invalid types are not considered Escapable. This makes it difficult to make any assumptions about
+  // nonescapable types.
   public func isEscapable(in function: Function) -> Bool {
     bridged.isEscapable(function.bridged)
   }
@@ -90,6 +93,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public func isExactSuperclass(of type: Type) -> Bool {
     bridged.isExactSuperclassOf(type.bridged)
+  }
+
+  public var isVoid: Bool {
+    bridged.isVoid()
   }
 
   public func isEmpty(in function: Function) -> Bool {

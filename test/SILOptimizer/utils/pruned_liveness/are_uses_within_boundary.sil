@@ -1,0 +1,257 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+import Builtin
+
+class Klass {}
+
+sil @getKlass : $@convention(thin) () -> (@owned Klass)
+sil @takeKlass : $@convention(thin) (@owned Klass) -> ()
+sil @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: begin running test {{.*}} on dead_function_argument
+// CHECK:       RESULT: true
+// CHECK-LABEL: end running test {{.*}} on dead_function_argument
+sil [ossa] @dead_function_argument : $@convention(thin) (@owned Klass) -> () {
+entry(%k : @owned $Klass):
+  debug_value %k : $Klass
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses:
+  uses: @instruction[0].operand[0]
+  """
+
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__before
+// CHECK:       RESULT: false
+// CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__before
+sil [ossa] @liveness_in_dead_end__before : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %val = tuple ()
+  %inst = tuple (%val : $())
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  apply %takeKlass(%k) : $@convention(thin) (@owned Klass) -> ()
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block.instruction[3] ending
+  uses: @block.instruction[1].operand[0]
+  """
+  
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__before_2
+// CHECK:       RESULT: false
+// CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__before_2
+sil [ossa] @liveness_in_dead_end__before_2 : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %val = tuple ()
+  %inst = tuple (%val : $())
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  apply %takeKlass(%k) : $@convention(thin) (@owned Klass) -> ()
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block.instruction[3] ending
+  uses: @block.instruction[1].operand[0]
+  """
+  
+  br die2
+die2:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__after_consuming
+// CHECK:       RESULT: false
+// CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__after_consuming
+sil [ossa] @liveness_in_dead_end__after_consuming : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  apply %takeKlass(%k) : $@convention(thin) (@owned Klass) -> ()
+  %val = tuple ()
+  %inst = tuple (%val : $())
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block.instruction[1] ending
+  uses: @block.instruction[1].operand[0]
+  """
+  
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__after_nonconsuming
+// CHECK:       RESULT: true
+// CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__after_nonconsuming
+sil [ossa] @liveness_in_dead_end__after_nonconsuming : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  %borrowKlass = function_ref @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  apply %borrowKlass(%k) : $@convention(thin) (@guaranteed Klass) -> ()
+  %val = tuple ()
+  %inst = tuple (%val : $())
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block.instruction[1] non-ending
+  uses: @block.instruction[3].operand[0]
+  """
+  
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__after_nonuse
+// CHECK:       RESULT: true
+// CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__after_nonuse
+sil [ossa] @liveness_in_dead_end__after_nonuse : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  %borrowKlass = function_ref @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  %val = tuple ()
+  %inst = tuple (%val : $())
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block.instruction[1] non-ending
+  uses: @block.instruction[2].operand[0]
+  """
+  
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on use_in_dead_end__after_nonconsuming_liveness_boundary
+// CHECK:       RESULT: true
+// CHECK-LABEL: end running test {{.*}} on use_in_dead_end__after_nonconsuming_liveness_boundary
+sil [ossa] @use_in_dead_end__after_nonconsuming_liveness_boundary : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  %borrowKlass = function_ref @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  cond_br undef, exit, die
+exit:
+  apply %takeKlass(%k) : $@convention(thin) (@owned Klass) -> ()
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %val = tuple ()
+  %inst = tuple (%val : $())
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block[1].instruction[1] ending
+  uses: @block.instruction[1].operand[0]
+  """
+  
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on use_in_dead_end__after_unavailable
+// CHECK:       RESULT: false
+// CHECK-LABEL: end running test {{.*}} on use_in_dead_end__after_unavailable
+sil [ossa] @use_in_dead_end__after_unavailable : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  %borrowKlass = function_ref @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  apply %takeKlass(%k) : $@convention(thin) (@owned Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %val = tuple ()
+  %inst = tuple (%val : $())
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block[0].instruction[4] ending
+  uses: @block.instruction[1].operand[0]
+  """
+  
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on use_in_dead_end__after_available_but_dead
+// CHECK:       RESULT: false
+// CHECK-LABEL: end running test {{.*}} on use_in_dead_end__after_available_but_dead
+sil [ossa] @use_in_dead_end__after_available_but_dead : $@convention(thin) () -> () {
+entry:
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %takeKlass = function_ref @takeKlass : $@convention(thin) (@owned Klass) -> ()
+  %borrowKlass = function_ref @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %k = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
+  apply %borrowKlass(%k) : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, exit, die
+exit:
+  apply %takeKlass(%k) : $@convention(thin) (@owned Klass) -> ()
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  %val = tuple ()
+  %inst = tuple (%val : $())
+
+  specify_test """
+  SSAPrunedLiveness__areUsesWithinBoundary
+  def: %k
+  liveness-uses: @block[0].instruction[4] non-ending
+  uses: @block.instruction[1].operand[0]
+  """
+  
+  unreachable
+}

@@ -2151,6 +2151,21 @@ FUNCTION(PlatformVersionAtLeast, __isPlatformVersionAtLeast,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
+// int32 __isPlatformOrVariantPlatformVersionAtLeast(uint32_t platform1,
+//            uint32_t major1, uint32_t minor1, uint32_t patch1,
+//            uint32_t platform2, uint32_t major2, uint32_t minor2,
+//            uint32_t patch2);
+// This is a C builtin provided by compiler-rt.
+FUNCTION(TargetOSVersionOrVariantOSVersionAtLeast,
+         __isPlatformOrVariantPlatformVersionAtLeast,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int32Ty, Int32Ty, Int32Ty, Int32Ty, Int32Ty, Int32Ty, Int32Ty,
+              Int32Ty),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
 FUNCTION(GetKeyPath, swift_getKeyPath, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(Int8PtrTy, Int8PtrTy),

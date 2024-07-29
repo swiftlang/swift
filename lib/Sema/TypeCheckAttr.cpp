@@ -144,7 +144,6 @@ public:
   IGNORED_ATTR(NoObjCBridging)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
-  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
@@ -364,6 +363,8 @@ public:
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
+  
+  void visitSILGenNameAttr(SILGenNameAttr *attr);
 };
 
 } // end anonymous namespace
@@ -2223,6 +2224,30 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   }
 }
 
+static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
+  // The Swift standard library needs to be able to define reserved symbols.
+  if (fromModule->isStdlibModule()
+      || fromModule->getName() == fromModule->getASTContext().Id_Concurrency
+      || fromModule->getName() == fromModule->getASTContext().Id_Distributed) {
+    return true;
+  }
+
+  // Swift runtime functions are a private contract between the compiler and
+  // runtime, and attempting to access them directly without going through
+  // builtins or proper language features breaks the compiler in various hard
+  // to predict ways. Warn when code attempts to do so; hopefully we can
+  // promote this to an error after a while.
+  
+  return llvm::StringSwitch<bool>(symbol)
+#define FUNCTION(_, Name, ...) \
+    .Case(#Name, false) \
+    .Case("_" #Name, false) \
+    .Case(#Name "_", false) \
+    .Case("_" #Name "_", false)
+#include "swift/Runtime/RuntimeFunctions.def"
+    .Default(true);
+}
+
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // Only top-level func decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
@@ -2231,6 +2256,12 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // The name must not be empty.
   if (attr->Name.empty())
     diagnose(attr->getLocation(), diag::cdecl_empty_name);
+
+  // The standard library can use @_cdecl to implement runtime functions.
+  if (!canDeclareSymbolName(attr->Name, D->getModuleContext())) {
+      diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
+               attr->Name);
+  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -2338,11 +2369,13 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
     return;
   }
+  
   // Only top-level func or static func decls are currently supported.
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD || (FD->getDeclContext()->isTypeContext() && !FD->isStatic())) {
     diagnose(attr->getLocation(), diag::extern_not_at_top_level_func);
   }
+
 
   // C name must not be empty.
   if (attr->getExternKind() == ExternKind::C) {
@@ -2357,6 +2390,14 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
       // they are doing, and don't warn.
       diagnose(attr->getLocation(), diag::extern_c_maybe_invalid_name, cName)
           .fixItInsert(attr->getRParenLoc(), (", \"" + cName + "\"").str());
+    }
+    
+    // Diagnose reserved symbol names.
+    // The standard library can't use normal C interop so needs extern(c)
+    // for access to C standard library and ObjC/Swift runtime functions.
+    if (!canDeclareSymbolName(cName, D->getModuleContext())) {
+      diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
+               cName);
     }
 
     // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.
@@ -2405,6 +2446,13 @@ static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
     return true;
 
   return false;
+}
+
+void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
+  if (!canDeclareSymbolName(A->Name, D->getModuleContext())) {
+    diagnose(A->getLocation(), diag::reserved_runtime_symbol_name,
+             A->Name);
+  }
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
@@ -2546,6 +2594,12 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 }
 
 void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
+  // This attribute is deprecated and slated for removal.
+  diagnose(attr->getLocation(), diag::moveOnly_deprecated)
+    .fixItRemove(attr->getRange())
+    .warnInSwiftInterface(D->getDeclContext());
+
+
   if (isa<StructDecl>(D) || isa<EnumDecl>(D))
     return;
 
@@ -4611,7 +4665,7 @@ void AttributeChecker::checkBackDeployedAttrs(
   auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
-  auto *ActiveAttr = D->getAttrs().getBackDeployed(Ctx);
+  auto *ActiveAttr = D->getAttrs().getBackDeployed(Ctx, false);
 
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
@@ -4698,7 +4752,6 @@ void AttributeChecker::checkBackDeployedAttrs(
       if (!inheritsAvailabilityFromPlatform(unavailableAttr->Platform,
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
-
         llvm::VersionTuple ignoredVersion;
 
         AvailabilityInference::updateBeforePlatformForFallback(

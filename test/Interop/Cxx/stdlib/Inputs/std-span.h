@@ -50,6 +50,10 @@ inline Span initSpan() {
   return Span(a);
 }
 
+inline Span initSpan(int arr[], size_t size) {
+  return Span(arr, size);
+}
+
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

@@ -4,13 +4,11 @@
 
 class CopyableKlass {}
 
-@_moveOnly
-class MoveOnlyKlass { // expected-note 6{{class 'MoveOnlyKlass' has '~Copyable' constraint preventing 'Copyable' conformance}}
+class MoveOnlyKlass: ~Copyable { // expected-note 6{{class 'MoveOnlyKlass' has '~Copyable' constraint preventing 'Copyable' conformance}}
     init?() {}
 }
 
-@_moveOnly
-struct MoveOnlyStruct { // expected-note {{struct 'MoveOnlyStruct' has '~Copyable' constraint preventing 'Copyable' conformance}}
+struct MoveOnlyStruct: ~Copyable { // expected-note {{struct 'MoveOnlyStruct' has '~Copyable' constraint preventing 'Copyable' conformance}}
     init?(one: Bool) {}
     init!(two: Bool) {}
 }
@@ -24,8 +22,7 @@ class C {
     var moveOnlySs: [MoveOnlyStruct] = [] // expected-error {{type 'MoveOnlyStruct' does not conform to protocol 'Copyable'}}
 }
 
-@_moveOnly
-class CMoveOnly {
+class CMoveOnly: ~Copyable {
     var copyable: CopyableKlass? = nil
     var moveOnlyC: MoveOnlyKlass? = nil
     var moveOnlyS: MoveOnlyStruct? = nil
@@ -61,8 +58,7 @@ struct S2 { // expected-note {{consider adding '~Copyable' to struct 'S2'}}
     var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyStruct'}}
 }
 
-@_moveOnly
-struct SMoveOnly {
+struct SMoveOnly: ~Copyable {
     var copyable: CopyableKlass
     var moveOnly: MoveOnlyKlass
 }
@@ -73,8 +69,7 @@ enum E { // expected-note {{consider adding '~Copyable' to enum 'E'}}
     case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
 }
 
-@_moveOnly
-enum EMoveOnly {
+enum EMoveOnly: ~Copyable {
     case lhs(CopyableKlass)
     case rhs(MoveOnlyKlass)
 
@@ -101,8 +96,7 @@ func foo() {
         var moveOnlies: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
     }
 
-    @_moveOnly
-    class C2MoveOnly {
+class C2MoveOnly: ~Copyable {
         var copyable: CopyableKlass? = nil
         var moveOnly: MoveOnlyKlass? = nil
         var copyables: [CopyableKlass] = []
@@ -114,8 +108,7 @@ func foo() {
         var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyKlass'}}
     }
 
-    @_moveOnly
-    struct S2MoveOnly {
+struct S2MoveOnly: ~Copyable {
         var copyable: CopyableKlass
         var moveOnly: MoveOnlyKlass
     }
@@ -125,8 +118,7 @@ func foo() {
         case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E2' has non-Copyable type 'MoveOnlyKlass'}}
     }
 
-    @_moveOnly
-    enum E2MoveOnly {
+enum E2MoveOnly: ~Copyable {
         case lhs(CopyableKlass)
         case rhs(MoveOnlyKlass)
     }
@@ -138,8 +130,7 @@ func foo() {
             var moveOnlies: [MoveOnlyKlass] = [] // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
         }
 
-        @_moveOnly
-        class C3MoveOnly {
+class C3MoveOnly: ~Copyable {
             var copyable: CopyableKlass? = nil
             var moveOnly: MoveOnlyKlass? = nil
             var copyables: [CopyableKlass] = []
@@ -151,8 +142,7 @@ func foo() {
             var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S3' has non-Copyable type 'MoveOnlyKlass'}}
         }
 
-        @_moveOnly
-        struct S3MoveOnly {
+struct S3MoveOnly: ~Copyable {
             var copyable: CopyableKlass
             var moveOnly: MoveOnlyKlass
         }
@@ -162,8 +152,7 @@ func foo() {
             case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E3' has non-Copyable type 'MoveOnlyKlass'}}
         }
 
-        @_moveOnly
-        enum E3MoveOnly {
+enum E3MoveOnly: ~Copyable {
             case lhs(CopyableKlass)
             case rhs(MoveOnlyKlass)
         }
@@ -184,11 +173,11 @@ struct UnsafePointerWithOwner<T> {
 // protocol.
 protocol P {} // expected-note 6{{type}}
 protocol Q {} // expected-note 2{{type}}
-@_moveOnly class ProtocolCheckMoveOnlyKlass {}
-@_moveOnly struct ProtocolCheckMoveOnlyStruct {
+class ProtocolCheckMoveOnlyKlass: ~Copyable {}
+struct ProtocolCheckMoveOnlyStruct: ~Copyable {
     var k: MoveOnlyKlass
 }
-@_moveOnly enum ProtocolCheckMoveOnlyEnum {}
+enum ProtocolCheckMoveOnlyEnum: ~Copyable {}
 
 extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{type 'ProtocolCheckMoveOnlyKlass' does not conform to protocol 'Copyable'}}
 extension ProtocolCheckMoveOnlyStruct : P, Q {}
@@ -212,19 +201,15 @@ extension ProtocolCheckMoveOnlyStruct {}
 extension ProtocolCheckMoveOnlyEnum {}
 
 // Check if we define a move only type and make it conform on the base type
-@_moveOnly
-class MoveOnlyKlassP : P {} // expected-error {{type 'MoveOnlyKlassP' does not conform to protocol 'Copyable'}}
-@_moveOnly
-struct MoveOnlyStructP : P { // expected-error {{type 'MoveOnlyStructP' does not conform to protocol 'Copyable'}}
+class MoveOnlyKlassP : P, ~Copyable {} // expected-error {{type 'MoveOnlyKlassP' does not conform to protocol 'Copyable'}}
+struct MoveOnlyStructP : P, ~Copyable { // expected-error {{type 'MoveOnlyStructP' does not conform to protocol 'Copyable'}}
     var mv: MoveOnlyKlass
 }
-@_moveOnly
-enum MoveOnlyEnumP : P {} // expected-error {{type 'MoveOnlyEnumP' does not conform to protocol 'Copyable'}}
+enum MoveOnlyEnumP : P, ~Copyable {} // expected-error {{type 'MoveOnlyEnumP' does not conform to protocol 'Copyable'}}
 
 // ensure there is no auto-synthesis of Equatable, Hashable, etc, for this move-only enum,
 // because it normally would be synthesized since it only has cases without associated values.
-@_moveOnly
-enum Color {
+enum Color: ~Copyable {
     case red
     case green
     case blue

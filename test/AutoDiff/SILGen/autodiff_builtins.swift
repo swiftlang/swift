@@ -99,7 +99,7 @@ func test_context_builtins_with_type<T>(t: T) {
 // CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContextWithType"<T>({{%.*}} : $@thick T.Type) : $Builtin.NativeObject
 // CHECK:   [[CTX_LIFETIME:%.*]] = move_value [lexical] [var_decl] [[CTX]]
 // CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX_LIFETIME]]
-// CHECK:   [[BUF:%.*]] = builtin "autoDiffProjectTopLevelSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject) : $Builtin.RawPointer // users: {{.*}}
+// CHECK:   [[BUF:%.*]] = builtin "autoDiffProjectTopLevelSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject) : $Builtin.RawPointer
 // CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX_LIFETIME]]
-// CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontextWithType"<T>([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $@thick T.Type) : $Builtin.RawPointer // users: {{.*}}
+// CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontextWithType"<T>([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $@thick T.Type) : $Builtin.RawPointer
 // CHECK:   destroy_value [[CTX_LIFETIME]]

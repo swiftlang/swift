@@ -35,8 +35,7 @@ public func consumeVal<T>(_ x: __owned AddressOnlyGeneric<T>) {}
 public func consumeVal(_ x: __owned AddressOnlyProtocol) {}
 public func consumeVal<T>(_ x: __owned T) {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init() {
@@ -45,8 +44,7 @@ public final class Klass {
     }
 }
 
-@_moveOnly
-public final class FinalKlass {
+public final class FinalKlass: ~Copyable {
     var k: Klass = Klass()
 }
 

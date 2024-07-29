@@ -5402,19 +5402,11 @@ private:
 public:
   /// Pre-check the target, validating any types that occur in it
   /// and folding sequence expressions.
-  ///
-  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
-  /// to replace any discovered invalid member references with `ErrorExpr`.
-  static bool preCheckTarget(SyntacticElementTarget &target,
-                             bool replaceInvalidRefsWithErrors);
+  static bool preCheckTarget(SyntacticElementTarget &target);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
-  ///
-  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
-  /// to replace any discovered invalid member references with `ErrorExpr`.
-  static bool preCheckExpression(Expr *&expr, DeclContext *dc,
-                                 bool replaceInvalidRefsWithErrors);
+  static bool preCheckExpression(Expr *&expr, DeclContext *dc);
 
   /// Solve the system of constraints generated from provided target.
   ///

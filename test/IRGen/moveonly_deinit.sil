@@ -19,8 +19,7 @@ class C {}
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
-@_moveOnly
-struct MOStruct {
+struct MOStruct: ~Copyable {
   var x: Int
   var y: C
 
@@ -32,8 +31,7 @@ struct MOStruct {
 // noncopyable, enum, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0xA1_0007>
 // CHECK-32-SAME: <i32 0xA1_0003>
-@_moveOnly
-enum MOEnum {
+enum MOEnum: ~Copyable {
   case x(Int)
   case y(C)
 
@@ -45,8 +43,7 @@ enum MOEnum {
 // noncopyable, non-inline, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x83_0007>
 // CHECK-32-SAME: <i32 0x83_0003>
-@_moveOnly
-struct MOComboStruct {
+struct MOComboStruct: ~Copyable {
   var a: MOStruct
   var b: MOEnum
   var c: C
@@ -57,8 +54,7 @@ struct MOComboStruct {
 // noncopyable, enum, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0xA1_0007>
 // CHECK-32-SAME: <i32 0xA1_0003>
-@_moveOnly
-enum MOComboEnum {
+enum MOComboEnum: ~Copyable {
   case a(MOStruct)
   case b(MOEnum)
   case c(C)
@@ -71,8 +67,7 @@ enum MOComboEnum {
 // CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, nontrivial deinit, byte aligned
 // CHECK-SAME: <i32 0x81_0000>
-@_moveOnly
-struct MOEmptyStruct {
+struct MOEmptyStruct: ~Copyable {
   deinit
 }
 
@@ -81,8 +76,7 @@ struct MOEmptyStruct {
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
-@_moveOnly
-struct MOIntLikeStruct {
+struct MOIntLikeStruct: ~Copyable {
   var x: Int
 
   deinit
@@ -93,8 +87,7 @@ struct MOIntLikeStruct {
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
-@_moveOnly
-struct MOSingleRefcountLikeStruct {
+struct MOSingleRefcountLikeStruct: ~Copyable {
   var x: C
 
   deinit
@@ -106,8 +99,7 @@ struct MOSingleRefcountLikeStruct {
 // CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, trivial deinit, byte aligned
 // CHECK-SAME: <i32 0x80_0000>
-@_moveOnly
-struct MOEmptyStructNoDeinit {
+struct MOEmptyStructNoDeinit: ~Copyable {
 }
 
 // CHECK-LABEL: @{{.*}}23MOIntLikeStructNoDeinitVWV" =
@@ -115,8 +107,7 @@ struct MOEmptyStructNoDeinit {
 // noncopyable, trivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x80_0007>
 // CHECK-32-SAME: <i32 0x80_0003>
-@_moveOnly
-struct MOIntLikeStructNoDeinit {
+struct MOIntLikeStructNoDeinit: ~Copyable {
   var x: Int
 }
 
@@ -125,8 +116,7 @@ struct MOIntLikeStructNoDeinit {
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
-@_moveOnly
-struct MOSingleRefcountLikeStructNoDeinit {
+struct MOSingleRefcountLikeStructNoDeinit: ~Copyable {
   var x: C
 }
 
@@ -146,8 +136,7 @@ struct MOSingleRefcountLikeStructNoDeinit {
 
 // Very large structs will use indirect conventions for their deinit.
 
-@_moveOnly
-struct MOVeryBigStructDeinit {
+struct MOVeryBigStructDeinit: ~Copyable {
   var x: Int, y: Int, z: Int, w: Int, a: Int, b: Int, c: Int, d: Int
 
   deinit
@@ -158,8 +147,7 @@ struct MOVeryBigStructDeinit {
 protocol P {}
 extension Int: P {}
 
-@_moveOnly
-struct MOGenericDeinit<T: P, U> {
+struct MOGenericDeinit<T: P, U>: ~Copyable {
   var t: T
   var u: U
 

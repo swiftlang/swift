@@ -2,6 +2,7 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 // #############################################################################
 // #############################################################################
@@ -11,7 +12,7 @@ import Builtin
 
 sil [ossa] @condition : $@convention(thin) () -> Builtin.Int1
 
-@_moveOnly struct S {
+struct S: ~Copyable {
   deinit
 }
 
@@ -393,7 +394,7 @@ bottom:
 // #############################################################################
 // #############################################################################
 
-@_moveOnly struct S2 {
+struct S2: ~Copyable {
     var s1: S
     var s2: S
 }
@@ -401,7 +402,7 @@ bottom:
 sil [ossa] @get_value_S2 : $@convention(thin) () -> @owned S2
 sil [ossa] @end_S2 : $@convention(thin) (@owned S2) -> ()
 
-@_moveOnly struct S3 {
+struct S3: ~Copyable {
     var s1: S
     var s2: S
     var s3: S

@@ -2702,19 +2702,24 @@ public:
   }
 
   void checkExtendLifetimeInst(ExtendLifetimeInst *I) {
-    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
-            "Source value should be non-trivial");
     require(F.hasOwnership(),
             "extend_lifetime is only valid in functions with qualified "
             "ownership");
+    // In Raw SIL, extend_lifetime marks the end of variable scopes.
+    if (F.getModule().getStage() == SILStage::Raw)
+      return;
+
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial after diagnostics");
     require(getDeadEndBlocks().isDeadEnd(I->getParent()),
-            "extend_lifetime in non-dead-end!?");
+            "extend_lifetime in non-dead-end after diagnostics");
+
     auto value = I->getOperand();
     LinearLiveness linearLiveness(value,
                                   LinearLiveness::DoNotIncludeExtensions);
     linearLiveness.compute();
     auto &liveness = linearLiveness.getLiveness();
-    require(!liveness.isWithinBoundary(I),
+    require(!liveness.isWithinBoundary(I, /*deadEndBlocks=*/nullptr),
             "extend_lifetime use within unextended linear liveness boundary!?");
     PrunedLivenessBoundary boundary;
     liveness.computeBoundary(boundary);
@@ -2789,7 +2794,8 @@ public:
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
-      if (!scopedAddressLiveness->isWithinBoundary(user)) {
+      if (!scopedAddressLiveness->isWithinBoundary(user,
+                                                   /*deadEndBlocks=*/nullptr)) {
         llvm::errs() << "User found outside scope: " << *user;
         return false;
       }
@@ -3402,7 +3408,8 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction())
+            || I->getOperand()->isFromVarDecl(),
             "Source value should be non-trivial");
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
@@ -6778,6 +6785,9 @@ public:
 
         } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
+          while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
+            op = mvi->getOperand();
+          }
           require(!state.Stack.empty(),
                   "stack dealloc with empty stack");
           if (op != state.Stack.back()) {

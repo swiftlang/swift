@@ -12,7 +12,6 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @_unsafeNonescapableResult
   init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
@@ -30,13 +29,21 @@ struct NC : ~Copyable {
   borrowing func getBV() -> dependsOn(self) BV {
     BV(p, i)
   }
+
+  borrowing func getEmpty() -> Empty {
+    Empty()
+  }
 }
+
+// Test dependencies on an empty struct.
+public struct Empty: ~Escapable {}
+
+func use(e: Empty) {}
 
 struct NE : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @_unsafeNonescapableResult
   init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
     self.p = p
     self.i = i
@@ -70,3 +77,12 @@ let nc = NC(ptr, 0) // expected-error {{lifetime-dependent variable 'nc' escapes
 func bv_global(dummy: BV) -> BV {
   nc.getBV()
 } // expected-note {{this use causes the lifetime-dependent value to escape}}
+
+func testEmpty(nc: consuming NC) {
+  var e: Empty // expected-error {{lifetime-dependent variable 'e' escapes its scope}}
+  do {
+    let inner = nc // expected-note {{it depends on the lifetime of variable 'inner'}}
+    e = inner.getEmpty()
+  }
+  use(e: e) // expected-note {{this use of the lifetime-dependent value is out of scope}}
+}

@@ -123,6 +123,11 @@ final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
   override init(start: Int32, end: Int32)
 }
 
+class COpt {
+  final var i: Optional<Int32>
+  init()
+}
+
 sil_global @total : $Int32
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
@@ -1315,3 +1320,24 @@ bb0(%0 : $Int):
   dealloc_stack %1 : $*Int
   return %53 : $Int
 }
+
+// CHECK-LABEL: sil [ossa] @test_anyobject_cast :
+// CHECK:         store
+// CHECK:         [[L:%[0-9]+]] = load
+// CHECK:         return [[L]]
+// CHECK-LABEL: } // end sil function 'test_anyobject_cast'
+sil [ossa] @test_anyobject_cast : $@convention(thin) (@guaranteed COpt, Int32) -> Optional<Int32> {
+bb0(%0 : @guaranteed $COpt, %1 : $Int32):
+  %2 = init_existential_ref %0 : $COpt : $COpt, $AnyObject
+  %3 = unchecked_ref_cast %2 : $AnyObject to $COpt
+  %4 = ref_element_addr %3 : $COpt, #COpt.i
+  %5 = load [trivial] %4 : $*Optional<Int32>
+  %6 = ref_element_addr %3 : $COpt, #COpt.i
+  %7 = init_enum_data_addr %6 : $*Optional<Int32>, #Optional.some!enumelt
+  store %1 to [trivial] %7 : $*Int32
+  %9 = ref_element_addr %3 : $COpt, #COpt.i
+  %10 = load [trivial] %9 : $*Optional<Int32>
+  return %10 : $Optional<Int32>
+}
+
+

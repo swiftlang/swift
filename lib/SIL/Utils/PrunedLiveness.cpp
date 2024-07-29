@@ -501,7 +501,7 @@ static FunctionTest SSAUseLivenessTest("ssa_use_liveness", [](auto &function,
 } // end namespace swift::test
 
 template <typename LivenessWithDefs>
-bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
+bool PrunedLiveRange<LivenessWithDefs>::isWithinLivenessBoundary(
     SILInstruction *inst) const {
   assert(asImpl().isInitialized());
 
@@ -515,6 +515,13 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   if (isLive && !asImpl().isDefBlock(block))
     return true;
 
+  return isInstructionLive(inst, isLive);
+}
+
+template <typename LivenessWithDefs>
+bool PrunedLiveRange<LivenessWithDefs>::isInstructionLive(SILInstruction *inst,
+                                                          bool isLive) const {
+  auto *block = inst->getParent();
   // Check if instruction is between a last use and a definition
   for (SILInstruction &it : llvm::reverse(*block)) {
     // the def itself is not within the boundary, so cancel liveness before
@@ -532,52 +539,260 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   llvm_unreachable("instruction must be in its parent block");
 }
 
-/// Whether \p parent is a dead (reported to be dead by `liveBlocks`), dead-end
-/// (such as an infinite loop) block within the availability boundary (where
-/// the value has not been consumed).
-static bool checkDeadEnd(SILBasicBlock *parent, DeadEndBlocks *deadEndBlocks,
-                         PrunedLiveBlocks const &liveBlocks) {
-  if (!deadEndBlocks) {
-    return false;
+template <typename LivenessWithDefs>
+bool PrunedLiveRange<LivenessWithDefs>::isAvailableOut(
+    SILBasicBlock *block, DeadEndBlocks &deadEndBlocks) const {
+  assert(getBlockLiveness(block) == PrunedLiveBlocks::LiveWithin);
+  assert(deadEndBlocks.isDeadEnd(block));
+  for (SILInstruction &inst : llvm::reverse(*block)) {
+    if (asImpl().isDef(&inst)) {
+      return true;
+    }
+    switch (isInterestingUser(&inst)) {
+    case PrunedLiveness::NonUser:
+      continue;
+    case PrunedLiveness::NonLifetimeEndingUse:
+      return true;
+    case PrunedLiveness::LifetimeEndingUse:
+      return false;
+    }
   }
-  if (!deadEndBlocks->isDeadEnd(parent)) {
-    return false;
+  assert(asImpl().isDefBlock(block));
+  assert(llvm::any_of(block->getArguments(), [this](SILArgument *arg) {
+    return asImpl().isDef(arg);
+  }));
+  return true;
+}
+
+template <typename LivenessWithDefs>
+bool PrunedLiveRange<LivenessWithDefs>::isInstructionAvailable(
+    SILInstruction *user, DeadEndBlocks &deadEndBlocks) const {
+  auto *parent = user->getParent();
+  assert(getBlockLiveness(parent) == PrunedLiveBlocks::LiveWithin);
+  assert(deadEndBlocks.isDeadEnd(parent));
+  return isInstructionLive(user, isAvailableOut(parent, deadEndBlocks));
+}
+
+template <typename LivenessWithDefs>
+bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
+    SILInstruction *inst, DeadEndBlocks *deadEndBlocks) const {
+  if (deadEndBlocks) {
+    return asImpl().isWithinExtendedBoundary(inst, *deadEndBlocks);
+  } else {
+    return asImpl().isWithinLivenessBoundary(inst);
   }
-  if (liveBlocks.getBlockLiveness(parent) != PrunedLiveBlocks::Dead) {
-    return false;
-  }
-  // Check whether the value is available in `parent` (i.e. not consumed on any
-  // path to it):
+}
+
+template <typename LivenessWithDefs>
+bool PrunedLiveRange<LivenessWithDefs>::isWithinExtendedBoundary(
+    SILInstruction *inst, DeadEndBlocks &deadEndBlocks) const {
+  // A value has a pruned live region, a live region and an available region.
+  // (Note: PrunedLiveness does not distinguish between the pruned live region
+  // and the live region; the pruned live region coincides with the live region
+  // whenever consuming uses are considered.) This method refers to a FOURTH
+  // region: the "extended region" which MAY be different from the others.
+  // (Terminological note: this isn't intended to gain regular usage, hence its
+  // lack of specificity.)
   //
-  // Search backward until LiveOut or LiveWithin blocks are reached.
-  // (1) If ALL the reached blocks are LiveOut, then `parent` IS within the
-  //     availability boundary.
-  // (2) If ANY reached block is LiveWithin, the value was consumed in that
-  //     reached block, preventing the value from being available at `parent`,
-  //     so `parent` is NOT within the availability boundary.
+  // Before _defining_ the extended region, consider the following example:
+  //
+  //   def = ...
+  //   inst_1
+  //   use %def // added to pruned liveness
+  //   inst_2
+  //   cond_br %c1, die, normal
+  // die:
+  //   inst_3
+  //   unreachable
+  // normal:
+  //   inst_4
+  //   destroy %def // NOT added to pruned liveness
+  //   inst_5
+  //
+  // This table describes which regions the `inst_i`s are in:
+  // +------+----+------+--------+---------+
+  // |      |live|pruned|extended|available|
+  // +------+----+------+--------+---------+
+  // |inst_1| yes| yes  | yes    | yes     |
+  // +------+----+------+--------+---------+
+  // |inst_2| yes| no   | yes    | yes     |
+  // +------+----+------+--------+---------+
+  // |inst_3| no | no   | yes    | yes     |
+  // +------+----+------+--------+---------+
+  // |inst_4| yes| no   | no     | yes     |
+  // +------+----+------+--------+---------+
+  // |inst_5| no | no   | no     | no      |
+  // +------+----+------+--------+---------+
+  //
+  // This example demonstrates that
+  //     pruned live ≠ extended ≠ available
+  // and indicates the fact that
+  //     pruned live ⊆ extended ⊆ available
+  //
+  // The "extended region" is the pruned live region availability-extended into
+  // dead-end regions.  In more detail, it's obtained by (1) unioning the
+  // dead-end regions adjacent to the pruned live region (the portions of those
+  // adjacent dead-end regions which are forward reachable from the pruned live
+  // region) and (2) intersecting the result with the availability region.
+  //
+  // That this region is of interest is another result of lacking complete
+  // OSSA lifetimes.
+
+  if (asImpl().isWithinLivenessBoundary(inst)) {
+    // The extended region is a superset of the pruned live region.
+    return true;
+  }
+
+  SILBasicBlock *parent = inst->getParent();
+  if (!deadEndBlocks.isDeadEnd(parent)) {
+    // The extended region intersected with the non-dead-end region is equal to
+    // the pruned live region.
+    return false;
+  }
+  switch (liveBlocks.getBlockLiveness(parent)) {
+  case PrunedLiveBlocks::Dead:
+    break;
+  case PrunedLiveBlocks::LiveWithin:
+    // Dead defs may result in LiveWithin but AvailableOut blocks.
+    return isInstructionAvailable(inst, deadEndBlocks);
+  case PrunedLiveBlocks::LiveOut:
+    // The instruction is not within the boundary, but its parent is LiveOut;
+    // therefore it must be a def block.
+    assert(asImpl().isDefBlock(parent));
+
+    // Where within the block might the instruction be?
+    // - before the first def: return false (outside the extended region).
+    // - between a def and a use: unreachable (withinBoundary would have
+    //   returned true).
+    // - between a def and another def: unreachable (withinBoundary would have
+    //   returned true)
+    // - between a use and a def: return false (outside the extended region).
+    // - after the final def: unreachable (withinBoundary would have returned
+    //   true)
+    return false;
+  }
+  // Check whether `parent` is in the extended region: walk backwards within
+  // the dead portion of the dead-end region up _through_ the first block which
+  // is either not dead or not dead-end.
+  //
+  // During the walk, if ANY reached block satisfies one of
+  // (1) dead-end, LiveWithin, !AvailableOut
+  // (2) NOT dead-end, NOT LiveOut
+  // then the `parent` is not in the extended region.
+  //
+  // Otherwise, ALL reached blocks satisfied one of the following:
+  // (a) dead-end, Dead
+  // (b) dead-end, LiveWithin, AvailableOut
+  // (b) MAYBE dead-end, LiveOut
+  // In this case, `parent` is in the extended region.
   BasicBlockWorklist worklist(parent->getFunction());
   worklist.push(parent);
   while (auto *block = worklist.pop()) {
     auto isLive = liveBlocks.getBlockLiveness(block);
+    if (!deadEndBlocks.isDeadEnd(block)) {
+      // The first block beyond the dead-end region has been reached.
+      if (isLive != PrunedLiveBlocks::LiveOut) {
+        // Cases (2) above.
+        return false;
+      }
+      // Stop walking.  (No longer in the dead portion of the dead-end region.)
+      continue;
+    }
     switch (isLive) {
-    case PrunedLiveBlocks::Dead: {
-      // Availability is unchanged; continue the backwards walk.
+    case PrunedLiveBlocks::Dead:
+      // Still within the dead portion of the dead-end region.  Keep walking.
       for (auto *predecessor : block->getPredecessorBlocks()) {
         worklist.pushIfNotVisited(predecessor);
       }
-      break;
-    }
+      continue;
     case PrunedLiveBlocks::LiveWithin:
-      // Availability ended in this block.  Some path to `parent` consumed the
-      // value.  Case (2) above.
-      return false;
+      // Availability may have ended in this block.  Check whether the block is
+      // "AvailableOut".
+      if (!isAvailableOut(block, deadEndBlocks)) {
+        // Case (1) above.
+        return false;
+      }
+      // Stop walking.  (No longer in the dead portion of the dead-end region.)
+      continue;
     case PrunedLiveBlocks::LiveOut:
-      // Availability continued out of this block.  Case (1) above.
+      // Stop walking.  (No longer in the dead portion of the dead-end region.)
       continue;
     }
   }
   return true;
 }
+
+namespace swift::test {
+// Arguments:
+// - string: "def:"
+// - SILValue: value to be analyzed
+// - string: "liveness-uses:"
+// - variadic list of - SILInstruction: user to pass to updateForUse
+//                    -         string: non-ending/ending/non-use
+// - string: "uses:"
+// - variadic list of - SILInstruction: the instruction to pass to
+// areUsesWithinBoundary Dumps:
+// - true/false
+static FunctionTest SSAPrunedLiveness__areUsesWithinBoundary(
+    "SSAPrunedLiveness__areUsesWithinBoundary",
+    [](auto &function, auto &arguments, auto &test) {
+      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+      SSAPrunedLiveness liveness(&function, &discoveredBlocks);
+
+      llvm::outs() << "SSAPrunedLiveness:\n";
+
+      if (arguments.takeString() != "def:") {
+        llvm::report_fatal_error("test expects the 'def:' label\n");
+      }
+      auto def = arguments.takeValue();
+      liveness.initializeDef(def);
+      llvm::outs() << "\tdef: " << def;
+      if (arguments.takeString() != "liveness-uses:") {
+        llvm::report_fatal_error("test expects the 'def:' label\n");
+      }
+      llvm::outs() << "\tuses:\n";
+      while (true) {
+        auto argument = arguments.takeArgument();
+        if (isa<StringArgument>(argument)) {
+          auto string = cast<StringArgument>(argument);
+          if (string.getValue() != "uses:") {
+            llvm::report_fatal_error("test expects the 'inst:' label\n");
+          }
+          break;
+        }
+        auto *instruction = cast<InstructionArgument>(argument).getValue();
+        auto string = arguments.takeString();
+        PrunedLiveness::LifetimeEnding::Value kind =
+            llvm::StringSwitch<PrunedLiveness::LifetimeEnding::Value>(string)
+                .Case("non-ending",
+                      PrunedLiveness::LifetimeEnding::Value::NonEnding)
+                .Case("ending", PrunedLiveness::LifetimeEnding::Value::Ending)
+                .Case("non-use", PrunedLiveness::LifetimeEnding::Value::NonUse);
+
+        llvm::outs() << "\t\t" << string << " " << *instruction;
+        liveness.updateForUse(instruction, kind);
+      }
+      liveness.print(llvm::outs());
+
+      PrunedLivenessBoundary boundary;
+      liveness.computeBoundary(boundary);
+      boundary.print(llvm::outs());
+
+      llvm::outs() << "\noperands:\n";
+      SmallVector<Operand *, 4> operands;
+      while (arguments.hasUntaken()) {
+        auto *operand = arguments.takeOperand();
+        operands.push_back(operand);
+        operand->print(llvm::outs());
+      }
+
+      auto result =
+          liveness.areUsesWithinBoundary(operands, test.getDeadEndBlocks());
+
+      llvm::outs() << "RESULT: " << StringRef(result ? "true" : "false")
+                   << "\n";
+    });
+} // end namespace swift::test
 
 template <typename LivenessWithDefs>
 bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
@@ -586,8 +801,7 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
 
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (!asImpl().isWithinBoundary(user) &&
-        !checkDeadEnd(user->getParent(), deadEndBlocks, liveBlocks))
+    if (!isWithinBoundary(user, deadEndBlocks))
       return false;
   }
   return true;
@@ -600,8 +814,7 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(
 
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (asImpl().isWithinBoundary(user) ||
-        checkDeadEnd(user->getParent(), deadEndBlocks, liveBlocks))
+    if (isWithinBoundary(user, deadEndBlocks))
       return false;
   }
   return true;

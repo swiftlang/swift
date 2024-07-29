@@ -162,7 +162,7 @@ namespace swift::test {
 // Dumps:
 // - value
 // - whether it's lexical
-static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
+static FunctionTest IsLexicalTest("is_lexical", [](auto &function,
                                                    auto &arguments,
                                                    auto &test) {
   auto value = arguments.takeValue();
@@ -205,6 +205,16 @@ bool ValueBase::hasDebugTrace() const {
       if (debugValue->hasTrace())
         return true;
     }
+  }
+  return false;
+}
+
+bool ValueBase::isFromVarDecl() {
+  if (auto *mvi = dyn_cast<MoveValueInst>(this)) {
+    return mvi->isFromVarDecl();
+  }
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(this)) {
+    return bbi->isFromVarDecl();
   }
   return false;
 }

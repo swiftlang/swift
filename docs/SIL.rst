@@ -5652,7 +5652,7 @@ strong reference count is greater than 1.
 A discussion of the semantics can be found here:
 `is_unique instruction <arcopts_is_unique_>`_
 
-.. _arcopts_is_unique: https://github.com/apple/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
+.. _arcopts_is_unique: https://github.com/swiftlang/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
 
 begin_cow_mutation
 ``````````````````
@@ -7023,7 +7023,7 @@ presence or value of the ``enum_extensibility`` Clang attribute.
 
 (See `SE-0192`__ for more information about non-frozen enums.)
 
-__ https://github.com/apple/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md
+__ https://github.com/swiftlang/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md
 
 enum
 ````

@@ -654,6 +654,8 @@ ERROR(expr_keypath_type_of_property,none,
       (DeclNameRef, Type))
 ERROR(expr_keypath_generic_type,none,
       "key path cannot refer to generic type %0", (Identifier))
+ERROR(expr_keypath_noncopyable_type,none,
+      "key path cannot refer to noncopyable type %0", (Type))
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
@@ -1954,6 +1956,12 @@ ERROR(section_linkage_markers_disabled,none,
       "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
+
+// @_silgen_name and friends
+WARNING(reserved_runtime_symbol_name,none,
+        "symbol name '%0' is reserved for the Swift runtime and cannot be "
+        "directly referenced without causing unpredictable behavior; "
+        "this will become an error", (StringRef))
 
 // @_extern
 ERROR(attr_extern_experimental,none,
@@ -7741,10 +7749,14 @@ ERROR(noncopyable_objc_enum, none,
       "noncopyable enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
+ERROR(moveOnly_deprecated,none,
+      "'@_moveOnly' attribute is deprecated and will be removed; use '~Copyable' instead", ())
 ERROR(consume_expression_needed_for_cast,none,
       "implicit conversion to %0 is consuming", (Type))
 NOTE(add_consume_to_silence,none,
      "add 'consume' to make consumption explicit", ())
+WARNING(consume_of_bitwisecopyable_noop,none,
+      "'consume' applied to bitwise-copyable type %0 has no effect", (Type))
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(consume_expression_partial_copyable,none,

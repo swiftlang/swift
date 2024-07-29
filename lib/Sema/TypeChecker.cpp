@@ -571,9 +571,9 @@ bool swift::typeCheckForCodeCompletion(
                                                  callback);
 }
 
-Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                                bool replaceInvalidRefsWithErrors) {
-  return TypeChecker::resolveDeclRefExpr(UDRE, Context, replaceInvalidRefsWithErrors);
+Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                DeclContext *Context) {
+  return TypeChecker::resolveDeclRefExpr(UDRE, Context);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {

@@ -7,8 +7,7 @@ import Builtin
 
 public class CopyableKlass {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init()
@@ -20,8 +19,7 @@ sil @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
 sil @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> () // user: %24
 sil @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed CopyableKlass) -> () // user: %16
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var k = Klass()
     var copyableK = CopyableKlass()
     var nonTrivialStruct2 = NonTrivialStruct2()
@@ -32,20 +30,18 @@ sil @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
 sil @consumeNonTrivialStructAddr : $@convention(thin) (@in NonTrivialStruct) -> ()
 sil @consumeNonTrivialStruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
 
-@_moveOnly
-public struct NonTrivialStructPair {
+public struct NonTrivialStructPair: ~Copyable {
     var lhs: NonTrivialStruct
     var rhs: NonTrivialStruct
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
+public struct NonTrivialStruct2: ~Copyable {
     var copyableKlass = CopyableKlass()
 }
 
 sil @useNonTrivialStruct2 : $@convention(thin) (@guaranteed NonTrivialStruct2) -> ()
 
-@_moveOnly struct MyBufferView<T> {
+struct MyBufferView<T>: ~Copyable {
   var ptr: UnsafeBufferPointer<T>
 }
 
@@ -600,12 +596,10 @@ bb0(%0 : @owned $NonTrivialStruct):
   return %9999 : $()
 }
 
-@_moveOnly
-struct M {
+struct M: ~Copyable {
   deinit {}
 }
-@_moveOnly
-struct M2 {
+struct M2: ~Copyable {
   let s1: M
   let s2: M
 }
