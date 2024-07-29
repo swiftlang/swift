@@ -264,10 +264,10 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20240625"],
+            "aliases": ["rebranch", "stable/20240723"],
             "repos": {
-                "llvm-project": "stable/20240625",
-                "swift-llvm-bindings": "stable/20240625",
+                "llvm-project": "stable/20240723",
+                "swift-llvm-bindings": "stable/20240723",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -288,10 +288,12 @@
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
+                "swift-foundation-icu": "main",
+                "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
-                "ninja": "release",
+                "ninja": "v1.11.1",
                 "yams": "5.0.6",
                 "cmake": "v3.24.2",
                 "indexstore-db": "main",
@@ -304,12 +306,11 @@
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-nio": "2.65.0",
-                "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
+                "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-20",
                 "wasmkit": "0.0.3",
                 "curl": "curl-8_5_0",
-                "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
             }
