@@ -203,21 +203,9 @@ public:
     }
 
     if (auto rawLayout = T.getRawLayout()) {
-      // Because we have a rawlayout attribute, we know this has to be a struct.
-      auto structDecl = T.getStructOrBoundGenericStruct();
-
-      if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
-        if (rawLayout->shouldMoveAsLikeType()) {
-          auto astT = T.getASTType();
-          auto subs = astT->getContextSubstitutionMap();
-          auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
-          auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
-
-          likeTypeInfo.assignWithTake(IGF, dest, src, loweredLikeType,
-                                      isOutlined);
-          return;
-        }
-      }
+      return takeRawLayout(IGF, dest, src, T, isOutlined,
+                           /* zeroizeIfSensitive */ false, rawLayout,
+                           /* isInit */ false);
     }
 
     if (isOutlined || T.hasParameterizedExistential()) {
@@ -280,20 +268,8 @@ public:
       // If the fields are not ABI-accessible, use the value witness table.
       return emitInitializeWithTakeCall(IGF, T, dest, src);
     } else if (auto rawLayout = T.getRawLayout()) {
-      // Because we have a rawlayout attribute, we know this has to be a struct.
-      auto structDecl = T.getStructOrBoundGenericStruct();
-
-      if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
-        if (rawLayout->shouldMoveAsLikeType()) {
-          auto astT = T.getASTType();
-          auto subs = astT->getContextSubstitutionMap();
-          auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
-          auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
-
-          likeTypeInfo.initializeWithTake(IGF, dest, src, loweredLikeType,
-                                          isOutlined, zeroizeIfSensitive);
-        }
-      }
+      return takeRawLayout(IGF, dest, src, T, isOutlined, zeroizeIfSensitive,
+                           rawLayout, /* isInit */ true);
     } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -311,6 +287,90 @@ public:
     }
     if (zeroizeIfSensitive)
       fillWithZerosIfSensitive(IGF, src, T);
+  }
+
+  void takeRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                     bool isOutlined, bool zeroizeIfSensitive,
+                     RawLayoutAttr *rawLayout, bool isInit) const {
+    if (rawLayout->shouldMoveAsLikeType()) {
+      // Because we have a rawlayout attribute, we know this has to be a struct.
+      auto structDecl = T.getStructOrBoundGenericStruct();
+
+      if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
+        auto astT = T.getASTType();
+        auto subs = astT->getContextSubstitutionMap();
+        auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
+        auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+
+        if (isInit) {
+          likeTypeInfo.initializeWithTake(IGF, dest, src, loweredLikeType,
+                                        isOutlined, zeroizeIfSensitive);
+        } else {
+          likeTypeInfo.assignWithTake(IGF, dest, src, loweredLikeType,
+                                      isOutlined);
+        }
+      }
+
+      if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(structDecl)) {
+        auto likeType = likeArray->first;
+        unsigned count = likeArray->second;
+
+        auto astT = T.getASTType();
+        auto subs = astT->getContextSubstitutionMap();
+        auto loweredLikeType = IGF.IGM.getLoweredType(likeType.subst(subs));
+        auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+
+        for (unsigned i = 0; i != count; i += 1) {
+          auto index = llvm::ConstantInt::get(IGF.IGM.SizeTy, i);
+
+          Address srcEltAddr;
+          Address destEltAddr;
+
+          // If we have a fixed type, we can use a typed GEP to index into the
+          // array raw layout. Otherwise, we need to advance by bytes given the
+          // stride from the VWT of the like type.
+          if (auto fixedLikeType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
+            srcEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
+                                    fixedLikeType->getStorageType(),
+                                    src.getAddress(),
+                                    index),
+                                 fixedLikeType->getStorageType(),
+                                 src.getAlignment());
+            destEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
+                                    fixedLikeType->getStorageType(),
+                                    dest.getAddress(),
+                                    index),
+                                 fixedLikeType->getStorageType(),
+                                 dest.getAlignment());
+          } else {
+            auto eltSize = likeTypeInfo.getStride(IGF, loweredLikeType);
+            auto offset = IGF.Builder.CreateMul(index, eltSize);
+
+            srcEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
+                                    IGF.IGM.Int8Ty,
+                                    src.getAddress(),
+                                    offset),
+                                 IGF.IGM.Int8Ty,
+                                 src.getAlignment());
+            destEltAddr = Address(IGF.Builder.CreateInBoundsGEP(
+                                    IGF.IGM.Int8Ty,
+                                    dest.getAddress(),
+                                    offset),
+                                 IGF.IGM.Int8Ty,
+                                 dest.getAlignment());
+          }
+
+          if (isInit) {
+            likeTypeInfo.initializeWithTake(IGF, destEltAddr, srcEltAddr,
+                                            loweredLikeType, isOutlined,
+                                            zeroizeIfSensitive);
+          } else {
+            likeTypeInfo.assignWithTake(IGF, destEltAddr, srcEltAddr,
+                                        loweredLikeType, isOutlined);
+          }
+        }
+      }
+    }
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
