@@ -226,7 +226,7 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{missing return in subscript expected to return 'Int'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int {
