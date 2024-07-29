@@ -2442,7 +2442,7 @@ static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
 
   if (macroDecl->getParentModule()->isStdlibModule() &&
       macroDecl->getName().getBaseIdentifier()
-          .str().equals("_DebugDescriptionProperty"))
+          .str() == "_DebugDescriptionProperty")
     return true;
 
   return false;
@@ -7366,11 +7366,11 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
   } else if (fn->getBaseName().isSpecial() ||
-             !fn->getParentModule()->getName().str().equals("_Concurrency") ||
+             fn->getParentModule()->getName().str() != "_Concurrency" ||
              !fn->getBaseIdentifier().str()
                 .starts_with("_unsafeInheritExecutor_")) {
     bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
-        .str().equals("_Concurrency");
+        .str() == "_Concurrency";
     auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
     diag.warnUntilSwiftVersion(6);
     diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
