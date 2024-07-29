@@ -2537,6 +2537,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver;
     SwiftInvocationRef Invok;
 
+    bool requiresDeepStack() override { return true; }
+
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // FIXME: Don't silently eat errors here.
     RelatedIdentsResult getRelatedIdents(SourceFile *SrcFile,

@@ -153,6 +153,15 @@ class SwiftASTConsumer : public std::enable_shared_from_this<SwiftASTConsumer> {
 public:
   virtual ~SwiftASTConsumer() { }
 
+  /// Whether `handlePrimaryAST` should be executed with the same stack size as
+  /// the main thread.
+  ///
+  /// By default, it is assumed that `handlePrimaryAST` does not do a lot of
+  /// work and it is sufficient to run it on a background thread's stack with
+  /// reduced size. Set this to `true` if the consumer can perform additional
+  /// work that might require more stack size, such as invoking SwiftParser.
+  virtual bool requiresDeepStack() { return false; }
+
   // MARK: Cancellation
 
   /// The result of this consumer is no longer of interest to the SourceKit
