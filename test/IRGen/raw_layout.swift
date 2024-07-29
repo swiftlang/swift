@@ -336,11 +336,11 @@ entry(%0 : $*Cell<T>):
 // CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK: [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT: [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
-// CHECK: [[OFFSET_0:%.*]] = mul i64 0, [[STRIDE]]
+// CHECK: [[OFFSET_0:%.*]] = mul {{i64|i32}} 0, [[STRIDE]]
 // CHECK-NEXT: [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
 // CHECK-NEXT: [[DEST_ELT_0:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_0]]
 // CHECK: {{%.*}} = call ptr %InitializeWithTake(ptr {{.*}} [[DEST_ELT_0]], ptr {{.*}} [[SRC_ELT_0]], ptr [[T]])
-// CHECK: [[OFFSET_1:%.*]] = mul i64 1, [[STRIDE]]
+// CHECK: [[OFFSET_1:%.*]] = mul {{i64|i32}} 1, [[STRIDE]]
 // CHECK-NEXT: [[SRC_ELT_1:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_1]]
 // CHECK-NEXT: [[DEST_ELT_1:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_1]]
 // CHECK: {{%.*}} = call ptr %InitializeWithTake(ptr {{.*}} [[DEST_ELT_1]], ptr {{.*}} [[SRC_ELT_1]], ptr [[T]])
@@ -354,11 +354,11 @@ entry(%0 : $*Cell<T>):
 // CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
 // CHECK: [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT: [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
-// CHECK: [[OFFSET_0:%.*]] = mul i64 0, [[STRIDE]]
+// CHECK: [[OFFSET_0:%.*]] = mul {{i64|i32}} 0, [[STRIDE]]
 // CHECK-NEXT: [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
 // CHECK-NEXT: [[DEST_ELT_0:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_0]]
 // CHECK: {{%.*}} = call ptr %AssignWithTake(ptr {{.*}} [[DEST_ELT_0]], ptr {{.*}} [[SRC_ELT_0]], ptr [[T]])
-// CHECK: [[OFFSET_1:%.*]] = mul i64 1, [[STRIDE]]
+// CHECK: [[OFFSET_1:%.*]] = mul {{i64|i32}} 1, [[STRIDE]]
 // CHECK-NEXT: [[SRC_ELT_1:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_1]]
 // CHECK-NEXT: [[DEST_ELT_1:%.*]] = getelementptr inbounds i8, ptr %dest, {{i64|i32}} [[OFFSET_1]]
 // CHECK: {{%.*}} = call ptr %AssignWithTake(ptr {{.*}} [[DEST_ELT_1]], ptr {{.*}} [[SRC_ELT_1]], ptr [[T]])
