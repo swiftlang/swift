@@ -2096,7 +2096,7 @@ void swift::replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
 
 /// Whether this declaration context is in the _Concurrency module.
 static bool inConcurrencyModule(const DeclContext *dc) {
-  return dc->getParentModule()->getName().str().equals("_Concurrency");
+  return dc->getParentModule()->getName().str() == "_Concurrency";
 }
 
 void swift::introduceUnsafeInheritExecutorReplacements(
