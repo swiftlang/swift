@@ -15,6 +15,7 @@ from .cmark import CMark
 from .curl import LibCurl
 from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
+from .foundationtests import FoundationTests
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
 from .libdispatch import LibDispatch
@@ -33,6 +34,7 @@ from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
 from .swiftformat import SwiftFormat
+from .swiftfoundationtests import SwiftFoundationTests
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
@@ -47,6 +49,8 @@ from .zlib import Zlib
 __all__ = [
     'CMark',
     'Foundation',
+    'FoundationTests',
+    'SwiftFoundationTests',
     'LibCXX',
     'LibDispatch',
     'LibXML2',
