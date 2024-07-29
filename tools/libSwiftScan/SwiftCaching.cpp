@@ -981,8 +981,11 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
     DH.initDiagConsumers(Invocation);
     DH.beginMessage(Invocation, Instance.Args);
 
-    if (auto E = CDP->replayCachedDiagnostics(DiagnosticsOutput->getData()))
+    if (auto E = CDP->replayCachedDiagnostics(DiagnosticsOutput->getData())) {
+      DH.endMessage(/*ReturnCode=*/1);
+      Inst.getDiags().finishProcessing();
       return E;
+    }
 
     if (Remarks)
       Inst.getDiags().diagnose(SourceLoc(), diag::replay_output,
