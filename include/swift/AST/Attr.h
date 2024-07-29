@@ -2553,11 +2553,12 @@ public:
         MovesAsLike(movesAsLike) {}
 
   /// Construct a `@_rawLayout(likeArrayOf: T, count: N)` attribute.
-  RawLayoutAttr(TypeRepr *LikeType, unsigned Count, SourceLoc AtLoc,
-                SourceRange Range)
+  RawLayoutAttr(TypeRepr *LikeType, unsigned Count, bool movesAsLike,
+                SourceLoc AtLoc, SourceRange Range)
       : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
                       /*implicit*/ false),
-        LikeType(LikeType), SizeOrCount(Count), Alignment(0) {}
+        LikeType(LikeType), SizeOrCount(Count), Alignment(0),
+        MovesAsLike(movesAsLike) {}
 
   /// Construct a `@_rawLayout(size: N, alignment: M)` attribute.
   RawLayoutAttr(unsigned Size, unsigned Alignment, SourceLoc AtLoc,
