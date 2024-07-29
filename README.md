@@ -103,7 +103,7 @@ script is used by swift.org's CI to produce snapshots and can allow for one to
 locally reproduce such builds for development or distribution purposes. A typical 
 invocation looks like the following:
 
-```
+```sh
   $ ./swift/utils/build-toolchain $BUNDLE_PREFIX
 ```
 
@@ -134,7 +134,7 @@ On macOS if one wants to install such a toolchain into Xcode:
 1. Untar and copy the toolchain to one of `/Library/Developer/Toolchains/` or
    `~/Library/Developer/Toolchains/`. E.g.:
 
-```
+```sh
   $ sudo tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz -C /
   $ tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz -C ~/
 ```
@@ -143,7 +143,7 @@ The script also generates an archive containing debug symbols which
 can be installed over the main archive allowing symbolication of any
 compiler crashes.
 
-```
+```sh
   $ sudo tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx-symbols.tar.gz -C /
   $ tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx-symbols.tar.gz -C ~/
 ```
