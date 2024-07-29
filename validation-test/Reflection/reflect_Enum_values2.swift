@@ -6,6 +6,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: reflection_test_support
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: asan
 
