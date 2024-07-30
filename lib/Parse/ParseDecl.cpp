@@ -7080,10 +7080,6 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   // If explicitly disabled, respect the flag.
   if (!isDelayedParsingEnabled())
     return false;
-  // Recovering parser status later for #sourceLocation is not-trivial and
-  // it may not worth it.
-  if (InPoundLineEnvironment)
-    return false;
 
   // Skip until the matching right curly bracket; if we find a pound directive,
   // we can't lazily parse.
