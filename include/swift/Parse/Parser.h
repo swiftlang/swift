@@ -156,7 +156,13 @@ public:
   /// Whether this context has an async attribute.
   bool InPatternWithAsyncAttribute = false;
 
+  /// Whether a '#sourceLocation' is currently active.
+  /// NOTE: Do not use this outside of `parseLineDirective`, it doesn't have
+  /// its state restored when parsing delayed bodies (we avoid skipping bodies
+  /// if we see a `#sourceLocation` in them though). Instead, query the
+  /// SourceManager.
   bool InPoundLineEnvironment = false;
+
   bool InPoundIfEnvironment = false;
   /// ASTScopes are not created in inactive clauses and lookups to decls will fail.
   bool InInactiveClauseEnvironment = false;
