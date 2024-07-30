@@ -738,6 +738,7 @@ EXPECTED_OPTIONS = [
                   dest='test_playgroundsupport'),
     DisableOption('--skip-test-cmark', dest='test_cmark'),
     DisableOption('--skip-test-swiftpm', dest='test_swiftpm'),
+    DisableOption('--skip-test-foundation', dest='test_foundation'),
     DisableOption('--skip-test-swift-driver', dest='test_swift_driver'),
     DisableOption('--skip-test-swiftsyntax', dest='test_swiftsyntax'),
     DisableOption('--skip-test-indexstore-db', dest='test_indexstoredb'),
