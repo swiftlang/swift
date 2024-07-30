@@ -24,7 +24,7 @@ public struct CalleeAnalysis {
       },
       // getMemBehaviorFn
       { (bridgedApply: BridgedInstruction, observeRetains: Bool, bca: BridgedCalleeAnalysis) -> BridgedMemoryBehavior in
-        let apply = bridgedApply.instruction as! ApplySite
+        let apply = bridgedApply.instruction as! FullApplySite
         let e = bca.analysis.getSideEffects(ofApply: apply)
         return e.getMemBehavior(observeRetains: observeRetains)
       }
@@ -60,7 +60,7 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the global (i.e. not argument specific) side effects of an apply.
-  public func getSideEffects(ofApply apply: ApplySite) -> SideEffects.GlobalEffects {
+  public func getSideEffects(ofApply apply: FullApplySite) -> SideEffects.GlobalEffects {
     return getSideEffects(ofCallee: apply.callee)
   }
 
@@ -78,7 +78,7 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the argument specific side effects of an apply.
-  public func getSideEffects(of apply: ApplySite, operand: Operand, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
+  public func getSideEffects(of apply: FullApplySite, operand: Operand, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
     var result = SideEffects.GlobalEffects()
     guard let calleeArgIdx = apply.calleeArgumentIndex(of: operand) else {
       return result

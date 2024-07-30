@@ -73,7 +73,7 @@ static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
                                             transform) != nullptr);
       } else if (auto *metatype = dyn_cast<MetatypeInst>(&inst)) {
         changed |= (specializeVTableForType(
-                        metatype->getType().getInstanceTypeOfMetatype(&func),
+                        metatype->getType().getLoweredInstanceTypeOfMetatype(&func),
                         module, transform) != nullptr);
       } else if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
         changed |= specializeClassMethodInst(cm);

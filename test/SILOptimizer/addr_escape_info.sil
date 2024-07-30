@@ -796,3 +796,66 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: Address escape information for test_is_unique:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:  End function test_is_unique
+sil [ossa] @test_is_unique : $@convention(thin) (@owned X) -> () {
+bb0(%0 :  @owned $X):
+  %1 = alloc_stack $X
+  store %0 to [init] %1 : $*X
+  fix_lifetime %1 : $*X
+  %3 = is_unique %1 : $*X
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_unchecked_addr_cast:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:  End function test_unchecked_addr_cast
+sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@owned X) -> @owned XandIntClass {
+bb0(%0 :  @owned $X):
+  %1 = alloc_stack $X
+  store %0 to [init] %1 : $*X
+  fix_lifetime %1 : $*X
+  %4 = unchecked_addr_cast %1 : $*X to $*XandIntClass
+  %5 = is_unique %4 : $*XandIntClass
+  %6 = load_borrow %4 : $*XandIntClass
+  end_borrow %6 : $XandIntClass
+  %8 = load [take] %4 : $*XandIntClass
+  dealloc_stack %1 : $*X
+  return %8 : $XandIntClass
+}
+
+// CHECK-LABEL: Address escape information for test_unchecked_addr_cast_escaping:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:  ==>   %6 = apply %5(%4) : $@convention(thin) (@inout X) -> ()
+// CHECK-NEXT:  End function test_unchecked_addr_cast_escaping
+sil [ossa] @test_unchecked_addr_cast_escaping : $@convention(thin) (@owned XandIntClass) -> () {
+bb0(%0 :  @owned $XandIntClass):
+  %1 = alloc_stack $XandIntClass
+  store %0 to [init] %1 : $*XandIntClass
+  fix_lifetime %1 : $*XandIntClass
+  %4 = unchecked_addr_cast %1 : $*XandIntClass to $*X
+  %5 = function_ref @inout_class_argument : $@convention(thin) (@inout X) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@inout X) -> ()
+  dealloc_stack %1 : $*XandIntClass
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: Address escape information for test_store_borrow:
+// CHECK:       value:  %2 = store_borrow %0 to %1 : $*X                // users: %4, %3
+// CHECK-NEXT:  End function test_store_borrow
+sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 :  @guaranteed $X):
+  %1 = alloc_stack $X
+  %2 = store_borrow %0 to %1 : $*X
+  fix_lifetime %2 : $*X
+  end_borrow %2 : $*X
+  dealloc_stack %1 : $*X
+  %3 = tuple ()
+  return %3 : $()
+}
+

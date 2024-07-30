@@ -550,6 +550,12 @@ extension BridgedArgument {
   public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }
 
+extension Optional where Wrapped == Argument {
+  public var bridged: OptionalBridgedArgument {
+    OptionalBridgedArgument(obj: self?.bridged.obj)
+  }
+}
+
 extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
