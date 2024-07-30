@@ -5620,11 +5620,13 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
 
 static unsigned skipUntilMatchingRBrace(Parser &P,
                                         bool &HasPoundDirective,
+                                        bool &HasPoundSourceLocation,
                                         bool &HasOperatorDeclarations,
                                         bool &HasNestedClassDeclarations,
                                         bool &HasNestedTypeDeclarations,
                                         bool &HasPotentialRegexLiteral) {
   HasPoundDirective = false;
+  HasPoundSourceLocation = false;
   HasOperatorDeclarations = false;
   HasNestedClassDeclarations = false;
   HasNestedTypeDeclarations = false;
@@ -5646,8 +5648,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
 
     HasNestedClassDeclarations |= P.Tok.is(tok::kw_class);
 
-    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
-      tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
+    HasPoundSourceLocation |= P.Tok.isAny(tok::pound_sourceLocation,
+                                          tok::pound_line);
+    HasPoundDirective |= HasPoundSourceLocation;
+    HasPoundDirective |= P.Tok.isAny(tok::pound_if, tok::pound_else,
+                                     tok::pound_endif, tok::pound_elseif);
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
                                              tok::kw_enum, tok::kw_typealias,
@@ -7080,25 +7085,27 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   // If explicitly disabled, respect the flag.
   if (!isDelayedParsingEnabled())
     return false;
-  // Recovering parser status later for #sourceLocation is not-trivial and
-  // it may not worth it.
-  if (InPoundLineEnvironment)
-    return false;
 
   // Skip until the matching right curly bracket; if we find a pound directive,
   // we can't lazily parse.
   CancellableBacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
+  bool HasPoundSourceLocation;
   bool HasNestedTypeDeclarations;
   bool HasPotentialRegexLiteral;
   skipUntilMatchingRBrace(*this,
                           HasPoundDirective,
+                          HasPoundSourceLocation,
                           HasOperatorDeclarations,
                           HasNestedClassDeclarations,
                           HasNestedTypeDeclarations,
                           HasPotentialRegexLiteral);
-  if (!HasPoundDirective && !HasPotentialRegexLiteral)
+  if (!HasPoundDirective && !HasPotentialRegexLiteral) {
+    // If we didn't see any pound directive, we must not have seen
+    // #sourceLocation either.
+    ASSERT(!HasPoundSourceLocation);
     BackTrack.cancelBacktrack();
+  }
   return !BackTrack.willBacktrack();
 }
 
@@ -7694,17 +7701,20 @@ bool Parser::canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations) {
     return false;
 
   // Skip until the matching right curly bracket; If it has a potential regex
-  // literal, we can't skip. We don't care others, so just ignore them;
+  // literal, we can't skip. If there's a `#sourceLocation`, we also can't skip
+  // since we rely on setting and restoring state in the parser. Other cases we
+  // can handle.
   CancellableBacktrackingScope BackTrack(*this);
   consumeToken(tok::l_brace);
   bool HasPoundDirectives;
+  bool HasPoundSourceLocation;
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
   bool HasPotentialRegexLiteral;
-  skipUntilMatchingRBrace(*this, HasPoundDirectives, HasOperatorDeclarations,
-                          HasNestedClassDeclarations, HasNestedTypeDeclarations,
-                          HasPotentialRegexLiteral);
-  if (HasPotentialRegexLiteral)
+  skipUntilMatchingRBrace(*this, HasPoundDirectives, HasPoundSourceLocation,
+                          HasOperatorDeclarations, HasNestedClassDeclarations,
+                          HasNestedTypeDeclarations, HasPotentialRegexLiteral);
+  if (HasPoundSourceLocation || HasPotentialRegexLiteral)
     return false;
 
   BackTrack.cancelBacktrack();
