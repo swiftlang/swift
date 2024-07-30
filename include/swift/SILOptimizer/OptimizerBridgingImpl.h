@@ -34,9 +34,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //                                BridgedAliasAnalysis
 //===----------------------------------------------------------------------===//
 
-BridgedMemoryBehavior BridgedAliasAnalysis::getMemBehavior(BridgedInstruction inst, BridgedValue addr) const {
-  return (BridgedMemoryBehavior)aa->computeMemoryBehavior(inst.unbridged(),
-                                                          addr.getSILValue());
+bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) const {
+  return true;
 }
 
 //===----------------------------------------------------------------------===//

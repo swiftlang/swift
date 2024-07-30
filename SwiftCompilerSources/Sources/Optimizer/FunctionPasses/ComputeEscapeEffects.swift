@@ -47,8 +47,10 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
     }
 
     // First check: is the argument (or a projected value of it) escaping at all?
-    if !arg.at(.anything).isEscapingWhenWalkingDown(using: IgnoreRecursiveCallVisitor(),
-                                                    context) {
+    if !arg.at(.anything).isEscaping(using: IgnoreRecursiveCallVisitor(),
+                                     initialWalkingDirection: .down,
+                                     context)
+    {
       let effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index,
                                                 pathPattern: SmallProjectionPath(.anything))
       newEffects.append(effect)
@@ -84,7 +86,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
   
-  guard let result = arg.at(argPath).visitByWalkingDown(using: ArgEffectsVisitor(), context) else {
+  guard let result = arg.at(argPath).visit(using: ArgEffectsVisitor(), initialWalkingDirection: .down, context) else {
     return false
   }
   
