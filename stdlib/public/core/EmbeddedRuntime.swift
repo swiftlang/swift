@@ -73,7 +73,7 @@ public struct HeapObject {
 func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _: Int) -> CInt
 
 @_extern(c, "free")
-func free(_ p: Builtin.RawPointer)
+func free(_ p: UnsafeMutableRawPointer?)
 
 
 
@@ -99,7 +99,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 
 @_cdecl("swift_slowDealloc")
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
-  free(ptr._rawValue)
+  free(ptr)
 }
 
 @_cdecl("swift_allocObject")
@@ -121,7 +121,7 @@ public func swift_deallocObject(object: Builtin.RawPointer, allocatedSize: Int, 
 }
 
 func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
-  free(object._rawValue)
+  free(UnsafeMutableRawPointer(object))
 }
 
 @_cdecl("swift_deallocClassInstance")
@@ -134,7 +134,7 @@ func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, alloca
     return
   }
 
-  free(object._rawValue)
+  free(UnsafeMutableRawPointer(object))
 }
 
 @_cdecl("swift_deallocPartialClassInstance")
