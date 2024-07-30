@@ -539,7 +539,8 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       }
       switch convention {
       case .indirectIn, .packOwned:
-        result.memory.write = false
+        // indirect-in arguments are consumed by the caller and that not only counts as read but also as a write.
+        break
       case .indirectInGuaranteed, .packGuaranteed:
         result.memory.write = false
         result.ownership.destroy = false
@@ -601,6 +602,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     public mutating func merge(with other: Memory) {
       read = read || other.read
       write = write || other.write
+    }
+
+    public static var noEffects: Memory {
+      Memory(read: false, write: false)
     }
 
     public static var worstEffects: Memory {

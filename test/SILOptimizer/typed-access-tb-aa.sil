@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa-kind=typed-access-tb-aa -aa-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-alias-info -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -86,334 +86,208 @@ bb0:
 // CHECK-LABEL: @builtin_test
 
 // Check that a raw pointer address may alias everything.
-// CHECK: PAIR #134.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #135.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #136.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #137.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #138.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #139.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #140.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #141.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #142.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #143.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #144.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #145.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #146.
-// CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: MayAlias
 
-// Now check that a native object address may:
-//
-// 1. May alias raw pointer addresses.
-// 2. May alias an unknown object.
-// 3. Does not alias scalar addresses. This can only occur via inttoptr and the
-// like. Since we are using type oracles we are allowed to make the assumption
-// that this type of type punning can be ignored.
-// 4. May alias addresses to other Builtin.NativeObjects
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   MayAlias
 
-// CHECK: PAIR #149.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #150.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #151.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #152.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #153.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #154.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #155.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #156.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #157.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #158.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #159.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #160.
-// CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
 
-// Check that AnyObject addresses can alias pretty much any object or untyped
-// pointer.
-// FIXME: We could do better here; AnyObject is a particularly easy existential.
-// CHECK: PAIR #163.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #164.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #165.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #166.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #167.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #168.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #169.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #170.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #171.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #172.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #173.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: MayAlias
+// Now check that a NativeObject and AnyObject alias everything.
+// This is a conservative approach. We could (if needed) relax this and don't let object types alias with scalar types.
 
-// Next check that Int8 addresses can only alias Int8 addresses and raw
-// pointers. This includes ensuring that Int8 cannot alias Int32 addresses.
-// CHECK: PAIR #176.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #177.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #178.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #179.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #180.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #181.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #182.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #183.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #184.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #185.
-// CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
+// CHECK:      PAIR #8.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #9.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #10.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #11.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #12.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #13.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #15.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #16.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #17.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #18.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #19.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   MayAlias
 
-// Finally conclude by checking that FPIEEE32 addresses only can alias raw
-// pointer addresses and other FPIEEE32 addresses. Again this includes proving
-// that FPIEEE64 addresses cannot alias FPIEEE32.
-// CHECK: PAIR #199.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #200.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #201.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #202.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #203.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #204.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #205.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #206.
-// CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
+// Check that scalar types don't alias different scalar types.
+
+// CHECK:      PAIR #21.
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #22.
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #23.
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #24.
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #26.
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #27.
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #28.
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #30.
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #31.
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #33.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
+// CHECK-NEXT:   MayAlias
 
 sil @builtin_test : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
-  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int8>
-  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
-  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>
+  %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.AnyObject
+  %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+  %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+  %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+  %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE64
 
-  %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-  %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
-  %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-  %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-  %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-
-  // This second block ensures that we gain the benefits of not repeating
-  // already known values with being able to have associated with the output for
-  // each type each of the items we are trying to check aliasing against. This
-  // makes it simpler to write these tests.
-  %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-  %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
-  %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-  %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-  %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
+  fix_lifetime %0 : $*Builtin.RawPointer
+  fix_lifetime %1 : $*Builtin.NativeObject
+  fix_lifetime %2 : $*Builtin.AnyObject
+  fix_lifetime %3 : $*Builtin.Int8
+  fix_lifetime %4 : $*Builtin.Int32
+  fix_lifetime %5 : $*Builtin.FPIEEE32
+  fix_lifetime %6 : $*Builtin.FPIEEE64
 
   %21 = tuple()
   return %21 : $()
 }
 
+
 // Make sure that struct addresses:
 //
 // 1. Alias address types that they contain.
 // 2. Do not alias address types that they do not contain.
-// 3. Do not alias Builtin.ObjectPointers.
-// 4. Aliases raw pointers.
+// 3. Aliases raw pointers.
+// 4. Aliases builtin objects (this is conservative!).
 
 // CHECK-LABEL: @struct_tests
-// CHECK: PAIR #339.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <STest_S1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #340.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <STest_S2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #341.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <STest_E1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #342.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <STest_E2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #343.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <STest_C1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #344.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <STest_C2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #345.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #351.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %26 = project_box %21 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #352.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %27 = project_box %22 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #353.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #354.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #355.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %30 = project_box %25 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
+
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #18.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S2
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #29.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_E1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #39.
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_E2
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #48.
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_C1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #56.
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_C2
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #63.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #64.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:     %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #65.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:     %8 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #66.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:     %9 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #67.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:     %10 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #68.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
+// CHECK-NEXT:     %11 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   NoAlias
 
 struct STest_S1 {
   var a : Builtin.Int32
@@ -446,96 +320,88 @@ struct STest_S3 {
 }
 
 sil @struct_tests : $@convention(thin) () -> () {
+bb0:
+  %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S1
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S2
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_E1
+  %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_E2
+  %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_C1
+  %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_C2
+  %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*STest_S3
 
-  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_S1>
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_S2>
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_E1>
-  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_E2>
-  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_C1>
-  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_C2>
-  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <STest_S3>
+  %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %8 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %9 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.AnyObject
+  %10 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+  %11 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
 
-  %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <STest_S1>, 0
-  %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <STest_S2>, 0
-  %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <STest_E1>, 0
-  %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <STest_E2>, 0
-  %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <STest_C1>, 0
-  %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <STest_C2>, 0
-  %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-
-  %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <STest_S1>, 0
-  %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <STest_S2>, 0
-  %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <STest_E1>, 0
-  %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <STest_E2>, 0
-  %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <STest_C1>, 0
-  %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <STest_C2>, 0
-  %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-
-  %21 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
-  %22 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
-  %24 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %25 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
-
-  %26 = project_box %21 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-  %27 = project_box %22 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
-  %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %30 = project_box %25 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
+  fix_lifetime %0 : $*STest_S1
+  fix_lifetime %1 : $*STest_S2
+  fix_lifetime %2 : $*STest_E1
+  fix_lifetime %3 : $*STest_E2
+  fix_lifetime %4 : $*STest_C1
+  fix_lifetime %5 : $*STest_C2
+  fix_lifetime %6 : $*STest_S3
+  fix_lifetime %7 : $*Builtin.RawPointer
+  fix_lifetime %8 : $*Builtin.NativeObject
+  fix_lifetime %9 : $*Builtin.AnyObject
+  fix_lifetime %10 : $*Builtin.Int32
+  fix_lifetime %11 : $*Builtin.FPIEEE32
 
   %9999 = tuple()
   return %9999 : $()
 }
 
 // CHECK-LABEL: @enum_tests
-// CHECK: PAIR #339.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <ETest_S1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #340.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <ETest_S2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #341.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <ETest_E1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #342.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <ETest_E2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #343.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <ETest_C1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #344.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <ETest_C2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #345.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #351.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %26 = project_box %21 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #352.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %27 = project_box %22 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #353.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #354.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #355.
-// CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %30 = project_box %25 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
+
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_S1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #18.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_S2
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #29.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #39.
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E2
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #48.
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_C1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #56.
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_C2
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #63.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #64.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:     %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #65.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:     %8 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #66.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:     %9 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #67.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:     %10 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #68.
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
+// CHECK-NEXT:     %11 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
+// CHECK-NEXT:   NoAlias
 
 struct ETest_S1 {
   var a : Builtin.Int32
@@ -569,174 +435,74 @@ enum ETest_E3 {
 }
 
 sil @enum_tests : $@convention(thin) () -> () {
-  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_S1>
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_S2>
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_E1>
-  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_E2>
-  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_C1>
-  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_C2>
-  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <ETest_E3>
+bb0:
+  %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_S1
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_S2
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E1
+  %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E2
+  %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_C1
+  %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_C2
+  %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*ETest_E3
 
-  %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <ETest_S1>, 0
-  %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <ETest_S2>, 0
-  %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <ETest_E1>, 0
-  %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <ETest_E2>, 0
-  %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <ETest_C1>, 0
-  %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <ETest_C2>, 0
-  %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
+  %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %8 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %9 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.AnyObject
+  %10 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+  %11 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
 
-  %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <ETest_S1>, 0
-  %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <ETest_S2>, 0
-  %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <ETest_E1>, 0
-  %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <ETest_E2>, 0
-  %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <ETest_C1>, 0
-  %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <ETest_C2>, 0
-  %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-
-  %21 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
-  %22 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
-  %24 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %25 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
-
-  %26 = project_box %21 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-  %27 = project_box %22 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
-  %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %30 = project_box %25 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
+  fix_lifetime %0 : $*ETest_S1
+  fix_lifetime %1 : $*ETest_S2
+  fix_lifetime %2 : $*ETest_E1
+  fix_lifetime %3 : $*ETest_E2
+  fix_lifetime %4 : $*ETest_C1
+  fix_lifetime %5 : $*ETest_C2
+  fix_lifetime %6 : $*ETest_E3
+  fix_lifetime %7 : $*Builtin.RawPointer
+  fix_lifetime %8 : $*Builtin.NativeObject
+  fix_lifetime %9 : $*Builtin.AnyObject
+  fix_lifetime %10 : $*Builtin.Int32
+  fix_lifetime %11 : $*Builtin.FPIEEE32
 
   %9999 = tuple()
   return %9999 : $()
 }
 
+// Classes are treated conservatively.
+
 // CHECK-LABEL: @class_tests
 
-// CHECK: PAIR #72.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %6 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #73.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #74.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #82.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <any AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #83.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %17 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #84.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %18 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #85.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #86.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %20 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #87.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %21 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #88.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %22 = project_box %15 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-
-// CHECK: PAIR #91.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #92.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %6 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #93.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #94.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #102.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <any AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #103.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %17 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #104.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %18 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #105.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #106.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %20 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #107.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %21 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #108.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %22 = project_box %15 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-
-// CHECK: PAIR #111.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %6 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #112.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #113.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #121.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <any AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #122.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %17 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #123.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %18 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #124.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #125.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %20 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #126.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %21 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #127.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %22 = project_box %15 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C2
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C3
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*any AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+// CHECK-NEXT:     %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:   NoAlias
 
 class CTest_C1 {
   var x : Builtin.Int32
@@ -759,139 +525,97 @@ class CTest_C3 : CTest_C1 {
 protocol AnyObject {}
 
 sil @class_tests : $@convention(thin) () -> () {
-  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <CTest_C1>
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <CTest_C2>
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <CTest_C3>
+bb0:
+  %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C1
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C2
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*CTest_C3
+  %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
 
-  %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-  %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-  %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
+  %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+  %6 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.AnyObject
+  %7 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+  %8 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+  %9 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.FPIEEE32
 
-  %6 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-  %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-  %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-
-  %9 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
-  %10 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
-  %11 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %12 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
-  %13 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int8>
-  %14 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %15 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
-
-  %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-  %17 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-  %18 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
-  %20 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-  %21 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %22 = project_box %15 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
+  fix_lifetime %0 : $*CTest_C1
+  fix_lifetime %1 : $*CTest_C2
+  fix_lifetime %2 : $*CTest_C3
+  fix_lifetime %3 : $*AnyObject
+  fix_lifetime %4 : $*Builtin.RawPointer
+  fix_lifetime %5 : $*Builtin.NativeObject
+  fix_lifetime %6 : $*Builtin.AnyObject
+  fix_lifetime %7 : $*Builtin.Int8
+  fix_lifetime %8 : $*Builtin.Int32
+  fix_lifetime %9 : $*Builtin.FPIEEE32
 
   %9999 = tuple()
   return %9999 : $()
 }
 
+
 // CHECK-LABEL: @tuple_tests
-// CHECK: PAIR #66.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %6 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #67.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #68.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #75.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %15 = project_box %9 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #76.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %16 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #77.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #78.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #79.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %19 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #80.
-// CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %20 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #85.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #86.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #93.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %15 = project_box %9 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #94.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %16 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #95.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #96.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #97.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %19 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #98.
-// CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %20 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #102.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #103.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #110.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %15 = project_box %9 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #111.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %16 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #112.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #113.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: MayAlias
-// CHECK: PAIR #114.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %19 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
-// CHECK: PAIR #115.
-// CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %20 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
+
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #8.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   NoAlias
+// CHECK:      PAIR #9.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #10.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #11.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #13.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #14.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:     %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #15.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:     %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*AnyObject
+// CHECK-NEXT:   MayAlias
+// CHECK:      PAIR #16.
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
+// CHECK-NEXT:     %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
+// CHECK-NEXT:   NoAlias
 
 struct TTest_S1 {
   var x : Builtin.Int32
@@ -903,35 +627,26 @@ enum TTest_E1 {
 }
 
 sil @tuple_tests : $@convention(thin) () -> () {
-  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>
+bb0:
+  %0 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(Builtin.RawPointer, Builtin.Int64)
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_S1, Builtin.Int64)
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*(TTest_E1, Builtin.Int64)
 
-  %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-  %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-  %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
+  %3 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %4 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.AnyObject
+  %5 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int32
 
-  %6 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-  %7 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-  %8 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-
-  %9 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
-  %10 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %11 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
-  %12 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int8>
-  %13 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %14 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
-
-  %15 = project_box %9 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-  %16 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
-  %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-  %19 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %20 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
+  fix_lifetime %0 : $*(Builtin.RawPointer, Builtin.Int64)
+  fix_lifetime %1 : $*(TTest_S1, Builtin.Int64)
+  fix_lifetime %2 : $*(TTest_E1, Builtin.Int64)
+  fix_lifetime %3 : $*Builtin.RawPointer
+  fix_lifetime %4 : $*Builtin.AnyObject
+  fix_lifetime %5 : $*Builtin.Int32
 
   %9999 = tuple()
   return %9999 : $()
 }
+
 
 // Check that TBAA fails when the root is unchecked_addr_cast or
 // pointer_to_address without [strict].
@@ -944,7 +659,7 @@ sil @tuple_tests : $@convention(thin) () -> () {
 // CHECK:      PAIR #5.
 // CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int64
 // CHECK-NEXT:   %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*Builtin.Int32
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK:      PAIR #6.
 // CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int64
 // CHECK-NEXT:   %9 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
@@ -975,6 +690,9 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 }
   %2 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %3 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
 
+  fix_lifetime %2 : $*Builtin.Int32
+  fix_lifetime %3 : $*Builtin.Int64
+
   %r = tuple()
   return %r : $()
 }
@@ -989,6 +707,32 @@ bb0(%0 : $CTest_C1, %1 : $CTest_C1):
   %2 = ref_element_addr %0 : $CTest_C1, #CTest_C1.x
   %3 = ref_tail_addr %1 : $CTest_C1, $Builtin.Int16
 
+  fix_lifetime %2 : $*Builtin.Int32
+  fix_lifetime %3 : $*Builtin.Int16
+
   %r = tuple()
   return %r : $()
 }
+
+// CHECK-LABEL: @test_generic_struct
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+// CHECK-NEXT:     %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*GenericStruct<T>
+// CHECK-NEXT:   MayAlias
+
+struct GenericStruct<T> {
+  var x : T
+}
+
+sil @test_generic_struct : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %1 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*Builtin.Int8
+  %2 = pointer_to_address undef : $Builtin.RawPointer to [strict] $*GenericStruct<T>
+
+  fix_lifetime %1 : $*Builtin.Int8
+  fix_lifetime %2 : $*GenericStruct<T>
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+

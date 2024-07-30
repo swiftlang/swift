@@ -258,11 +258,6 @@ struct FunctionPassContext : MutatingContext {
     SimplifyContext(_bridged: _bridged, notifyInstructionChanged: notifyInstructionChanged, preserveDebugInfo: preserveDebugInfo)
   }
 
-  var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = _bridged.getAliasAnalysis()
-    return AliasAnalysis(bridged: bridgedAA)
-  }
-
   var deadEndBlocks: DeadEndBlocksAnalysis {
     let bridgeDEA = _bridged.getDeadEndBlocksAnalysis()
     return DeadEndBlocksAnalysis(bridged: bridgeDEA)

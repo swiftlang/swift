@@ -544,6 +544,6 @@ private extension PartialApplyInst {
       var followTrivialTypes: Bool { true }
     }
 
-    return self.isEscapingWhenWalkingDown(using: EscapesToApply(), context)
+    return self.isEscaping(using: EscapesToApply(), initialWalkingDirection: .down, context)
   }
 }
