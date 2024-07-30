@@ -725,6 +725,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
   Bits.ModuleDecl.HasCxxInteroperability = 0;
+  Bits.ModuleDecl.CXXStdlibKind = 0;
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
 }

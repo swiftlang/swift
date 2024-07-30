@@ -642,6 +642,11 @@ public:
     return Core->Bits.HasCxxInteroperability;
   }
 
+  /// The kind of the C++ stdlib that this module was built with.
+  CXXStdlibKind getCXXStdlibKind() const {
+    return static_cast<CXXStdlibKind>(Core->Bits.CXXStdlibKind);
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);

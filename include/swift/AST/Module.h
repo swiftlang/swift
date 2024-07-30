@@ -27,6 +27,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
@@ -703,6 +704,13 @@ public:
   }
   void setHasCxxInteroperability(bool enabled = true) {
     Bits.ModuleDecl.HasCxxInteroperability = enabled;
+  }
+
+  CXXStdlibKind getCXXStdlibKind() const {
+    return static_cast<CXXStdlibKind>(Bits.ModuleDecl.CXXStdlibKind);
+  }
+  void setCXXStdlibKind(CXXStdlibKind kind) {
+    Bits.ModuleDecl.CXXStdlibKind = static_cast<uint8_t>(kind);
   }
 
   /// \returns true if this module is a system module; note that the StdLib is

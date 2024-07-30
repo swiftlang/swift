@@ -391,6 +391,10 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    unsigned CXXStdlibKind : 8;
+
     /// Whether this module is built with -allow-non-resilient-access.
     unsigned AllowNonResilientAccess : 1;
 

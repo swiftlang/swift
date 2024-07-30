@@ -21,6 +21,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
@@ -135,7 +136,7 @@ void registerBackDeployLibraries(
     std::function<void(const LinkLibrary &)> RegistrationCallback);
 void registerCxxInteropLibraries(
     const llvm::Triple &Target, StringRef mainModuleName, bool hasStaticCxx,
-    bool hasStaticCxxStdlib,
+    bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
     std::function<void(const LinkLibrary &)> RegistrationCallback);
 } // namespace dependencies
 

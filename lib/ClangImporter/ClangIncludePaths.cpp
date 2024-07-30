@@ -112,15 +112,18 @@ parseClangDriverArgs(const clang::driver::Driver &clangDriver,
   return clangDriver.getOpts().ParseArgs(args, unused1, unused2);
 }
 
-static clang::driver::Driver
-createClangDriver(const ASTContext &ctx,
-                  const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+std::pair<clang::driver::Driver,
+          llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+ClangImporter::createClangDriver(
+    const LangOptions &LangOpts, const ClangImporterOptions &ClangImporterOpts,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
+  auto *silentDiagConsumer = new clang::DiagnosticConsumer();
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
-      new clang::DiagnosticOptions());
-  clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
-                                    ctx.LangOpts.Target.str(), *clangDiags,
+      new clang::DiagnosticOptions(), silentDiagConsumer);
+  clang::driver::Driver clangDriver(ClangImporterOpts.clangPath,
+                                    LangOpts.Target.str(), *clangDiags,
                                     "clang LLVM compiler", vfs);
-  return clangDriver;
+  return {std::move(clangDriver), clangDiags};
 }
 
 /// Given a list of include paths and a list of file names, finds the first
@@ -162,21 +165,23 @@ static std::optional<Path> findFirstIncludeDir(
   return std::nullopt;
 }
 
-static llvm::opt::InputArgList
-createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
+llvm::opt::InputArgList
+ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
+                               const SearchPathOptions &SearchPathOpts,
+                               clang::driver::Driver &clangDriver) {
   // Flags passed to Swift with `-Xcc` might affect include paths.
   std::vector<const char *> clangArgs;
-  for (const auto &each : ctx.ClangImporterOpts.ExtraArgs) {
+  for (const auto &each : ClangImporterOpts.ExtraArgs) {
     clangArgs.push_back(each.c_str());
   }
   llvm::opt::InputArgList clangDriverArgs =
       parseClangDriverArgs(clangDriver, clangArgs);
   // If an SDK path was explicitly passed to Swift, make sure to pass it to
   // Clang driver as well. It affects the resulting include paths.
-  auto sdkPath = ctx.SearchPathOpts.getSDKPath();
+  auto sdkPath = SearchPathOpts.getSDKPath();
   if (!sdkPath.empty())
     clangDriver.SysRoot = sdkPath.str();
-  if (auto sysroot = ctx.SearchPathOpts.getSysRoot())
+  if (auto sysroot = SearchPathOpts.getSysRoot())
     clangDriver.SysRoot = sysroot->str();
   return clangDriverArgs;
 }
@@ -188,8 +193,10 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
   // Extract the libc path from Clang driver.
-  auto clangDriver = createClangDriver(ctx, vfs);
-  auto clangDriverArgs = createClangArgs(ctx, clangDriver);
+  auto [clangDriver, clangDiagEngine] = ClangImporter::createClangDriver(
+      ctx.LangOpts, ctx.ClangImporterOpts, vfs);
+  auto clangDriverArgs = ClangImporter::createClangArgs(
+      ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList includeArgStrings;
   const auto &clangToolchain =
@@ -256,10 +263,16 @@ static void getLibStdCxxFileMapping(
   if (triple.isAndroid()
       || (triple.isMusl() && triple.getVendor() == llvm::Triple::Swift))
     return;
+  // Make sure we are building with libstdc++. On platforms where libstdc++ is
+  // the default C++ stdlib, users can still compile with `-Xcc -stdlib=libc++`.
+  if (ctx.LangOpts.CXXStdlib != CXXStdlibKind::Libstdcxx)
+    return;
 
   // Extract the libstdc++ installation path from Clang driver.
-  auto clangDriver = createClangDriver(ctx, vfs);
-  auto clangDriverArgs = createClangArgs(ctx, clangDriver);
+  auto [clangDriver, clangDiagEngine] = ClangImporter::createClangDriver(
+      ctx.LangOpts, ctx.ClangImporterOpts, vfs);
+  auto clangDriverArgs = ClangImporter::createClangArgs(
+      ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList stdlibArgStrings;
   const auto &clangToolchain =
@@ -453,8 +466,10 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
   if (!Triple.isWindowsMSVCEnvironment())
     return Mappings;
 
-  clang::driver::Driver Driver = createClangDriver(Context, driverVFS);
-  const llvm::opt::InputArgList Args = createClangArgs(Context, Driver);
+  auto [Driver, clangDiagEngine] = ClangImporter::createClangDriver(
+      Context.LangOpts, Context.ClangImporterOpts, driverVFS);
+  const llvm::opt::InputArgList Args = ClangImporter::createClangArgs(
+      Context.ClangImporterOpts, Context.SearchPathOpts, Driver);
   const clang::driver::ToolChain &ToolChain = Driver.getToolChain(Args, Triple);
   llvm::vfs::FileSystem &VFS = ToolChain.getVFS();
 

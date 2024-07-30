@@ -256,6 +256,10 @@ public:
   /// FIXME: Remove this after all the clients start sending it.
   void setDefaultInProcessPluginServerPathIfNecessary();
 
+  /// Determine which C++ stdlib should be used for this compilation, and which
+  /// C++ stdlib is the default for the specified target.
+  void computeCXXStdlibOptions();
+
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
   static void computeRuntimeResourcePathFromExecutablePath(

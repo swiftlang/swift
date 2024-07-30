@@ -50,6 +50,7 @@ namespace swift {
   class ValueDecl;
   class SourceFile;
 
+  enum class CXXStdlibKind : uint8_t;
   enum class DescriptivePatternKind : uint8_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;

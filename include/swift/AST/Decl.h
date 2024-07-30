@@ -722,7 +722,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -779,6 +779,10 @@ protected:
 
     /// Whether this module has been built with C++ interoperability enabled.
     HasCxxInteroperability : 1,
+
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    CXXStdlibKind : 8,
 
     /// Whether this module has been built with -allow-non-resilient-access.
     AllowNonResilientAccess : 1,
