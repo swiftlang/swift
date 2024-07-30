@@ -129,8 +129,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       // substitute it out.
       auto subs = (*type)->getContextSubstitutionMap();
       auto loweredLikeType = IGM.getLoweredType(likeType->subst(subs));
-      const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
-      auto likeFixedType = dyn_cast<FixedTypeInfo>(likeTypeInfo);
+      auto &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
+      auto likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo);
 
       // Substitute our count type if we have one.
       if (countType) {
@@ -142,11 +142,11 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       // We can only fixup the type's layout when either this is a scalar and
       // the like type is a fixed type or if we're an array and both the like
       // type and count are statically known. Otherwise this is opaque.
-      if (likeFixedType && (!countType || countType->is<IntegerType>())) {
+      if (likeFixedType && (!countType || countType.value()->is<IntegerType>())) {
         // If we have a count type, then we're the array variant so
         // 'stride * count'. Otherwise we're a scalar which is just 'size'.
         if (countType) {
-          auto integer = countType->getAs<IntegerType>();
+          auto integer = countType.value()->getAs<IntegerType>();
 
           if (integer->isNegative()) {
             MinimumSize = Size(0);
