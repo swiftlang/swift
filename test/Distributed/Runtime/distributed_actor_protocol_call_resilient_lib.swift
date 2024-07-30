@@ -52,7 +52,11 @@
 // RUN:     -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run %t/a.out                                                   \
+// RUN:     %t/%target-library-name(FakeDistributedActorSystems)               \
+// RUN:     %t/%target-library-name(ResilientLib)                              \
+// RUN:     %t/%target-library-name(ResilientActorLib)                         \
+// RUN:     | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
