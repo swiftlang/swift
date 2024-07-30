@@ -99,6 +99,8 @@ actor MyActor {
   var klass: NonSendableKlass { get set }
 }
 
+sil @beginApplyMultipleResultCallee : $@yield_once @convention(thin) () -> (@yields @guaranteed NonSendableKlass, @yields @guaranteed NonSendableKlass)
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -393,6 +395,22 @@ bb0:
 
   destroy_addr %0 : $*NonSendableKlass
   dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Make sure that we do not crash on this.
+//
+// We used to crash on this since we would want to assign the region of an
+// operand to the results... but we do not have one and have multiple
+// results. This doesn't normally happen with most applies since applies do not
+// have multiple results, so in such a case, we would just assign fresh and not
+// try to do the assignment for the rest of the values.
+sil [ossa] @handleNoOperandToAssignToResults : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @beginApplyMultipleResultCallee : $@yield_once @convention(thin) () -> (@yields @guaranteed NonSendableKlass, @yields @guaranteed NonSendableKlass)
+  (%1, %2, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @guaranteed NonSendableKlass, @yields @guaranteed NonSendableKlass)
+  end_apply %3 as $()
   %9999 = tuple ()
   return %9999 : $()
 }

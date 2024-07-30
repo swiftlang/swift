@@ -1158,8 +1158,16 @@ struct PartitionOpBuilder {
   Element getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
 
   void addAssignFresh(SILValue value) {
+    std::array<Element, 1> values = {lookupValueID(value)};
     currentInstPartitionOps.emplace_back(
-        PartitionOp::AssignFresh(lookupValueID(value), currentInst));
+        PartitionOp::AssignFresh(values, currentInst));
+  }
+
+  void addAssignFresh(ArrayRef<SILValue> values) {
+    auto transformedCollection = makeTransformRange(
+        values, [&](SILValue value) { return lookupValueID(value); });
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::AssignFresh(transformedCollection, currentInst));
   }
 
   void addAssign(SILValue destValue, Operand *srcOperand) {
@@ -1732,23 +1740,18 @@ public:
       return;
     }
 
-    auto assignResultsRef = llvm::ArrayRef(assignResults);
-    SILValue front = assignResultsRef.front();
-    assignResultsRef = assignResultsRef.drop_front();
-
+    // If we do not have any non-Sendable srcs, then all of our results get one
+    // large fresh region.
     if (assignOperands.empty()) {
-      // If no non-sendable srcs, non-sendable tgts get a fresh region.
-      builder.addAssignFresh(front);
-    } else {
-      builder.addAssign(front, assignOperands.front().first);
+      builder.addAssignFresh(assignResults);
+      return;
     }
 
-    // Assign all targets to the target region.
-    while (assignResultsRef.size()) {
-      SILValue next = assignResultsRef.front();
-      assignResultsRef = assignResultsRef.drop_front();
-
-      builder.addAssign(next, assignOperands.front().first);
+    // Otherwise, we need to assign all of the results to be in the same region
+    // as the operands. Without losing generality, we just use the first
+    // non-Sendable one.
+    for (auto result : assignResults) {
+      builder.addAssign(result, assignOperands.front().first);
     }
   }
 
