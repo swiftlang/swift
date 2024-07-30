@@ -325,7 +325,7 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
 
-  /// The declaration of 'AsyncIteratorProtocol.next(_:)' that takes
+  /// The declaration of 'AsyncIteratorProtocol.next(isolation:)' that takes
   /// an actor isolation.
   FuncDecl *AsyncIteratorNextIsolated = nullptr;
 
