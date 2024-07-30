@@ -695,6 +695,7 @@ UNINTERESTING_FEATURE(BorrowingSwitch)
 
 UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
+UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
 
 static bool usesFeatureConformanceSuppression(Decl *decl) {
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);

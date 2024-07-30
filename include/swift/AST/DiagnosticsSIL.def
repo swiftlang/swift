@@ -876,6 +876,8 @@ ERROR(sil_movechecking_discard_missing_consume_self, none,
       "must consume 'self' before exiting method that discards self", ())
 ERROR(sil_movechecking_reinit_after_discard, none,
       "cannot reinitialize 'self' after 'discard self'", ())
+ERROR(sil_movechecking_consume_during_deinit, none,
+      "'self' cannot be consumed during 'deinit'", ())
 
 NOTE(sil_movechecking_discard_self_here, none,
      "discarded self here", ())
