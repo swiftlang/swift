@@ -2817,13 +2817,13 @@ bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
       ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
 }
 
-ImportFlags SourceFile::getImportFlags(const ModuleDecl *module) const {
-  unsigned flags = 0x0;
+void SourceFile::forEachImportOfModule(
+    const ModuleDecl *module,
+    llvm::function_ref<void(AttributedImport<ImportedModule> &)> callback) {
   for (auto import : *Imports) {
     if (import.module.importedModule == module)
-      flags |= import.options.toRaw();
+      callback(import);
   }
-  return ImportFlags(flags);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(

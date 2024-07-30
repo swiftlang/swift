@@ -163,6 +163,12 @@ private:
   /// were not written in the source file.
   llvm::SmallDenseSet<ImportedModule> ImplicitImportsForModuleInterface;
 
+  /// Associates a list of source locations to the member declarations that must
+  /// be diagnosed as being out of scope due to a missing import.
+  using DelayedMissingImportForMemberDiags =
+      llvm::SmallDenseMap<const ValueDecl *, std::vector<SourceLoc>>;
+  DelayedMissingImportForMemberDiags MissingImportForMemberDiagnostics;
+
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
@@ -467,8 +473,11 @@ public:
   /// If not, we can fast-path module checks.
   bool hasImportsWithFlag(ImportFlags flag) const;
 
-  /// Returns the import flags that are active on imports of \p module.
-  ImportFlags getImportFlags(const ModuleDecl *module) const;
+  /// Enumerates each of the direct imports of \p module in the file.
+  using AttributedImportCallback =
+      llvm::function_ref<void(AttributedImport<ImportedModule> &)>;
+  void forEachImportOfModule(const ModuleDecl *module,
+                             AttributedImportCallback callback);
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
@@ -527,6 +536,20 @@ public:
   /// compatibility with code in some Swift 5 modules.
   void getImplicitImportsForModuleInterface(
       SmallVectorImpl<ImportedModule> &imports) const override;
+
+  /// Add a source location for which a delayed missing import for member
+  /// diagnostic should be emited.
+  void addDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl,
+                                                  SourceLoc loc) {
+    MissingImportForMemberDiagnostics[decl].push_back(loc);
+  }
+
+  DelayedMissingImportForMemberDiags
+  takeDelayedMissingImportForMemberDiagnostics() {
+    DelayedMissingImportForMemberDiags diags;
+    std::swap(diags, MissingImportForMemberDiagnostics);
+    return diags;
+  }
 
   /// Record the source range info for a parsed \c #if clause.
   void recordIfConfigClauseRangeInfo(const IfConfigClauseRangeInfo &range);
