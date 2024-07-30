@@ -160,7 +160,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         auto compiledCandidates =
             getCompiledCandidates(Ctx, realModuleName.str(), InPath);
         if (!compiledCandidates.empty() &&
-            !Ctx.SearchPathOpts.NoScannerModuleValidation) {
+            Ctx.SearchPathOpts.ScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
           auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
