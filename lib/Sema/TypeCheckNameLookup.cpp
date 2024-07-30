@@ -783,9 +783,6 @@ bool swift::diagnoseMissingImportForMember(const ValueDecl *decl,
       flags |= sf->getImportFlags(definingModule);
   }
 
-  if (flags.contains(ImportFlags::Exported) ||
-      parentModule->isClangOverlayOf(definingModule))
-    importText += "@_exported ";
   if (flags.contains(ImportFlags::ImplementationOnly))
     importText += "@_implementationOnly ";
   if (flags.contains(ImportFlags::WeakLinked))
