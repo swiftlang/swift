@@ -1820,7 +1820,21 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   LLVM_DEBUG(llvm::dbgs() << "    Iter Type: " << iterType << '\n'
                           << "    Target Type: " << targetType << '\n');
 
+  // Allowing full object consumption in a deinit is still not allowed.
   if (iterType == targetType && !isa<DropDeinitInst>(user)) {
+    // Don't allow whole-value consumption of `self` from a `deinit`.
+    if (!fn->getModule().getASTContext().LangOpts
+            .hasFeature(Feature::ConsumeSelfInDeinit)
+        && kind == PartialMutation::Kind::Consume
+        && useState.sawDropDeinit
+        // TODO: Revisit this when we introduce deinits on enums.
+        && !targetType.getEnumOrBoundGenericEnum()) {
+      LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
+                                 "Not allowed yet");
+      
+      return {PartialMutationError::consumeDuringDeinit(iterType)};
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
                                "without emitting error!\n");
     return {};
