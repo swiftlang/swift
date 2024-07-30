@@ -133,10 +133,11 @@ public enum Optional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
 }
 
 extension Optional: Copyable where Wrapped: Copyable /*& ~Escapable */ {}
+
 extension Optional: Escapable where Wrapped: Escapable /*& ~Copyable */ {}
 
-extension Optional: BitwiseCopyable where Wrapped: BitwiseCopyable {}
-// FIXME: Maybe BitwiseCopyable shouldn't require Escapability
+extension Optional: BitwiseCopyable
+where Wrapped: BitwiseCopyable & ~Escapable {}
 
 extension Optional: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable {}
 
