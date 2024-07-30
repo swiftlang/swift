@@ -46,6 +46,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
@@ -65,6 +66,7 @@
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/FrontendOptions.h"
 #include "clang/Frontend/IncludeTreePPActions.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
@@ -753,31 +755,6 @@ void importer::getNormalInvocationArguments(
   invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
                                llvm::sys::path::get_separator() +
                                "apinotes").str());
-
-  auto CASOpts = ctx.CASOpts;
-  if (CASOpts.EnableCaching) {
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("-fno-pch-timestamp");
-    if (!CASOpts.CASOpts.CASPath.empty()) {
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back("-fcas-path");
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back(CASOpts.CASOpts.CASPath);
-    }
-    if (!CASOpts.CASOpts.PluginPath.empty()) {
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back("-fcas-plugin-path");
-      invocationArgStrs.push_back("-Xclang");
-      invocationArgStrs.push_back(CASOpts.CASOpts.PluginPath);
-      for (auto Opt : CASOpts.CASOpts.PluginOptions) {
-        invocationArgStrs.push_back("-Xclang");
-        invocationArgStrs.push_back("-fcas-plugin-option");
-        invocationArgStrs.push_back("-Xclang");
-        invocationArgStrs.push_back(
-            (llvm::Twine(Opt.first) + "=" + Opt.second).str());
-      }
-    }
-  }
 }
 
 static void
@@ -1170,8 +1147,21 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // to reduce the number of argument passing on the command-line and swift
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
-    if (ctx.CASOpts.EnableCaching)
+    if (ctx.CASOpts.EnableCaching) {
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
+      // When clangImporter is used to compile (generate .pcm or .pch), need to
+      // inherit the include tree from swift args (last one wins) and clear the
+      // input file.
+      if ((CI->getFrontendOpts().ProgramAction ==
+               clang::frontend::ActionKind::GenerateModule ||
+           CI->getFrontendOpts().ProgramAction ==
+               clang::frontend::ActionKind::GeneratePCH) &&
+          ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+        CI->getFrontendOpts().CASIncludeTreeID =
+            ctx.CASOpts.ClangIncludeTrees.back();
+        CI->getFrontendOpts().Inputs.clear();
+      }
+    }
 
     // If clang target is ignored, using swift target.
     if (ignoreClangTarget)
