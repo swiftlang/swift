@@ -51,8 +51,18 @@
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -o %t/a.out
 
+// Sign the main binary and all libraries
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-codesign %t/%target-library-name(FakeDistributedActorSystems)
+// RUN: %target-codesign %t/%target-library-name(ResilientActorLib)
+// RUN: %target-codesign %t/%target-library-name(ResilientLib)
+
+// Run and verify output
+// RUN: %target-run %t/a.out                                                   \
+// RUN:     %t/%target-library-name(FakeDistributedActorSystems)               \
+// RUN:     %t/%target-library-name(ResilientActorLib)                         \
+// RUN:     %t/%target-library-name(ResilientLib)                              \
+// RUN:     | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
