@@ -598,6 +598,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-toolchain-only'),
     EnableOption('--build-swift-private-stdlib'),
     EnableOption('--build-swift-stdlib-unicode-data'),
+    EnableOption('--build-embedded-stdlib'),
     EnableOption('--build-embedded-stdlib-cross-compiling'),
     EnableOption('--build-swift-libexec'),
     EnableOption('--build-swift-clang-overlays'),
