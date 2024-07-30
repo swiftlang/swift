@@ -88,6 +88,7 @@ EXPECTED_DEFAULTS = {
     'build_swift_stdlib_unittest_extra': False,
     'build_swift_stdlib_static_print': False,
     'build_swift_stdlib_unicode_data': True,
+    'build_embedded_stdlib': True,
     'build_embedded_stdlib_cross_compiling': False,
     'build_swift_clang_overlays': True,
     'build_swift_remote_mirror': True,
