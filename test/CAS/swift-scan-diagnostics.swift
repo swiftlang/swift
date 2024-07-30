@@ -54,6 +54,7 @@
 // PARSEABLE-NEXT: {
 // PARSEABLE-NEXT:   "kind": "began",
 // PARSEABLE-NEXT:   "name": "compile",
+// PARSEABLE-NEXT:   "command": "swift-frontend
 
 // PARSEABLE:   "kind": "finished",
 // PARSEABLE-NEXT:   "name": "compile",
