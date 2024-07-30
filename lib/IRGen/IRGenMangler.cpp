@@ -148,8 +148,8 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
   SymbolicReferences.clear();
   
   body();
-  
-  return {finalize(), std::move(SymbolicReferences)};
+
+  return {finalize(), std::move(SymbolicReferences), nullptr};
 }
 
 SymbolicMangling
@@ -212,7 +212,7 @@ IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
   appendType(type, sig);
 
   assert(SymbolicReferences.empty());
-  return {finalize(), {}};
+  return {finalize(), {}, nullptr};
 }
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
