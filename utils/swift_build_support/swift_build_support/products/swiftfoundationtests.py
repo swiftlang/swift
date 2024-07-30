@@ -50,7 +50,7 @@ class SwiftFoundationTests(product.Product):
         return False
 
     def should_test(self, host_target):
-        return True
+        return self.args.test_foundation
 
     def configuration(self):
         return 'release' if self.is_release() else 'debug'
