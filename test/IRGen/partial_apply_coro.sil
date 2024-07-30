@@ -1429,12 +1429,66 @@ bb0(%x : $*T):
   return %p : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> (@out T, @yields @in T) for <T>
 }
 
-// FIXME: Cannot mangle free-standing archetypes
-// sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)) -> @yield_once @callee_guaranteed () -> (@out T, @yields @in T) {
-// bb0(%x : $Int32, %f : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)):
-//   %p = partial_apply [callee_guaranteed] %f(%x) : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)
-//   return %p : $@yield_once @callee_guaranteed () -> (@out T, @yields @in T)
-// }
+// CHECK: define {{.*}} { ptr, ptr } @partial_apply_dynamic_with_out_param
+// CHECK-SAME: (i32 %[[ARG1:.*]], ptr %[[ARG_FUNC:.*]], ptr %[[ARG_FUNC_SELF:.*]], ptr %[[TY:.*]])
+// CHECK: entry:
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata
+// CHECK:   %[[PA_ARG1:.*]] = getelementptr inbounds <{ %swift.refcounted, %Ts5Int32V, [4 x i8], ptr, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[PA_ARG1_INT:.*]] = getelementptr inbounds %Ts5Int32V, ptr %[[PA_ARG1]], i32 0, i32 0
+// CHECK:   store i32 %[[ARG1]], ptr %[[PA_ARG1_INT]]
+// CHECK:   %[[PA_ARG_FUNC_SELF:.*]] = getelementptr inbounds <{ %swift.refcounted, %Ts5Int32V, [4 x i8], ptr, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 3
+// CHECK:   store ptr %[[ARG_FUNC_SELF]], ptr %[[PA_ARG_FUNC_SELF]]
+// CHECK:   %[[PA_ARG_FUNC:.*]] = getelementptr inbounds <{ %swift.refcounted, %Ts5Int32V, [4 x i8], ptr, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 4
+// CHECK:   store ptr %[[ARG_FUNC]], ptr %[[PA_ARG_FUNC]]
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$sTA", ptr undef }, ptr %[[PA_CTX_BOX]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
+
+// CHECK: define {{.*}} { ptr, ptr } @"$sTA"
+// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], ptr %[[INDIRECT_RET:.*]], ptr swiftself %[[PA_CTX_BOX:.*]])
+// CHECK: entry:
+// CHECK:   %[[SPILL:.*]] = call ptr @malloc(i64 40)
+// CHECK:   store ptr %[[SPILL]], ptr %[[CTX]]
+// CHECK:   %[[FRAME:.*]] = getelementptr inbounds %"$sTA.Frame", ptr %[[SPILL]], i32 0, i32 0
+// CHECK:   %[[PA_ARG1:.*]] = getelementptr inbounds <{ %swift.refcounted, %Ts5Int32V, [4 x i8], ptr, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
+// CHECK:   %[[PA_ARG1_INT:.*]] = getelementptr inbounds %Ts5Int32V, ptr %[[PA_ARG1]], i32 0, i32 0
+// CHECK:   %[[ARG1:.*]] = load i32, ptr %[[PA_ARG1_INT]]
+// CHECK:   %[[PA_ARG_FUNC_SELF:.*]] = getelementptr inbounds <{ %swift.refcounted, %Ts5Int32V, [4 x i8], ptr, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 3
+// CHECK:   %[[ARG_FUNC_SELF:.*]] = load ptr, ptr %[[PA_ARG_FUNC_SELF]]
+// CHECK:   %[[PA_ARG_FUNC:.*]] = getelementptr inbounds <{ %swift.refcounted, %Ts5Int32V, [4 x i8], ptr, ptr }>, ptr %[[PA_CTX_BOX]], i32 0, i32 4
+// CHECK:   %[[ARG_FUNC:.*]] = load ptr, ptr %[[PA_ARG_FUNC]]
+// CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds [32 x i8], ptr %[[FRAME]], i32 0, i32 0
+// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr %[[FRAMEPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } %[[ARG_FUNC]](ptr noalias {{.*}} %[[FRAMEPTR]], ptr %[[INDIRECT_RET]], i32 %[[ARG1]], ptr swiftself %[[ARG_FUNC_SELF]])
+// CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
+// CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$sTA.Frame", ptr %[[SPILL]], i32 0, i32 1
+// CHECK:   store ptr %[[RESUME]], ptr %[[SPILL1]]
+// CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
+// CHECK:   %[[RET0:.*]] = insertvalue { ptr, ptr } poison, ptr @"$sTA.resume.0", 0
+// CHECK:   %[[RET1:.*]] = insertvalue { ptr, ptr } %[[RET0]], ptr %[[YIELD]], 1
+// CHECK:   ret { ptr, ptr } %[[RET1]]
+// CHECK: }
+
+sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)) -> @yield_once @callee_guaranteed () -> (@out T, @yields @in T) {
+bb0(%x : $Int32, %f : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)):
+  %p = partial_apply [callee_guaranteed] %f(%x) : $@yield_once @callee_guaranteed (Int32) -> (@out T, @yields @in T)
+  return %p : $@yield_once @callee_guaranteed () -> (@out T, @yields @in T)
+}
+
+// Verify that the partial apply function is unique (even if it is not uniquely mangled)
+//
+// CHECK: define {{.*}} { ptr, ptr } @partial_apply_dynamic_with_out_param_another
+// CHECK: entry:
+// CHECK:   %[[PA_CTX_BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata
+// CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$sTA.{{.*}}", ptr undef }, ptr %[[PA_CTX_BOX]], 1
+// CHECK:   ret { ptr, ptr } %[[RET]]
+// CHECK: }
+
+sil @partial_apply_dynamic_with_out_param_another : $@convention(thin) <T> (Int64, @owned @yield_once @callee_guaranteed (Int64) -> (@out T, @yields @in T)) -> @yield_once @callee_guaranteed () -> (@out T, @yields @in T) {
+bb0(%x : $Int64, %f : $@yield_once @callee_guaranteed (Int64) -> (@out T, @yields @in T)):
+  %p = partial_apply [callee_guaranteed] %f(%x) : $@yield_once @callee_guaranteed (Int64) -> (@out T, @yields @in T)
+  return %p : $@yield_once @callee_guaranteed () -> (@out T, @yields @in T)
+}
 
 class Base {
 }

@@ -498,10 +498,6 @@ public:
                                                 CanType shapeType,
                                                 bool isUnique);
 
-  std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
-    return mangleTypeSymbol(type, "TC");
-  }
-
   std::string mangleReflectionBuiltinDescriptor(Type type) {
     const char * const reflectionDescriptorOp = "MB";
     if (type->isAnyObject()) {
