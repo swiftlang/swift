@@ -889,5 +889,11 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     registerDiagnosticEmitted(address);
     return;
   }
+  case PartialMutationError::Kind::ConsumeDuringDeinit: {
+    astContext.Diags.diagnose(user->getLoc().getSourceLoc(),
+                              diag::sil_movechecking_consume_during_deinit);
+    return;
   }
+  }
+  llvm_unreachable("unhandled case");
 }
