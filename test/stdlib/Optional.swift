@@ -465,9 +465,7 @@ OptionalTests.test("BitwiseCopyability") {
   expectFalse(isBitwiseCopyable(Optional<NoncopyableStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<RegularClass>.self))
 #if $NonescapableTypes
-  // FIXME: Should this be true?
-  expectFalse(isBitwiseCopyable(Optional<NonescapableStruct>.self))
-
+  expectTrue(isBitwiseCopyable(Optional<NonescapableStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<NoncopyableNonescapableStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<NonescapableNontrivialStruct>.self))
 #endif
