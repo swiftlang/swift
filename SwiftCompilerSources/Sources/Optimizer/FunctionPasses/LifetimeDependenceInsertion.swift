@@ -116,7 +116,6 @@ private func insertDependencies(for apply: LifetimeDependentApply,
     insertMarkDependencies(value: dependentValue, initializer: nil,
                            bases: bases, builder: builder, context)
   }
-  let builder = Builder(after: apply.applySite, context)
   for resultOper in apply.applySite.indirectResultOperands {
     let accessBase = resultOper.value.accessBase
     guard let (initialAddress, initializingStore) =
@@ -132,11 +131,11 @@ private func insertDependencies(for apply: LifetimeDependentApply,
                                             context) else {
       continue
     }
-    assert(initializingStore == resultOper.instruction,
-           "an indirect result is a store")
-    insertMarkDependencies(value: initialAddress,
-                           initializer: initializingStore, bases: bases,
-                           builder: builder, context)
+    assert(initializingStore == resultOper.instruction, "an indirect result is a store")
+    Builder.insert(after: apply.applySite, context) { builder in
+      insertMarkDependencies(value: initialAddress, initializer: initializingStore, bases: bases, builder: builder,
+                             context)
+    }
   }
 }
 
