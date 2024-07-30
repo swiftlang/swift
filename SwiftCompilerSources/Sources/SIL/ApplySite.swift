@@ -71,6 +71,12 @@ public struct ApplyOperandConventions : Collection {
       calleeArgumentIndex(ofOperandIndex: operandIndex)!]
   }
 
+  public subscript(parameterDependencies operandIndex: Int)
+    -> FunctionConvention.LifetimeDependencies? {
+    return calleeArgumentConventions[parameterDependencies:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
   public var firstParameterOperandIndex: Int {
     return ApplyOperandConventions.firstArgumentIndex +
       calleeArgumentConventions.firstParameterIndex
@@ -220,6 +226,16 @@ extension ApplySite {
 
   public var hasResultDependence: Bool {
     functionConvention.resultDependencies != nil
+  }
+
+  public var hasLifetimeDependence: Bool {
+    functionConvention.hasLifetimeDependencies()
+  }
+
+  public func parameterDependencies(target operand: Operand) -> FunctionConvention.LifetimeDependencies? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[parameterDependencies: idx]
   }
 
   public var yieldConventions: YieldConventions {

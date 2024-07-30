@@ -179,7 +179,6 @@ private func createForwardingApply(
                                        isNonThrowing: ai.isNonThrowing,
                                        isNonAsync: ai.isNonAsync,
                                        specializationInfo: ai.specializationInfo)
-    let builder = Builder(after: newApply, context)
     builder.createReturn(of: newApply)
   case let tai as TryApplyInst:
     let normalBlock = thunk.appendNewBlock(context)

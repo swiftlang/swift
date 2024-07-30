@@ -16,7 +16,7 @@ private let verbose = false
 
 private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print((prefix ? "### " : "") + message())
+    debugLog(prefix: prefix, message())
   }
 }
 
@@ -36,6 +36,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 #endif
   log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
+  log("\(function.convention)")
 
   for argument in function.arguments
       where !argument.type.isEscapable(in: function)
@@ -54,8 +55,8 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       continue
     }
     if let apply = instruction as? FullApplySite {
-      // Handle ~Escapable results that do not have a lifetime
-      // dependence (@_unsafeNonescapableResult).
+      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers and
+      // @_unsafeNonescapableResult.
       apply.resultOrYields.forEach {
         if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0,
                                                 context) {

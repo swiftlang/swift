@@ -109,7 +109,7 @@ struct LifetimeDependence : CustomStringConvertible {
     case caller(Argument)
     /// An access scope.
     case access(BeginAccessInst)
-    /// An coroutine.
+    /// A coroutine.
     case yield(Value)
     /// An owned value whose OSSA lifetime encloses nonescapable values
     case owned(Value)
