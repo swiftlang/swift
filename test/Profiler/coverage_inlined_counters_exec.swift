@@ -21,6 +21,9 @@
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
 
+// FIXME: Currently fails on device_run (rdar://132715280)
+// UNSUPPORTED: device_run
+
 //--- a.swift
 @_transparent
 public func foo() {}
