@@ -56,9 +56,9 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    debugLog(prefix: prefix, message())
   }
 }
 

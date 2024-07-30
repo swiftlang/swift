@@ -24,7 +24,7 @@ private let verbose = false
 
 private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print((prefix ? "### " : "") + message())
+    debugLog(prefix: prefix, message())
   }
 }
 
