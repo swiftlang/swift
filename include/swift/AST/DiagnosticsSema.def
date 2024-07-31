@@ -5648,7 +5648,7 @@ ERROR(non_sendable_result_type,none,
       "%3 '@objc' %kind2}1 cannot cross actor boundary",
       (Type, unsigned, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_call_result_type,none,
-      "non-sendable type %0 returned by %select{implicitly asynchronous |}1"
+      "non-sendable type %0 returned by %select{|implicitly async }1"
       "call to %2 function cannot cross actor boundary",
       (Type, bool, ActorIsolation))
 ERROR(non_sendable_property_type,none,
