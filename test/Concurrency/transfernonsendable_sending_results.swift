@@ -234,7 +234,7 @@ func asyncLetReabstractionThunkTest() async {
 func asyncLetReabstractionThunkTest2() async {
   // We emit the error here since we are returning a main actor isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by call to main actor-isolated function cannot cross actor boundary}}
 
   let _ = await newValue
 
@@ -257,7 +257,7 @@ func asyncLetReabstractionThunkTest2() async {
 @MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
   // We emit the error here since we are returning a main actor isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by call to main actor-isolated function cannot cross actor boundary}}
 
   let _ = await newValue
 
