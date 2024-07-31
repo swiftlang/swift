@@ -61,7 +61,7 @@ SILType SILBuilder::getPartialApplyResultType(
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs, context);
 
-  assert(!FTI->isPolymorphic()
+  ASSERT(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");
   auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
@@ -155,7 +155,7 @@ SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
 SingleValueInstruction *
 SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
                                            SILType Ty) {
-  assert(isLoadableOrOpaque(Ty));
+  ASSERT(isLoadableOrOpaque(Ty));
   if (Ty.isTrivial(getFunction()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction()));
@@ -189,7 +189,7 @@ SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
   if (!hasOwnership())
     return createUncheckedReinterpretCast(Loc, Op, Ty);
 
-  assert(isLoadableOrOpaque(Ty));
+  ASSERT(isLoadableOrOpaque(Ty));
   if (Ty.isTrivial(getFunction()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction()));
@@ -232,7 +232,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
   }
 
   // Fall though from the currently active block into the given block.
-  assert(BB->args_empty() && "cannot fall through to bb with args");
+  ASSERT(BB->args_empty() && "cannot fall through to bb with args");
 
   // This is a fall through into BB, emit the fall through branch.
   createBranch(BranchLoc, BB);
@@ -537,7 +537,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
 ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
                                                    SILType MetatypeTy,
                                                    SILValue Base) {
-  assert(Base->getType().isLoweringOf(
+  ASSERT(Base->getType().isLoweringOf(
              getTypeExpansionContext(), getModule(),
              MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
          "value_metatype result must be formal metatype of the lowered operand "
@@ -757,7 +757,7 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ValueOwnershipKind forwardingOwnershipKind,
     ProfileCounter target1Count, ProfileCounter target2Count) {
-  assert((!hasOwnership() || !failureBB->getNumArguments() ||
+  ASSERT((!hasOwnership() || !failureBB->getNumArguments() ||
           failureBB->getArgument(0)->getType() == op->getType()) &&
          "failureBB's argument doesn't match incoming argument type");
 
@@ -772,7 +772,7 @@ void SILBuilderWithScope::insertAfter(SILInstruction *inst,
   if (isa<TermInst>(inst)) {
     for (const SILSuccessor &succ : inst->getParent()->getSuccessors()) {
       SILBasicBlock *succBlock = succ;
-      assert(succBlock->getSinglePredecessorBlock() == inst->getParent() &&
+      ASSERT(succBlock->getSinglePredecessorBlock() == inst->getParent() &&
              "the terminator instruction must not have critical successors");
       SILBuilderWithScope builder(succBlock->begin());
       func(builder);
