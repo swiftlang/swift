@@ -54,6 +54,9 @@ void qemu_exit() {
 }
 
 int putchar(int c) {
+  // This is only valid in an emulator (QEMU), and it's skipping a proper configuration of the UART device
+  // and waiting for a "ready to transit" state.
+
   // STM32F1 specific location of USART1 and its DR register
   *(volatile uint32_t *)(0x40013800 + 0x04) = c;
   return c;

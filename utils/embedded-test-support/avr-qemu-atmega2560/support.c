@@ -32,8 +32,7 @@ void usart_init() {
   *((volatile char *)0xc1) = 1 << 3; // enable TX on UART0
 }
 
-__attribute__((used))
-static inline void *memcpy_flash_to_sram(void *restrict dst, const void __attribute__((__address_space__(1))) *restrict src, size_t n) {
+void *memcpy_flash_to_sram(void *restrict dst, const void __attribute__((__address_space__(1))) *restrict src, size_t n) {
   for (int i = 0; i < n; i++) {
     ((char *)dst)[i] = ((char __attribute__((__address_space__(1))) *)src)[i];
   }
@@ -46,6 +45,9 @@ void copy_data_from_flash_to_sram() {
 }
 
 int putchar(int c) {
+  // This is only valid in an emulator (QEMU), and it's skipping a proper configuration of the UART device
+  // and waiting for a "ready to transit" state.
+
   // AVR's UART0 DR register
   *((volatile char *)0xc6) = c;
   return c;
