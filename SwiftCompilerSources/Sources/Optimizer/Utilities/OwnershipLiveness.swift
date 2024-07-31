@@ -742,7 +742,11 @@ extension InteriorUseWalker: AddressUseVisitor {
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
     return .continueWalk
-  }    
+  }
+  
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    return .continueWalk
+  }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {

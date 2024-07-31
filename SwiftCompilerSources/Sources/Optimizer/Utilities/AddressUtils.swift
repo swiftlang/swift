@@ -64,6 +64,10 @@ protocol AddressUseVisitor {
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult
 
+  /// Yielding an address may modify the value at the yield, but not past the yield. The yielded value may escape, but
+  /// only if its type is escapable.
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult
+
   /// A non-address owned `value` whose ownership depends on the in-memory
   /// value at `address`, such as `mark_dependence %value on %address`.
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
@@ -119,7 +123,7 @@ extension AddressUseVisitor {
     case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
-    case is ReturnInst, is ThrowInst, is YieldInst, is AddressToPointerInst:
+    case is ThrowInst, is AddressToPointerInst:
       return escapingAddressUse(of: operand)
 
     case is StructElementAddrInst, is TupleElementAddrInst,
@@ -149,11 +153,13 @@ extension AddressUseVisitor {
          is PackElementSetInst:
       return leafAddressUse(of: operand)
 
-    case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, 
-         is ValueMetatypeInst, is ExistentialMetatypeInst,
+    case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
          is PackElementGetInst:
       let svi = operand.instruction as! SingleValueInstruction
       return loadedAddressUse(of: operand, into: svi)
+
+    case is YieldInst:
+      return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction
            where sdai.sourceOperand == operand:
@@ -332,6 +338,11 @@ extension AddressInitializationWalker {
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
     return .continueWalk
+  }
+
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    // An inout yield is a partial write.
+    return .abortWalk
   }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
