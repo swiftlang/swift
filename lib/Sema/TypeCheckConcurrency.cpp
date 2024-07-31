@@ -2273,85 +2273,6 @@ static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
   return fn;
 }
 
-static bool shouldCheckSendable(Expr *expr) {
-  if (auto *declRef = dyn_cast<DeclRefExpr>(expr->findOriginalValue())) {
-    auto isolation = getActorIsolation(declRef->getDecl());
-    return isolation != ActorIsolation::NonisolatedUnsafe;
-  }
-
-  return true;
-}
-
-bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *declContext) {
-  auto isolationCrossing = apply->getIsolationCrossing();
-  if (!isolationCrossing.has_value())
-    return false;
-
-  auto fnExprType = apply->getFn()->getType();
-  if (!fnExprType)
-    return false;
-
-  // Check the 'self' argument.
-  if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn())) {
-    auto *base = selfApply->getBase();
-
-    if (shouldCheckSendable(base) &&
-        diagnoseNonSendableTypes(
-            base->getType(),
-            declContext, /*inDerivedConformance*/Type(),
-            base->getStartLoc(),
-            diag::non_sendable_call_argument,
-            isolationCrossing.value().exitsIsolation(),
-            isolationCrossing.value().getDiagnoseIsolation()))
-      return true;
-  }
-  auto fnType = fnExprType->getAs<FunctionType>();
-  if (!fnType)
-    return false;
-
-  auto params = fnType->getParams();
-  for (unsigned paramIdx : indices(params)) {
-    const auto &param = params[paramIdx];
-
-    // Dig out the location of the argument.
-    SourceLoc argLoc = apply->getLoc();
-    Type argType;
-    bool checkSendable = true;
-    if (auto argList = apply->getArgs()) {
-      auto arg = argList->get(paramIdx);
-      if (arg.getStartLoc().isValid())
-          argLoc = arg.getStartLoc();
-
-      // Determine the type of the argument, ignoring any implicit
-      // conversions that could have stripped sendability.
-      if (Expr *argExpr = arg.getExpr()) {
-        checkSendable = shouldCheckSendable(argExpr);
-        argType = argExpr->findOriginalType();
-
-        // If this is a default argument expression, don't check Sendability
-        // if the argument is evaluated in the callee's isolation domain.
-        if (auto *defaultExpr = dyn_cast<DefaultArgumentExpr>(argExpr)) {
-          auto argIsolation = defaultExpr->getRequiredIsolation();
-          auto calleeIsolation = isolationCrossing->getCalleeIsolation();
-          if (argIsolation == calleeIsolation) {
-            continue;
-          }
-        }
-      }
-    }
-
-    if (checkSendable &&
-        diagnoseNonSendableTypes(
-            argType ? argType : param.getParameterType(),
-            declContext, /*inDerivedConformance*/Type(),
-            argLoc, diag::non_sendable_call_argument,
-            isolationCrossing.value().exitsIsolation(),
-            isolationCrossing.value().getDiagnoseIsolation()))
-      return true;
-  }
-  return false;
-}
-
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -2844,29 +2765,17 @@ namespace {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
             // Defer diagnosing checking of non-Sendable types that are passed
-            // into async let to SIL level region based isolation if we have
-            // region based isolation enabled.
-            //
-            // We purposely do not do this for SendingArgsAndResults since that
-            // just triggers the actual ability to represent
-            // 'sending'. RegionBasedIsolation is what determines if we get the
-            // differing semantics.
-            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
-              diagnoseNonSendableTypes(
-                  type, getDeclContext(),
-                  /*inDerivedConformance*/Type(), capture.getLoc(),
-                  diag::implicit_async_let_non_sendable_capture,
-                  decl->getName());
-            }
-          } else {
-            // Fallback to a generic implicit capture missing sendable
-            // conformance diagnostic.
-            diagnoseNonSendableTypes(type, getDeclContext(),
-                                     /*inDerivedConformance*/Type(),
-                                     capture.getLoc(),
-                                     diag::implicit_non_sendable_capture,
-                                     decl->getName());
+            // into async let to SIL level region based isolation.
+            return;
           }
+
+          // Fallback to a generic implicit capture missing sendable
+          // conformance diagnostic.
+          diagnoseNonSendableTypes(type, getDeclContext(),
+                                   /*inDerivedConformance*/Type(),
+                                   capture.getLoc(),
+                                   diag::implicit_non_sendable_capture,
+                                   decl->getName());
         } else if (fnType->isSendable()) {
           diagnoseNonSendableTypes(type, getDeclContext(),
                                    /*inDerivedConformance*/Type(),
@@ -3903,12 +3812,11 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
-      // Check if language features ask us to defer sendable diagnostics if so,
-      // don't check for sendability of arguments here.
-      if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
-        diagnoseApplyArgSendability(apply, getDeclContext());
-      }
+      // Sendable checking for arguments is deferred to region isolation.
 
+      // FIXME: Defer sendable checking for result types to region isolation
+      // always.
+      //
       // Check for sendability of the result type if we do not have a
       // sending result.
       if ((!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation) ||
