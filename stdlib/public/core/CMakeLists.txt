@@ -79,7 +79,6 @@ split_embedded_sources(
   EMBEDDED ErrorType.swift
   EMBEDDED ExistentialCollection.swift
     NORMAL Filter.swift
-    NORMAL FixedArray.swift
     NORMAL FlatMap.swift
     NORMAL Flatten.swift
   EMBEDDED FloatingPoint.swift
