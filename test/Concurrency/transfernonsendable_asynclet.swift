@@ -722,7 +722,7 @@ func asyncLetWithoutCapture() async {
   //
   // NOTE: Error below will go away in next commit.
   async let x: NonSendableKlass = await returnValueFromMain()
-  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by call to main actor-isolated function cannot cross actor boundary}}
   let y = await x
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
@@ -774,7 +774,7 @@ extension NonSendableStruct {
     async let subTask6: NonSendableStruct = self
     // expected-warning @-1 {{sending 'self' risks causing data races}}
     // expected-note @-2 {{sending 'actor'-isolated 'self' into async let risks causing data races between nonisolated and 'actor'-isolated uses}}
-    // expected-warning @-3 {{non-sendable type 'NonSendableStruct' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
+    // expected-warning @-3 {{non-sendable type 'NonSendableStruct' returned by call to nonisolated function cannot cross actor boundary}}
     _ = await subTask6
   }
 }

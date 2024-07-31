@@ -102,7 +102,7 @@ extension A1 {
     _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' in implicitly asynchronous access to actor-isolated property 'localLet' cannot cross actor boundary}}
     // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@-2 {{property access is 'async'}}
-    _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by call to actor-isolated function cannot cross actor boundary}}
+    _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by implicitly async call to actor-isolated function cannot cross actor boundary}}
     _ = await other.asynchronous(nil)
   }
 }
@@ -182,10 +182,10 @@ func globalTestMain(nc: NotConcurrent) async {
   // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local main actor-isolated uses}}
   await globalSync(a) // expected-tns-note {{access can happen concurrently}}
   _ = await ClassWithGlobalActorInits(nc)
-  // expected-warning @-1 {{non-sendable type 'ClassWithGlobalActorInits' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'ClassWithGlobalActorInits' returned by implicitly async call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   // expected-tns-warning @-2 {{sending 'nc' risks causing data races}}
   // expected-tns-note @-3 {{sending main actor-isolated 'nc' to global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'SomeGlobalActor'-isolated and main actor-isolated uses}}
-  _ = await ClassWithGlobalActorInits() // expected-warning{{non-sendable type 'ClassWithGlobalActorInits' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
+  _ = await ClassWithGlobalActorInits() // expected-warning{{non-sendable type 'ClassWithGlobalActorInits' returned by implicitly async call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
 }
 
 @SomeGlobalActor
