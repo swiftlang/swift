@@ -1386,6 +1386,8 @@ def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
+def scanner_module_validation: Flag<["-"], "scanner-module-validation">,
+    HelpText<"Validate binary modules in the dependency scanner">;
 def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
     HelpText<"Do not validate binary modules in scanner and delegate the validation to swift-frontend">;
 def module_load_mode: Separate<["-"], "module-load-mode">,

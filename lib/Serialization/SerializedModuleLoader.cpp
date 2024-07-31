@@ -455,7 +455,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
 
-  if (!Ctx.SearchPathOpts.NoScannerModuleValidation) {
+  if (Ctx.SearchPathOpts.ScannerModuleValidation) {
     // If failed to load, just ignore and return do not found.
     if (loadInfo.status != serialization::Status::Valid) {
       if (Ctx.LangOpts.EnableModuleLoadingRemarks)
