@@ -21,6 +21,8 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: remote_run || device_run
+
 //--- Library.swift
 @frozen
 public struct Inlinable {
