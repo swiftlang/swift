@@ -1403,7 +1403,7 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
 
   auto validateModule = [&](StringRef modulePath) {
     // Legacy behavior do not validate module.
-    if (Ctx.SearchPathOpts.NoScannerModuleValidation)
+    if (!Ctx.SearchPathOpts.ScannerModuleValidation)
       return true;
 
     // If we picked the other module already, no need to validate this one since
@@ -1922,8 +1922,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
       searchPathOpts.PluginSearchOpts;
 
   // Get module loading behavior options.
-  genericSubInvocation.getSearchPathOptions().NoScannerModuleValidation =
-      searchPathOpts.NoScannerModuleValidation;
+  genericSubInvocation.getSearchPathOptions().ScannerModuleValidation = searchPathOpts.ScannerModuleValidation;
   genericSubInvocation.getSearchPathOptions().ModuleLoadMode =
       searchPathOpts.ModuleLoadMode;
 
