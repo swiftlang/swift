@@ -213,6 +213,7 @@ def _apply_default_arguments(args):
         args.test_android = False
         args.test_cmark = False
         args.test_swiftpm = False
+        args.test_foundation = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
@@ -1316,6 +1317,8 @@ def create_argument_parser():
            help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
+    option('--skip-test-foundation', toggle_false('test_foundation'),
+           help='skip testing Foundation')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
            help='skip testing Swift driver')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
