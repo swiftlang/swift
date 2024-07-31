@@ -480,10 +480,6 @@ The standard library cannot import the Darwin module (much less an ICU module), 
 
 ### Internal structures
 
-#### `_FixedArray16`
-
-The standard library has an internal array type of fixed size 16. This provides fast random access into contiguous (usually stack-allocated) memory. See [FixedArray.swift](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/FixedArray.swift) for implementation.
-
 #### Thread Local Storage
 
 The standard library utilizes thread local storage (TLS) to cache expensive computations or operations in a thread-safe fashion. This is currently used for tracking some ICU state for Strings. Adding new things to this struct is a little more involved, as Swift lacks some of the features required for it to be expressed elegantly (e.g. move-only structs):
