@@ -432,3 +432,30 @@ int swift::RunImmediatelyFromAST(CompilerInstance &CI) {
 
   return *Result;
 }
+
+void swift::loadFoundationIfNeeded(DiagnosticEngine &Diags) {
+#if defined(__APPLE__)
+  const char *FoundationPath =
+      "/System/Library/Frameworks/Foundation.framework/Foundation";
+  void *handle = dlopen(FoundationPath, RTLD_NOLOAD);
+  if (handle) {
+    // Foundation is already loaded. Use dlclose to release the ref-count that
+    // was incremented by dlopen and return.
+    dlclose(handle);
+    return;
+  } else {
+    // Foundation is not yet loaded. Load it now and leak the handle.
+    // FIXME: it is fragile to load here, as there is no guarantee the swift
+    // runtime has not initialized already. As the compiler adds more swift code
+    // we may need to move this or find another solution.
+    handle = dlopen(FoundationPath, RTLD_LAZY | RTLD_GLOBAL);
+    if (!handle)
+      Diags.diagnose(SourceLoc(),
+                     diag::warning_immediate_mode_cannot_load_foundation,
+                     dlerror());
+  }
+
+#else
+  // Nothing to do.
+#endif
+}
