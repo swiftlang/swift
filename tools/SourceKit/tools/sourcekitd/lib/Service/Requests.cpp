@@ -912,7 +912,7 @@ static void
 handleRequestEditorOpenInterface(const RequestDict &Req,
                                  SourceKitCancellationToken CancellationToken,
                                  ResponseReceiver Rec) {
-  {
+  handleSemanticRequest(Req, Rec, [Req, Rec]() {
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
@@ -929,7 +929,7 @@ handleRequestEditorOpenInterface(const RequestDict &Req,
     std::optional<StringRef> InterestedUSR = Req.getString(KeyInterestedUSR);
     return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args,
                                    SynthesizedExtension, InterestedUSR));
-  }
+  });
 }
 
 static void handleRequestEditorOpenHeaderInterface(
