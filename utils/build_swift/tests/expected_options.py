@@ -307,6 +307,7 @@ EXPECTED_DEFAULTS = {
     'test_playgroundsupport': True,
     'test_cmark': False,
     'test_swiftpm': False,
+    'test_foundation': False,
     'test_swift_driver': False,
     'test_swiftsyntax': False,
     'test_indexstoredb': False,
