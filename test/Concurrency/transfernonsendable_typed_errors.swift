@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -disable-availability-checking
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -45,7 +45,7 @@ func isolatedClosureTest() async {
 func sendingError() async {
   let x = NonSendableKlass()
   transferToSendingParam(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
-  // expected-note @-1 {{Passing value of non-Sendable type 'NonSendableKlass' as a 'sending' argument to global function 'transferToSendingParam' risks causing races in between local and callee code}}
+  // expected-note @-1 {{Passing value of non-Sendable type 'NonSendableKlass' as a 'sending' argument to global function 'transferToSendingParam' risks causing races in between local and caller code}}
   print(x) // expected-note {{access can happen concurrently}}
 }
 

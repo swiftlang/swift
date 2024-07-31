@@ -675,6 +675,7 @@ bb0:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
+  // expected-note @-3 {{}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{access can happen concurrently}}
@@ -754,6 +755,7 @@ bb0:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
+  // expected-note @-3 {{}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{access can happen concurrently}}
@@ -836,6 +838,7 @@ bb0:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
+  // expected-note @-3 {{}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{access can happen concurrently}}
