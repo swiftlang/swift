@@ -161,9 +161,6 @@ public:
       uint16_t GenericParamIndex;
       InvertibleProtocolSet Protocols;
     } InvertedProtocols;
-
-    /// FIXME ALEX DOCS
-    uint32_t ValueType;
   };
 
   constexpr GenericRequirementFlags getFlags() const {

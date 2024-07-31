@@ -35,7 +35,7 @@ TEST(ASTDumper, ArchetypeType) {
     llvm::SmallVector<ProtocolDecl *> protocols;
     archetype = PrimaryArchetypeType::getNew(ctx, sig.getGenericEnvironment(),
                                              genericParamTy, protocols, Type(),
-                                             nullptr);
+                                             nullptr, Type());
   }
 
   std::string fullStr;
