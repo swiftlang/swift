@@ -12,6 +12,7 @@ public struct NUPixelSize {
      */
     public var height: Int
 }
+public func show_only_for_swift()
 
 [
   {
@@ -118,6 +119,21 @@ public struct NUPixelSize {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 226,
     key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 232,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 239,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 244,
+    key.length: 19
   }
 ]
 [
@@ -256,6 +272,22 @@ public struct NUPixelSize {
             key.attribute: source.decl.attribute.public
           }
         ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "show_only_for_swift()",
+    key.offset: 239,
+    key.length: 26,
+    key.nameoffset: 244,
+    key.namelength: 21,
+    key.attributes: [
+      {
+        key.offset: 232,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
       }
     ]
   }
