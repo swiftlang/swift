@@ -10,14 +10,16 @@
 
 import SwiftReflectionTest
 
+@available(SwiftStdlib 5.1, *)
 actor MyActor {
   var i: Int
   init() { i = 1 }
 }
 
-var actor = MyActor()
-
-reflect(object: actor)
+if #available(SwiftStdlib 5.1, *) {
+  let actor = MyActor()
+  reflect(object: actor)
+}
 
 // CHECK-64: Reflecting an object.
 // CHECK-64-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
