@@ -3987,8 +3987,8 @@ namespace {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, "dependent_member_type");
-      } else if (originator.is<PlaceholderTypeRepr *>()) {
-        printFlag("placeholder_type_repr");
+      } else if (originator.is<TypeRepr *>()) {
+        printFlag("type_repr");
       } else {
         assert(false && "unknown originator");
       }
