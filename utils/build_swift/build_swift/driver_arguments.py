@@ -1137,6 +1137,10 @@ def create_argument_parser():
     option('--build-swift-stdlib-static-print', toggle_true,
            help='Build constant-folding print() support')
 
+    option('--build-embedded-stdlib', toggle_true,
+           default=True,
+           help='Build embedded stdlib')
+
     option('--build-embedded-stdlib-cross-compiling', toggle_true,
            help='Build embedded stdlib for cross-compiling targets.')
 
