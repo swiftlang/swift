@@ -7327,7 +7327,7 @@ class PlaceholderType : public TypeBase {
   // recursive property logic in PlaceholderType::get.
   using Originator =
       llvm::PointerUnion<TypeVariableType *, DependentMemberType *, VarDecl *,
-                         ErrorExpr *, PlaceholderTypeRepr *>;
+                         ErrorExpr *, TypeRepr *>;
 
   Originator O;
 

@@ -998,7 +998,7 @@ class SwiftDependencyScanningService {
   std::vector<std::string> AllContextHashes;
 
   /// Shared state mutual-exclusivity lock
-  llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
+  mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
