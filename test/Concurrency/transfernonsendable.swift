@@ -872,8 +872,8 @@ func letSendableTrivialLetStructFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-  _ = test.letSendableTrivial
-  useValue(test) // expected-tns-note {{access can happen concurrently}}
+  _ = test.letSendableTrivial // expected-tns-note {{access can happen concurrently}}
+  useValue(test)
 }
 
 func letSendableNonTrivialLetStructFieldTest() async {
@@ -941,11 +941,11 @@ func letNonSendableNonTrivialLetStructFieldClosureTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-  let z = test.letSendableNonTrivial
+  let z = test.letSendableNonTrivial // expected-tns-note {{access can happen concurrently}}
   _ = z
   let z2 = test.varSendableNonTrivial
   _ = z2
-  useValue(test) // expected-tns-note {{access can happen concurrently}}
+  useValue(test)
 }
 
 func varSendableTrivialLetStructFieldTest() async {
@@ -953,8 +953,8 @@ func varSendableTrivialLetStructFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-  _ = test.varSendableTrivial
-  useValue(test) // expected-tns-note {{access can happen concurrently}}
+  _ = test.varSendableTrivial // expected-tns-note {{access can happen concurrently}}
+  useValue(test)
 }
 
 func varSendableNonTrivialLetStructFieldTest() async {
