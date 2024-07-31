@@ -17,21 +17,21 @@
 // RUN:   -emit-module-interface-path %t/revision/Foo.swiftinterface -enable-library-evolution %t/foo.swift
 
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=1.0.0.0.1 \
-// RUN:   %target-swift-frontend -scan-dependencies -module-name Test -O -module-load-mode prefer-binary \
+// RUN:   %target-swift-frontend -scan-dependencies -scanner-module-validation -module-name Test -O -module-load-mode prefer-binary \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   %t/main.swift -o %t/deps-1.json -swift-version 5 -I %t/match
 
 // RUN: %FileCheck %s --check-prefix=BINARY --input-file=%t/deps-1.json
 
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=1.0.0.0.1 \
-// RUN:   %target-swift-frontend -scan-dependencies -module-name Test -O -module-load-mode prefer-binary \
+// RUN:   %target-swift-frontend -scan-dependencies -scanner-module-validation -module-name Test -O -module-load-mode prefer-binary \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   %t/main.swift -o %t/deps-2.json -swift-version 5 -I %t/new
 
 // RUN: %FileCheck %s --check-prefix=TEXTUAL --input-file=%t/deps-2.json
 
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=1.0.0.0.1 \
-// RUN:   %target-swift-frontend -scan-dependencies -module-name Test -O -module-load-mode prefer-binary \
+// RUN:   %target-swift-frontend -scan-dependencies -scanner-module-validation -module-name Test -O -module-load-mode prefer-binary \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   %t/main.swift -o %t/deps-3.json -swift-version 5 -I %t/revision
 

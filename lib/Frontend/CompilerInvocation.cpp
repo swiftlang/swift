@@ -2005,6 +2005,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
+                                const CASOptions &CASOpts,
                                 StringRef workingDirectory) {
   using namespace options;
   namespace path = llvm::sys::path;
@@ -2148,8 +2149,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
 
-  Opts.NoScannerModuleValidation |=
-      Args.hasArg(OPT_no_scanner_module_validation);
+  // rdar://132340493 disable scanner-side validation for non-caching builds
+  Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
+                                               OPT_no_scanner_module_validation,
+                                               CASOpts.EnableCaching);
 
   std::optional<std::string> forceModuleLoadingMode;
   if (auto *A = Args.getLastArg(OPT_module_load_mode))
@@ -3556,7 +3559,7 @@ bool CompilerInvocation::parseArgs(
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
   if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
-                          workingDirectory)) {
+                          CASOpts, workingDirectory)) {
     return true;
   }
 
