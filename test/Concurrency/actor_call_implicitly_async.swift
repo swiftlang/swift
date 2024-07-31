@@ -353,23 +353,23 @@ actor Calculator {
 
 @OrangeActor func doSomething() async {
   let _ = (await bananaAdd(1))(2)
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly async call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly async call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly async call to actor-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly async call to actor-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly async call to actor-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = plusOne(2)
 }
