@@ -5520,9 +5520,6 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
-ERROR(implicit_async_let_non_sendable_capture,none,
-      "capture of %1 with non-sendable type %0 in 'async let' binding",
-      (Type, DeclName))
 ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
@@ -5642,10 +5639,6 @@ ERROR(non_sendable_param_type,none,
       "in parameter of superclass method overridden by %3 %kind2|"
       "in parameter of %3 '@objc' %kind2}1 cannot cross actor boundary",
       (Type, unsigned, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_call_argument,none,
-      "passing argument of non-sendable type %0 %select{into %2 context|"
-      "outside of %2 context}1 may introduce data races",
-      (Type, bool, ActorIsolation))
 ERROR(non_sendable_result_type,none,
       "non-sendable type %0 returned by %select{call to %3 %kind2|"
       "call from %4 context to nonisolated %kind2|"
