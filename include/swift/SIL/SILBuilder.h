@@ -3319,7 +3319,7 @@ public:
   }
 
   ~DebugLocOverrideRAII() {
-    ASSERT(Builder.getCurrentDebugLocOverride() == installedOverride &&
+    assert(Builder.getCurrentDebugLocOverride() == installedOverride &&
            "Restoring debug location override to an unexpected state");
     Builder.applyDebugLocOverride(oldOverride);
   }
