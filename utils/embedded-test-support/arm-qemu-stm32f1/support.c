@@ -48,9 +48,10 @@ __attribute((section(".vectors"))) void *vector_table[114] = {
 };
 
 void qemu_exit() {
-  register uintptr_t a asm("r0") = 0x18;
-  register uintptr_t b asm("r1") = 0x20026;
-  __asm__ volatile("BKPT #0xAB" : : "r"(a), "r"(b));
+  __asm__ volatile("mov r0, #0x18");
+  __asm__ volatile("movw r1, #0x0026");
+  __asm__ volatile("movt r1, #0x2"); // construct 0x20026 in r1
+  __asm__ volatile("bkpt #0xab");
 }
 
 int putchar(int c) {
