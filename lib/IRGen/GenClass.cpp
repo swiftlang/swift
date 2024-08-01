@@ -1401,6 +1401,12 @@ namespace {
       }
 
       auto dataPtr = emitROData(ForMetaClass, DoesNotHaveUpdateCallback);
+
+      // Record the ro-data globals if this is a pre-specialized class.
+      if (specializedGenericType) {
+        IGM.addGenericROData(dataPtr);
+      }
+
       dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
 
       llvm::Constant *fields[] = {
@@ -2684,7 +2690,14 @@ static llvm::Constant *doEmitClassPrivateData(
   }
 
   // Then build the class RO-data.
-  return builder.emitROData(ForClass, hasUpdater);
+  auto res = builder.emitROData(ForClass, hasUpdater);
+
+  // Record the ro-data globals if this is a pre-specialized class.
+  if (classUnion.isa<std::pair<ClassDecl*, CanType>>()) {
+    IGM.addGenericROData(res);
+  }
+
+  return res;
 }
 
 llvm::Constant *irgen::emitSpecializedGenericClassPrivateData(
