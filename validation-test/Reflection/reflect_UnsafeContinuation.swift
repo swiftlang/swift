@@ -8,6 +8,7 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: ASAN
+// UNSUPPORTED: back_deployment_runtime
 
 import SwiftReflectionTest
 
@@ -22,7 +23,7 @@ struct MyError: Error {
 @available(SwiftStdlib 5.1, *)
 class MyClass {
     let cont: UnsafeContinuation<MyValue, any Error>
-    
+
     init(cont: UnsafeContinuation<MyValue, any Error>) {
         self.cont = cont
     }
