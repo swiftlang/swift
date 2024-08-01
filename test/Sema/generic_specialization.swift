@@ -9,7 +9,7 @@ extension Int {
   func baz() -> Int {}
   func baz(_ x: Int = 0) -> Int {}
 
-  func gen<T>() -> T {} // expected-note 2 {{in call to function 'gen()'}}
+  func gen<T>() -> T {} // expected-note 2 {{in call to function 'gen()'}} expected-note 2 {{'gen()' declared here}}
 }
 
 // https://github.com/swiftlang/swift/issues/74857
@@ -28,7 +28,7 @@ func test(i: Int) {
 }
 
 extension Bool {
-  func foo<T>() -> T {}
+  func foo<T>() -> T {} // expected-note {{'foo()' declared here}}
 }
 
 let _: () -> Bool = false.foo<Int> // expected-error {{cannot explicitly specialize a generic function}}
