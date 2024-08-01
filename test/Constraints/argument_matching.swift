@@ -1810,3 +1810,14 @@ func test_extraneous_argument_with_inout() {
   var x: Int = 0
   test(42, &x) // expected-error {{extra argument in call}}
 }
+
+// https://github.com/swiftlang/swift/issues/75527
+struct Issue75527 {
+  func foo(x: Int) {}
+
+  func bar() {
+    typealias Magic<T> = T
+    let fn = Issue75527.foo(self) as Magic
+    fn(0) // Make sure the argument label does not escape here.
+  }
+}
