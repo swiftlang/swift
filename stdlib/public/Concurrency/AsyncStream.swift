@@ -250,7 +250,7 @@ public struct AsyncStream<Element> {
   ///
   /// - Parameters:
   ///    - elementType: The type of element the `AsyncStream` produces.
-  ///    - bufferingPolicy: A `Continuation.BufferingPolicy` value to
+  ///    - limit: A `Continuation.BufferingPolicy` value to
   ///       set the stream's buffering behavior. By default, the stream buffers an
   ///       unlimited number of elements. You can also set the policy to buffer a
   ///       specified number of oldest or newest elements.
