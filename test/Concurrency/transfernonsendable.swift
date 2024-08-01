@@ -1849,3 +1849,18 @@ func testBooleanCapture(_ x: inout NonSendableKlass) {
     print(z)
   }
 }
+
+public class Context {
+  let value: Int
+
+  init(value: Int) {
+    self.value = value
+  }
+}
+
+extension MyActor {
+  public func withContext<T>(_ block: sending (NonSendableKlass) throws -> T) async throws -> sending T {
+    return try block(klass) // expected-tns-warning {{returning 'self'-isolated 'self.klass' as a 'sending' result risks causing data races}}
+    // expected-tns-note @-1 {{returning 'self'-isolated 'self.klass' risks causing data races since the caller assumes that 'self.klass' can be safely sent to other isolation domains}}
+  }
+}
