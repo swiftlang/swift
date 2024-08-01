@@ -496,6 +496,12 @@ namespace swift {
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
 
+    /// If set to true, the source manager will avoid memory mapping source files
+    /// with the expectation they may change on disk. This is most useful when
+    /// opening files under sourcekitd on Windows, as memory mapping on Windows
+    /// prevents files from being written.
+    bool OpenSourcesAsVolatile = false;
+
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 

@@ -574,6 +574,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     Invocation.getSearchPathOptions().dump(LangOpts.Target.isOSDarwin());
   }
 
+  if (LangOpts.OpenSourcesAsVolatile) {
+    this->getSourceMgr().setOpenSourcesAsVolatile();
+  }
+
   // If we expect an implicit stdlib import, load in the standard library. If we
   // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
   // trigger a bunch of other errors due to the stdlib being missing, or at
