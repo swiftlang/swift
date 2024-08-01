@@ -32,8 +32,15 @@ extension BuiltinInst : OnoneSimplifyable {
            .Strideof,
            .Alignof:
         optimizeTargetTypeConst(context)
-      case .DestroyArray,
-           .CopyArray,
+      case .DestroyArray:
+        if let elementType = substitutionMap.replacementTypes[0],
+           elementType.isTrivial(in: parentFunction)
+        {
+          context.erase(instruction: self)
+          return
+        }
+        optimizeArgumentToThinMetatype(argument: 0, context)
+      case .CopyArray,
            .TakeArrayNoAlias,
            .TakeArrayFrontToBack,
            .TakeArrayBackToFront,
