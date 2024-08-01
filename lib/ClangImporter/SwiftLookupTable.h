@@ -283,7 +283,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 19; // 64-bit clang serialization IDs
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 20; // hash functions
 
 
 /// A lookup table that maps Swift names to the set of Clang
