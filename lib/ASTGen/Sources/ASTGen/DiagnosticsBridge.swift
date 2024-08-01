@@ -75,6 +75,12 @@ fileprivate func emitDiagnosticParts(
       replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
       newText = newTrivia.description
 
+    case .replaceChild(let replacingChildData):
+      let replacementRange = replacingChildData.replacementRange
+      replaceStartLoc = bridgedSourceLoc(at: replacementRange.lowerBound)
+      replaceEndLoc = bridgedSourceLoc(at: replacementRange.upperBound)
+      newText = replacingChildData.newChild.description
+      
 #if RESILIENT_SWIFT_SYNTAX
     @unknown default:
       fatalError()
@@ -221,6 +227,18 @@ extension SourceManager {
         )
         newText = newTrivia.description
 
+      case .replaceChild(let replacingChildData):
+        let replacementRange = replacingChildData.replacementRange
+        replaceStartLoc = bridgedSourceLoc(
+          for: replacingChildData.parent,
+          at: replacementRange.lowerBound
+        )
+        replaceEndLoc = bridgedSourceLoc(
+          for: replacingChildData.parent,
+          at: replacementRange.upperBound
+        )
+        newText = replacingChildData.newChild.description
+        
 #if RESILIENT_SWIFT_SYNTAX
       @unknown default:
         fatalError()
