@@ -433,8 +433,9 @@ extension String {
   >(_ input: C) -> (result: String, repairsMade: Bool) {
     _internalInvariant(C.Element.self == UInt8.self)
     return Array(input).withUnsafeBufferPointer {
-      let raw = UnsafeRawBufferPointer($0)
-      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self))
+      UnsafeRawBufferPointer($0).withMemoryRebound(to: UInt8.self) {
+        String._fromUTF8Repairing($0)
+      }
     }
   }
 
