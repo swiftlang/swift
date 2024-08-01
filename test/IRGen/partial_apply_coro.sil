@@ -1,10 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=OnoneSimplification -emit-ir %s -o - | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=OnoneSimplification -I %t -emit-ir %s -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
 
 import Builtin
 import Swift
+import resilient_struct
 
 // Basic coroutine: a single yield and no results.
 //
@@ -2187,6 +2189,124 @@ bb0(%x : $*SwiftClassPair):
   end_apply %token as $()
   dealloc_stack %p : $@noescape @yield_once @callee_guaranteed (Int) -> (@yields Int)
   destroy_addr %x: $*SwiftClassPair
+  %t = tuple()
+  return %t : $()
+}
+
+// CHECK: define {{.*}} void @test_initial_offset
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientIntVMa"
+// CHECK:   [[MD:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK:   [[VWT_PTR:%.*]] = getelementptr inbounds ptr, ptr [[MD]], i64 -1
+// CHECK:   [[VWT:%.*]] = load ptr, ptr [[VWT_PTR]]
+// CHECK:   [[FLAGS_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 10
+// CHECK:   [[FLAGS:%.*]] = load i32, ptr [[FLAGS_PTR]]
+// CHECK:   [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
+// CHECK:   [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
+// CHECK:   = xor i64 [[ALIGNMASK]], -1
+// CHECK:   = add i64 16, [[ALIGNMASK]]
+
+sil public_external @closure : $@yield_once @convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> (@yields @in ResilientInt)
+sil @test_initial_offset : $@convention(thin) (@in ResilientInt, @guaranteed SwiftClass) -> () {
+bb0(%x : $*ResilientInt, %y : $SwiftClass):
+  %f = function_ref @closure : $@yield_once @convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> (@yields @in ResilientInt)
+  %p = partial_apply [callee_guaranteed] %f(%x, %y) : $@yield_once @convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> (@yields @in ResilientInt)
+  (%yield, %token) = begin_apply %p() : $@yield_once @callee_guaranteed () -> (@yields @in ResilientInt)
+  end_apply %token as $()
+  release_value %p : $@yield_once @callee_guaranteed () -> (@yields @in ResilientInt)
+  %t = tuple()
+  return %t : $()
+}
+
+protocol Proto1 {}
+protocol Proto2 {}
+struct EmptyType : Proto1 { }
+
+struct SomeType : Proto2 {
+  var d : ResilientInt // some resilient type
+  var x : Int
+}
+
+// CHECK-64-LABEL: define{{.*}} swiftcc void @empty_followed_by_non_fixed(ptr noalias %0)
+// CHECK-64:  [[FLAGS:%.*]] = load i32, ptr
+// CHECK-64:  [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
+// CHECK-64:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
+// CHECK-64:  [[NOTALIGNMASK:%.*]] = xor i64 [[ALIGNMASK]], -1
+// Make sure we take the header offset (16) into account.
+// CHECK-64:  [[TMP:%.*]] = add i64 16, [[ALIGNMASK]]
+// CHECK-64:  [[OFFSET:%.*]] = and i64 [[TMP]], [[NOTALIGNMASK]]
+// CHECK-64:  [[CONTEXT:%.*]] = call noalias ptr @swift_allocObject
+// CHECK-64:  [[GEP:%.*]] = getelementptr inbounds i8, ptr [[CONTEXT]], i64 [[OFFSET]]
+// CHECK-64:  call ptr @"$s18partial_apply_coro8SomeTypeVWOb"(ptr {{.*}}, ptr [[GEP]])
+
+sil @foo : $@yield_once @convention(thin) <T0, T1 where T0 : Proto1, T1 : Proto2> (@in_guaranteed T0, @in_guaranteed T1) -> (@yields @in T0, @yields @in T1)
+sil @empty_followed_by_non_fixed : $@convention(thin)  (EmptyType, @in_guaranteed SomeType) -> () {
+entry(%0 : $EmptyType, %1: $*SomeType):
+  %5 = alloc_stack $EmptyType
+  store %0 to %5 : $*EmptyType
+  %31 = function_ref @foo : $@yield_once @convention(thin) <T0, T1 where T0 : Proto1, T1 : Proto2> (@in_guaranteed T0, @in_guaranteed T1) -> (@yields @in T0, @yields @in T1)
+  %32 = alloc_stack $EmptyType
+  copy_addr %5 to [init] %32 : $*EmptyType
+  %34 = alloc_stack $SomeType
+  copy_addr %1 to [init] %34 : $*SomeType // id: %35
+  %36 = partial_apply [callee_guaranteed] %31<EmptyType, SomeType>(%32, %34) : $@yield_once @convention(thin) <T0, T1 where T0 : Proto1, T1 : Proto2> (@in_guaranteed T0, @in_guaranteed T1) -> (@yields @in T0, @yields @in T1)
+  (%yield1, %yield2, %token) = begin_apply %36() : $@yield_once @callee_guaranteed @substituted <T0, T1 where T0 : Proto1, T1 : Proto2> () -> (@yields @in T0, @yields @in T1) for <EmptyType, SomeType>
+  end_apply %token as $()
+  release_value %36: $@yield_once @callee_guaranteed @substituted <T0, T1 where T0 : Proto1, T1 : Proto2> () -> (@yields @in T0, @yields @in T1) for <EmptyType, SomeType>
+  dealloc_stack %34 : $*SomeType
+  dealloc_stack %32 : $*EmptyType
+  dealloc_stack %5 : $*EmptyType
+  %40 = tuple()
+  return %40 : $()
+}
+
+// CHECK-64-LABEL: define{{.*}} swiftcc void @fixed_followed_by_empty_followed_by_non_fixed
+// CHECK-64-NOT: ret
+// CHECK-64:  [[FLAGS:%.*]] = load i32, ptr
+// CHECK-64:  [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
+// CHECK-64:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
+// CHECK-64:  [[NOTALIGNMASK:%.*]] = xor i64 [[ALIGNMASK]], -1
+// Make sure we compute the correct offset of the non-fixed field.
+// CHECK-64:  [[TMP:%.*]] = add i64 20, [[ALIGNMASK]]
+// CHECK-64: ret
+
+struct FixedType {
+  var f: Int32
+}
+sil @foo2 : $@yield_once @convention(thin) <T0, T1, T2> (@in_guaranteed T0, @in_guaranteed T1, @in_guaranteed T2) -> (@yields @in T0, @out T1, @out T2)
+sil @fixed_followed_by_empty_followed_by_non_fixed : $@convention(thin)  (EmptyType, @in_guaranteed SomeType, FixedType) -> () {
+entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
+  %5 = alloc_stack $EmptyType
+  store %0 to %5 : $*EmptyType
+  %7 = alloc_stack $FixedType
+  store %3 to %7 : $*FixedType
+  %31 = function_ref @foo2 : $@yield_once @convention(thin) <T0, T1, T2> (@in_guaranteed T0, @in_guaranteed T1, @in_guaranteed T2) -> (@yields @in T0, @out T1, @out T2)
+  %32 = alloc_stack $EmptyType
+  copy_addr %5 to [init] %32 : $*EmptyType
+  %34 = alloc_stack $SomeType
+  copy_addr %1 to [init] %34 : $*SomeType // id: %35
+  %36 = partial_apply [callee_guaranteed] %31<FixedType, EmptyType, SomeType>(%7, %32, %34) : $@yield_once @convention(thin) <T0, T1, T2> (@in_guaranteed T0, @in_guaranteed T1, @in_guaranteed T2) -> (@yields @in T0, @out T1, @out T2)
+  release_value %36: $@yield_once @callee_guaranteed @substituted <T0, T1, T2 where T0: Copyable, T0: Escapable, T1: Copyable, T1: Escapable, T2: Copyable, T2: Escapable> () -> (@yields @in T0, @out T1, @out T2) for <FixedType, EmptyType, SomeType>
+  dealloc_stack %34 : $*SomeType
+  dealloc_stack %32 : $*EmptyType
+  dealloc_stack %7 : $*FixedType
+  dealloc_stack %5 : $*EmptyType
+  %40 = tuple()
+  return %40 : $()
+}
+
+// Test that we don't have an alloc object with 0, because that is not allowed
+// CHECK-LABEL: define{{.*}} swiftcc void @my_test_case
+// CHECK-NOT: swift_allocObject
+// CHECK: ret
+sil @take_empty : $@yield_once @convention(thin) (@in_guaranteed EmptyType) -> (@yields EmptyType)
+sil @my_test_case : $@convention(thin)  () -> () {
+entry:
+  %5 = alloc_stack $EmptyType
+  // store % to %5
+  %f = function_ref @take_empty : $@yield_once @convention(thin) (@in_guaranteed EmptyType) -> (@yields EmptyType)
+  %36 = partial_apply [callee_guaranteed] %f(%5) : $@yield_once @convention(thin) (@in_guaranteed EmptyType) -> (@yields EmptyType)
+  release_value %36: $@yield_once @callee_guaranteed () -> (@yields EmptyType)
+  dealloc_stack %5 : $*EmptyType
   %t = tuple()
   return %t : $()
 }
