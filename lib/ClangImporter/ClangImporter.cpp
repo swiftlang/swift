@@ -749,10 +749,24 @@ void importer::getNormalInvocationArguments(
   invocationArgStrs.push_back("-fapinotes-modules");
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
                               languageVersion.asAPINotesVersionString());
-  invocationArgStrs.push_back("-iapinotes-modules");
-  invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
-                               llvm::sys::path::get_separator() +
-                               "apinotes").str());
+
+  // Prefer `-sdk` paths.
+  if (!searchPathOpts.getSDKPath().empty()) {
+    llvm::SmallString<261> path{searchPathOpts.getSDKPath()};
+    llvm::sys::path::append(path, "usr", "lib", "swift", "apinotes");
+
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(path.str().str());
+  }
+
+  // Fallback to "legacy" `-resource-dir` paths.
+  {
+    llvm::SmallString<261> path{searchPathOpts.RuntimeResourcePath};
+    llvm::sys::path::append(path, "apinotes");
+
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(path.str().str());
+  }
 }
 
 static void
