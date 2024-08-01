@@ -493,6 +493,19 @@ private:
            "Transfer needs a sourceInst");
   }
 
+  template <typename T>
+  PartitionOp(PartitionOpKind opKind, T collectionOfIndices,
+              SILInstruction *sourceInst = nullptr)
+      : opKind(opKind), opArgs(), source(sourceInst) {
+    assert(((opKind != PartitionOpKind::Transfer &&
+             opKind != PartitionOpKind::UndoTransfer) ||
+            sourceInst) &&
+           "Transfer needs a sourceInst");
+    for (Element elt : collectionOfIndices) {
+      opArgs.push_back(elt);
+    }
+  }
+
   PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand)
       : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
     assert(((opKind != PartitionOpKind::Transfer &&
@@ -529,9 +542,10 @@ public:
     return PartitionOp(PartitionOpKind::Assign, destElt, srcElt, srcOperand);
   }
 
-  static PartitionOp AssignFresh(Element tgt,
+  template <typename T>
+  static PartitionOp AssignFresh(T collection,
                                  SILInstruction *sourceInst = nullptr) {
-    return PartitionOp(PartitionOpKind::AssignFresh, tgt, sourceInst);
+    return PartitionOp(PartitionOpKind::AssignFresh, collection, sourceInst);
   }
 
   static PartitionOp Transfer(Element tgt, Operand *transferringOp) {
@@ -1162,12 +1176,18 @@ public:
       p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
     }
-    case PartitionOpKind::AssignFresh:
-      assert(op.getOpArgs().size() == 1 &&
-             "AssignFresh PartitionOp should be passed 1 argument");
+    case PartitionOpKind::AssignFresh: {
+      auto arrayRef = op.getOpArgs();
 
-      p.trackNewElement(op.getOpArgs()[0]);
+      Element front = arrayRef.front();
+      p.trackNewElement(front);
+      arrayRef = arrayRef.drop_front();
+      for (auto x : arrayRef) {
+        p.trackNewElement(x);
+        p.assignElement(x, front);
+      }
       return;
+    }
     case PartitionOpKind::Transfer: {
       // NOTE: We purposely do not check here if a transferred value is already
       // transferred. Callers are expected to put a require for that
