@@ -153,9 +153,8 @@ struct LifetimeDependence : CustomStringConvertible {
         precondition(initialAddress is AllocStackInst
                        || initialAddress is FunctionArgument,
                      "expected storage for a a local 'let'")
-        precondition(initializingStore is StoringInstruction
-                       || initializingStore is SourceDestAddrInstruction
-                       || initializingStore is FullApplySite,
+        precondition(initializingStore == nil || initializingStore is StoringInstruction
+                       || initializingStore is SourceDestAddrInstruction || initializingStore is FullApplySite,
                      "expected a store")
       }
     }
