@@ -751,10 +751,21 @@ void importer::getNormalInvocationArguments(
   invocationArgStrs.push_back("-fapinotes-modules");
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
                               languageVersion.asAPINotesVersionString());
-  invocationArgStrs.push_back("-iapinotes-modules");
-  invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
-                               llvm::sys::path::get_separator() +
-                               "apinotes").str());
+  std::string apiNotesPath = (llvm::Twine(searchPathOpts.RuntimeResourcePath) +
+                              llvm::sys::path::get_separator() +
+                              "apinotes").str();
+  auto vfs = ctx.SourceMgr.getFileSystem();
+  if (!vfs->exists(apiNotesPath)) {
+    StringRef SDKPath = searchPathOpts.getSDKPath();
+    llvm::SmallString<256> path{SDKPath};
+    llvm::sys::path::append(path, "usr", "lib", "swift", "apinotes");
+    if (vfs->exists(path))
+      apiNotesPath = path.str();
+  }
+  if (!apiNotesPath.empty()) {
+    invocationArgStrs.push_back("-iapinotes-modules");
+    invocationArgStrs.push_back(std::move(apiNotesPath));
+  }
 }
 
 static void
