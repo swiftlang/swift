@@ -440,9 +440,11 @@ public:
   AccessLevel
   getMaxAccessLevelUsingImport(const ModuleDecl *import) const;
 
-  /// Register the use of \p import from an API with \p accessLevel.
-  void registerAccessLevelUsingImport(AttributedImport<ImportedModule> import,
-                                      AccessLevel accessLevel);
+  /// Register the requirement that \p mod be imported with an access level
+  /// that is at least as permissive as \p accessLevel in order to satisfy
+  /// access or exportability checking constraints.
+  void registerRequiredAccessLevelForModule(ModuleDecl *mod,
+                                            AccessLevel accessLevel);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.

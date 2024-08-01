@@ -207,18 +207,15 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
 
   // Report where it was imported from.
-  if (contextAccessScope.isPublic() ||
-      contextAccessScope.isPackage()) {
-    auto SF = useDC->getParentSourceFile();
+  if (contextAccessScope.isPublicOrPackage()) {
     auto report = [&](const DeclRefTypeRepr *typeRepr, const ValueDecl *VD) {
+      // Remember that the module defining the decl must be imported publicly.
+      recordRequiredImportAccessLevelForDecl(
+          VD, useDC, contextAccessScope.accessLevelForDiagnostics());
+
+      // Emit a remark explaining the required access level.
       ImportAccessLevel import = VD->getImportAccessFrom(useDC);
       if (import.has_value()) {
-        if (SF) {
-          auto useLevel = contextAccessScope.isPublic() ? AccessLevel::Public
-                                                        : AccessLevel::Package;
-          SF->registerAccessLevelUsingImport(import.value(), useLevel);
-        }
-
         if (Context.LangOpts.EnableModuleApiImportRemarks) {
           SourceLoc diagLoc = typeRepr? typeRepr->getLoc()
                                       : extractNearestSourceLoc(useDC);
@@ -2390,20 +2387,21 @@ public:
                                   !ED->getInherited().empty());
     checkConstrainedExtensionRequirements(ED, hasExportedMembers);
 
-    if (!hasExportedMembers &&
-        !ED->getInherited().empty()) {
-      // If we haven't already visited the extended nominal visit it here.
-      // This logic is too wide but prevents false reports of an unused public
-      // import. We should instead check for public generic requirements
-      // similarly to ShouldPrintForModuleInterface::shouldPrint.
+    // If we haven't already visited the extended nominal visit it here.
+    // This logic is too wide but prevents false reports of an unused public
+    // import. We should instead check for public generic requirements
+    // similarly to ShouldPrintForModuleInterface::shouldPrint.
+    if (!hasExportedMembers && !ED->getInherited().empty()) {
       auto DC = Where.getDeclContext();
-      ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
-      if (import.has_value()) {
-        auto SF = DC->getParentSourceFile();
-        if (SF)
-          SF->registerAccessLevelUsingImport(import.value(),
+
+      // Remember that the module defining the extended type must be imported
+      // publicly.
+      recordRequiredImportAccessLevelForDecl(extendedType, DC,
                                              AccessLevel::Public);
 
+      // Emit a remark explaining the required access level.
+      ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
+      if (import.has_value()) {
         auto &ctx = DC->getASTContext();
         if (ctx.LangOpts.EnableModuleApiImportRemarks) {
           ModuleDecl *importedVia = import->module.importedModule,
@@ -2510,6 +2508,29 @@ DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
   return getDisallowedOriginKind(decl, where, downgradeToWarning);
 }
 
+void swift::recordRequiredImportAccessLevelForDecl(const Decl *decl,
+                                                   const DeclContext *dc,
+                                                   AccessLevel accessLevel) {
+  auto sf = dc->getParentSourceFile();
+  if (!sf)
+    return;
+
+  auto definingModule = decl->getModuleContext();
+  if (definingModule == dc->getParentModule())
+    return;
+
+  sf->registerRequiredAccessLevelForModule(definingModule, accessLevel);
+
+  if (auto attributedImport = sf->getImportAccessLevel(definingModule)) {
+    auto importedModule = attributedImport->module.importedModule;
+
+    // If the defining module is transitively imported, mark the responsible
+    // module as requiring the minimum access level too.
+    if (importedModule != definingModule)
+      sf->registerRequiredAccessLevelForModule(importedModule, accessLevel);
+  }
+}
+
 void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
   ASTContext &ctx = SF.getASTContext();
   if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
@@ -2577,13 +2598,15 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
     return;
 
   DeclContext *DC = ED->getDeclContext();
-  ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
-  if (import.has_value()) {
-    auto SF = DC->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(import.value(),
+
+  // Remember that the module defining the decl must be imported with at least
+  // package visibility.
+  recordRequiredImportAccessLevelForDecl(extendedType, DC,
                                          AccessLevel::Package);
 
+  // Emit a remark explaining the required access level.
+  ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
+  if (import.has_value()) {
     auto &ctx = DC->getASTContext();
     if (ctx.LangOpts.EnableModuleApiImportRemarks) {
       ModuleDecl *importedVia = import->module.importedModule,

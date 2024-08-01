@@ -75,13 +75,12 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     }
   }
 
+  // Remember that the module defining the decl must be imported publicly.
+  recordRequiredImportAccessLevelForDecl(D, DC, AccessLevel::Public);
+
+  // Emit a remark explaining the required access level.
   ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value()) {
-    auto SF = DC->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(problematicImport.value(),
-                                         AccessLevel::Public);
-
     if (Context.LangOpts.EnableModuleApiImportRemarks) {
       ModuleDecl *importedVia = problematicImport->module.importedModule,
                  *sourceModule = D->getModuleContext();
@@ -161,17 +160,17 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   if (!D)
     return false;
 
-  auto exportingModule = where.getDeclContext()->getParentModule();
+  const DeclContext *DC = where.getDeclContext();
+  auto exportingModule = DC->getParentModule();
   ASTContext &ctx = exportingModule->getASTContext();
 
-  ImportAccessLevel problematicImport = D->getImportAccessFrom(
-                                                       where.getDeclContext());
-  if (problematicImport.has_value()) {
-    auto SF = where.getDeclContext()->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(problematicImport.value(),
-                                         AccessLevel::Public);
+  // Remember that the module defining the underlying type must be imported
+  // publicly.
+  recordRequiredImportAccessLevelForDecl(D, DC, AccessLevel::Public);
 
+  // Emit a remark explaining the required access level.
+  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
+  if (problematicImport.has_value()) {
     if (ctx.LangOpts.EnableModuleApiImportRemarks) {
       ModuleDecl *importedVia = problematicImport->module.importedModule,
                  *sourceModule = D->getModuleContext();
@@ -224,7 +223,6 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 
   // If limited by an import, note which one.
   if (originKind == DisallowedOriginKind::NonPublicImport) {
-    const DeclContext *DC = where.getDeclContext();
     ImportAccessLevel limitImport = D->getImportAccessFrom(DC);
     assert(limitImport.has_value() &&
            limitImport->accessLevel < AccessLevel::Public &&
@@ -250,14 +248,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   ASTContext &ctx = DC->getASTContext();
   auto originKind = getDisallowedOriginKind(D, where, downgradeToWarning);
 
-  // If we got here it was used in API, we can record the use of the import.
-  ImportAccessLevel import = D->getImportAccessFrom(DC);
-  if (import.has_value() && reason.has_value()) {
-    auto SF = DC->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(import.value(),
-                                         AccessLevel::Public);
-  }
+  // Remember that the module defining the decl must be imported publicly.
+  recordRequiredImportAccessLevelForDecl(D, DC, AccessLevel::Public);
 
   // Access levels from imports are reported with the others access levels.
   // Except for extensions and protocol conformances, we report them here.
@@ -277,6 +269,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
+  // Emit a remark explaining the required access level.
+  ImportAccessLevel import = D->getImportAccessFrom(DC);
   if (ctx.LangOpts.EnableModuleApiImportRemarks &&
       import.has_value() && where.isExported() &&
       reason != ExportabilityReason::General &&
@@ -379,16 +373,17 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   if (ext->getParentModule()->isBuiltinModule())
     return false;
 
+  const DeclContext *DC = where.getDeclContext();
   ModuleDecl *M = ext->getParentModule();
   ASTContext &ctx = M->getASTContext();
 
-  ImportAccessLevel problematicImport = ext->getImportAccessFrom(where.getDeclContext());
-  if (problematicImport.has_value()) {
-    auto SF = where.getDeclContext()->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(problematicImport.value(),
-                                         AccessLevel::Public);
+  // Remember that the module defining the conformance must be imported
+  // publicly.
+  recordRequiredImportAccessLevelForDecl(ext, DC, AccessLevel::Public);
 
+  // Emit a remark explaining the required access level.
+  ImportAccessLevel problematicImport = ext->getImportAccessFrom(DC);
+  if (problematicImport.has_value()) {
     if (ctx.LangOpts.EnableModuleApiImportRemarks) {
       ModuleDecl *importedVia = problematicImport->module.importedModule,
                  *sourceModule = ext->getModuleContext();
@@ -425,7 +420,6 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
 
   // If limited by an import, note which one.
   if (originKind == DisallowedOriginKind::NonPublicImport) {
-    const DeclContext *DC = where.getDeclContext();
     ImportAccessLevel limitImport = ext->getImportAccessFrom(DC);
     assert(limitImport.has_value() &&
            limitImport->accessLevel < AccessLevel::Public &&
