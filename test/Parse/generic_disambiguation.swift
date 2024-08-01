@@ -19,7 +19,7 @@ protocol Fungible {}
 func meta<T>(_ m: T.Type) {}
 func meta2<T>(_ m: T.Type, _ x: Int) {}
 
-func generic<T>(_ x: T) {}
+func generic<T>(_ x: T) {} // expected-note {{'generic' declared here}}
 
 var a, b, c, d : Int
 
