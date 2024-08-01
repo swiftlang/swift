@@ -1896,7 +1896,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       assert(!OSVersion.isEmpty()
              || getASTContext().LangOpts.DisableAvailabilityChecking);
 
-      if (getASTContext().LangOpts.TargetVariant) {
+      if (getASTContext().LangOpts.TargetVariant &&
+          !getASTContext().LangOpts.DisableAvailabilityChecking) {
         // We're building zippered, so we need to pass both macOS and iOS
         // versions to the the runtime version range check. At run time
         // that check will determine what kind of process this code is loaded
