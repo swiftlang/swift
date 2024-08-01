@@ -6788,8 +6788,7 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
 }
 
 RValue RValueEmitter::visitTypeValueExpr(TypeValueExpr *E, SGFContext C) {
-  auto metatype = E->getSubExpr()->getType()->castTo<MetatypeType>();
-  auto paramType = metatype->getInstanceType()->getCanonicalType();
+  auto paramType = E->getParamType()->getCanonicalType();
 
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(
     SGF.B.createTypeValue(E, SGF.getLoweredType(E->getType()), paramType)));

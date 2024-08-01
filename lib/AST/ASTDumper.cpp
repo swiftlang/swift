@@ -3261,7 +3261,12 @@ public:
 
   void visitTypeValueExpr(TypeValueExpr *E, StringRef label) {
     printCommon(E, "type_value_expr", label);
-    printRec(E->getSubExpr());
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(Type(E->getParamType()).getString(PO), "param_type",
+                     TypeColor);
+
     printFoot();
   }
 };

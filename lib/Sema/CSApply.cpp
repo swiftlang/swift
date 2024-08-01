@@ -3207,6 +3207,13 @@ namespace {
       return expr;
     }
 
+    Expr *visitTypeValueExpr(TypeValueExpr *expr) {
+      auto toType = simplifyType(cs.getType(expr));
+      assert(toType->isEqual(expr->getParamType()->getValueType()));
+      cs.setType(expr, toType);
+      return expr;
+    }
+
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
       cs.setType(expr, expr->getDecl()->getInitializerInterfaceType());
       return expr;
@@ -7307,10 +7314,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       finishApply(implicitInit, toType, callLocator, callLocator);
       return implicitInit;
-    }
-
-    case ConversionRestrictionKind::ValueGeneric: {
-      return cs.cacheType(new (ctx) TypeValueExpr(expr, toType));
     }
     }
   }

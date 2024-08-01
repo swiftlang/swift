@@ -7846,20 +7846,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  // It is legal to convert between '(let N).Type' and its underlying value type.
-  //
-  // E.g. '(let N).Type' => 'Int'
-  if (kind >= ConstraintKind::Conversion) {
-    if (auto metaTy = type1->getAs<MetatypeType>()) {
-      if (auto archetype = metaTy->getInstanceType()->getAs<ArchetypeType>()) {
-        if (archetype->getValueType() &&
-            archetype->getValueType()->isEqual(type2)) {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::ValueGeneric);
-        }
-      }
-    }
-  }
-
   if (kind == ConstraintKind::BindToPointerType) {
     if (desugar2->isEqual(getASTContext().TheEmptyTupleType))
       return getTypeMatchSuccess();
@@ -14863,16 +14849,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     ImplicitValueConversions.insert(
         {getConstraintLocator(locator), restriction});
-    return SolutionKind::Solved;
-  }
-
-  case ConversionRestrictionKind::ValueGeneric: {
-    auto metatype = type1->castTo<MetatypeType>();
-    auto archetype = metatype->getInstanceType()->castTo<ArchetypeType>();
-
-    addConstraint(ConstraintKind::Equal, archetype->getValueType(), type2,
-                  getConstraintLocator(locator));
-
     return SolutionKind::Solved;
   }
   }

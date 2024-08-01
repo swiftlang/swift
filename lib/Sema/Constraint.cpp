@@ -707,8 +707,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[CGFloat-to-Double]";
   case ConversionRestrictionKind::DoubleToCGFloat:
     return "[Double-to-CGFloat]";
-  case ConversionRestrictionKind::ValueGeneric:
-    return "[value-generic]";
   }
   llvm_unreachable("bad conversion restriction kind");
 }

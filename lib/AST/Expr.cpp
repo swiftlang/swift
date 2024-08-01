@@ -459,7 +459,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
   PASS_THROUGH_REFERENCE(Unreachable, getSubExpr);
   PASS_THROUGH_REFERENCE(ActorIsolationErasure, getSubExpr);
-  PASS_THROUGH_REFERENCE(TypeValue, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -480,6 +479,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
   SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
+  NO_REFERENCE(TypeValue);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -2369,6 +2369,15 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
     return DRE->getDecl() == AFD->getImplicitSelfDecl();
 
   return false;
+}
+
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
+                                            DeclContext *DC) {
+  ASTContext &C = Decl->getASTContext();
+  assert(Loc.isValid());
+  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
+  Repr->setValue(Decl, DC);
+  return new (C) TypeValueExpr(Repr);
 }
 
 OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {

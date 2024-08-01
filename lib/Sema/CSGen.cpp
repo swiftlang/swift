@@ -1704,6 +1704,21 @@ namespace {
       return MetatypeType::get(type);
     }
 
+    Type visitTypeValueExpr(TypeValueExpr *E) {
+      auto locator = CS.getConstraintLocator(E);
+      auto type = resolveTypeReferenceInExpression(E->getParamTypeRepr(),
+                                              TypeResolverContext::InExpression,
+                                                  locator);
+
+      if (!type || type->hasError()) {
+        return Type();
+      }
+
+      auto archetype = type->castTo<ArchetypeType>();
+      E->setParamType(archetype);
+      return archetype->getValueType();
+    }
+
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -1961,27 +1976,7 @@ namespace {
     }
 
     Type visitIdentityExpr(IdentityExpr *expr) {
-      auto subType = CS.getType(expr->getSubExpr());
-
-      if (!isa<TypeExpr>(expr->getSubExpr()) || !isa<DotSelfExpr>(expr)) {
-        return subType;
-      }
-
-      // Disallow 'N.self' where N is a value generic 'let N'.
-      auto metatype = subType->castTo<MetatypeType>();
-      auto archetype = metatype->getInstanceType()->getAs<ArchetypeType>();
-
-      if (!archetype) {
-        return subType;
-      }
-
-      if (archetype->getValueType()) {
-        auto &de = CS.getASTContext().Diags;
-        de.diagnose(expr->getLoc(), diag::cannot_self_value_generic, archetype);
-        return Type();
-      }
-
-      return subType;
+      return CS.getType(expr->getSubExpr());
     }
 
     Type visitCopyExpr(CopyExpr *expr) {

@@ -9,7 +9,15 @@ struct A<let N: Int> { // expected-note {{requirement specified as 'let N' == 'I
   }
 
   var uint: UInt {
-    N // expected-error {{cannot convert return expression of type '(let N).Type' to return type 'UInt'}}
+    N // expected-error {{cannot convert return expression of type 'Int' to return type 'UInt'}}
+  }
+
+  var goodUInt: UInt {
+    UInt(N) // OK
+  }
+
+  var intSelf: Int {
+    N.self // OK
   }
 }
 
