@@ -1603,7 +1603,7 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
 }
 
 const TypeInfo *TypeConverter::getRawUnsafeContinuationTypeInfo() {
-  // FIXME:  This is a bad approximation
+  // An UnsafeContinuation is (essentially) a strong pointer to heap data
   return getReferenceTypeInfo(ReferenceKind::Strong,
 				 ReferenceCounting::Native);
 }
