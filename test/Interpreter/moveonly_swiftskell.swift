@@ -22,6 +22,9 @@
 // Temporarily disable for back-deployment (rdar://128544927)
 // UNSUPPORTED: back_deployment_runtime
 
+// And on older OS (rdar://132936383)
+// UNSUPPORTED: use_os_stdlib
+
 import Swiftskell
 
 /// Basic noncopyable type for testing.
