@@ -1982,7 +1982,8 @@ void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
     // string a path component for that class_method.
     if (info.srcOperand->get()->getType() != info.outSendingResult->getType()) {
       if (auto fas = FullApplySite::isa(info.srcOperand->getUser())) {
-        if (fas.getSelfArgument() == info.srcOperand->get() &&
+        if (fas.hasSelfArgument() &&
+            fas.getSelfArgument() == info.srcOperand->get() &&
             fas.getNumIndirectSILResults() == 1) {
           // First check if our function argument is exactly our out parameter.
           bool canEmit =
