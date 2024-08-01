@@ -418,12 +418,8 @@ static Expr *foldSequence(DeclContext *DC,
     }
     
     // Pull out the next binary operator.
-    Op op2{S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(
-                     DC, S[0], /*diagnose=*/true)};
-
-    // If the second operator's precedence is lower than the
-    // precedence bound, break out of the loop.
-    if (!precedenceBound.shouldConsider(op2.precedence)) break;
+    Op op2 = getNextOperator();
+    if (!op2) break;
 
     // If we're missing precedence info for either operator, treat them
     // as non-associative.
@@ -635,6 +631,15 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
+  // First resolve any unresolved decl references in operator positions.
+  for (auto i : indices(expr->getElements())) {
+    if (i % 2 == 0)
+      continue;
+    auto *elt = expr->getElement(i);
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(elt))
+      elt = TypeChecker::resolveDeclRefExpr(UDRE, dc);
+    expr->setElement(i, elt);
+  }
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");
   assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
