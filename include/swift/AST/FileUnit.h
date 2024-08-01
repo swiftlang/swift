@@ -273,8 +273,8 @@ public:
                      ModuleDecl::ImportFilter filter) const {}
 
   /// Lists modules that are not imported from this file and used in API.
-  virtual void
-  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const {}
+  virtual void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const {}
 
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(

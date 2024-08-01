@@ -1720,9 +1720,9 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   FORWARD(getImportedModules, (modules, filter));
 }
 
-void ModuleDecl::getMissingImportedModules(
+void ModuleDecl::getImplicitImportsForModuleInterface(
     SmallVectorImpl<ImportedModule> &imports) const {
-  FORWARD(getMissingImportedModules, (imports));
+  FORWARD(getImplicitImportsForModuleInterface, (imports));
 }
 
 const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
@@ -1811,9 +1811,9 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   }
 }
 
-void SourceFile::getMissingImportedModules(
+void SourceFile::getImplicitImportsForModuleInterface(
     SmallVectorImpl<ImportedModule> &modules) const {
-  for (auto module : MissingImportedModules)
+  for (auto module : ImplicitImportsForModuleInterface)
     modules.push_back(module);
 }
 

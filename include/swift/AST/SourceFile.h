@@ -159,6 +159,10 @@ private:
   /// The highest access level of declarations referencing each import.
   llvm::DenseMap<const ModuleDecl *, AccessLevel> ImportsUseAccessLevel;
 
+  /// Imports that should be printed in the module interface even though they
+  /// were not written in the source file.
+  llvm::SmallDenseSet<ImportedModule> ImplicitImportsForModuleInterface;
+
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
@@ -510,11 +514,19 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
 
-  llvm::SmallDenseSet<ImportedModule> MissingImportedModules;
-
-  void addMissingImportedModule(ImportedModule module) const {
-     const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
+  /// Record an import that should be printed in the module interface even
+  /// though it was not written in the source file. These imports are needed in
+  /// Swift 5 mode to preserve the integrity of swiftinterface files when code
+  /// publicly use declarations from modules that were \c `@_implementationOnly`
+  /// imported in other source files.
+  void addImplicitImportForModuleInterface(ImportedModule module) {
+    ImplicitImportsForModuleInterface.insert(module);
   }
+
+  /// Gather implicit imports that should printed in swiftinterfaces for
+  /// compatibility with code in some Swift 5 modules.
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const override;
 
   /// Record the source range info for a parsed \c #if clause.
   void recordIfConfigClauseRangeInfo(const IfConfigClauseRangeInfo &range);
@@ -527,10 +539,10 @@ public:
   ArrayRef<IfConfigClauseRangeInfo>
   getIfConfigClausesWithin(SourceRange outer) const;
 
-  void getMissingImportedModules(
-         SmallVectorImpl<ImportedModule> &imports) const override;
-
+  /// Record visible declarations for use in code completion and refactoring.
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
+
+  /// Retrieve visible declarations for use in code completion and refactoring.
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
