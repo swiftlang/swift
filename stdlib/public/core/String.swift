@@ -428,7 +428,7 @@ extension String {
   // check in String(decoding:as:).
   @_alwaysEmitIntoClient
   @inline(never) // slow-path
-  private static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
+  internal static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
     C: Collection
   >(_ input: C) -> (result: String, repairsMade: Bool) {
     _internalInvariant(C.Element.self == UInt8.self)
