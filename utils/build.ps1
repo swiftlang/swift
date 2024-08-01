@@ -1655,6 +1655,12 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       $Targets = @("default", "install")
       $InstallPath = "$($Arch.SDKInstallRoot)\usr"
 
+      if ($Platform -eq "Android") {
+        $HostDefines = @{ CMAKE_HOST_Swift_FLAGS = "-sdk `"$($HostArch.SDKInstallRoot)`"" }
+      } else {
+        $HostDefines = @{}
+      }
+
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin $FoundationBinaryCache `
@@ -1684,7 +1690,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
         _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
         _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
-      } + $TestingDefines)
+      } + $HostDefines + $TestingDefines)
     }
   }
 }
