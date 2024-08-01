@@ -1602,6 +1602,12 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
   return DefaultActorStorageTI;
 }
 
+const TypeInfo *TypeConverter::getRawUnsafeContinuationTypeInfo() {
+  // An UnsafeContinuation is (essentially) a strong pointer to heap data
+  return getReferenceTypeInfo(ReferenceKind::Strong,
+				 ReferenceCounting::Native);
+}
+
 const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
@@ -2208,6 +2214,8 @@ public:
                                      ReferenceCounting::Unknown);
     } else if (B->getMangledName() == "BD") {
       return TC.getDefaultActorStorageTypeInfo();
+    } else if (B->getMangledName() == "Bc") {
+      return TC.getRawUnsafeContinuationTypeInfo();
     }
 
     /// Otherwise, get the fixed layout information from reflection
