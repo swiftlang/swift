@@ -1789,7 +1789,7 @@ std::string ModuleFileSharedCore::resolveModuleDefiningFilePath(const StringRef 
 ModuleLoadingBehavior
 ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           const Dependency &dependency,
-                                          bool debuggerMode,
+                                          bool importNonPublicDependencies,
                                           bool isPartialModule,
                                           StringRef packageName,
                                           bool forTestable) const {
@@ -1805,7 +1805,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
-    if (debuggerMode || forTestable) {
+    if (importNonPublicDependencies || forTestable) {
       // In the debugger, try to load the module if possible.
       // Same in the case of a testable import, try to load the dependency
       // but don't fail if it's missing as this could be source breaking.
@@ -1823,7 +1823,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // on testable imports.
     if (forTestable || !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
-    } else if (debuggerMode) {
+    } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;
@@ -1837,7 +1837,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
         forTestable ||
         !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
-    } else if (debuggerMode) {
+    } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;

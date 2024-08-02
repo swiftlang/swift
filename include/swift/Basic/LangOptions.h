@@ -267,6 +267,10 @@ namespace swift {
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Used only by the debugger. When set, the module loader will try to
+    /// import non-public transitive dependencies.
+    bool ImportNonPublicDependencies = false;
+
     /// Enable the MemoryBufferSerializedModuleImporter.
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
