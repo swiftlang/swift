@@ -55,6 +55,16 @@ using Region = PartitionPrimitives::Region;
 
 } // namespace
 
+// This option is used so we can test typed errors. Typed errors are a fallback
+// case which are emitted when we are unable to infer the name of a value. We in
+// most cases do succeed inferring, so it makes sense to add an asserts only
+// option that can be used by the compiler to test that we emit these correctly.
+static llvm::cl::opt<bool> ForceTypedErrors(
+    "sil-regionbasedisolation-force-use-of-typed-errors",
+    llvm::cl::desc("Force the usage of typed instead of named errors to make "
+                   "it easier to test typed errors"),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -152,6 +162,23 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
   }
 
   return foundExpr;
+}
+
+/// Attempt to infer a name for \p value. Returns none if we fail or if we are
+/// asked to force typed errors since we are testing.
+static std::optional<Identifier> inferNameHelper(SILValue value) {
+  if (ForceTypedErrors)
+    return {};
+  return VariableNameInferrer::inferName(value);
+}
+
+/// Attempt to infer a name and root for \p value. Returns none if we fail or if
+/// we are asked to force typed errors since we are testing.
+static std::optional<std::pair<Identifier, SILValue>>
+inferNameAndRootHelper(SILValue value) {
+  if (ForceTypedErrors)
+    return {};
+  return VariableNameInferrer::inferNameAndRoot(value);
 }
 
 //===----------------------------------------------------------------------===//
@@ -674,12 +701,22 @@ public:
 
   void emitTypedIsolationCrossing(SILLocation loc, Type inferredType,
                                   ApplyIsolationCrossing isolationCrossing) {
-    diagnoseError(
-        loc, diag::regionbasedisolation_transfer_yields_race_with_isolation,
-        inferredType, isolationCrossing.getCallerIsolation(),
-        isolationCrossing.getCalleeIsolation())
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_type_use_after_transfer_callee,
+                   inferredType, isolationCrossing.getCalleeIsolation(),
+                   calleeInfo->first, calleeInfo->second,
+                   isolationCrossing.getCallerIsolation());
+    } else {
+      diagnoseNote(loc, diag::regionbasedisolation_type_use_after_transfer,
+                   inferredType, isolationCrossing.getCalleeIsolation(),
+                   isolationCrossing.getCallerIsolation());
+    }
     emitRequireInstDiagnostics();
   }
 
@@ -703,23 +740,18 @@ public:
 
   void emitTypedUseOfStronglyTransferredValue(SILLocation loc,
                                               Type inferredType) {
-    diagnoseError(
-        loc,
-        diag::
-            regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
-        inferredType)
-        .highlight(loc.getSourceRange())
-        .limitBehaviorIf(getBehaviorLimit());
-    emitRequireInstDiagnostics();
-  }
-
-  void emitTypedRaceWithUnknownIsolationCrossing(SILLocation loc,
-                                                 Type inferredType) {
-    diagnoseError(loc,
-                  diag::regionbasedisolation_transfer_yields_race_no_isolation,
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
                   inferredType)
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_typed_use_after_sending_callee,
+                   inferredType, calleeInfo->first, calleeInfo->second);
+    } else {
+      diagnoseNote(loc, diag::regionbasedisolation_typed_use_after_sending,
+                   inferredType);
+    }
     emitRequireInstDiagnostics();
   }
 
@@ -753,11 +785,14 @@ public:
   void emitTypedIsolationCrossingDueToCapture(
       SILLocation loc, Type inferredType,
       ApplyIsolationCrossing isolationCrossing) {
-    diagnoseError(loc, diag::regionbasedisolation_isolated_capture_yields_race,
-                  inferredType, isolationCrossing.getCalleeIsolation(),
-                  isolationCrossing.getCallerIsolation())
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_type_isolated_capture_yields_race,
+                 inferredType, isolationCrossing.getCalleeIsolation(),
+                 isolationCrossing.getCallerIsolation());
     emitRequireInstDiagnostics();
   }
 
@@ -904,8 +939,7 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
     emittedDiagnostic = true;
 
     auto &state = transferringOpToStateMap.get(transferOp);
-    if (auto rootValueAndName =
-            VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+    if (auto rootValueAndName = inferNameAndRootHelper(transferOp->get())) {
       diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), rootValueAndName->first,
           state.isolationInfo.getIsolationInfo(), std::get<2>(p));
@@ -1076,15 +1110,23 @@ void UseAfterTransferDiagnosticInferrer::infer() {
             .hasOption(SILParameterInfo::Sending)) {
 
       // First try to do the named diagnostic if we can find a name.
-      if (auto rootValueAndName =
-              VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+      if (auto rootValueAndName = inferNameAndRootHelper(transferOp->get())) {
         return diagnosticEmitter.emitNamedUseOfStronglyTransferredValue(
             baseLoc, rootValueAndName->first);
       }
 
+      // See if we have an ApplyExpr and if we can infer a better type.
+      Type type = baseInferredType;
+      if (auto *applyExpr =
+              transferOp->getUser()->getLoc().getAsASTNode<ApplyExpr>()) {
+        if (auto *foundExpr =
+                inferArgumentExprFromApplyExpr(applyExpr, fas, transferOp))
+          type = foundExpr->findOriginalType();
+      }
+
       // Otherwise, emit the typed diagnostic.
-      return diagnosticEmitter.emitTypedUseOfStronglyTransferredValue(
-          baseLoc, baseInferredType);
+      return diagnosticEmitter.emitTypedUseOfStronglyTransferredValue(baseLoc,
+                                                                      type);
     }
   }
 
@@ -1103,8 +1145,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
-    if (auto rootValueAndName =
-            VariableNameInferrer::inferNameAndRoot(transferOp->get())) {
+    if (auto rootValueAndName = inferNameAndRootHelper(transferOp->get())) {
       auto &state = transferringOpToStateMap.get(transferOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
           baseLoc, rootValueAndName->first,
@@ -1274,17 +1315,30 @@ public:
         .limitBehaviorIf(getBehaviorLimit());
   }
 
-  void emitFunctionArgumentApply(SILLocation loc, Type type,
-                                 ApplyIsolationCrossing crossing) {
+  void emitPassToApply(SILLocation loc, Type inferredType,
+                       ApplyIsolationCrossing crossing) {
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
       getIsolationRegionInfo().printForDiagnostics(os);
     }
-    diagnoseError(loc, diag::regionbasedisolation_arg_transferred,
-                  descriptiveKindStr, type, crossing.getCalleeIsolation())
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
-        .limitBehaviorIf(getBehaviorLimit());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc,
+          diag::regionbasedisolation_typed_transferneversendable_via_arg_callee,
+          descriptiveKindStr, inferredType, crossing.getCalleeIsolation(),
+          calleeInfo->first, calleeInfo->second);
+    } else {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_typed_transferneversendable_via_arg,
+          descriptiveKindStr, inferredType, crossing.getCalleeIsolation());
+    }
   }
 
   void emitNamedFunctionArgumentClosure(SILLocation loc, Identifier name,
@@ -1305,18 +1359,28 @@ public:
         .highlight(loc.getSourceRange());
   }
 
-  void emitFunctionArgumentApplyStronglyTransferred(SILLocation loc,
-                                                    Type type) {
+  void emitTypedSendingNeverSendableToSendingParam(SILLocation loc,
+                                                   Type inferredType) {
+    diagnoseError(loc, diag::regionbasedisolation_type_transfer_yields_race,
+                  inferredType)
+        .highlight(loc.getSourceRange())
+        .limitBehaviorIf(getBehaviorLimit());
+
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
       getIsolationRegionInfo().printForDiagnostics(os);
     }
-    auto diag =
-        diag::regionbasedisolation_arg_passed_to_strongly_transferred_param;
-    diagnoseError(loc, diag, descriptiveKindStr, type)
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
-        .limitBehaviorIf(getBehaviorLimit());
+
+    if (auto calleeInfo = getTransferringCalleeInfo()) {
+      diagnoseNote(
+          loc, diag::regionbasedisolation_typed_tns_passed_to_sending_callee,
+          descriptiveKindStr, inferredType, calleeInfo->first,
+          calleeInfo->second);
+    } else {
+      diagnoseNote(loc, diag::regionbasedisolation_typed_tns_passed_to_sending,
+                   descriptiveKindStr, inferredType);
+    }
   }
 
   void emitNamedOnlyError(SILLocation loc, Identifier name) {
@@ -1374,8 +1438,8 @@ public:
     }
   }
 
-  void emitNamedFunctionArgumentApplyStronglyTransferred(SILLocation loc,
-                                                         Identifier varName) {
+  void emitNamedSendingNeverSendableToSendingParam(SILLocation loc,
+                                                   Identifier varName) {
     emitNamedOnlyError(loc, varName);
     SmallString<64> descriptiveKindStr;
     {
@@ -1589,8 +1653,8 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
         // See if we can infer a name from the value.
         SmallString<64> resultingName;
-        if (auto varName = VariableNameInferrer::inferName(op->get())) {
-          diagnosticEmitter.emitNamedFunctionArgumentApplyStronglyTransferred(
+        if (auto varName = inferNameHelper(op->get())) {
+          diagnosticEmitter.emitNamedSendingNeverSendableToSendingParam(
               loc, *varName);
           return true;
         }
@@ -1600,8 +1664,8 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
                 inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
           type = inferredArgExpr->findOriginalType();
         }
-        diagnosticEmitter.emitFunctionArgumentApplyStronglyTransferred(loc,
-                                                                       type);
+        diagnosticEmitter.emitTypedSendingNeverSendableToSendingParam(loc,
+                                                                      type);
         return true;
       }
     }
@@ -1629,7 +1693,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
     // See if we can infer a name from the value.
     SmallString<64> resultingName;
-    if (auto name = VariableNameInferrer::inferName(op->get())) {
+    if (auto name = inferNameHelper(op->get())) {
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
     }
@@ -1644,7 +1708,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       }
     }
 
-    diagnosticEmitter.emitFunctionArgumentApply(loc, type, *isolation);
+    diagnosticEmitter.emitPassToApply(loc, type, *isolation);
     return true;
   }
 
@@ -1659,8 +1723,8 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   // See if we are in SIL and have an apply site specified isolation.
   if (auto fas = FullApplySite::isa(op->getUser())) {
     if (auto isolation = fas.getIsolationCrossing()) {
-      diagnosticEmitter.emitFunctionArgumentApply(
-          loc, op->get()->getType().getASTType(), *isolation);
+      diagnosticEmitter.emitPassToApply(loc, op->get()->getType().getASTType(),
+                                        *isolation);
       return true;
     }
   }
@@ -1677,7 +1741,7 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
              "All result info must be the same... if that changes... update "
              "this code!");
       SmallString<64> resultingName;
-      if (auto name = VariableNameInferrer::inferName(op->get())) {
+      if (auto name = inferNameHelper(op->get())) {
         diagnosticEmitter.emitNamedTransferringReturn(loc, *name);
         return true;
       }
@@ -1817,7 +1881,7 @@ public:
 void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto varName = VariableNameInferrer::inferName(info.inoutSendingParam);
+  auto varName = inferNameHelper(info.inoutSendingParam);
   if (!varName) {
     return emitUnknownPatternError();
   }

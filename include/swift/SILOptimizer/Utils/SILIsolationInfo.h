@@ -346,18 +346,6 @@ public:
             Flag::UnappliedIsolatedAnyParameter};
   }
 
-  /// Only use this as a fallback if we cannot find better information.
-  static SILIsolationInfo
-  getWithIsolationCrossing(ApplyIsolationCrossing crossing) {
-    if (crossing.getCalleeIsolation().isActorIsolated()) {
-      // SIL level, just let it through
-      return SILIsolationInfo(SILValue(), SILValue(),
-                              crossing.getCalleeIsolation());
-    }
-
-    return {};
-  }
-
   static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
                                                    SILValue actorInstance,
                                                    NominalTypeDecl *typeDecl) {
@@ -463,6 +451,20 @@ public:
 
 private:
   void printOptions(llvm::raw_ostream &os) const;
+
+  /// This is used only to let through apply isolation crossings that we define
+  /// in SIL just for testing. Do not use this in any other contexts!
+  static SILIsolationInfo
+  getWithIsolationCrossing(ApplyIsolationCrossing crossing) {
+    if (!crossing.getCalleeIsolation().isActorIsolated())
+      return {};
+
+    // SIL level, just let it through without an actor instance. We assume since
+    // we are using this for SIL tests that we do not need to worry about having
+    // a null actor instance.
+    return SILIsolationInfo(SILValue(), SILValue(),
+                            crossing.getCalleeIsolation());
+  }
 };
 
 /// A SILIsolationInfo that has gone through merging and represents the dynamic
