@@ -2728,10 +2728,8 @@ SourceFile::getMaxAccessLevelUsingImport(
   return known->second;
 }
 
-void SourceFile::registerAccessLevelUsingImport(
-    AttributedImport<ImportedModule> import,
-    AccessLevel accessLevel) {
-  auto mod = import.module.importedModule;
+void SourceFile::registerRequiredAccessLevelForModule(ModuleDecl *mod,
+                                                      AccessLevel accessLevel) {
   auto known = ImportsUseAccessLevel.find(mod);
   if (known == ImportsUseAccessLevel.end())
     ImportsUseAccessLevel[mod] = accessLevel;
@@ -2754,7 +2752,7 @@ void SourceFile::registerAccessLevelUsingImport(
     auto otherImportModName = otherImportMod->getName();
     if (otherImportMod == declaringMod ||
         llvm::find(bystanders, otherImportModName) != bystanders.end()) {
-      registerAccessLevelUsingImport(otherImport, accessLevel);
+      registerRequiredAccessLevelForModule(otherImportMod, accessLevel);
     }
   }
 }

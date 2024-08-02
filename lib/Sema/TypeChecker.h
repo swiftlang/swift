@@ -1522,6 +1522,16 @@ public:
   }
 };
 
+using RequiredImportAccessLevelCallback =
+    std::function<void(AttributedImport<ImportedModule>)>;
+
+/// Make a note that uses of \p decl in \p dc require that the decl's defining
+/// module be imported with an access level that is at least as permissive as \p
+/// accessLevel.
+void recordRequiredImportAccessLevelForDecl(
+    const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
+    RequiredImportAccessLevelCallback remark);
+
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
