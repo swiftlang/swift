@@ -12,11 +12,29 @@
 // CHECK-LABEL: public actor TestActor {
 @available(SwiftStdlib 5.5, *)
 public actor TestActor {
-  // FIXME: The convenience keyword should be omitted (rdar://130926278)
-  // CHECK: public convenience init(convenience: Swift.Int)
-  public init(convenience: Int) {
-    self.init()
+  private var x: Int
+
+  // CHECK: public convenience init(convenience x: Swift.Int)
+  public init(convenience x: Int) {
+    self.init(designated: x)
   }
+
   // CHECK: public init()
-  public init() {}
+  public init() {
+    self.x = 0
+  }
+
+  // CHECK: public init(designated x: Swift.Int)
+  public init(designated x: Int) {
+    self.x = x
+  }
+}
+
+// CHECK-LABEL: extension Library.TestActor {
+@available(SwiftStdlib 5.5, *)
+extension TestActor {
+  // CHECK: public convenience init(convenienceInExtension x: Swift.Int)
+  public init(convenienceInExtension x: Int) {
+    self.init(designated: x)
+  }
 }
