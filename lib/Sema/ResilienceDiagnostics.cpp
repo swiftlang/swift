@@ -75,22 +75,16 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     }
   }
 
-  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
-  if (problematicImport.has_value()) {
-    auto SF = DC->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(problematicImport.value(),
-                                         AccessLevel::Public);
-
-    if (Context.LangOpts.EnableModuleApiImportRemarks) {
-      ModuleDecl *importedVia = problematicImport->module.importedModule,
-                 *sourceModule = D->getModuleContext();
-      Context.Diags.diagnose(loc, diag::module_api_import,
-                             D, importedVia, sourceModule,
-                             importedVia == sourceModule,
-                             /*isImplicit*/false);
-    }
-  }
+  // Remember that the module defining the decl must be imported publicly.
+  recordRequiredImportAccessLevelForDecl(
+      D, DC, AccessLevel::Public,
+      [&](AttributedImport<ImportedModule> attributedImport) {
+        ModuleDecl *importedVia = attributedImport.module.importedModule,
+                   *sourceModule = D->getModuleContext();
+        Context.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
+                               sourceModule, importedVia == sourceModule,
+                               /*isImplicit*/ false);
+      });
 
   // General check on access-level of the decl.
   auto declAccessScope =
@@ -141,6 +135,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
+  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
     Context.Diags.diagnose(problematicImport->importLoc,
@@ -161,25 +156,20 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   if (!D)
     return false;
 
-  auto exportingModule = where.getDeclContext()->getParentModule();
+  const DeclContext *DC = where.getDeclContext();
+  auto exportingModule = DC->getParentModule();
   ASTContext &ctx = exportingModule->getASTContext();
 
-  ImportAccessLevel problematicImport = D->getImportAccessFrom(
-                                                       where.getDeclContext());
-  if (problematicImport.has_value()) {
-    auto SF = where.getDeclContext()->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(problematicImport.value(),
-                                         AccessLevel::Public);
-
-    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
-      ModuleDecl *importedVia = problematicImport->module.importedModule,
-                 *sourceModule = D->getModuleContext();
-      ctx.Diags.diagnose(loc, diag::module_api_import_aliases,
-                             D, importedVia, sourceModule,
-                             importedVia == sourceModule);
-    }
-  }
+  // Remember that the module defining the underlying type must be imported
+  // publicly.
+  recordRequiredImportAccessLevelForDecl(
+      D, DC, AccessLevel::Public,
+      [&](AttributedImport<ImportedModule> attributedImport) {
+        ModuleDecl *importedVia = attributedImport.module.importedModule,
+                   *sourceModule = D->getModuleContext();
+        ctx.Diags.diagnose(loc, diag::module_api_import_aliases, D, importedVia,
+                           sourceModule, importedVia == sourceModule);
+      });
 
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
@@ -224,7 +214,6 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 
   // If limited by an import, note which one.
   if (originKind == DisallowedOriginKind::NonPublicImport) {
-    const DeclContext *DC = where.getDeclContext();
     ImportAccessLevel limitImport = D->getImportAccessFrom(DC);
     assert(limitImport.has_value() &&
            limitImport->accessLevel < AccessLevel::Public &&
@@ -250,14 +239,20 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   ASTContext &ctx = DC->getASTContext();
   auto originKind = getDisallowedOriginKind(D, where, downgradeToWarning);
 
-  // If we got here it was used in API, we can record the use of the import.
-  ImportAccessLevel import = D->getImportAccessFrom(DC);
-  if (import.has_value() && reason.has_value()) {
-    auto SF = DC->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(import.value(),
-                                         AccessLevel::Public);
-  }
+  // Remember that the module defining the decl must be imported publicly.
+  recordRequiredImportAccessLevelForDecl(
+      D, DC, AccessLevel::Public,
+      [&](AttributedImport<ImportedModule> attributedImport) {
+        if (where.isExported() && reason != ExportabilityReason::General &&
+            originKind != DisallowedOriginKind::NonPublicImport) {
+          // These may be reported twice, for the Type and for the TypeRepr.
+          ModuleDecl *importedVia = attributedImport.module.importedModule,
+                     *sourceModule = D->getModuleContext();
+          ctx.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
+                             sourceModule, importedVia == sourceModule,
+                             /*isImplicit*/ false);
+        }
+      });
 
   // Access levels from imports are reported with the others access levels.
   // Except for extensions and protocol conformances, we report them here.
@@ -275,19 +270,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     }();
     if (!reportHere)
       return false;
-  }
-
-  if (ctx.LangOpts.EnableModuleApiImportRemarks &&
-      import.has_value() && where.isExported() &&
-      reason != ExportabilityReason::General &&
-      originKind != DisallowedOriginKind::NonPublicImport) {
-    // These may be reported twice, for the Type and for the TypeRepr.
-    ModuleDecl *importedVia = import->module.importedModule,
-               *sourceModule = D->getModuleContext();
-    ctx.Diags.diagnose(loc, diag::module_api_import,
-                       D, importedVia, sourceModule,
-                       importedVia == sourceModule,
-                       /*isImplicit*/false);
   }
 
   if (originKind == DisallowedOriginKind::None)
@@ -336,6 +318,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   }
 
   // If limited by an import, note which one.
+  ImportAccessLevel import = D->getImportAccessFrom(DC);
   if (originKind == DisallowedOriginKind::NonPublicImport) {
     assert(import.has_value() &&
            import->accessLevel < AccessLevel::Public &&
@@ -379,25 +362,22 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   if (ext->getParentModule()->isBuiltinModule())
     return false;
 
+  const DeclContext *DC = where.getDeclContext();
   ModuleDecl *M = ext->getParentModule();
   ASTContext &ctx = M->getASTContext();
 
-  ImportAccessLevel problematicImport = ext->getImportAccessFrom(where.getDeclContext());
-  if (problematicImport.has_value()) {
-    auto SF = where.getDeclContext()->getParentSourceFile();
-    if (SF)
-      SF->registerAccessLevelUsingImport(problematicImport.value(),
-                                         AccessLevel::Public);
-
-    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
-      ModuleDecl *importedVia = problematicImport->module.importedModule,
-                 *sourceModule = ext->getModuleContext();
-      ctx.Diags.diagnose(loc, diag::module_api_import_conformance,
-                         rootConf->getType(), rootConf->getProtocol(),
-                         importedVia, sourceModule,
-                         importedVia == sourceModule);
-    }
-  }
+  // Remember that the module defining the conformance must be imported
+  // publicly.
+  recordRequiredImportAccessLevelForDecl(
+      ext, DC, AccessLevel::Public,
+      [&](AttributedImport<ImportedModule> attributedImport) {
+        ModuleDecl *importedVia = attributedImport.module.importedModule,
+                   *sourceModule = ext->getModuleContext();
+        ctx.Diags.diagnose(loc, diag::module_api_import_conformance,
+                           rootConf->getType(), rootConf->getProtocol(),
+                           importedVia, sourceModule,
+                           importedVia == sourceModule);
+      });
 
   auto originKind = getDisallowedOriginKind(ext, where);
   if (originKind == DisallowedOriginKind::None)
@@ -425,7 +405,6 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
 
   // If limited by an import, note which one.
   if (originKind == DisallowedOriginKind::NonPublicImport) {
-    const DeclContext *DC = where.getDeclContext();
     ImportAccessLevel limitImport = ext->getImportAccessFrom(DC);
     assert(limitImport.has_value() &&
            limitImport->accessLevel < AccessLevel::Public &&
