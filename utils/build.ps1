@@ -1661,36 +1661,36 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         $HostDefines = @{}
       }
 
-    Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation `
-      -Bin $FoundationBinaryCache `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
-      -Platform $Platform `
-      -UseBuiltCompilers ASM,C,CXX,Swift `
-      -BuildTargets $Targets `
-      -Defines (@{
-        FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-        CURL_DIR = "$LibraryRoot\curl-8.5.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
-        LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
-          "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
-        } else {
-          "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
-        };
-        LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
-        LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
-        ZLIB_LIBRARY = if ($Platform -eq "Windows") {
-          "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
-        } else {
-          "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\libz.a"
-        };
-        ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
-        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
-        SwiftSyntax_DIR = "$SwiftSyntaxDir";
-        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
-      } + $HostDefines + $TestingDefines)
+      Build-CMakeProject `
+        -Src $SourceCache\swift-corelibs-foundation `
+        -Bin $FoundationBinaryCache `
+        -InstallTo $InstallPath `
+        -Arch $Arch `
+        -Platform $Platform `
+        -UseBuiltCompilers ASM,C,CXX,Swift `
+        -BuildTargets $Targets `
+        -Defines (@{
+          FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+          CURL_DIR = "$LibraryRoot\curl-8.5.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
+          LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
+            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
+          } else {
+            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
+          };
+          LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
+          LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
+          ZLIB_LIBRARY = if ($Platform -eq "Windows") {
+            "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
+          } else {
+            "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\libz.a"
+          };
+          ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
+          dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
+          SwiftSyntax_DIR = "$SwiftSyntaxDir";
+          _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+          _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+          _SwiftCollections_SourceDIR = "$SourceCache\swift-collections"
+        } + $HostDefines + $TestingDefines)
     }
   }
 }
