@@ -9,7 +9,7 @@
 // RUN: rm %t/Library.swiftmodule
 // RUN: %target-swift-frontend -emit-sil %t/main.swift -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -I %t | %FileCheck %t/main.swift
 
-// REQUIRES: maccatalyst_support
+// REQUIRES: OS=macosx || OS=maccatalyst
 
 //--- Library.swift
 
