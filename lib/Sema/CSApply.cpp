@@ -7806,6 +7806,20 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     llvm_unreachable("BuiltinTupleType should not show up here");
   }
 
+  // Allow existential-to-supertype conversion if all protocol
+  // bounds are marker protocols. Normally this requires a
+  // conversion restriction but there are situations related
+  // to `@preconcurrency` where the `& Sendable` would be stripped
+  // transparently to the solver.
+  if (auto *existential = fromType->getAs<ExistentialType>()) {
+    if (auto *PCT = existential->getConstraintType()
+                        ->getAs<ProtocolCompositionType>()) {
+      if (PCT->withoutMarkerProtocols()->isEqual(toType)) {
+        return coerceSuperclass(expr, toType);
+      }
+    }
+  }
+
   // Unresolved types come up in diagnostics for lvalue and inout types.
   if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
