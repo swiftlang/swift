@@ -92,7 +92,7 @@ struct Symbol::Storage final
     DEBUG_ASSERT(kind == Symbol::Kind::Superclass ||
                  kind == Symbol::Kind::ConcreteType);
     ASSERT(!type->hasUnboundGenericType());
-    ASSERT(!type->hasTypeVariable());
+    DEBUG_ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = kind;
@@ -105,7 +105,7 @@ struct Symbol::Storage final
   }
 
   Storage(CanType type, ArrayRef<Term> substitutions, const ProtocolDecl *proto) {
-    ASSERT(!type->hasTypeVariable());
+    DEBUG_ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = Symbol::Kind::ConcreteConformance;
