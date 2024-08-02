@@ -35,8 +35,6 @@
 
 using namespace swift;
 
-static std::atomic<bool> disablePrespecializedMetadata = false;
-
 static bool prespecializedLoggingEnabled = false;
 
 #define LOG(fmt, ...)                                                          \
@@ -44,6 +42,8 @@ static bool prespecializedLoggingEnabled = false;
     if (SWIFT_UNLIKELY(prespecializedLoggingEnabled))                          \
       fprintf(stderr, "Prespecializations library: " fmt "\n", __VA_ARGS__);   \
   } while (0)
+
+#define LOG0(string) LOG("%s", string)
 
 static bool environmentProcessListContainsProcess(const char *list,
                                                   const char *progname) {
@@ -110,68 +110,6 @@ static bool isThisProcessEnabled(const LibPrespecializedData<InProcess> *data) {
   return true;
 }
 
-static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
-  if (!runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED()) {
-    LOG("Disabling, SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED = %d",
-        runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED());
-    return nullptr;
-  }
-
-  const void *dataPtr = nullptr;
-#if USE_DLOPEN
-  auto path = runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH();
-  if (path && path[0]) {
-    // Use RTLD_NOLOAD to avoid actually loading the library. We just want to
-    // find it if it has already been loaded by other means, such as
-    // DYLD_INSERT_LIBRARIES.
-    void *handle = dlopen(path, RTLD_LAZY | RTLD_NOLOAD);
-    if (!handle) {
-      swift::warning(0, "Failed to load prespecializations library: %s\n",
-                     dlerror());
-      return nullptr;
-    }
-
-    dataPtr = dlsym(handle, LIB_PRESPECIALIZED_TOP_LEVEL_SYMBOL_NAME);
-    LOG("Loaded custom library from %s, found dataPtr %p", path, dataPtr);
-  }
-#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
-  else if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_get_swift_prespecialized_data)) {
-    // Disable the prespecializations library if anything in the shared cache is
-    // overridden. Eventually we want to be cleverer and only disable the
-    // prespecializations that have been invalidated, but we'll start with the
-    // simplest approach.
-    if (!dyld_shared_cache_some_image_overridden()) {
-      dataPtr = SWIFT_RUNTIME_WEAK_USE(_dyld_get_swift_prespecialized_data());
-      LOG("Got dataPtr %p from _dyld_get_swift_prespecialized_data", dataPtr);
-    } else {
-      LOG("Not calling _dyld_get_swift_prespecialized_data "
-          "dyld_shared_cache_some_image_overridden = %d",
-          dyld_shared_cache_some_image_overridden());
-    }
-  }
-#endif
-#endif
-
-  if (!dataPtr)
-    return nullptr;
-
-  auto *data =
-      reinterpret_cast<const LibPrespecializedData<InProcess> *>(dataPtr);
-  if (data->majorVersion !=
-      LibPrespecializedData<InProcess>::currentMajorVersion) {
-    LOG("Unknown major version %" PRIu32 ", disabling", data->majorVersion);
-    return nullptr;
-  }
-
-  if (!isThisProcessEnabled(data))
-    return nullptr;
-
-  LOG("Returning data %p, major version %" PRIu32 " minor %" PRIu32, data,
-      data->majorVersion, data->minorVersion);
-
-  return data;
-}
-
 struct LibPrespecializedState {
   struct AddressRange {
     uintptr_t start, end;
@@ -182,6 +120,7 @@ struct LibPrespecializedState {
   };
 
   enum class MapConfiguration {
+    Unset,
     UseNameKeyedMap,
     UsePointerKeyedMap,
     UsePointerKeyedMapDebugMode,
@@ -189,9 +128,10 @@ struct LibPrespecializedState {
   };
 
   const LibPrespecializedData<InProcess> *data;
-  MapConfiguration mapConfiguration;
+  std::atomic<MapConfiguration> mapConfiguration = MapConfiguration::Unset;
   AddressRange sharedCacheRange{0, 0};
   AddressRange metadataAllocatorInitialPoolRange{0, 0};
+  bool descriptorMapEnabled;
 
   LibPrespecializedState() {
     prespecializedLoggingEnabled =
@@ -211,8 +151,41 @@ struct LibPrespecializedState {
         metadataAllocatorInitialPoolRange.start + initialPoolLength;
 #endif
 
-    // Must do this after the shared cache range has been retrieved.
-    mapConfiguration = computeMapConfiguration(data);
+    // Compute our map configuration if it hasn't already been set. We must do
+    // this after the shared cache range has been retrieved, because the map
+    // configuration can be different depending on whether the map is in the
+    // shared cache.
+    if (mapConfiguration.load(std::memory_order_relaxed) ==
+        MapConfiguration::Unset)
+      mapConfiguration.store(computeMapConfiguration(data),
+                             std::memory_order_relaxed);
+
+    if (data) {
+      descriptorMapEnabled =
+          data->getOptionFlags() &
+          LibPrespecializedData<InProcess>::OptionFlagDescriptorMapDefaultOn;
+      LOG("Setting descriptorMapEnabled=%s from the option flags.",
+          descriptorMapEnabled ? "true" : "false");
+    }
+
+    if (runtime::environment::
+            SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP_isSet()) {
+      descriptorMapEnabled = runtime::environment::
+          SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP();
+      LOG("Setting descriptorMapEnabled=%s from "
+          "SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP.",
+          descriptorMapEnabled ? "true" : "false");
+    } else {
+#if HAS_OS_FEATURE
+      if (os_feature_enabled_simple(Swift, togglePrespecializationDescriptorMap,
+                                    false)) {
+        descriptorMapEnabled = !descriptorMapEnabled;
+        LOG("Toggling descriptorMapEnabled to %s "
+            "togglePrespecializationDescriptorMap is set.",
+            descriptorMapEnabled ? "true" : "false");
+      }
+#endif
+    }
   }
 
   MapConfiguration
@@ -220,6 +193,13 @@ struct LibPrespecializedState {
     // If no data, we have to disable.
     if (!data)
       return MapConfiguration::Disabled;
+
+    if (!runtime::environment::
+            SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA()) {
+      LOG0("Disabling metadata, SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA "
+           "is false.");
+      return MapConfiguration::Disabled;
+    }
 
     auto nameKeyedMap = data->getMetadataMap();
     auto pointerKeyedMap = data->getPointerKeyedMetadataMap();
@@ -265,13 +245,74 @@ struct LibPrespecializedState {
     }
     return MapConfiguration::UseNameKeyedMap;
   }
+
+  const LibPrespecializedData<InProcess> *findLibPrespecialized() {
+    const void *dataPtr = nullptr;
+#if USE_DLOPEN
+    auto path = runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH();
+    if (path && path[0]) {
+      // Use RTLD_NOLOAD to avoid actually loading the library. We just want to
+      // find it if it has already been loaded by other means, such as
+      // DYLD_INSERT_LIBRARIES.
+      void *handle = dlopen(path, RTLD_LAZY | RTLD_NOLOAD);
+      if (!handle) {
+        swift::warning(0, "Failed to load prespecializations library: %s\n",
+                       dlerror());
+        return nullptr;
+      }
+
+      dataPtr = dlsym(handle, LIB_PRESPECIALIZED_TOP_LEVEL_SYMBOL_NAME);
+      LOG("Loaded custom library from %s, found dataPtr %p", path, dataPtr);
+    }
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+    else if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_get_swift_prespecialized_data)) {
+      dataPtr = SWIFT_RUNTIME_WEAK_USE(_dyld_get_swift_prespecialized_data());
+      LOG("Got dataPtr %p from _dyld_get_swift_prespecialized_data", dataPtr);
+
+      // Disable the prespecialized metadata if anything in the shared cache is
+      // overridden. Eventually we want to be cleverer and only disable the
+      // prespecializations that have been invalidated, but we'll start with the
+      // simplest approach.
+      if (dyld_shared_cache_some_image_overridden()) {
+        mapConfiguration.store(MapConfiguration::Disabled,
+                               std::memory_order_release);
+        LOG("Disabling prespecialized metadata, "
+            "dyld_shared_cache_some_image_overridden = %d",
+            dyld_shared_cache_some_image_overridden());
+      }
+    }
+#endif
+#endif
+
+    LOG("Returning data pointer %p", dataPtr);
+
+    if (!dataPtr)
+      return nullptr;
+
+    auto *data =
+        reinterpret_cast<const LibPrespecializedData<InProcess> *>(dataPtr);
+    if (data->majorVersion !=
+        LibPrespecializedData<InProcess>::currentMajorVersion) {
+      LOG("Unknown major version %" PRIu32 ", disabling", data->majorVersion);
+      return nullptr;
+    }
+
+    if (!isThisProcessEnabled(data))
+      return nullptr;
+
+    LOG("Returning data %p, major version %" PRIu32 " minor %" PRIu32, data,
+        data->majorVersion, data->minorVersion);
+    LOG("  optionFlags=%#zx", data->getOptionFlags());
+    LOG("  metadataMap=%p", data->getMetadataMap());
+    LOG("  disabledProcessTable=%p", data->getDisabledProcessesTable());
+    LOG("  pointerKeyedMetadataMap=%p", data->getPointerKeyedMetadataMap());
+    LOG("  descriptorMap=%p", data->getDescriptorMap());
+
+    return data;
+  }
 };
 
 static Lazy<LibPrespecializedState> LibPrespecialized;
-
-const LibPrespecializedData<InProcess> *swift::getLibPrespecializedData() {
-  return SWIFT_LAZY_CONSTANT(findLibPrespecialized());
-}
 
 // Returns true if the type has any arguments that aren't plain types (packs or
 // unknown kinds).
@@ -310,17 +351,27 @@ isPotentialPrespecializedPointer(const LibPrespecializedState &state,
   return true;
 }
 
-static bool disableForValidation = false;
+static bool isDescriptorLoaded(const void *descriptor, uint16_t imageIndex) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  return _dyld_is_preoptimized_objc_image_loaded(imageIndex);
+#else
+  // If we're not using the dyld SPI, then we're working with a test dylib, and
+  // a test dylib can't have pointers to unloaded dylibs.
+  return true;
+#endif
+}
 
 void
 swift::libPrespecializedImageLoaded() {
-  #if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
   // A newly loaded image might have caused us to load images that are
   // overriding images in the shared cache.  If we do that, turn off
   // prespecialized metadata.
   if (dyld_shared_cache_some_image_overridden())
-    disablePrespecializedMetadata.store(true, std::memory_order_release);
-  #endif
+    LibPrespecialized.get().mapConfiguration.store(
+        LibPrespecializedState::MapConfiguration::Disabled,
+        std::memory_order_release);
+#endif
 }
 
 static Metadata *
@@ -476,13 +527,13 @@ static Metadata *getMetadataFromPointerKeyedMapDebugMode(
 Metadata *
 swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                     const void *const *arguments) {
-  if (SWIFT_UNLIKELY(disableForValidation || disablePrespecializedMetadata.load(
-                                                 std::memory_order_acquire)))
-    return nullptr;
-
   auto &state = LibPrespecialized.get();
 
   switch (state.mapConfiguration) {
+  case LibPrespecializedState::MapConfiguration::Unset:
+    assert(false &&
+           "Map configuration should never be unset after initialization.");
+    return nullptr;
   case LibPrespecializedState::MapConfiguration::Disabled:
     return nullptr;
   case LibPrespecializedState::MapConfiguration::UseNameKeyedMap:
@@ -495,13 +546,125 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
   }
 }
 
+std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
+swift::getLibPrespecializedTypeDescriptor(Demangle::NodePointer node) {
+  auto &state = LibPrespecialized.get();
+
+  // Retrieve the map and return immediately if we don't have it.
+  auto *data = state.data;
+  if (!data)
+    return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+
+  if (!state.descriptorMapEnabled)
+    return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+
+  auto *descriptorMap = data->getDescriptorMap();
+  if (!descriptorMap)
+    return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+
+  // Demangler and resolver for subsequent mangling operations.
+  StackAllocatedDemangler<4096> dem;
+  ExpandResolvedSymbolicReferences resolver{dem};
+
+  if (SWIFT_UNLIKELY(prespecializedLoggingEnabled)) {
+    auto mangling = Demangle::mangleNode(node, resolver, dem);
+    if (!mangling.isSuccess()) {
+      LOG("Failed to build demangling for node %p.", node);
+      return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+    }
+
+    auto mangled = mangling.result();
+    LOG("Looking up descriptor named '%.*s'.", (int)mangled.size(),
+        mangled.data());
+  }
+
+  // Get the simplified mangling that we use as the map's key.
+  auto simplifiedNode = buildSimplifiedDescriptorDemangling(node, dem);
+  if (!simplifiedNode) {
+    LOG("Failed to build simplified mangling for node %p.", node);
+    return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+  }
+
+  auto simplifiedMangling = Demangle::mangleNode(simplifiedNode, resolver, dem);
+  if (!simplifiedMangling.isSuccess()) {
+    LOG("Failed to build demangling for simplified node %p.\n", node);
+    return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+  }
+
+  // The map key is the simplified mangled name.
+  auto key = simplifiedMangling.result();
+
+  // Track how many descriptors we checked and how many were actually loaded,
+  // for logging.
+  unsigned numDescriptorsChecked = 0;
+  unsigned numDescriptorsLoaded = 0;
+
+  // A descriptor is a match if it's actually loaded, and if it matches the node
+  // we're looking up.
+  auto isMatch = [&](auto pointers) {
+    auto *descriptor = *pointers.first;
+    uint16_t libraryIndex = *pointers.second;
+
+    numDescriptorsChecked++;
+
+    if (!isDescriptorLoaded(descriptor, libraryIndex))
+      return false;
+
+    numDescriptorsLoaded++;
+
+    return _contextDescriptorMatchesMangling(
+        (const TypeContextDescriptor *)descriptor, node);
+  };
+
+  // Perform the lookup.
+  auto isNull = [](auto pointers) { return *pointers.first == nullptr; };
+  auto found = descriptorMap->find(key.data(), key.size(), isMatch, isNull);
+
+  LOG("Hash table lookup checked %u loaded entries, %u total entries.",
+      numDescriptorsLoaded, numDescriptorsChecked);
+
+  // The pointers in `found` are pointers to the map entries, and should always
+  // be non-NULL. The only condition that returns NULL is if the map has no
+  // entries where `isMatch` or `isNull` return true, and the map should always
+  // have at least one NULL entry.
+  assert(found.first);
+  if (!found.first) {
+    LOG("Descriptor table lookup of '%.*s' returned NULL pointer to descriptor "
+        "pointer.",
+        (int)key.size(), key.data());
+    return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+  }
+
+  auto *foundDescriptor = *found.first;
+
+  if (!foundDescriptor) {
+    LOG("Did not find descriptor for key '%.*s'.", (int)key.size(), key.data());
+
+    // This result is definitive if the descriptor map is comprehensive. If the
+    // map is not comprehensive, return NonDefinitiveNotFound to tell the caller
+    // that it needs to perform a full search.
+    if (data->getOptionFlags() &
+        LibPrespecializedData<
+            InProcess>::OptionFlagDescriptorMapNotComprehensive)
+      return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
+    return {LibPrespecializedLookupResult::DefinitiveNotFound, nullptr};
+  }
+
+  LOG("Found descriptor %p for key '%.*s'.", foundDescriptor, (int)key.size(),
+      key.data());
+  return {LibPrespecializedLookupResult::Found,
+          (const TypeContextDescriptor *)foundDescriptor};
+}
+
 void _swift_validatePrespecializedMetadata() {
-  auto *data = getLibPrespecializedData();
+  auto *data = LibPrespecialized.get().data;
   if (!data) {
     return;
   }
 
-  disableForValidation = true;
+  LibPrespecialized.get().mapConfiguration.store(
+      LibPrespecializedState::MapConfiguration::Disabled,
+      std::memory_order_release);
 
   unsigned validated = 0;
   unsigned failed = 0;
