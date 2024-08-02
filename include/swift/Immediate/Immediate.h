@@ -24,6 +24,7 @@
 
 namespace swift {
   class CompilerInstance;
+  class DiagnosticEngine;
   class IRGenOptions;
   class SILOptions;
   class SILModule;
@@ -44,6 +45,9 @@ namespace swift {
 
   int RunImmediatelyFromAST(CompilerInstance &CI);
 
+  /// On platforms that support ObjC bridging from the Foundation framework,
+  /// ensure that Foundation is loaded early enough. Otherwise does nothing.
+  void loadFoundationIfNeeded(DiagnosticEngine &Diags);
 } // end namespace swift
 
 #endif // SWIFT_IMMEDIATE_IMMEDIATE_H
