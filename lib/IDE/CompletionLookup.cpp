@@ -720,6 +720,35 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       if (MaybeNominalType->hasUnboundGenericType())
         return T;
 
+      // If we are doing implicit member lookup on a protocol and we have found
+      // a declaration in an extension, use the extension's `Self` type for the
+      // generic substitution.
+      // Eg in the following, the `Self` type returned by `qux` is
+      // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
+      // ```
+      // protocol MyProto {}
+      // struct MyGeneric<T>: MyProto {}
+      // extension MyProto where Self == MyGeneric<Int> {
+      //   static func qux() -> Self { .init() }
+      // }
+      // func takeMyProto(_: any MyProto)  {}
+      // func test() {
+      //   takeMyProto(.#^COMPLETE^#)
+      // }
+      // ```
+      if (MaybeNominalType->isExistentialType()) {
+        Type SelfType;
+        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          SelfType = ED->getGenericSignature()->getConcreteType(
+              ED->getSelfInterfaceType());
+        }
+        if (SelfType) {
+          MaybeNominalType = SelfType;
+        } else {
+          return T;
+        }
+      }
+
       // For everything else, substitute in the base type.
       auto Subs = MaybeNominalType->getMemberSubstitutionMap(VD);
 
