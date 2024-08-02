@@ -13978,6 +13978,8 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     decl = bound->getDecl();
     for (auto argType : bound->getDirectGenericArgs()) {
       auto *typeVar = argType->getAs<TypeVariableType>();
+      if (!typeVar)
+        return SolutionKind::Error;
       auto *genericParam = typeVar->getImpl().getGenericParameter();
       openedTypes.push_back({genericParam, typeVar});
     }
