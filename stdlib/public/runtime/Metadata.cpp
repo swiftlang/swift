@@ -7775,6 +7775,14 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
 
   Demangle::StackAllocatedDemangler<1024> Dem;
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
+  if (!node) {
+    swift::warning(
+        RuntimeErrorFlagNone,
+        "Failed to build demangling to verify roundtrip for metadata %p\n",
+        metadata);
+    return;
+  }
+
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.
   if (referencesAnonymousContext(node))
