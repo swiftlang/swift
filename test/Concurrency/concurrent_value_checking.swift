@@ -413,19 +413,23 @@ extension NotConcurrent {
   func f() { }
 
   func test() {
-    Task { // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
+    Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
       f()
     }
 
-    Task { // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
+    Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
       self.f()
     }
 
-    Task { [self] in // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
+    Task { [self] in // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
       f()
     }
 
-    Task { [self] in // expected-tns-warning {{task-isolated value of type '() async -> ()' passed as a strongly transferred parameter}}
+    Task { [self] in // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter risks causing races inbetween task-isolated uses and uses reachable from the callee}}
       self.f()
     }
   }

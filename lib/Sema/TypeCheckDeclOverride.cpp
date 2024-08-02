@@ -857,19 +857,6 @@ namespace {
 
       return cachedDeclType;
     }
-
-    /// Adjust the interface of the given declaration, which is found in
-    /// a supertype of the given type.
-    Type getSuperMemberDeclType(ValueDecl *baseDecl) const {
-      auto selfType = decl->getDeclContext()->getSelfInterfaceType();
-      if (selfType->getClassOrBoundGenericClass()) {
-        selfType = selfType->getSuperclass();
-        assert(selfType && "No superclass type?");
-      }
-
-      return selfType->adjustSuperclassMemberDeclType(
-               baseDecl, decl, baseDecl->getInterfaceType());
-    }
   };
 }
 
@@ -1283,7 +1270,9 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     }
   } else if (auto property = dyn_cast<VarDecl>(decl)) {
     auto propertyTy = property->getInterfaceType();
-    auto parentPropertyTy = getSuperMemberDeclType(baseDecl);
+    auto selfType = decl->getDeclContext()->getSelfInterfaceType();
+    auto parentPropertyTy = selfType->adjustSuperclassMemberDeclType(
+             baseDecl, decl, baseDecl->getInterfaceType());
 
     CanType parentPropertyCanTy =
       parentPropertyTy->getReducedType(

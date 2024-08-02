@@ -788,8 +788,8 @@ class NonIsolatedUnsafeFieldGenericKlass<T> { // expected-complete-note 4{{}}
     // TODO: This diagnostic is unfortunate since we are erroring on the
     // temporary created by the class_method call.
     await transferToMainIndirect(varAddressOnly)
-    // expected-tns-warning @-1 {{sending task-isolated value of type 'T?' with later accesses to main actor-isolated context risks causing data races}}
-    // expected-complete-warning @-2 {{passing argument of non-sendable type 'T?' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{sending value of non-Sendable type 'T?' risks causing data races}}
+    // expected-tns-note @-2 {{sending task-isolated value of non-Sendable type 'T?' to main actor-isolated global function 'transferToMainIndirect' risks causing races in between task-isolated and main actor-isolated uses}}
   }
 
   // This is safe since self will become main actor isolated as a result of
