@@ -46,4 +46,4 @@ extension P where Self == B<A> {
 func bar() {}
 // COMPLETE:     Begin completions, 2 items
 // COMPLETE-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: foo()[#S#]; name=foo()
-// COMPLETE-DAG: Decl[StaticMethod]/Super/Flair[ExprSpecific]/TypeRelation[Convertible]: qux()[#any Q#]; name=qux()
+// COMPLETE-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: qux()[#B<S>#]; name=qux()

@@ -28,7 +28,7 @@ func protocolExtCollection1b(_ a: Collection) {
 }
 
 // FIXME(https://github.com/apple/swift/issues/65696): We should not be showing this because (1) it cannot be accessed on the existential (2) we don't have the syntax and features to represent the projected type sig anyway.
-// PRIVATE_NOMINAL_MEMBERS_2B-DAG: map({#(transform): (any Collection.Element) throws(Error) -> T##(any Collection.Element) throws(Error) -> T#})[' throws'][#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_2B-DAG: map({#(transform): (Collection.Element) throws(Error) -> T##(Collection.Element) throws(Error) -> T#})[' throws'][#[T]#]{{; name=.+}}
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B-NOT: Decl{{.*}}: index({#before: any Comparable#})
 
 func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_ a: C) {
