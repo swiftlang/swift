@@ -89,17 +89,10 @@ class ContainsSpecializableArchetype : public TypeWalker {
 
   Action walkToTypePre(Type T) override {
     if (auto *Archetype = T->getAs<ArchetypeType>()) {
-      if (auto *GenericTypeParam =
-              Archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
-        if (auto GenericTypeParamDecl = GenericTypeParam->getDecl()) {
-          bool ParamMaybeVisibleInCurrentContext =
-              (DC == GenericTypeParamDecl->getDeclContext() ||
-               DC->isChildContextOf(GenericTypeParamDecl->getDeclContext()));
-          if (!ParamMaybeVisibleInCurrentContext) {
-            Result = true;
-            return Action::Stop;
-          }
-        }
+      if (Archetype->getGenericEnvironment() !=
+          DC->getGenericEnvironmentOfContext()) {
+        Result = true;
+        return Action::Stop;
       }
     }
     return Action::Continue;
