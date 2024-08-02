@@ -109,11 +109,6 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ variantMinor: Builtin.Word,
   _ variantPatch: Builtin.Word
   ) -> Builtin.Int1 {
-  return _stdlib_isOSVersionAtLeast(major, minor, patch)
-
-  // FIXME: Enable when __isPlatformOrVariantPlatformVersionAtLeast() support
-  // is added to compiler-rt.
-#if false
   if Int(major) == 9999 {
     return true._value
   }
@@ -136,7 +131,6 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
           variantMajor32._value, variantMinor32._value, variantPatch32._value))
 
   return (result32 != (0 as UInt32))._value
-#endif
 }
 #endif
 
