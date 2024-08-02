@@ -265,7 +265,8 @@ extension MyActor {
     let x = (1, closure)
     await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type '(Int, () -> ())' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-    // expected-tns-warning @-2 {{sending 'self'-isolated value of type '(Int, () -> ())' with later accesses to main actor-isolated context risks causing data races}}
+    // expected-tns-warning @-2 {{sending value of non-Sendable type '(Int, () -> ())' risks causing data races}}
+    // expected-tns-note @-3 {{sending 'self'-isolated value of non-Sendable type '(Int, () -> ())' to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfAndTransferThroughTupleBackwards() async {
@@ -274,9 +275,8 @@ extension MyActor {
     }
 
     let x = (closure, 1)
-    await transferToMain(x) // expected-tns-warning {{sending 'self'-isolated value of type '(() -> (), Int)' with later accesses to main actor-isolated context risks causing data races}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '(() -> (), Int)' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(x) // expected-tns-warning {{sending value of non-Sendable type '(() -> (), Int)' risks causing data races}}
+    // expected-tns-note @-1 {{sending 'self'-isolated value of non-Sendable type '(() -> (), Int)' to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfAndTransferThroughOptional() async {
@@ -1762,7 +1762,8 @@ extension MyActor {
         _ = self
         _ = sc
 
-        Task { // expected-tns-warning {{value of non-Sendable type '@isolated(any) @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>' accessed after being transferred}}
+        Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument risks causing races in between local and caller code}}
           _ = sc
         }
 
