@@ -4280,13 +4280,15 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     // Protocol extension initializers are modeled as convenience initializers,
     // but they're not written that way in source. Check if we're actually
     // printing onto a class.
-    ClassDecl *classDecl = CurrentType
-                               ? CurrentType->getClassOrBoundGenericClass()
-                               : decl->getDeclContext()->getSelfClassDecl();
-    if (classDecl) {
-      // Convenience intializers are also unmarked on actors.
-      if (!classDecl->isActor())
-        Printer.printKeyword("convenience", Options, " ");
+    bool isClassContext;
+    if (CurrentType) {
+      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+    } else {
+      const DeclContext *dc = decl->getDeclContext();
+      isClassContext = dc->getSelfClassDecl() != nullptr;
+    }
+    if (isClassContext) {
+      Printer.printKeyword("convenience", Options, " ");
     } else {
       assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
              "unexpected convenience initializer");
