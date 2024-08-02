@@ -189,3 +189,12 @@ do {
   let _ = i16 -- i16
   // expected-error@-1 {{ambiguous use of operator '--'}}
 }
+
+struct Issue75623 {
+  func f(p: String) {}
+  func f(_: Int) -> (Int) -> Void {}
+
+  func g() {
+    f(0)(0) // was hitting assertion
+  }
+}
