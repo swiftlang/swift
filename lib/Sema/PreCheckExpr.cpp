@@ -2427,37 +2427,17 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
   auto *DC = target.getDeclContext();
+  auto &ctx = DC->getASTContext();
 
-  bool hadErrors = false;
+  FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-target");
+  PreCheckExpression preCheck(DC);
 
-  if (auto *expr = target.getAsExpr()) {
-    hadErrors |= preCheckExpression(expr, DC);
-    // Even if the pre-check fails, expression still has to be re-set.
-    target.setExpr(expr);
-  }
+  auto newTarget = target.walk(preCheck);
+  if (!newTarget)
+    return true;
 
-  if (target.isForEachPreamble()) {
-    auto *stmt = target.getAsForEachStmt();
-
-    auto *sequenceExpr = stmt->getParsedSequence();
-    auto *whereExpr = stmt->getWhere();
-
-    hadErrors |= preCheckExpression(sequenceExpr, DC);
-
-    if (whereExpr) {
-      hadErrors |= preCheckExpression(whereExpr, DC);
-    }
-
-    // Update sequence and where expressions to pre-checked versions.
-    if (!hadErrors) {
-      stmt->setParsedSequence(sequenceExpr);
-
-      if (whereExpr)
-        stmt->setWhere(whereExpr);
-    }
-  }
-
-  return hadErrors;
+  target = *newTarget;
+  return false;
 }
 
 /// Pre-check the expression, validating any types that occur in the
