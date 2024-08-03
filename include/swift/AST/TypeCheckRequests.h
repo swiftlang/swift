@@ -3028,60 +3028,8 @@ public:
   void cacheResult(ProtocolConformanceRef value) const;
 };
 
-struct PreCheckResultBuilderDescriptor {
-  AnyFunctionRef Fn;
-
-private:
-  // NOTE: Since source tooling (e.g. code completion) might replace the body,
-  // we need to take the body into account to calculate 'hash_value' and '=='.
-  // Also, we cannot 'getBody()' inside 'hash_value' and '==' because it invokes
-  // another request (even if it's cached).
-  BraceStmt *Body;
-
-public:
-  PreCheckResultBuilderDescriptor(AnyFunctionRef Fn)
-      : Fn(Fn), Body(Fn.getBody()) {}
-
-  friend llvm::hash_code
-  hash_value(const PreCheckResultBuilderDescriptor &owner) {
-    return llvm::hash_combine(owner.Fn, owner.Body);
-  }
-
-  friend bool operator==(const PreCheckResultBuilderDescriptor &lhs,
-                         const PreCheckResultBuilderDescriptor &rhs) {
-    return lhs.Fn == rhs.Fn && lhs.Body == rhs.Body;
-  }
-
-  friend bool operator!=(const PreCheckResultBuilderDescriptor &lhs,
-                         const PreCheckResultBuilderDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend SourceLoc extractNearestSourceLoc(PreCheckResultBuilderDescriptor d) {
-    return extractNearestSourceLoc(d.Fn);
-  }
-
-  friend void simple_display(llvm::raw_ostream &out,
-                             const PreCheckResultBuilderDescriptor &d) {
-    simple_display(out, d.Fn);
-  }
-};
-
-enum class ResultBuilderBodyPreCheck : uint8_t {
-  /// There were no problems pre-checking the closure.
-  Okay,
-
-  /// There was an error pre-checking the closure.
-  Error,
-
-  /// The closure has a return statement.
-  HasReturnStmt,
-};
-
-class PreCheckResultBuilderRequest
-    : public SimpleRequest<PreCheckResultBuilderRequest,
-                           ResultBuilderBodyPreCheck(
-                               PreCheckResultBuilderDescriptor),
+class BraceHasReturnRequest
+    : public SimpleRequest<BraceHasReturnRequest, bool(const BraceStmt *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3090,8 +3038,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ResultBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const;
+  bool evaluate(Evaluator &evaluator, const BraceStmt *BS) const;
 
 public:
   // Separate caching.
