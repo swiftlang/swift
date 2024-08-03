@@ -1244,9 +1244,6 @@ namespace {
           return parent;
         };
         if (auto *parent = takeNextParent()) {
-          if (isa<SequenceExpr>(parent))
-            return finish(true, expr);
-
           SourceLoc lastInnerParenLoc;
           // Unwrap to the outermost paren in the sequence.
           // e.g. `foo(((&bar))`
