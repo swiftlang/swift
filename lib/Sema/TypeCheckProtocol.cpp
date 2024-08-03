@@ -4683,7 +4683,10 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
                                       ReferencedAssociatedTypesRequest{requirement},
                                       TinyPtrVector<AssociatedTypeDecl *>());
   for (auto assocType : referenced) {
-    if (Conformance->getTypeWitness(assocType)->hasError()) {
+    auto typeWitness = Conformance->getTypeWitness(assocType);
+    if (!typeWitness)
+      return;
+    if (typeWitness->hasError()) {
       Conformance->setInvalid();
       return;
     }
