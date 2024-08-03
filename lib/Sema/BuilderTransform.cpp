@@ -926,9 +926,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request =
-      PreCheckResultBuilderRequest{{AnyFunctionRef(func),
-                                      /*SuppressDiagnostics=*/false}};
+  auto request = PreCheckResultBuilderRequest{AnyFunctionRef(func)};
   switch (evaluateOrDefault(ctx.evaluator, request,
                             ResultBuilderBodyPreCheck::Error)) {
   case ResultBuilderBodyPreCheck::Okay:
@@ -1144,9 +1142,8 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   // not apply the result builder transform if it contained an explicit return.
   // To maintain source compatibility, we still need to check for HasReturnStmt.
   // https://github.com/apple/swift/issues/64332.
-  auto request =
-      PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/false}};
-  switch (evaluateOrDefault(getASTContext().evaluator, request,
+  switch (evaluateOrDefault(getASTContext().evaluator,
+                            PreCheckResultBuilderRequest{fn},
                             ResultBuilderBodyPreCheck::Error)) {
   case ResultBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the result-builder transform.
@@ -1383,8 +1380,7 @@ ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
   // to pre-check them again.
   bool skipPrecheck = owner.Fn.getAbstractClosureExpr();
   return PreCheckResultBuilderApplication(
-             owner.Fn, skipPrecheck,
-             /*suppressDiagnostics=*/owner.SuppressDiagnostics)
+             owner.Fn, skipPrecheck, /*suppressDiagnostics=*/false)
       .run();
 }
 

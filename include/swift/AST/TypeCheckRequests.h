@@ -3030,7 +3030,6 @@ public:
 
 struct PreCheckResultBuilderDescriptor {
   AnyFunctionRef Fn;
-  bool SuppressDiagnostics;
 
 private:
   // NOTE: Since source tooling (e.g. code completion) might replace the body,
@@ -3040,8 +3039,8 @@ private:
   BraceStmt *Body;
 
 public:
-  PreCheckResultBuilderDescriptor(AnyFunctionRef Fn, bool suppressDiagnostics)
-      : Fn(Fn), SuppressDiagnostics(suppressDiagnostics), Body(Fn.getBody()) {}
+  PreCheckResultBuilderDescriptor(AnyFunctionRef Fn)
+      : Fn(Fn), Body(Fn.getBody()) {}
 
   friend llvm::hash_code
   hash_value(const PreCheckResultBuilderDescriptor &owner) {
