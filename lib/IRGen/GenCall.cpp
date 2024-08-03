@@ -760,9 +760,6 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
 
     // Yield-once coroutines may optionaly return a value from the continuation.
     case SILCoroutineKind::YieldOnce: {
-      auto fnConv = getSILFuncConventions();
-
-      assert(fnConv.getNumIndirectSILResults() == 0);
       // Ensure that no parameters were added before to correctly record their ABI
       // details.
       assert(ParamIRTypes.empty());
@@ -1930,6 +1927,17 @@ void SignatureExpansion::expandParameters(
   case SILCoroutineKind::YieldOnce:
   case SILCoroutineKind::YieldMany:
     addCoroutineContextParameter();
+
+    // Add indirect results as parameters. Similar to
+    // expandIndirectResults, but it doesn't add sret attribute,
+    // because the function has direct results (a continuation pointer
+    // and yield results).
+    auto fnConv = getSILFuncConventions();
+    for (auto indirectResultType : fnConv.getIndirectSILResultTypes(
+           IGM.getMaximalTypeExpansionContext())) {
+      auto storageTy = IGM.getStorageType(indirectResultType);
+      addPointerParameter(storageTy);
+    }
     break;
   }
 
@@ -6330,13 +6338,12 @@ void irgen::emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
       // Capture results via result token
       resultToken =
         Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_results, coroResults);
-
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
-                              {handle,
-                               /*is unwind*/ Builder.getFalse(),
-                               resultToken});
-        Builder.CreateUnreachable();
     }
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                {handle,
+                                 /*is unwind*/ Builder.getFalse(),
+                                 resultToken});
+    Builder.CreateUnreachable();
   } else {
     if (coroResults.empty()) {
       // No results, we do not need to change anything around existing coro.end
