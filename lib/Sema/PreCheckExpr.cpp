@@ -1054,9 +1054,6 @@ namespace {
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
-    /// The current number of nested \c SingleValueStmtExprs that we're within.
-    unsigned SingleValueStmtExprDepth = 0;
-
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
@@ -1213,13 +1210,6 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr))
         return finish(walkToClosureExprPre(closure), expr);
 
-      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
-        // Record the scope of a single value stmt expr, as we want to skip
-        // pre-checking of any patterns, similar to closures.
-        SingleValueStmtExprDepth += 1;
-        return finish(true, expr);
-      }
-
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
         return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
 
@@ -1320,10 +1310,6 @@ namespace {
         assert(DC == ce && "DeclContext imbalance");
         DC = ce->getParent();
       }
-
-      // Restore the depth for the single value stmt counter.
-      if (isa<SingleValueStmtExpr>(expr))
-        SingleValueStmtExprDepth -= 1;
 
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
         // Mark the direct callee as being a callee.
@@ -1473,11 +1459,17 @@ namespace {
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
-      // Constraint generation is responsible for pattern verification and
-      // type-checking in the body of the closure and single value stmt expr,
-      // so there is no need to walk into patterns.
-      return Action::SkipNodeIf(
-          isa<ClosureExpr>(DC) || SingleValueStmtExprDepth > 0, pattern);
+      // In general we can't walk into patterns due to the fact that we don't
+      // currently resolve patterns until constraint generation, and therefore
+      // shouldn't walk into any expressions that may turn into patterns.
+      // One exception to this is if the parent is an expression. In that case,
+      // we are type-checking an expression in an ExprPattern, meaning that
+      // the pattern will already be resolved, and that we ought to e.g
+      // diagnose any stray '_' expressions nested within it. This then also
+      // means we should walk into any child pattern if we walked into the
+      // parent pattern.
+      return Action::VisitNodeIf(Parent.getAsExpr() || Parent.getAsPattern(),
+                                 pattern);
     }
   };
 } // end anonymous namespace
