@@ -3721,8 +3721,15 @@ private:
            // callee is isolated to an actor.
            auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
            if (callee) {
-             Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
+             auto calleeIsolation = getInferredActorIsolation(callee);
+             Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                                diag::actor_isolated_sync_func,
                                 callee);
+             if (calleeIsolation.source.isInferred()) {
+               callee->diagnose(diag::actor_isolation_source,
+                                calleeIsolation.isolation,
+                                calleeIsolation.source);
+             }
            } else {
              Ctx.Diags.diagnose(
                  diag.expr.getStartLoc(), diag::actor_isolated_sync_func_value,

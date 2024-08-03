@@ -5535,6 +5535,10 @@ NOTE(actor_isolated_sync_func_value,none,
      "calls function of type %0 from outside of its actor context are "
      "implicitly asynchronous",
      (Type))
+NOTE(actor_isolation_source,none,
+     "%noun0 inferred from %1",
+     (ActorIsolation, IsolationSource))
+
 NOTE(note_distributed_actor_isolated_method,none,
      "distributed actor-isolated %kind0 declared here",
      (const ValueDecl *))

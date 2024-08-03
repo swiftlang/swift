@@ -11295,10 +11295,15 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
 }
 
 ActorIsolation swift::getActorIsolation(ValueDecl *value) {
+  return getInferredActorIsolation(value).isolation;
+}
+
+InferredActorIsolation
+swift::getInferredActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, ActorIsolationRequest{value},
-      ActorIsolation::forUnspecified());
+      InferredActorIsolation::forUnspecified());
 }
 
 ActorIsolation swift::getActorIsolationOfContext(
