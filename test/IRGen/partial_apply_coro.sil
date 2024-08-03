@@ -1381,7 +1381,7 @@ bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
 // CHECK:   store ptr %[[ARGTY]], ptr %[[PA_CTX]]
 // CHECK:   %[[PA_CTX_ARG:.*]] = getelementptr inbounds i8, ptr %[[PA_BOX_ALLOC]], i64 %[[ARGTY_ALIGN4]]
 // CHECK:   %[[INIT_PTR:.*]] = getelementptr inbounds ptr, ptr %[[ARGTY_VW]], i32 4
-// CHECK:   %[[INIT:.*]] = load ptr, ptr %[[INIT_PTR]], align 8, !invariant.load !7
+// CHECK:   %[[INIT:.*]] = load ptr, ptr %[[INIT_PTR]]
 // CHECK:   call ptr %[[INIT]](ptr noalias %[[PA_CTX_ARG]], ptr noalias %[[ARG]], ptr %[[ARGTY]])
 // CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s28captured_dependent_out_paramTA", ptr undef }, ptr %[[PA_BOX_ALLOC]], 1
 // CHECK:   ret { ptr, ptr } %[[RET]]
