@@ -1040,8 +1040,6 @@ namespace {
     ASTContext &Ctx;
     DeclContext *DC;
 
-    Expr *ParentExpr;
-
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1106,8 +1104,7 @@ namespace {
     void markAcceptableDiscardExprs(Expr *E);
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1237,12 +1234,16 @@ namespace {
         if (expr->isImplicit())
           return finish(true, expr);
 
-        auto parents = ParentExpr->getParentMap();
+        ArrayRef<Expr *> parents = ExprStack;
+        auto takeNextParent = [&]() -> Expr * {
+          if (parents.empty())
+            return nullptr;
 
-        auto result = parents.find(expr);
-        if (result != parents.end()) {
-          auto *parent = result->getSecond();
-
+          auto parent = parents.back();
+          parents = parents.drop_back();
+          return parent;
+        };
+        if (auto *parent = takeNextParent()) {
           if (isa<SequenceExpr>(parent))
             return finish(true, expr);
 
@@ -1250,12 +1251,12 @@ namespace {
           // Unwrap to the outermost paren in the sequence.
           // e.g. `foo(((&bar))`
           while (auto *PE = dyn_cast<ParenExpr>(parent)) {
-            auto nextParent = parents.find(parent);
-            if (nextParent == parents.end())
+            auto nextParent = takeNextParent();
+            if (!nextParent)
               break;
 
             lastInnerParenLoc = PE->getLParenLoc();
-            parent = nextParent->second;
+            parent = nextParent;
           }
 
           if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
@@ -2476,7 +2477,7 @@ bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr);
+  PreCheckExpression preCheck(dc);
 
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
