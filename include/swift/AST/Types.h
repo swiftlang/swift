@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericParamKey.h"
+#include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
@@ -6959,11 +6960,12 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
   }
   llvm_unreachable("unhandled ArchetypeType subclass?");
 }
-  
+
 /// Describes the type of a generic parameter.
 ///
 /// \sa GenericTypeParamDecl
-class GenericTypeParamType : public SubstitutableType {
+class GenericTypeParamType : public SubstitutableType,
+                             public llvm::FoldingSetNode {
   static constexpr unsigned TYPE_SEQUENCE_BIT = (1 << 30);
 
   using DepthIndexTy = llvm::PointerEmbeddedInt<unsigned, 31>;
@@ -6971,20 +6973,51 @@ class GenericTypeParamType : public SubstitutableType {
   /// The generic type parameter or depth/index.
   llvm::PointerUnion<GenericTypeParamDecl *, DepthIndexTy> ParamOrDepthIndex;
 
-  /// Whether this is a value type parameter.
-  /// Note: This is only set when the ParamOrDepthIndex is a DepthIndex.
-  bool IsValue = false;
+  /// The kind of generic type parameter this is.
+  GenericTypeParamKind ParamKind;
+
+  /// If this type represents a value generic, 'let N', then this is the value
+  /// type relating to this type.
+  ///
+  /// Note: This is not set when the sugared form is used where the decl is
+  /// stored.
+  Type ValueType;
 
 public:
-  /// Retrieve a generic type parameter at the given depth and index.
-  static GenericTypeParamType *get(bool isParameterPack, bool isValue,
+
+  /// Retrieve a generic type parameter with the given kind, depth, index, and
+  /// optional value type.
+  static GenericTypeParamType *get(GenericTypeParamKind paramKind,
                                    unsigned depth, unsigned index,
-                                   const ASTContext &ctx);
+                                   Type valueType, const ASTContext &ctx);
+
+  /// Retrieve a generic type parameter at the given depth and index.
+  static GenericTypeParamType *getType(unsigned depth, unsigned index,
+                                       const ASTContext &ctx);
+
+  /// Retrieve a generic parameter pack at the given depth and index.
+  static GenericTypeParamType *getPack(unsigned depth, unsigned index,
+                                       const ASTContext &ctx);
+
+  /// Retrieve a generic value parameter at the given depth and index with the
+  /// given value type.
+  static GenericTypeParamType *getValue(unsigned depth, unsigned index,
+                                        Type valueType, const ASTContext &ctx);
+
+  /// Retrieve a generic type parameter for the given generic type param decl.
+  ///
+  /// Note: This should only be called by the GenericTypeParamDecl constructor.
+  static GenericTypeParamType *get(GenericTypeParamDecl *param);
 
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
   GenericTypeParamDecl *getDecl() const {
     return ParamOrDepthIndex.dyn_cast<GenericTypeParamDecl *>();
+  }
+
+  /// Retrieve the kind of generic type parameter this type is referencing.
+  GenericTypeParamKind getParamKind() const {
+    return ParamKind;
   }
 
   /// Get the name of the generic type parameter.
@@ -7020,14 +7053,31 @@ public:
   /// func foo<T...>() { }
   /// struct Foo<T...> { }
   /// \endcode
-  bool isParameterPack() const;
+  bool isParameterPack() const {
+    return ParamKind == GenericTypeParamKind::Pack;
+  }
 
   /// Returns \c true if this type parameter is declared as a value.
   ///
   /// \code
   /// struct Vector<Element, let N: Int>
   /// \endcode
-  bool isValue() const;
+  bool isValue() const {
+    return ParamKind == GenericTypeParamKind::Value;
+  }
+
+  Type getValueType() const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getParamKind(), getDepth(), getIndex(), getValueType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, GenericTypeParamKind paramKind,
+                      unsigned depth, unsigned index, Type valueType) {
+    ID.AddInteger((uint8_t)paramKind);
+    ID.AddInteger(depth);
+    ID.AddInteger(index);
+    ID.AddPointer(valueType.getPointer());
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -7037,26 +7087,22 @@ public:
 private:
   friend class GenericTypeParamDecl;
 
-  explicit GenericTypeParamType(GenericTypeParamDecl *param,
-                                RecursiveTypeProperties props)
-    : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
-      ParamOrDepthIndex(param) { }
+  explicit GenericTypeParamType(RecursiveTypeProperties props)
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props) {}
 
-  explicit GenericTypeParamType(bool isParameterPack, bool isValue,
-                                unsigned depth, unsigned index,
+  explicit GenericTypeParamType(GenericTypeParamKind paramKind,
+                                unsigned depth, unsigned index, Type valueType,
                                 RecursiveTypeProperties props,
                                 const ASTContext &ctx)
       : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
-        ParamOrDepthIndex(depth << 16 | index |
-                          ((isParameterPack ? 1 : 0) << 30)),
-        IsValue(isValue) {}
+        ParamOrDepthIndex(depth << 16 | index),
+        ParamKind(paramKind), ValueType(valueType) {}
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-static CanGenericTypeParamType get(bool isParameterPack, bool isValue,
-                                   unsigned depth, unsigned index,
-                                   const ASTContext &C) {
+static CanGenericTypeParamType getType(unsigned depth, unsigned index,
+                                       const ASTContext &C) {
   return CanGenericTypeParamType(
-      GenericTypeParamType::get(isParameterPack, isValue, depth, index, C));
+      GenericTypeParamType::getType(depth, index, C));
 }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 

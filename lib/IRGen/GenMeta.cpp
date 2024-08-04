@@ -7050,6 +7050,13 @@ irgen::addGenericParameters(IRGenModule &IGM, ConstantStructBuilder &B,
         metadata.ShapeClasses.push_back(reducedShape);
     }
 
+    // Only key arguments count toward NumGenericValueArguments.
+    if (descriptor.hasKeyArgument() &&
+        descriptor.getKind() == GenericParamKind::Value) {
+      metadata.GenericValueArguments.push_back(
+          GenericValueArgument(param->getValueType()->getCanonicalType()));
+    }
+
     if (descriptor.hasKeyArgument())
       ++metadata.NumGenericKeyArguments;
   });
@@ -7134,10 +7141,6 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       break;
     case RequirementKind::Layout:
       abiKind = GenericRequirementKind::Layout;
-      break;
-    case RequirementKind::Value:
-      // Value requirements don't introduce requirements in the runtime generic
-      // signature. We set them up in the value header and descriptors.
       break;
     }
 
@@ -7238,12 +7241,6 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       // ABI TODO: Same type and superclass constraints also imply
       // "same conformance" constraints on any protocol requirements of
       // the constrained type, which we should emit.
-      break;
-    }
-
-    case RequirementKind::Value: {
-      metadata.GenericValueArguments.push_back(
-          GenericValueArgument(requirement.getSecondType()->getCanonicalType()));
       break;
     }
     }

@@ -314,7 +314,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             break;
           case RequirementKind::SameShape:
           case RequirementKind::Layout:
-          case RequirementKind::Value:
             break;
           }
         }
@@ -1556,8 +1555,7 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
     llvm_unreachable("Same-shape requirements not supported here");
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
-  case RequirementKind::Superclass:
-  case RequirementKind::Value: {
+  case RequirementKind::Superclass: {
     auto subject = req.getFirstType();
     auto result = findRelevantDeclAndDirectUse(subject);
 
@@ -1637,8 +1635,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
-  case RequirementKind::SameShape:
-  case RequirementKind::Value: {
+  case RequirementKind::SameShape: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
     unsigned secondDepth = getDepthOfType(req.getSecondType());
@@ -1932,7 +1929,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
         case RequirementKind::Conformance:
         case RequirementKind::Superclass:
-        case RequirementKind::Value:
           printType(second);
           break;
 
@@ -2062,10 +2058,6 @@ void PrintAST::printRequirement(const Requirement &req) {
       Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " == ";
-    break;
-  case RequirementKind::Value:
-    printTransformedType(req.getFirstType());
-    Printer << " : ";
     break;
   }
   printTransformedType(req.getSecondType());

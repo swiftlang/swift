@@ -296,11 +296,6 @@ public:
       Symbol concreteConformanceSymbol,
       Symbol associatedTypeSymbol);
 
-  unsigned recordConcreteValueRelation(
-      Symbol concreteSymbol,
-      Symbol valueSymbol,
-      Symbol concreteValueSymbol);
-
 private:
   /// The map's values are indices into the vector. The map is used for
   /// uniquing, then the index is returned and lookups are performed into

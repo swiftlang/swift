@@ -1506,7 +1506,6 @@ static InferenceCandidateKind checkInferenceCandidate(
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
       case RequirementKind::Layout:
-      case RequirementKind::Value:
         break;
 
       case RequirementKind::SameType:
@@ -2789,9 +2788,6 @@ static void sanitizeProtocolRequirements(
     case RequirementKind::SameShape:
       llvm_unreachable("Same-shape requirement not supported here");
 
-    case RequirementKind::Value:
-      llvm_unreachable("Value requirement not supported here");
-
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass: {
@@ -3411,10 +3407,8 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
   if (!sig1 || !sig2)
     return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
-  auto selfParam = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                             /*isValue*/ false,
-                                             /*depth*/ 0, /*index*/ 0,
-                                             decl1->getASTContext());
+  auto selfParam = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
+                                                 decl1->getASTContext());
 
   // Collect the protocols required by extension 1.
   Type class1;
@@ -3444,7 +3438,6 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
     case RequirementKind::SameShape:
     case RequirementKind::SameType:
     case RequirementKind::Layout:
-    case RequirementKind::Value:
       break;
     }
   }
@@ -3478,7 +3471,6 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
     case RequirementKind::SameShape:
     case RequirementKind::SameType:
     case RequirementKind::Layout:
-    case RequirementKind::Value:
       break;
     }
   }

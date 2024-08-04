@@ -488,11 +488,6 @@ void decodeRequirement(
       inverseRequirements.push_back(
           Builder.createInverseRequirement(subjectType, protocolKind));
       continue;
-    } else if (child->getKind() ==
-          Demangle::Node::Kind::DependentGenericValueRequirement) {
-      constraintType = Builder.decodeMangledType(child->getChild(1));
-      if (!constraintType)
-        return;
     }
 
 
@@ -506,11 +501,6 @@ void decodeRequirement(
     }
     case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
       requirements.push_back(BuiltRequirement(RequirementKind::SameType,
-                                              subjectType, constraintType));
-      break;
-    }
-    case Demangle::Node::Kind::DependentGenericValueRequirement: {
-      requirements.push_back(BuiltRequirement(RequirementKind::Value,
                                               subjectType, constraintType));
       break;
     }

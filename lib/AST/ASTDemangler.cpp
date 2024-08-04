@@ -765,8 +765,6 @@ Type ASTBuilder::createConstrainedExistentialType(
       switch (req.getKind()) {
       case RequirementKind::SameShape:
         llvm_unreachable("Same-shape requirement not supported here");
-      case RequirementKind::Value:
-        llvm_unreachable("Value requirement not supported here");
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
       case RequirementKind::Layout:
@@ -848,15 +846,12 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
   if (!ParameterPacks.empty()) {
     for (auto pair : ParameterPacks) {
       if (pair.first == depth && pair.second == index) {
-        return GenericTypeParamType::get(/*isParameterPack*/ true,
-                                         /*isValue*/ false, depth, index,
-                                         Ctx);
+        return GenericTypeParamType::getPack(depth, index, Ctx);
       }
     }
   }
 
-  return GenericTypeParamType::get(/*isParameterPack*/ false,
-                                   /*isValue*/ false, depth, index, Ctx);
+  return GenericTypeParamType::getType(depth, index, Ctx);
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,

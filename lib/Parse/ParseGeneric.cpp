@@ -129,18 +129,26 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    const bool isParameterPack = EachLoc.isValid();
-    const bool isValue = LetLoc.isValid();
+    auto ParamKind = GenericTypeParamKind::Type;
+    SourceLoc SpecifierLoc;
+
+    if (EachLoc.isValid()) {
+      ParamKind = GenericTypeParamKind::Pack;
+      SpecifierLoc = EachLoc;
+    } else if (LetLoc.isValid()) {
+      ParamKind = GenericTypeParamKind::Value;
+      SpecifierLoc = LetLoc;
+    }
 
     // If we're a value type parameter with no inherited entry, then diagnose
     // because we must have a type that we're assigning to the value.
-    if (isValue && Inherited.empty()) {
+    if (ParamKind == GenericTypeParamKind::Value && Inherited.empty()) {
       diagnose(LetLoc, diag::expected_value_generic_type);
     }
 
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, EachLoc, LetLoc,
-        /*index*/ GenericParams.size(), isParameterPack, isValue);
+        CurDeclContext, Name, NameLoc, SpecifierLoc,
+        /*index*/ GenericParams.size(), ParamKind);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);

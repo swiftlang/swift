@@ -160,9 +160,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      auto *paramType = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                  /*isValue*/ false,
-                                                  opaqueSignatureDepth, i, ctx);
+      auto *paramType = GenericTypeParamType::getType(opaqueSignatureDepth, i,
+                                                      ctx);
       genericParamTypes.push_back(paramType);
     
       TypeRepr *constraint = currentRepr;
@@ -301,7 +300,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      static_assert((unsigned)RequirementKind::LAST_KIND == 5,
+      static_assert((unsigned)RequirementKind::LAST_KIND == 4,
                     "update %select in diagnostic!");
       ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
                          req.getFirstType().getString(),
@@ -402,7 +401,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
-    case RequirementKind::Value:
       first = req.getFirstType();
       break;
     }
@@ -960,17 +958,6 @@ void TypeChecker::diagnoseRequirementFailure(
   case RequirementKind::SameType:
     diagnostic = diag::types_not_equal;
     diagnosticNote = diag::types_not_equal_requirement;
-    break;
-
-  case RequirementKind::Value:
-    if (substReq.getFirstType()->is<IntegerType>()) {
-      diagnostic = diag::invalid_value_value_generic;
-      diagnosticNote = diag::invalid_value_value_generic_requirement;
-    } else {
-      diagnostic = diag::cannot_pass_type_for_value_generic;
-      diagnosticNote = diag::invalid_value_value_generic_requirement;
-    }
-
     break;
   }
 

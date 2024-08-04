@@ -64,7 +64,6 @@ public:
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::Layout:
-      case RequirementKind::Value:
         continue;
 
       case RequirementKind::Conformance: {

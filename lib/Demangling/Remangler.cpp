@@ -3977,40 +3977,13 @@ ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned int depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleDependentGenericValueRequirement(Node *node,
-                                                          unsigned int depth) {
-  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
-
-  if (!Mangling.isSuccess()) {
-    return Mangling.error();
-  }
-
-  auto NumMembersAndParamIdx = Mangling.result();
-  // DEMANGLER_ASSERT(
-  //     NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
-
-  // FIXME: Substitution?
+ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
+                                                               unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::Type, node);
+  RETURN_IF_ERROR(mangleType(node->getChild(0)->getChild(1), depth + 1));
   Buffer << "RV";
-
-  // switch (NumMembersAndParamIdx.first) {
-  // case -1:
-  //   Buffer << "RI";
-  //   mangleIndex(node->getChild(1)->getIndex());
-  //   return ManglingError::Success; // substitution
-  // case 0:
-  //   Buffer << "Ri";
-  //   break;
-  // case 1:
-  //   Buffer << "Rj";
-  //   break;
-  // default:
-  //   Buffer << "RJ";
-  //   break;
-  // }
-
-  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  mangleDependentGenericParamIndex(node->getChild(0)->getChild(0));
   return ManglingError::Success;
 }
 

@@ -83,7 +83,6 @@ void LocalArchetypeRequirementCollector::addOpenedElement(
   for (auto req : OuterSig.getRequirements()) {
     switch (req.getKind()) {
     case RequirementKind::SameShape:
-    case RequirementKind::Value:
       // These never involve element types.
       break;
     case RequirementKind::Conformance:
@@ -118,8 +117,7 @@ GenericTypeParamType *LocalArchetypeRequirementCollector::addParameter() {
     index = Params.back()->getIndex() + 1;
   }
 
-  auto *param = GenericTypeParamType::get(/*pack*/ false, /*isValue*/ false,
-                                          Depth, index, Context);
+  auto *param = GenericTypeParamType::getType(Depth, index, Context);
   Params.push_back(param);
   return param;
 }
@@ -178,10 +176,8 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
   unsigned depth = baseGenericSig.getNextDepth();
   for (auto *capturedEnv : capturedEnvs) {
     if (capturedEnv == genericEnv) {
-      return GenericTypeParamType::get(/*isParameterPack=*/false,
-                                       /*isValue*/ false,
-                                       depth, rootParam->getIndex(),
-                                       rootParam->getASTContext());
+      return GenericTypeParamType::getType(depth, rootParam->getIndex(),
+                                           rootParam->getASTContext());
     }
 
     ++depth;

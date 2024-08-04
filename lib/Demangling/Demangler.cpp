@@ -80,12 +80,12 @@ static bool isEntity(Node::Kind kind) {
 static bool isRequirement(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::DependentGenericParamPackMarker:
+    case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::DependentGenericSameTypeRequirement:
     case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
-    case Node::Kind::DependentGenericValueRequirement:
       return true;
     default:
       return false;
@@ -4155,10 +4155,21 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
 
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse, Value } ConstraintKind;
+
+  enum {
+    Protocol,
+    BaseClass,
+    SameType,
+    SameShape,
+    Layout,
+    PackMarker,
+    Inverse,
+    ValueMarker
+  } ConstraintKind;
 
   NodePointer inverseKind = nullptr;
   switch (nextChar()) {
+    case 'V': ConstraintKind = ValueMarker; TypeKind = Generic; break;
     case 'v': ConstraintKind = PackMarker; TypeKind = Generic; break;
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
     case 'C': ConstraintKind = BaseClass; TypeKind = CompoundAssoc; break;
@@ -4176,7 +4187,6 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
     case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
-    case 'V': ConstraintKind = Value; TypeKind = Generic; break;
     case 'i': 
       ConstraintKind = Inverse;
       TypeKind = Generic;
@@ -4214,6 +4224,10 @@ NodePointer Demangler::demangleGenericRequirement() {
   }
 
   switch (ConstraintKind) {
+  case ValueMarker:
+    return createWithChildren(
+        Node::Kind::DependentGenericParamValueMarker, ConstrTy,
+        popNode(Node::Kind::Type));
   case PackMarker:
     return createWithChild(
         Node::Kind::DependentGenericParamPackMarker, ConstrTy);
@@ -4235,10 +4249,6 @@ NodePointer Demangler::demangleGenericRequirement() {
   case SameShape:
     return createWithChildren(Node::Kind::DependentGenericSameShapeRequirement,
                               ConstrTy, popNode(Node::Kind::Type));
-  case Value: {
-    return createWithChildren(Node::Kind::DependentGenericValueRequirement,
-                              ConstrTy, popNode(Node::Kind::Type));
-  }
   case Layout: {
     auto c = nextChar();
     NodePointer size = nullptr;

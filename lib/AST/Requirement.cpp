@@ -50,7 +50,6 @@ bool Requirement::isCanonical() const {
     break;
 
   case RequirementKind::Layout:
-  case RequirementKind::Value:
     break;
   }
 
@@ -65,8 +64,7 @@ Requirement Requirement::getCanonical() const {
   case RequirementKind::SameShape:
   case RequirementKind::Conformance:
   case RequirementKind::SameType:
-  case RequirementKind::Superclass:
-  case RequirementKind::Value: {
+  case RequirementKind::Superclass: {
     Type secondType = getSecondType()->getCanonicalType();
     return Requirement(getKind(), firstType, secondType);
   }
@@ -80,41 +78,6 @@ Requirement Requirement::getCanonical() const {
 ProtocolDecl *Requirement::getProtocolDecl() const {
   assert(getKind() == RequirementKind::Conformance);
   return getSecondType()->castTo<ProtocolType>()->getDecl();
-}
-
-// Checks the APInt value from an IntegerType to ensure that it is representable
-// and a valid instance of the underlying generic value type.
-//
-// Note: If we ever support other integer types in the future, this needs to
-// change. Right now it assumes we only allow 'Int'. This lets us just check
-// if the APInt can be represented in a single word on the target machine. If
-// so, it's a valid value.
-static bool checkValue(IntegerType *integer) {
-  auto &ctx = integer->getASTContext();
-
-  unsigned bits = 0;
-
-  if (ctx.LangOpts.Target.isArch16Bit()) {
-    bits = 16;
-  }
-
-  if (ctx.LangOpts.Target.isArch32Bit()) {
-    bits = 32;
-  }
-
-  if (ctx.LangOpts.Target.isArch64Bit()) {
-    bits = 64;
-  }
-
-  // If the integer value uses more bits to represent its value than available
-  // bits in a word for the target machine then we've overflowed.
-  if (integer->getValue().getActiveBits() > bits) {
-    return false;
-  }
-
-  return integer->getValue()
-    .sextOrTrunc(bits)
-    .sle(APInt::getSignedMaxValue(bits));
 }
 
 CheckRequirementResult Requirement::checkRequirement(
@@ -216,25 +179,6 @@ CheckRequirementResult Requirement::checkRequirement(
 
     return CheckRequirementResult::RequirementFailure;
   }
-
-  case RequirementKind::Value: {
-    if (auto archetype = firstType->getAs<ArchetypeType>()) {
-      if (archetype->getValueType() &&
-          archetype->getValueType()->isEqual(getSecondType()))
-        return CheckRequirementResult::Success;
-
-      return CheckRequirementResult::RequirementFailure;
-    }
-
-    if (auto integer = firstType->getAs<IntegerType>()) {
-      if (checkValue(integer))
-        return CheckRequirementResult::Success;
-
-      return CheckRequirementResult::RequirementFailure;
-    }
-
-    return CheckRequirementResult::RequirementFailure;
-  }
   }
 
   llvm_unreachable("Bad requirement kind");
@@ -244,9 +188,6 @@ bool Requirement::canBeSatisfied() const {
   switch (getKind()) {
   case RequirementKind::SameShape:
     llvm_unreachable("Same-shape requirements not supported here");
-
-  case RequirementKind::Value:
-    llvm_unreachable("Value requirements not supported here");
 
   case RequirementKind::Conformance:
     return getFirstType()->is<ArchetypeType>();
@@ -286,7 +227,6 @@ static unsigned getRequirementKindOrder(RequirementKind kind) {
   case RequirementKind::Superclass: return 0;
   case RequirementKind::SameType: return 3;
   case RequirementKind::Layout: return 1;
-  case RequirementKind::Value: return 5;
   }
   llvm_unreachable("unhandled kind");
 }
@@ -305,25 +245,16 @@ int Requirement::compare(const Requirement &other) const {
   if (compareKind != 0)
     return compareKind;
 
-  // We should only have multiple conformance or value requirements.
-  if (getKind() != RequirementKind::Conformance &&
-      getKind() != RequirementKind::Value) {
+  // We should only have multiple conformance requirements.
+  if (getKind() != RequirementKind::Conformance) {
     llvm::errs() << "Unordered generic requirements\n";
     llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
     llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
     abort();
   }
 
-  TypeDecl *decl1 = nullptr;
-  TypeDecl *decl2 = nullptr;
-
-  if (getKind() == RequirementKind::Conformance) {
-    decl1 = getProtocolDecl();
-    decl2 = other.getProtocolDecl();
-  } else {
-    decl1 = getSecondType()->getAnyNominal();
-    decl2 = other.getSecondType()->getAnyNominal();
-  }
+  auto decl1 = getProtocolDecl();
+  auto decl2 = other.getProtocolDecl();
 
   int compareDecls = TypeDecl::compare(decl1, decl2);
   assert(compareDecls != 0 && "Duplicate decl requirements");

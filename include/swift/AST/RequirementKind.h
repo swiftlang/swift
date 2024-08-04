@@ -37,13 +37,10 @@ enum class RequirementKind : unsigned {
   /// A same-shape requirement shape(T) == shape(U), where T and U are pack
   /// parameters.
   SameShape,
-  /// A value requirement N: T where the value N must be a valid instance of
-  /// type T.
-  Value,
 
   // Note: there is code that packs this enum in a 3-bit bitfield.  Audit users
   // when adding enumerators.
-  LAST_KIND=Value
+  LAST_KIND=SameShape
 };
 
 } // namespace swift

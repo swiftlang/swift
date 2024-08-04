@@ -47,12 +47,10 @@ class Term;
 ///   case layout(LayoutConstraint)
 ///   case superclass(CanType, substitutions: [Term])
 ///   case concrete(CanType, substitutions: [Term])
-///   case value(CanType)
-///   case concreteValue(CanType, substitutions: [Term])
 /// }
 ///
-/// For the concrete type symbol kinds (`superclass`, `concrete`, `conformance`,
-/// and `concreteValue`), arbitrary type parameters are replaced with generic
+/// For the concrete type symbol kinds (`superclass`, `concrete` and
+/// `conformance`), arbitrary type parameters are replaced with generic
 /// parameters with depth 0. The index is the generic parameter is an
 /// index into the `substitutions` array.
 ///
@@ -97,22 +95,6 @@ public:
     /// When appearing at the end of a term, denotes that the
     /// term's type conforms to the protocol.
     Protocol,
-
-    /// When appearing at the end of a term, denotes that the term's concrete
-    /// type is a valid instance of some constraint type.
-    ///
-    /// Introduced by property map construction when a term has both
-    /// a concrete type requirement and a value requirement.
-    ///
-    /// This orders before Kind::Value, so that a rule of the form
-    /// T.[concrete: C : P] => T orders before T.[value: P] => T. This ensures
-    /// that homotopy reduction will try to eliminate the latter rule
-    /// first, if possible.
-    ConcreteValue,
-
-    /// When appearing at the end of a term, denotes that the term
-    /// must be a valid value within the constraint type.
-    Value,
 
     //////
     ////// "Type-like" symbol kinds:
@@ -174,25 +156,22 @@ public:
   Kind getKind() const;
 
   /// A property records something about a type term; either a protocol
-  /// conformance, a layout constraint, a superclass or concrete type
-  /// constraint, or a value constraint.
+  /// conformance, a layout constraint, or a superclass or concrete type
+  /// constraint.
   bool isProperty() const {
     auto kind = getKind();
     return (kind == Symbol::Kind::ConcreteConformance ||
             kind == Symbol::Kind::Protocol ||
             kind == Symbol::Kind::Layout ||
             kind == Symbol::Kind::Superclass ||
-            kind == Symbol::Kind::ConcreteType ||
-            kind == Symbol::Kind::ConcreteValue ||
-            kind == Symbol::Kind::Value);
+            kind == Symbol::Kind::ConcreteType);
   }
 
   bool hasSubstitutions() const {
     auto kind = getKind();
     return (kind == Kind::Superclass ||
             kind == Kind::ConcreteType ||
-            kind == Kind::ConcreteConformance ||
-            kind == Kind::ConcreteValue);
+            kind == Kind::ConcreteConformance);
   }
 
   Identifier getName() const;
@@ -247,12 +226,6 @@ public:
                                        llvm::ArrayRef<Term> substitutions,
                                        const ProtocolDecl *proto,
                                        RewriteContext &ctx);
-
-  static Symbol forValue(CanType type, RewriteContext &ctx);
-
-  static Symbol forConcreteValue(CanType type,
-                                 llvm::ArrayRef<Term> substitutions,
-                                 RewriteContext &ctx);
 
   const ProtocolDecl *getRootProtocol() const;
 

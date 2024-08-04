@@ -3493,9 +3493,9 @@ namespace {
           auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
               param, AccessLevel::Public, dc,
               Impl.SwiftContext.getIdentifier(param->getName()),
-              /*nameLoc*/ SourceLoc(), /*eachLoc*/ SourceLoc(),
-              /*letLoc*/ SourceLoc(), /*depth*/ 0, /*index*/ i,
-              /*isParameterPack*/ false, /*isValue*/ false);
+              /*nameLoc*/ SourceLoc(), /*specifierLoc*/ SourceLoc(),
+              /*depth*/ 0, /*index*/ i,
+              GenericTypeParamKind::Type);
           templateParams.push_back(typeParam);
           (void)++i;
         }
@@ -4040,9 +4040,8 @@ namespace {
                 param, AccessLevel::Public, dc,
                 Impl.SwiftContext.getIdentifier(param->getName()),
                 Impl.importSourceLoc(param->getLocation()),
-                /*eachLoc*/ SourceLoc(), /*letLoc*/ SourceLoc(), /*depth*/ 0,
-                /*index*/ genericParams.size(), /*isParameterPack*/ false,
-                /*isValue*/ false);
+                /*specifierLoc*/ SourceLoc(), /*depth*/ 0,
+                /*index*/ genericParams.size(), GenericTypeParamKind::Type);
         genericParams.push_back(genericParamDecl);
       }
       auto genericParamList = GenericParamList::create(
@@ -7330,9 +7329,9 @@ std::optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         objcGenericParam, AccessLevel::Public, dc,
         Impl.SwiftContext.getIdentifier(objcGenericParam->getName()),
         Impl.importSourceLoc(objcGenericParam->getLocation()),
-        /*eachLoc*/ SourceLoc(), /*letLoc*/ SourceLoc(),
-        /*depth*/ 0, /*index*/ genericParams.size(), /*isParameterPack*/ false,
-        /*isValue*/ false);
+        /*specifierLoc*/ SourceLoc(),
+        /*depth*/ 0, /*index*/ genericParams.size(),
+        GenericTypeParamKind::Type);
     // NOTE: depth is always 0 for ObjC generic type arguments, since only
     // classes may have generic types in ObjC, and ObjC classes cannot be
     // nested.

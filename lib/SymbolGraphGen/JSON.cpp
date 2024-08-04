@@ -107,9 +107,6 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
       break;
     case RequirementKind::Layout:
       return;
-    case RequirementKind::Value:
-      Kind = "value";
-      break;
   }
 
   OS.object([&](){

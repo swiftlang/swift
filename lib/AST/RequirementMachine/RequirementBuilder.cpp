@@ -220,15 +220,7 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
         return;
       }
 
-      case Symbol::Kind::Value: {
-        Reqs.emplace_back(RequirementKind::Value,
-                          subjectType,
-                          prop->getConcreteType());
-        return;
-      }
-
       case Symbol::Kind::ConcreteConformance:
-      case Symbol::Kind::ConcreteValue:
         // "Concrete conformance requirements" are not recorded in the generic
         // signature.
         return;

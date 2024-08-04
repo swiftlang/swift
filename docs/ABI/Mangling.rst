@@ -1012,10 +1012,17 @@ now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 
-  generic-signature ::= requirement* generic-param-pack-marker* 'l'     // one generic parameter
-  generic-signature ::= requirement* generic-param-pack-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+  generic-signature ::= requirement* generic-param-marker 'l'     // one generic parameter
+  generic-signature ::= requirement* generic-param-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+
+  generic-param-marker ::= generic-param-pack-marker
+  generic-param-marker ::= generic-param-value-marker
 
   generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
+
+#if SWIFT_RUNTIME_VERSION >= 6.TBD
+  generic-param-value-marker ::= type 'RV' GENERIC-PARAM-INDEX // generic parameter value marker
+#endif
 
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
@@ -1044,10 +1051,6 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= type substitution 'RM' LAYOUT-CONSTRAINT                           // layout requirement with substitution
 
   requirement ::= type 'Rh' GENERIC-PARAM-INDEX                     // same-shape requirement (only supported on a generic parameter)
-
-#if SWIFT_RUNTIME_VERSION >= 6.TBD
-  requirement ::= type 'RV' GENERIC-PARAM-INDEX                     // value requirement
-#endif
 
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1

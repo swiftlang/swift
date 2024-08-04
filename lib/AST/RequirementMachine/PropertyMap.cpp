@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // The property map is used to answer generic signature queries. It also
-// implements special behaviors of layout, superclass, concrete type, and value
+// implements special behaviors of layout, superclass, and concrete type
 // requirements in the Swift language.
 //
 // # Property map construction
@@ -31,13 +31,13 @@
 //
 //    T.[P] => T
 //
-// Similarly, layout, superclass, concrete-type, and value requirements are
-// represented by a rewrite rule of the form:
+// Similarly, layout, superclass, and concrete-type requirements are represented
+// by a rewrite rule of the form:
 //
 //    T.[p] => T
 //
 // Where [p] is a "property symbol": [layout: L], [superclass: Foo],
-// [concrete: Bar], [value: Int].
+// [concrete: Bar].
 //
 // Given an arbitrary type T and a property [p], we can check if T satisfies the
 // property by checking if the two terms T.[p] and T reduce to the same term T'.
@@ -132,10 +132,6 @@ void PropertyBag::dump(llvm::raw_ostream &out) const {
     out << " concrete_type: " << *ConcreteType;
   }
 
-  if (isValue()) {
-    out << " value: " << *ValueType;
-  }
-
   out << " }";
 }
 
@@ -202,14 +198,12 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   DEBUG_ASSERT(std::equal(Key.begin() + prefixLength, Key.end(),
                           next->Key.begin()));
 
-  // Conformances, the layout constraint, and values, if any, can be copied
-  // over unmodified.
+  // Conformances and the layout constraint, if any, can be copied over
+  // unmodified.
   ConformsTo = next->ConformsTo;
   ConformsToRules = next->ConformsToRules;
   Layout = next->Layout;
   LayoutRule = next->LayoutRule;
-  ValueType = next->ValueType;
-  ValueRule = next->ValueRule;
 
   // If the property bag of V has superclass or concrete type
   // substitutions {X1, ..., Xn}, then the property bag of

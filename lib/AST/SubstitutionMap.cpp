@@ -501,10 +501,9 @@ Type QueryOverrideSubs::operator()(SubstitutableType *type) const {
       }
 
       return GenericTypeParamType::get(
-          gp->isParameterPack(),
-          gp->isValue(),
+          gp->getParamKind(),
           gp->getDepth() + info.OrigDepth - info.BaseDepth,
-          gp->getIndex(), info.Ctx);
+          gp->getIndex(), gp->getValueType(), info.Ctx);
     }
   }
 

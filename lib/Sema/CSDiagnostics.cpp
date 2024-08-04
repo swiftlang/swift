@@ -478,9 +478,6 @@ bool RequirementFailure::diagnoseAsError() {
 
     case RequirementKind::SameShape:
       return false;
-
-    case RequirementKind::Value:
-      llvm_unreachable("Value requirement not supported here");
     }
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {

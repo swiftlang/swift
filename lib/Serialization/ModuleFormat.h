@@ -485,7 +485,6 @@ enum GenericRequirementKind : uint8_t {
   SameType    = 2,
   Superclass  = 3,
   Layout = 4,
-  Value = 5,
 };
 using GenericRequirementKindField = BCFixed<3>;
 
@@ -699,6 +698,15 @@ enum class FunctionTypeIsolation : uint8_t {
   GlobalActorOffset, // Add this to the global actor type ID
 };
 using FunctionTypeIsolationField = TypeIDField;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class GenericParamKind : uint8_t {
+  Type   = 0,
+  Pack   = 1,
+  Value  = 2,
+};
+using GenericParamKindField = BCFixed<2>;
 
 // Encodes a VersionTuple:
 //
@@ -1214,11 +1222,11 @@ namespace decls_block {
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
     GENERIC_TYPE_PARAM_TYPE,
-    BCFixed<1>,  // parameter pack?
-    BCFixed<1>, // value?
-    DeclIDField, // generic type parameter decl or depth
-    BCVBR<4> // index + 1, or zero if we have a generic type
-            // parameter decl
+    GenericParamKindField,    // param kind
+    DeclIDField,              // generic type parameter decl or depth
+    BCVBR<4>,                 // index + 1, or zero if we have a generic type
+                              // parameter decl
+    TypeIDField               // value type (if param kind == Value)
   );
 
   TYPE_LAYOUT(DependentMemberTypeLayout,
@@ -1480,13 +1488,11 @@ namespace decls_block {
   >;
 
   using GenericTypeParamDeclLayout = BCRecordLayout<GENERIC_TYPE_PARAM_DECL,
-    IdentifierIDField, // name
-    BCFixed<1>,        // implicit flag
-    BCFixed<1>,        // parameter pack?
-    BCFixed<1>,        // value?
-    BCVBR<4>,          // depth
-    BCVBR<4>,          // index
-    BCFixed<1>         // opaque type?
+    IdentifierIDField,     // name
+    BCFixed<1>,            // implicit flag
+    GenericParamKindField, // param kind
+    BCVBR<4>,              // depth
+    BCVBR<4>               // index
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<

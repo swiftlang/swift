@@ -3528,8 +3528,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   } break;
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
-  case RequirementKind::SameShape:
-  case RequirementKind::Value: {
+  case RequirementKind::SameShape: {
     Type SecondTy = reqt.getSecondType();
     appendType(SecondTy->getCanonicalType(), sig);
     break;
@@ -3552,8 +3551,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
       return appendOpWithGenericParamIndex("Rs", subject.gpBase);
     case RequirementKind::SameShape:
       return appendOpWithGenericParamIndex("Rh", subject.gpBase);
-    case RequirementKind::Value:
-      return appendOpWithGenericParamIndex("RV", subject.gpBase);
     }
     break;
 
@@ -3571,8 +3568,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
       return appendOperator("RB");
     case RequirementKind::SameType:
       return appendOperator("RS");
-    case RequirementKind::Value:
-      llvm_unreachable("Value requirement with dependent member type?");
     }
     break;
 
@@ -3598,8 +3593,6 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     case RequirementKind::SameType:
       return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RT" : "Rt",
                                            gpBase, lhsBaseIsProtocolSelf);
-    case RequirementKind::Value:
-      llvm_unreachable("Value requirements should never occur with associated types");
     }
     break;
   }
@@ -4743,8 +4736,7 @@ static void extractExistentialInverseRequirements(
 
   // Form a parameter referring to the existential's Self.
   auto existentialSelf =
-      GenericTypeParamType::get(/*isParameterPack=*/false, /*isValue*/ false,
-                                /*depth=*/0, /*index=*/0, ctx);
+      GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
 
   for (auto ip : PCT->getInverses()) {
     auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
@@ -4794,8 +4786,6 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
     switch (reqt.getKind()) {
     case RequirementKind::SameShape:
       llvm_unreachable("Same-shape requirement not supported here");
-    case RequirementKind::Value:
-      llvm_unreachable("Value requirement not supported here");
     case RequirementKind::Layout:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:

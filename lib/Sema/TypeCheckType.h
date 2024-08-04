@@ -106,6 +106,8 @@ enum class TypeResolverContext : uint8_t {
   /// arguments.
   VariadicGenericArgument,
 
+  ValueGenericArgument,
+
   /// Whether we are checking a tuple element type.
   TupleElement,
 
@@ -302,6 +304,7 @@ public:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
     case Context::Inverted:
+    case Context::ValueGenericArgument:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -346,6 +349,7 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
       return true;
     }
   }
@@ -388,6 +392,7 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
       return false;
     }
   }
@@ -432,6 +437,7 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::Inverted:
+    case Context::ValueGenericArgument:
       return false;
     }
   }

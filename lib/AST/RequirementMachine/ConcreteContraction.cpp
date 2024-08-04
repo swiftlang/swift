@@ -367,8 +367,7 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
-  case RequirementKind::SameShape:
-  case RequirementKind::Value: {
+  case RequirementKind::SameShape: {
     auto substFirstType = substType(firstType);
     auto substSecondType = substType(req.getSecondType());
 
@@ -604,7 +603,6 @@ bool ConcreteContraction::performConcreteContraction(
       break;
     }
     case RequirementKind::Layout:
-    case RequirementKind::Value:
       break;
     }
   }

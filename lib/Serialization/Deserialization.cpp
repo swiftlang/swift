@@ -1237,7 +1237,6 @@ getActualRequirementKind(uint64_t rawKind) {
   CASE(Superclass)
   CASE(SameType)
   CASE(Layout)
-  CASE(Value)
   }
 #undef CASE
 
@@ -1263,6 +1262,24 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   CASE(UnknownLayout)
   CASE(BridgeObject)
   CASE(TrivialStride)
+  }
+#undef CASE
+
+  return std::nullopt;
+}
+
+/// Translate from the param kind to the Serialization enum values, which are
+/// guaranteed to be stable.
+static std::optional<GenericTypeParamKind>
+getActualParamKind(uint64_t rawKind) {
+#define CASE(KIND)                   \
+  case serialization::GenericParamKind::KIND: \
+    return GenericTypeParamKind::KIND;
+
+  switch ((serialization::GenericParamKind)rawKind) {
+  CASE(Type)
+  CASE(Pack)
+  CASE(Value)
   }
 #undef CASE
 
@@ -1580,8 +1597,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       if (!name.empty()) {
         auto *paramDecl = GenericTypeParamDecl::createDeserialized(
             getAssociatedModule(), name, paramTy->getDepth(),
-            paramTy->getIndex(), paramTy->isParameterPack(),
-            paramTy->isValue(), /*isOpaqueType*/ false);
+            paramTy->getIndex(), paramTy->getParamKind());
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -3450,22 +3466,22 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     bool isImplicit;
-    bool isParameterPack;
-    bool isValue;
+    unsigned rawParamKind;
     unsigned depth;
     unsigned index;
-    bool isOpaqueType;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isParameterPack, isValue, depth, index,
-        isOpaqueType);
+        scratch, nameID, isImplicit, rawParamKind, depth, index);
+
+    auto paramKind = getActualParamKind(rawParamKind);
+    if (!paramKind)
+      return MF.diagnoseFatal();
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
     auto *genericParam = GenericTypeParamDecl::createDeserialized(
-        DC, MF.getIdentifier(nameID), depth, index, isParameterPack, isValue,
-        isOpaqueType);
+        DC, MF.getIdentifier(nameID), depth, index, *paramKind);
     declOrOffset = genericParam;
 
     if (isImplicit)
@@ -7310,13 +7326,17 @@ Expected<Type> DESERIALIZE_TYPE(ELEMENT_ARCHETYPE_TYPE)(
 Expected<Type>
 DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool parameterPack;
-  bool value;
+  unsigned rawParamKind;
   DeclID declIDOrDepth;
   unsigned indexPlusOne;
+  TypeID valueTypeID;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, parameterPack, value, declIDOrDepth, indexPlusOne);
+      scratch, rawParamKind, declIDOrDepth, indexPlusOne, valueTypeID);
+
+  auto paramKind = getActualParamKind(rawParamKind);
+  if (!paramKind)
+    return MF.diagnoseFatal();
 
   if (indexPlusOne == 0) {
     auto genericParamOrError = MF.getDeclChecked(declIDOrDepth);
@@ -7331,8 +7351,13 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     return genericParam->getDeclaredInterfaceType();
   }
 
-  return GenericTypeParamType::get(parameterPack, value, declIDOrDepth,
-                                   indexPlusOne - 1, MF.getContext());
+  auto valueType = MF.getTypeChecked(valueTypeID);
+  if (!valueType)
+    return valueType.takeError();
+
+  return GenericTypeParamType::get(*paramKind, declIDOrDepth,
+                                   indexPlusOne - 1, valueType.get(),
+                                   MF.getContext());
 }
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(

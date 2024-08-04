@@ -41,6 +41,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Assertions.h"
@@ -174,6 +175,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
+  case TypeResolverContext::ValueGenericArgument:
     break;
   }
 
@@ -718,6 +720,54 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
                  DescriptiveDeclKind::GenericType, decl->getName());
 }
 
+namespace {
+  /// Visits a requirement type to match it to a potential witness for
+  /// the purpose of deducing associated types.
+  ///
+  /// The visitor argument is the witness type. If there are any
+  /// obvious conflicts between the structure of the two types,
+  /// returns true. The conflict checking is fairly conservative, only
+  /// considering rough structure.
+  class ValueMatchVisitor : public TypeMatcher<ValueMatchVisitor> {
+  public:
+    ValueMatchVisitor() {}
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      return true;
+    }
+
+    bool mismatch(GenericTypeParamType *paramType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (paramType->isValue()) {
+        if (secondType->is<IntegerType>())
+          return true;
+
+        return false;
+      }
+
+      return true;
+    }
+
+    bool mismatch(GenericTypeParamType *paramType,
+                  GenericTypeParamType *secondType, Type sugaredFirstType) {
+      // If either of these is a value parameter and the other is not, bail.
+      if (paramType->isValue() != secondType->isValue())
+        return false;
+
+      // If both of these aren't values then we're good.
+      if (!paramType->isValue())
+        return true;
+
+      // Otherwise, these are both value parameters and check that both their
+      // value types are the same.
+      return paramType->getValueType()->isEqual(secondType->getValueType());
+    }
+
+    bool alwaysMismatchTypeParameters() const { return true; }
+  };
+}
+
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -878,10 +928,12 @@ static Type applyGenericArguments(Type type,
   auto *decl = unboundType->getDecl();
 
   auto genericParams = decl->getGenericParams();
-  auto hasParameterPack = llvm::any_of(
-      *genericParams, [](auto *paramDecl) {
-          return paramDecl->isParameterPack();
-      });
+  auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isParameterPack();
+  });
+  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isValue();
+  });
 
   // If the type declares at least one parameter pack, allow pack expansions
   // anywhere in the argument list. We'll use the PackMatcher to ensure that
@@ -891,6 +943,8 @@ static Type applyGenericArguments(Type type,
       hasParameterPack
       ? TypeResolverContext::VariadicGenericArgument
       : TypeResolverContext::ScalarGenericArgument);
+  if (hasValueParam)
+    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -911,6 +965,11 @@ static Type applyGenericArguments(Type type,
       return ErrorType::get(ctx);
 
     args.push_back(substTy);
+
+    // The type we're binding to may not have value parameters, but one of the
+    // arguments may be a value parameter so diagnose this situation as well.
+    if (substTy->isValueParameter())
+      hasValueParam = true;
   }
 
   // Make sure we have the right number of generic arguments.
@@ -977,6 +1036,31 @@ static Type applyGenericArguments(Type type,
       }
 
       args.push_back(arg);
+    }
+  }
+
+  if (hasValueParam) {
+    ValueMatchVisitor matcher;
+
+    for (auto i : indices(genericParams->getParams())) {
+      auto param = genericParams->getParams()[i]->getDeclaredInterfaceType();
+      auto arg = args[i];
+
+      if (!matcher.match(param, arg)) {
+        // If the parameter is a value, then we're trying to substitute a
+        // non-value type like 'Int' or 'T' to our value.
+        if (param->isValueParameter()) {
+          diags.diagnose(loc, diag::cannot_pass_type_for_value_generic, arg, param);
+          return ErrorType::get(ctx);
+
+        // Otherwise, we're trying to use a value type (either an integer
+        // directly or another generic value parameter) for a non-value
+        // parameter.
+        } else {
+          diags.diagnose(loc, diag::value_type_used_in_type_parameter, arg, param);
+          return ErrorType::get(ctx);
+        }
+      }
     }
   }
 
@@ -4762,37 +4846,6 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     return ErrorType::get(result->getASTContext());
   }
 
-  // Diagnose an error if an IntegerType or GenericTypeParamType who is a value
-  // is being used as a type parameter instead of a value parameter.
-  //
-  // FIXME: This runs through every bound generic type, is there a better way
-  // of doing this or perhaps add a quicker check so that we aren't doing this
-  // for all types..?
-  if (auto generic = result->getAs<BoundGenericType>()) {
-    auto subs = generic->getContextSubstitutionMap();
-    auto replacements = subs.getReplacementTypes();
-    auto params = subs.getGenericSignature().getGenericParams();
-
-    for (auto p : llvm::zip(params, replacements)) {
-      auto param = std::get<0>(p);
-      auto replacement = std::get<1>(p);
-
-      if (replacement->is<IntegerType>() && !param->isValue()) {
-        result->getASTContext().Diags.diagnose(repr->getLoc(),
-          diag::value_type_used_in_type_parameter, replacement, param);
-        return ErrorType::get(result->getASTContext());
-      }
-
-      if (replacement->is<GenericTypeParamType>() &&
-          replacement->getAs<GenericTypeParamType>()->isValue() &&
-          !param->isValue()) {
-        result->getASTContext().Diags.diagnose(repr->getLoc(),
-          diag::value_type_used_in_type_parameter, replacement, param);
-        return ErrorType::get(result->getASTContext());
-      }
-    }
-  }
-
   if (auto moduleTy = result->getAs<ModuleType>()) {
     // Allow module types only if flag is specified.
     if (options.contains(TypeResolutionFlags::AllowModule))
@@ -5083,6 +5136,13 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
                                      TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::ValueGenericArgument) &&
+      !options.is(TypeResolverContext::SameTypeRequirement)) {
+    diagnoseInvalid(repr, repr->getLoc(),
+                    diag::integer_type_not_accepted);
+    return ErrorType::get(getASTContext());
+  }
+
   return IntegerType::get(repr->getValue(), (bool)repr->getMinusLoc(),
                           getASTContext());
 }
@@ -5198,6 +5258,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
+  case TypeResolverContext::ValueGenericArgument:
     doDiag = true;
     break;
   }

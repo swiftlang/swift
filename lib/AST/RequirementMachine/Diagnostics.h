@@ -59,6 +59,9 @@ struct RequirementError {
     /// A value generic type was used to conform to a protocol,
     /// e.g. 'where N: P' where N == 'let N: Int' and P is some protocol.
     InvalidValueGenericConformance,
+    /// A value generic type was used to same-type to an unrelated type,
+    /// e.g. 'where N == Int' where N == 'let N: Int'.
+    InvalidValueGenericSameType,
   } kind;
 
 private:
@@ -156,14 +159,25 @@ public:
     return {Kind::UnsupportedSameElement, req, loc};
   }
 
-  static RequirementError forInvalidValueGenericType(Requirement req,
+  static RequirementError forInvalidValueGenericType(Type subjectType,
+                                                     Type constraint,
                                                      SourceLoc loc) {
-    return {Kind::InvalidValueGenericType, req, loc};
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueGenericType, requirement, loc};
   }
 
-  static RequirementError forInvalidValueGenericConformance(Requirement req,
+  static RequirementError forInvalidValueGenericConformance(Type subjectType,
+                                                            Type constraint,
                                                             SourceLoc loc) {
-    return {Kind::InvalidValueGenericConformance, req, loc};
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueGenericConformance, requirement, loc};
+  }
+
+  static RequirementError forInvalidValueGenericSameType(Type subjectType,
+                                                         Type constraint,
+                                                         SourceLoc loc) {
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueGenericSameType, requirement, loc};
   }
 };
 

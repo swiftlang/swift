@@ -41,10 +41,9 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
-      eachKeywordLoc: self.generateSourceLoc(node.eachKeyword),
 
       // FIXME ALEX
-      letKeywordLoc: self.generateSourceLoc(node.eachKeyword),
+      specifierLoc: self.generateSourceLoc(node.eachKeyword),
       name: name,
       nameLoc: nameLoc,
       inheritedType: self.generate(type: node.inheritedType),

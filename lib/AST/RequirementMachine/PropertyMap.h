@@ -92,12 +92,6 @@ class PropertyBag {
   /// Cache of associated type declarations.
   llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
 
-  /// The value type that this type must be a valid value for.
-  std::optional<Symbol> ValueType;
-
-  /// The corresponding value rule for the above.
-  std::optional<unsigned> ValueRule;
-
   explicit PropertyBag(Term key) : Key(key) {}
 
   void copyPropertiesFrom(const PropertyBag *next,
@@ -156,14 +150,6 @@ public:
   }
 
   AssociatedTypeDecl *getAssociatedType(Identifier name);
-
-  bool isValue() const {
-    return ValueType.has_value();
-  }
-
-  CanType getValueType() const {
-    return ValueType->getConcreteType();
-  }
 
   Symbol concretelySimplifySubstitution(const MutableTerm &mutTerm,
                                         RewriteContext &ctx,
@@ -281,8 +267,6 @@ private:
   void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);
   void addConcreteTypeProperty(Term key, Symbol property, unsigned ruleID);
 
-  void addValueProperty(Term key, Symbol property, unsigned ruleID);
-
   void checkConcreteTypeRequirements();
 
   void concretizeNestedTypesFromConcreteParents();
@@ -294,14 +278,6 @@ private:
                    ArrayRef<Term> substitutions,
                    ArrayRef<unsigned> conformsToRules,
                    ArrayRef<const ProtocolDecl *> conformsTo);
-
-  void concretizeNestedTypesFromConcreteParent(
-                   Term key,
-                   unsigned concreteRuleID,
-                   CanType concreteType,
-                   ArrayRef<Term> substitutions,
-                   std::optional<unsigned> valueRuleID,
-                   std::optional<Symbol> valueType);
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
@@ -320,10 +296,11 @@ private:
       ArrayRef<Term> substitutions,
       RewritePath &path) const;
 
-  void recordConcreteRelationRule(
+  void recordConcreteConformanceRule(
     unsigned concreteRuleID,
-    unsigned relationRuleID,
-    Symbol concreteRelationSymbol) const;
+    unsigned conformanceRuleID,
+    RequirementKind requirementKind,
+    Symbol concreteConformanceSymbol) const;
 
   void verify() const;
 };

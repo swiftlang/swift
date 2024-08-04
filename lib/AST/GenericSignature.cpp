@@ -151,7 +151,6 @@ void GenericSignatureImpl::forEachParam(
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
     case RequirementKind::SameShape:
-    case RequirementKind::Value:
       continue;
     }
 
@@ -181,7 +180,6 @@ bool GenericSignatureImpl::areAllParamsConcrete() const {
     case RequirementKind::Superclass:
     case RequirementKind::Layout:
     case RequirementKind::SameShape:
-    case RequirementKind::Value:
       continue;
     }
   }
@@ -982,10 +980,6 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       conformances[CanType(reqt.getFirstType())].push_back(
           reqt.getProtocolDecl());
       break;
-
-    case RequirementKind::Value:
-      // FIXME: Add checking
-      break;
     }
 
     // From here on, we're only interested in requirements beyond the first.
@@ -1078,8 +1072,7 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
 
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-  case RequirementKind::Value:
-    // Same-shape and value requirements do not involve dependent member types.
+    // Same-shape requirements do not involve dependent member types.
     return req;
 
   case RequirementKind::Conformance:

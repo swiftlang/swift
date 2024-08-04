@@ -390,7 +390,7 @@ public:
       : RequirementFailure(solution, lhs, rhs, locator) {
 #ifndef NDEBUG
     auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
-    //assert(reqElt.getRequirementKind() == RequirementKind::SameType);
+    assert(reqElt.getRequirementKind() == RequirementKind::SameType);
 #endif
   }
 

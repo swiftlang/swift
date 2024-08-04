@@ -8009,8 +8009,7 @@ NOTE(invalid_value_value_generic_requirement,none,
      "requirement specified as %0 == %1%2",
      (Type, Type, StringRef))
 ERROR(cannot_pass_type_for_value_generic,none,
-      "cannot pass type %1 as a value for generic value of %2",
-      (Type, Type, Type))
+      "cannot pass type %0 as a value for generic value %1", (Type, Type))
 ERROR(value_type_used_in_type_parameter,none,
       "cannot use value type %0 for generic argument %1", (Type, Type))
 ERROR(cannot_self_value_generic,none,
@@ -8019,6 +8018,10 @@ ERROR(invalid_value_type_value_generic,none,
       "%0 is not a supported value type for %1", (Type, Type))
 ERROR(invalid_value_generic_conformance,none,
       "value generic type %0 cannot conform to protocol %1", (Type, Type))
+ERROR(invalid_value_generic_same_type,none,
+      "cannot constrain value parameter %0 to be type %1", (Type, Type))
+ERROR(integer_type_not_accepted,none,
+      "integer unexpectedly used in a type position", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

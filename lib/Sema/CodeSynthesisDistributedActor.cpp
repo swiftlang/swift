@@ -1080,9 +1080,8 @@ GetDistributedActorAsActorConformanceRequest::evaluate(
   if (!ext)
     return nullptr;
 
-  auto genericParam = GenericTypeParamType::get(/*isParameterPack=*/false,
-                                                /*isValue=*/ false,
-                                                /*depth=*/0, /*index=*/0, ctx);
+  auto genericParam = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0,
+                                                    ctx);
 
   auto distributedActorAsActorConformance = ctx.getNormalConformance(
       Type(genericParam), actorProto, SourceLoc(), ext,

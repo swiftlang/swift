@@ -650,7 +650,7 @@ private:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
     case Node::Kind::LifetimeDependence:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
-    case Node::Kind::DependentGenericValueRequirement:
+    case Node::Kind::DependentGenericParamValueMarker:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1089,6 +1089,30 @@ private:
       return false;
     };
 
+    auto isGenericParamValue = [&](unsigned depth, unsigned index) {
+      for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
+        auto child = Node->getChild(i);
+        if (child->getKind() != Node::Kind::DependentGenericParamPackMarker)
+          continue;
+        child = child->getChild(0);
+
+        if (child->getKind() != Node::Kind::Type)
+          continue;
+
+        auto param = child->getChild(0);
+        auto type = child->getChild(1);
+        if (param->getKind() != Node::Kind::DependentGenericParamType)
+          continue;
+
+        if (index == param->getChild(0)->getIndex() &&
+            depth == param->getChild(1)->getIndex()) {
+          return std::make_pair(true, type);
+        }
+      }
+
+      return std::make_pair(false, NodePointer());
+    };
+
     unsigned gpDepth = 0;
     for (; gpDepth < numGenericParams; ++gpDepth) {
       if (gpDepth != 0)
@@ -1110,9 +1134,19 @@ private:
         if (isGenericParamPack(gpDepth, index))
           Printer << "each ";
 
+        auto value = isGenericParamValue(gpDepth, index);
+
+        if (value.first)
+          Printer << "let ";
+
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
         Printer << Options.GenericParameterName(gpDepth, index);
+
+        if (value.second) {
+          Printer << ": ";
+          print(value.second, depth + 1);
+        }
       }
     }
 
@@ -2883,6 +2917,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::DependentGenericParamCount:
   case Node::Kind::DependentGenericParamPackMarker:
+  case Node::Kind::DependentGenericParamValueMarker:
     printer_unreachable("should be printed as a child of a "
                         "DependentGenericSignature");
   case Node::Kind::DependentGenericConformanceRequirement: {
@@ -3400,15 +3435,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     auto signedValue = (ssize_t)Node->getIndex();
 
     Printer << signedValue;
-    return nullptr;
-  }
-  case Node::Kind::DependentGenericValueRequirement: {
-    NodePointer type = Node->getChild(0);
-    NodePointer reqt = Node->getChild(1);
-    Printer << "let ";
-    print(type, depth + 1);
-    Printer << ": ";
-    print(reqt, depth + 1);
     return nullptr;
   }
   }

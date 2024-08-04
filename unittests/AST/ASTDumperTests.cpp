@@ -26,7 +26,7 @@ TEST(ASTDumper, ArchetypeType) {
   TestContext C;
   auto &ctx = C.Ctx;
 
-  auto *genericParamTy = GenericTypeParamType::get(false, false, 0, 0, ctx);
+  auto *genericParamTy = GenericTypeParamType::getType(0, 0, ctx);
   auto sig = buildGenericSignature(ctx, nullptr, {genericParamTy}, {},
                                    /*allowInverses=*/true);
 

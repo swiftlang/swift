@@ -114,7 +114,6 @@ public:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
-    case RequirementKind::Value:
       second = hash_value(requirement.getSecondType());
       break;
 
@@ -137,7 +136,6 @@ public:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
-    case RequirementKind::Value:
       return lhs.getSecondType().getPointer() ==
           rhs.getSecondType().getPointer();
 
@@ -171,8 +169,7 @@ public:
     case RequirementKind::SameShape:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
-    case RequirementKind::SameType:
-    case RequirementKind::Value: {
+    case RequirementKind::SameType: {
       auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
       return Requirement(getKind(), newFirst, newSecond);
     }

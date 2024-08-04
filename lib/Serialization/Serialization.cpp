@@ -1497,6 +1497,20 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(Superclass)
   CASE(SameType)
   CASE(Layout)
+  }
+#undef CASE
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
+}
+
+static uint8_t getRawStableGenericParamKind(GenericTypeParamKind kind) {
+#define CASE(KIND)            \
+  case GenericTypeParamKind::KIND: \
+    return (uint8_t)serialization::GenericParamKind::KIND;
+
+  switch (kind) {
+  CASE(Type)
+  CASE(Pack)
   CASE(Value)
   }
 #undef CASE
@@ -4185,9 +4199,9 @@ public:
     GenericTypeParamDeclLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(genericParam->getName()),
-        genericParam->isImplicit(), genericParam->isParameterPack(),
-        genericParam->isValue(), genericParam->getDepth(),
-        genericParam->getIndex(), genericParam->isOpaqueType());
+        genericParam->isImplicit(),
+        getRawStableGenericParamKind(genericParam->getParamKind()),
+        genericParam->getDepth(), genericParam->getIndex());
   }
 
   void visitAssociatedTypeDecl(const AssociatedTypeDecl *assocType) {
@@ -5558,6 +5572,8 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
+    uint8_t paramKind = getRawStableGenericParamKind(genericParam->getParamKind());
+    TypeID valueTypeID;
     if (genericParam->getDecl() &&
         !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
           S.isDeclXRef(genericParam->getDecl()))) {
@@ -5567,10 +5583,14 @@ public:
       declIDOrDepth = genericParam->getDepth();
       indexPlusOne = genericParam->getIndex() + 1;
     }
+
+    if (auto valueType = genericParam->getValueType()) {
+      valueTypeID = S.addTypeRef(valueType);
+    }
+
     GenericTypeParamTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           genericParam->isParameterPack(),
-                                           genericParam->isValue(),
-                                           declIDOrDepth, indexPlusOne);
+                                           paramKind, declIDOrDepth,
+                                           indexPlusOne, valueTypeID);
   }
 
   void visitDependentMemberType(const DependentMemberType *dependent) {

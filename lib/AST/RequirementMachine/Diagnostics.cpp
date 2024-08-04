@@ -249,6 +249,18 @@ bool swift::rewriting::diagnoseRequirementErrors(
       diagnosedError = true;
       break;
     }
+
+    case RequirementError::Kind::InvalidValueGenericSameType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_generic_same_type,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
     }
   }
 
@@ -282,10 +294,6 @@ getRequirementForDiagnostics(Type subject, Symbol property,
   case Symbol::Kind::Layout:
     return Requirement(RequirementKind::Layout, subject,
                        property.getLayoutConstraint());
-
-  case Symbol::Kind::Value:
-    return Requirement(RequirementKind::Value, subject,
-                       property.getConcreteType());
 
   default:
     llvm::errs() << "Bad property symbol: " << property << "\n";

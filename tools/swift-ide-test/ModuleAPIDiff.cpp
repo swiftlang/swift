@@ -755,7 +755,6 @@ public:
         break;
       case RequirementKind::Layout:
       case RequirementKind::SameShape:
-      case RequirementKind::Value:
         // FIXME
         assert(false && "Not implemented");
         break;

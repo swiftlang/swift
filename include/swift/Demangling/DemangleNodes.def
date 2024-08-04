@@ -401,7 +401,7 @@ NODE(DependentGenericInverseConformanceRequirement)
 // Added in Swift 6.TBD
 NODE(Integer)
 NODE(NegativeInteger)
-NODE(DependentGenericValueRequirement)
+NODE(DependentGenericParamValueMarker)
 
 #undef CONTEXT_NODE
 #undef NODE

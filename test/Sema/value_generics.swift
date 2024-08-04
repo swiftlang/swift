@@ -2,8 +2,7 @@
 
 protocol P {}
 
-struct A<let N: Int> { // expected-note {{requirement specified as 'let N' == 'Int' [with N = T]}}
-                       // expected-note@-1 {{requirement specified as 'let N' == 'Int' [with N = Int]}}
+struct A<let N: Int> {
   var int: Int {
     N // OK
   }
@@ -23,15 +22,26 @@ struct A<let N: Int> { // expected-note {{requirement specified as 'let N' == 'I
 
 extension A where N: P {} // expected-error {{value generic type 'let N' cannot conform to protocol 'P'}}
 
+extension A where N == Int {} // expected-error {{cannot constrain value parameter 'let N' to be type 'Int'}}
+
 func b(with a: A<123>) {} // OK
 func c<let M: Int>(with a: A<M>) {} // OK
-func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value of 'Int'}}
-func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value of 'Int'}}
+func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'let N'}}
+func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'let N'}}
 
 struct Generic<T: ~Copyable & ~Escapable> {}
+struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
-func f(with generic: Generic<123>) {} // expected-error {{cannot use value type '123' for generic argument 'T'}}
-func g<let N: Int>(with generic: Generic<N>) {} // expected-error {{cannot use value type 'let N' for generic argument 'T'}}
+func f(_: Generic<123>) {} // expected-error {{integer unexpectedly used in a type position}}
+func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'let N' for generic argument 'T'}}
+func h(_: (Int, 123)) {} // expected-error {{integer unexpectedly used in a type position}}
+func i(_: () -> 123) {} // expected-error {{integer unexpectedly used in a type position}}
+func j(_: (A<123>) -> ()) {} // OK
+func k(_: some 123) {} // expected-error {{integer unexpectedly used in a type position}}
+func l(_: GenericWithIntParam<123, Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'let N'}}
+func m(_: GenericWithIntParam<Int, 123>) {} // OK
+
+typealias One = 1 // expected-error {{integer unexpectedly used in a type position}}
 
 struct B<let N: UInt8> {} // expected-error {{'UInt8' is not a supported value type for 'let N'}}
 

@@ -2166,7 +2166,6 @@ void ConstraintSystem::openGenericRequirement(
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
   case RequirementKind::SameShape:
-  case RequirementKind::Value:
     openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
     break;
   case RequirementKind::Layout:
@@ -7523,7 +7522,6 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
     }
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
-    case RequirementKind::Value:
       break;
     }
   }

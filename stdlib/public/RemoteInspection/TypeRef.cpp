@@ -343,8 +343,6 @@ public:
     case RequirementKind::Layout:
       stream << "layout requirement";
       break;
-    case RequirementKind::Value:
-      llvm_unreachable("implement me");
     }
     stream << ")";
   }
@@ -972,8 +970,6 @@ public:
     case RequirementKind::Layout:
       // Not implemented.
       return nullptr;
-    case RequirementKind::Value:
-      llvm_unreachable("implement me");
     }
   }
 
@@ -1406,8 +1402,6 @@ public:
     case RequirementKind::Layout:
       return TypeRefRequirement(req.getKind(), newFirst,
                                 req.getLayoutConstraint());
-    case RequirementKind::Value:
-      llvm_unreachable("implement me");
     }
 
     llvm_unreachable("Unhandled RequirementKind in switch.");

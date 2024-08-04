@@ -254,11 +254,9 @@ private:
 
     // Create a new generalization type parameter and record the
     // substitution.
-    auto newParam = GenericTypeParamType::get(/*isParameterPack*/ false,
-                                              /*isValue*/ false,
-                                              /*depth*/ 0,
-                                              /*index*/ substTypes.size(),
-                                              ctx);
+    auto newParam = GenericTypeParamType::getType(/*depth*/ 0,
+                                                  /*index*/ substTypes.size(),
+                                                  ctx);
     addedParameters.push_back(newParam);
 
     substTypes.insert({CanType(newParam), origArg});

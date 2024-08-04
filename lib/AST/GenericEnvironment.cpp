@@ -406,7 +406,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout,
-                                            requirements.valueType);
+                                            rootGP->getValueType());
     }
 
     break;
@@ -423,7 +423,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
                                              requirements.protos, superclass,
                                              requirements.layout,
-                                             requirements.valueType);
+                                             rootGP->getValueType());
     break;
   }
 
@@ -449,12 +449,12 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
       result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
                                            superclass, requirements.layout,
-                                           requirements.valueType);
+                                           rootGP->getValueType());
     } else {
       result = OpenedArchetypeType::getNew(this, requirements.anchor,
                                            requirements.protos, superclass,
                                            requirements.layout,
-                                           requirements.valueType);
+                                           rootGP->getValueType());
     }
 
     break;

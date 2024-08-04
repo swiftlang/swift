@@ -3181,9 +3181,6 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
     case RequirementKind::SameShape:
       llvm_unreachable("Same-shape requirement not supported here");
 
-    case RequirementKind::Value:
-      llvm_unreachable("Value requirement not supported here");
-
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),

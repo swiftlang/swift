@@ -1896,11 +1896,11 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
     BridgedSourceLoc cRightAngleLoc);
 
 SWIFT_NAME(
-    "BridgedGenericTypeParamDecl.createParsed(_:declContext:eachKeywordLoc:"
-    "letKeywordLoc:name:nameLoc:inheritedType:index:)")
+    "BridgedGenericTypeParamDecl.createParsed(_:declContext:specifierLoc:"
+    "name:nameLoc:inheritedType:index:)")
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cEachLoc, BridgedSourceLoc cLetLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr opaqueInheritedType,
     size_t index);
 

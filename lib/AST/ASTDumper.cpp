@@ -439,7 +439,6 @@ static StringRef getDumpString(RequirementKind kind) {
     case RequirementKind::Layout: return "has_layout";
     case RequirementKind::Superclass: return "subclass_of";
     case RequirementKind::SameType: return "same_type";
-    case RequirementKind::Value: return "value";
   }
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
@@ -4284,6 +4283,10 @@ namespace {
       if (auto decl = T->getDecl())
         printFieldQuoted(decl->printRef(), "decl");
       printFlag(T->isParameterPack(), "pack");
+
+      if (T->isValue())
+        printRec(T->getValueType(), "value");
+
       printFoot();
     }
 

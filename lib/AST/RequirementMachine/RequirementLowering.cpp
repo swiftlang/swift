@@ -231,6 +231,25 @@ static void desugarSameTypeRequirement(
         }
       }
 
+      if (firstType->isValueParameter() || secondType->isValueParameter()) {
+        // FIXME: If we ever support other value types in the future besides
+        // 'Int', then we'd want to check their underlying value type to ensure
+        // they are the same.
+        if (firstType->isValueParameter() &&
+            !(secondType->isValueParameter() || secondType->is<IntegerType>())) {
+          errors.push_back(RequirementError::forInvalidValueGenericSameType(
+              sugaredFirstType, secondType, loc));
+          return true;
+        }
+
+        if (secondType->isValueParameter() &&
+            !(firstType->isValueParameter() || firstType->is<IntegerType>())) {
+          errors.push_back(RequirementError::forInvalidValueGenericSameType(
+              secondType, sugaredFirstType, loc));
+          return true;
+        }
+      }
+
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;
@@ -337,12 +356,6 @@ static void desugarConformanceRequirement(
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (req.getFirstType()->isTypeParameter()) {
-      // Value generic types cannot conform to protocols.
-      if (req.getFirstType()->getRootGenericParam()->isValue()) {
-        errors.push_back(RequirementError::forInvalidValueGenericConformance(req, loc));
-        return;
-      }
-
       result.push_back(req);
       return;
     }
@@ -421,27 +434,6 @@ static void desugarSameShapeRequirement(
                       req.getFirstType(), req.getSecondType());
 }
 
-static void desugarValueRequirement(Requirement req, SourceLoc loc,
-                                    SmallVectorImpl<Requirement> &result,
-                                    SmallVectorImpl<InverseRequirement> &inverses,
-                                    SmallVectorImpl<RequirementError> &errors) {
-
-  if (!req.getSecondType()->isLegalValueGenericType()) {
-    errors.push_back(RequirementError::forInvalidValueGenericType(req, loc));
-    return;
-  }
-
-  if (req.getFirstType()->isTypeParameter()) {
-    result.push_back(req);
-    return;
-  }
-
-  // FIXME: Are there scenarios were desugaring a value requirement actually
-  // doesn't have a first type type parameter?
-  llvm_unreachable("desugar value requirement");
-}
-
-
 /// Convert a requirement where the subject type might not be a type parameter,
 /// or the constraint type in the conformance requirement might be a protocol
 /// composition, into zero or more "proper" requirements which can then be
@@ -473,10 +465,6 @@ swift::rewriting::desugarRequirement(
   case RequirementKind::SameType:
     desugarSameTypeRequirement(req, loc, result, inverses, errors);
     break;
-
-  case RequirementKind::Value:
-    desugarValueRequirement(req, loc, result, inverses, errors);
-    break;
   }
 }
 
@@ -501,7 +489,7 @@ void swift::rewriting::desugarRequirements(
 // Requirement realization and inference.
 //
 
-static void realizeTypeRequirement(TypeDecl *decl, DeclContext *dc,
+static void realizeTypeRequirement(DeclContext *dc,
                                    Type subjectType, Type constraintType,
                                    SourceLoc loc,
                                    SmallVectorImpl<StructuralRequirement> &result,
@@ -533,19 +521,49 @@ static void realizeTypeRequirement(TypeDecl *decl, DeclContext *dc,
     }
   }
 
-  auto gpDecl = dyn_cast_or_null<GenericTypeParamDecl>(decl);
+  if (subjectType->isValueParameter()) {
+    // This is a correct value generic definition where 'let N: Int'.
+    //
+    // Note: This definition is only valid in non-extension contexts. If we are
+    // in an extension context then the user has written something like:
+    // 'extension T where N: Int' which is weird and not supported.
+    if (constraintType->isLegalValueGenericType() && !isa<ExtensionDecl>(dc)) {
+      return;
+    }
 
-  if (constraintType->isConstraintType()) {
+    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
+    // is some protocol in either the defining context or in an extension where
+    // clause.
+    if (constraintType->isConstraintType()) {
+      errors.push_back(
+        RequirementError::forInvalidValueGenericConformance(subjectType,
+                                                            constraintType,
+                                                            loc));
+    // OK, this is not a constraint type. If we're in an extension complain
+    // about constraining to non-protocol type.
+    //
+    // FIXME: Maybe a better diagnostic here saying you can't constrain a value
+    // generic parameter to a different value type in an extension?
+    } else if (isa<ExtensionDecl>(dc)) {
+      errors.push_back(
+        RequirementError::forInvalidTypeRequirement(subjectType,
+                                                    constraintType,
+                                                    loc));
+    // Otherwise, we're trying to define a value generic parameter with an
+    // unsupported type right now e.g. 'let N: UInt8'.
+    } else {
+      errors.push_back(
+        RequirementError::forInvalidValueGenericType(subjectType,
+                                                     constraintType,
+                                                     loc));
+    }
+  } else if (constraintType->isConstraintType()) {
     result.push_back({Requirement(RequirementKind::Conformance,
                                   subjectType, constraintType),
                       loc});
   } else if (constraintType->getClassOrBoundGenericClass()) {
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
-                      loc});
-  } else if (gpDecl && gpDecl->isValue()) {
-    result.push_back({Requirement(RequirementKind::Value,
-                                subjectType, constraintType),
                       loc});
   } else {
     errors.push_back(
@@ -699,10 +717,6 @@ struct InferRequirementsWalker : public TypeWalker {
       if (skipRequirement(rawReq, decl))
         continue;
 
-      if (rawReq.getKind() == RequirementKind::Value) {
-        continue;
-      }
-
       reqs.push_back({rawReq.subst(subMap), SourceLoc()});
     }
 
@@ -744,9 +758,6 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::SameShape:
     llvm_unreachable("Same-shape requirement not supported here");
 
-  case RequirementKind::Value:
-    llvm_unreachable("Value requirement not supported here");
-
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
     auto firstType = req.getFirstType();
@@ -757,8 +768,7 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, moduleForInference, dc, result);
     }
 
-    realizeTypeRequirement(/*decl*/ nullptr, dc, firstType, secondType, loc,
-                           result, errors);
+    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
     break;
   }
 
@@ -821,10 +831,8 @@ void swift::rewriting::applyInverses(
       continue;
     }
 
-    // Variable generics never have inverse requirements (or the positive
-    // thereof).
-    if (canSubject->is<GenericTypeParamType>() &&
-        canSubject->castTo<GenericTypeParamType>()->isValue()) {
+    // Value generics never have inverse requirements (or the positive thereof).
+    if (canSubject->isValueParameter()) {
       continue;
     }
 
@@ -906,13 +914,14 @@ void swift::rewriting::realizeInheritedRequirements(
     if (!inheritedType) continue;
 
     if (shouldInferRequirements) {
-      inferRequirements(inheritedType, moduleForInference, dc, result);
+      inferRequirements(inheritedType, moduleForInference,
+                        decl->getInnermostDeclContext(), result);
     }
 
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
-    realizeTypeRequirement(decl, dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }
 
   // Also check for `SynthesizedProtocolAttr`s with additional constraints added
@@ -923,7 +932,7 @@ void swift::rewriting::realizeInheritedRequirements(
     auto inheritedType = attr->getProtocol()->getDeclaredType();
     auto loc = attr->getLocation();
 
-    realizeTypeRequirement(decl, dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }
 }
 
