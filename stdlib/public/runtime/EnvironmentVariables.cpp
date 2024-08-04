@@ -247,11 +247,11 @@ void swift::runtime::environment::initialize(void *context) {
   // everywhere.
 #define VARIABLE(name, type, defaultValue, help)                               \
   do {                                                                         \
-    const char name##_string = getenv(#name);                                  \
+    const char *name##_string = getenv(#name);                                 \
     if (name##_string)                                                         \
       name##_isSet_variable = true;                                            \
     name##_variable = parse_##type(#name, name##_string, defaultValue);        \
-  } while (0)
+  } while (0);
 #include "EnvironmentVariables.def"
 
   // Print help if requested.
