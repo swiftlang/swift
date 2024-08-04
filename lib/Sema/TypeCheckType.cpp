@@ -721,13 +721,9 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
 }
 
 namespace {
-  /// Visits a requirement type to match it to a potential witness for
-  /// the purpose of deducing associated types.
-  ///
-  /// The visitor argument is the witness type. If there are any
-  /// obvious conflicts between the structure of the two types,
-  /// returns true. The conflict checking is fairly conservative, only
-  /// considering rough structure.
+  /// Visits a generic parameter and the type attempting to substitute for it
+  /// to see if it's a valid parameter for integer arguments or other value
+  /// generic parameters.
   class ValueMatchVisitor : public TypeMatcher<ValueMatchVisitor> {
   public:
     ValueMatchVisitor() {}
@@ -4944,6 +4940,19 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   // function type.
   if (result->is<FunctionType>())
     result = applyNonEscapingIfNecessary(result, options);
+
+  // Referencing a value generic by name, e.g. 'let N' and referencing 'N', is
+  // only valid as a generic argument, in generic requirements, and when being
+  // used as an expression.
+  if (result->isValueParameter() &&
+      !(options.isGenericArgument() ||
+        options.isGenericRequirement() ||
+        options.isAnyExpr())) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(repr->getNameLoc(), diag::value_generic_unexpected, result);
+    }
+    return ErrorType::get(getASTContext());
+  }
 
   return result;
 }

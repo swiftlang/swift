@@ -8012,8 +8012,6 @@ ERROR(cannot_pass_type_for_value_generic,none,
       "cannot pass type %0 as a value for generic value %1", (Type, Type))
 ERROR(value_type_used_in_type_parameter,none,
       "cannot use value type %0 for generic argument %1", (Type, Type))
-ERROR(cannot_self_value_generic,none,
-      "cannot reference '.self' on value generic parameter %0", (Type))
 ERROR(invalid_value_type_value_generic,none,
       "%0 is not a supported value type for %1", (Type, Type))
 ERROR(invalid_value_generic_conformance,none,
@@ -8022,6 +8020,8 @@ ERROR(invalid_value_generic_same_type,none,
       "cannot constrain value parameter %0 to be type %1", (Type, Type))
 ERROR(integer_type_not_accepted,none,
       "integer unexpectedly used in a type position", ())
+ERROR(value_generic_unexpected,none,
+      "using value generic %0 here is not allowed", (Type))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

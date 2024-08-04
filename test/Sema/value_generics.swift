@@ -18,6 +18,18 @@ struct A<let N: Int> {
   var intSelf: Int {
     N.self // OK
   }
+
+  var n: N { // expected-error {{using value generic 'let N' here is not allowed}}
+    fatalError()
+  }
+
+  var nType: N.Type { // expected-error {{using value generic 'let N' here is not allowed}}
+    fatalError()
+  }
+
+  var a: A<N> { // OK
+    fatalError()
+  }
 }
 
 extension A where N: P {} // expected-error {{value generic type 'let N' cannot conform to protocol 'P'}}
