@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/Assertions.h"
@@ -766,6 +767,44 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
 } // end anonymous namespace
 
+extern "C" intptr_t swift_ASTGen_evaluatePoundIfCondition(
+                        BridgedASTContext astContext,
+                        void *_Nonnull diagEngine,
+                        BridgedStringRef sourceFileBuffer,
+                        BridgedStringRef conditionText,
+                        bool);
+
+/// Call into the Swift implementation of #if condition evaluation.
+///
+/// \returns std::nullopt if the Swift implementation is not available, or
+/// a pair (isActive, allowSyntaxErrors) describing whether the evaluated
+/// condition indicates that the region is active and whether, if inactive,
+/// the code in that region is allowed to have syntax errors.
+static std::optional<std::pair<bool, bool>> evaluateWithSwiftIfConfig(
+    Parser &parser,
+    SourceRange conditionRange,
+    bool shouldEvaluate
+) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
+  auto &sourceMgr = parser.Context.SourceMgr;
+  StringRef sourceFileText =
+      sourceMgr.getEntireTextForBuffer(*parser.SF.getBufferID());
+  StringRef conditionText =
+      sourceMgr.extractText(Lexer::getCharSourceRangeFromSourceRange(
+          sourceMgr, conditionRange));
+  intptr_t evalResult = swift_ASTGen_evaluatePoundIfCondition(
+      parser.Context, &parser.Context.Diags, sourceFileText, conditionText,
+      shouldEvaluate
+  );
+
+  bool isActive = (evalResult & 0x01) != 0;
+  bool allowSyntaxErrors = (evalResult & 0x02) != 0;
+  return std::pair(isActive, allowSyntaxErrors);
+#else
+  return std::nullopt;
+#endif
+}
 
 /// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
@@ -842,7 +881,15 @@ Result Parser::parseIfConfigRaw(
       if (result.isNull())
         return makeParserError();
       Condition = result.get();
-      if (validateIfConfigCondition(Condition, Context, Diags)) {
+      if (std::optional<std::pair<bool, bool>> evalResult =
+              evaluateWithSwiftIfConfig(*this,
+                                        Condition->getSourceRange(),
+                                        shouldEvaluate)) {
+        if (!foundActive) {
+          isActive = evalResult->first;
+          isVersionCondition = evalResult->second;
+        }
+      } else if (validateIfConfigCondition(Condition, Context, Diags)) {
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
