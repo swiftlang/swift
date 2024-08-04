@@ -6316,7 +6316,9 @@ public:
           SILType::getPrimitiveObjectType(indexedElementType);
         auto substTargetElementSILType =
           targetElementSILType.subst(F.getModule(),
-                                     substTypes, substConformances);
+                                     substTypes, substConformances,
+                                     CanGenericSignature(),
+                                     SubstFlags::PreservePackExpansionLevel);
         requireSameType(indexedElementSILType, substTargetElementSILType,
                         "lanewise-substituted pack element type didn't "
                         "match expected element type");
