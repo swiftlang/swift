@@ -123,8 +123,12 @@ unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext) {
 
 bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
                                                   BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts
-    .isCustomConditionalCompilationFlagSet(cName.unbridged());
+  ASTContext &ctx = cContext.unbridged();
+  auto name = cName.unbridged();
+  if (name.starts_with("$") && ctx.LangOpts.hasFeature(name.drop_front()))
+    return true;
+
+  return ctx.LangOpts.isCustomConditionalCompilationFlagSet(name);
 }
 
 bool BridgedASTContext_langOptsHasFeatureNamed(BridgedASTContext cContext,
