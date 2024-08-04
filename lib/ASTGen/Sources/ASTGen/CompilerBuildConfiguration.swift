@@ -11,13 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
+import SwiftDiagnostics
 import SwiftIfConfig
+import SwiftParser
 import SwiftSyntax
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
+  let conditionLoc: BridgedSourceLoc
 
   func isCustomConditionSet(name: String) throws -> Bool {
     var name = name
@@ -63,6 +66,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
         ctx.canImport(
           importPath: bridgedImportPathStr,
+          location: conditionLoc,
           versionKind: cVersionKind,
           versionComponents: versionComponentsBuf.baseAddress,
           numVersionComponents: versionComponentsBuf.count
@@ -154,12 +158,15 @@ public func configuredRegions(
   cRegionsOut: UnsafeMutablePointer<UnsafeMutablePointer<BridgedIfConfigClauseRangeInfo>?>
 ) -> Int {
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
-  let configuration = CompilerBuildConfiguration(ctx: astContext)
+  let configuration = CompilerBuildConfiguration(
+    ctx: astContext,
+    conditionLoc: sourceFilePtr.pointee.sourceLoc(at: AbsolutePosition(utf8Offset: 0))
+  )
   let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
 
   var cRegions: [BridgedIfConfigClauseRangeInfo] = []
 
-  // Keep track of the enclosing #ifs so that we can emit and "#endif" directive
+  // Keep track of the enclosing #ifs so that we can emit an "#endif" directive
   // right before moving on to the next #if (and at the end).
   var ifConfigStack: [IfConfigDeclSyntax] = []
 

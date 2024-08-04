@@ -252,9 +252,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCanImportVersion : size_t {
   CanImportUnderlyingVersion,
 };
 
-SWIFT_NAME("BridgedASTContext.canImport(self:importPath:versionKind:versionComponents:numVersionComponents:)")
+SWIFT_NAME("BridgedASTContext.canImport(self:importPath:location:versionKind:versionComponents:numVersionComponents:)")
 bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  BridgedStringRef importPath,
+                                 BridgedSourceLoc canImportLoc,
                                  BridgedCanImportVersion versionKind,
                                  const SwiftInt * _Nullable versionComponents,
                                  SwiftInt numVersionComponents);

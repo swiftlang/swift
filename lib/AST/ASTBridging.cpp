@@ -216,6 +216,7 @@ SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(BridgedASTContext cC
 
 bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  BridgedStringRef importPath,
+                                 BridgedSourceLoc canImportLoc,
                                  BridgedCanImportVersion versionKind,
                                  const SwiftInt * _Nullable versionComponents,
                                  SwiftInt numVersionComponents) {
@@ -240,15 +241,11 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
     break;
   }
 
-  // FIXME: The source location here is empty because build configurations
-  // are supposed to be completely separated from source code. We could re-plumb
-  // things to have any errors reported up through the "canImportModule"
-  // API.
   ImportPath::Module::Builder builder(
       cContext.unbridged(), importPath.unbridged(), /*separator=*/'.',
-      SourceLoc());
+      canImportLoc.unbridged());
   return cContext.unbridged().canImportModule(
-      builder.get(), SourceLoc(), version,
+      builder.get(), canImportLoc.unbridged(), version,
       versionKind == CanImportUnderlyingVersion);
 }
 
