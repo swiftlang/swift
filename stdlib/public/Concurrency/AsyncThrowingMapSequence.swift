@@ -154,7 +154,9 @@ extension AsyncThrowingMapSequence: AsyncSequence {
         return nil
       }
       do {
-        return try await transform(element)
+        nonisolated(unsafe) let t = transform
+        nonisolated(unsafe) let e = element
+        return try await t(e)
       } catch {
         finished = true
         throw error   

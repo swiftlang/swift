@@ -412,7 +412,8 @@ extension AsyncThrowingStream {
 
           state.continuation = nil
           unlock()
-          continuation.resume(returning: value)
+          nonisolated(unsafe) let v = value
+          continuation.resume(returning: v)
         }
       } else {
         if state.terminal == nil {

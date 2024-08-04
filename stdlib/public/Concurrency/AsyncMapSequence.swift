@@ -130,7 +130,9 @@ extension AsyncMapSequence: AsyncSequence {
       guard let element = try await baseIterator.next(isolation: actor) else {
         return nil
       }
-      return await transform(element)
+      nonisolated(unsafe) let unsafeTransform = transform
+      nonisolated(unsafe) let unsafeElement = element
+      return await unsafeTransform(unsafeElement)
     }
   }
 

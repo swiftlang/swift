@@ -118,7 +118,10 @@ extension AsyncIteratorProtocol {
   @inlinable
   public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
     do {
-      return try await next()
+      nonisolated(unsafe) var this = self
+      let result = try await this.next()
+      self = this
+      return result
     } catch {
       throw error as! Failure
     }

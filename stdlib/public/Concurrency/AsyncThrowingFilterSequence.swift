@@ -153,7 +153,8 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
           return nil
         }
         do {
-          if try await isIncluded(element) {
+          nonisolated(unsafe) let e = element
+          if try await isIncluded(e) {
             return element
           }
         } catch {

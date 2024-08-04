@@ -3843,7 +3843,41 @@ namespace {
                  fnType->getResult().getPointer();
         };
 
-        if (!willDoubleError() &&
+        bool shouldSuppressError = willDoubleError();
+
+        // See if we are calling a function typed decl ref. In such a case, see
+        // if the decl ref has nonisolated(unsafe) attached to it and if so,
+        // suppress the error.
+        if (auto *declRef = dyn_cast<DeclRefExpr>(apply->getFn())) {
+          if (auto *nonisolatedAttr = declRef->getDecl()
+                                          ->getAttrs()
+                                          .getAttribute<NonisolatedAttr>()) {
+            if (nonisolatedAttr->isUnsafe()) {
+              shouldSuppressError = true;
+            }
+          }
+        }
+
+        // See if we are calling a method on a nonisolated(unsafe) declref. In
+        // such a case, ignore our result.
+        if (auto *innerCall = dyn_cast<DotSyntaxCallExpr>(apply->getFn())) {
+          auto *base = innerCall->getBase();
+          if (auto *li = dyn_cast<LoadExpr>(base))
+            base = li->getSubExpr();
+          else if (auto *inoutExpr = dyn_cast<InOutExpr>(base))
+            base = inoutExpr->getSubExpr();
+          if (auto *declRef = dyn_cast<DeclRefExpr>(base)) {
+            if (auto *nonisolatedAttr = declRef->getDecl()
+                                            ->getAttrs()
+                                            .getAttribute<NonisolatedAttr>()) {
+              if (nonisolatedAttr->isUnsafe()) {
+                shouldSuppressError = true;
+              }
+            }
+          }
+        }
+
+        if (!shouldSuppressError &&
             diagnoseNonSendableTypes(fnType->getResult(), getDeclContext(),
                                      /*inDerivedConformance*/ Type(),
                                      apply->getLoc(),

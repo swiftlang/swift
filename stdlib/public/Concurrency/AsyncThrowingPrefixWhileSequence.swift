@@ -150,8 +150,9 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       if !predicateHasFailed, let nextElement = try await baseIterator.next(isolation: actor) {
-        do { 
-          if try await predicate(nextElement) {
+        do {
+          nonisolated(unsafe) let e = nextElement
+          if try await predicate(e) {
             return nextElement
           } else {
             predicateHasFailed = true

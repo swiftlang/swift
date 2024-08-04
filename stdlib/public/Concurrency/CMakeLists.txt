@@ -11,7 +11,9 @@
 #===----------------------------------------------------------------------===#
 
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
-set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+  -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims
+  -strict-concurrency=complete)
 
 set(swift_concurrency_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

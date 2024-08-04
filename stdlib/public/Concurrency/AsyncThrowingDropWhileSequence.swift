@@ -172,7 +172,8 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
           return nil
         }
         do {
-          if try await predicate(element) == false {
+          nonisolated(unsafe) let e = element
+          if try await predicate(e) == false {
             doneDropping = true
             return element
           }
