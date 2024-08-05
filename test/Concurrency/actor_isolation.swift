@@ -187,6 +187,9 @@ extension MyActor {
     set { }
   }
 
+  // expected-warning@+1{{'nonisolated(unsafe)' has no effect on instance method 'nonisolatedUnsafe(otherActor:)', consider using 'nonisolated'}}{{3-14=nonisolated}}
+  nonisolated(unsafe) func nonisolatedUnsafe(otherActor: MyActor) -> Int { }
+
   nonisolated func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
     _ = mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from a nonisolated}}

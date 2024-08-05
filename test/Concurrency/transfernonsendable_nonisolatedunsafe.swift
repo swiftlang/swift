@@ -507,6 +507,7 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
   case second
 
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject: NonSendableKlass { NonSendableKlass() }
+  // expected-warning@-1{{'nonisolated(unsafe)' has no effect on property 'nonIsolatedUnsafeVarObject', consider using 'nonisolated'}}
 
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeVarObject)
@@ -605,6 +606,7 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
   nonisolated(unsafe) let nonIsolatedUnsafeLetObject = NonSendableKlass()
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject = NonSendableKlass()
   nonisolated(unsafe) var nonIsolatedUnsafeVarComputedObject: NonSendableKlass { NonSendableKlass() }
+  // expected-warning@-1{{'nonisolated(unsafe)' has no effect on property 'nonIsolatedUnsafeVarComputedObject', consider using 'nonisolated'}}
 
   var t: T? = nil
 
@@ -646,6 +648,7 @@ enum NonIsolatedUnsafeComputedEnum: Sendable {
   case second
 
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject: NonSendableKlass { NonSendableKlass() }
+  // expected-warning@-1{{'nonisolated(unsafe)' has no effect on property 'nonIsolatedUnsafeVarObject', consider using 'nonisolated'}}
 
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeVarObject)
@@ -668,6 +671,7 @@ struct NonIsolatedUnsafeFieldNonSendableStruct {
   nonisolated(unsafe) let nonIsolatedUnsafeLetObject = NonSendableKlass()
   nonisolated(unsafe) var nonIsolatedUnsafeVarObject = NonSendableKlass()
   nonisolated(unsafe) var nonIsolatedUnsafeVarComputedObject: NonSendableKlass { NonSendableKlass() }
+  // expected-warning@-1{{'nonisolated(unsafe)' has no effect on property 'nonIsolatedUnsafeVarComputedObject', consider using 'nonisolated'}}
 
   let letObject = NonSendableKlass()
   var varObject = NonSendableKlass()

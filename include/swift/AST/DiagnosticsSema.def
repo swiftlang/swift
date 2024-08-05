@@ -5738,6 +5738,10 @@ WARNING(nonisolated_unsafe_sendable_actor_constant,none,
      "'nonisolated(unsafe)' is unnecessary for a constant actor-isolated "
      "property with 'Sendable' type %0, consider removing it",
      (Type))
+WARNING(nonisolated_unsafe_uneffective_on_funcs,none,
+     "'nonisolated(unsafe)' has no effect on %0 %1, "
+     "consider using 'nonisolated'",
+     (DescriptiveDeclKind, const ValueDecl*))
 ERROR(nonisolated_non_sendable,none,
       "'nonisolated' can not be applied to variable with non-'Sendable' "
       "type %0",
