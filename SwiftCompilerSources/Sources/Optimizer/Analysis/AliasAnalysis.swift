@@ -574,11 +574,7 @@ private enum MemoryLocation {
   var isLetValue: Bool {
     switch self {
     case .memoryAddress(let addr):
-      switch addr.accessBase {
-        case .global(let global): return global.isLet
-        case .class(let rea):     return rea.fieldIsLet
-        default:                  return false
-      }
+      return addr.accessBase.isLet
     case .modifyAccessScope:
       return false
     }
