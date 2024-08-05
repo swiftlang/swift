@@ -19,7 +19,6 @@
 #include "DemanglerAssert.h"
 #include "RemanglerBase.h"
 #include "swift/AST/Ownership.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
