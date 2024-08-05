@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_foreach -o %t/main
 
-// This unusual use of 'sh' allows the path of the profraw file to be
-// substituted by %target-run.
 // RUN: %target-codesign %t/main
-// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
+// RUN: env %env-LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // need to move counts attached to expr for this
@@ -18,7 +16,6 @@
 
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
 
 // UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
