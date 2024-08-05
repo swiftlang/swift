@@ -142,12 +142,12 @@ protocol P {
   func foo(x : () -> ()) -> () {}
 
   func bar(x : () -> ()) -> () {}
-  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from protocol requirement 'bar(x:)' into actor-isolated implementation}}
+  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from caller of protocol requirement 'bar(x:)' into actor-isolated implementation}}
 
   func foo2<T>(x : T) -> () {}
 
   func bar2<T>(x : T) -> () {}
-  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from protocol requirement 'bar2(x:)' into actor-isolated implementation}}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar2(x:)' into actor-isolated implementation}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -174,12 +174,12 @@ class Sub : Super {
   override nonisolated func foo(x : () -> ()) async {}
 
   override nonisolated func bar(x : () -> ()) async {}
-  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from superclass instance method 'bar(x:)' into nonisolated override}}
+  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from caller of superclass instance method 'bar(x:)' into nonisolated override}}
 
   override nonisolated func foo2<T>(x: T) async {}
 
   override nonisolated func bar2<T>(x: T) async {}
-  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from superclass instance method 'bar2(x:)' into nonisolated override}}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -216,8 +216,8 @@ class SuperWUnsafeSubscript {
 class SubWUnsafeSubscript : SuperWUnsafeSubscript {
   override nonisolated subscript<T>(x : T) -> Int {
     get async {
-      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from superclass subscript 'subscript(_:)' into nonisolated override}}
-      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from superclass getter for subscript 'subscript(_:)' into nonisolated override}}
+      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from caller of superclass subscript 'subscript(_:)' into nonisolated override}}
+      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from caller of superclass getter for subscript 'subscript(_:)' into nonisolated override}}
       // there really shouldn't be two warnings produced here, see rdar://110846040 (Sendable diagnostics reported twice for subscript getters)
       return 0
     }

@@ -270,7 +270,7 @@ protocol AsyncProto {
 }
 
 extension A1: AsyncProto {
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable parameter type 'NotConcurrent' cannot be sent from protocol requirement 'asyncMethod' into actor-isolated implementation}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMethod' into actor-isolated implementation}}
 }
 
 protocol MainActorProto {
@@ -279,7 +279,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable parameter type 'NotConcurrent' cannot be sent from protocol requirement 'asyncMainMethod' into global actor 'SomeGlobalActor'-isolated implementation}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMainMethod' into global actor 'SomeGlobalActor'-isolated implementation}}
 }
 
 // ----------------------------------------------------------------------

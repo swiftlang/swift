@@ -5644,12 +5644,12 @@ ERROR(non_sendable_arg_exits_actor,none,
       "%kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_witness,none,
-      "non-sendable parameter type %0 cannot be sent from protocol "
-      "requirement %1 into %2 implementation",
+      "non-sendable parameter type %0 cannot be sent from caller of "
+      "protocol requirement %1 into %2 implementation",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_override,none,
-      "non-sendable parameter type %0 cannot be sent from superclass "
-      "%kind1 into %2 override",
+      "non-sendable parameter type %0 cannot be sent from caller of "
+      "superclass %kind1 into %2 override",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_objc,none,
       "non-sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
