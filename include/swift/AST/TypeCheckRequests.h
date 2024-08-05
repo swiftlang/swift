@@ -1536,7 +1536,7 @@ public:
 /// Determine the actor isolation for the given declaration.
 class ActorIsolationRequest :
     public SimpleRequest<ActorIsolationRequest,
-                         ActorIsolation(ValueDecl *),
+                         InferredActorIsolation(ValueDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1544,7 +1544,8 @@ public:
 private:
   friend SimpleRequest;
 
-  ActorIsolation evaluate(Evaluator &evaluator, ValueDecl *value) const;
+  InferredActorIsolation evaluate(Evaluator &evaluator,
+                                  ValueDecl *value) const;
 
 public:
   // Caching

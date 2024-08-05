@@ -144,6 +144,7 @@ topLevelSyncFunction(&value)
 
 class Sub: Super {
   func f() { }
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from inheritance from class 'Super'}}
 
   func g() {
     Task.detached {
