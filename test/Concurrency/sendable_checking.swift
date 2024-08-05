@@ -96,7 +96,7 @@ public actor MyActor: MyProto {
     await nonisolatedAsyncFunc1(ns1)
     // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
     // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
-    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by call to nonisolated function cannot cross actor boundary}}
+    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable result type 'NS1' cannot be sent from nonisolated context in call to global function 'nonisolatedAsyncFunc2()'}}
   }
 }
 

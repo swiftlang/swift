@@ -5656,18 +5656,31 @@ ERROR(non_sendable_param_in_objc,none,
       "boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
-ERROR(non_sendable_result_type,none,
-      "non-sendable type %0 returned by %select{call to %3 %kind2|"
-      "call from %4 context to nonisolated %kind2|"
-      "implicitly asynchronous call to %3 %kind2|"
-      "%3 %kind2 satisfying protocol requirement|"
-      "%3 overriding %kind2|"
-      "%3 '@objc' %kind2}1 cannot cross actor boundary",
-      (Type, unsigned, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_result_into_actor,none,
+      "non-sendable result type %0 cannot be sent from %2 context in call "
+      "to %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_result_exits_actor,none,
+      "non-sendable result type %0 cannot exit %2 context in call to "
+      "nonisolated %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_result_in_witness,none,
+      "non-sendable type %0 cannot be returned from %2 implementation "
+      "to caller of protocol requirement %1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_result_in_override,none,
+      "non-sendable type %0 cannot be returned from %2 override to "
+      "caller of superclass %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_result_in_objc,none,
+      "non-sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
+      "actor boundary",
+      (Type, const ValueDecl *, ActorIsolation))
+
 ERROR(non_sendable_call_result_type,none,
-      "non-sendable type %0 returned by %select{|implicitly async }1"
-      "call to %2 function cannot cross actor boundary",
-      (Type, bool, ActorIsolation))
+      "non-sendable result type %0 cannot be sent from %1 context in call "
+      "to async function",
+      (Type, ActorIsolation))
 ERROR(non_sendable_property_type,none,
       "non-sendable type %0 in %select{"
       "%select{asynchronous access to %4 %kind1|"
