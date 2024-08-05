@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -verify -sil-verify-all
+// RUN: %target-swift-frontend -emit-sil %s -verify -sil-verify-all -disable-availability-checking
 
 ////////////////////////
 // MARK: Declarations //
@@ -997,3 +997,17 @@ struct TrivialSelfTest {
 }
 
 func consumeTrivialSelfTest(_ x: consuming TrivialSelfTest) {}
+
+extension AsyncSequence where Element: Sendable {
+    consuming func iterate_bad() async { // expected-error {{missing reinitialization of inout parameter 'self' after consume}}
+        await withTaskGroup(of: Void.self) { _ in
+            var _:AsyncIterator = self.makeAsyncIterator() // expected-note {{consumed here}}
+        }
+    }
+
+    consuming func iterate_fixed() async {
+        await withTaskGroup(of: Void.self) { [seq = copy self] _ in
+            var _:AsyncIterator = seq.makeAsyncIterator()
+        }
+    }
+}
