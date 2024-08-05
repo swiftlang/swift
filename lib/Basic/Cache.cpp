@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__APPLE__)
-#include "Darwin/Cache-Mac.inc"
-#else
+//#if defined(__APPLE__)
+//#include "Darwin/Cache-Mac.inc"
+//#else
 
 //  This file implements a default caching implementation that never evicts
 //  its entries.
@@ -151,4 +151,4 @@ void CacheImpl::destroy() {
   delete static_cast<DefaultCache*>(Impl);
 }
 
-#endif // finish default implementation
+//#endif // finish default implementation
