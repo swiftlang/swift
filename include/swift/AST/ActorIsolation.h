@@ -275,9 +275,13 @@ public:
   void print(llvm::raw_ostream &os) const;
 
   void printForSIL(llvm::raw_ostream &os) const;
-
+  
+  /// Print the given isolation for diagnostics. If \c asNoun is \c false,
+  /// the participle adjective form is printed, e.g. "main actor-isolated".
+  /// Otherwise, the noun form is printed, e.g. "main actor isolation".
   void printForDiagnostics(llvm::raw_ostream &os,
-                           StringRef openingQuotationMark = "'") const;
+                           StringRef openingQuotationMark = "'",
+                           bool asNoun = false) const;
 
   SWIFT_DEBUG_DUMPER(dump());
 
@@ -287,8 +291,67 @@ public:
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
+struct IsolationSource {
+  enum Kind : uint8_t {
+    /// Isolation is written in an explicit attribute.
+    Explicit,
+    /// Isolation is inferred from the enclosing lexical context.
+    LexicalContext,
+    /// Isolation is inferred from conformance to a protocol.
+    Conformance,
+    /// Isolation is inherited from a superclass.
+    Superclass,
+    /// Isolation is inferred from an overridden superclass method.
+    Override,
+    /// Isolation is inferred from \c @main.
+    MainFunction,
+    /// Isolation is inferred in top-level code.
+    TopLevelCode,
+    /// Unspecified isolation, which defaults to \c nonisolated.
+    None,
+  };
+
+  using InferenceSource =
+      llvm::PointerUnion<Decl *, AbstractClosureExpr *>;
+
+  /// The declaration with the original isolation attribute.
+  InferenceSource inferenceSource;
+  Kind kind;
+
+  IsolationSource(InferenceSource inferenceSource = nullptr,
+                  Kind kind = Kind::None)
+      : inferenceSource(inferenceSource), kind(kind) {}
+
+  bool isInferred() const {
+    return (kind != None) && (kind != Explicit);
+  }
+
+  void printForDiagnostics(llvm::raw_ostream &os,
+                           StringRef openingQuotationMark = "'") const;
+};
+
+struct InferredActorIsolation {
+  ActorIsolation isolation;
+  IsolationSource source;
+
+  static InferredActorIsolation forUnspecified() {
+    return {
+      ActorIsolation::forUnspecified(),
+      IsolationSource()
+    };
+  }
+
+  bool preconcurrency() const {
+    return isolation.preconcurrency();
+  }
+};
+
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
+
+/// Infer the actor isolation of the given declaration, including
+/// the source of isolation inference.
+InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
 
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation

@@ -217,6 +217,7 @@ class MainActorPreconcurrency {}
 class InferMainActorPreconcurrency: MainActorPreconcurrency {
   static func predatesConcurrency() {}
   // expected-note@-1 {{calls to static method 'predatesConcurrency()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from inheritance from class 'MainActorPreconcurrency'}}
 }
 
 nonisolated func blah() {

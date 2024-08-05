@@ -3764,16 +3764,22 @@ namespace {
           }
         } else {
           if (calleeDecl) {
+            auto calleeIsolation = getInferredActorIsolation(calleeDecl);
             auto preconcurrency = getContextIsolation().preconcurrency() ||
-              getActorIsolation(calleeDecl).preconcurrency();
+                calleeIsolation.preconcurrency();
 
             ctx.Diags.diagnose(
-                               apply->getLoc(), diag::actor_isolated_call_decl,
-                               *unsatisfiedIsolation,
-                               calleeDecl,
-                               getContextIsolation())
-            .warnUntilSwiftVersionIf(preconcurrency, 6);
+              apply->getLoc(), diag::actor_isolated_call_decl,
+              *unsatisfiedIsolation,
+              calleeDecl,
+              getContextIsolation())
+                .warnUntilSwiftVersionIf(preconcurrency, 6);
             calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
+            if (auto source = calleeIsolation.source.isInferred()) {
+              calleeDecl->diagnose(diag::actor_isolation_source,
+                                   calleeIsolation.isolation,
+                                   calleeIsolation.source);
+            }
           } else {
             ctx.Diags.diagnose(
                                apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
@@ -4714,7 +4720,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
 }
 
 /// Infer isolation from witnessed protocol requirements.
-static std::optional<ActorIsolation>
+static std::optional<InferredActorIsolation>
 getIsolationFromWitnessedRequirements(ValueDecl *value) {
   // Associated types cannot have isolation, so there's no such inference for
   // type witnesses.
@@ -4818,19 +4824,25 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
   if (isolatedRequirements.size() != 1)
     return std::nullopt;
 
-  return std::get<1>(isolatedRequirements.front());
+  auto requirement = isolatedRequirements.front();
+  auto isolation = std::get<1>(requirement);
+  auto *protocol = std::get<0>(requirement)->getProtocol();
+  return InferredActorIsolation{
+    isolation,
+    IsolationSource(protocol, IsolationSource::Conformance)
+  };
 }
 
 /// Compute the isolation of a nominal type from the conformances that
 /// are directly specified on the type.
-static std::optional<ActorIsolation>
+static std::optional<InferredActorIsolation>
 getIsolationFromConformances(NominalTypeDecl *nominal) {
   auto &ctx = nominal->getASTContext();
 
   if (isa<ProtocolDecl>(nominal))
     return std::nullopt;
 
-  std::optional<ActorIsolation> foundIsolation;
+  std::optional<InferredActorIsolation> foundIsolation;
   for (auto conformance :
        nominal->getLocalConformances(ConformanceLookupKind::NonStructural)) {
 
@@ -4861,11 +4873,14 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
 
     case ActorIsolation::GlobalActor:
       if (!foundIsolation) {
-        foundIsolation = protoIsolation;
+        foundIsolation = {
+          protoIsolation,
+          IsolationSource(proto, IsolationSource::Conformance)
+        };
         continue;
       }
 
-      if (*foundIsolation != protoIsolation)
+      if (foundIsolation->isolation != protoIsolation)
         return std::nullopt;
 
       break;
@@ -4876,9 +4891,9 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
 }
 
 /// Compute the isolation of a protocol
-static std::optional<ActorIsolation>
+static std::optional<InferredActorIsolation>
 getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
-  std::optional<ActorIsolation> foundIsolation;
+  std::optional<InferredActorIsolation> foundIsolation;
   bool conflict = false;
 
   auto inferIsolation = [&](ValueDecl *decl) {
@@ -4894,11 +4909,14 @@ getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
 
     case ActorIsolation::GlobalActor:
       if (!foundIsolation) {
-        foundIsolation = protoIsolation;
+        foundIsolation = {
+          protoIsolation,
+          IsolationSource(decl, IsolationSource::Conformance)
+        };
         return;
       }
 
-      if (*foundIsolation != protoIsolation)
+      if (foundIsolation->isolation != protoIsolation)
         conflict = true;
 
       return;
@@ -5312,7 +5330,7 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
   }
 }
 
-ActorIsolation ActorIsolationRequest::evaluate(
+InferredActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   auto &ctx = value->getASTContext();
 
@@ -5321,7 +5339,10 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
     auto actor = value->getDeclContext()->getSelfNominalTypeDecl();
     assert(actor && "could not find the actor that 'self' is isolated to");
-    return ActorIsolation::forActorInstanceSelf(value);
+    return {
+      ActorIsolation::forActorInstanceSelf(value),
+      IsolationSource()
+    };
   }
 
   // If this declaration has an isolated parameter, it's isolated to that
@@ -5339,7 +5360,10 @@ ActorIsolation ActorIsolationRequest::evaluate(
       actorType = paramType;
     }
     if (auto actor = actorType->getAnyActor())
-      return ActorIsolation::forActorInstanceParameter(param, *paramIdx);
+      return {
+        ActorIsolation::forActorInstanceParameter(param, *paramIdx),
+        IsolationSource()
+      };
   }
 
   // Diagnose global state that is not either immutable plus Sendable or
@@ -5427,7 +5451,10 @@ ActorIsolation ActorIsolationRequest::evaluate(
               fd->getLoc(), diag::main_function_must_be_mainActor);
         }
       }
-      return *mainIsolation;
+      return {
+        *mainIsolation,
+        IsolationSource(fd, IsolationSource::MainFunction)
+      };
     }
   }
   // If this declaration has one of the actor isolation attributes, report
@@ -5439,12 +5466,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
         checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
     }
 
-    return checkGlobalIsolation(*isolationFromAttr);
+    return {
+      checkGlobalIsolation(*isolationFromAttr),
+      IsolationSource(/*source*/nullptr, IsolationSource::Explicit)
+    };
   }
 
   // Determine the default isolation for this declaration, which may still be
   // overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
+  IsolationSource defaultIsolationSource;
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     // A @Sendable function is assumed to be actor-independent.
@@ -5466,6 +5497,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (overriddenValue) {
     // use the overridden decl's iso as the default isolation for this decl.
     defaultIsolation = getOverriddenIsolationFor(value);
+    defaultIsolationSource =
+        IsolationSource(overriddenValue, IsolationSource::Override);
     overriddenIso = defaultIsolation;
   }
 
@@ -5555,8 +5588,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
     if (func->isLocalCapture() && !func->isSendable()) {
-      switch (auto enclosingIsolation =
-                  getActorIsolationOfContext(func->getDeclContext())) {
+      auto *dc = func->getDeclContext();
+      llvm::PointerUnion<Decl *, AbstractClosureExpr *> inferenceSource;
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+        inferenceSource = closure;
+      } else {
+        inferenceSource = dc->getAsDecl();
+      }
+
+      switch (auto enclosingIsolation = getActorIsolationOfContext(dc)) {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::Unspecified:
@@ -5567,10 +5607,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
         llvm_unreachable("context cannot have erased isolation");
 
       case ActorIsolation::ActorInstance:
-        return inferredIsolation(enclosingIsolation);
+        return {
+          inferredIsolation(enclosingIsolation),
+          IsolationSource(inferenceSource, IsolationSource::LexicalContext)
+        };
 
       case ActorIsolation::GlobalActor:
-        return inferredIsolation(enclosingIsolation);
+        return {
+          inferredIsolation(enclosingIsolation),
+          IsolationSource(inferenceSource, IsolationSource::LexicalContext)
+        };
       }
     }
   }
@@ -5578,7 +5624,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this is an accessor, use the actor isolation of its storage
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    return getActorIsolation(accessor->getStorage());
+    return getInferredActorIsolation(accessor->getStorage());
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
@@ -5589,27 +5635,42 @@ ActorIsolation ActorIsolationRequest::evaluate(
              StrictConcurrency::Complete ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
-        return inferredIsolation(
+        return {
+          inferredIsolation(
             ActorIsolation::forGlobalActor(mainActor))
-                .withPreconcurrency(var->preconcurrency());
+              .withPreconcurrency(var->preconcurrency()),
+          IsolationSource(/*source*/nullptr, IsolationSource::TopLevelCode)
+        };
     }
-    if (auto isolation = getActorIsolationFromWrappedProperty(var))
-      return inferredIsolation(isolation);
+    if (auto isolation = getActorIsolationFromWrappedProperty(var)) {
+      return {
+        inferredIsolation(isolation),
+        IsolationSource(/*source*/nullptr, IsolationSource::None)
+      };
+    }
   }
 
   // If this is a dynamic replacement for another function, use the
   // actor isolation of the function it replaces.
   if (auto replacedDecl = value->getDynamicallyReplacedDecl()) {
-    if (auto isolation = getActorIsolation(replacedDecl))
-      return inferredIsolation(isolation);
+    if (auto isolation = getActorIsolation(replacedDecl)) {
+      return {
+        inferredIsolation(isolation),
+        IsolationSource(replacedDecl, IsolationSource::None)
+      };
+    }
   }
 
   if (shouldInferAttributeInContext(value->getDeclContext())) {
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
-      if (auto inferred = inferredIsolation(*witnessedIsolation))
-        return inferred;
+      if (auto inferred = inferredIsolation(witnessedIsolation->isolation)) {
+        return {
+          inferred,
+          witnessedIsolation->source
+        };
+      }
     }
 
     // If the declaration is a class with a superclass that has specified
@@ -5621,15 +5682,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
           if (superclassIsolation.requiresSubstitution()) {
             Type superclassType = classDecl->getSuperclass();
             if (!superclassType)
-              return ActorIsolation::forUnspecified();
+              return InferredActorIsolation::forUnspecified();
 
             SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
                 classDecl);
             superclassIsolation = superclassIsolation.subst(subs);
           }
 
-          if (auto inferred = inferredIsolation(superclassIsolation))
-            return inferred;
+          if (auto inferred = inferredIsolation(superclassIsolation)) {
+            return {
+              inferred,
+              IsolationSource(superclassDecl, IsolationSource::Superclass)
+            };
+          }
         }
       }
     }
@@ -5637,17 +5702,26 @@ ActorIsolation ActorIsolationRequest::evaluate(
     if (auto nominal = dyn_cast<NominalTypeDecl>(value)) {
       // If the declaration is a nominal type and any of the protocols to which
       // it directly conforms is isolated to a global actor, use that.
-      if (auto conformanceIsolation = getIsolationFromConformances(nominal))
-        if (auto inferred = inferredIsolation(*conformanceIsolation))
-          return inferred;
+      if (auto conformanceIsolation = getIsolationFromConformances(nominal)) {
+        if (auto inferred = inferredIsolation(conformanceIsolation->isolation)) {
+          return {
+            inferred,
+            conformanceIsolation->source
+          };
+        }
+      }
 
       // For a protocol, inherit isolation from the directly-inherited
       // protocols.
       if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
         if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
           if (auto protoIsolation = getIsolationFromInheritedProtocols(proto)) {
-            if (auto inferred = inferredIsolation(*protoIsolation))
-              return inferred;
+            if (auto inferred = inferredIsolation(protoIsolation->isolation)) {
+              return {
+                inferred,
+                protoIsolation->source
+              };
+            }
           }
         }
       }
@@ -5655,8 +5729,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
       // Before Swift 6: If the declaration is a nominal type and any property
       // wrappers on its stored properties require isolation, use that.
       if (auto wrapperIsolation = getIsolationFromWrappers(nominal)) {
-        if (auto inferred = inferredIsolation(*wrapperIsolation))
-          return inferred;
+        if (auto inferred = inferredIsolation(*wrapperIsolation)) {
+          return {
+            inferred,
+            IsolationSource()
+          };
+        }
       }
     }
   }
@@ -5671,15 +5749,23 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
       if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-        return inferredIsolation(*isolationFromAttr, onlyGlobal);
+        return {
+          inferredIsolation(*isolationFromAttr, onlyGlobal),
+          IsolationSource(ext, IsolationSource::Explicit)
+        };
       }
     }
 
     // If the declaration is in a nominal type (or extension thereof) that
     // has isolation, use that.
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (auto selfTypeIsolation = getActorIsolation(selfTypeDecl))
-        return inferredIsolation(selfTypeIsolation, onlyGlobal);
+      auto selfTypeIsolation = getInferredActorIsolation(selfTypeDecl);
+      if (selfTypeIsolation.isolation) {
+        return {
+          inferredIsolation(selfTypeIsolation.isolation, onlyGlobal),
+          selfTypeIsolation.source
+        };
+      }
     }
   }
 
@@ -5687,14 +5773,20 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (value->getAttrs().hasAttribute<IBActionAttr>()) {
     ASTContext &ctx = value->getASTContext();
     if (Type mainActor = ctx.getMainActorType()) {
-      return inferredIsolation(
+      return {
+        inferredIsolation(
           ActorIsolation::forGlobalActor(mainActor)
-              .withPreconcurrency(true));
+              .withPreconcurrency(true)),
+        IsolationSource(),
+      };
     }
   }
 
   // Default isolation for this member.
-  return checkGlobalIsolation(defaultIsolation);
+  return {
+    checkGlobalIsolation(defaultIsolation),
+    defaultIsolationSource
+  };
 }
 
 bool HasIsolatedSelfRequest::evaluate(
