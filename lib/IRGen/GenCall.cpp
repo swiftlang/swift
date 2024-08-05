@@ -4483,12 +4483,12 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
       for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
         llvm::Value *elt = values[combined.errorValueMapping[i]];
         auto *nativeTy = structTy->getElementType(i);
-        elt = convertForAsyncDirect(IGF, elt, nativeTy, /*forExtraction*/ true);
+        elt = convertForDirectError(IGF, elt, nativeTy, /*forExtraction*/ true);
         errorExplosion.add(elt);
       }
     } else {
       auto *converted =
-          convertForAsyncDirect(IGF, values[combined.errorValueMapping[0]],
+          convertForDirectError(IGF, values[combined.errorValueMapping[0]],
                                 combined.combinedTy, /*forExtraction*/ true);
       errorExplosion.add(converted);
     }
@@ -4506,12 +4506,12 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
             dyn_cast<llvm::StructType>(nativeSchema.getExpandedType(IGF.IGM))) {
       for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
         auto *nativeTy = structTy->getElementType(i);
-        auto *converted = convertForAsyncDirect(IGF, values[i], nativeTy,
+        auto *converted = convertForDirectError(IGF, values[i], nativeTy,
                                                 /*forExtraction*/ true);
         resultExplosion.add(converted);
       }
     } else {
-      auto *converted = convertForAsyncDirect(
+      auto *converted = convertForDirectError(
           IGF, values[0], combined.combinedTy, /*forExtraction*/ true);
       resultExplosion.add(converted);
     }
@@ -5379,7 +5379,7 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   return loaded;
 }
 
-llvm::Value *irgen::convertForAsyncDirect(IRGenFunction &IGF,
+llvm::Value *irgen::convertForDirectError(IRGenFunction &IGF,
                                           llvm::Value *value, llvm::Type *toTy,
                                           bool forExtraction) {
   auto &Builder = IGF.Builder;
@@ -5389,12 +5389,9 @@ llvm::Value *irgen::convertForAsyncDirect(IRGenFunction &IGF,
     if (toTy->isPointerTy()) {
       if (fromTy->isPointerTy())
         return Builder.CreateBitCast(value, toTy);
-      if (fromTy == IGF.IGM.IntPtrTy)
-        return Builder.CreateIntToPtr(value, toTy);
+      return Builder.CreateIntToPtr(value, toTy);
     } else if (fromTy->isPointerTy()) {
-      if (toTy == IGF.IGM.IntPtrTy) {
-        return Builder.CreatePtrToInt(value, toTy);
-      }
+      return Builder.CreatePtrToInt(value, toTy);
     }
 
     if (forExtraction) {
@@ -5852,12 +5849,12 @@ void IRGenFunction::emitScalarReturn(SILType returnResultType,
         for (unsigned i = 0, e = native.size(); i != e; ++i) {
           llvm::Value *elt = native.claimNext();
           auto *nativeTy = structTy->getElementType(i);
-          elt = convertForAsyncDirect(*this, elt, nativeTy,
+          elt = convertForDirectError(*this, elt, nativeTy,
                                       /*forExtraction*/ false);
           nativeAgg = Builder.CreateInsertValue(nativeAgg, elt, i);
         }
       } else {
-        nativeAgg = convertForAsyncDirect(*this, native.claimNext(), combinedTy,
+        nativeAgg = convertForDirectError(*this, native.claimNext(), combinedTy,
                                           /*forExtraction*/ false);
       }
     }
@@ -6189,7 +6186,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
           for (unsigned i = 0, e = result.size(); i != e; ++i) {
             llvm::Value *elt = result.claimNext();
             auto *nativeTy = structTy->getElementType(i);
-            elt = convertForAsyncDirect(IGF, elt, nativeTy,
+            elt = convertForDirectError(IGF, elt, nativeTy,
                                         /*forExtraction*/ false);
             nativeAgg = IGF.Builder.CreateInsertValue(nativeAgg, elt, i);
           }
@@ -6199,7 +6196,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
             nativeResultsStorage.push_back(out.claimNext());
           }
         } else {
-          auto *converted = convertForAsyncDirect(
+          auto *converted = convertForDirectError(
               IGF, result.claimNext(), combinedTy, /*forExtraction*/ false);
           nativeResultsStorage.push_back(converted);
         }
