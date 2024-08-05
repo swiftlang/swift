@@ -2216,7 +2216,7 @@ struct DiagnosticEvaluator final
                      << "        Rep: "
                      << *info->getValueMap().getRepresentative(transferredVal)
                      << "        Dynamic Isolation Region: ";
-        isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+        isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
         llvm::dbgs() << '\n');
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     auto nonTransferrableValue =
@@ -2236,7 +2236,7 @@ struct DiagnosticEvaluator final
                      << "        Rep: "
                      << *info->getValueMap().getRepresentative(inoutSendingVal)
                      << "        Dynamic Isolation Region: ";
-        isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+        isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
         llvm::dbgs() << '\n');
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     auto nonTransferrableValue =
@@ -2257,7 +2257,7 @@ struct DiagnosticEvaluator final
                      << "        Rep: "
                      << *info->getValueMap().getRepresentative(transferredVal)
                      << "        Dynamic Isolation Region: ";
-        isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+        isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
         llvm::dbgs() << '\n');
 
     auto *self = const_cast<DiagnosticEvaluator *>(this);
