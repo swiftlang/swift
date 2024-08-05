@@ -2551,7 +2551,7 @@ Parser::parseMacroRoleAttribute(
   SmallVector<TypeExpr *, 2> conformances;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
-      /*AllowSepAfterLast=*/true, diag::expected_rparen_expr_list, [&] {
+      /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
         ParserStatus status;
 
         if (consumeIf(tok::code_complete)) {

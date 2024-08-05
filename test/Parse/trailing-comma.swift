@@ -57,11 +57,6 @@ struct S {
     #foo(1, 2,)
 }
 
-// Macro Role Attribute
-
-@attached(extension, conformances: OptionSet,)
-macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
-
 // String Literal Interpolation
 
 "\(1,)"
@@ -73,6 +68,9 @@ if #unavailable(iOS 15, watchOS 9,) { }
 if #available(iOS 15,) { }  // expected-error {{expected platform name}}
 
 // Built-in Attributes
+
+@attached(extension, conformances: OptionSet,)  // expected-error {{unexpected ',' separator}}
+macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
 
 @inline(never,) // expected-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
 func foo() { }
