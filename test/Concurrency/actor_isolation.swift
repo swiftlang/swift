@@ -153,13 +153,13 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   // these still do need an await in Swift 5
   _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
   _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
-  // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
+  // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' cannot be sent into global actor 'SomeGlobalActor'-isolated context in call to property 'point'}}
 
   _ = formance.counter
   _ = anno.counter
 
   // these will always need an await
-  _ = await (formance as MainCounter).counter // expected-warning {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
+  _ = await (formance as MainCounter).counter // expected-warning {{non-sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated property 'polygon' cannot cross actor boundary}}
@@ -1662,7 +1662,7 @@ actor SafeMutatingCall {
 
 
 @MainActor
-func testLocalFunctoinIsolation() {
+func testLocalFunctionIsolation() {
   func isolatedLocalFn() {}
   // expected-note@-1 {{calls to local function 'isolatedLocalFn()' from outside of its actor context are implicitly asynchronous}}
   // expected-note@-2 {{main actor isolation inferred from enclosing context}}

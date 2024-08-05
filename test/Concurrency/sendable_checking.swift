@@ -142,12 +142,12 @@ protocol P {
   func foo(x : () -> ()) -> () {}
 
   func bar(x : () -> ()) -> () {}
-  // expected-warning@-1 {{non-sendable type '() -> ()' in parameter of the protocol requirement satisfied by actor-isolated instance method 'bar(x:)' cannot cross actor boundary}}
+  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from protocol requirement 'bar(x:)' into actor-isolated implementation}}
 
   func foo2<T>(x : T) -> () {}
 
   func bar2<T>(x : T) -> () {}
-  // expected-warning@-1 {{non-sendable type 'T' in parameter of the protocol requirement satisfied by actor-isolated instance method 'bar2(x:)' cannot cross actor boundary}}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from protocol requirement 'bar2(x:)' into actor-isolated implementation}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -174,12 +174,12 @@ class Sub : Super {
   override nonisolated func foo(x : () -> ()) async {}
 
   override nonisolated func bar(x : () -> ()) async {}
-  // expected-warning@-1 {{non-sendable type '() -> ()' in parameter of superclass method overridden by nonisolated instance method 'bar(x:)' cannot cross actor boundary}}
+  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from superclass instance method 'bar(x:)' into nonisolated override}}
 
   override nonisolated func foo2<T>(x: T) async {}
 
   override nonisolated func bar2<T>(x: T) async {}
-  // expected-warning@-1 {{non-sendable type 'T' in parameter of superclass method overridden by nonisolated instance method 'bar2(x:)' cannot cross actor boundary}}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from superclass instance method 'bar2(x:)' into nonisolated override}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -216,8 +216,8 @@ class SuperWUnsafeSubscript {
 class SubWUnsafeSubscript : SuperWUnsafeSubscript {
   override nonisolated subscript<T>(x : T) -> Int {
     get async {
-      // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated subscript 'subscript(_:)' cannot cross actor boundary}}
-      // expected-warning@-2{{non-sendable type 'T' in parameter of superclass method overridden by nonisolated getter for subscript 'subscript(_:)' cannot cross actor boundary}}
+      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from superclass subscript 'subscript(_:)' into nonisolated override}}
+      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from superclass getter for subscript 'subscript(_:)' into nonisolated override}}
       // there really shouldn't be two warnings produced here, see rdar://110846040 (Sendable diagnostics reported twice for subscript getters)
       return 0
     }
@@ -269,10 +269,10 @@ final class NonSendable {
     // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
     _ = await x
-    // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+    // expected-warning@-1 {{non-sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
 
     _ = await self.x
-      // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+      // expected-warning@-1 {{non-sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   }
 
   @MainActor
@@ -294,7 +294,7 @@ func testNonSendableBaseArg() async {
   // expected-tns-note @-2 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   _ = await t.x
-  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   // expected-tns-note @-2 {{access can happen concurrently}}
 }
 
@@ -309,7 +309,7 @@ func testNonSendableBaseArg2() async {
   // expected-tns-note @-4 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   _ = await t.y
-  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to global actor 'CustomActor'-isolated property 'y' cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'NonSendable' cannot be sent into global actor 'CustomActor'-isolated context in call to property 'y'}}
   // expected-tns-note @-2 {{access can happen concurrently}}
 }
 

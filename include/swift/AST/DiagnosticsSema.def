@@ -5635,14 +5635,27 @@ NOTE(in_derived_conformance, none,
 NOTE(in_derived_witness, none,
      "in %0 %1 for derived conformance to %2",
      (DescriptiveDeclKind, DeclName, Type))
-ERROR(non_sendable_param_type,none,
-      "non-sendable type %0 %select{passed in call to %3 %kind2|"
-      "exiting %3 context in call to nonisolated %kind2|"
-      "passed in implicitly asynchronous call to %3 %kind2|"
-      "in parameter of the protocol requirement satisfied by %3 %kind2|"
-      "in parameter of superclass method overridden by %3 %kind2|"
-      "in parameter of %3 '@objc' %kind2}1 cannot cross actor boundary",
-      (Type, unsigned, const ValueDecl *, ActorIsolation))
+
+ERROR(non_sendable_arg_into_actor,none,
+      "non-sendable type %0 cannot be sent into %2 context in call to %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_arg_exits_actor,none,
+      "non-sendable type %0 cannot exit %2 context in call to nonisolated "
+      "%kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_param_in_witness,none,
+      "non-sendable parameter type %0 cannot be sent from protocol "
+      "requirement %1 into %2 implementation",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_param_in_override,none,
+      "non-sendable parameter type %0 cannot be sent from superclass "
+      "%kind1 into %2 override",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_param_in_objc,none,
+      "non-sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
+      "boundary",
+      (Type, const ValueDecl *, ActorIsolation))
+
 ERROR(non_sendable_result_type,none,
       "non-sendable type %0 returned by %select{call to %3 %kind2|"
       "call from %4 context to nonisolated %kind2|"

@@ -1121,6 +1121,28 @@ bool swift::diagnoseNonSendableTypes(
   return anyMissing;
 }
 
+static
+Diag<Type, const ValueDecl *, ActorIsolation>
+getSendableParamDiag(SendableCheckReason refKind) {
+  switch (refKind) {
+  case SendableCheckReason::CrossActor:
+  case SendableCheckReason::SynchronousAsAsync:
+    return diag::non_sendable_arg_into_actor;
+
+  case SendableCheckReason::ExitingActor:
+    return diag::non_sendable_arg_exits_actor;
+
+  case SendableCheckReason::Conformance:
+    return diag::non_sendable_param_in_witness;
+
+  case SendableCheckReason::Override:
+    return diag::non_sendable_param_in_override;
+
+  case SendableCheckReason::ObjC:
+    return diag::non_sendable_param_in_objc;
+  }
+}
+
 bool swift::diagnoseNonSendableTypesInReference(
     Expr *base, ConcreteDeclRef declRef, const DeclContext *fromDC,
     SourceLoc refLoc, SendableCheckReason refKind,
@@ -1155,8 +1177,8 @@ bool swift::diagnoseNonSendableTypesInReference(
             base->getType(),
             fromDC, derivedConformanceType,
             base->getStartLoc(),
-            diag::non_sendable_param_type,
-            (unsigned)refKind, declRef.getDecl(),
+            getSendableParamDiag(refKind),
+            declRef.getDecl(),
             getActorIsolation()))
       return true;
   }
@@ -1171,8 +1193,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                diag::non_sendable_param_type,
-            (unsigned)refKind, function, getActorIsolation()))
+                getSendableParamDiag(refKind),
+                function, getActorIsolation()))
           return true;
       }
     }
@@ -1217,8 +1239,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                diag::non_sendable_param_type,
-                (unsigned)refKind, subscript, getActorIsolation()))
+                getSendableParamDiag(refKind),
+                subscript, getActorIsolation()))
           return true;
       }
     }
