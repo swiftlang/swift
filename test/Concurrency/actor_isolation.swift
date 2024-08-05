@@ -1662,3 +1662,33 @@ actor SafeMutatingCall {
     _ = try await self.iterator.next()
   }
 }
+
+
+@MainActor
+func testLocalFunctoinIsolation() {
+  func isolatedLocalFn() {}
+  // expected-note@-1 {{calls to local function 'isolatedLocalFn()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from enclosing context}}
+
+
+  nonisolated func nonisolatedLocalFn() {
+    isolatedLocalFn()
+    // expected-error@-1 {{call to main actor-isolated local function 'isolatedLocalFn()' in a synchronous nonisolated context}}
+  }
+}
+
+class SuperWithIsolatedMethod {
+  @MainActor
+  func isolatedMethod() {}
+}
+
+class InferIsolationViaOverride: SuperWithIsolatedMethod {
+  override func isolatedMethod() {}
+  // expected-note@-1 {{calls to instance method 'isolatedMethod()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from overridden superclass method}}
+
+  nonisolated func callIsolated() {
+    isolatedMethod()
+    // expected-error@-1 {{call to main actor-isolated instance method 'isolatedMethod()' in a synchronous nonisolated context}}
+  }
+}
