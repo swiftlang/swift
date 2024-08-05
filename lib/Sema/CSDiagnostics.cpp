@@ -6188,7 +6188,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   if (IsMissingImport) {
-    diagnoseMissingImportForMember(Member, getDC(), loc);
+    maybeDiagnoseMissingImportForMember(Member, getDC(), loc);
     return true;
   }
 

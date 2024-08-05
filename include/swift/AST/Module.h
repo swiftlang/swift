@@ -1034,8 +1034,8 @@ public:
                           ImportFilter filter = ImportFilterKind::Exported) const;
 
   /// Lists modules that are not imported from a file and used in API.
-  void
-  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const;
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
@@ -1318,11 +1318,6 @@ inline bool DeclContext::isPackageContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
-
-/// If the import that would make the given declaration visibile is absent,
-/// emit a diagnostic and a fix-it suggesting adding the missing import.
-bool diagnoseMissingImportForMember(const ValueDecl *decl,
-                                    const DeclContext *dc, SourceLoc loc);
 
 } // end namespace swift
 
