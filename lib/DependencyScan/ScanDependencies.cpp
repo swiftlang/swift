@@ -761,7 +761,8 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(swiftBinaryDeps->headerSourceFiles),
             swiftBinaryDeps->isFramework,
             swiftBinaryDeps->isStatic,
-            create_clone(swiftBinaryDeps->moduleCacheKey.c_str())};
+            create_clone(swiftBinaryDeps->moduleCacheKey.c_str()),
+            create_clone(swiftBinaryDeps->userModuleVersion.c_str())};
       } else {
         // Clang module details
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_CLANG;

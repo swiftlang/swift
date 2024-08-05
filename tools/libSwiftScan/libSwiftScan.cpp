@@ -88,6 +88,8 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_binary_details.header_dependency);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_cache_key);
+    swiftscan_string_dispose(
+        details_impl->swift_binary_details.user_module_version);
     break;
   case SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER:
     swiftscan_string_dispose(
@@ -437,6 +439,11 @@ swiftscan_string_ref_t swiftscan_swift_binary_detail_get_module_cache_key(
   return details->swift_binary_details.module_cache_key;
 }
 
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_user_module_version(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.user_module_version;
+}
 
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 

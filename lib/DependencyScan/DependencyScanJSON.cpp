@@ -550,6 +550,10 @@ void writeJSON(llvm::raw_ostream &out,
                            swiftBinaryDeps->compiled_module_path,
                            /*indentLevel=*/5,
                            /*trailingComma=*/true);
+      writeJSONSingleField(out, "userModuleVersion",
+                           swiftBinaryDeps->user_module_version,
+                           /*indentLevel=*/5,
+                           /*trailingComma=*/true);
       // Module doc file
       if (swiftBinaryDeps->module_doc_path.data &&
           get_C_string(swiftBinaryDeps->module_doc_path)[0] != '\0')
