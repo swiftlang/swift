@@ -87,7 +87,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
 
     SmallVector<ImportedModule> imports;
     M->getImportedModules(imports, filter);
-    M->getMissingImportedModules(imports);
+    M->getImplicitImportsForModuleInterface(imports);
 
     for (ImportedModule import: imports) {
       StringRef importedName = import.importedModule->getNameStr();
@@ -338,7 +338,7 @@ static void printImports(raw_ostream &out,
   M->getImportedModules(allImports, allImportFilter);
 
   if (Opts.PrintMissingImports)
-    M->getMissingImportedModules(allImports);
+    M->getImplicitImportsForModuleInterface(allImports);
 
   ImportedModule::removeDuplicates(allImports);
   diagnoseScopedImports(ctx.Diags, allImports);

@@ -1388,7 +1388,7 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     if (!nonImportedResults.empty()) {
       auto first = cast<TypeDecl>(nonImportedResults.front().getValueDecl());
       auto nameLoc = repr->getNameLoc();
-      diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
+      maybeDiagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -1493,7 +1493,7 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
   if (nonImportedMembers) {
     const TypeDecl *first = nonImportedMembers.front().Member;
     auto nameLoc = repr->getNameLoc();
-    diagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
+    maybeDiagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
     // Don't try to recover here; we'll get more access-related diagnostics
     // downstream if we do.
     return ErrorType::get(ctx);

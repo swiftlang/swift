@@ -629,7 +629,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
     if (nonImportedResults) {
       const ValueDecl *first = nonImportedResults.front().getValueDecl();
-      diagnoseMissingImportForMember(first, DC, Loc);
+      maybeDiagnoseMissingImportForMember(first, DC, Loc);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if the type of the inaccessible decl is also inaccessible.
