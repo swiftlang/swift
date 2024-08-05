@@ -4432,7 +4432,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         for (unsigned i : combined.errorValueMapping) {
           llvm::Value *elt = nativeError.claimNext();
           auto *nativeTy = structTy->getElementType(i);
-          elt = convertForAsyncDirect(*this, elt, nativeTy,
+          elt = convertForDirectError(*this, elt, nativeTy,
                                       /*forExtraction*/ false);
           expandedResult = Builder.CreateInsertValue(expandedResult, elt, i);
         }
@@ -4443,7 +4443,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         }
       } else if (!errorSchema.getExpandedType(IGM)->isVoidTy()) {
         out =
-            convertForAsyncDirect(*this, nativeError.claimNext(),
+            convertForDirectError(*this, nativeError.claimNext(),
                                   combined.combinedTy, /*forExtraction*/ false);
       }
     } else {
