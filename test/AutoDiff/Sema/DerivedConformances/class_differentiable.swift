@@ -607,7 +607,9 @@ class WrappedProperties: Differentiable {
 // Test derived conformances in disallowed contexts.
 
 extension OtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 extension GenericOtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}

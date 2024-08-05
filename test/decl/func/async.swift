@@ -25,10 +25,10 @@ class Sub: Super {
 
 // Witness checking
 protocol P1 {
-  func g() // expected-note{{protocol requires function 'g()' with type '() -> ()'; add a stub for conformance}}
+  func g() // expected-note{{protocol requires function 'g()' with type '() -> ()'}}
 }
 
-struct ConformsToP1: P1 { // expected-error{{type 'ConformsToP1' does not conform to protocol 'P1'}}
+struct ConformsToP1: P1 { // expected-error{{type 'ConformsToP1' does not conform to protocol 'P1'}} expected-note {{add stubs for conformance}}
   func g() async { }  // expected-note{{candidate is 'async', but protocol requirement is not}}
 }
 

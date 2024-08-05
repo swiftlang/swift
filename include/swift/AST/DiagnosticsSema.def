@@ -2944,9 +2944,8 @@ NOTE(inherited_protocol_does_not_conform,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,none,
      "protocol requires "
-     "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
-     "%select{|; add a stub for conformance}3",
-     (RequirementKind, const ValueDecl *, WitnessType, bool))
+     "%select{initializer %1|function %1|property %1|subscript}0 with type %2",
+     (RequirementKind, const ValueDecl *, WitnessType))
 NOTE(missing_witnesses_general,none, "add stubs for conformance",
      ())
 NOTE(ambiguous_witnesses,none,
@@ -2960,11 +2959,10 @@ NOTE(ambiguous_witnesses_wrong_name,none,
      "subscript operators}0 with type %2",
      (RequirementKind, const ValueDecl *, WitnessType))
 NOTE(no_witnesses_type,none,
-     "protocol requires nested type %0; add nested type %0 for conformance",
+     "protocol requires nested type %0",
      (const AssociatedTypeDecl *))
 NOTE(no_witnesses_type_tuple,none,
-     "protocol requires nested type %0; add type alias %0 with underlying type %1 "
-     "for conformance",
+     "protocol requires nested type %0",
      (const AssociatedTypeDecl *, Type))
 NOTE(default_associated_type_unsatisfied_conformance,none,
      "default type %0 for associated type %1 (from protocol %2) "

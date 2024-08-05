@@ -45,6 +45,7 @@ actor A2: DistributedActor {
 // FIXME(distributed): error reporting is a bit whacky here; needs cleanup
 // expected-error@-2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 // expected-error@-3{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
+// expected-note@-4 {{add stubs for conformance}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -63,6 +64,7 @@ actor A2: DistributedActor {
 
 final class DA2: DistributedActor {
 // expected-error@-1{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
+// expected-note@-2 {{add stubs for conformance}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -84,6 +86,7 @@ final class DA2: DistributedActor {
 struct S2: DistributedActor {
   // expected-error@-1{{non-class type 'S2' cannot conform to class protocol 'DistributedActor'}}
   // expected-error@-2{{type 'S2' does not conform to protocol 'Identifiable'}}
+  // expected-note@-3 {{add stubs for conformance}}
 }
 
 // ==== -----------------------------------------------------------------------

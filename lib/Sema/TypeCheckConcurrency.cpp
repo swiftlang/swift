@@ -1644,11 +1644,10 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
 
     if (missingRequirement) {
       nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
-      missingRequirement->diagnose(diag::no_witnesses,
-                                   getProtocolRequirementKind(missingRequirement),
-                                   missingRequirement,
-                                   missingRequirement->getParameters()->get(0)->getInterfaceType(),
-                                   /*AddFixIt=*/true);
+      missingRequirement->diagnose(
+          diag::no_witnesses, getProtocolRequirementKind(missingRequirement),
+          missingRequirement,
+          missingRequirement->getParameters()->get(0)->getInterfaceType());
       return;
     }
   }

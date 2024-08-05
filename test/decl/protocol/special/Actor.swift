@@ -63,8 +63,9 @@ class C2: Actor {
 @available(SwiftStdlib 5.1, *)
 class C3: Actor {
   // expected-error@-1{{type 'C3' does not conform to protocol 'Actor'}}
-  // expected-error@-2{{non-actor type 'C3' cannot conform to the 'Actor' protocol}}
-  // expected-warning@-3{{non-final class 'C3' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{non-actor type 'C3' cannot conform to the 'Actor' protocol}}
+  // expected-warning@-4{{non-final class 'C3' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
   nonisolated func enqueue(_ job: UnownedJob) { }
 }
 
