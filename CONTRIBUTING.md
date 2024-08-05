@@ -4,9 +4,9 @@ Contributions to Swift are welcomed and encouraged!
 For contributions to the broader Swift Language project, please see the
 [Contributing to Swift guide](https://swift.org/contributing/).
 
-To give clarity of what is expected of our members, Swift has adopted the code of conduct defined by the Contributor Covenant.
-This document is used across many open source communities, and we think it articulates our values well.
-For more detail, see the [Code of Conduct](https://swift.org/code-of-conduct/).
+To give clarity of what is expected of our members, Swift has adopted the code of conduct defined by the [Contributor Covenant](http://contributor-covenant.org/).
+This document is used across many open source communities, and it articulates our values.
+For more detail, read the project's [Code of Conduct](https://swift.org/code-of-conduct/).
 
 It is highly recommended that you become familiar with using Swift in your own projects before contributing directly to the language itself.
 We put together handy [Getting Started](https://www.swift.org/getting-started/) guide and tutorials with step-by-step instructions to get you up and running.
@@ -34,13 +34,6 @@ Include information about the Swift compiler’s version, the deployment target 
 Because Swift is under very active development, we receive a lot of bug reports.
 Before opening a new issue, take a moment to [browse our existing issues](https://github.com/swiftlang/swift/issues) to reduce the chance of reporting a duplicate.
 
-## Proposing changes - Swift Evolution
-
-Shaping the future of Swift is a community effort that anyone can participate in via the [Evolution sections on the Swift forums](https://www.swift.org/community/#swift-evolution).
-The [Swift evolution process](https://github.com/swiftlang/swift-evolution/blob/main/process.md) covers all changes to the Swift language and the public interface of the Swift standard library, including new language features and APIs, changes to existing language features or APIs, removal of existing features, and so on.
-
-See the [Swift evolution review schedule](https://www.swift.org/swift-evolution) for current and upcoming proposal reviews.
-
 ## Good First Issues
 
 Good first issues are bugs, ideas, and tasks that are intended to be accessible for contributors that are new to working on the Swift project, and even new to the patterns and concepts behind subprojects such as the Swift compiler.
@@ -53,6 +46,7 @@ Anyone with [commit access](https://www.swift.org/contributing/#commit-access) a
 ## Contributing Code
 
 If you are interested in:
+
 - Contributing fixes and features to the compiler: See our
   [How to Submit Your First Pull Request guide](/docs/HowToGuides/FirstPullRequest.md).
 - Building the compiler as a one-off: See our [Getting Started guide][].
@@ -63,6 +57,13 @@ If you are interested in:
 We also host answers to [Frequently Aasked Questions](/docs/HowToGuides/FAQ.md) that may be of interest.
 
 [Getting Started guide]: /docs/HowToGuides/GettingStarted.md
+
+### Proposing changes - Swift Evolution
+
+Shaping the future of Swift is a community effort that anyone can participate in via the [Evolution sections on the Swift forums](https://www.swift.org/community/#swift-evolution).
+The [Swift evolution process](https://github.com/swiftlang/swift-evolution/blob/main/process.md) covers all changes to the Swift language and the public interface of the Swift standard library, including new language features and APIs, changes to existing language features or APIs, removal of existing features, and so on.
+
+See the [Swift evolution review schedule](https://www.swift.org/swift-evolution) for current and upcoming proposal reviews.
 
 ### Incremental Development
 
@@ -176,23 +177,6 @@ The divider lines should be exactly 80 characters wide to aid in adherence to th
 The bottom section contains an optional description intended for generated documentation (these lines begin with `///` rather than `//`).
 If there is no description, this area can be skipped.
 
-### Release Branch Pull Requests
-
-A pull request targeting a release branch (`release/x.y` or `swift/release/x.y`) cannot be merged without a GitHub approval by a corresponding branch manager.
-In order for a change to be considered for inclusion in a release branch, the pull request must have:
-
-A title starting with a designation containing the release version number of the target branch.
-
-[This form](https://github.com/swiftlang/.github/blob/main/PULL_REQUEST_TEMPLATE/release.md?plain=1) filled out in its description.
-An item that is not applicable may be left blank or completed with an indication thereof, but must not be omitted altogether.
-
-To switch to this template when drafting a pull request in a [swiftlang](https://github.com/swiftlang) repository in a browser, append the `template=release.md` query parameter to the current URL and refresh. For example:
-
--https://github.com/swiftlang/swift/compare/main...my-branch?quick_pull=1
-+https://github.com/swiftlang/swift/compare/main...my-branch?quick_pull=1&template=release.md
-
-[Here](https://github.com/swiftlang/swift/pull/73697) is an example.
-
 ### Code Review
 
 The Swift project relies heavily on code review to improve software quality:
@@ -256,6 +240,25 @@ You are expected to check those messages to see whether they are your fault and,
 
 Commits that clearly violate these quality standards may be reverted, in particular when the change blocks other developers from making progress.
 The developer is welcome to recommit the change after the problem has been fixed.
+
+### Release Branch Pull Requests
+
+A pull request targeting a release branch (`release/x.y` or `swift/release/x.y`) cannot be merged without a GitHub approval by a corresponding branch manager.
+In order for a change to be considered for inclusion in a release branch, the pull request must have:
+
+A title starting with a designation containing the release version number of the target branch.
+
+[This form](https://github.com/swiftlang/.github/blob/main/PULL_REQUEST_TEMPLATE/release.md?plain=1) filled out in its description.
+An item that is not applicable may be left blank or completed with an indication thereof, but must not be omitted altogether.
+
+To switch to this template when drafting a pull request in a [swiftlang](https://github.com/swiftlang) repository in a browser, append the `template=release.md` query parameter to the current URL and refresh. For example:
+
+```diff
+-https://github.com/swiftlang/swift/compare/main...my-branch?quick_pull=1
++https://github.com/swiftlang/swift/compare/main...my-branch?quick_pull=1&template=release.md
+```
+
+[Here](https://github.com/swiftlang/swift/pull/73697) is an example.
 
 ### Commit Access
 
