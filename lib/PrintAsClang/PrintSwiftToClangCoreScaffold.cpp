@@ -186,9 +186,21 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   if (!(isSwiftIntLong && !isInt64Long))
     primTypesArray = primTypesArray.drop_back(2);
 
+  // We do not have metadata for primitive types in Embedded Swift.
+  bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
+
   for (Type type : primTypesArray) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
         type->getNominalOrBoundGenericNominal());
+
+    if (!isCForwardDefinition) {
+      os << "template<>\n";
+      os << "static inline const constexpr bool isUsableInGenericContext<"
+         << typeInfo.name << "> = true;\n\n";
+    }
+
+    if (embedded)
+      continue;
 
     auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadata(
         type->getCanonicalType(), irgen::TypeMetadataAddress::AddressPoint);
@@ -200,10 +212,6 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
          << ";\n";
       continue;
     }
-
-    os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<"
-       << typeInfo.name << "> = true;\n\n";
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
        << "  static ";
