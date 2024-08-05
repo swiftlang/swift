@@ -434,6 +434,17 @@ private extension PointerToAddressInst {
     }
     return walker.result
   }
+
+  var resultOfGlobalAddressorCall: GlobalVariable? {
+    if isStrict,
+       let apply = pointer as? ApplyInst,
+       let callee = apply.referencedFunction,
+       let global = callee.globalOfGlobalInitFunction
+    {
+      return global
+    }
+    return nil
+  }
 }
 
 /// The `EnclosingScope` of an access is the innermost `begin_access`
@@ -507,6 +518,9 @@ private struct AccessPathWalker : AddressUseDefWalker {
     if let p2ai = address as? PointerToAddressInst {
       if let originatingAddr = p2ai.originatingAddress {
         return walkUp(address: originatingAddr, path: path)
+      } else if let global = p2ai.resultOfGlobalAddressorCall {
+        self.result = AccessPath(base: .global(global), projectionPath: path.projectionPath)
+        return .continueWalk
       } else {
         self.result = AccessPath(base: .pointer(p2ai), projectionPath: path.projectionPath)
         return .continueWalk
@@ -626,5 +640,17 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
       case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
         return false
     }
+  }
+}
+
+extension Function {
+  public var globalOfGlobalInitFunction: GlobalVariable? {
+    if isGlobalInitFunction,
+       let ret = returnInstruction,
+       let atp = ret.returnedValue as? AddressToPointerInst,
+       let ga = atp.address as? GlobalAddrInst {
+      return ga.global
+    }
+    return nil
   }
 }
