@@ -1381,20 +1381,6 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       return ErrorType::get(ctx);
     }
 
-    // Try ignoring missing imports.
-    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-    auto nonImportedResults = TypeChecker::lookupUnqualifiedType(
-        dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
-    if (!nonImportedResults.empty()) {
-      auto first = cast<TypeDecl>(nonImportedResults.front().getValueDecl());
-      auto nameLoc = repr->getNameLoc();
-      maybeDiagnoseMissingImportForMember(first, dc, nameLoc.getStartLoc());
-
-      // Don't try to recover here; we'll get more access-related diagnostics
-      // downstream if we do.
-      return ErrorType::get(ctx);
-    }
-
     // Fallback.
     auto L = repr->getNameLoc();
     SourceRange R = repr->getNameLoc().getSourceRange();
@@ -1656,6 +1642,16 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
   auto globals =
       TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(), lookupOptions);
 
+  // If the look up did not yield any results, try again but allow members from
+  // modules that are not directly imported to be accessible.
+  bool didIgnoreMissingImports = false;
+  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
+                                                 lookupOptions);
+    didIgnoreMissingImports = true;
+  }
+
   // If we're doing structural resolution and one of the results is an
   // associated type, ignore any other results found from the same
   // DeclContext; they are going to be protocol typealiases, possibly
@@ -1730,6 +1726,11 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
 
   // If we found a type declaration with the given name, return it now.
   if (current) {
+    if (didIgnoreMissingImports &&
+        maybeDiagnoseMissingImportForMember(currentDecl, DC, repr->getLoc())) {
+      repr->setInvalid();
+      return ErrorType::get(ctx);
+    }
     repr->setValue(currentDecl, currentDC);
     return current;
   }

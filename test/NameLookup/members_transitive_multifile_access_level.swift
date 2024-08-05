@@ -47,19 +47,20 @@ func internalFunc(_ x: Int) {
 
 //--- function_signatures.swift
 
-// FIXME: The access level is wrong on many of these fix-its.
 import Swift // Just here to anchor the fix-its
 // expected-note    2 {{add import of module 'InternalUsesOnly'}}{{1-1=internal import InternalUsesOnly\n}}
-// expected-note@-1   {{add import of module 'PackageUsesOnly'}}{{1-1=internal import PackageUsesOnly\n}}
-// expected-note@-2   {{add import of module 'PublicUsesOnly'}}{{1-1=internal import PublicUsesOnly\n}}
-// expected-note@-3 2 {{add import of module 'MixedUses'}}{{1-1=internal import MixedUses\n}}
+// expected-note@-1   {{add import of module 'PackageUsesOnly'}}{{1-1=package import PackageUsesOnly\n}}
+// expected-note@-2   {{add import of module 'PublicUsesOnly'}}{{1-1=public import PublicUsesOnly\n}}
+// expected-note@-3 2 {{add import of module 'MixedUses'}}{{1-1=public import MixedUses\n}}
 
 extension Int {
   private func usesTypealiasInInternalUsesOnly_Private(x: TypealiasInInternalUsesOnly) {} // expected-error {{type alias 'TypealiasInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
   internal func usesTypealiasInInternalUsesOnly(x: TypealiasInInternalUsesOnly) {} // expected-error {{type alias 'TypealiasInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
   package func usesTypealiasInPackageUsesOnly(x: TypealiasInPackageUsesOnly) {} // expected-error {{type alias 'TypealiasInPackageUsesOnly' is not available due to missing import of defining module 'PackageUsesOnly'}}
   public func usesTypealiasInPublicUsesOnly(x: TypealiasInPublicUsesOnly) {} // expected-error {{type alias 'TypealiasInPublicUsesOnly' is not available due to missing import of defining module 'PublicUsesOnly'}}
+  // expected-warning@-1 {{cannot use type alias 'TypealiasInPublicUsesOnly' here; 'PublicUsesOnly' was not imported by this file}}
   public func usesTypealiasInMixedUses(x: TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
+  // expected-warning@-1 {{cannot use type alias 'TypealiasInMixedUses' here; 'MixedUses' was not imported by this file}}
   internal func usesTypealiasInMixedUses_Internal(x: TypealiasInMixedUses) {} // expected-error {{type alias 'TypealiasInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
 }
 
