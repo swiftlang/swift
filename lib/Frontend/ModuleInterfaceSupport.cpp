@@ -184,7 +184,8 @@ static void
 diagnoseDeclShadowsModule(ModuleInterfaceOptions const &Opts,
                           TypeDecl *shadowingDecl, ModuleDecl *shadowedModule,
                           ModuleDecl *brokenModule) {
-  if (Opts.PreserveTypesAsWritten || shadowingDecl == shadowedModule)
+  if (Opts.PreserveTypesAsWritten || Opts.AliasModuleNames ||
+      shadowingDecl == shadowedModule)
     return;
 
   shadowingDecl->diagnose(
