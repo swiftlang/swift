@@ -165,9 +165,7 @@ class NonObjC {}
 // https://github.com/apple/swift/issues/52295
 
 @objc class NonOptionalWeak {
-  // expected-error@+3 {{@IBOutlet property has non-optional type 'OX'}}
-  // expected-note @+2 {{add '?' to form the optional type 'OX?'}}
-  // expected-note @+1 {{add '!' to form an implicitly unwrapped optional}}
+  // expected-error@+1 {{'weak' variable should have optional type 'OX?'}} {{35-35=?}}
   @IBOutlet weak var something: OX
   init() { }
 }

@@ -23,7 +23,7 @@
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
-// RUN: %FileCheck %s -check-prefixes=PASS_PRINT_AST,PASS_PRINT_AST_TYPEREPR -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefixes=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
@@ -1364,11 +1364,7 @@ public func ParamAttrs5(a : (@escaping () -> ()) -> ()) {
 // PASS_PRINT_AST: public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 
-// The following type only has the internal parameter name inferred from the
-// closure on the right-hand side of `=`. Thus, it is only part of the `Type`
-// and not part of the `TypeRepr`.
-// PASS_PRINT_AST_TYPE: public var ParamAttrs7: (_ f: @escaping () -> ()) -> ()
-// PASS_PRINT_AST_TYPEREPR: public var ParamAttrs7: (@escaping () -> ()) -> ()
+// PASS_PRINT_AST_TYPE: public var ParamAttrs7: (@escaping () -> ()) -> ()
 public var ParamAttrs7: (@escaping () -> ()) -> () = { f in f() }
 
 // PASS_PRINT_AST: public var ParamAttrs8: (_ f: @escaping () -> ()) -> ()

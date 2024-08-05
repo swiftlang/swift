@@ -6695,6 +6695,13 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
+    if (lhs->is<TupleType>() && rhs->is<TupleType>()) {
+      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
+                                                 getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
@@ -9878,22 +9885,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
-  // If we are pattern-matching an enum element and we found any enum elements,
-  // ignore anything that isn't an enum element.
-  bool onlyAcceptEnumElements = false;
-  if (memberLocator &&
-      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
-      isa<EnumElementPattern>(
-          memberLocator->getLastElementAs<LocatorPathElt::PatternMatch>()
-            ->getPattern())) {
-    for (const auto &result: lookup) {
-      if (isa<EnumElementDecl>(result.getValueDecl())) {
-        onlyAcceptEnumElements = true;
-        break;
-      }
-    }
-  }
-
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
@@ -9929,9 +9920,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       return;
     }
 
-    // If we only accept enum elements but this isn't one, ignore it.
-    if (onlyAcceptEnumElements && !isa<EnumElementDecl>(decl))
+    // If we're looking up for an enum element pattern, and we don't have an
+    // EnumElementDecl, ignore it.
+    if (!isa<EnumElementDecl>(decl) &&
+        memberLocator->isForEnumElementPatternMember()) {
       return;
+    }
 
     // Dig out the instance type and figure out what members of the instance type
     // we are going to see.
@@ -10223,6 +10217,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   auto getOverloadChoice =
       [&](ValueDecl *cand, bool isBridged, bool isUnwrappedOptional,
           bool isFallbackUnwrap = false) -> OverloadChoice {
+    // If we're looking up for an EnumElementPattern and have a VarDecl, we can
+    // potentially extract an EnumElementDecl for a imported computed property.
+    if (memberLocator->isForEnumElementPatternMember()) {
+      if (auto *VD = dyn_cast<VarDecl>(cand)) {
+        auto anchor = memberLocator->getAnchor();
+        auto *EEP = castToPattern<EnumElementPattern>(anchor);
+        auto loc = EEP->getNameLoc().getBaseNameLoc();
+        if (auto *EED = TypeChecker::tryExtractClangEnumElement(DC, loc, VD))
+          cand = EED;
+      }
+    }
+
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (instanceTy->isAnyObject()) {
@@ -10361,10 +10367,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // match, unwrap optionals and try again to allow implicit creation of
   // optional "some" patterns (spelled "?").
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
-      memberLocator &&
-      memberLocator->isLastElement<LocatorPathElt::PatternMatch>() &&
-      instanceTy->getOptionalObjectType() &&
-      baseObjTy->is<AnyMetatypeType>()) {
+      memberLocator->isForEnumElementPatternMember() &&
+      instanceTy->getOptionalObjectType() && baseObjTy->is<AnyMetatypeType>()) {
     SmallVector<Type, 2> optionals;
     Type instanceObjectTy = instanceTy->lookThroughAllOptionalTypes(optionals);
     Type metaObjectType = MetatypeType::get(instanceObjectTy);
@@ -10782,7 +10786,11 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   cs.addConstraint(ConstraintKind::Conversion, cs.getType(EP->getSubExpr()),
                    elementTy, cs.getConstraintLocator(EP));
 
+  cs.setExprPatternFor(EP->getSubExpr(), EP);
+
+  // Set the target for both the EnumElementPattern and ExprPattern.
   cs.setTargetFor(pattern, target);
+  cs.setTargetFor(EP, target);
   return false;
 }
 
@@ -11057,27 +11065,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // If there were no results from a direct enum lookup, let's attempt
   // to resolve this member via ~= operator application.
   if (candidates.empty()) {
-    if (auto patternLoc =
-            locator->getLastElementAs<LocatorPathElt::PatternMatch>()) {
-      if (auto *enumElement =
-              dyn_cast<EnumElementPattern>(patternLoc->getPattern())) {
-        auto enumType = baseObjTy->getMetatypeInstanceType();
+    if (locator->isForEnumElementPatternMember()) {
+      auto *enumElement =
+          castToPattern<EnumElementPattern>(locator->getAnchor());
+      auto enumType = baseObjTy->getMetatypeInstanceType();
 
-        // Optional base type does not trigger `~=` synthesis, but it tries
-        // to find member on both `Optional` and its wrapped type.
-        if (!enumType->getOptionalObjectType()) {
-          // If the synthesis of ~= resulted in errors (i.e. broken stdlib)
-          // that would be diagnosed inline, so let's just fall through and
-          // let this situation be diagnosed as a missing member.
-          auto hadErrors = inferEnumMemberThroughTildeEqualsOperator(
+      // Optional base type does not trigger `~=` synthesis, but it tries
+      // to find member on both `Optional` and its wrapped type.
+      if (!enumType->getOptionalObjectType()) {
+        // If the synthesis of ~= resulted in errors (i.e. broken stdlib)
+        // that would be diagnosed inline, so let's just fall through and
+        // let this situation be diagnosed as a missing member.
+        auto hadErrors = inferEnumMemberThroughTildeEqualsOperator(
             *this, enumElement, enumType, memberTy, locator);
 
-          // Let's consider current member constraint solved because it's
-          // replaced by a new set of constraints that would resolve member
-          // type.
-          if (!hadErrors)
-            return SolutionKind::Solved;
-        }
+        // Let's consider current member constraint solved because it's
+        // replaced by a new set of constraints that would resolve member
+        // type.
+        if (!hadErrors)
+          return SolutionKind::Solved;
       }
     }
   }
@@ -11117,7 +11123,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
-          } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
+          } else if (locator->isForEnumElementPatternMember()) {
             // Let's handle member patterns specifically because they use
             // equality instead of argument application constraint, so allowing
             // them to bind member could mean missing valid hole positions in

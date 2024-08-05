@@ -5142,12 +5142,6 @@ ERROR(iflet_implicitly_unwraps,none,
 ERROR(type_pattern_missing_is,none,
       "'is' keyword required to pattern match against type name", ())
 
-
-ERROR(pattern_type_mismatch_context,none,
-      "type annotation does not match contextual type %0", (Type))
-
-ERROR(tuple_pattern_in_non_tuple_context,none,
-      "tuple pattern cannot match values of the non-tuple type %0", (Type))
 WARNING(found_one_pattern_for_several_associated_values,Deprecation,
         "enum case '%0' has %1 associated values; matching them as a tuple "
         "is deprecated", (StringRef, unsigned))
