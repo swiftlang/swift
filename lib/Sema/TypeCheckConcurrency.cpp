@@ -1165,6 +1165,28 @@ getSendableResultDiag(SendableCheckReason refKind) {
   }
 }
 
+static
+Diag<Type, const ValueDecl *, ActorIsolation>
+getSendablePropertyDiag(SendableCheckReason refKind) {
+  switch (refKind) {
+  case SendableCheckReason::CrossActor:
+  case SendableCheckReason::SynchronousAsAsync:
+    return diag::non_sendable_property_exits_actor;
+
+  case SendableCheckReason::ExitingActor:
+    return diag::non_sendable_property_into_actor;
+
+  case SendableCheckReason::Conformance:
+    return diag::non_sendable_property_in_witness;
+
+  case SendableCheckReason::Override:
+    return diag::non_sendable_property_in_override;
+
+  case SendableCheckReason::ObjC:
+    return diag::non_sendable_property_in_objc;
+  }
+}
+
 bool swift::diagnoseNonSendableTypesInReference(
     Expr *base, ConcreteDeclRef declRef, const DeclContext *fromDC,
     SourceLoc refLoc, SendableCheckReason refKind,
@@ -1245,11 +1267,8 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (diagnoseNonSendableTypes(
             propertyType, fromDC,
             derivedConformanceType, refLoc,
-            diag::non_sendable_property_type,
-            var,
-            var->isLocalCapture(),
-            (unsigned)refKind,
-            getActorIsolation()))
+            getSendablePropertyDiag(refKind),
+            var, getActorIsolation()))
       return true;
   }
 

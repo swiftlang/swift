@@ -111,7 +111,7 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
 
-  _ = act.point  // expected-warning{{non-sendable type 'Point' in implicitly asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
+  _ = act.point  // expected-warning{{non-sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
   // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-2 {{property access is 'async'}}
 }
@@ -151,8 +151,8 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ ext: InferredFromContext,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
-  _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
-  _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
+  _ = await ext.point // expected-warning {{non-sendable type 'Point' of property 'point' cannot exit main actor-isolated context}}
+  _ = await anno.point // expected-warning {{non-sendable type 'Point' of property 'point' cannot exit global actor 'SomeGlobalActor'-isolated context}}
   // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' cannot be sent into global actor 'SomeGlobalActor'-isolated context in call to property 'point'}}
 
   _ = formance.counter
@@ -162,9 +162,9 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await (formance as MainCounter).counter // expected-warning {{non-sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
   _ = await ext[1]
   _ = await formance.ticker
-  _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated property 'polygon' cannot cross actor boundary}}
+  _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' of property 'polygon' cannot exit main actor-isolated context}}
   _ = await InferredFromContext.stuff
-  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'polygon' cannot cross actor boundary}}
+  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' of static property 'polygon' cannot exit main actor-isolated context}}
 }
 
 // expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
@@ -1049,8 +1049,8 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
   _ = actor.b         // okay
   _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{property access is 'async'}}
-  // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
-  _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+  // expected-warning@-2{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+  _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
   _ = await actor.d // okay
 }
 
@@ -1085,8 +1085,8 @@ actor CrossModuleFromInitsActor {
     _ = actor.b         // okay
     _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
     // expected-note@-1{{property access is 'async'}}
-    // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
-    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+    // expected-warning@-2{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
     _ = await actor.d // okay
   }
 }
@@ -1613,7 +1613,7 @@ class ReferenceActor {
   init() async {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+3 {{non-sendable type 'NonSendable' in implicitly asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+3 {{non-sendable type 'NonSendable' of property 'ns' cannot exit actor-isolated context}}
     // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@+1 {{property access is 'async'}}
     _ = a.ns

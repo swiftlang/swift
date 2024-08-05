@@ -53,7 +53,7 @@ protocol AsyncProtocolWithNotSendable {
 actor A3: AsyncProtocolWithNotSendable {
   func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -66,7 +66,7 @@ actor A3: AsyncProtocolWithNotSendable {
 actor A4: AsyncProtocolWithNotSendable {
   func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -111,7 +111,7 @@ protocol AsyncThrowingProtocolWithNotSendable {
 actor A7: AsyncThrowingProtocolWithNotSendable {
   func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -124,7 +124,7 @@ actor A7: AsyncThrowingProtocolWithNotSendable {
 actor A8: AsyncThrowingProtocolWithNotSendable {
   func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }

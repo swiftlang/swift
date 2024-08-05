@@ -5681,16 +5681,27 @@ ERROR(non_sendable_call_result_type,none,
       "non-sendable result type %0 cannot be sent from %1 context in call "
       "to async function",
       (Type, ActorIsolation))
-ERROR(non_sendable_property_type,none,
-      "non-sendable type %0 in %select{"
-      "%select{asynchronous access to %4 %kind1|"
-      "asynchronous access from %4 context to nonisolated %kind1|"
-      "implicitly asynchronous access to %4 %kind1|"
-      "conformance of %4 %kind1 to protocol requirement|"
-      "%4 overriding %kind1|"
-      "%4 '@objc' %kind1}3|captured local %1}2 cannot "
-      "cross %select{actor|task}2 boundary",
-      (Type, const ValueDecl *, bool, unsigned, ActorIsolation))
+
+ERROR(non_sendable_property_exits_actor,none,
+      "non-sendable type %0 of %kind1 cannot exit %2 context",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_property_into_actor,none,
+      "non-sendable type %0 of nonisolated %kind1 cannot be sent to "
+      "%2 context",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_property_in_witness,none,
+      "non-sendable type %0 cannot be returned from %2 implementation "
+      "to caller of protocol requirement %1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_property_in_override,none,
+      "non-sendable type %0 cannot be returned from %2 override to "
+      "caller of superclass %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_property_in_objc,none,
+      "non-sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
+      "actor boundary",
+      (Type, const ValueDecl *, ActorIsolation))
+
 ERROR(non_sendable_keypath_capture,none,
       "cannot form key path that captures non-sendable type %0",
       (Type))

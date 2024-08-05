@@ -1474,8 +1474,8 @@ actor ActorWithSetter {
   func recursive() async {
     let x = NonSendableKlass()
     await self.recursive!.twoFieldBoxInTuple.1.k2 = x
-    // expected-typechecker-only-warning @-1 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
-    // expected-typechecker-only-warning @-2 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
+    // expected-typechecker-only-warning @-1 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' of property 'twoFieldBoxInTuple' cannot exit actor-isolated context}}
+    // expected-typechecker-only-warning @-2 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' of property 'twoFieldBoxInTuple' cannot exit actor-isolated context}}
 
     await transferToMain(x) // xpected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
@@ -1527,8 +1527,8 @@ final actor FinalActorWithSetter {
   func recursive() async {
     let x = NonSendableKlass()
     await self.recursive!.twoFieldBoxInTuple.1.k2 = x
-    // expected-typechecker-only-warning @-1 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
-    // expected-typechecker-only-warning @-2 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
+    // expected-typechecker-only-warning @-1 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' of property 'twoFieldBoxInTuple' cannot exit actor-isolated context}}
+    // expected-typechecker-only-warning @-2 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' of property 'twoFieldBoxInTuple' cannot exit actor-isolated context}}
 
     await transferToMain(x) // xpected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
