@@ -41,9 +41,26 @@ public:
   using Options = OptionSet<Flag>;
 
 private:
-  template <typename T, unsigned smallSize>
+  /// A two phase stack data structure. The first phase only allows for two
+  /// operations:
+  ///
+  /// 1. pushing elements onto the stack.
+  /// 2. pushing/popping a "snapshot" of the stack (see description below).
+  ///
+  /// The second phase only allows for the stack to be drained.
+  ///
+  /// DISCUSSION: The snapshot operation stashes the current size of the
+  /// variable name path array when the snapshot operation occurs. If one pops
+  /// the snapshot, the data structure sets its current insertion point to be
+  /// the old stack point effectively popping off all of the elements of the
+  /// stack until the last snapshot. This is useful when working with things
+  /// like phis where one wants to speculatively push items onto this stack
+  /// while discovering if one has an actual interesting value from the phi. If
+  /// one fails to find something interesting, then one can just pop the
+  /// snapshot and go process the next phi incoming value.
+  template <typename T, unsigned SmallSize>
   class VariableNamePathArray {
-    SmallVector<T, smallSize> data;
+    SmallVector<T, SmallSize> data;
 
     unsigned lastSnapShotIndex = 0;
     unsigned insertionPointIndex = 0;
