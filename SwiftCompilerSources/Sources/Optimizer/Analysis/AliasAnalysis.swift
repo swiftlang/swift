@@ -309,6 +309,11 @@ struct AliasAnalysis {
       if destroy.destroyedValue.type.isNoEscapeFunction {
         return .noEffects
       }
+      if destroy.isDeadEnd {
+        // We don't have to take deinit effects into acount for a `destroy_value [dead_end]`.
+        // Such destroys are lowered to no-ops and will not call any deinit.
+        return .noEffects
+      }
       return defaultEffects(of: destroy, on: memLoc)
 
     default:

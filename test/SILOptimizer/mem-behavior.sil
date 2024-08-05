@@ -1009,6 +1009,36 @@ bb0 (%0 : $*C):
   return %2 : $()
 }
 
+// CHECK-LABEL: @test_destroy_value_with_effects
+// CHECK:       PAIR #1.
+// CHECK-NEXT:     destroy_value %0 : $X
+// CHECK-NEXT:     %2 = ref_element_addr %1 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_destroy_value_with_effects : $@convention(thin) (@owned X) -> () {
+bb0 (%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr %1 : $X, #X.x
+  fix_lifetime %2 : $*X
+  end_borrow %1 : $X
+  destroy_value %0 : $X
+  unreachable
+}
+
+// CHECK-LABEL: @test_deadend_destroy_value
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      destroy_value [dead_end] %0 : $X
+// CHECK-NEXT:      %2 = ref_element_addr %1 : $X, #X.x
+// CHECK-NEXT:    r=0,w=0
+sil [ossa] @test_deadend_destroy_value : $@convention(thin) (@owned X) -> () {
+bb0 (%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr %1 : $X, #X.x
+  fix_lifetime %2 : $*X
+  end_borrow %1 : $X
+  destroy_value [dead_end] %0 : $X
+  unreachable
+}
+
 // CHECK-LABEL: @test_copy_value
 // CHECK: PAIR #1.
 // CHECK-NEXT:     %2 = copy_value %1 : $C
