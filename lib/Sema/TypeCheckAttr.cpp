@@ -7217,6 +7217,17 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   }
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
+    //'nonisolated(unsafe)' is meaningless for computed properties, functions etc.
+    auto var = dyn_cast<VarDecl>(VD);
+    if (attr->isUnsafe() &&
+        (!var || !var->hasStorage())) {
+      auto &ctx = VD->getASTContext();
+      ctx.Diags.diagnose(attr->getStartLoc(),
+                         diag::nonisolated_unsafe_uneffective_on_funcs,
+                         VD->getDescriptiveKind(), VD)
+          .fixItReplace(attr->getStartLoc(), "nonisolated");
+    }
+
     (void)getActorIsolation(VD);
   }
 }
