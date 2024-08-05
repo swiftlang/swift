@@ -326,7 +326,7 @@ struct RequireLiveness {
 } // namespace
 
 void RequireLiveness::processDefBlock() {
-  LLVM_DEBUG(llvm::dbgs() << "    Processing def block!\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Processing def block!\n");
   // First walk from the beginning of the block to the transfer instruction to
   // see if we have any requires before our def. Once we find one, we can skip
   // the traversal and jump straight to the transfer.
@@ -335,8 +335,9 @@ void RequireLiveness::processDefBlock() {
        ii != ie; ++ii) {
     if (allRequires.contains(&*ii) && !firstRequireBeforeTransferInDefBlock) {
       firstRequireBeforeTransferInDefBlock = &*ii;
-      LLVM_DEBUG(llvm::dbgs() << "        Found transfer before def: "
-                              << *firstRequireBeforeTransferInDefBlock);
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "        Found transfer before def: "
+                               << *firstRequireBeforeTransferInDefBlock);
       break;
     }
   }
@@ -353,7 +354,8 @@ void RequireLiveness::processDefBlock() {
       continue;
 
     finalRequires.insert(&*ii);
-    LLVM_DEBUG(llvm::dbgs() << "        Found transfer after def: " << *ii);
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "        Found transfer after def: " << *ii);
     return;
   }
 }
@@ -370,13 +372,14 @@ void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
 
 template <typename Collection>
 void RequireLiveness::process(Collection requireInstList) {
-  LLVM_DEBUG(llvm::dbgs() << "==> Performing Require Liveness for: "
-                          << *transferInst);
+  REGIONBASEDISOLATION_LOG(
+      llvm::dbgs() << "==> Performing Require Liveness for: " << *transferInst);
 
   // Then put all of our requires into our allRequires set.
   BasicBlockWorklist initializingWorklist(transferInst->getFunction());
   for (auto require : requireInstList) {
-    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << **require);
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "        Require Inst: " << **require);
     allRequires.insert(*require);
     initializingWorklist.pushIfNotVisited(require->getParent());
   }
@@ -388,19 +391,20 @@ void RequireLiveness::process(Collection requireInstList) {
   // If we found /any/ requries after the transferInst, we can bail early since
   // that is guaranteed to dominate all further requires.
   if (!finalRequires.empty()) {
-    LLVM_DEBUG(
+    REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
         << "        Found transfer after def in def block! Exiting early!\n");
     return;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "        Did not find transfer after def in def "
-                             "block! Walking blocks!\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "        Did not find transfer after def in def "
+                              "block! Walking blocks!\n");
 
   // If we found a transfer in the def block before our def, add it to the block
   // state for the def.
   if (firstRequireBeforeTransferInDefBlock) {
-    LLVM_DEBUG(
+    REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
         << "        Found a require before transfer! Adding to block state!\n");
     auto blockState = blockLivenessInfo.get(transferInst->getParent());
@@ -414,8 +418,9 @@ void RequireLiveness::process(Collection requireInstList) {
     for (auto &inst : *requireBlock) {
       if (!allRequires.contains(&inst))
         continue;
-      LLVM_DEBUG(llvm::dbgs() << "        Mapping Block bb"
-                              << requireBlock->getDebugID() << " to: " << inst);
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        Mapping Block bb"
+                                            << requireBlock->getDebugID()
+                                            << " to: " << inst);
       blockState.get()->setInst(generation, &inst);
       break;
     }
@@ -1193,13 +1198,15 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
   if (transferOpToRequireInstMultiMap.empty())
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "Emitting use after transfer diagnostics.\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "Emitting use after transfer diagnostics.\n");
 
   for (auto [transferOp, requireInsts] :
        transferOpToRequireInstMultiMap.getRange()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Transfer Op. Number: " << transferOp->getOperandNumber()
-               << ". User: " << *transferOp->getUser());
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "Transfer Op. Number: "
+                             << transferOp->getOperandNumber()
+                             << ". User: " << *transferOp->getUser());
 
     // Then look for our requires before we emit any error. We want to emit a
     // single we don't understand error if we do not find the require.
@@ -1785,7 +1792,7 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
   if (transferredNonTransferrableInfoList.empty())
     return;
 
-  LLVM_DEBUG(
+  REGIONBASEDISOLATION_LOG(
       llvm::dbgs() << "Emitting transfer non transferrable diagnostics.\n");
 
   for (auto info : transferredNonTransferrableInfoList) {
@@ -2186,14 +2193,15 @@ struct DiagnosticEvaluator final
     }
 
     auto rep = info->getValueMap().getRepresentative(transferredVal);
-    LLVM_DEBUG(llvm::dbgs()
-               << "    Emitting Use After Transfer Error!\n"
-               << "        Transferring Inst: " << *transferringOp->getUser()
-               << "        Transferring Op Value: " << transferringOp->get()
-               << "        Require Inst: " << *partitionOp.getSourceInst()
-               << "        ID:  %%" << transferredVal << "\n"
-               << "        Rep: " << *rep << "        Transferring Op Num: "
-               << transferringOp->getOperandNumber() << '\n');
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs()
+        << "    Emitting Use After Transfer Error!\n"
+        << "        Transferring Inst: " << *transferringOp->getUser()
+        << "        Transferring Op Value: " << transferringOp->get()
+        << "        Require Inst: " << *partitionOp.getSourceInst()
+        << "        ID:  %%" << transferredVal << "\n"
+        << "        Rep: " << *rep << "        Transferring Op Num: "
+        << transferringOp->getOperandNumber() << '\n');
     transferOpToRequireInstMultiMap.insert(
         transferringOp,
         RequireInst::forUseAfterTransfer(partitionOp.getSourceInst()));
@@ -2202,14 +2210,14 @@ struct DiagnosticEvaluator final
   void handleTransferNonTransferrable(
       const PartitionOp &partitionOp, Element transferredVal,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {
-    LLVM_DEBUG(llvm::dbgs()
-                   << "    Emitting TransferNonTransferrable Error!\n"
-                   << "        ID:  %%" << transferredVal << "\n"
-                   << "        Rep: "
-                   << *info->getValueMap().getRepresentative(transferredVal)
-                   << "        Dynamic Isolation Region: ";
-               isolationRegionInfo.printForDiagnostics(llvm::dbgs());
-               llvm::dbgs() << '\n');
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "    Emitting TransferNonTransferrable Error!\n"
+                     << "        ID:  %%" << transferredVal << "\n"
+                     << "        Rep: "
+                     << *info->getValueMap().getRepresentative(transferredVal)
+                     << "        Dynamic Isolation Region: ";
+        isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+        llvm::dbgs() << '\n');
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     auto nonTransferrableValue =
         info->getValueMap().getRepresentative(transferredVal);
@@ -2221,15 +2229,15 @@ struct DiagnosticEvaluator final
   void handleInOutSendingNotDisconnectedAtExitError(
       const PartitionOp &partitionOp, Element inoutSendingVal,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {
-    LLVM_DEBUG(llvm::dbgs()
-                   << "    Emitting InOut Sending ActorIsolated at end of "
-                      "Function Error!\n"
-                   << "        ID:  %%" << inoutSendingVal << "\n"
-                   << "        Rep: "
-                   << *info->getValueMap().getRepresentative(inoutSendingVal)
-                   << "        Dynamic Isolation Region: ";
-               isolationRegionInfo.printForDiagnostics(llvm::dbgs());
-               llvm::dbgs() << '\n');
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "    Emitting InOut Sending ActorIsolated at end of "
+                        "Function Error!\n"
+                     << "        ID:  %%" << inoutSendingVal << "\n"
+                     << "        Rep: "
+                     << *info->getValueMap().getRepresentative(inoutSendingVal)
+                     << "        Dynamic Isolation Region: ";
+        isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+        llvm::dbgs() << '\n');
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     auto nonTransferrableValue =
         info->getValueMap().getRepresentative(inoutSendingVal);
@@ -2243,30 +2251,30 @@ struct DiagnosticEvaluator final
       const PartitionOp &partitionOp, Element transferredVal,
       Element actualNonTransferrableValue,
       SILDynamicMergedIsolationInfo isolationRegionInfo) const {
-    LLVM_DEBUG(llvm::dbgs()
-                   << "    Emitting TransferNonTransferrable Error!\n"
-                   << "        ID:  %%" << transferredVal << "\n"
-                   << "        Rep: "
-                   << *info->getValueMap().getRepresentative(transferredVal)
-                   << "        Dynamic Isolation Region: ";
-               isolationRegionInfo.printForDiagnostics(llvm::dbgs());
-               llvm::dbgs() << '\n');
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "    Emitting TransferNonTransferrable Error!\n"
+                     << "        ID:  %%" << transferredVal << "\n"
+                     << "        Rep: "
+                     << *info->getValueMap().getRepresentative(transferredVal)
+                     << "        Dynamic Isolation Region: ";
+        isolationRegionInfo.printForDiagnostics(llvm::dbgs());
+        llvm::dbgs() << '\n');
 
     auto *self = const_cast<DiagnosticEvaluator *>(this);
     // If we have a non-actor introducing fake representative value, just use
     // the value that actually introduced the actor isolation.
     if (auto nonTransferrableValue = info->getValueMap().maybeGetRepresentative(
             actualNonTransferrableValue)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "        ActualTransfer: " << nonTransferrableValue);
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        ActualTransfer: "
+                                            << nonTransferrableValue);
       self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
                                                      nonTransferrableValue,
                                                      isolationRegionInfo);
     } else if (auto *nonTransferrableInst =
                    info->getValueMap().maybeGetActorIntroducingInst(
                        actualNonTransferrableValue)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "        ActualTransfer: " << *nonTransferrableInst);
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        ActualTransfer: "
+                                            << *nonTransferrableInst);
       self->transferredNonTransferrable.emplace_back(
           partitionOp.getSourceOp(), nonTransferrableInst, isolationRegionInfo);
     } else {
@@ -2287,7 +2295,7 @@ struct DiagnosticEvaluator final
       SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
       SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {
     auto srcRep = info->getValueMap().getRepresentativeValue(srcElement);
-    LLVM_DEBUG(
+    REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
         << "    Emitting Error! Kind: Assign Isolated Into Sending Result!\n"
         << "        Assign Inst: " << *partitionOp.getSourceInst()
@@ -2306,14 +2314,15 @@ struct DiagnosticEvaluator final
                                               Element inoutSendingVal,
                                               Operand *transferringOp) const {
     auto rep = info->getValueMap().getRepresentative(inoutSendingVal);
-    LLVM_DEBUG(llvm::dbgs()
-               << "    Emitting InOut Not Reinitialized At End Of Function!\n"
-               << "        Transferring Inst: " << *transferringOp->getUser()
-               << "        Transferring Op Value: " << transferringOp->get()
-               << "        Require Inst: " << *partitionOp.getSourceInst()
-               << "        ID:  %%" << inoutSendingVal << "\n"
-               << "        Rep: " << *rep << "        Transferring Op Num: "
-               << transferringOp->getOperandNumber() << '\n');
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs()
+        << "    Emitting InOut Not Reinitialized At End Of Function!\n"
+        << "        Transferring Inst: " << *transferringOp->getUser()
+        << "        Transferring Op Value: " << transferringOp->get()
+        << "        Require Inst: " << *partitionOp.getSourceInst()
+        << "        ID:  %%" << inoutSendingVal << "\n"
+        << "        Rep: " << *rep << "        Transferring Op Num: "
+        << transferringOp->getOperandNumber() << '\n');
     transferOpToRequireInstMultiMap.insert(
         transferringOp, RequireInst::forInOutReinitializationNeeded(
                             partitionOp.getSourceInst()));
@@ -2372,17 +2381,19 @@ struct DiagnosticEvaluator final
 
 void TransferNonSendableImpl::runDiagnosticEvaluator() {
   // Then for each block...
-  LLVM_DEBUG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
   for (auto [block, blockState] : regionInfo->getRange()) {
-    LLVM_DEBUG(llvm::dbgs() << "|--> Block bb" << block.getDebugID() << "\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "|--> Block bb" << block.getDebugID() << "\n");
 
     if (!blockState.getLiveness()) {
-      LLVM_DEBUG(llvm::dbgs() << "Dead block... skipping!\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Dead block... skipping!\n");
       continue;
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Entry Partition: ";
-               blockState.getEntryPartition().print(llvm::dbgs()));
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "Entry Partition: ";
+        blockState.getEntryPartition().print(llvm::dbgs()));
 
     // Grab its entry partition and setup an evaluator for the partition that
     // has callbacks that emit diagnsotics...
@@ -2399,11 +2410,12 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
       eval.apply(partitionOp);
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Exit Partition: ";
-               workingPartition.print(llvm::dbgs()));
+    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Exit Partition: ";
+                             workingPartition.print(llvm::dbgs()));
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Finished walking blocks for diagnostics.\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "Finished walking blocks for diagnostics.\n");
 
   // Now that we have found all of our transferInsts/Requires emit errors.
   transferOpToRequireInstMultiMap.setFrozen();
@@ -2418,8 +2430,8 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
 /// state.
 void TransferNonSendableImpl::emitDiagnostics() {
   auto *function = regionInfo->getFunction();
-  LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
-                          << function->getName() << "\n");
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Emitting diagnostics for function "
+                                        << function->getName() << "\n");
 
   runDiagnosticEvaluator();
   emitTransferredNonTransferrableDiagnostics();
@@ -2436,14 +2448,15 @@ class TransferNonSendable : public SILFunctionTransform {
 
     auto *functionInfo = getAnalysis<RegionAnalysis>()->get(function);
     if (!functionInfo->isSupportedFunction()) {
-      LLVM_DEBUG(llvm::dbgs() << "===> SKIPPING UNSUPPORTED FUNCTION: "
-                              << function->getName() << '\n');
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "===> SKIPPING UNSUPPORTED FUNCTION: "
+                               << function->getName() << '\n');
 
       return;
     }
 
-    LLVM_DEBUG(llvm::dbgs()
-               << "===> PROCESSING: " << function->getName() << '\n');
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "===> PROCESSING: " << function->getName() << '\n');
 
     TransferNonSendableImpl impl(functionInfo);
     impl.emitDiagnostics();

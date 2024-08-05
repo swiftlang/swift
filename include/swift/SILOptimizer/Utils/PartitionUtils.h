@@ -36,17 +36,31 @@ namespace swift {
 
 namespace PartitionPrimitives {
 
-#ifndef NDEBUG
+extern bool REGIONBASEDISOLATION_ENABLE_LOGGING;
+
+#ifdef REGIONBASEDISOLATION_LOG
+#error "REGIONBASEDISOLATION_LOG already defined?!"
+#endif
+
+#define REGIONBASEDISOLATION_LOG(...)                                          \
+  do {                                                                         \
+    if (PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_LOGGING) {            \
+      __VA_ARGS__;                                                             \
+    }                                                                          \
+  } while (0);
+
 extern bool REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
+
+#ifdef REGIONBASEDISOLATION_VERBOSE_LOG
+#error "REGIONBASEDISOLATION_VERBOSE_LOG already defined?!"
+#endif
+
 #define REGIONBASEDISOLATION_VERBOSE_LOG(...)                                  \
   do {                                                                         \
     if (PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {    \
-      LLVM_DEBUG(__VA_ARGS__);                                                 \
+      __VA_ARGS__;                                                             \
     }                                                                          \
   } while (0);
-#else
-#define REGIONBASEDISOLATION_VERBOSE_LOG(...)
-#endif
 
 struct Element {
   unsigned num;
