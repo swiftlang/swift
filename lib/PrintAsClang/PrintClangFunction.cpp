@@ -134,9 +134,9 @@ private:
     if (auto *record = dyn_cast<clang::CXXRecordDecl>(typeDecl))
       return record->isTrivial();
 
-    // FIXME: If we can get plain clang::RecordDecls here, we need to figure out
-    //        how nontrivial (i.e. ARC) fields work.
-    assert(!isa<clang::RecordDecl>(typeDecl));
+    // Structs with ARC members are not considered trivial.
+    if (auto *record = dyn_cast<clang::RecordDecl>(typeDecl))
+      return !record->hasObjectMember();
 
     // C-family enums are always trivial.
     return isa<clang::EnumDecl>(typeDecl);
