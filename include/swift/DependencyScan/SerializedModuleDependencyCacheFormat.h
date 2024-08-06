@@ -178,7 +178,8 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDArrayIDField,               // headerSourceFiles
                    IsFrameworkField,                 // isFramework
                    IsStaticField,                    // isStatic
-                   IdentifierIDField                 // moduleCacheKey
+                   IdentifierIDField,                // moduleCacheKey
+                   IdentifierIDField                 // UserModuleVersion
                    >;
 
 using SwiftPlaceholderModuleDetailsLayout =
