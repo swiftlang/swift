@@ -200,6 +200,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
 
 RewriteContext::RewriteContext(ASTContext &ctx)
     : TheShapeSymbol(nullptr),
+      ThePackElementSymbol(nullptr),
       Context(ctx),
       Stats(ctx.Stats),
       SymbolHistogram(Symbol::NumKinds),
