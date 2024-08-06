@@ -167,7 +167,7 @@
                 "wasi-libc": "wasi-sdk-22",
                 "wasmkit": "0.0.3",
                 "curl": "curl-8_9_1",
-                "libxml2": "v2.11.5",
+                "libxml2": "v2.13.3",
                 "zlib": "v1.3.1"
             }
         },

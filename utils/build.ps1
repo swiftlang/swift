@@ -1504,8 +1504,8 @@ function Build-XML2([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
-    -Bin "$($Arch.BinaryCache)\$Platform\libxml2-2.11.5" `
-    -InstallTo "$LibraryRoot\libxml2-2.11.5\usr" `
+    -Bin "$($Arch.BinaryCache)\$Platform\libxml2-2.13.3" `
+    -InstallTo "$LibraryRoot\libxml2-2.13.3\usr" `
     -Arch $Arch `
     -Platform $Platform `
     -UseMSVCCompilers C,CXX `
@@ -1516,12 +1516,39 @@ function Build-XML2([Platform]$Platform, $Arch) {
       CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
+      LIBXML2_WITH_C14N = "YES";
+      LIBXML2_WITH_CATALOG = "YES";
+      LIBXML2_WITH_DEBUG = "NO";
+      LIBXML2_WITH_FTP = "NO";
+      LIBXML2_WITH_HTML = "YES";
+      LIBXML2_WITH_HTTP = "NO";
       LIBXML2_WITH_ICONV = "NO";
+      LIBXML2_WITH_ISO8859X = "YES";
       LIBXML2_WITH_ICU = "NO";
+      LIBXML2_WITH_LEGACY = "NO";
       LIBXML2_WITH_LZMA = "NO";
+      LIBXML2_WITH_MODULES = "NO";
+      LIBXML2_WITH_OUTPUT = "YES";
+      LIBXML2_WITH_PATTERN = "YES";
+      LIBXML2_WITH_PROGRAMS = "NO";
+      LIBXML2_WITH_PUSH = "YES";
       LIBXML2_WITH_PYTHON = "NO";
+      LIBXML2_WITH_READER = "YES";
+      LIBXML2_WITH_REGEXPS = "YES";
+      LIBXML2_WITH_SAX1 = "YES";
+      LIBXML2_WITH_SCHEMAS = "YES";
+      LIBXML2_WITH_SCHEMATRON = "YES";
       LIBXML2_WITH_TESTS = "NO";
-      LIBXML2_WITH_THREADS = "YES";
+      LIBXML2_WITH_THREADS = "NO";
+      LIBXML2_WITH_THREAD_ALLOC = "NO";
+      LIBXML2_WITH_TLS = "NO";
+      LIBXML2_WITH_TREE = "YES";
+      LIBXML2_WITH_VALID = "YES";
+      LIBXML2_WITH_WRITER = "YES";
+      LIBXML2_WITH_XINCLUDE = "YES";
+      LIBXML2_WITH_XPATH = "YES";
+      LIBXML2_WITH_XPTR = "YES";
+      LIBXML2_WITH_XPTR_LOCS = "YES";
       LIBXML2_WITH_ZLIB = "NO";
     }
 }
@@ -1766,8 +1793,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     Isolate-EnvVars {
       $env:SWIFTCI_USE_LOCAL_DEPS=1
       $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
-      $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/$Platform/$ShortArch"
-      $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
+      $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.13.3/usr/lib/$Platform/$ShortArch"
+      $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.13.3/usr/include/libxml2"
       $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/$Platform/$ShortArch"
       $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/$Platform/$ShortArch"
       $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
@@ -1805,11 +1832,11 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
           LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
+            "$LibraryRoot\libxml2-2.13.3\usr\lib\$Platform\$ShortArch\libxml2s.lib";
           } else {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
+            "$LibraryRoot\libxml2-2.13.3\usr\lib\$Platform\$ShortArch\libxml2.a";
           };
-          LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
+          LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.13.3\usr\include\libxml2";
           LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
           ZLIB_LIBRARY = if ($Platform -eq "Windows") {
             "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
