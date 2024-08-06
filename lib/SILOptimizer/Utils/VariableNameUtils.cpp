@@ -454,38 +454,38 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *sei = dyn_cast<StructExtractInst>(searchValue)) {
-      variableNamePath.push_back(sei);
+      variableNamePath.push_back(getNameFromDecl(sei->getField()));
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(searchValue)) {
-      variableNamePath.push_back(uedi);
+      variableNamePath.push_back(getNameFromDecl(uedi->getElement()));
       searchValue = uedi->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleExtractInst>(searchValue)) {
-      variableNamePath.push_back(tei);
+      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
       searchValue = tei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(sei);
+      variableNamePath.push_back(getNameFromDecl(sei->getField()));
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(tei);
+      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
       searchValue = tei->getOperand();
       continue;
     }
 
-    if (auto *e = dyn_cast<UncheckedTakeEnumDataAddrInst>(searchValue)) {
-      variableNamePath.push_back(e);
-      searchValue = e->getOperand();
+    if (auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(searchValue)) {
+      variableNamePath.push_back(getNameFromDecl(utedai->getElement()));
+      searchValue = utedai->getOperand();
       continue;
     }
 
@@ -494,7 +494,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     // them and add the case to the variableNamePath.
     if (auto *e = dyn_cast<EnumInst>(searchValue)) {
       if (e->hasOperand()) {
-        variableNamePath.push_back(e);
+        variableNamePath.push_back(getNameFromDecl(e->getElement()));
         searchValue = e->getOperand();
         continue;
       }
@@ -684,43 +684,6 @@ void VariableNameInferrer::popSingleVariableName() {
 
     if (auto m = dyn_cast<MethodInst>(inst)) {
       resultingString += getNameFromDecl(m->getMember().getDecl());
-      return;
-    }
-
-    if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
-      resultingString += getNameFromDecl(sei->getField());
-      return;
-    }
-
-    if (auto *tei = dyn_cast<TupleExtractInst>(inst)) {
-      llvm::raw_svector_ostream stream(resultingString);
-      stream << tei->getFieldIndex();
-      return;
-    }
-
-    if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
-      resultingString += getNameFromDecl(uedi->getElement());
-      return;
-    }
-
-    if (auto *sei = dyn_cast<StructElementAddrInst>(inst)) {
-      resultingString += getNameFromDecl(sei->getField());
-      return;
-    }
-
-    if (auto *tei = dyn_cast<TupleElementAddrInst>(inst)) {
-      llvm::raw_svector_ostream stream(resultingString);
-      stream << tei->getFieldIndex();
-      return;
-    }
-
-    if (auto *uedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
-      resultingString += getNameFromDecl(uedi->getElement());
-      return;
-    }
-
-    if (auto *ei = dyn_cast<EnumInst>(inst)) {
-      resultingString += getNameFromDecl(ei->getElement());
       return;
     }
 

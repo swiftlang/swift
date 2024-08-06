@@ -229,6 +229,18 @@ private:
   /// DebugVariable provided name, attempt to find a root value from its
   /// initialization.
   SILValue getRootValueForTemporaryAllocation(AllocationInst *allocInst);
+
+  StringRef getStringRefForIndex(unsigned index) const {
+    llvm::SmallString<64> indexString;
+    {
+      llvm::raw_svector_ostream stream(indexString);
+      stream << index;
+    }
+    return rootValue->getFunction()
+        ->getASTContext()
+        .getIdentifier(indexString)
+        .str();
+  }
 };
 
 } // namespace swift
