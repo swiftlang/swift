@@ -48,6 +48,12 @@ sil @non_escaping_class_argument : $@convention(thin) (@guaranteed X) -> () {
 sil @inout_class_argument : $@convention(thin) (@inout X) -> () {
 [%0: noescape **]
 }
+sil @inout_class_argument2 : $@convention(thin) (@inout XandIntClass) -> () {
+[%0: noescape **]
+}
+sil @inout_class_argument3 : $@convention(thin) (@inout XandIntClass) -> @error Error {
+[%0: noescape **]
+}
 sil @container_argument : $@convention(thin) (@guaranteed Container) -> ()
 sil @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
 sil @take_closure_as_addr_noescape : $@convention(thin) (@in @callee_guaranteed () -> ()) -> () {
@@ -813,6 +819,9 @@ bb0(%0 :  @owned $X):
 
 // CHECK-LABEL: Address escape information for test_unchecked_addr_cast:
 // CHECK:       value:  %1 = alloc_stack $X
+// CHECK:         ==>   %10 = apply %9(%4) : $@convention(thin) (@inout XandIntClass) -> ()
+// CHECK:         ==>   try_apply %11(%4) : $@convention(thin) (@inout XandIntClass) -> @error any Error, normal bb1, error bb2
+// CHECK:         -     %15 = apply %14() : $@convention(thin) () -> ()
 // CHECK-NEXT:  End function test_unchecked_addr_cast
 sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@owned X) -> @owned XandIntClass {
 bb0(%0 :  @owned $X):
@@ -824,25 +833,19 @@ bb0(%0 :  @owned $X):
   %6 = load_borrow %4 : $*XandIntClass
   end_borrow %6 : $XandIntClass
   %8 = load [take] %4 : $*XandIntClass
+  %9 = function_ref @inout_class_argument2 : $@convention(thin) (@inout XandIntClass) -> ()
+  %10 = apply %9(%4) : $@convention(thin) (@inout XandIntClass) -> ()
+  %11 = function_ref @inout_class_argument3 : $@convention(thin) (@inout XandIntClass) -> @error Error
+  try_apply %11(%4) : $@convention(thin) (@inout XandIntClass) -> @error Error, normal bb1, error bb2
+
+bb1(%13 : $()):
+  %14 = function_ref @no_arguments : $@convention(thin) () -> ()
+  %15 = apply %14() : $@convention(thin) () -> ()
   dealloc_stack %1 : $*X
   return %8 : $XandIntClass
-}
 
-// CHECK-LABEL: Address escape information for test_unchecked_addr_cast_escaping:
-// CHECK:       value:  %1 = alloc_stack $X
-// CHECK-NEXT:  ==>   %6 = apply %5(%4) : $@convention(thin) (@inout X) -> ()
-// CHECK-NEXT:  End function test_unchecked_addr_cast_escaping
-sil [ossa] @test_unchecked_addr_cast_escaping : $@convention(thin) (@owned XandIntClass) -> () {
-bb0(%0 :  @owned $XandIntClass):
-  %1 = alloc_stack $XandIntClass
-  store %0 to [init] %1 : $*XandIntClass
-  fix_lifetime %1 : $*XandIntClass
-  %4 = unchecked_addr_cast %1 : $*XandIntClass to $*X
-  %5 = function_ref @inout_class_argument : $@convention(thin) (@inout X) -> ()
-  %6 = apply %5(%4) : $@convention(thin) (@inout X) -> ()
-  dealloc_stack %1 : $*XandIntClass
-  %8 = tuple ()
-  return %8 : $()
+bb2(%17 : $Error):
+  unreachable
 }
 
 // CHECK-LABEL: Address escape information for test_store_borrow:
