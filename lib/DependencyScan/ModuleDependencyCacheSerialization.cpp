@@ -302,7 +302,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!rootFileSystemID)
         llvm::report_fatal_error("Bad CASFileSystem RootID");
       auto moduleCacheKey = getIdentifier(moduleCacheKeyID);
-      if (!moduleCacheKeyID)
+      if (!moduleCacheKey)
         llvm::report_fatal_error("Bad moduleCacheKey");
 
       // TODO: LinkLibraries, MacroDependencies
@@ -626,7 +626,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!clangIncludeTreeRoot)
         llvm::report_fatal_error("Bad clang include tree ID");
       auto moduleCacheKey = getIdentifier(moduleCacheKeyID);
-      if (!moduleCacheKeyID)
+      if (!moduleCacheKey)
         llvm::report_fatal_error("Bad moduleCacheKey");
 
       // TODO: LinkLibraries
