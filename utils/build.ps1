@@ -1602,7 +1602,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     $Targets = @("default", "ExperimentalTest")
     $InstallPath = ""
   } else {
-    $Targets = @("default", "install")
+    $Targets = @("default")
     $InstallPath = "$($Arch.SDKInstallRoot)\usr"
   }
 
@@ -1652,7 +1652,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
     Isolate-EnvVars {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
-      $Targets = @("default", "install")
+      $Targets = @("default")
       $InstallPath = "$($Arch.SDKInstallRoot)\usr"
 
       if ($Platform -eq "Android") {
@@ -1714,7 +1714,7 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
       $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-TargetProjectBinaryCache $Arch Runtime)\bin;$env:Path;$UnixToolsBinDir"
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
-      $Targets = @("default", "install")
+      $Targets = @("default")
       $InstallPath = "$($Arch.XCTestInstallRoot)\usr"
     }
 
@@ -1914,15 +1914,17 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
       $env:Path = "$env:Path;$UnixToolsBinDir"
       $env:AR = ([IO.Path]::Combine((Get-HostProjectBinaryCache Compilers), "bin", "llvm-ar.exe"))
       $env:CLANG = ([IO.Path]::Combine((Get-HostProjectBinaryCache Compilers), "bin", "clang.exe"))
+      $InstallPath = ""
     } else {
-      $Targets = @("default", "install")
+      $Targets = @("default")
       $TestingDefines = @{}
+      $InstallPath = "$($Arch.ToolchainInstallRoot)\usr"
     }
 
     Build-CMakeProject `
       -Src $SourceCache\llbuild `
       -Bin (Get-HostProjectBinaryCache LLBuild) `
-      -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+      -InstallTo $InstallPath `
       -Arch $Arch `
       -Platform Windows `
       -UseMSVCCompilers CXX `
